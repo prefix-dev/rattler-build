@@ -19,8 +19,8 @@ use dunce::canonicalize;
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, IndexJson, PackageFile},
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    package::{ArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::index_fs;
 use rattler_shell::{
@@ -31,10 +31,10 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
     env_vars,
-    metadata::PlatformWithVirtualPackages,
+    metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
-        TestType,
+        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, Script,
+        ScriptContent, TestType,
     },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
@@ -135,7 +135,16 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
+                    .run_script(
+                        env_vars,
+                        tmp_dir.path(),
+                        cwd,
+                        environment,
+                        None,
+                        None,
+                        None,
+                        Debug::new(true),
+                    )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -147,7 +156,16 @@ impl Tests {
                 };
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
+                    .run_script(
+                        env_vars,
+                        tmp_dir.path(),
+                        cwd,
+                        environment,
+                        None,
+                        None,
+                        None,
+                        Debug::new(true),
+                    )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -438,6 +456,7 @@ pub async fn run_test(
                     perl.run_test(&pkg, &package_folder, &prefix, &config)
                         .await?
                 }
+                TestType::R { r } => r.run_test(&pkg, &package_folder, &prefix, &config).await?,
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
                         .run_test(&pkg, package_file, &prefix, &config)
@@ -584,6 +603,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -599,7 +619,16 @@ impl PythonTest {
                 ..Script::default()
             };
             script
-                .run_script(Default::default(), path, path, prefix, None, None, None)
+                .run_script(
+                    Default::default(),
+                    path,
+                    path,
+                    prefix,
+                    None,
+                    None,
+                    None,
+                    Debug::new(true),
+                )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
@@ -672,6 +701,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -781,6 +811,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -871,6 +902,75 @@ impl DownstreamTest {
                 );
             }
         }
+
+        Ok(())
+    }
+}
+
+impl RTest {
+    /// Execute the R test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running R test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["r-base".parse().unwrap(), match_spec];
+
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut libraries = String::new();
+        tracing::info!("Testing R libraries:\n");
+
+        for library in &self.libraries {
+            writeln!(libraries, "library({})", library)?;
+            tracing::info!("  library({})", library);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(libraries.clone()),
+            interpreter: Some("rscript".into()),
+            ..Script::default()
+        };
+
+        let tmp_dir = tempfile::tempdir()?;
+        script
+            .run_script(
+                Default::default(),
+                tmp_dir.path(),
+                path,
+                prefix,
+                None,
+                None,
+                None,
+                Debug::new(true),
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
         Ok(())
     }

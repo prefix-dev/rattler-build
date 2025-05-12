@@ -4,10 +4,10 @@ use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
 use crate::script::{
-    interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs, ResolvedScriptContents,
+    ExecutionArgs, ResolvedScriptContents, interpreter::DEBUG_HELP, run_process_with_replacements,
 };
 
-use super::{find_interpreter, CmdExeInterpreter, Interpreter};
+use super::{CmdExeInterpreter, Interpreter, find_interpreter};
 
 const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble
@@ -37,7 +37,11 @@ impl Interpreter for BaseBashInterpreter {
         tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["bash", "-e", &build_script_path_str];
+        let mut cmd_args = vec!["bash", "-e"];
+        if args.debug.is_enabled() {
+            cmd_args.push("-x");
+        }
+        cmd_args.push(&build_script_path_str);
 
         let output = run_process_with_replacements(
             &cmd_args,

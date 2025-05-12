@@ -14,11 +14,11 @@ use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
 use rattler_conda_types::{
+    NoArchType, Platform,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
     },
-    NoArchType, Platform,
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
 
@@ -293,7 +293,7 @@ impl Output {
 
         Ok(IndexJson {
             name: self.name().clone(),
-            version: self.version().clone().into(),
+            version: self.version().clone(),
             build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
             arch,

@@ -4,7 +4,7 @@ use rattler_conda_types::Platform;
 
 use crate::script::{ExecutionArgs, ResolvedScriptContents};
 
-use super::{find_interpreter, BaseBashInterpreter, CmdExeInterpreter, Interpreter};
+use super::{BaseBashInterpreter, CmdExeInterpreter, Interpreter, find_interpreter};
 
 pub(crate) struct PerlInterpreter;
 

@@ -1,25 +1,26 @@
 //! This module contains the functions to package a conda package from a given
 //! output.
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     io::Write,
-    path::{Component, Path, PathBuf},
+    path::{Component, MAIN_SEPARATOR, Path, PathBuf},
 };
 
 use fs_err as fs;
 use fs_err::File;
 use rattler_conda_types::{
-    package::{ArchiveType, PackageFile, PathsJson},
     Platform,
+    package::{ArchiveType, PackageFile, PathsJson},
 };
 use rattler_package_streaming::write::{
-    write_conda_package, write_tar_bz2_package, CompressionLevel,
+    CompressionLevel, write_conda_package, write_tar_bz2_package,
 };
+use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{content_type, Files, TempFiles};
+pub use file_finder::{Files, TempFiles, content_type};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -130,7 +131,10 @@ fn copy_license_files(
         // issue a warning
         for file in copied_files_recipe_dir {
             if copied_files_work_dir.contains(file) {
-                let warn_str = format!("License file from source directory was overwritten by license file from recipe folder ({})", file.display());
+                let warn_str = format!(
+                    "License file from source directory was overwritten by license file from recipe folder ({})",
+                    file.display()
+                );
                 tracing::warn!(warn_str);
                 output.record_warning(&warn_str);
             }
@@ -228,6 +232,140 @@ impl rattler_package_streaming::write::ProgressBar for ProgressBar {
     }
 }
 
+/// Error type for path normalization operations
+#[derive(Debug, thiserror::Error)]
+pub enum PathNormalizationError {
+    /// Error when a path component contains invalid Unicode
+    #[error("Path component contains invalid Unicode: {0}")]
+    InvalidUnicode(String),
+}
+
+/// Normalizes a component string for comparison.
+///
+/// This helper function applies Unicode normalization (NFKC) and optional case folding to a path component.
+/// When case folding is applied, it's done in a way that properly handles special Unicode cases.
+fn normalize_component(component_str: &str, to_lowercase: bool) -> String {
+    if to_lowercase {
+        let normalized = component_str.nfkc().collect::<String>();
+        normalized.to_uppercase().to_lowercase()
+    } else {
+        component_str.nfkc().collect::<String>()
+    }
+}
+
+/// Normalizes a path for case-insensitive comparison.
+///
+/// This function:
+/// 1. Applies Unicode normalization (NFKC) to each path component
+/// 2. Handles path separators consistently across platforms
+/// 3. Optionally converts to lowercase for case-insensitive comparison
+///
+/// Returns a normalized string representation of the path.
+fn normalize_path_for_comparison(
+    path: &Path,
+    to_lowercase: bool,
+) -> Result<String, PathNormalizationError> {
+    let estimated_capacity = path.as_os_str().len() * 6 / 5 + path.components().count();
+    let mut normalized = String::with_capacity(estimated_capacity);
+    let mut first = true;
+
+    for c in path.components() {
+        match c {
+            Component::CurDir => continue,
+            Component::RootDir => {
+                normalized.push(MAIN_SEPARATOR);
+                first = false;
+            }
+            _ => {
+                if !first {
+                    normalized.push(MAIN_SEPARATOR);
+                }
+
+                let os_str = match c {
+                    Component::Prefix(p) => p.as_os_str(),
+                    _ => c.as_os_str(),
+                };
+
+                let component_type = if matches!(c, Component::Prefix(_)) {
+                    "Prefix"
+                } else {
+                    "Component"
+                };
+                let component_str = os_str.to_str().ok_or_else(|| {
+                    PathNormalizationError::InvalidUnicode(format!(
+                        "{}: {}",
+                        component_type,
+                        os_str.to_string_lossy()
+                    ))
+                })?;
+
+                normalized.push_str(&normalize_component(component_str, to_lowercase));
+            }
+        }
+    }
+
+    Ok(normalized)
+}
+
+/// Finds paths that would collide on case-insensitive filesystems.
+///
+/// Returns groups of paths that differ only by case.
+pub fn find_case_insensitive_collisions<I, P>(paths: I) -> Vec<Vec<PathBuf>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let paths_vec: Vec<P> = paths.into_iter().collect();
+    let mut lc_map: HashMap<String, Vec<PathBuf>> = HashMap::with_capacity(paths_vec.len() / 2);
+
+    for path_ref in &paths_vec {
+        let path = path_ref.as_ref();
+        let case_folded = match normalize_path_for_comparison(path, true) {
+            Ok(normalized) => normalized,
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to normalize path for comparison: {}: {}",
+                    path.display(),
+                    err
+                );
+                path.display().to_string().to_lowercase()
+            }
+        };
+
+        lc_map
+            .entry(case_folded)
+            .or_insert_with(|| Vec::with_capacity(1))
+            .push(path.to_path_buf());
+    }
+
+    let mut result: Vec<Vec<PathBuf>> = lc_map
+        .into_values()
+        .filter(|group| group.len() > 1)
+        .map(|group| {
+            let mut unique_vec: Vec<PathBuf> = if group.len() <= 4 {
+                let mut unique = Vec::with_capacity(group.len());
+                for path in group {
+                    if !unique.iter().any(|p| p == &path) {
+                        unique.push(path);
+                    }
+                }
+                unique
+            } else {
+                let mut unique_set = HashSet::with_capacity(group.len());
+                group.into_iter().for_each(|path| {
+                    unique_set.insert(path);
+                });
+                unique_set.into_iter().collect()
+            };
+            unique_vec.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
+            unique_vec
+        })
+        .collect();
+
+    result.sort_by(|a, b| a[0].as_os_str().cmp(b[0].as_os_str()));
+    result
+}
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -305,6 +443,20 @@ pub fn package_conda(
             (false, true) => std::cmp::Ordering::Less,
         }
     });
+
+    for group in find_case_insensitive_collisions(&files) {
+        let list = group
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let warn_str = format!(
+            "Mixed-case filenames detected, case-insensitive filesystems may break: {}",
+            list
+        );
+        tracing::error!(warn_str);
+        output.record_warning(&warn_str);
+    }
 
     let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
 
@@ -416,5 +568,47 @@ impl Output {
         )?;
 
         package_conda(self, tool_configuration, &files_after)
+    }
+}
+
+#[cfg(test)]
+mod packaging_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_find_case_insensitive_collisions_detects() {
+        let files = vec![
+            Path::new("foo/BAR"),
+            Path::new("foo/bar"),
+            Path::new("foo/Baz"),
+            Path::new("foo/qux"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 1);
+
+        let paths_in_group: Vec<String> =
+            groups[0].iter().map(|p| p.display().to_string()).collect();
+
+        assert!(paths_in_group.contains(&"foo/BAR".to_string()));
+        assert!(paths_in_group.contains(&"foo/bar".to_string()));
+    }
+
+    #[test]
+    fn test_find_case_insensitive_collisions_empty() {
+        let files = vec![Path::new("foo/bar"), Path::new("foo/baz")];
+        let groups = find_case_insensitive_collisions(&files);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn test_find_case_insensitive_collisions_unicode() {
+        let files = vec![
+            Path::new("foo/straße"),
+            Path::new("foo/STRASSE"),
+            Path::new("foo/other"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 1);
     }
 }

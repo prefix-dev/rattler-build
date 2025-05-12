@@ -13,9 +13,10 @@ use crate::{
     source::extract::{extract_tar, extract_zip},
     tool_configuration::{self, APP_USER_AGENT},
 };
+use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
 
-use super::{checksum::Checksum, extract::is_tarball, SourceError};
+use super::{SourceError, checksum::Checksum, extract::is_tarball};
 
 /// Splits a path into stem and extension, handling special cases like .tar.gz
 fn split_path(path: &Path) -> std::io::Result<(String, String)> {
@@ -49,7 +50,7 @@ fn cache_name_from_url(
     checksum: &Checksum,
     with_extension: bool,
 ) -> Option<String> {
-    let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
+    let filename = url.path_segments()?.filter(|x| !x.is_empty()).next_back()?;
 
     let (stem, extension) = split_path(Path::new(filename)).ok()?;
     let checksum_hex = checksum.to_hex();
@@ -66,13 +67,51 @@ async fn fetch_remote(
     target: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
-    let client = reqwest::Client::builder()
-        .user_agent(APP_USER_AGENT)
-        .redirect(reqwest::redirect::Policy::limited(50))
-        .build()?;
+    let client = tool_configuration.client.for_host(url);
 
     let (mut response, download_size) = {
-        let resp = client.get(url.as_str()).send().await?;
+        let resp = client
+            .get(url.as_str())
+            .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
+            .send()
+            .await
+            .map_err(|e| {
+                let err_string = match &e {
+                    MiddlewareError::Reqwest(e) => {
+                        let err_str = e.to_string();
+                        if err_str.contains("SSL")
+                            || err_str.contains("certificate")
+                            || err_str.contains("handshake")
+                        {
+                            format!("SSL certificate error: {}", err_str)
+                        } else {
+                            err_str
+                        }
+                    }
+                    MiddlewareError::Middleware(e) => {
+                        let mut err_msg = e.to_string();
+                        let mut source = e.source();
+
+                        while let Some(err) = source {
+                            let source_str = err.to_string();
+                            if source_str.contains("SSL")
+                                || source_str.contains("certificate")
+                                || source_str.contains("handshake")
+                                || source_str.contains("CERTIFICATE")
+                            {
+                                err_msg = format!("SSL certificate error: {}", source_str);
+                                break;
+                            } else if !source_str.contains("retry") {
+                                err_msg = source_str;
+                            }
+                            source = err.source();
+                        }
+                        err_msg
+                    }
+                };
+
+                SourceError::UnknownError(format!("Error downloading {}: {}", url, err_string))
+            })?;
 
         match resp.error_for_status() {
             Ok(resp) => {
@@ -98,13 +137,13 @@ async fn fetch_remote(
 
     progress_bar.set_message(
         url.path_segments()
-            .and_then(|segs| segs.last())
+            .and_then(|mut segs| segs.next_back())
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
 
     let mut file = tokio::fs::File::create(&target).await?;
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response.chunk().await.map_err(SourceError::Url)? {
         progress_bar.inc(chunk.len() as u64);
         file.write_all(&chunk).await?;
     }
@@ -295,27 +334,35 @@ mod tests {
 
     #[test]
     fn test_cache_name() {
-        let cases =
-            vec![
+        let cases = vec![
             (
                 "https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
+                    )
+                    .unwrap(),
+                ),
                 "snowflake-3_13_27_6a15e95e.zip",
             ),
             (
                 "https://example.com/example.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                    )
+                    .unwrap(),
+                ),
                 "example_12345678.tar.gz",
             ),
             (
                 "https://github.com/mamba-org/mamba/archive/refs/tags/micromamba-12.23.12.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
+                    )
+                    .unwrap(),
+                ),
                 "micromamba-12_23_12_63fd8a1d.tar.gz",
             ),
         ];

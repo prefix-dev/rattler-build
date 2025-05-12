@@ -15,8 +15,9 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
+    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
+    VersionWithSource,
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
 };
 use rattler_index::index_fs;
 use rattler_package_streaming::write::CompressionLevel;
@@ -119,6 +120,7 @@ impl Directories {
         output_dir: &Path,
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
+        merge_build_and_host: bool,
     ) -> Result<Directories, std::io::Error> {
         if !output_dir.exists() {
             fs::create_dir_all(output_dir)?;
@@ -156,7 +158,11 @@ impl Directories {
 
         let directories = Directories {
             build_dir: build_dir.clone(),
-            build_prefix: build_dir.join("build_env"),
+            build_prefix: if merge_build_and_host {
+                host_prefix.clone()
+            } else {
+                build_dir.join("build_env")
+            },
             cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
@@ -311,6 +317,22 @@ impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
     }
 }
 
+/// A newtype wrapper around a boolean indicating whether debug output is enabled
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Debug(bool);
+
+impl Debug {
+    /// Create a new Debug instance
+    pub fn new(debug: bool) -> Self {
+        Self(debug)
+    }
+
+    /// Returns true if debug output is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.0
+    }
+}
+
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
@@ -352,6 +374,9 @@ pub struct BuildConfiguration {
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]
     pub sandbox_config: Option<SandboxConfiguration>,
+    /// Whether to enable debug output in build scripts
+    #[serde(skip_serializing, default)]
+    pub debug: Debug,
 }
 
 impl BuildConfiguration {
@@ -375,6 +400,7 @@ impl BuildConfiguration {
             hash: Some(self.hash.clone()),
             experimental: false,
             allow_undefined: false,
+            recipe_path: None,
         }
     }
 }
@@ -385,7 +411,7 @@ pub struct PackageIdentifier {
     /// The name of the package
     pub name: PackageName,
     /// The version of the package
-    pub version: Version,
+    pub version: VersionWithSource,
     /// The build string of the package
     pub build_string: String,
 }
@@ -452,7 +478,7 @@ impl Output {
     }
 
     /// The version of the package
-    pub fn version(&self) -> &Version {
+    pub fn version(&self) -> &VersionWithSource {
         self.recipe.package().version()
     }
 
@@ -792,7 +818,7 @@ mod test {
         MatchSpec, NoArchType, PackageName, PackageRecord, ParseStrictness, RepoDataRecord,
         VersionWithSource,
     };
-    use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
     use std::str::FromStr;
     use url::Url;
@@ -810,6 +836,7 @@ mod test {
             &tempdir.path().join("output"),
             false,
             &chrono::Utc::now(),
+            false,
         )
         .unwrap();
         directories.create_build_dir(false).unwrap();
@@ -825,10 +852,13 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![SourceDependency {
-                spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }
-            .into()],
+            specs: vec![
+                SourceDependency {
+                    spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict)
+                        .unwrap(),
+                }
+                .into(),
+            ],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),

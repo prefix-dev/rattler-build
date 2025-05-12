@@ -168,6 +168,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::sequence_mixed_types))]
     SequenceMixedTypes((ValueKind, ValueKind)),
 
+    /// Error when a context variable name contains a hyphen.
+    #[diagnostic(code(error::invalid_context_variable_name))]
+    InvalidContextVariableName,
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -287,6 +291,7 @@ impl fmt::Display for ErrorKind {
             ),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
             ErrorKind::ExperimentalOnly(s) => write!(f, "experimental only: `{}`.", s),
+            ErrorKind::InvalidContextVariableName => write!(f, "invalid context variable name."),
         }
     }
 }
@@ -328,12 +333,8 @@ macro_rules! _error {
             kind: $kind,
         }
     }};
-    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
-    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
+    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
+    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
     ($src:expr, $span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
             src: $src,
@@ -373,12 +374,8 @@ macro_rules! _partialerror {
             kind: $kind,
         }
     }};
-    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
-    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
+    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
+    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
             span: $span,
@@ -465,11 +462,7 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
         }
         None => {
             let l = find_length(src, start);
-            if l == 0 {
-                1
-            } else {
-                l
-            }
+            if l == 0 { 1 } else { l }
         }
     };
 

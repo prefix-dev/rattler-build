@@ -9,18 +9,18 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
-    Platform, RepoDataRecord,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
+    package::RunExportsJson,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
 use crate::{
-    metadata::{build_reindexed_channels, BuildConfiguration, Output},
+    metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
     recipe::parser::{Dependency, Requirements},
     render::{
@@ -720,7 +720,7 @@ pub(crate) async fn resolve_dependencies(
             .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.client.clone(),
+                    tool_configuration.client.get_client().clone(),
                     tool_configuration.package_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
@@ -816,7 +816,7 @@ pub(crate) async fn resolve_dependencies(
             .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.client.clone(),
+                    tool_configuration.client.get_client().clone(),
                     tool_configuration.package_cache.clone(),
                     tool_configuration
                         .fancy_log_handler

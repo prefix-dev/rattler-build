@@ -3,8 +3,8 @@ use std::sync::Arc;
 use futures::future::OptionFuture;
 use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
 use rattler_conda_types::{
-    package::{PackageFile, RunExportsJson},
     RepoDataRecord,
+    package::{PackageFile, RunExportsJson},
 };
 use rattler_networking::retry_policies::default_retry_policy;
 use reqwest_middleware::ClientWithMiddleware;
@@ -82,7 +82,7 @@ impl RunExportExtractor {
         let Some((package_cache, mut package_cache_reporter)) = self.package_cache.clone() else {
             return Ok(None);
         };
-        let Some(client) = self.client.clone() else {
+        let Some(client) = self.client.as_ref() else {
             return Ok(None);
         };
 
@@ -100,7 +100,7 @@ impl RunExportExtractor {
             .get_or_fetch_from_url_with_retry(
                 cache_key,
                 url,
-                client,
+                client.clone(),
                 default_retry_policy(),
                 Some(Arc::new(progress_reporter)),
             )

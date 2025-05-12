@@ -1,0 +1,43 @@
+package:
+  name: r-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: rscript
+    content: |
+      print("Testing R Interpreter", quote = FALSE)
+
+      # Create test data and output file
+      test_data <- data.frame(
+        name = c("package1", "package2"),
+        version = c("1.0", "2.0")
+      )
+
+      # Load and use ggplot2
+      library(ggplot2)
+      p <- ggplot(test_data, aes(x = name, y = as.numeric(version))) +
+        geom_bar(stat = "identity")
+
+      # Create output file
+      output_file <- file.path(Sys.getenv("PREFIX"), "r-test-output.txt")
+      writeLines(c(
+        "This file was created by the R interpreter in rattler-build",
+        "R test successful",
+        paste("R version:", R.version.string),
+        paste("PREFIX:", Sys.getenv("PREFIX"))
+      ), output_file)
+
+requirements:
+  host:
+    - r-base
+    - r-ggplot2
+  run:
+    - r-base
+    - r-ggplot2
+
+tests:
+  - r:
+      libraries:
+        - ggplot2

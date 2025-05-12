@@ -3,28 +3,49 @@ mod cmd_exe;
 mod nushell;
 mod perl;
 mod python;
+mod r;
 
 use std::path::PathBuf;
 
-pub(crate) use bash::BashInterpreter;
 pub(crate) use bash::BaseBashInterpreter;
+pub(crate) use bash::BashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;
 pub(crate) use python::PythonInterpreter;
+pub(crate) use r::RInterpreter;
 
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{
-        prefix_path_entries, ActivationError, ActivationVariables, Activator,
-        PathModificationBehavior,
+        ActivationError, ActivationVariables, Activator, PathModificationBehavior,
+        prefix_path_entries,
     },
     shell::{self, Shell},
 };
 
 use super::ExecutionArgs;
 
-const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+pub(crate) const DEBUG_HELP: &str = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+
+pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
+## Start of bash preamble
+if [ -z ${CONDA_BUILD+x} ]; then
+    source ((script_path))
+fi
+## End of preamble
+"#;
+
+pub const CMDEXE_PREAMBLE: &str = r#"
+@chcp 65001 > nul
+@echo on
+IF "%CONDA_BUILD%" == "" (
+    @rem special behavior from conda-build for Windows
+    call ((script_path))
+)
+@rem re-enable echo because the activation scripts might have messed with it
+@echo on
+"#;
 
 fn find_interpreter(
     name: &str,

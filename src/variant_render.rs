@@ -11,10 +11,10 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
+        Jinja, ParsingError, Recipe,
         custom_yaml::Node,
         parser::{BuildString, Dependency},
         variable::Variable,
-        Jinja, ParsingError, Recipe,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -372,8 +372,9 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 additional_variables.insert("CONDA_BUILD_SYSROOT".into());
             }
 
-            // also always add `target_platform` and `channel_targets`
+            // also always add `target_platform`, `channel_sources` and `channel_targets`
             additional_variables.insert("target_platform".into());
+            additional_variables.insert("channel_sources".into());
             additional_variables.insert("channel_targets".into());
 
             // Environment variables can be overwritten by the variant configuration

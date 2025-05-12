@@ -15,6 +15,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `completion` — Generate shell completion script
 * `generate-recipe` — Generate a recipe from PyPI or CRAN
 * `auth` — Handle authentication to external channels
+* `debug` — Debug a recipe by setting up the environment without running the build script
 
 ##### **Options:**
 
@@ -47,6 +48,11 @@ This document contains the help content for the `rattler-build` command-line pro
 	Wrap log lines at the terminal width. This is automatically disabled on CI (by detecting the `CI` environment variable)
 
 	- Possible values: `true`, `false`
+
+
+- `--config-file <CONFIG_FILE>`
+
+	The rattler-build configuration file to use
 
 
 - `--color <COLOR>`
@@ -155,6 +161,11 @@ Build a package from a recipe
 	Enable experimental features
 
 
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
 - `--channel-priority <CHANNEL_PRIORITY>`
 
 	Channel priority to use when solving
@@ -163,6 +174,11 @@ Build a package from a recipe
 - `--extra-meta <EXTRA_META>`
 
 	Extra metadata to include in about.json
+
+
+- `--continue-on-failure`
+
+	Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
 
 
 ###### **Modifying result**
@@ -219,6 +235,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--noarch-build-platform <NOARCH_BUILD_PLATFORM>`
 
 	Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
+
+
+- `--debug`
+
+	Enable debug output in build scripts
 
 
 ###### **Sandbox arguments**
@@ -292,6 +313,11 @@ These test files are written at "package creation time" and are part of the pack
 	Enable experimental features
 
 
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
 - `--channel-priority <CHANNEL_PRIORITY>`
 
 	Channel priority to use when solving
@@ -333,6 +359,11 @@ Rebuild a package from a package file instead of a recipe
 - `--experimental`
 
 	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -390,6 +421,11 @@ Upload a package
 - `--experimental`
 
 	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -774,6 +810,74 @@ Remove authentication information for a given host
 - `<HOST>`
 
 	The host to remove authentication for
+
+
+
+
+
+### `debug`
+
+Debug a recipe by setting up the environment without running the build script
+
+**Usage:** `rattler-build debug [OPTIONS] --recipe <RECIPE>`
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPE>`
+
+	Recipe file to debug
+
+
+- `-o`, `--output <OUTPUT>`
+
+	Output directory for build artifacts
+
+
+- `--target-platform <TARGET_PLATFORM>`
+
+	The target platform to build for
+
+
+- `--host-platform <HOST_PLATFORM>`
+
+	The host platform to build for (defaults to target_platform)
+
+
+- `--build-platform <BUILD_PLATFORM>`
+
+	The build platform to build for (defaults to current platform)
+
+
+- `-c`, `--channel <CHANNELS>`
+
+	Channels to use when building
+
+
+- `--experimental`
+
+	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+- `--output-name <OUTPUT_NAME>`
+
+	Name of the specific output to debug
+
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
 
 
 

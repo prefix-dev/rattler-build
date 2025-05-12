@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::recipe::parser::PackageContentsTest;
 use crate::{metadata::Output, package_test::TestError};
 use globset::{Glob, GlobBuilder, GlobSet};
-use rattler_conda_types::{package::PathsJson, Arch, Platform};
+use rattler_conda_types::{Arch, Platform, package::PathsJson};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);
@@ -68,6 +68,12 @@ impl PackageContentsTest {
                     .add(build_glob(format!("Library/bin/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!("Scripts/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!("bin/{bin_raw}{path_ext}"))?)
+                    .build()
+            } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
+                // emscripten build outputs will gonna get .js extension
+                GlobSet::builder()
+                    .add(build_glob(format!("bin/{bin_raw}.js"))?)
+                    .add(build_glob(format!("bin/{bin_raw}.wasm"))?)
                     .build()
             } else {
                 GlobSet::builder()
@@ -389,6 +395,29 @@ mod tests {
 
         let paths = &["lib/foo".to_string(), "asd/bar".to_string()];
         test_glob_matches(&globs, paths).unwrap_err();
+    }
+
+    #[test]
+    fn test_wasm_bin_globs() {
+        let package_contents = PackageContentsTest {
+            bin: GlobVec::from_vec(vec!["foo", "bar"], None),
+            ..Default::default()
+        };
+
+        let globs = package_contents
+            .bin_as_globs(&Platform::EmscriptenWasm32)
+            .unwrap();
+
+        let paths = &[
+            "bin/foo.js".to_string(),
+            "bin/bar.js".to_string(),
+            "bin/foo.wasm".to_string(),
+            "bin/bar.wasm".to_string(),
+        ];
+        test_glob_matches(&globs, paths).unwrap();
+
+        let bad_paths = &["bin/foo".to_string(), "bin/bar".to_string()];
+        test_glob_matches(&globs, bad_paths).unwrap_err();
     }
 
     #[derive(Debug, Deserialize)]

@@ -3,20 +3,9 @@ use std::path::PathBuf;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
+use crate::script::{ExecutionArgs, interpreter::DEBUG_HELP, run_process_with_replacements};
 
-use super::{find_interpreter, Interpreter};
-
-const CMDEXE_PREAMBLE: &str = r#"
-@chcp 65001 > nul
-@echo on
-IF "%CONDA_BUILD%" == "" (
-    @rem special behavior from conda-build for Windows
-    call ((script_path))
-)
-@rem re-enable echo because the activation scripts might have messed with it
-@echo on
-"#;
+use super::{CMDEXE_PREAMBLE, Interpreter, find_interpreter};
 
 pub(crate) struct CmdExeInterpreter;
 

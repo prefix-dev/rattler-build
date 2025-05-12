@@ -1,13 +1,14 @@
 //! The upload module provides the package upload functionality.
 
-use crate::{tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, QuetzData};
+use crate::{AnacondaData, ArtifactoryData, QuetzData, tool_configuration::APP_USER_AGENT};
 use fs_err::tokio as fs;
 use futures::TryStreamExt;
-use indicatif::{style::TemplateError, HumanBytes, ProgressState};
-use opendal::{services::S3Config, Configurator, Operator};
-use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
+use indicatif::{HumanBytes, ProgressState, style::TemplateError};
+use opendal::{Configurator, Operator, services::S3Config};
+use reqwest_retry::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use std::{
     fmt::Write,
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
@@ -20,7 +21,7 @@ use reqwest::{Method, StatusCode};
 use tracing::{info, warn};
 use url::Url;
 
-use crate::upload::package::{sha256_sum, ExtractedPackage};
+use crate::upload::package::{ExtractedPackage, sha256_sum};
 
 mod anaconda;
 pub mod conda_forge;
@@ -143,7 +144,9 @@ pub async fn upload_package_to_artifactory(
                     password,
                 }),
             )) => {
-                warn!("A bearer token is required for authentication with artifactory. Using the password from the keychain / auth file to authenticate. Consider switching to a bearer token instead for Artifactory.");
+                warn!(
+                    "A bearer token is required for authentication with artifactory. Using the password from the keychain / auth file to authenticate. Consider switching to a bearer token instead for Artifactory."
+                );
                 password
             }
             Ok((_, Some(_))) => {
@@ -280,6 +283,15 @@ pub async fn upload_package_to_s3(
     let bucket = channel
         .host_str()
         .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
+
+    if let Some(host_endpoint) = endpoint_url.host_str() {
+        if host_endpoint.parse::<Ipv4Addr>().is_ok() && !force_path_style {
+            return Err(miette::miette!(
+                "Endpoint URL {} (IPv4 address) cannot be used without path style, please use --force-path-style",
+                endpoint_url
+            ));
+        }
+    }
 
     let mut s3_config = S3Config::default();
     s3_config.root = Some(channel.path().to_string());

@@ -46,6 +46,7 @@ pub mod source_code;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -55,26 +56,30 @@ use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
 use metadata::{
-    build_reindexed_channels, BuildConfiguration, BuildSummary, Directories, Output,
-    PackageIdentifier, PackagingSettings,
+    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels,
 };
 use miette::{Context, IntoDiagnostic};
 pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
-    package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
+    GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
+    package::ArchiveType,
 };
+use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::parser::{find_outputs_from_src, Dependency, TestType};
+use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
 use source_code::Source;
 use system_tools::SystemTools;
-use tool_configuration::{Configuration, TestStrategy};
+use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use variant_config::VariantConfig;
 
+use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
 
 /// Returns the recipe path.
@@ -126,9 +131,13 @@ pub fn get_tool_config(
     build_data: &BuildData,
     fancy_log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<Configuration> {
-    let client =
-        tool_configuration::reqwest_client_from_auth_storage(build_data.common.auth_file.clone())
-            .into_diagnostic()?;
+    let client = tool_configuration::reqwest_client_from_auth_storage(
+        build_data.common.auth_file.clone(),
+        build_data.common.s3_config.clone(),
+        build_data.common.mirror_config.clone(),
+        build_data.common.allow_insecure_host.clone(),
+    )
+    .into_diagnostic()?;
 
     let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
@@ -136,8 +145,10 @@ pub fn get_tool_config(
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
         .with_skip_existing(build_data.skip_existing)
+        .with_continue_on_failure(build_data.continue_on_failure)
         .with_noarch_build_platform(build_data.noarch_build_platform)
-        .with_channel_priority(build_data.common.channel_priority);
+        .with_channel_priority(build_data.common.channel_priority)
+        .with_allow_insecure_host(build_data.common.allow_insecure_host.clone());
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -199,6 +210,7 @@ pub async fn get_build_output(
         experimental: build_data.common.experimental,
         // allow undefined while finding the variants
         allow_undefined: true,
+        recipe_path: Some(recipe_path.to_path_buf()),
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
@@ -291,7 +303,7 @@ pub async fn get_build_output(
             recipe.package().name().clone(),
             PackageIdentifier {
                 name: recipe.package().name().clone(),
-                version: recipe.package().version().version().clone(),
+                version: recipe.package().version().clone(),
                 build_string: discovered_output.build_string.clone(),
             },
         );
@@ -302,12 +314,42 @@ pub async fn get_build_output(
             recipe.package().name().as_normalized().to_string()
         };
 
-        // Add the channels from the args and by default always conda-forge
-        let channels = build_data
-            .channels
-            .clone()
+        let variant_channels = if let Some(channel_sources) = discovered_output
+            .used_vars
+            .get(&NormalizedKey("channel_sources".to_string()))
+        {
+            Some(
+                channel_sources
+                    .to_string()
+                    .split(',')
+                    .map(str::trim)
+                    .map(|s| NamedChannelOrUrl::from_str(s).into_diagnostic())
+                    .collect::<miette::Result<Vec<_>>>()?,
+            )
+        } else {
+            None
+        };
+
+        // priorities
+        // 1. channel_sources from variant file
+        // 2. channels from args
+        // 3. channels from pixi_config
+        // 4. conda-forge as fallback
+        if variant_channels.is_some() && build_data.channels.is_some() {
+            return Err(miette::miette!(
+                "channel_sources and channels cannot both be set at the same time"
+            ));
+        }
+        let channels = variant_channels.unwrap_or_else(|| {
+            build_data
+                .channels
+                .clone()
+                .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
+        });
+
+        let channels = channels
             .into_iter()
-            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .map(|c| c.into_base_url(&tool_config.channel_config))
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
@@ -333,6 +375,7 @@ pub async fn get_build_output(
                     &output_dir,
                     build_data.no_build_id,
                     &timestamp,
+                    recipe.build().merge_build_and_host_envs(),
                 )
                 .into_diagnostic()?,
                 channels,
@@ -347,6 +390,7 @@ pub async fn get_build_output(
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
+                debug: build_data.debug,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -454,6 +498,11 @@ pub async fn run_build_from_args(
                 (output, archive)
             }
             Err(e) => {
+                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
+                    output.record_warning(&format!("Build failed: {}", e));
+                    continue;
+                }
                 return Err(e);
             }
         };
@@ -472,7 +521,12 @@ pub async fn run_build_from_args(
                     && output.build_configuration.host_platform.platform
                         != output.build_configuration.build_platform.platform
                 {
-                    let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
+                    let reason = format!(
+                        "the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})",
+                        output.build_configuration.target_platform,
+                        output.build_configuration.build_platform.platform,
+                        output.build_configuration.host_platform.platform
+                    );
 
                     (true, reason)
                 } else {
@@ -605,16 +659,23 @@ pub async fn run_test(
         .with_keep_build(true)
         .with_compression_threads(test_data.compression_threads)
         .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(test_data.common.auth_file)
-                .into_diagnostic()?,
+            tool_configuration::reqwest_client_from_auth_storage(
+                test_data.common.auth_file,
+                test_data.common.s3_config,
+                test_data.common.mirror_config,
+                test_data.common.allow_insecure_host.clone(),
+            )
+            .into_diagnostic()?,
         )
         .with_channel_priority(test_data.common.channel_priority)
         .finish();
 
     let channels = test_data
         .channels
+        .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]);
+    let channels = channels
         .into_iter()
-        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
+        .map(|c| c.into_base_url(&tool_config.channel_config))
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()?;
 
@@ -649,16 +710,16 @@ pub async fn run_test(
 
 /// Rebuild.
 pub async fn rebuild(
-    args: RebuildData,
+    rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
+    tracing::info!("Rebuilding {}", rebuild_data.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
     // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+    rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
 
     let temp_dir = temp_folder.into_path();
 
@@ -673,7 +734,7 @@ pub async fn rebuild(
     output.build_configuration.directories.recipe_dir = temp_dir;
 
     // create output dir and set it in the config
-    let output_dir = args.common.output_dir;
+    let output_dir = rebuild_data.common.output_dir;
 
     fs::create_dir_all(&output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
@@ -682,12 +743,17 @@ pub async fn rebuild(
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
-        .with_compression_threads(args.compression_threads)
+        .with_compression_threads(rebuild_data.compression_threads)
         .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
-                .into_diagnostic()?,
+            tool_configuration::reqwest_client_from_auth_storage(
+                rebuild_data.common.auth_file,
+                rebuild_data.common.s3_config.clone(),
+                rebuild_data.common.mirror_config.clone(),
+                rebuild_data.common.allow_insecure_host.clone(),
+            )
+            .into_diagnostic()?,
         )
-        .with_test_strategy(args.test)
+        .with_test_strategy(rebuild_data.test)
         .finish();
 
     output
@@ -890,6 +956,133 @@ pub async fn build_recipes(
 
     sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
     run_build_from_args(outputs, tool_config).await?;
+
+    Ok(())
+}
+
+/// Debug a recipe by setting up the environment without running the build script
+pub async fn debug_recipe(
+    debug_data: DebugData,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<()> {
+    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
+
+    let build_data = BuildData {
+        build_platform: debug_data.build_platform,
+        target_platform: debug_data.target_platform,
+        host_platform: debug_data.host_platform,
+        channels: debug_data.channels,
+        common: debug_data.common,
+        keep_build: true,
+        debug: Debug::new(true),
+        test: TestStrategy::Skip,
+        up_to: None,
+        variant_config: Vec::new(),
+        ignore_recipe_variants: false,
+        render_only: false,
+        with_solve: true,
+        no_build_id: false,
+        package_format: PackageFormatAndCompression {
+            archive_type: ArchiveType::Conda,
+            compression_level: CompressionLevel::Default,
+        },
+        compression_threads: None,
+        io_concurrency_limit: num_cpus::get(),
+        no_include_recipe: false,
+        color_build_log: true,
+        tui: false,
+        skip_existing: SkipExisting::None,
+        noarch_build_platform: None,
+        extra_meta: None,
+        sandbox_configuration: None,
+        continue_on_failure: ContinueOnFailure::No,
+    };
+
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+
+    let mut outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+
+    if let Some(output_name) = &debug_data.output_name {
+        let original_count = outputs.len();
+        outputs.retain(|output| output.name().as_normalized() == output_name);
+
+        if outputs.is_empty() {
+            return Err(miette::miette!(
+                "Output with name '{}' not found in recipe. Available outputs: {}",
+                output_name,
+                original_count
+            ));
+        }
+    } else if outputs.len() > 1 {
+        let output_names: Vec<String> = outputs
+            .iter()
+            .map(|output| output.name().as_normalized().to_string())
+            .collect();
+
+        return Err(miette::miette!(
+            "Multiple outputs found in recipe ({}). Please specify which output to debug using --output-name. Available outputs: {}",
+            outputs.len(),
+            output_names.join(", ")
+        ));
+    }
+
+    tracing::info!("Build and/or host environments created for debugging.");
+
+    for output in outputs {
+        output
+            .build_configuration
+            .directories
+            .recreate_directories()
+            .into_diagnostic()?;
+        let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
+        let output = output
+            .resolve_dependencies(&tool_config)
+            .await
+            .into_diagnostic()?;
+        output
+            .install_environments(&tool_config)
+            .await
+            .into_diagnostic()?;
+
+        output.create_build_script().await.into_diagnostic()?;
+
+        if let Some(deps) = &output.finalized_dependencies {
+            if deps.build.is_some() {
+                tracing::info!(
+                    "\nBuild dependencies available in {}",
+                    output
+                        .build_configuration
+                        .directories
+                        .build_prefix
+                        .display()
+                );
+            }
+            if deps.host.is_some() {
+                tracing::info!(
+                    "Host dependencies available in {}",
+                    output.build_configuration.directories.host_prefix.display()
+                );
+            }
+        }
+
+        tracing::info!("\nTo run the actual build, use:");
+        tracing::info!(
+            "rattler-build build --recipe {}",
+            output.build_configuration.directories.recipe_path.display()
+        );
+        tracing::info!("Or run the build script directly with:");
+        if cfg!(windows) {
+            tracing::info!(
+                "cd {} && ./conda_build.bat",
+                output.build_configuration.directories.work_dir.display()
+            );
+        } else {
+            tracing::info!(
+                "cd {} && ./conda_build.sh",
+                output.build_configuration.directories.work_dir.display()
+            );
+        }
+    }
 
     Ok(())
 }

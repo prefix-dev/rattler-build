@@ -1,13 +1,13 @@
 [package]
 name = "rust-tests"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 glob = "0.3.2"
-rattler_package_streaming = { version = "0.22.33", default-features = false }
+rattler_package_streaming = { version = "0.22.36", default-features = false }
 serde_json = "1.0.140"
 sha1 = "0.10.6"
 duct = "0.13.7"

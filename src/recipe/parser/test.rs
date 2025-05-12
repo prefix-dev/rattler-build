@@ -6,14 +6,16 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedSequenceNode, TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode,
+            TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
     },
     validate_keys,
 };
 
-use super::{glob_vec::GlobVec, FlattenErrors, Script};
+use super::{FlattenErrors, Script, glob_vec::GlobVec};
+use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -135,6 +137,13 @@ pub struct DownstreamTest {
     pub downstream: String,
 }
 
+/// A test that checks if R libraries can be loaded
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RTest {
+    /// List of R libraries to test with library()
+    pub libraries: Vec<String>,
+}
+
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -148,6 +157,11 @@ pub enum TestType {
     Perl {
         /// The modules to test
         perl: PerlTest,
+    },
+    /// An R test that will test if the R libraries can be loaded
+    R {
+        /// The R libraries to load and test
+        r: RTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
@@ -245,9 +259,9 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
             match key_str {
                 "python" => {
                     let python = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::Python{ python };
+                    test = TestType::Python { python };
                 }
-                "script" | "requirements" | "files"  => {
+                "script" | "requirements" | "files" => {
                     let commands = self.try_convert(key_str)?;
                     test = TestType::Command(commands);
                 }
@@ -263,10 +277,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::Perl { perl };
                 }
+                "r" => {
+                    let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::R { r: rscript };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -298,27 +316,32 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
 }
 
 impl TryConvertNode<PythonVersion> for RenderedNode {
-    fn try_convert(&self, _name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
+    fn try_convert(&self, name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
         let python_version = match self {
             RenderedNode::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::InvalidField("expected string, sequence or null".into()),
             )])?,
-            RenderedNode::Scalar(version) => PythonVersion::Single(version.to_string()),
-            RenderedNode::Sequence(versions) => versions
-                .iter()
-                .map(|v| {
-                    v.as_scalar()
-                        .ok_or_else(|| {
+            RenderedNode::Scalar(version) => {
+                let _: NamelessMatchSpec = version.try_convert(name)?;
+                PythonVersion::Single(version.to_string())
+            }
+            RenderedNode::Sequence(versions) => {
+                let version_strings = versions
+                    .iter()
+                    .map(|v| {
+                        let scalar = v.as_scalar().ok_or_else(|| {
                             vec![_partialerror!(
                                 *self.span(),
                                 ErrorKind::InvalidField("invalid value".into()),
                             )]
-                        })
-                        .map(|s| s.to_string())
-                })
-                .collect::<Result<Vec<String>, _>>()
-                .map(PythonVersion::Multiple)?,
+                        })?;
+                        let _: NamelessMatchSpec = scalar.try_convert(name)?;
+                        Ok::<String, Vec<PartialParsingError>>(scalar.to_string())
+                    })
+                    .collect::<Result<Vec<String>, _>>()?;
+                PythonVersion::Multiple(version_strings)
+            }
             RenderedNode::Null(_) => PythonVersion::None,
         };
 
@@ -408,6 +431,24 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
 }
 
 ///////////////////////////
+/// R Test              ///
+///////////////////////////
+impl TryConvertNode<RTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RTest, Vec<PartialParsingError>> {
+        let mut rtest = RTest::default();
+        validate_keys!(rtest, self.iter(), libraries);
+        if rtest.libraries.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("libraries".into()),
+                help = "expected field `libraries` in R test to be a list of strings."
+            )])?;
+        }
+        Ok(rtest)
+    }
+}
+
+///////////////////////////
 /// Package Contents    ///
 ///////////////////////////
 impl TryConvertNode<PackageContentsTest> for RenderedNode {
@@ -436,6 +477,38 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
             include
         );
         Ok(package_contents)
+    }
+}
+
+///////////////////////////
+/// Python Version     ///
+///////////////////////////
+impl TryConvertNode<NamelessMatchSpec> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<NamelessMatchSpec, Vec<PartialParsingError>> {
+        NamelessMatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!(
+                    "error parsing `{}` as a version specification",
+                    self.as_str()
+                )
+            )]
+        })
+    }
+}
+
+impl TryConvertNode<NamelessMatchSpec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<NamelessMatchSpec, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )]
+            })
+            .and_then(|s| s.try_convert(name))
     }
 }
 
@@ -510,11 +583,11 @@ mod test {
           - python:
               imports:
                 - pandas
-              python_version: "3.10"
+              python_version: ">=3.10"
           - python:
               imports:
                 - pandas
-              python_version: ["3.10", "3.12"]
+              python_version: [">=3.10", ">=3.12"]
         "#;
 
         // parse the YAML
@@ -537,7 +610,7 @@ mod test {
                 assert!(python.pip_check);
                 assert_eq!(
                     python.python_version,
-                    PythonVersion::Single("3.10".to_string())
+                    PythonVersion::Single(">=3.10".to_string())
                 );
             }
             _ => panic!("expected python test"),
@@ -551,7 +624,7 @@ mod test {
                 assert!(python.pip_check);
                 assert_eq!(
                     python.python_version,
-                    PythonVersion::Multiple(vec!["3.10".to_string(), "3.12".to_string()])
+                    PythonVersion::Multiple(vec![">=3.10".to_string(), ">=3.12".to_string()])
                 );
             }
             _ => panic!("expected python test"),

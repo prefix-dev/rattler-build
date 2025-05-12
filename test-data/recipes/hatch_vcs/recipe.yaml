@@ -1,0 +1,7 @@
+package:
+  name: hatch-vcs-example
+  # hatch-vcs produces these kinds of version numbers
+  version: '0.1.0.dev12+ga47bad07'
+
+build:
+  number: 0

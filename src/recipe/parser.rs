@@ -10,10 +10,10 @@ use std::fmt::Debug;
 use crate::{
     _partialerror,
     recipe::{
+        Render,
         custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
-        Render,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -49,7 +49,7 @@ pub use self::{
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PerlTest, PythonTest, PythonVersion, TestType,
+        PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest, TestType,
     },
 };
 
@@ -89,19 +89,12 @@ pub struct Recipe {
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
     fn collect_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.push(x);
                 acc
             });
-        if err.is_empty() {
-            Ok(())
-        } else {
-            Err(err)
-        }
+        if err.is_empty() { Ok(()) } else { Err(err) }
     }
 }
 
@@ -110,19 +103,12 @@ impl<T, K, V> CollectErrors<K, V> for T where T: Iterator<Item = Result<K, V>> +
 pub(crate) trait FlattenErrors<K, V>: Iterator<Item = Result<K, Vec<V>>> + Sized {
     fn flatten_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.extend(x);
                 acc
             });
-        if err.is_empty() {
-            Ok(())
-        } else {
-            Err(err)
-        }
+        if err.is_empty() { Ok(()) } else { Err(err) }
     }
 }
 
@@ -148,6 +134,14 @@ impl Recipe {
         v: &Node,
         jinja: &Jinja,
     ) -> Result<Option<Variable>, Vec<PartialParsingError>> {
+        if k.as_str().contains('-') {
+            return Err(vec![_partialerror!(
+                *k.span(),
+                ErrorKind::InvalidContextVariableName,
+                help = "`context` variable names cannot contain hyphens (-) as they are not valid in jinja expressions"
+            )]);
+        }
+
         let val = v.as_scalar().ok_or_else(|| {
             vec![_partialerror!(
                 *v.span(),
@@ -216,7 +210,10 @@ impl Recipe {
                                 {
                                     return Err(vec![_partialerror!(
                                         *item.span(),
-                                        ErrorKind::SequenceMixedTypes((variable.as_ref().kind(), rendered_sequence[0].as_ref().kind())),
+                                        ErrorKind::SequenceMixedTypes((
+                                            variable.as_ref().kind(),
+                                            rendered_sequence[0].as_ref().kind()
+                                        )),
                                         help = "sequence `context` must have all members of the same scalar type"
                                     )]);
                                 }
@@ -312,8 +309,11 @@ impl Recipe {
         build.skip = build.skip.with_eval(&jinja)?;
 
         if schema_version != 1 {
-            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
-                schema_version, env!("CARGO_PKG_VERSION"));
+            tracing::warn!(
+                "Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
+                schema_version,
+                env!("CARGO_PKG_VERSION")
+            );
         }
 
         let recipe = Recipe {
@@ -494,6 +494,22 @@ mod tests {
                 ..SelectorConfig::default()
             },
         );
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn context_variable_with_hyphen() {
+        let raw_recipe = r#"
+        context:
+          foo-bar: baz
+
+        package:
+            name: test
+            version: 0.1.0
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
         let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }

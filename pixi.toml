@@ -15,7 +15,7 @@ test = "cargo test"
 test-slow = "cargo test --release"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
-generate-cli-docs = "cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown"
+generate-cli-docs = "mkdir src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]
@@ -26,7 +26,7 @@ deploy-dev = "mike deploy --push dev devel"
 
 [dependencies]
 openssl = "3.*"
-rust = ">=1.83.0,<1.84"
+rust = ">=1.86.0,<1.87"
 compilers = "1.6.0.*"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
@@ -38,8 +38,9 @@ pyyaml = ">=6.0.1,<6.1"
 conda-package-handling = "2.2.0.*"
 requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
-rust-src = ">=1.83.0,<2"
+rust-src = ">=1.86.0,<1.87"
 boto3 = "*"
+nushell = "==0.104.0"
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"

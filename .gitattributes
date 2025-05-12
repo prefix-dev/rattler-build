@@ -1,2 +1,3 @@
 # GitHub syntax highlighting
-pixi.lock linguist-language=YAML
+pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+Cargo.lock merge=binary linguist-generated=true
