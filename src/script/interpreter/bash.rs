@@ -107,14 +107,18 @@ fn to_posix_path_string(path_buf: &Path) -> String {
 
     for component in path_buf.components() {
         match component {
-            Component::Prefix(prefix_comp) => {
-                // On Windows, this could be "C:", "\\?\C:", or a UNC prefix like "\\server\share".
-                // For simplicity, we'll take its lossy string version.
-                // A true POSIX representation of Windows drive letters or UNC paths
-                // can be ambiguous (e.g., "/mnt/c/" or "/server/share").
-                // This example will produce something like "C:" or "//server/share".
-                posix_path.push_str(&prefix_comp.as_os_str().to_string_lossy());
-            }
+            Component::Prefix(prefix_comp) => match prefix_comp.kind() {
+                std::path::Prefix::Verbatim(_os_str) => todo!(),
+                std::path::Prefix::VerbatimUNC(_os_str, _os_str1) => todo!(),
+                std::path::Prefix::VerbatimDisk(_) => todo!(),
+                std::path::Prefix::DeviceNS(_os_str) => todo!(),
+                std::path::Prefix::UNC(_os_str, _os_str1) => todo!(),
+                // D: => /D
+                std::path::Prefix::Disk(disk) => {
+                    posix_path.push('/');
+                    posix_path.push(disk.into());
+                }
+            },
             Component::RootDir => {
                 if !posix_path.ends_with('/') {
                     posix_path.push('/');
@@ -162,9 +166,9 @@ mod tests {
                 PathBuf::from("relative/path/to/file"),
                 "relative/path/to/file",
             ),
-            (PathBuf::from(r"C:\foo\bar.txt"), "C:/foo/bar.txt"),
-            (PathBuf::from(r"C:"), "C:"),
-            (PathBuf::from(r"C:\"), "C:/"),
+            (PathBuf::from(r"C:\foo\bar.txt"), "/C/foo/bar.txt"),
+            (PathBuf::from(r"C:"), "/C"),
+            (PathBuf::from(r"C:\"), "/C/"),
         ];
 
         for (input, expected) in cases {
