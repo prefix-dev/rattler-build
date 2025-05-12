@@ -1,23 +1,11 @@
-use std::path::{Component, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{
-    ExecutionArgs, ResolvedScriptContents, interpreter::DEBUG_HELP, run_process_with_replacements,
-};
+use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs, ResolvedScriptContents};
 
-use super::{CmdExeInterpreter, Interpreter, find_interpreter};
-
-const BASH_PREAMBLE: &str = r#"#!/bin/bash
-## Start of bash preamble
-if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
-fi
-# enable debug mode for the rest of the script
-set -x
-## End of preamble
-"#;
+use super::{find_interpreter, CmdExeInterpreter, Interpreter, BASH_PREAMBLE};
 
 // BaseBashIntercepreter is used to setup activative env,
 //
@@ -106,7 +94,7 @@ impl Interpreter for BashInterpreter {
     }
 }
 
-fn to_posix_path_string(path_buf: &PathBuf) -> String {
+fn to_posix_path_string(path_buf: &Path) -> String {
     let mut posix_path = String::new();
     let mut first = true;
 
@@ -119,25 +107,19 @@ fn to_posix_path_string(path_buf: &PathBuf) -> String {
                 // can be ambiguous (e.g., "/mnt/c/" or "/server/share").
                 // This example will produce something like "C:" or "//server/share".
                 posix_path.push_str(&prefix_comp.as_os_str().to_string_lossy());
-                // If the prefix doesn't naturally end in a separator (like "C:"),
-                // and there are more components, a separator will be added before the next component.
             }
             Component::RootDir => {
-                // Ensure the path starts with a slash if it's an absolute path,
-                // or if a prefix was present (e.g. "C:" becomes "C:/").
                 if !posix_path.ends_with('/') {
                     posix_path.push('/');
                 }
             }
             Component::CurDir => {
-                // "."
                 if !first && !posix_path.ends_with('/') {
                     posix_path.push('/');
                 }
                 posix_path.push('.');
             }
             Component::ParentDir => {
-                // ".."
                 if !first && !posix_path.ends_with('/') {
                     posix_path.push('/');
                 }
@@ -157,11 +139,37 @@ fn to_posix_path_string(path_buf: &PathBuf) -> String {
         return String::new(); // Handle empty PathBuf
     }
 
-    // If the path was just a prefix (e.g. "C:") and no RootDir,
-    // and the original path_buf didn't end with a separator,
-    // the result might be just "C:". If it was "C:\", it would be "C:/".
-    // If the path was relative and empty (e.g. PathBuf::new("")) it should be empty.
-    // If the path was "." it should be "."
-
     posix_path
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_posix_path_string() {
+        let cases = vec![
+            (PathBuf::from("/usr/local/bin"), "/usr/local/bin"),
+            (
+                PathBuf::from("relative/path/to/file"),
+                "relative/path/to/file",
+            ),
+            (PathBuf::from(r"C:\foo\bar.txt"), "C:/foo/bar.txt"),
+            (
+                PathBuf::from(r"\\server\share\file.zip"),
+                "//server/share/file.zip",
+            ),
+            (PathBuf::from(r"C:"), "C:"),
+            (PathBuf::from(r"C:\"), "C:/"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                to_posix_path_string(&input),
+                expected,
+                "Failed for input: {:?}",
+                input
+            );
+        }
+    }
 }
