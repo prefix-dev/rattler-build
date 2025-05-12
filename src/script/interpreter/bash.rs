@@ -149,7 +149,8 @@ fn to_posix_path_string(path_buf: &Path) -> String {
     posix_path
 }
 
-#[cfg(test and windows)]
+#[cfg(test)]
+#[cfg(windows)]
 mod tests {
     use super::*;
 
