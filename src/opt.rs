@@ -25,6 +25,15 @@ use crate::{
     url_with_trailing_slash::UrlWithTrailingSlash,
 };
 
+/// Defines the behavior when no recipes are found during a build.
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AllowEmptyBehavior {
+    /// Fail the build if no recipes are found (default behavior).
+    Deny,
+    /// Issue a warning and exit successfully if no recipes are found.
+    Warn,
+}
+
 /// Application subcommands.
 #[derive(Parser)]
 #[allow(clippy::large_enum_variant)]
@@ -446,6 +455,12 @@ pub struct BuildOpts {
     /// This is useful when building many packages with `--recipe-dir`.`
     #[clap(long)]
     pub continue_on_failure: bool,
+
+    /// Behavior when no recipes are found.
+    /// Deny: Fail the build (default).
+    /// Warn: Issue a warning and exit successfully.
+    #[arg(long, value_enum, default_value_t = AllowEmptyBehavior::Deny, help_heading = "Modifying result")]
+    pub allow_empty_recipe_dir: AllowEmptyBehavior,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -475,6 +490,7 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
+    pub allow_empty_recipe_dir: AllowEmptyBehavior,
 }
 
 impl BuildData {
@@ -505,6 +521,7 @@ impl BuildData {
         sandbox_configuration: Option<SandboxConfiguration>,
         debug: bool,
         continue_on_failure: ContinueOnFailure,
+        allow_empty_recipe_dir: AllowEmptyBehavior,
     ) -> Self {
         Self {
             up_to,
@@ -539,6 +556,7 @@ impl BuildData {
             sandbox_configuration,
             debug: Debug::new(debug),
             continue_on_failure,
+            allow_empty_recipe_dir,
         }
     }
 }
@@ -584,6 +602,7 @@ impl BuildData {
             opts.sandbox_arguments.into(),
             opts.debug,
             opts.continue_on_failure.into(),
+            opts.allow_empty_recipe_dir,
         )
     }
 }

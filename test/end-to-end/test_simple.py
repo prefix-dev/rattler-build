@@ -1870,3 +1870,52 @@ def test_merge_build_and_host(
         recipes / "merge_build_and_host/recipe.yaml",
         tmp_path,
     )
+
+
+def test_allow_empty_recipe_dir(rattler_build: RattlerBuild, tmp_path: Path):
+    """
+    Tests the behavior of the --allow-empty-recipe-dir flag.
+    """
+    empty_recipe_dir = tmp_path / "empty_recipes"
+    empty_recipe_dir.mkdir()
+    output_dir = tmp_path / "output"
+
+    args_warn = (
+        "build",
+        "--recipe-dir",
+        str(empty_recipe_dir),
+        "--output-dir",
+        str(output_dir),
+        "--allow-empty-recipe-dir",
+        "warn",
+    )
+
+    output_warn = rattler_build(*args_warn, stderr=STDOUT, text=True)
+    assert (
+        "No recipes found. Proceeding as per --allow-empty-recipe-dir warn."
+        in output_warn
+    )
+    assert not output_dir.exists() or not any(
+        output_dir.iterdir()
+    ), "Output directory should not exist or be empty after warn"
+
+    args_deny = (
+        "build",
+        "--recipe-dir",
+        str(empty_recipe_dir),
+        "--output-dir",
+        str(output_dir),
+    )
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build(*args_deny, stderr=STDOUT, text=True)
+
+    error_output = exc_info.value.output
+    expected_error_core = (
+        "No 'recipe.yaml' files found in the specified recipe directory:"
+    )
+    assert (
+        expected_error_core in error_output
+    ), f"Expected core error message '{expected_error_core}' not found in: {error_output}"
+    assert (
+        empty_recipe_dir.name in error_output
+    ), f"Directory name {empty_recipe_dir.name} not found in error output: {error_output}"

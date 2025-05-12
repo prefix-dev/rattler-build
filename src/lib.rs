@@ -81,9 +81,13 @@ use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
+use crate::opt::AllowEmptyBehavior;
 
 /// Returns the recipe path.
-pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
+pub fn get_recipe_path(
+    path: &Path,
+    allow_empty_recipe_dir: AllowEmptyBehavior,
+) -> miette::Result<PathBuf> {
     let recipe_path = canonicalize(path);
     if let Err(e) = &recipe_path {
         match e.kind() {
@@ -115,6 +119,11 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
         let recipe_yaml_path = recipe_path.join("recipe.yaml");
         if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
             recipe_path = recipe_yaml_path;
+        } else if allow_empty_recipe_dir == AllowEmptyBehavior::Warn {
+            // If we allow empty dirs and recipe.yaml is not found, return the directory path itself.
+            // The caller (recipe_paths) will handle the collection of paths, and the main function
+            // will check if the final list is empty.
+            return Ok(recipe_path);
         } else {
             return Err(miette::miette!(
                 "'recipe.yaml' not found in the directory {}",
@@ -965,7 +974,7 @@ pub async fn debug_recipe(
     debug_data: DebugData,
     log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
-    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
+    let recipe_path = get_recipe_path(&debug_data.recipe_path, AllowEmptyBehavior::Deny)?;
 
     let build_data = BuildData {
         build_platform: debug_data.build_platform,
@@ -996,6 +1005,7 @@ pub async fn debug_recipe(
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
+        allow_empty_recipe_dir: AllowEmptyBehavior::Deny,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
@@ -1085,4 +1095,100 @@ pub async fn debug_recipe(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::opt::AllowEmptyBehavior;
+    use std::fs::File;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_get_recipe_path_file_exists() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("recipe.yaml");
+        File::create(&file_path).unwrap();
+        let canonical_path = dunce::canonicalize(&file_path).unwrap();
+        assert_eq!(
+            get_recipe_path(&file_path, AllowEmptyBehavior::Deny).unwrap(),
+            canonical_path
+        );
+        assert_eq!(
+            get_recipe_path(&file_path, AllowEmptyBehavior::Warn).unwrap(),
+            canonical_path
+        );
+    }
+
+    #[test]
+    fn test_get_recipe_path_in_directory() {
+        let dir = tempdir().unwrap();
+        let recipe_dir = dir.path().join("my_recipe");
+        fs::create_dir(&recipe_dir).unwrap();
+        let file_path = recipe_dir.join("recipe.yaml");
+        File::create(&file_path).unwrap();
+        let canonical_path = dunce::canonicalize(&file_path).unwrap();
+
+        assert_eq!(
+            get_recipe_path(&recipe_dir, AllowEmptyBehavior::Deny).unwrap(),
+            canonical_path
+        );
+        assert_eq!(
+            get_recipe_path(&recipe_dir, AllowEmptyBehavior::Warn).unwrap(),
+            canonical_path
+        );
+    }
+
+    #[test]
+    fn test_get_recipe_path_dir_no_recipe_deny() {
+        let dir = tempdir().unwrap();
+        let recipe_dir = dir.path().join("empty_recipe");
+        fs::create_dir(&recipe_dir).unwrap();
+
+        let result = get_recipe_path(&recipe_dir, AllowEmptyBehavior::Deny);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'recipe.yaml' not found")
+        );
+    }
+
+    #[test]
+    fn test_get_recipe_path_dir_no_recipe_warn() {
+        let dir = tempdir().unwrap();
+        let recipe_dir = dir.path().join("empty_recipe");
+        fs::create_dir(&recipe_dir).unwrap();
+        let canonical_dir_path = dunce::canonicalize(&recipe_dir).unwrap();
+
+        assert_eq!(
+            get_recipe_path(&recipe_dir, AllowEmptyBehavior::Warn).unwrap(),
+            canonical_dir_path
+        );
+    }
+
+    #[test]
+    fn test_get_recipe_path_non_existent() {
+        let dir = tempdir().unwrap();
+        let non_existent_path = dir.path().join("nope");
+
+        let result_deny = get_recipe_path(&non_existent_path, AllowEmptyBehavior::Deny);
+        assert!(result_deny.is_err());
+        assert!(
+            result_deny
+                .unwrap_err()
+                .to_string()
+                .contains("could not be found")
+        );
+
+        let result_warn = get_recipe_path(&non_existent_path, AllowEmptyBehavior::Warn);
+        assert!(result_warn.is_err());
+        assert!(
+            result_warn
+                .unwrap_err()
+                .to_string()
+                .contains("could not be found")
+        );
+    }
 }
