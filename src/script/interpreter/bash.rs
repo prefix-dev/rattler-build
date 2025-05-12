@@ -8,7 +8,7 @@ use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, Exec
 use super::{find_interpreter, CmdExeInterpreter, Interpreter, BASH_PREAMBLE};
 
 // BaseBashIntercepreter is used to setup activative env,
-//
+// use `BashIntercepreter` to execute `build.script`
 pub(crate) struct BaseBashInterpreter;
 
 impl Interpreter for BaseBashInterpreter {
