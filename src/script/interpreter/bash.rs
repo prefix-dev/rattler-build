@@ -98,6 +98,10 @@ impl Interpreter for BashInterpreter {
 }
 
 fn to_posix_path_string(path_buf: &Path) -> String {
+    if cfg!(windows) {
+        return path_buf.to_string_lossy().into();
+    }
+
     let mut posix_path = String::new();
     let mut first = true;
 
