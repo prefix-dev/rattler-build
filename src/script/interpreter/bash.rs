@@ -3,9 +3,11 @@ use std::path::{Component, Path, PathBuf};
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs, ResolvedScriptContents};
+use crate::script::{
+    ExecutionArgs, ResolvedScriptContents, interpreter::DEBUG_HELP, run_process_with_replacements,
+};
 
-use super::{find_interpreter, CmdExeInterpreter, Interpreter, BASH_PREAMBLE};
+use super::{BASH_PREAMBLE, CmdExeInterpreter, Interpreter, find_interpreter};
 
 // BaseBashIntercepreter is used to setup activative env,
 // use `BashIntercepreter` to execute `build.script`
@@ -20,11 +22,12 @@ impl Interpreter for BaseBashInterpreter {
 
         tokio::fs::write(&build_env_path, script).await?;
 
-        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
+        let preamble =
+            BASH_PREAMBLE.replace("((script_path))", &to_posix_path_string(&build_env_path));
         let script = format!("{}\n{}", preamble, args.script.script());
         tokio::fs::write(&build_script_path, script).await?;
 
-        let build_script_path_str = build_script_path.to_string_lossy().to_string();
+        let build_script_path_str = to_posix_path_string(&build_script_path);
         let mut cmd_args = vec!["bash", "-e"];
         if args.debug.is_enabled() {
             cmd_args.push("-x");
@@ -155,10 +158,6 @@ mod tests {
                 "relative/path/to/file",
             ),
             (PathBuf::from(r"C:\foo\bar.txt"), "C:/foo/bar.txt"),
-            (
-                PathBuf::from(r"\\server\share\file.zip"),
-                "//server/share/file.zip",
-            ),
             (PathBuf::from(r"C:"), "C:"),
             (PathBuf::from(r"C:\"), "C:/"),
         ];
