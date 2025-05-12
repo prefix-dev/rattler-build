@@ -7,6 +7,7 @@ mod python;
 use std::path::PathBuf;
 
 pub(crate) use bash::BashInterpreter;
+pub(crate) use bash::BaseBashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;

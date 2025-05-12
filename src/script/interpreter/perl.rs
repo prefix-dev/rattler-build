@@ -4,7 +4,7 @@ use rattler_conda_types::Platform;
 
 use crate::script::{ExecutionArgs, ResolvedScriptContents};
 
-use super::{find_interpreter, BashInterpreter, CmdExeInterpreter, Interpreter};
+use super::{find_interpreter, BaseBashInterpreter, CmdExeInterpreter, Interpreter};
 
 pub(crate) struct PerlInterpreter;
 
@@ -22,7 +22,7 @@ impl Interpreter for PerlInterpreter {
         if cfg!(windows) {
             CmdExeInterpreter.run(args).await
         } else {
-            BashInterpreter.run(args).await
+            BaseBashInterpreter.run(args).await
         }
     }
 
