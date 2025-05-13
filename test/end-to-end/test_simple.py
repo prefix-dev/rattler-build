@@ -37,6 +37,7 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows for spaces in paths handling")
 def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that building a package with spaces in output paths works correctly."""
     output_dir = tmp_path / "Output Space Dir"
