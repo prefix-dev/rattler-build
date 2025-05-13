@@ -72,29 +72,31 @@ impl ExecutionArgs {
     /// will be replaced with the actual variable name.
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-        if let Some(build_prefix) = &self.build_prefix {
-            let build_prefix_str = build_prefix.display().to_string();
-            let build_prefix_var = template.replace("((var))", "BUILD_PREFIX");
-            replacements.insert(build_prefix_str.clone(), build_prefix_var.clone());
-            // we will check if the path contains spaces and add a quoted version for bash scripts
-            if build_prefix_str.contains(' ') && template.starts_with('$') {
-                replacements.insert(format!("\"{}\"", build_prefix_str), build_prefix_var);
+
+        /// Function to add path replacements with handling of spaces
+        fn add_path_replacement(
+            replacements: &mut HashMap<String, String>,
+            path: &Path,
+            var_name: &str,
+            template: &str,
+        ) {
+            let path_str = path.display().to_string();
+            let var_replacement = template.replace("((var))", var_name);
+
+            replacements.insert(path_str.clone(), var_replacement.clone());
+
+            // Add quoted version for bash scripts if path contains spaces
+            if path_str.contains(' ') && template.starts_with('$') {
+                replacements.insert(format!("\"{}\"", path_str), var_replacement);
             }
+        }
+
+        if let Some(build_prefix) = &self.build_prefix {
+            add_path_replacement(&mut replacements, build_prefix, "BUILD_PREFIX", template);
         };
 
-        let run_prefix_str = self.run_prefix.display().to_string();
-        let run_prefix_var = template.replace("((var))", "PREFIX");
-        replacements.insert(run_prefix_str.clone(), run_prefix_var.clone());
-        if run_prefix_str.contains(' ') && template.starts_with('$') {
-            replacements.insert(format!("\"{}\"", run_prefix_str), run_prefix_var);
-        }
-
-        let work_dir_str = self.work_dir.display().to_string();
-        let work_dir_var = template.replace("((var))", "SRC_DIR");
-        replacements.insert(work_dir_str.clone(), work_dir_var.clone());
-        if work_dir_str.contains(' ') && template.starts_with('$') {
-            replacements.insert(format!("\"{}\"", work_dir_str), work_dir_var);
-        }
+        add_path_replacement(&mut replacements, &self.run_prefix, "PREFIX", template);
+        add_path_replacement(&mut replacements, &self.work_dir, "SRC_DIR", template);
 
         // if the paths contain `\` then also replace the forward slash variants
         for (k, v) in replacements.clone() {
