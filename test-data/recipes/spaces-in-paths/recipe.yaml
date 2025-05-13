@@ -13,4 +13,4 @@ build:
         echo "This is a test with spaces in paths" > "$PREFIX/test.txt"
     - if: win
       then: |
-        echo "This is a test with spaces in paths" > "%PREFIX%\test.txt" 
+        echo "This is a test with spaces in paths" > "%PREFIX%\test.txt"
