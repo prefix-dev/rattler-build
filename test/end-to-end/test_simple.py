@@ -48,6 +48,11 @@ def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     )
     pkg = get_extracted_package(output_dir, "spaces-in-paths")
     assert (pkg / "test.txt").exists()
+    assert (pkg / "dir with spaces").exists()
+    assert (pkg / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
 
     # Build the recipe with quoted paths on all platforms
     rattler_build.build(
@@ -62,7 +67,7 @@ def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
     assert (
         pkg_quoted / "dir with spaces" / "file.txt"
-    ).read_text().strip() == '"This file is in a directory with spaces"'
+    ).read_text().strip() == "This file is in a directory with spaces"
 
 
 def check_info(folder: Path, expected: Path):

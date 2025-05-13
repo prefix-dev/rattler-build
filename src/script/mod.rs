@@ -73,20 +73,28 @@ impl ExecutionArgs {
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
         if let Some(build_prefix) = &self.build_prefix {
-            replacements.insert(
-                build_prefix.display().to_string(),
-                template.replace("((var))", "BUILD_PREFIX"),
-            );
+            let build_prefix_str = build_prefix.display().to_string();
+            let build_prefix_var = template.replace("((var))", "BUILD_PREFIX");
+            replacements.insert(build_prefix_str.clone(), build_prefix_var.clone());
+            // we will check if the path contains spaces and add a quoted version for bash scripts
+            if build_prefix_str.contains(' ') && template.starts_with('$') {
+                replacements.insert(format!("\"{}\"", build_prefix_str), build_prefix_var);
+            }
         };
-        replacements.insert(
-            self.run_prefix.display().to_string(),
-            template.replace("((var))", "PREFIX"),
-        );
 
-        replacements.insert(
-            self.work_dir.display().to_string(),
-            template.replace("((var))", "SRC_DIR"),
-        );
+        let run_prefix_str = self.run_prefix.display().to_string();
+        let run_prefix_var = template.replace("((var))", "PREFIX");
+        replacements.insert(run_prefix_str.clone(), run_prefix_var.clone());
+        if run_prefix_str.contains(' ') && template.starts_with('$') {
+            replacements.insert(format!("\"{}\"", run_prefix_str), run_prefix_var);
+        }
+
+        let work_dir_str = self.work_dir.display().to_string();
+        let work_dir_var = template.replace("((var))", "SRC_DIR");
+        replacements.insert(work_dir_str.clone(), work_dir_var.clone());
+        if work_dir_str.contains(' ') && template.starts_with('$') {
+            replacements.insert(format!("\"{}\"", work_dir_str), work_dir_var);
+        }
 
         // if the paths contain `\` then also replace the forward slash variants
         for (k, v) in replacements.clone() {
