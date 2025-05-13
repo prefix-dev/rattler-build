@@ -37,9 +37,6 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
-@pytest.mark.skipif(
-    os.name != "nt", reason="Test requires Windows for spaces in paths handling"
-)
 def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that building a package with spaces in output paths works correctly."""
     output_dir = tmp_path / "Output Space Dir"
@@ -52,7 +49,7 @@ def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pkg = get_extracted_package(output_dir, "spaces-in-paths")
     assert (pkg / "test.txt").exists()
 
-    # Build the recipe with quoted paths in Windows
+    # Build the recipe with quoted paths on all platforms
     rattler_build.build(
         recipes / "spaces-in-paths" / "recipe-with-quotes.yaml",
         output_dir,
@@ -60,12 +57,12 @@ def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pkg_quoted = get_extracted_package(output_dir, "spaces-in-paths-quotes")
     assert (pkg_quoted / "test.txt").exists()
 
-    if os.name == "nt":
-        assert (pkg_quoted / "dir with spaces").exists()
-        assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
-        assert (
-            pkg_quoted / "dir with spaces" / "file.txt"
-        ).read_text().strip() == '"This file is in a directory with spaces"'
+    # Check directories with spaces on all platforms
+    assert (pkg_quoted / "dir with spaces").exists()
+    assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg_quoted / "dir with spaces" / "file.txt"
+    ).read_text().strip() == '"This file is in a directory with spaces"'
 
 
 def check_info(folder: Path, expected: Path):
