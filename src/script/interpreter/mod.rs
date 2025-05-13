@@ -40,7 +40,7 @@ pub const CMDEXE_PREAMBLE: &str = r#"
 @echo on
 IF "%CONDA_BUILD%" == "" (
     @rem special behavior from conda-build for Windows
-    call ((script_path))
+    call "((script_path))"
 )
 @rem re-enable echo because the activation scripts might have messed with it
 @echo on
