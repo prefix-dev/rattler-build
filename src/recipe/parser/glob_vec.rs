@@ -75,11 +75,13 @@ impl From<Vec<GlobWithSource>> for InnerGlobVec {
 
 fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
     // first, try to parse as a normal glob so that we get a descriptive error
-    let _ = Glob::new(glob)?;
+    let _ = GlobBuilder::new(glob).backslash_escape(false).build()?;
     if glob.ends_with('/') {
         // we treat folders as globs that match everything in the folder
         Ok(GlobWithSource {
-            glob: Glob::new(&format!("{glob}**"))?,
+            glob: GlobBuilder::new(&format!("{glob}**"))
+                .backslash_escape(false)
+                .build()?,
             source: glob.to_string(),
         })
     } else {
@@ -87,6 +89,7 @@ fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
         Ok(GlobWithSource {
             glob: GlobBuilder::new(&format!("{glob}{{,/**}}"))
                 .empty_alternates(true)
+                .backslash_escape(false)
                 .build()?,
             source: glob.to_string(),
         })
