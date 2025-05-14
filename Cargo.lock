@@ -4243,6 +4243,7 @@ dependencies = [
  "criterion",
  "crossterm",
  "dunce",
+ "filetime",
  "flate2",
  "fs-err",
  "futures",
