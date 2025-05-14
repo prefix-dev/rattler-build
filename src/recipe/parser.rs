@@ -35,7 +35,7 @@ mod test;
 
 pub use self::{
     about::About,
-    build::{BinaryPrefixBehavior, Build, BuildString, DynamicLinking, PrefixDetection, Python},
+    build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
     glob_vec::{GlobVec, GlobWithSource},
     output::find_outputs_from_src,
