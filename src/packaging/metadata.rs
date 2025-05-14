@@ -292,7 +292,7 @@ impl Output {
         };
 
         Ok(IndexJson {
-            name: self.name().clone(),
+            name: self.name().as_normalized().parse().expect("Should always be valid"),
             version: self.version().clone(),
             build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
