@@ -369,6 +369,32 @@ impl GlobCheckerVec {
         })
     }
 
+    /// Static method to convert a list of globs to a GlobCheckerVec
+    pub fn from_vec(exists: Vec<&str>, not_exists: Option<Vec<&str>>) -> Self {
+        let exists_vec: Vec<GlobWithSource> = exists
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
+
+        let not_exists_vec: Vec<GlobWithSource> = not_exists
+            .unwrap_or_default()
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
+
+        let exists = InnerGlobVec(exists_vec);
+        let exists_globset = exists.globset().unwrap();
+        let not_exists = InnerGlobVec(not_exists_vec);
+        let not_exists_globset = not_exists.globset().unwrap();
+
+        Self {
+            exists,
+            not_exists,
+            exists_globset,
+            not_exists_globset,
+        }
+    }
+
     /// Returns true if the path matches any exists glob and does not match any not_exists glob
     /// If there are no globs at all, we match nothing.
     /// If there is no exists glob, we match everything except the not_exists globs.

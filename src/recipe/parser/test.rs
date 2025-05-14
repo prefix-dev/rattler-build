@@ -189,17 +189,21 @@ pub struct PackageContentsTest {
     pub files: GlobCheckerVec,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub site_packages: GlobVec,
+    /// Uses `exists` field for packages that must be present and `not_exists` for packages that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub site_packages: GlobCheckerVec,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub bin: GlobVec,
+    /// Uses `exists` field for binaries that must be present and `not_exists` for binaries that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub bin: GlobCheckerVec,
     /// check for dynamic or static library file path
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub lib: GlobVec,
+    /// Uses `exists` field for libraries that must be present and `not_exists` for libraries that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub lib: GlobCheckerVec,
     /// check if include path contains the file, direct or glob?
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub include: GlobVec,
+    /// Uses `exists` field for headers that must be present and `not_exists` for headers that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub include: GlobCheckerVec,
 }
 
 impl TryConvertNode<Vec<TestType>> for RenderedNode {

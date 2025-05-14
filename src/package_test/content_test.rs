@@ -31,7 +31,7 @@ impl PackageContentsTest {
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
-        for include in self.include.include_globs() {
+        for include in self.include.exists_globs() {
             let glob = if target_platform.is_windows() {
                 format!("Library/include/{}", include.source())
             } else {
@@ -54,7 +54,7 @@ impl PackageContentsTest {
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for bin in self.bin.include_globs() {
+        for bin in self.bin.exists_globs() {
             let bin_raw = bin.source();
             let globset = if target_platform.is_windows() {
                 // This is usually encoded as `PATHEXT` in the environment
@@ -96,7 +96,7 @@ impl PackageContentsTest {
 
         if target_platform.is_windows() {
             // Windows is special because it requires both a `.dll` and a `.bin` file
-            for lib in self.lib.include_globs() {
+            for lib in self.lib.exists_globs() {
                 let raw = lib.source();
                 if raw.ends_with(".dll") {
                     result.push((
@@ -128,7 +128,7 @@ impl PackageContentsTest {
                 }
             }
         } else {
-            for lib in self.lib.include_globs() {
+            for lib in self.lib.exists_globs() {
                 let raw = lib.source();
                 let globset = if target_platform.is_osx() {
                     if raw.ends_with(".dylib") || raw.ends_with(".a") {
@@ -180,7 +180,7 @@ impl PackageContentsTest {
             "lib/python*/site-packages"
         };
 
-        for site_package in self.site_packages.include_globs() {
+        for site_package in self.site_packages.exists_globs() {
             let mut globset = GlobSet::builder();
 
             if site_package.source().contains('/') {
@@ -377,7 +377,7 @@ mod tests {
     use std::path::Path;
 
     use super::PackageContentsTest;
-    use crate::recipe::parser::GlobVec;
+    use crate::recipe::parser::GlobCheckerVec;
     use globset::GlobSet;
     use rattler_conda_types::Platform;
     use serde::Deserialize;
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_include_globs() {
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"], None),
+            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -422,7 +422,7 @@ mod tests {
         test_glob_matches(&globs, paths).unwrap();
 
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"], None),
+            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -437,7 +437,7 @@ mod tests {
     #[test]
     fn test_wasm_bin_globs() {
         let package_contents = PackageContentsTest {
-            bin: GlobVec::from_vec(vec!["foo", "bar"], None),
+            bin: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
