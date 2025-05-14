@@ -670,6 +670,18 @@ impl ForceFileType {
     }
 }
 
+/// Handle host-prefix detection in binary files
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BinaryPrefixBehavior {
+    /// Treat detection as an error
+    Error,
+    /// Patch the binary by replacing the host prefix
+    Patch,
+    /// Skip detection for binary files
+    Ignore,
+}
+
 /// Configuration related to prefix replacement
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixDetection {
@@ -681,10 +693,13 @@ pub struct PrefixDetection {
     #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
     pub ignore: AllOrGlobVec,
 
-    /// Ignore binary files for prefix replacement (ignored on Windows)
-    /// This option defaults to false on Unix
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub ignore_binary_files: bool,
+    /// Handle host-prefix detection in binary files
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "ignore_binary_files"
+    )]
+    pub ignore_binary_files: Option<BinaryPrefixBehavior>,
 }
 
 impl Default for PrefixDetection {
@@ -692,7 +707,7 @@ impl Default for PrefixDetection {
         Self {
             force_file_type: ForceFileType::default(),
             ignore: AllOrGlobVec::All(false),
-            ignore_binary_files: false,
+            ignore_binary_files: None,
         }
     }
 }
@@ -739,5 +754,31 @@ impl TryConvertNode<ForceFileType> for RenderedMappingNode {
         let mut force_file_type = ForceFileType::default();
         validate_keys!(force_file_type, self.iter(), text, binary);
         Ok(force_file_type)
+    }
+}
+
+impl TryConvertNode<BinaryPrefixBehavior> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryPrefixBehavior, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .cloned()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<BinaryPrefixBehavior> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryPrefixBehavior, Vec<PartialParsingError>> {
+        match self.as_str() {
+            "error" => Ok(BinaryPrefixBehavior::Error),
+            "patch" => Ok(BinaryPrefixBehavior::Patch),
+            "ignore" => Ok(BinaryPrefixBehavior::Ignore),
+            other => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                help = format!(
+                    "invalid value `{other}` for {name}, valid options are `error`, `patch`, or `ignore`"
+                )
+            )]),
+        }
     }
 }

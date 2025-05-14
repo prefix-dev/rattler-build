@@ -157,7 +157,7 @@ Recipe {
             ignore: All(
                 false,
             ),
-            ignore_binary_files: false,
+            ignore_binary_files: None,
         },
         post_process: [],
         files: [],

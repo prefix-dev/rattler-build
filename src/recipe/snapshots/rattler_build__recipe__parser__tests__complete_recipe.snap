@@ -87,7 +87,7 @@ build:
       binary:
       - bla/*.so
     ignore: true
-    ignore_binary_files: true
+    ignore_binary_files: ignore
   post_process:
   - files:
     - '*.cmake'
