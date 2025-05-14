@@ -28,6 +28,7 @@ use rattler_shell::{
     shell::{Shell, ShellEnum},
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use tempfile::TempDir;
 
 use crate::{
     env_vars,
@@ -231,6 +232,8 @@ pub struct TestConfiguration {
     pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+    /// The output directory to create the test prefixes in (will be `output_dir/test`)
+    pub output_dir: PathBuf,
     /// Debug mode yes, or no
     pub debug: Debug,
 }
@@ -462,24 +465,29 @@ pub async fn run_test(
         };
 
         for test in tests {
+            let test_prefix =
+                TempDir::with_prefix_in(format!("test_{}", pkg.name), &prefix)?.into_path();
             match test {
                 TestType::Command(c) => {
-                    c.run_test(&pkg, &package_folder, &prefix, &config, &env)
+                    c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)
                         .await?
                 }
                 TestType::Python { python } => {
                     python
-                        .run_test(&pkg, &package_folder, &prefix, &config)
+                        .run_test(&pkg, &package_folder, &test_prefix, &config)
                         .await?
                 }
                 TestType::Perl { perl } => {
-                    perl.run_test(&pkg, &package_folder, &prefix, &config)
+                    perl.run_test(&pkg, &package_folder, &test_prefix, &config)
                         .await?
                 }
-                TestType::R { r } => r.run_test(&pkg, &package_folder, &prefix, &config).await?,
+                TestType::R { r } => {
+                    r.run_test(&pkg, &package_folder, &test_prefix, &config)
+                        .await?
+                }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
-                        .run_test(&pkg, package_file, &prefix, &config)
+                        .run_test(&pkg, package_file, &test_prefix, &config)
                         .await?
                 }
                 TestType::Downstream(_) => {
@@ -593,7 +601,7 @@ impl PythonTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            prefix,
+            &prefix.join("test_env"),
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -613,11 +621,11 @@ impl PythonTest {
             ..Script::default()
         };
 
-        let tmp_dir = tempfile::tempdir()?;
+        let test_dir = prefix.join("test");
         script
             .run_script(
                 Default::default(),
-                tmp_dir.path(),
+                &test_dir,
                 path,
                 prefix,
                 None,
@@ -661,30 +669,6 @@ impl PythonTest {
     }
 }
 
-// fn run_script(content: &str, interpreter: &str, cwd: &Path) -> Result<(), TestError> {
-//     let script = Script {
-//         content: ScriptContent::Command(content.to_string()),
-//         interpreter: Some(interpreter.into()),
-//         ..Script::default()
-//     };
-
-//     let tmp_dir = tempfile::tempdir()?;
-//     script
-//         .run_script(
-//             Default::default(),
-//             tmp_dir.path(),
-//             path,
-//             prefix,
-//             None,
-//             None,
-//             None,
-//             config.debug,
-//         )
-//         .await
-//         .map_err(|e| TestError::TestFailed(e.to_string()))?;
-//     Ok(())
-// }
-
 impl PerlTest {
     /// Execute the Perl test
     pub async fn run_test(
@@ -711,7 +695,7 @@ impl PerlTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            prefix,
+            &prefix.join("test_prefix"),
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -735,13 +719,14 @@ impl PerlTest {
             ..Script::default()
         };
 
-        let tmp_dir = tempfile::tempdir()?;
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
         script
             .run_script(
                 Default::default(),
-                tmp_dir.path(),
+                &test_folder,
                 path,
-                prefix,
+                &test_folder,
                 None,
                 None,
                 None,
@@ -837,8 +822,8 @@ impl CommandsTest {
 
         // copy all test files to a temporary directory and set it as the working
         // directory
-        let tmp_dir = tempfile::tempdir()?;
-        CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
+        let test_dir = test_directory.join("test");
+        CopyDir::new(path, &test_dir).run().map_err(|e| {
             TestError::IoError(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to copy test files: {}", e),
@@ -849,7 +834,7 @@ impl CommandsTest {
         self.script
             .run_script(
                 env_vars,
-                tmp_dir.path(),
+                &test_dir,
                 path,
                 &run_prefix,
                 build_prefix.as_ref(),
@@ -1001,11 +986,12 @@ impl RTest {
             ..Script::default()
         };
 
-        let tmp_dir = tempfile::tempdir()?;
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
         script
             .run_script(
                 Default::default(),
-                tmp_dir.path(),
+                &test_folder,
                 path,
                 prefix,
                 None,

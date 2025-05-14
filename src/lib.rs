@@ -577,6 +577,7 @@ pub async fn run_build_from_args(
                         solve_strategy: SolveStrategy::Highest,
                         tool_configuration: tool_configuration.clone(),
                         test_index: None,
+                        output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
                     },
                     None,
@@ -713,6 +714,7 @@ pub async fn run_test(
         channel_priority: tool_config.channel_priority,
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
+        output_dir: test_data.common.output_dir,
         debug: test_data.debug,
     };
 

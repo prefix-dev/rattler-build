@@ -673,9 +673,9 @@ impl TestData {
             package_file,
             channels,
             compression_threads,
-            common,
             test_index,
             debug,
+            common,
         }
     }
 }
