@@ -173,8 +173,10 @@ pub fn create_prefix_placeholder(
         // Check if there's a host prefix in the binary file
         if contains_prefix_binary(file_path, encoded_prefix)? {
             if prefix_detection.ignore_binary_files {
-                tracing::info!("Setting binary prefix replacement: {:?}", relative_path);
-                has_prefix = Some(encoded_prefix.to_string_lossy().to_string());
+                tracing::info!(
+                    "Detected host prefix in binary file {:?} but ignoring as per ignore_binary_files=true",
+                    relative_path
+                );
             } else {
                 // Default behavior is to error when host prefix is detected in binary file
                 tracing::error!("Detected host prefix in binary file: {:?}", relative_path);
