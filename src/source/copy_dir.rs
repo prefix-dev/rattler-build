@@ -47,12 +47,7 @@ fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
         .set_modified(metadata.modified()?);
 
     let file = std::fs::OpenOptions::new().write(true).open(to)?;
-    match file.set_times(file_times) {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::debug!("failed to set file times: {:?} - ignoring", e);
-        }
-    }
+    file.set_times(file_times)?;
 
     Ok(())
 }
@@ -416,7 +411,12 @@ where
         }
         Ok(Some(_)) => {
             // File has been copied
-            copy_metadata(from, to.as_ref())?;
+            match copy_metadata(from, to.as_ref()) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::debug!("Failed to copy metadata for {:?} {:?}", to.as_ref(), e);
+                }
+            }
         }
         Err(e) => {
             return Err(e);
