@@ -162,10 +162,12 @@ pub fn create_prefix_placeholder(
     };
 
     // Special handling for binary files forced as text
-    if forced_file_type == Some(FileMode::Text) && !detected_is_text {
-        if has_prefix.is_none() && contains_prefix_binary(file_path, encoded_prefix)? {
-            has_prefix = Some(prefix.to_string_lossy().to_string());
-        }
+    if forced_file_type == Some(FileMode::Text)
+        && !detected_is_text
+        && has_prefix.is_none()
+        && contains_prefix_binary(file_path, encoded_prefix)?
+    {
+        has_prefix = Some(prefix.to_string_lossy().to_string());
     }
 
     if file_mode == FileMode::Binary {
@@ -177,20 +179,18 @@ pub fn create_prefix_placeholder(
             return Ok(None);
         }
 
-        // Check if there's a host prefix in the binary file
-        if contains_prefix_binary(file_path, encoded_prefix)? {
-            if prefix_detection.ignore_binary_files {
-                tracing::info!(
-                    "Detected host prefix in binary file {:?} but ignoring as per ignore_binary_files=true",
-                    relative_path
-                );
-            } else {
-                // Default behavior is to error when host prefix is detected in binary file
-                tracing::error!("Detected host prefix in binary file: {:?}", relative_path);
-                return Err(PackagingError::BinaryPrefixDetected(
-                    relative_path.to_path_buf(),
-                ));
-            }
+        // Short-circuit if we're ignoring binary files with prefixes
+        if prefix_detection.ignore_binary_files {
+            tracing::debug!(
+                "Skipping binary prefix detection as ignore_binary_files=true for file: {:?}",
+                relative_path
+            );
+        } else if contains_prefix_binary(file_path, encoded_prefix)? {
+            // Default behavior is to error when host prefix is detected in binary file
+            tracing::error!("Detected host prefix in binary file: {:?}", relative_path);
+            return Err(PackagingError::BinaryPrefixDetected(
+                relative_path.to_path_buf(),
+            ));
         }
     }
 
@@ -523,7 +523,8 @@ mod test {
     use crate::recipe::parser::PrefixDetection;
     use content_inspector::ContentType;
     use rattler_conda_types::Platform;
-    use std::fs;
+    use std::fs::File;
+    use std::io::Write;
     use std::path::Path;
     use tempfile::TempDir;
 
@@ -532,10 +533,15 @@ mod test {
         let tempdir = TempDir::new().unwrap();
         let file_path = tempdir.path().join("f.bin");
         let encoded_prefix = Path::new("PREFIX");
-        fs::write(&file_path, b"abcPREFIXdef").unwrap();
+        File::create(&file_path)
+            .unwrap()
+            .write_all(b"abcPREFIXdef")
+            .unwrap();
 
-        let mut pd = PrefixDetection::default();
-        pd.ignore_binary_files = true;
+        let pd = PrefixDetection {
+            ignore_binary_files: true,
+            ..PrefixDetection::default()
+        };
         let result = create_prefix_placeholder(
             &Platform::Linux64,
             &file_path,
@@ -553,7 +559,10 @@ mod test {
         let tempdir = TempDir::new().unwrap();
         let file_path = tempdir.path().join("f.bin");
         let encoded_prefix = Path::new("PREFIX");
-        fs::write(&file_path, b"abcPREFIXdef").unwrap();
+        File::create(&file_path)
+            .unwrap()
+            .write_all(b"abcPREFIXdef")
+            .unwrap();
 
         let pd = PrefixDetection::default();
         let err = create_prefix_placeholder(
