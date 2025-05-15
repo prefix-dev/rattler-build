@@ -214,7 +214,7 @@ fn write_recipe_folder(
         .build_configuration
         .channels
         .iter()
-        .map(|url| clean_url(url))
+        .map(clean_url)
         .map(|url| ChannelUrl::from(url.parse::<url::Url>().expect("url is valid")))
         .collect();
 
