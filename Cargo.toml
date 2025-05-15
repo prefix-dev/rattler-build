@@ -171,7 +171,7 @@ rattler_solve = { version = "1.4.5", default-features = false, features = [
   "serde",
 ] }
 rattler_virtual_packages = { version = "2.0.10", default-features = false }
-rattler_package_streaming = { version = "0.22.36", default-features = false }
+rattler_package_streaming = { version = "0.22.37", default-features = false }
 rattler_menuinst = "0.2.7"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
@@ -204,17 +204,17 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-rattler = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_sandbox = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_cache = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_conda_types = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_digest = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_index = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_networking = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_repodata_gateway = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_shell = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_solve = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_redaction = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_virtual_packages = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_package_streaming = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
-rattler_menuinst = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_menuinst = { git = "https://github.com/conda/rattler", branch = "main" }

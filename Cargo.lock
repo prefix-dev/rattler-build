@@ -1848,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "file_url"
 version = "0.2.4"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -3810,7 +3810,7 @@ dependencies = [
 [[package]]
 name = "pixi_config"
 version = "0.1.0"
-source = "git+https://github.com/pavelzw/pixi?branch=bump-rattler#bfd3305314fffccbf8fa119383da2cd31e534e8c"
+source = "git+https://github.com/pavelzw/pixi?branch=bump-rattler#64b5a64eae1e8691e120a5fd9b15fe678045a20e"
 dependencies = [
  "clap",
  "console",
@@ -3837,7 +3837,7 @@ dependencies = [
 [[package]]
 name = "pixi_consts"
 version = "0.1.0"
-source = "git+https://github.com/pavelzw/pixi?branch=bump-rattler#bfd3305314fffccbf8fa119383da2cd31e534e8c"
+source = "git+https://github.com/pavelzw/pixi?branch=bump-rattler#64b5a64eae1e8691e120a5fd9b15fe678045a20e"
 dependencies = [
  "console",
  "rattler_cache",
@@ -4174,7 +4174,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.33.6"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "clap",
@@ -4319,7 +4319,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.3.18"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -4350,7 +4350,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.33.0"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "chrono",
  "core-foundation 0.10.0",
@@ -4389,7 +4389,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.1.1"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "blake2",
  "digest",
@@ -4406,7 +4406,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.22.6"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4433,7 +4433,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.8"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "quote",
  "syn",
@@ -4442,7 +4442,7 @@ dependencies = [
 [[package]]
 name = "rattler_menuinst"
 version = "0.2.8"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "chrono",
  "configparser",
@@ -4471,7 +4471,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.23.0"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4500,7 +4500,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.22.37"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "bzip2",
  "chrono",
@@ -4529,7 +4529,7 @@ dependencies = [
 [[package]]
 name = "rattler_pty"
 version = "0.2.0"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "libc",
  "nix",
@@ -4539,7 +4539,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.10"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4549,7 +4549,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.22.6"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4605,7 +4605,7 @@ dependencies = [
 [[package]]
 name = "rattler_sandbox"
 version = "0.1.7"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "birdcage",
  "clap",
@@ -4616,7 +4616,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.23.0"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "anyhow",
  "enum_dispatch",
@@ -4636,7 +4636,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "1.4.6"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "chrono",
  "futures",
@@ -4653,7 +4653,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.0.11"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "archspec",
  "libloading",
@@ -5665,7 +5665,7 @@ dependencies = [
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.1.0"
-source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
+source = "git+https://github.com/conda/rattler?branch=main#0160a2f88129935ced52596ab795389f70164557"
 dependencies = [
  "tokio",
 ]
