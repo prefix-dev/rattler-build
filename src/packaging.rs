@@ -8,8 +8,9 @@ use std::{
 
 use fs_err as fs;
 use fs_err::File;
+use metadata::clean_url;
 use rattler_conda_types::{
-    Platform,
+    ChannelUrl, Platform,
     package::{ArchiveType, PackageFile, PathsJson},
 };
 use rattler_package_streaming::write::{
@@ -207,11 +208,21 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
+    let mut output_clean = output.clone();
+    // clean URLs of any secrets or tokens
+    output_clean.build_configuration.channels = output_clean
+        .build_configuration
+        .channels
+        .iter()
+        .map(|url| clean_url(url))
+        .map(|url| ChannelUrl::from(url.parse::<url::Url>().expect("url is valid")))
+        .collect();
+
     // Write out the "rendered" recipe as well (the recipe with all the variables
     // replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
-    rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
+    rendered_recipe.write_all(serde_yaml::to_string(&output_clean)?.as_bytes())?;
     files.push(rendered_recipe_file);
 
     Ok(files)

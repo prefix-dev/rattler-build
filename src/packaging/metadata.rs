@@ -192,20 +192,21 @@ pub fn create_prefix_placeholder(
 }
 
 /// Clean credentials out of a channel url and return the string representation
-fn clean_url(url: &ChannelUrl) -> String {
+pub fn clean_url(url: &ChannelUrl) -> String {
     let mut url: Url = url.url().clone().into();
     // remove credentials from the url
-    url.set_username("").expect("username is empty");
-    url.set_password(None).expect("password is empty");
+    url.set_username("").ok();
+    url.set_password(None).ok();
 
     // remove `/t/<TOKEN>` from the url if present
-    let mut path = url.path_segments().unwrap().collect::<Vec<_>>();
-    if path.len() > 2 && path[0] == "t" {
-        // Remove the first two segments
-        path.remove(0);
-        path.remove(0);
-        // Join the remaining segments back into a path
-        url.set_path(&path.join("/"));
+    let segments: Vec<&str> = url
+        .path_segments()
+        .map(|segments| segments.collect())
+        .unwrap_or_default();
+
+    if segments.len() > 2 && segments[0] == "t" {
+        let new_path = segments[2..].join("/");
+        url.set_path(&new_path);
     }
 
     url.to_string()
