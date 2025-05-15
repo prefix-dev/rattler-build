@@ -144,7 +144,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(true),
+                        Debug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -165,7 +165,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(true),
+                        Debug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
