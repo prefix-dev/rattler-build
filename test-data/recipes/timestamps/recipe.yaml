@@ -14,7 +14,7 @@ requirements:
     - python 3.12.*
 
 build:
-  script: 
+  script:
     interpreter: python
     content: |
       import os
