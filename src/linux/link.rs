@@ -426,7 +426,7 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
@@ -457,7 +457,7 @@ mod test {
         );
 
         // manually clean up temporary directory because it was
-        // persisted to disk by calling `into_path`
+        // persisted to disk by calling `keep`
         fs::remove_dir_all(tmp_dir)?;
 
         Ok(())
@@ -477,7 +477,7 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink-no-rpath");
         fs::copy(prefix.join("zlink-no-rpath"), &binary_path)?;
 
@@ -502,7 +502,7 @@ mod test {
         );
 
         // manually clean up temporary directory because it was
-        // persisted to disk by calling `into_path`
+        // persisted to disk by calling `keep`
         fs::remove_dir_all(tmp_dir)?;
 
         Ok(())

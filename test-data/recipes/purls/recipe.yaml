@@ -1,0 +1,18 @@
+context: 
+  version: "1.0.0"
+
+package:
+  name: "purls"
+  version: ${{ version }}
+
+build:
+  noarch: generic
+
+about: 
+  purls:
+    - pkg:pypi/purls@${{ version }}
+    - if: linux
+      then: pkg:conda/purls-linux@${{ version }}
+      else: pkg:conda/purls-other@${{ version }}
+
+

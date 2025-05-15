@@ -480,6 +480,7 @@ Recipe {
             "LICENSE{,/**}",
         ],
         license_url: None,
+        purls: None,
         summary: Some(
             "The C++ tensor algebra library",
         ),
