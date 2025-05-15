@@ -561,7 +561,7 @@ pub async fn run_build_from_args(
                 match package_test::run_test(
                     archive,
                     &TestConfiguration {
-                        test_prefix: output.build_configuration.directories.work_dir.join("test"),
+                        test_prefix: output.build_configuration.directories.output_dir.join("test"),
                         target_platform: Some(output.build_configuration.target_platform),
                         host_platform: Some(output.build_configuration.host_platform.clone()),
                         current_platform: output.build_configuration.build_platform.clone(),
