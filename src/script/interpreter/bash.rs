@@ -1,4 +1,4 @@
-use std::{fs::Permissions, path::PathBuf};
+use std::path::PathBuf;
 
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
@@ -45,7 +45,7 @@ impl Interpreter for BashInterpreter {
         // Mark build_env.sh and conda_build.sh as executable
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
             let permissions = Permissions::from_mode(0o755);
             tokio::fs::set_permissions(&build_script_path, permissions).await?;
         }
