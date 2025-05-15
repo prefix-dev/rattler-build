@@ -138,6 +138,7 @@ fn build_recipes_py(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=None, test_index=None))]
 fn test_package_py(
