@@ -146,7 +146,9 @@ def test_package(
     Returns:
         None
     """
-    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host, debug, test_index)
+    test_package_py(
+        package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host, debug, test_index
+    )
 
 
 def upload_package_to_quetz(
