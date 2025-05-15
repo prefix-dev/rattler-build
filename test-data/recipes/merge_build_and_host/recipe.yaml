@@ -34,3 +34,11 @@ build:
     else
       echo "PREFIX and BUILD_PREFIX are the same. Host and build envs have been merged!"
     fi
+
+    # check that we have a file under $PREFIX/conda-meta/history
+    if [[ ! -f ${PREFIX}/conda-meta/history ]]; then
+      echo "history file not found under $PREFIX/conda-meta/history"
+      exit 1
+    else
+      echo "history file found under $PREFIX/conda-meta/history"
+    fi
