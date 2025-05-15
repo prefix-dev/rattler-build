@@ -1,7 +1,7 @@
 //! Configuration for the rattler-build tool
 //! This is useful when using rattler-build as a library
 
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
@@ -9,6 +9,7 @@ use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
     AuthenticationMiddleware, AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
+    mirror_middleware, s3_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
@@ -46,8 +47,30 @@ pub enum TestStrategy {
     NativeAndEmulated,
 }
 
+/// Whether we want to continue building on failure of a package or stop the build
+/// entirely
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContinueOnFailure {
+    /// Continue building on failure of a package
+    Yes,
+    /// Stop the build entirely on failure of a package
+    #[default]
+    No,
+}
+
+// This is the key part - implement From<bool> for your type
+impl From<bool> for ContinueOnFailure {
+    fn from(value: bool) -> Self {
+        if value {
+            ContinueOnFailure::Yes
+        } else {
+            ContinueOnFailure::No
+        }
+    }
+}
+
 /// A client that can handle both secure and insecure connections
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BaseClient {
     /// The standard client with SSL verification enabled
     client: ClientWithMiddleware,
@@ -62,9 +85,16 @@ impl BaseClient {
     pub fn new(
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
+        s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+        mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     ) -> Result<Self, AuthenticationStorageError> {
         let auth_storage = get_auth_store(auth_file)?;
         let timeout = 5 * 60;
+
+        let s3_middleware =
+            s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
+        let mirror_middleware =
+            mirror_middleware::MirrorMiddleware::from_map(mirror_middleware_config);
 
         let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
             builder
@@ -85,6 +115,8 @@ impl BaseClient {
         .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
             auth_storage.clone(),
         )))
+        .with(mirror_middleware)
+        .with(s3_middleware)
         .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
@@ -183,6 +215,9 @@ pub struct Configuration {
 
     /// List of hosts for which SSL certificate verification should be skipped
     pub allow_insecure_host: Option<Vec<String>>,
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub continue_on_failure: ContinueOnFailure,
 }
 
 /// Get the authentication storage from the given file
@@ -207,9 +242,16 @@ pub fn get_auth_store(
 /// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
+    s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<BaseClient, AuthenticationStorageError> {
-    BaseClient::new(auth_file, allow_insecure_host)
+    BaseClient::new(
+        auth_file,
+        allow_insecure_host,
+        s3_middleware_config,
+        mirror_middleware_config,
+    )
 }
 
 /// A builder for a [`Configuration`].
@@ -229,6 +271,7 @@ pub struct ConfigurationBuilder {
     io_concurrency_limit: Option<usize>,
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: ContinueOnFailure,
 }
 
 impl Configuration {
@@ -257,6 +300,7 @@ impl ConfigurationBuilder {
             io_concurrency_limit: None,
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
+            continue_on_failure: ContinueOnFailure::No,
         }
     }
 
@@ -265,6 +309,14 @@ impl ConfigurationBuilder {
     pub fn with_cache_dir(self, cache_dir: PathBuf) -> Self {
         Self {
             cache_dir: Some(cache_dir),
+            ..self
+        }
+    }
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
+        Self {
+            continue_on_failure,
             ..self
         }
     }
@@ -395,10 +447,7 @@ impl ConfigurationBuilder {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
-        let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None, self.allow_insecure_host.clone())
-                .expect("failed to create client")
-        });
+        let client = self.client.unwrap_or_default();
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
@@ -442,6 +491,7 @@ impl ConfigurationBuilder {
             repodata_gateway,
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
+            continue_on_failure: self.continue_on_failure,
         }
     }
 }

@@ -8,6 +8,7 @@ use opendal::{Configurator, Operator, services::S3Config};
 use reqwest_retry::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use std::{
     fmt::Write,
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
@@ -282,6 +283,15 @@ pub async fn upload_package_to_s3(
     let bucket = channel
         .host_str()
         .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
+
+    if let Some(host_endpoint) = endpoint_url.host_str() {
+        if host_endpoint.parse::<Ipv4Addr>().is_ok() && !force_path_style {
+            return Err(miette::miette!(
+                "Endpoint URL {} (IPv4 address) cannot be used without path style, please use --force-path-style",
+                endpoint_url
+            ));
+        }
+    }
 
     let mut s3_config = S3Config::default();
     s3_config.root = Some(channel.path().to_string());

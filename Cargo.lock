@@ -960,12 +960,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
-name = "bytecount"
-version = "0.6.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ce89b21cab1437276d2650d57e971f9d548a2d9037cc231abdc0562b97498ce"
-
-[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2127,17 +2121,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
-name = "gitpatch"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce212119eb3801015ea7e8bfb78f029ca16805de0d808358c080ff55ecbe675"
-dependencies = [
- "chrono",
- "nom",
- "nom_locate",
-]
-
-[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3083,6 +3066,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "line-ending"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "834e592123b39b7b3ba3fdc4b7e4822fad3ced449010f8229f843fe6dd1a33f1"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3323,17 +3312,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "nom_locate"
-version = "4.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e3c83c053b0713da60c5b8de47fe8e494fe3ece5267b2f23090a07a053ba8f3"
-dependencies = [
- "bytecount",
- "memchr",
- "nom",
 ]
 
 [[package]]
@@ -4238,7 +4216,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.40.0"
+version = "0.41.0"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -4260,7 +4238,6 @@ dependencies = [
  "flate2",
  "fs-err",
  "futures",
- "gitpatch",
  "globset",
  "goblin",
  "hex",
@@ -4270,6 +4247,7 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "lazy_static",
+ "line-ending",
  "marked-yaml",
  "memchr",
  "memmap2",
@@ -4329,6 +4307,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "tui-input",
+ "unicode-normalization",
  "url",
  "walkdir",
  "which",

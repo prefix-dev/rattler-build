@@ -1,0 +1,26 @@
+recipe:
+  name: test-interpreter-all
+  version: 0.1.0
+
+outputs:
+    - package:
+        name: test-interpreter-all
+        version: 0.1.0
+
+      tests:
+        - script: py/build.py
+          requirements:
+            build:
+              - python
+        - script: pl/build.pl
+          requirements:
+            build:
+              - perl
+        - script: r/build.r
+          requirements:
+            build:
+              - r
+        - script: nu/build.nu
+          requirements:
+            build:
+              - nushell

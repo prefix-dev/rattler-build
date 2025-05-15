@@ -24,7 +24,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -50,15 +50,19 @@ fn build_recipes_py(
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // todo: allow custom config here
+    let config = pixi_config::Config::default();
     let common = CommonData::new(
         output_dir,
         false,
         auth_file.map(|a| a.into()),
+        config,
         channel_priority,
         allow_insecure_host,
     );
@@ -121,6 +125,7 @@ fn build_recipes_py(
         None,
         None,
         true,
+        continue_on_failure.into(),
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -146,13 +151,28 @@ fn test_package_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // todo: allow custom config here
+    let config = pixi_config::Config::default();
     let common = CommonData::new(
         None,
         false,
         auth_file,
+        config,
         channel_priority,
         allow_insecure_host,
     );
+    let channel = match channel {
+        None => None,
+        Some(channel) => Some(
+            channel
+                .iter()
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+                })
+                .collect::<PyResult<_>>()?,
+        ),
+    };
     let test_data = TestData::new(package_file, channel, compression_threads, common);
 
     let rt = tokio::runtime::Runtime::new().unwrap();

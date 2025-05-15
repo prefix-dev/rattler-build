@@ -186,6 +186,14 @@ requirements:
   - libcurl >=8,<9
 ```
 
+### Channel sources
+
+You can specify the channels when building by adjusting `channel_sources` in your variant file:
+
+```yaml
+channel_sources: conda-forge/label/rust_dev,conda-forge
+```
+
 ## Prioritizing variants
 
 You might produce multiple variants for a package, but want to define a _priority_ for a given variant.

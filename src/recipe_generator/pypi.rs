@@ -358,7 +358,7 @@ pub async fn create_recipe(
     };
 
     recipe.source.push(serialize::SourceElement {
-        url: release_url.replace(metadata.info.version.as_str(), "${{ version }}"),
+        url: vec![release_url.replace(metadata.info.version.as_str(), "${{ version }}")],
         sha256: metadata.release.digests.get("sha256").cloned(),
         md5: None,
     });

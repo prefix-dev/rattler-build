@@ -1,0 +1,11 @@
+diff --git a/text.md b/text.md
+index 0fbe3c1..71c9c03 100644
+--- a/text.md
++++ b/text.md
+@@ -1,4 +1,5 @@
+ I am a long text.
+ And I want to be patched.
++Oh, wow, I was patched! Thank you soooo much!
+ By the patching tool in rattler-build.
+ Thank you!
+\ No newline at end of file

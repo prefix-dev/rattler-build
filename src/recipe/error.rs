@@ -156,6 +156,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::package_name_parsing))]
     PackageNameParsing(#[from] rattler_conda_types::InvalidPackageNameError),
 
+    /// Error when parsing a [`PackageName`](rattler_conda_types::PackageName).
+    #[diagnostic(code(error::package_name_normalization))]
+    PackageNameNormalization(String),
+
     /// Error when parsing a [`EntryPoint`](rattler_conda_types::package::EntryPoint).
     #[diagnostic(code(error::entry_point_parsing))]
     EntryPointParsing(String),
@@ -284,6 +288,9 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::PackageNameParsing(err) => {
                 write!(f, "failed to parse package name: {}", err)
+            }
+            ErrorKind::PackageNameNormalization(s) => {
+                write!(f, "input package name not normalized: {}", s)
             }
             ErrorKind::EntryPointParsing(err) => {
                 write!(f, "failed to parse entry point: {}", err)

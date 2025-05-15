@@ -3,6 +3,7 @@ mod cmd_exe;
 mod nushell;
 mod perl;
 mod python;
+mod r;
 
 use std::path::PathBuf;
 
@@ -11,6 +12,7 @@ pub(crate) use cmd_exe::CmdExeInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;
 pub(crate) use python::PythonInterpreter;
+pub(crate) use r::RInterpreter;
 
 use rattler_conda_types::Platform;
 use rattler_shell::{
@@ -28,7 +30,7 @@ pub(crate) const DEBUG_HELP: &str = "To debug the build, run it manually in the 
 pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
+    source "((script_path))"
 fi
 ## End of preamble
 "#;
@@ -38,7 +40,7 @@ pub const CMDEXE_PREAMBLE: &str = r#"
 @echo on
 IF "%CONDA_BUILD%" == "" (
     @rem special behavior from conda-build for Windows
-    call ((script_path))
+    call "((script_path))"
 )
 @rem re-enable echo because the activation scripts might have messed with it
 @echo on

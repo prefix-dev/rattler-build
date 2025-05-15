@@ -15,6 +15,7 @@
 use rattler_conda_types::{PackageName, PrefixRecord};
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     ops::Sub,
     path::{Path, PathBuf},
 };
@@ -126,10 +127,43 @@ impl PackageNature {
     }
 }
 
+pub struct CaseInsensitivePathBuf {
+    path: PathBuf,
+}
+
+impl CaseInsensitivePathBuf {
+    fn normalize_path(&self) -> String {
+        self.path
+            .to_string_lossy()
+            .to_lowercase()
+            .replace('\\', "/")
+    }
+}
+
+impl Hash for CaseInsensitivePathBuf {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.normalize_path().hash(state);
+    }
+}
+
+impl From<PathBuf> for CaseInsensitivePathBuf {
+    fn from(path: PathBuf) -> Self {
+        CaseInsensitivePathBuf { path }
+    }
+}
+
+impl PartialEq for CaseInsensitivePathBuf {
+    fn eq(&self, other: &Self) -> bool {
+        self.normalize_path() == other.normalize_path()
+    }
+}
+
+impl Eq for CaseInsensitivePathBuf {}
+
 #[derive(Default)]
 pub(crate) struct PrefixInfo {
     pub package_to_nature: HashMap<PackageName, PackageNature>,
-    pub path_to_package: HashMap<PathBuf, PackageName>,
+    pub path_to_package: HashMap<CaseInsensitivePathBuf, PackageName>,
 }
 
 impl PrefixInfo {
@@ -149,10 +183,12 @@ impl PrefixInfo {
                         record.repodata_record.package_record.name.clone(),
                         package_nature,
                     );
+
                     for file in record.files {
-                        prefix_info
-                            .path_to_package
-                            .insert(file, record.repodata_record.package_record.name.clone());
+                        prefix_info.path_to_package.insert(
+                            file.into(),
+                            record.repodata_record.package_record.name.clone(),
+                        );
                     }
                 }
             }

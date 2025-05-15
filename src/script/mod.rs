@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NuShellInterpreter,
-    PerlInterpreter, PythonInterpreter,
+    PerlInterpreter, PythonInterpreter, RInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -254,7 +254,8 @@ impl Script {
         //  executable is in a known place.
         let nushell_path = format!("bin/nu{}", std::env::consts::EXE_SUFFIX);
         let has_nushell = build_prefix
-            .map(|p| p.join(nushell_path))
+            .map(|p| p.join(&nushell_path))
+            .or_else(|| Some(run_prefix.join(&nushell_path)))
             .map(|p| p.is_file())
             .unwrap_or(false);
         if has_nushell {
@@ -356,6 +357,7 @@ impl Script {
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
             "python" => PythonInterpreter.run(exec_args).await?,
             "perl" => PerlInterpreter.run(exec_args).await?,
+            "rscript" => RInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,

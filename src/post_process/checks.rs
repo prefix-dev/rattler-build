@@ -4,10 +4,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::post_process::{package_nature::PackageNature, relink};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
+};
+use crate::{
+    post_process::{package_nature::PackageNature, relink},
+    windows::link::WIN_ALLOWLIST,
 };
 
 use crate::render::resolved_dependencies::RunExportDependency;
@@ -168,6 +171,13 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         return system_libs.build();
     }
 
+    if output.build_configuration.target_platform.is_windows() {
+        for v in WIN_ALLOWLIST {
+            system_libs.add(Glob::new(v)?);
+        }
+        return system_libs.build();
+    }
+
     if let Some(sysroot_package) = output
         .finalized_dependencies
         .clone()
@@ -240,7 +250,10 @@ pub fn perform_linking_checks(
 
                     let lib = resolved.as_ref().unwrap_or(lib);
                     if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                        if let Some(package) = prefix_info.path_to_package.get(libpath) {
+                        if let Some(package) = prefix_info
+                            .path_to_package
+                            .get(&libpath.to_path_buf().into())
+                        {
                             if let Some(nature) = prefix_info.package_to_nature.get(package) {
                                 // Only take shared libraries into account.
                                 if nature == &PackageNature::DSOLibrary {
@@ -288,7 +301,7 @@ pub fn perform_linking_checks(
                 continue;
             }
 
-            //  Check if the package has the library linked.
+            // Check if the package has the library linked.
             if let Some(package) = package.linked_dsos.get(lib) {
                 link_info.linked_packages.push(LinkedPackage {
                     name: lib.to_path_buf(),

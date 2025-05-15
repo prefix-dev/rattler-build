@@ -50,6 +50,11 @@ This document contains the help content for the `rattler-build` command-line pro
 	- Possible values: `true`, `false`
 
 
+- `--config-file <CONFIG_FILE>`
+
+	The rattler-build configuration file to use
+
+
 - `--color <COLOR>`
 
 	Enable or disable colored output from rattler-build. Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable
@@ -169,6 +174,11 @@ Build a package from a recipe
 - `--extra-meta <EXTRA_META>`
 
 	Extra metadata to include in about.json
+
+
+- `--continue-on-failure`
+
+	Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
 
 
 ###### **Modifying result**

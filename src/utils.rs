@@ -1,8 +1,12 @@
 //! Utility functions for working with paths.
 
 use fs_err as fs;
+#[cfg(windows)]
+use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(windows)]
+use std::time::Duration;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -81,7 +85,7 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
 
 /// Removes a directory and all its contents, including read-only files.
 pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
-    match fs::remove_dir_all(path) {
+    let result = match fs::remove_dir_all(path) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
             // If the normal removal fails, try to forcefully remove it.
@@ -106,6 +110,54 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
             fs::remove_dir_all(path)
         }
         Err(e) => Err(e),
+    };
+
+    #[cfg(windows)]
+    {
+        if result.is_err() {
+            return try_remove_with_retry(path, None);
+        }
+    }
+
+    result
+}
+
+#[cfg(windows)]
+/// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
+fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+    let mut current_try = if first_err.is_some() { 1 } else { 0 };
+    let mut last_err = first_err;
+    let request_start = SystemTime::now();
+
+    loop {
+        if let Some(e) = &last_err {
+            match retry_policy.should_retry(request_start, current_try) {
+                RetryDecision::DoNotRetry => {
+                    return Err(last_err.unwrap_or(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Directory could not be deleted",
+                    )));
+                }
+                RetryDecision::Retry { execute_after } => {
+                    let sleep_for = execute_after
+                        .duration_since(SystemTime::now())
+                        .unwrap_or(Duration::ZERO);
+
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
+                    std::thread::sleep(sleep_for);
+                }
+            }
+        }
+
+        match fs::remove_dir_all(path) {
+            Ok(_) => return Ok(()),
+            Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
+                last_err = Some(e);
+                current_try += 1;
+            }
+            Err(e) => return Err(e),
+        }
     }
 }
 
@@ -134,6 +186,151 @@ mod tests {
             let path = Path::new("/foo/bar/baz");
             let forward_slash = to_forward_slash_lossy(path);
             assert_eq!(forward_slash, "/foo/bar/baz");
+        }
+    }
+
+    #[cfg(windows)]
+    mod try_remove_with_retry_tests {
+        use super::*;
+        use std::fs::File;
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+        use tempfile::TempDir;
+
+        #[test]
+        fn test_successful_removal() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+
+            std::mem::forget(temp_dir);
+            let file_path = dir_path.join("test.txt");
+
+            File::create(&file_path)?;
+            let result = try_remove_with_retry(&dir_path, None);
+            assert!(result.is_ok());
+            assert!(!dir_path.exists());
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_nonexistent_path() {
+            let nonexistent_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
+            let result = try_remove_with_retry(&nonexistent_path, None);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_locked_file_retry() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("locked.txt");
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .share_mode(0)
+                .open(&file_path)?;
+
+            let file_handle = Arc::new(Mutex::new(Some(file)));
+            let file_handle_clone = file_handle.clone();
+            let locked_file_error = std::io::Error::from_raw_os_error(32);
+            let handle = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                let mut guard = file_handle_clone.lock().unwrap();
+                *guard = None;
+            });
+
+            let dir_path_clone = dir_path.clone();
+            let remove_result = std::thread::spawn(move || {
+                try_remove_with_retry(&dir_path_clone, Some(locked_file_error))
+            });
+
+            handle.join().unwrap();
+            let result = remove_result.join().unwrap();
+            std::thread::sleep(Duration::from_millis(1000));
+
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+
+            assert!(!dir_path.exists(), "Directory still exists!");
+
+            Ok(())
+        }
+
+        #[test]
+        // Original code for GO permission issues is tested here
+        fn test_readonly_file_removal() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("readonly.txt");
+            {
+                let mut file = File::create(&file_path)?;
+                file.write_all(b"Test content")?;
+            }
+
+            let metadata = fs::metadata(&file_path)?;
+            let mut permissions = metadata.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&file_path, permissions)?;
+            std::mem::forget(temp_dir);
+
+            let metadata = fs::metadata(&file_path)?;
+            assert!(
+                metadata.permissions().readonly(),
+                "File should be read-only"
+            );
+
+            let result = remove_dir_all_force(&dir_path);
+
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+            assert!(!dir_path.exists(), "Directory still exists!");
+            Ok(())
+        }
+
+        #[test]
+        // We are using remove_dir_all on retry logic, so it will even clear read-only files
+        // This is for testing’s sake only for permission-related issues
+        fn test_readonly_file_removal_with_retry() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("readonly.txt");
+            {
+                let mut file = File::create(&file_path)?;
+                file.write_all(b"Test content")?;
+            }
+
+            let metadata = fs::metadata(&file_path)?;
+            let mut permissions = metadata.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&file_path, permissions)?;
+            std::mem::forget(temp_dir);
+
+            let metadata = fs::metadata(&file_path)?;
+            assert!(
+                metadata.permissions().readonly(),
+                "File should be read-only"
+            );
+
+            let result = try_remove_with_retry(&dir_path, None);
+
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+            assert!(!dir_path.exists(), "Directory still exists!");
+            Ok(())
         }
     }
 }

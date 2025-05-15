@@ -104,6 +104,8 @@ nav:
     - "Rust": tutorials/rust.md
     - "Go": tutorials/go.md
     - "Perl": tutorials/perl.md
+    - "R": tutorials/r.md
+    - "Repackaging": tutorials/repackaging.md
     - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:
@@ -113,6 +115,7 @@ nav:
     - Selector syntax (if/then): selectors.md
     - Build script: build_script.md
     - Variants: variants.md
+    - Configuration: config.md
 
     - Compilers and cross compilation: compilers.md
 

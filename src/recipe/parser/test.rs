@@ -137,6 +137,13 @@ pub struct DownstreamTest {
     pub downstream: String,
 }
 
+/// A test that checks if R libraries can be loaded
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RTest {
+    /// List of R libraries to test with library()
+    pub libraries: Vec<String>,
+}
+
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -150,6 +157,11 @@ pub enum TestType {
     Perl {
         /// The modules to test
         perl: PerlTest,
+    },
+    /// An R test that will test if the R libraries can be loaded
+    R {
+        /// The R libraries to load and test
+        r: RTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
@@ -247,9 +259,9 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
             match key_str {
                 "python" => {
                     let python = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::Python{ python };
+                    test = TestType::Python { python };
                 }
-                "script" | "requirements" | "files"  => {
+                "script" | "requirements" | "files" => {
                     let commands = self.try_convert(key_str)?;
                     test = TestType::Command(commands);
                 }
@@ -265,10 +277,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::Perl { perl };
                 }
+                "r" => {
+                    let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::R { r: rscript };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -411,6 +427,24 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
         let mut perl_test = PerlTest::default();
         validate_keys!(perl_test, self.iter(), uses);
         Ok(perl_test)
+    }
+}
+
+///////////////////////////
+/// R Test              ///
+///////////////////////////
+impl TryConvertNode<RTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RTest, Vec<PartialParsingError>> {
+        let mut rtest = RTest::default();
+        validate_keys!(rtest, self.iter(), libraries);
+        if rtest.libraries.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("libraries".into()),
+                help = "expected field `libraries` in R test to be a list of strings."
+            )])?;
+        }
+        Ok(rtest)
     }
 }
 
