@@ -108,7 +108,7 @@ default = { features = [
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
 docs = { features = [
   "docs",
-], no-default-feature = true, solve-group = "default" }
+], no-default-feature = true }
 lint = { features = [
   "lint",
-], no-default-feature = true, solve-group = "default" }
+], solve-group = "default" }
