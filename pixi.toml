@@ -106,9 +106,5 @@ ruff = ">=0.4.10,<0.5"
 default = { features = [
   "dev",
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
-docs = { features = [
-  "docs",
-], no-default-feature = true }
-lint = { features = [
-  "lint",
-], solve-group = "default" }
+docs = { features = ["docs"], no-default-feature = true }
+lint = { features = ["lint"], solve-group = "default" }
