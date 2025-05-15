@@ -126,6 +126,7 @@ def test_package(
     compression_threads: Union[int, None] = None,
     auth_file: Union[str, Path, None] = None,
     channel_priority: Union[str, None] = None,
+    allow_insecure_host: Union[List[str], None] = None,
     debug: bool = False,
     test_index: Union[int, None] = None,
 ) -> None:
@@ -138,13 +139,14 @@ def test_package(
         compression_threads: The number of threads to use for compression.
         auth_file: The authentication file.
         channel_priority: The channel priority.
+        allow_insecure_host: Allow insecure hosts for the build.
         debug: Enable or disable debug mode. (default: False)
         test_index: The test to run, selected by index. (default: None - run all tests)
 
     Returns:
         None
     """
-    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority, debug, test_index)
+    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host, debug, test_index)
 
 
 def upload_package_to_quetz(
