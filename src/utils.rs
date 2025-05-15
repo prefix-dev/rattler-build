@@ -148,6 +148,8 @@ fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
+
                     std::thread::sleep(sleep_for);
                 }
             }
