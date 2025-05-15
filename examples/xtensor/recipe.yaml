@@ -15,7 +15,7 @@ build:
 requirements:
   build:
     - ${{ compiler('cxx') }}
-    - cmake
+    - cmake <4
     - ninja
     - nushell
   host:
@@ -32,6 +32,10 @@ tests:
       files:
         - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
         - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
+  - cmake:
+      find_package: [xtensor]
+  - pkg_config:
+      pkg_config: [xtensor]
 about:
   homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause

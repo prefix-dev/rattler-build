@@ -48,8 +48,8 @@ pub use self::{
     script::{Script, ScriptContent},
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
-        CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest, TestType,
+        CMakeTest, CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
+        PackageContentsTest, PerlTest, PkgConfigTest, PythonTest, PythonVersion, RTest, TestType,
     },
 };
 
