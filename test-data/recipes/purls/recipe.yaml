@@ -11,3 +11,8 @@ build:
 about: 
   purls:
     - pkg:pypi/purls@${{ version }}
+    - if: linux
+      then: pkg:conda/purls-linux@${{ version }}
+      else: pkg:conda/purls-other@${{ version }}
+
+

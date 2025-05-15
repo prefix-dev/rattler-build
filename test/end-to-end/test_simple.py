@@ -1915,4 +1915,7 @@ def test_purls(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     extracted_dir = get_extracted_package(tmp_path, "purls")
     assert extracted_dir.exists()
     assert (index_json := (extracted_dir / "info" / "index.json")).exists()
-    assert (json.loads(index_json.read_text()))["purls"] == ["pkg:pypi/purls@1.0.0"]
+    assert set((json.loads(index_json.read_text()))["purls"]) == {
+        "pkg:pypi/purls@1.0.0",
+        f'pkg:conda/purls-{"linux" if platform.system() == "Linux" else "other"}@1.0.0',
+    }
