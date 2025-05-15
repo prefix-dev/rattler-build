@@ -4301,6 +4301,7 @@ dependencies = [
  "pathdiff",
  "petgraph 0.8.1",
  "pixi_config",
+ "purl",
  "ratatui",
  "rattler",
  "rattler_cache",

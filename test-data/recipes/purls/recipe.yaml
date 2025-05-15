@@ -1,0 +1,10 @@
+context: 
+  version: "1.0.0"
+
+package:
+  name: "_testpackage_purls"
+  version: ${{ version }}
+
+about: 
+  purls:
+    - pkg:pypi/private-package@${{ version }}

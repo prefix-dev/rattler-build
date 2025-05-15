@@ -1,8 +1,10 @@
 use std::{
+    collections::BTreeSet,
     fmt::{Display, Formatter},
     str::FromStr,
 };
 
+use rattler_conda_types::PackageUrl;
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 use spdx::Expression;
@@ -12,7 +14,8 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode,
+            TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
     },
@@ -45,6 +48,9 @@ pub struct About {
     /// The license URL of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_url: Option<Url>,
+    /// The package urls of the package.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purls: Option<BTreeSet<PackageUrl>>,
     /// The summary of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
@@ -60,6 +66,42 @@ impl About {
     /// Returns true if the about has its default configuration.
     pub fn is_default(&self) -> bool {
         self == &Self::default()
+    }
+}
+
+impl TryConvertNode<BTreeSet<PackageUrl>> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<BTreeSet<PackageUrl>, Vec<PartialParsingError>> {
+        let mut result: BTreeSet<PackageUrl> = BTreeSet::new();
+        let mut errors = Vec::new();
+        for item in self.iter() {
+            let s: String = item.try_convert(name)?;
+            match PackageUrl::from_str(&s) {
+                Ok(purl) => {
+                    result.insert(purl);
+                }
+                Err(err) => {
+                    errors.push(_partialerror!(*item.span(), ErrorKind::PurlParsing(err),));
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(result)
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+impl TryConvertNode<BTreeSet<PackageUrl>> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BTreeSet<PackageUrl>, Vec<PartialParsingError>> {
+        match self {
+            RenderedNode::Sequence(sequence) => sequence.try_convert(name),
+            _ => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedSequence,
+                label = "expected a list of package urls"
+            )]),
+        }
     }
 }
 
@@ -85,6 +127,7 @@ impl TryConvertNode<About> for RenderedMappingNode {
             license_family,
             license_file,
             license_url,
+            purls,
             summary,
             description,
             prelink_message
@@ -177,6 +220,25 @@ mod test {
 
         about:
             license: MIT/X derivate
+        "#;
+
+        let err: ParseErrors<_> = Recipe::from_yaml(recipe, SelectorConfig::default())
+            .unwrap_err()
+            .into();
+
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn invalid_purls() {
+        let recipe = r#"
+        package:
+            name: test
+            version: 0.0.1
+
+        about:
+            purls:
+                - purl1
         "#;
 
         let err: ParseErrors<_> = Recipe::from_yaml(recipe, SelectorConfig::default())

@@ -136,6 +136,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::url_parsing))]
     UrlParsing(#[from] url::ParseError),
 
+    /// Error when processing URL
+    #[diagnostic(code(error::purl_parsing))]
+    PurlParsing(#[from] purl::ParseError),
+
     /// Error when parsing a integer.
     #[diagnostic(code(error::integer_parsing))]
     IntegerParsing(#[from] std::num::ParseIntError),
@@ -262,6 +266,7 @@ impl fmt::Display for ErrorKind {
                 write!(f, "condition in `if` selector must be a boolean: {}", err)
             }
             ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
+            ErrorKind::PurlParsing(err) => write!(f, "failed to parse purl: {}", err),
             ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
                 writeln!(f, "failed to parse SPDX license: {}", err.reason)?;
