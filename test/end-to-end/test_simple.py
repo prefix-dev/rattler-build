@@ -1927,3 +1927,13 @@ def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
             assert "123412341234" not in content, f"Secret found in {file}"
 
             assert "token1234567" not in content, f"Token found in {file}"
+
+
+def test_extracted_timestamps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # simply run the recipe "merge_build_and_host/recipe.yaml"
+    rattler_build.build(
+        recipes / "timestamps/recipe.yaml",
+        tmp_path,
+    )

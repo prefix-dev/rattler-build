@@ -1,0 +1,87 @@
+package:
+  name: timestamps-test
+  version: 0.1.0
+
+source:
+  - path: ./oldarchive.tar.gz
+    sha256: 91763f003f247544db90da8c303424001679097fa31814c159fe64af979e7db5
+  - url: https://github.com/xtensor-stack/xtensor/archive/0.23.2.tar.gz
+    sha256: fde26dcf93f5d95996b8cc7e556b84930af41ff699492b7b20b2e3335e12f862
+    target_directory: xtensor
+
+build:
+  script:
+    - if: unix
+      then: |
+        echo "Extracted file timestamp:"
+        ls -la oldfile.txt
+
+        # Convert timestamp to a more readable format
+        TIMESTAMP=$(stat -c "%y" oldfile.txt)
+        echo "Formatted timestamp: $TIMESTAMP"
+
+        # Verify if the year is 2000
+        YEAR=$(date -r oldfile.txt +"%Y")
+        if [ "$YEAR" = "2000" ]; then
+            echo "Verification PASSED: File has the correct year (2000)"
+        else
+            echo "Verification FAILED: Expected year 2000, got $YEAR"
+            exit 1
+        fi
+
+        # Check the timestamp of `xtensor/CMakeLists.txt` and make sure it's from 2021
+        XTENSOR_TIMESTAMP=$(stat -c "%y" xtensor/CMakeLists.txt)
+        XTENSOR_YEAR=$(date -r xtensor/CMakeLists.txt +"%Y")
+        echo "xtensor/CMakeLists.txt timestamp: $XTENSOR_TIMESTAMP"
+        echo "Formatted xtensor/CMakeLists.txt timestamp: $XTENSOR_YEAR"
+
+        if [ "$XTENSOR_YEAR" = "2021" ]; then
+            echo "Verification PASSED: xtensor/CMakeLists.txt has the correct year (2021)"
+        else
+            echo "Verification FAILED: Expected year 2021, got $XTENSOR_YEAR"
+            exit 1
+        fi
+      else: |
+        echo Extracted file timestamp:
+        dir oldfile.txt
+
+        REM Get file timestamp and extract year
+        for /f "tokens=1-5 delims=/ " %%a in ('dir oldfile.txt ^| findstr /i "oldfile.txt"') do (
+            set FILEDATE=%%a
+            set FILETIME=%%c
+            set YEAR=%%d
+        )
+
+        echo Formatted timestamp: %FILEDATE% %FILETIME% %YEAR%
+
+        REM Verify if the year is 2000
+        if "%YEAR%"=="2000" (
+            echo Verification PASSED: File has the correct year ^(2000^)
+        ) else (
+            echo Verification FAILED: Expected year 2000, got %YEAR%
+            exit /b 1
+        )
+
+        REM Check the timestamp of xtensor/CMakeLists.txt
+        echo.
+        echo xtensor/CMakeLists.txt timestamp:
+        dir xtensor\CMakeLists.txt
+
+        REM Get file timestamp and extract year for xtensor file
+        for /f "tokens=1-5 delims=/ " %%a in ('dir xtensor\CMakeLists.txt ^| findstr /i "CMakeLists.txt"') do (
+            set XTENSOR_FILEDATE=%%a
+            set XTENSOR_FILETIME=%%c
+            set XTENSOR_YEAR=%%d
+        )
+
+        echo Formatted xtensor/CMakeLists.txt timestamp: %XTENSOR_FILEDATE% %XTENSOR_FILETIME% %XTENSOR_YEAR%
+
+        REM Verify if the year is 2021
+        if "%XTENSOR_YEAR%"=="2021" (
+            echo Verification PASSED: xtensor/CMakeLists.txt has the correct year ^(2021^)
+        ) else (
+            echo Verification FAILED: Expected year 2021, got %XTENSOR_YEAR%
+            exit /b 1
+        )
+
+        echo Verification completed

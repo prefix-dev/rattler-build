@@ -126,7 +126,6 @@ pub(crate) fn copy_file(
                 }
             }
             reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
-            copy_metadata(path, dest_path).map_err(SourceError::FileSystemError)?;
             Ok(())
         }
     }
@@ -412,13 +411,20 @@ where
     }
 
     // Reflink or copy the file
-    if (reflink_copy::reflink_or_copy(from, &to)?).is_none() {
-        // File has been reflinked, on Linux we need to copy the permissions
-        #[cfg(target_os = "linux")]
-        {
-            let metadata = fs_err::metadata(from)?;
-            let permissions = metadata.permissions();
-            fs_err::set_permissions(to, permissions)?;
+    match reflink_copy::reflink_or_copy(from, &to) {
+        Ok(None) => {
+            // File has been reflinked
+            #[cfg(target_os = "linux")]
+            {
+                copy_metadata(from, to.as_ref())?;
+            }
+        }
+        Ok(Some(_)) => {
+            // File has been copied
+            copy_metadata(from, to.as_ref())?;
+        }
+        Err(e) => {
+            return Err(e);
         }
     }
 
