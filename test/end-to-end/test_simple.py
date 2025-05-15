@@ -2,17 +2,18 @@ import hashlib
 import json
 import os
 import platform
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
 from typing import Iterator
+from zipfile import ZipFile
 
 import boto3
 import pytest
 import requests
 import yaml
-import subprocess
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -1903,3 +1904,15 @@ def test_merge_build_and_host(
         recipes / "merge_build_and_host/recipe.yaml",
         tmp_path,
     )
+
+
+def test_purls(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "purls",
+        tmp_path,
+    )
+
+    extracted_dir = get_extracted_package(tmp_path, "purls")
+    assert extracted_dir.exists()
+    assert (index_json := (extracted_dir / "info" / "index.json")).exists()
+    assert (json.loads(index_json.read_text()))["purls"] == ["pkg:pypi/purls@1.0.0"]

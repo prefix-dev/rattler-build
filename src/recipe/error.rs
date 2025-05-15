@@ -136,7 +136,7 @@ pub enum ErrorKind {
     #[diagnostic(code(error::url_parsing))]
     UrlParsing(#[from] url::ParseError),
 
-    /// Error when processing URL
+    /// Error when processing purl
     #[diagnostic(code(error::purl_parsing))]
     PurlParsing(#[from] purl::ParseError),
 

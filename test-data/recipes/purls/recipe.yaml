@@ -2,9 +2,12 @@ context:
   version: "1.0.0"
 
 package:
-  name: "_testpackage_purls"
+  name: "purls"
   version: ${{ version }}
+
+build:
+  noarch: generic
 
 about: 
   purls:
-    - pkg:pypi/private-package@${{ version }}
+    - pkg:pypi/purls@${{ version }}
