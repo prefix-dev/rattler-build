@@ -37,6 +37,39 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that building a package with spaces in output paths works correctly."""
+    output_dir = tmp_path / "Output Space Dir"
+    output_dir.mkdir(exist_ok=True)
+
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe.yaml",
+        output_dir,
+    )
+    pkg = get_extracted_package(output_dir, "spaces-in-paths")
+    assert (pkg / "test.txt").exists()
+    assert (pkg / "dir with spaces").exists()
+    assert (pkg / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
+
+    # Build the recipe with quoted paths on all platforms
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe-with-quotes.yaml",
+        output_dir,
+    )
+    pkg_quoted = get_extracted_package(output_dir, "spaces-in-paths-quotes")
+    assert (pkg_quoted / "test.txt").exists()
+
+    # Check directories with spaces on all platforms
+    assert (pkg_quoted / "dir with spaces").exists()
+    assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg_quoted / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
+
+
 def check_info(folder: Path, expected: Path):
     for f in ["index.json", "about.json", "link.json", "paths.json"]:
         assert (folder / "info" / f).exists()
