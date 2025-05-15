@@ -19,6 +19,7 @@ build:
         - force_binary/*
       text:
         - force_text/*
+    ignore_binary_files: true
 
 requirements:
   host:

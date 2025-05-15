@@ -161,15 +161,16 @@ pub fn create_prefix_placeholder(
         FileMode::Binary
     };
 
-    if file_mode == FileMode::Binary {
-        if prefix_detection.ignore_binary_files {
-            tracing::info!(
-                "Ignoring binary file for prefix-replacement: {:?}",
-                relative_path
-            );
-            return Ok(None);
-        }
+    // Special handling for binary files forced as text
+    if forced_file_type == Some(FileMode::Text)
+        && !detected_is_text
+        && has_prefix.is_none()
+        && contains_prefix_binary(file_path, encoded_prefix)?
+    {
+        has_prefix = Some(prefix.to_string_lossy().to_string());
+    }
 
+    if file_mode == FileMode::Binary {
         if target_platform.is_windows() {
             tracing::debug!(
                 "Binary prefix replacement is not performed fors Windows: {:?}",
@@ -178,8 +179,18 @@ pub fn create_prefix_placeholder(
             return Ok(None);
         }
 
-        if contains_prefix_binary(file_path, encoded_prefix)? {
-            has_prefix = Some(encoded_prefix.to_string_lossy().to_string());
+        // Short-circuit if we're ignoring binary files with prefixes
+        if prefix_detection.ignore_binary_files {
+            tracing::debug!(
+                "Skipping binary prefix detection as ignore_binary_files=true for file: {:?}",
+                relative_path
+            );
+        } else if contains_prefix_binary(file_path, encoded_prefix)? {
+            // Default behavior is to error when host prefix is detected in binary file
+            tracing::error!("Detected host prefix in binary file: {:?}", relative_path);
+            return Err(PackagingError::BinaryPrefixDetected(
+                relative_path.to_path_buf(),
+            ));
         }
     }
 
@@ -519,27 +530,62 @@ impl Output {
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 mod test {
+    use super::{PackagingError, create_prefix_placeholder};
+    use crate::recipe::parser::PrefixDetection;
     use content_inspector::ContentType;
     use rattler_conda_types::Platform;
-
-    use super::create_prefix_placeholder;
-    use crate::recipe::parser::PrefixDetection;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
+    use tempfile::TempDir;
 
     #[test]
-    fn detect_prefix() {
-        let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("test-data/binary_files/binary_file_fallback");
-        let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    fn test_binary_prefix_behavior_ignore() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("f.bin");
+        let encoded_prefix = Path::new("PREFIX");
+        File::create(&file_path)
+            .unwrap()
+            .write_all(b"abcPREFIXdef")
+            .unwrap();
 
-        create_prefix_placeholder(
+        let pd = PrefixDetection {
+            ignore_binary_files: true,
+            ..PrefixDetection::default()
+        };
+        let result = create_prefix_placeholder(
             &Platform::Linux64,
-            &test_data,
-            prefix,
-            prefix,
+            &file_path,
+            tempdir.path(),
+            encoded_prefix,
             &ContentType::BINARY,
-            &PrefixDetection::default(),
+            &pd,
         )
         .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_binary_prefix_behavior_error() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("f.bin");
+        let encoded_prefix = Path::new("PREFIX");
+        File::create(&file_path)
+            .unwrap()
+            .write_all(b"abcPREFIXdef")
+            .unwrap();
+
+        let pd = PrefixDetection::default();
+        let err = create_prefix_placeholder(
+            &Platform::Linux64,
+            &file_path,
+            tempdir.path(),
+            encoded_prefix,
+            &ContentType::BINARY,
+            &pd,
+        );
+        assert!(matches!(err, Err(PackagingError::BinaryPrefixDetected(_))));
     }
 }
