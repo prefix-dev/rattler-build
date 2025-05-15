@@ -15,7 +15,6 @@ use std::{
     str::FromStr,
 };
 
-use dunce::canonicalize;
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
@@ -362,10 +361,6 @@ pub async fn run_test(
         fs::remove_dir_all(&package_folder)?;
     }
 
-    let prefix = canonicalize(&config.test_prefix)?;
-
-    tracing::info!("Creating test environment in '{}'", prefix.display());
-
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
 
@@ -398,6 +393,11 @@ pub async fn run_test(
     let env = env_vars_from_package(&index_json);
     // extract package in place
     if package_folder.join("info/test").exists() {
+        let prefix =
+            TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.output_dir)?.into_path();
+
+        tracing::info!("Creating test environment in '{}'", prefix.display());
+
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
         let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
             serde_json::from_str(&fs::read_to_string(package_folder.join(&test_dep_json))?)?
@@ -442,6 +442,10 @@ pub async fn run_test(
             "{} all tests passed!",
             console::style(console::Emoji("✔", "")).green()
         );
+
+        if prefix.exists() {
+            fs::remove_dir_all(prefix)?;
+        }
     }
 
     if package_folder.join("info/tests/tests.yaml").exists() {
@@ -466,7 +470,7 @@ pub async fn run_test(
 
         for test in tests {
             let test_prefix =
-                TempDir::with_prefix_in(format!("test_{}", pkg.name), &prefix)?.into_path();
+                TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.into_path();
             match test {
                 TestType::Command(c) => {
                     c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)
@@ -498,16 +502,16 @@ pub async fn run_test(
                 // This test already runs during the build process and we don't need to run it again
                 TestType::PackageContents { .. } => {}
             }
+
+            if !config.keep_test_prefix {
+                fs::remove_dir_all(test_prefix)?;
+            }
         }
 
         tracing::info!(
             "{} all tests passed!",
             console::style(console::Emoji("✔", "")).green()
         );
-    }
-
-    if prefix.exists() {
-        fs::remove_dir_all(prefix)?;
     }
 
     Ok(())
