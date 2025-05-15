@@ -594,6 +594,7 @@ impl PythonTest {
         let span = tracing::info_span!("", message = %span_message);
         let _guard = span.enter();
 
+        let test_prefix = prefix.join("test_env");
         create_environment(
             "test",
             &dependencies,
@@ -601,7 +602,7 @@ impl PythonTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            &prefix.join("test_env"),
+            &test_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -622,12 +623,13 @@ impl PythonTest {
         };
 
         let test_dir = prefix.join("test");
+        fs::create_dir_all(&test_dir)?;
         script
             .run_script(
                 Default::default(),
                 &test_dir,
                 path,
-                prefix,
+                &test_prefix,
                 None,
                 None,
                 None,
@@ -651,7 +653,7 @@ impl PythonTest {
                     Default::default(),
                     path,
                     path,
-                    prefix,
+                    &test_prefix,
                     None,
                     None,
                     None,
@@ -688,6 +690,7 @@ impl PerlTest {
 
         let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
+        let test_prefix = prefix.join("test_env");
         create_environment(
             "test",
             &dependencies,
@@ -695,7 +698,7 @@ impl PerlTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            &prefix.join("test_prefix"),
+            &test_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -726,7 +729,7 @@ impl PerlTest {
                 Default::default(),
                 &test_folder,
                 path,
-                &test_folder,
+                &test_prefix,
                 None,
                 None,
                 None,
@@ -756,7 +759,7 @@ impl CommandsTest {
 
         let build_prefix = if !deps.build.is_empty() {
             tracing::info!("Installing build dependencies");
-            let build_prefix = test_directory.join("bld");
+            let build_prefix = test_directory.join("test_build_env");
             let build_dependencies = deps
                 .build
                 .iter()
@@ -797,7 +800,7 @@ impl CommandsTest {
             .as_ref()
             .unwrap_or(&config.current_platform);
 
-        let run_prefix = test_directory.join("run");
+        let run_prefix = test_directory.join("test_run_env");
         create_environment(
             "test",
             &dependencies,
@@ -954,7 +957,7 @@ impl RTest {
         )?;
 
         let dependencies = vec!["r-base".parse().unwrap(), match_spec];
-
+        let test_prefix = prefix.join("test_env");
         create_environment(
             "test",
             &dependencies,
@@ -962,7 +965,7 @@ impl RTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            prefix,
+            &test_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -993,7 +996,7 @@ impl RTest {
                 Default::default(),
                 &test_folder,
                 path,
-                prefix,
+                &test_prefix,
                 None,
                 None,
                 None,
