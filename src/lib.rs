@@ -675,7 +675,7 @@ pub async fn rebuild(
 
     rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
 
-    let temp_dir = temp_folder.into_path();
+    let temp_dir = temp_folder.keep();
 
     tracing::info!("Extracted recipe to: {:?}", temp_dir);
 

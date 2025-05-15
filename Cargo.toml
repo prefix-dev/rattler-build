@@ -111,8 +111,8 @@ clap_complete_nushell = "4.5.5"
 tokio-util = { version = "0.7.14", features = ["codec", "compat"] }
 
 tar = "0.4.44"
-zip = { version = "2.6.1", default-features = false, features = [
-  "flate2",
+zip = { version = "3.0.0", default-features = false, features = [
+  "deflate-flate2",
   "deflate",
 ] }
 bzip2 = "0.5.2"
@@ -141,13 +141,13 @@ opendal = { version = "0.53.0", default-features = false, features = [
 ] }
 
 # Rattler crates
-pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
+pixi_config = { git = "https://github.com/pavelzw/pixi", branch = "bump-rattler" }
 rattler = { version = "0.33.5", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
 rattler_cache = { version = "0.3.17", default-features = false }
-rattler_conda_types = { version = "0.32.0", default-features = false, features = [
+rattler_conda_types = { version = "0.33.0", default-features = false, features = [
   "rayon",
 ] }
 rattler_digest = { version = "1.1.1", default-features = false, features = [
@@ -162,7 +162,7 @@ rattler_repodata_gateway = { version = "0.22.5", default-features = false, featu
 rattler_sandbox = { version = "0.1.7", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.26", default-features = false, features = [
+rattler_shell = { version = "0.23.0", default-features = false, features = [
   "sysinfo",
 ] }
 rattler_solve = { version = "1.4.4", default-features = false, features = [
@@ -197,17 +197,17 @@ name = "line_breaks"
 harness = false
 
 [patch.crates-io]
-# rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_index = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+rattler = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_sandbox = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_cache = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_conda_types = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_digest = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_index = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_networking = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_repodata_gateway = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_shell = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_solve = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_redaction = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_virtual_packages = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_package_streaming = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }
+rattler_menuinst = { git = "https://github.com/pavelzw/rattler", branch = "bump-zip" }

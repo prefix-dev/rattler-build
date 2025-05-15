@@ -301,6 +301,7 @@ impl Output {
             subdir: Some(self.build_configuration.target_platform.to_string()),
             license: recipe.about().license.as_ref().map(|l| l.to_string()),
             license_family: recipe.about().license_family.clone(),
+            purls: recipe.about().purls.clone(),
             timestamp: Some(self.build_configuration.timestamp),
             depends: finalized_dependencies
                 .run
