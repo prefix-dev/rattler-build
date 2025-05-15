@@ -40,7 +40,6 @@ requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 rust-src = ">=1.86.0,<1.87"
 boto3 = "*"
-nushell = "==0.104.0"
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
