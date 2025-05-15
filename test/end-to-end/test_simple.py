@@ -1903,3 +1903,23 @@ def test_merge_build_and_host(
         recipes / "merge_build_and_host/recipe.yaml",
         tmp_path,
     )
+
+def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # build the package with experimental flag to enable the feature
+    rattler_build.build(
+        recipes / "empty_folder",
+        tmp_path,
+        extra_args= ["-c", "https://iamasecretusername:123412341234@foobar.com/some-channel",
+        "-c", "https://bizbar.com/t/token1234567/channel-name"],
+    )
+    pkg = get_extracted_package(tmp_path, "empty_folder")
+    # scan all files to make sure that the secret is not present
+    for file in pkg.rglob("**/*"):
+        if file.is_file():
+            print("Checking file:", file)
+            content = file.read_text()
+            assert "iamasecretusername" not in content, f"Secret found in {file}"
+            assert "123412341234" not in content, f"Secret found in {file}"
+
+            assert "token1234567" not in content, f"Token found in {file}"
+
