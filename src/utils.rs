@@ -115,7 +115,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         if result.is_err() {
-            return try_remove_with_retry(path, None);
+            return try_remove_with_retry(path);
         }
     }
 
@@ -123,19 +123,19 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
+fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
     // Use a more gradual backoff with longer max retry time
     let retry_policy = ExponentialBackoff::builder()
-        .base_delay(Duration::from_millis(100))
-        .max_delay(Duration::from_secs(2))
-        .build_with_max_retries(15);
+        .base(2)
+        .retry_bounds(Duration::from_millis(100), Duration::from_secs(2))
+        .build_with_max_retries(5);
 
-    let mut current_try = if first_err.is_some() { 1 } else { 0 };
-    let mut last_err = first_err;
+    let mut last_err: Option<std::io::Error> = None;
+    let mut current_try = 0;
     let request_start = SystemTime::now();
 
     loop {
-        if let Some(e) = &last_err {
+        if let Some(_err) = &last_err {
             match retry_policy.should_retry(request_start, current_try) {
                 RetryDecision::DoNotRetry => {
                     return Err(last_err.unwrap_or(std::io::Error::new(
@@ -148,7 +148,6 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 15, e);
                     std::thread::sleep(sleep_for);
                 }
             }
@@ -159,13 +158,18 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
             let _ = make_path_writable(path);
         }
 
-        match fs::remove_dir_all(path) {
+        match std::fs::remove_dir_all(path) {
             Ok(_) => return Ok(()),
             Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
                 last_err = Some(e);
                 current_try += 1;
             }
-            Err(e) => return Err(e),
+            Err(e) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to remove directory {:?}: {}", path, e),
+                ));
+            }
         }
     }
 }
@@ -220,6 +224,8 @@ mod tests {
         use std::fs::OpenOptions;
         use std::io::Write;
         use std::os::windows::fs::OpenOptionsExt;
+        use std::sync::atomic::AtomicBool;
+        use std::sync::atomic::Ordering;
         use std::sync::{Arc, Mutex};
         use std::time::Duration;
         use tempfile::TempDir;
@@ -233,7 +239,7 @@ mod tests {
             let file_path = dir_path.join("test.txt");
 
             File::create(&file_path)?;
-            let result = try_remove_with_retry(&dir_path, None);
+            let result = try_remove_with_retry(&dir_path);
             assert!(result.is_ok());
             assert!(!dir_path.exists());
 
@@ -243,14 +249,14 @@ mod tests {
         #[test]
         fn test_nonexistent_path() {
             let nonexistent_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
-            let result = try_remove_with_retry(&nonexistent_path, None);
+            let result = try_remove_with_retry(&nonexistent_path);
             assert!(result.is_err());
         }
 
         #[test]
         fn test_locked_file_retry() -> std::io::Result<()> {
             let temp_dir = TempDir::new()?;
-            let dir_path = temp_dir.path().to_path_buf();
+            let dir_path = temp_dir.into_path();
             let file_path = dir_path.join("locked.txt");
 
             // Create the file with exclusive sharing mode (locked)
@@ -266,9 +272,6 @@ mod tests {
             let file_handle = Arc::new(Mutex::new(Some(file)));
             let file_handle_clone = file_handle.clone();
             let file_released_clone = file_released.clone();
-
-            // Forget temp_dir to prevent automatic cleanup
-            std::mem::forget(temp_dir);
 
             // Create a thread that will release the file lock after a delay
             let handle = std::thread::spawn(move || {
@@ -286,11 +289,8 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(100));
             });
 
-            // Create the error that would trigger retry logic
-            let locked_file_error = std::io::Error::from_raw_os_error(32);
-
             // Start the removal process with retry
-            let result = try_remove_with_retry(&dir_path, Some(locked_file_error));
+            let result = try_remove_with_retry(&dir_path);
 
             // Wait for the file release thread to complete
             handle.join().unwrap();
@@ -373,7 +373,7 @@ mod tests {
                 "File should be read-only"
             );
 
-            let result = try_remove_with_retry(&dir_path, None);
+            let result = try_remove_with_retry(&dir_path);
 
             assert!(
                 result.is_ok(),
