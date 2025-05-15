@@ -3821,7 +3821,7 @@ dependencies = [
  "pixi_consts",
  "rattler",
  "rattler_conda_types",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_package_streaming",
  "rattler_repodata_gateway",
  "reqwest",
@@ -4195,7 +4195,7 @@ dependencies = [
  "rattler_conda_types",
  "rattler_digest",
  "rattler_menuinst",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_package_streaming",
  "rattler_shell",
  "rayon",
@@ -4266,7 +4266,7 @@ dependencies = [
  "rattler_digest",
  "rattler_index",
  "rattler_menuinst",
- "rattler_networking 0.22.12",
+ "rattler_networking",
  "rattler_package_streaming",
  "rattler_redaction",
  "rattler_repodata_gateway",
@@ -4333,7 +4333,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "rattler_conda_types",
  "rattler_digest",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_package_streaming",
  "rayon",
  "reqwest",
@@ -4420,7 +4420,7 @@ dependencies = [
  "opendal 0.52.0",
  "rattler_conda_types",
  "rattler_digest",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_package_streaming",
  "reqwest",
  "serde_json",
@@ -4470,34 +4470,6 @@ dependencies = [
 
 [[package]]
 name = "rattler_networking"
-version = "0.22.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfe0171ee4c22e335ade0cb926e83cdf08a5dda5eaf26fc21fa9948beb65c764"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "dirs",
- "fs-err",
- "getrandom 0.2.16",
- "google-cloud-auth",
- "http 1.3.1",
- "itertools 0.14.0",
- "keyring",
- "netrc-rs",
- "reqwest",
- "reqwest-middleware",
- "retry-policies",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.12",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "rattler_networking"
 version = "0.23.0"
 source = "git+https://github.com/pavelzw/rattler?branch=bump-zip#07e06fa2dcc0582f89e15b68b53a2fa567053c91"
 dependencies = [
@@ -4537,7 +4509,7 @@ dependencies = [
  "num_cpus",
  "rattler_conda_types",
  "rattler_digest",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_redaction",
  "reqwest",
  "reqwest-middleware",
@@ -4607,7 +4579,7 @@ dependencies = [
  "rattler_cache",
  "rattler_conda_types",
  "rattler_digest",
- "rattler_networking 0.23.0",
+ "rattler_networking",
  "rattler_redaction",
  "reqwest",
  "reqwest-middleware",
