@@ -167,8 +167,18 @@ impl TryConvertNode<PackageName> for RenderedNode {
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
-        PackageName::from_str(self.as_str())
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])
+        let name = PackageName::from_str(self.as_str())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])?;
+
+        if name.as_normalized() != name.as_source() {
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::PackageNameNormalization(name.as_source().to_string()),
+                help = "package names are case insensitive, but the name is not normalized"
+            )]);
+        }
+
+        Ok(name)
     }
 }
 

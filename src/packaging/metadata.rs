@@ -291,8 +291,21 @@ impl Output {
             *self.recipe.build().noarch()
         };
 
+        if self.name().as_normalized() != self.name().as_source() {
+            tracing::warn!(
+                "The package name {} is not the same as the source name {}. Normalizing to {}.",
+                self.name().as_normalized(),
+                self.name().as_source(),
+                self.name().as_normalized()
+            );
+        }
+
         Ok(IndexJson {
-            name: self.name().as_normalized().parse().expect("Should always be valid"),
+            name: self
+                .name()
+                .as_normalized()
+                .parse()
+                .expect("Should always be valid"),
             version: self.version().clone(),
             build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
