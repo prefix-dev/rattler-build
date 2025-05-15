@@ -2,6 +2,7 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
+    metadata::Debug,
     opt::{
         AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
         CondaForgeData, PrefixData, QuetzData, TestData,
@@ -138,7 +139,7 @@ fn build_recipes_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=None, test_index=None))]
 fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
@@ -146,6 +147,8 @@ fn test_package_py(
     auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
+    debug: Option<bool>,
+    test_index: Option<usize>,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -173,7 +176,15 @@ fn test_package_py(
                 .collect::<PyResult<_>>()?,
         ),
     };
-    let test_data = TestData::new(package_file, channel, compression_threads, common);
+    let debug = Debug::new(debug.unwrap_or(false));
+    let test_data = TestData::new(
+        package_file,
+        channel,
+        compression_threads,
+        debug,
+        test_index,
+        common,
+    );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
