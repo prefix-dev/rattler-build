@@ -135,7 +135,7 @@ fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
     let request_start = SystemTime::now();
 
     loop {
-        if let Some(_err) = &last_err {
+        if let Some(err) = &last_err {
             match retry_policy.should_retry(request_start, current_try) {
                 RetryDecision::DoNotRetry => {
                     return Err(last_err.unwrap_or(std::io::Error::new(
@@ -148,7 +148,7 @@ fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 5, err);
 
                     std::thread::sleep(sleep_for);
                 }
