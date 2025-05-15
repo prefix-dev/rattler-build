@@ -18,10 +18,7 @@ impl Interpreter for BashInterpreter {
 
         tokio::fs::write(&build_env_path, script).await?;
 
-        let preamble = BASH_PREAMBLE.replace(
-            "((script_path))",
-            &format!("\"{}\"", build_env_path.to_string_lossy()),
-        );
+        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
         let script = format!("{}\n{}", preamble, args.script.script());
         tokio::fs::write(&build_script_path, script).await?;
 

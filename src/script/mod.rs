@@ -72,31 +72,21 @@ impl ExecutionArgs {
     /// will be replaced with the actual variable name.
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-
-        /// Function to add path replacements with handling of spaces
-        fn add_path_replacement(
-            replacements: &mut HashMap<String, String>,
-            path: &Path,
-            var_name: &str,
-            template: &str,
-        ) {
-            let path_str = path.display().to_string();
-            let var_replacement = template.replace("((var))", var_name);
-
-            replacements.insert(path_str.clone(), var_replacement.clone());
-
-            // Add quoted version for bash scripts if path contains spaces
-            if path_str.contains(' ') && template.starts_with('$') {
-                replacements.insert(format!("\"{}\"", path_str), var_replacement);
-            }
-        }
-
         if let Some(build_prefix) = &self.build_prefix {
-            add_path_replacement(&mut replacements, build_prefix, "BUILD_PREFIX", template);
+            replacements.insert(
+                build_prefix.display().to_string(),
+                template.replace("((var))", "BUILD_PREFIX"),
+            );
         };
+        replacements.insert(
+            self.run_prefix.display().to_string(),
+            template.replace("((var))", "PREFIX"),
+        );
 
-        add_path_replacement(&mut replacements, &self.run_prefix, "PREFIX", template);
-        add_path_replacement(&mut replacements, &self.work_dir, "SRC_DIR", template);
+        replacements.insert(
+            self.work_dir.display().to_string(),
+            template.replace("((var))", "SRC_DIR"),
+        );
 
         // if the paths contain `\` then also replace the forward slash variants
         for (k, v) in replacements.clone() {

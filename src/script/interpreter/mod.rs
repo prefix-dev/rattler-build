@@ -30,7 +30,7 @@ pub(crate) const DEBUG_HELP: &str = "To debug the build, run it manually in the 
 pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
+    source "((script_path))"
 fi
 ## End of preamble
 "#;
