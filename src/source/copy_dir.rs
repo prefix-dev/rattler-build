@@ -37,7 +37,6 @@ impl Default for CopyOptions {
 
 /// Copy metadata from source to destination
 fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
-    tracing::info!("Copying metadata from {:?} to {:?}", from, to);
     let metadata = fs_err::metadata(from)?;
 
     // Copy timestamps using std::fs::FileTimes
