@@ -36,6 +36,8 @@ impl Default for CopyOptions {
 }
 
 /// Copy metadata from source to destination
+/// The call to `fs::copy` already copied the data and the permissions, but
+/// we need to copy the timestamps as well.
 fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
     let metadata = fs_err::metadata(from)?;
 
@@ -45,11 +47,12 @@ fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
         .set_modified(metadata.modified()?);
 
     let file = std::fs::OpenOptions::new().write(true).open(to)?;
-    file.set_times(file_times)?;
-
-    // Copy permissions
-    let permissions = metadata.permissions();
-    fs_err::set_permissions(to, permissions)?;
+    match file.set_times(file_times) {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::debug!("failed to set file times: {:?} - ignoring", e);
+        }
+    }
 
     Ok(())
 }
