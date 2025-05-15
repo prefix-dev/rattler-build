@@ -503,7 +503,7 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
-        debug: bool,
+        debug: Debug,
         continue_on_failure: ContinueOnFailure,
     ) -> Self {
         Self {
@@ -537,7 +537,7 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug: Debug::new(debug),
+            debug,
             continue_on_failure,
         }
     }
@@ -582,7 +582,7 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
-            opts.debug,
+            Debug::new(opts.debug),
             opts.continue_on_failure.into(),
         )
     }
