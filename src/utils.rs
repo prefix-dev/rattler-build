@@ -123,9 +123,13 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-/// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
 fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+    // Use a more gradual backoff with longer max retry time
+    let retry_policy = ExponentialBackoff::builder()
+        .base_delay(Duration::from_millis(100))
+        .max_delay(Duration::from_secs(2))
+        .build_with_max_retries(15);
+
     let mut current_try = if first_err.is_some() { 1 } else { 0 };
     let mut last_err = first_err;
     let request_start = SystemTime::now();
@@ -144,10 +148,15 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 15, e);
                     std::thread::sleep(sleep_for);
                 }
             }
+        }
+
+        // Try to make the directory writable before removal
+        if path.exists() {
+            let _ = make_path_writable(path);
         }
 
         match fs::remove_dir_all(path) {
@@ -159,6 +168,21 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
             Err(e) => return Err(e),
         }
     }
+}
+
+#[cfg(windows)]
+fn make_path_writable(path: &Path) -> std::io::Result<()> {
+    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        let file_path = entry.path();
+        if let Ok(metadata) = fs::metadata(file_path) {
+            let mut permissions = metadata.permissions();
+            if permissions.readonly() {
+                permissions.set_readonly(false);
+                let _ = fs::set_permissions(file_path, permissions);
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -228,37 +252,64 @@ mod tests {
             let temp_dir = TempDir::new()?;
             let dir_path = temp_dir.path().to_path_buf();
             let file_path = dir_path.join("locked.txt");
+
+            // Create the file with exclusive sharing mode (locked)
             let file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .share_mode(0)
+                .share_mode(0) // Exclusive lock
                 .open(&file_path)?;
 
+            // Use atomic flag for synchronization
+            let file_released = Arc::new(AtomicBool::new(false));
             let file_handle = Arc::new(Mutex::new(Some(file)));
             let file_handle_clone = file_handle.clone();
-            let locked_file_error = std::io::Error::from_raw_os_error(32);
+            let file_released_clone = file_released.clone();
+
+            // Forget temp_dir to prevent automatic cleanup
+            std::mem::forget(temp_dir);
+
+            // Create a thread that will release the file lock after a delay
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(300));
+                // Wait longer to ensure retry logic kicks in
+                std::thread::sleep(Duration::from_millis(500));
+
+                // Release the file lock
                 let mut guard = file_handle_clone.lock().unwrap();
                 *guard = None;
+
+                // Signal that the file has been released
+                file_released_clone.store(true, Ordering::SeqCst);
+
+                // Give some time for OS to fully release the handle
+                std::thread::sleep(Duration::from_millis(100));
             });
 
-            let dir_path_clone = dir_path.clone();
-            let remove_result = std::thread::spawn(move || {
-                try_remove_with_retry(&dir_path_clone, Some(locked_file_error))
-            });
+            // Create the error that would trigger retry logic
+            let locked_file_error = std::io::Error::from_raw_os_error(32);
 
+            // Start the removal process with retry
+            let result = try_remove_with_retry(&dir_path, Some(locked_file_error));
+
+            // Wait for the file release thread to complete
             handle.join().unwrap();
-            let result = remove_result.join().unwrap();
-            std::thread::sleep(Duration::from_millis(1000));
 
+            // Verify the file was actually released
+            assert!(
+                file_released.load(Ordering::SeqCst),
+                "File lock was never released"
+            );
+
+            // Wait a bit more to ensure OS has fully processed the removal
+            std::thread::sleep(Duration::from_millis(100));
+
+            // Check the result
             assert!(
                 result.is_ok(),
                 "Directory removal failed: {:?}",
                 result.err()
             );
-
             assert!(!dir_path.exists(), "Directory still exists!");
 
             Ok(())
