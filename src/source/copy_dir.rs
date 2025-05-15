@@ -37,11 +37,8 @@ impl Default for CopyOptions {
 
 /// Copy metadata from source to destination
 fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
+    tracing::info!("Copying metadata from {:?} to {:?}", from, to);
     let metadata = fs_err::metadata(from)?;
-
-    // Copy permissions
-    let permissions = metadata.permissions();
-    fs_err::set_permissions(to, permissions)?;
 
     // Copy timestamps using std::fs::FileTimes
     let file_times = FileTimes::new()
@@ -51,13 +48,9 @@ fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
     let file = std::fs::OpenOptions::new().write(true).open(to)?;
     file.set_times(file_times)?;
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, chown};
-
-        // Set owner and group
-        let _ = chown(to, Some(metadata.uid()), Some(metadata.gid()));
-    }
+    // Copy permissions
+    let permissions = metadata.permissions();
+    fs_err::set_permissions(to, permissions)?;
 
     Ok(())
 }
