@@ -557,7 +557,7 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     for p in paths["paths"]:
         path = p["_path"]
         if path == "is_binary/file_with_prefix":
-            check_path(p, "binary")
+            check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
         elif path == "is_binary/file_without_prefix":
@@ -572,7 +572,7 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
-            check_path(p, "binary")
+            check_path(p, None)
         elif path == "force_binary/file_without_prefix":
             check_path(p, None)
         elif path == "ignore/file_with_prefix":

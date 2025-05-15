@@ -161,6 +161,13 @@ pub fn create_prefix_placeholder(
         FileMode::Binary
     };
 
+    // Special handling for binary files forced as text
+    if forced_file_type == Some(FileMode::Text) && !detected_is_text {
+        if has_prefix.is_none() && contains_prefix_binary(file_path, encoded_prefix)? {
+            has_prefix = Some(prefix.to_string_lossy().to_string());
+        }
+    }
+
     if file_mode == FileMode::Binary {
         if target_platform.is_windows() {
             tracing::debug!(
