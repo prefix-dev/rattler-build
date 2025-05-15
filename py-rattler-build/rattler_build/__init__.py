@@ -55,6 +55,7 @@ def build_recipes(
     noarch_build_platform: Union[str, None] = None,
     allow_insecure_host: Union[List[str], None] = None,
     continue_on_failure: bool = False,
+    debug: bool = False,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -115,6 +116,7 @@ def build_recipes(
         noarch_build_platform,
         allow_insecure_host,
         continue_on_failure,
+        debug,
     )
 
 
@@ -124,6 +126,8 @@ def test_package(
     compression_threads: Union[int, None] = None,
     auth_file: Union[str, Path, None] = None,
     channel_priority: Union[str, None] = None,
+    debug: bool = False,
+    test_index: Union[int, None] = None,
 ) -> None:
     """
     Run a test for a single package.
@@ -140,7 +144,7 @@ def test_package(
     Returns:
         None
     """
-    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority)
+    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority, debug, test_index)
 
 
 def upload_package_to_quetz(
