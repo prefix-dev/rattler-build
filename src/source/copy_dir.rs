@@ -513,7 +513,7 @@ mod test {
     #[test]
     fn test_copy_dir() {
         let tmp_dir = tempfile::TempDir::new().unwrap();
-        let tmp_dir_path = tmp_dir.into_path();
+        let tmp_dir_path = tmp_dir.keep();
         let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
         fs_err::create_dir_all(&dir).unwrap();
