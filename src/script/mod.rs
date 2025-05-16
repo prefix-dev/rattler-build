@@ -1,6 +1,7 @@
 //! Module for running scripts in different interpreters.
 mod interpreter;
 mod sandbox;
+pub use interpreter::InterpreterError;
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
 use crate::script::interpreter::Interpreter;
@@ -246,7 +247,7 @@ impl Script {
         mut jinja_config: Option<Jinja>,
         sandbox_config: Option<&SandboxConfiguration>,
         debug: Debug,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), InterpreterError> {
         // TODO: This is a bit of an out and about way to determine whether or
         //  not nushell is available. It would be best to run the activation
         //  of the environment and see if nu is on the path, but hat is a
@@ -349,7 +350,7 @@ impl Script {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         "Nushell is not installed, did you add `nushell` to the build dependencies?".to_string(),
-                    ));
+                    ).into());
                 }
                 NuShellInterpreter.run(exec_args).await?
             }
@@ -362,7 +363,8 @@ impl Script {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     format!("Unsupported interpreter: {}", interpreter),
-                ));
+                )
+                .into());
             }
         };
 
@@ -437,7 +439,7 @@ impl Output {
     /// - The script file cannot be read or found
     /// - The script execution fails
     /// - The interpreter is not supported or not available
-    pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
+    pub async fn run_build_script(&self) -> Result<(), InterpreterError> {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
 

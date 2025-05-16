@@ -71,7 +71,7 @@ async fn fetch_remote(
 
     let (mut response, download_size) = {
         let resp = client
-            .get(url.as_str())
+            .get(url.clone())
             .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
             .send()
             .await
