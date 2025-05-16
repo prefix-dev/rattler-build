@@ -89,24 +89,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
             // If the normal removal fails, try to forcefully remove it.
-            tracing::debug!(
-                "Adjusting permissions to remove read-only files in the build directory."
-            );
-            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-                let file_path = entry.path();
-                let metadata = fs::metadata(file_path)?;
-                let mut permissions = metadata.permissions();
-
-                if permissions.readonly() {
-                    // Set only the user write bit
-                    #[cfg(unix)]
-                    permissions.set_mode(permissions.mode() | 0o200);
-                    #[cfg(windows)]
-                    #[allow(clippy::permissions_set_readonly_false)]
-                    permissions.set_readonly(false);
-                    fs::set_permissions(file_path, permissions)?;
-                }
-            }
+            let _ = make_path_writable(path);
             fs::remove_dir_all(path)
         }
         Err(e) => Err(e),
@@ -160,6 +143,7 @@ fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
             let _ = make_path_writable(path);
         }
 
+        // Note: do not use `fs_err` here, it will not give us the correct error code!
         match std::fs::remove_dir_all(path) {
             Ok(_) => return Ok(()),
             Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
@@ -176,16 +160,26 @@ fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
     }
 }
 
-#[cfg(windows)]
+/// Make the path and any children writable by adjusting permissions.
 fn make_path_writable(path: &Path) -> std::io::Result<()> {
+    // If the normal removal fails, try to forcefully remove it.
+    tracing::debug!(
+        "Adjusting permissions to remove read-only files in {}.",
+        path.display()
+    );
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
         let file_path = entry.path();
-        if let Ok(metadata) = fs::metadata(file_path) {
-            let mut permissions = metadata.permissions();
-            if permissions.readonly() {
-                permissions.set_readonly(false);
-                let _ = fs::set_permissions(file_path, permissions);
-            }
+        let metadata = fs::metadata(file_path)?;
+        let mut permissions = metadata.permissions();
+
+        if permissions.readonly() {
+            // Set only the user write bit
+            #[cfg(unix)]
+            permissions.set_mode(permissions.mode() | 0o200);
+            #[cfg(windows)]
+            #[allow(clippy::permissions_set_readonly_false)]
+            permissions.set_readonly(false);
+            fs::set_permissions(file_path, permissions)?;
         }
     }
     Ok(())
