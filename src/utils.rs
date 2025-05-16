@@ -85,36 +85,42 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
 
 /// Removes a directory and all its contents, including read-only files.
 pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
-    let result = match fs::remove_dir_all(path) {
+    // Using std::fs to get proper error codes on Windows
+    let result = match std::fs::remove_dir_all(path) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
             // If the normal removal fails, try to forcefully remove it.
             let _ = make_path_writable(path);
-            fs::remove_dir_all(path)
+            std::fs::remove_dir_all(path)
         }
         Err(e) => Err(e),
     };
 
     #[cfg(windows)]
     {
-        if result.is_err() {
-            return try_remove_with_retry(path);
+        if let Err(e) = result {
+            return try_remove_with_retry(path, Some(e));
         }
+    }
+
+    if let Err(err) = &result {
+        tracing::warn!("Failed to remove directory {:?}: {}", path, err);
+    } else {
+        tracing::debug!("Removed directory {:?}", path);
     }
 
     result
 }
 
 #[cfg(windows)]
-fn try_remove_with_retry(path: &Path) -> std::io::Result<()> {
+fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> std::io::Result<()> {
     // Use a more gradual backoff with longer max retry time
     let retry_policy = ExponentialBackoff::builder()
         .base(2)
         .retry_bounds(Duration::from_millis(100), Duration::from_secs(2))
         .build_with_max_retries(5);
 
-    let mut last_err: Option<std::io::Error> = None;
-    let mut current_try = 0;
+    let mut current_try = if last_err.is_some() { 1 } else { 0 };
     let request_start = SystemTime::now();
 
     loop {
@@ -235,7 +241,7 @@ mod tests {
             let file_path = dir_path.join("test.txt");
 
             File::create(&file_path)?;
-            let result = try_remove_with_retry(&dir_path);
+            let result = try_remove_with_retry(&dir_path, None);
             assert!(result.is_ok());
             assert!(!dir_path.exists());
 
@@ -245,7 +251,7 @@ mod tests {
         #[test]
         fn test_nonexistent_path() {
             let nonexistent_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
-            let result = try_remove_with_retry(&nonexistent_path);
+            let result = try_remove_with_retry(&nonexistent_path, None);
             assert!(result.is_err());
         }
 
@@ -286,7 +292,7 @@ mod tests {
             });
 
             // Start the removal process with retry
-            let result = try_remove_with_retry(&dir_path);
+            let result = try_remove_with_retry(&dir_path, None);
 
             // Wait for the file release thread to complete
             handle.join().unwrap();
@@ -369,7 +375,7 @@ mod tests {
                 "File should be read-only"
             );
 
-            let result = try_remove_with_retry(&dir_path);
+            let result = try_remove_with_retry(&dir_path, None);
 
             assert!(
                 result.is_ok(),
