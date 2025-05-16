@@ -1,0 +1,10 @@
+---
+source: src/recipe/parser/test.rs
+expression: yaml_serde
+---
+- package_contents:
+    include:
+      include:
+      - foo.hpp
+      exclude:
+      - baz.hpp
