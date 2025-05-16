@@ -3744,7 +3744,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.41.0"
+version = "0.42.0"
 dependencies = [
  "clap",
  "pixi_config",
@@ -4029,7 +4029,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.41.0"
+version = "0.42.0"
 dependencies = [
  "anyhow",
  "async-once-cell",
