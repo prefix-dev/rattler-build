@@ -630,4 +630,44 @@ mod test {
             _ => panic!("expected python test"),
         }
     }
+
+    #[test]
+    fn test_package_contents_parsing() {
+        let test_section = r#"
+        tests:
+          - package_contents:
+              include:
+                exists:
+                  - foo.hpp
+                not_exists:
+                  - baz.hpp
+        "#;
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
+        let parsed: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
+        match &parsed[0] {
+            TestType::PackageContents { package_contents } => {
+                let inc: Vec<&str> = package_contents
+                    .include
+                    .include_globs()
+                    .iter()
+                    .map(|g| g.source())
+                    .collect();
+                let exc: Vec<&str> = package_contents
+                    .include
+                    .exclude_globs()
+                    .iter()
+                    .map(|g| g.source())
+                    .collect();
+                assert_eq!(inc, vec!["foo.hpp"]);
+                assert_eq!(exc, vec!["baz.hpp"]);
+            }
+            _ => panic!("expected a package_contents test"),
+        }
+    }
 }

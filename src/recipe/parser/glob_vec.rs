@@ -294,24 +294,27 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match (key_str, value) {
-                ("include", RenderedNode::Sequence(seq)) => {
+                ("include" | "exists", RenderedNode::Sequence(seq)) => {
                     include = to_vector_of_globs(seq)?;
                 }
-                ("exclude", RenderedNode::Sequence(seq)) => {
+                ("exclude" | "not_exists", RenderedNode::Sequence(seq)) => {
                     exclude = to_vector_of_globs(seq)?;
                 }
-                ("include" | "exclude", _) => {
+                ("include" | "exists" | "exclude" | "not_exists", _) => {
                     return Err(vec![_partialerror!(
                         *value.span(),
                         ErrorKind::ExpectedSequence,
-                        label = "expected a list of globs strings for `include` or `exclude`"
+                        label = "expected a list of globs strings for `include`/`exists` or `exclude`/`not_exists`"
                     )]);
                 }
                 _ => {
                     return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(key_str.to_string().into()),
-                        help = format!("valid options for {} are `include` and `exclude`", name)
+                        help = format!(
+                            "valid options for {} are `include`, `exclude`, `exists`, and `not_exists`",
+                            name
+                        )
                     )]);
                 }
             }
@@ -567,5 +570,20 @@ mod tests {
         insta::assert_snapshot!(&globs_none);
         let parsed_again: TestAllOrGlobVec = serde_yaml::from_str(&globs_none).unwrap();
         assert_eq!(parsed_again.globs, AllOrGlobVec::All(false));
+    }
+
+    #[test]
+    fn test_parsing_globvec_synonyms() {
+        let yaml = r#"globs:
+        exists: ["foo", "bar"]
+        not_exists: ["baz/**/qux"]
+        "#;
+        let yaml_root = RenderedNode::parse_yaml(0, yaml)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
+        let globvec: GlobVec = tests_node.try_convert("globs").unwrap();
+        assert_eq!(globvec.include.len(), 2);
+        assert_eq!(globvec.exclude.len(), 1);
     }
 }
