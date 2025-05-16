@@ -8,6 +8,20 @@ source:
 
 build:
   number: 0
+  script:
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/license-folder/
+        - echo "prefix-license" > $PREFIX/license-folder/prefix-license.txt
+        - echo "source-license" > $SRC_DIR/source-license.txt
+      else:
+        - mkdir -p %PREFIX%\license-folder\
+        - echo "prefix-license" > %PREFIX%\license-folder\prefix-license.txt
+        - echo "source-license" > %SRC_DIR%\source-license.txt
 
 about:
-  license_file: license.txt
+  license_file:
+    - license.txt
+    - recipe_license.txt
+    - license-folder/prefix-license.txt
+    - source-license.txt
