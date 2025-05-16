@@ -49,6 +49,10 @@ generate-cli-docs = []
 name = "rattler-build"
 required-features = ["recipe-generation"]
 
+[[bin]]
+name = "patch-apply-gen-test-data"
+path = "./scripts/patch-apply-gen-test-data.rs"
+
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
@@ -177,6 +181,11 @@ retry-policies = "0.4.0"
 strum = "0.27.1"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
+http-range-client = { git = "https://github.com/remimimimimi/http-range-client.git", default-features = false, features = [
+  "reqwest-sync",
+  "rustls-tls"
+] }
+
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { version = "0.10.8", features = ["asm"] }

@@ -2439,6 +2439,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-range-client"
+version = "0.9.0"
+source = "git+https://github.com/remimimimimi/http-range-client.git#2e7dd3ac5dfe57be1630ac40d15a777bb13339a7"
+dependencies = [
+ "async-trait",
+ "byteorder",
+ "bytes",
+ "read-logger",
+ "reqwest",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "http-serde"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4249,6 +4262,7 @@ dependencies = [
  "globset",
  "goblin",
  "hex",
+ "http-range-client",
  "ignore",
  "indexmap 2.9.0",
  "indicatif",
@@ -4711,6 +4725,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7f715a23c7db804b71eb9162a9cf210b89e99db9c3649a2a038d13b7594a99"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4865,6 +4888,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.10",

@@ -16,6 +16,7 @@ test-slow = "cargo test --release"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
 generate-cli-docs = "mkdir src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"
+generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]
