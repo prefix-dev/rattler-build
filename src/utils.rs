@@ -84,6 +84,7 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
 }
 
 /// Removes a directory and all its contents, including read-only files.
+#[allow(clippy::disallowed_methods)]
 pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
     // Using std::fs to get proper error codes on Windows
     let result = match std::fs::remove_dir_all(path) {
