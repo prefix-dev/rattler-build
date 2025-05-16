@@ -394,7 +394,7 @@ pub async fn run_test(
     // extract package in place
     if package_folder.join("info/test").exists() {
         let prefix =
-            TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.output_dir)?.into_path();
+            TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.output_dir)?.keep();
 
         tracing::info!("Creating test environment in '{}'", prefix.display());
 
@@ -470,8 +470,7 @@ pub async fn run_test(
 
         for test in tests {
             let test_prefix =
-                TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?
-                    .into_path();
+                TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.keep();
             match test {
                 TestType::Command(c) => {
                     c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)

@@ -354,6 +354,7 @@ impl Output {
             noarch,
             track_features,
             features: None,
+            purls: None,
             python_site_packages_path: recipe.build().python().site_packages_path.clone(),
         })
     }

@@ -60,7 +60,7 @@ serde_json = "1.0.140"
 reqwest = { version = "0.12.15", default-features = false, features = [
   "multipart",
 ] }
-tokio = { version = "1.44.2", features = [
+tokio = { version = "1.45.0", features = [
   "rt",
   "macros",
   "rt-multi-thread",
@@ -71,8 +71,8 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.37", features = ["derive", "env", "cargo"] }
-minijinja = { version = "2.9.0", features = [
+clap = { version = "4.5.38", features = ["derive", "env", "cargo"] }
+minijinja = { version = "2.10.2", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -93,7 +93,7 @@ futures = "0.3.31"
 indicatif = "0.17.11"
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 thiserror = "2.0.12"
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 chrono = "0.4.41"
 sha1 = "0.10.6"
 spdx = "0.10.8"
@@ -106,13 +106,12 @@ indexmap = "2.9.0"
 dunce = "1.0.5"
 fs-err = "3.1.0"
 which = "7.0.3"
-clap_complete = "4.5.48"
+clap_complete = "4.5.50"
 clap_complete_nushell = "4.5.5"
 tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
 
 tar = "0.4.44"
-zip = { version = "2.6.1", default-features = false, features = [
-  "flate2",
+zip = { version = "3.0.0", default-features = false, features = [
   "deflate",
 ] }
 bzip2 = "0.5.2"
@@ -127,62 +126,62 @@ async-once-cell = "0.5.4"
 terminal_size = "0.4.2"
 memchr = "2.7.4"
 ratatui = { version = "0.29.0", optional = true }
-crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
+crossterm = { version = "0.29.0", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
-tui-input = { version = "0.11.1", optional = true }
+tui-input = { version = "0.12.1", optional = true }
 reflink-copy = "0.1.26"
 rayon = "1.10.0"
 regex = "1.11.1"
 async-recursion = "1.1.1"
-opendal = { version = "0.53.1", default-features = false, features = [
+opendal = { version = "0.53.2", default-features = false, features = [
   "services-s3",
 ] }
 
 # Rattler crates
-pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
-rattler = { version = "0.33.5", default-features = false, features = [
+pixi_config = { git = "https://github.com/wolfv/pixi", branch = "try-fix-pixi-config" }
+rattler = { version = "0.33.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.17", default-features = false }
-rattler_conda_types = { version = "0.32.0", default-features = false, features = [
+rattler_cache = { version = "0.3.19", default-features = false }
+rattler_conda_types = { version = "0.34.0", default-features = false, features = [
   "rayon",
 ] }
-rattler_digest = { version = "1.1.1", default-features = false, features = [
+rattler_digest = { version = "1.1.2", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.22.5", default-features = false }
-rattler_networking = { version = "0.22.12", default-features = false }
+rattler_index = { version = "0.22.7", default-features = false }
+rattler_networking = { version = "0.24.0", default-features = false }
 rattler_redaction = { version = "0.1.10" }
-rattler_repodata_gateway = { version = "0.22.5", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.22.7", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.7", default-features = false, features = [
+rattler_sandbox = { version = "0.1.8", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.26", default-features = false, features = [
+rattler_shell = { version = "0.23.1", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.4.5", default-features = false, features = [
+rattler_solve = { version = "2.0.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.10", default-features = false }
-rattler_package_streaming = { version = "0.22.36", default-features = false }
-rattler_menuinst = "0.2.7"
+rattler_virtual_packages = { version = "2.0.12", default-features = false }
+rattler_package_streaming = { version = "0.22.38", default-features = false }
+rattler_menuinst = "0.2.9"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
-retry-policies = "0.4.0"
+retry-policies = "0.5.0"
 strum = "0.27.1"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-sha2 = { version = "0.10.8", features = ["asm"] }
+sha2 = { version = "0.10.9", features = ["asm"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-sha2 = { version = "0.10.8" }
+sha2 = { version = "0.10.9" }
 
 [dev-dependencies]
 insta = { version = "1.43.1", features = ["yaml"] }
