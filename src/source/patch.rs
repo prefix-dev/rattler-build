@@ -150,7 +150,7 @@ pub(crate) fn apply_patches(
             .arg("--verbose")
             .arg("--ignore-space-change")
             .arg("--ignore-whitespace")
-            .arg("--inaccurate-eof")
+            .arg("--recount")
             .arg(patch_file_path.as_os_str())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
