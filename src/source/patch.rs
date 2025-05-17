@@ -2,6 +2,7 @@
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
 use itertools::Itertools;
+use std::process::{Command, Output};
 use std::{
     collections::HashSet,
     ffi::OsStr,
@@ -140,47 +141,82 @@ pub(crate) fn apply_patches(
 
         let strip_level = guess_strip_level(&patch_file_path, work_dir)?;
 
-        let mut cmd_builder = system_tools
-            .call(Tool::Git)
-            .map_err(SourceError::GitNotFound)?;
-        cmd_builder
-            .current_dir(work_dir)
-            .arg("apply")
-            .arg(format!("-p{}", strip_level))
-            .arg("--verbose")
-            .arg("--ignore-space-change")
-            .arg("--ignore-whitespace")
-            .arg("--recount")
-            .arg(patch_file_path.as_os_str())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        struct GitApplyAttempt {
+            command: Command,
+            output: Output,
+        }
 
-        tracing::debug!(
-            "Running: {} {}",
-            cmd_builder.get_program().to_string_lossy(),
+        let mut outputs = Vec::new();
+        for try_extra_flag in [None, Some("--recount")] {
+            let mut cmd_builder = system_tools
+                .call(Tool::Git)
+                .map_err(SourceError::GitNotFound)?;
             cmd_builder
-                .get_args()
-                .map(OsStr::to_string_lossy)
-                .format(" ")
-        );
+                .current_dir(work_dir)
+                .arg("apply")
+                .arg(format!("-p{}", strip_level))
+                .arg("--verbose")
+                .arg("--ignore-space-change")
+                .arg("--ignore-whitespace")
+                .args(try_extra_flag.into_iter())
+                .arg(patch_file_path.as_os_str())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
 
-        let output = cmd_builder.output().map_err(SourceError::Io)?;
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if !output.status.success() {
-            return Err(SourceError::PatchFailed(format!(
-                "{}\n`git apply` failed. The output of the command is:\n\n\t{}\n\nThe command was invoked with:\n\n\t{} {}",
-                patch_path_relative.display(),
-                stderr.lines().format("\n\t"),
+            tracing::debug!(
+                "Running: {} {}",
                 cmd_builder.get_program().to_string_lossy(),
                 cmd_builder
                     .get_args()
                     .map(OsStr::to_string_lossy)
                     .format(" ")
+            );
+
+            let output = cmd_builder.output().map_err(SourceError::Io)?;
+            outputs.push(GitApplyAttempt {
+                command: cmd_builder,
+                output: output.clone(),
+            });
+
+            if outputs
+                .last()
+                .expect("we just added an entry")
+                .output
+                .status
+                .success()
+            {
+                break;
+            }
+        }
+
+        // Check if the last output was successful, if not, we report all the errors.
+        let last_output = outputs.last().expect("we just added at least one entry");
+        if !last_output.output.status.success() {
+            return Err(SourceError::PatchFailed(format!(
+                "{}\n`git apply` failed with a combination of flags.\n\n{}",
+                patch_path_relative.display(),
+                outputs
+                    .into_iter()
+                    .map(
+                        |GitApplyAttempt {
+                             output, command, ..
+                         }| {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            format!(
+                                "With the che command:\n\n\t{} {}The output was:\n\n\t{}\n\n",
+                                command.get_program().to_string_lossy(),
+                                command.get_args().map(OsStr::to_string_lossy).format(" "),
+                                stderr.lines().format("\n\t")
+                            )
+                        }
+                    )
+                    .format("\n\n")
             )));
         }
 
         // Sometimes git apply will skip the contents of a patch. This usually is *not* what we
         // want, so we detect this behavior and return an error.
+        let stderr = String::from_utf8_lossy(&last_output.output.stderr);
         let skipped_patch = stderr
             .lines()
             .any(|line| line.starts_with("Skipped patch "));
@@ -189,8 +225,9 @@ pub(crate) fn apply_patches(
                 "{}\n`git apply` seems to have skipped some of the contents of the patch. The output of the command is:\n\n\t{}\n\nThe command was invoked with:\n\n\t{} {}",
                 patch_path_relative.display(),
                 stderr.lines().format("\n\t"),
-                cmd_builder.get_program().to_string_lossy(),
-                cmd_builder
+                last_output.command.get_program().to_string_lossy(),
+                last_output
+                    .command
                     .get_args()
                     .map(OsStr::to_string_lossy)
                     .format(" ")
