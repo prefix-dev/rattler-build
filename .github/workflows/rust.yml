@@ -128,14 +128,13 @@ jobs:
         shell: bash
         run: 'echo "$HOME/.cargo/bin" >> $GITHUB_PATH'
 
-      - run: env
-      - run: ls ~/.cargo/bin
+      - run: ls -ahl ~/.cargo/bin/
+        if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
         shell: bash
 
       - name: Install Rust toolchain
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
-        run: rustup.exe install
-
+        run: ~/.cargo/bin/rustup.exe install
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
