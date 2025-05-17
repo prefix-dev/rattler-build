@@ -5,6 +5,7 @@ on:
       - "v*.*.*"
   pull_request:
     paths:
+      - '.github/workflows/rust.yml'
       - "src/**"
       - "Cargo.*"
   workflow_dispatch:
