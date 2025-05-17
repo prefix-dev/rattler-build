@@ -125,6 +125,9 @@ jobs:
           Invoke-WebRequest "https://win.rustup.rs/${env:RUSTUP_ARCH}" -OutFile ${{github.workspace}}\rustup-init.exe
           ${{github.workspace}}\rustup-init.exe -y --default-host=${{ matrix.target }} --profile=minimal
         shell: powershell
+      - name: Install Rustup using win.rustup.rs
+        if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+        run: 'echo "~/.cargo/bin" >> $GITHUB_PATH'
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
