@@ -123,7 +123,7 @@ jobs:
           # Disable the download progress bar which can cause perf issues
           $ProgressPreference = "SilentlyContinue"
           Invoke-WebRequest "https://win.rustup.rs/${env:RUSTUP_ARCH}" -OutFile ${{github.workspace}}\rustup-init.exe
-          .\${{github.workspace}}\rustup-init.exe -y --default-host=${{ matrix.target }} --profile=minimal
+          ${{github.workspace}}\rustup-init.exe -y --default-host=${{ matrix.target }} --profile=minimal
         shell: powershell
 
       - name: Install Rust toolchain
