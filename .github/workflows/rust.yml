@@ -118,13 +118,12 @@ jobs:
       - name: Install Rustup using win.rustup.rs
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
         env:
-          RUSTUP_ARCH: ${{ matrix.rustup_arch || 'x86_64' }}
+          RUSTUP_ARCH: aarch64
         run: |
           # Disable the download progress bar which can cause perf issues
           $ProgressPreference = "SilentlyContinue"
-          Invoke-WebRequest "https://win.rustup.rs/${env:RUSTUP_ARCH}" -OutFile rustup-init.exe
-          .\rustup-init.exe -y --default-host=${env:RUSTUP_ARCH}-pc-windows-msvc --profile=minimal
-          del rustup-init.exe
+          Invoke-WebRequest "https://win.rustup.rs/${env:RUSTUP_ARCH}" -OutFile ${{github.workspace}}\rustup-init.exe
+          .\${{github.workspace}}\rustup-init.exe -y --default-host=${{ matrix.target }} --profile=minimal
         shell: powershell
 
       - name: Install Rust toolchain
