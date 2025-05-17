@@ -127,6 +127,7 @@ jobs:
         shell: powershell
       - name: Install Rustup using win.rustup.rs
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+        shell: bash
         run: 'echo "~/.cargo/bin" >> $GITHUB_PATH'
 
       - name: Install Rust toolchain
