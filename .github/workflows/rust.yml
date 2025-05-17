@@ -115,7 +115,7 @@ jobs:
           fi
 
 
-      - run: choco install rustup
+      - run: winget install -e --id Rustlang.Rustup
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
 
       - name: Install Rust toolchain
