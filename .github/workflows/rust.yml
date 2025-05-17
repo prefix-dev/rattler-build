@@ -126,7 +126,7 @@ jobs:
       - name: Install Rustup using win.rustup.rs
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
         shell: bash
-        run: 'echo "${HOME}/.cargo/bin" >> $GITHUB_PATH'
+        run: 'echo "$HOME/.cargo/bin" >> $GITHUB_PATH'
 
       - run: env
       - run: ls ~/.cargo/bin
@@ -134,7 +134,7 @@ jobs:
 
       - name: Install Rust toolchain
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
-        run: rustup install
+        run: rustup.exe install
 
 
       - name: Install Rust toolchain
