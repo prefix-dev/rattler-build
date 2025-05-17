@@ -117,12 +117,10 @@ jobs:
       # https://github.com/rust-lang/rustup/blob/7ba0abf4ced87c239393d83971c1df017c45c40a/ci/actions-templates/windows-builds-template.yaml#L106C1-L115C26
       - name: Install Rustup using win.rustup.rs
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
-        env:
-          RUSTUP_ARCH: aarch64
         run: |
           # Disable the download progress bar which can cause perf issues
           $ProgressPreference = "SilentlyContinue"
-          Invoke-WebRequest "https://win.rustup.rs/${env:RUSTUP_ARCH}" -OutFile ${{github.workspace}}\rustup-init.exe
+          Invoke-WebRequest "https://win.rustup.rs/aarch64" -OutFile ${{github.workspace}}\rustup-init.exe
           ${{github.workspace}}\rustup-init.exe -y --default-host=${{ matrix.target }} --profile=minimal
         shell: powershell
       - name: Install Rustup using win.rustup.rs
@@ -131,7 +129,13 @@ jobs:
         run: 'echo "${HOME}/.cargo/bin" >> $GITHUB_PATH'
 
       - name: Install Rust toolchain
+        if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+        run: rustup install
+
+
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
+        if: ${{ matrix.target != 'aarch64-pc-windows-msvc' }}
         with:
           toolchain: "1.86.0"
           targets: ${{ matrix.target }}
