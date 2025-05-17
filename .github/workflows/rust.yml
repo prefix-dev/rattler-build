@@ -66,6 +66,8 @@ jobs:
             os: windows-2022
           - target: x86_64-pc-windows-msvc
             os: windows-2022
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
     env:
       # These are some environment variables that configure the build so that the binary size is reduced.
       # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
