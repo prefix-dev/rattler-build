@@ -115,6 +115,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
+        shell: bash
         run: rm ~/.cargo/ -rf
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
 
