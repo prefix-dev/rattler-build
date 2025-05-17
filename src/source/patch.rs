@@ -1,13 +1,14 @@
 //! Functions for applying patches to a work directory.
+use super::SourceError;
+use crate::system_tools::{SystemTools, Tool};
+use itertools::Itertools;
 use std::{
     collections::HashSet,
-    io::{BufRead, BufReader, Write},
+    ffi::OsStr,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     process::Stdio,
 };
-
-use super::SourceError;
-use crate::system_tools::{SystemTools, Tool};
 
 fn parse_patch_file<P: AsRef<Path>>(patch_file: P) -> std::io::Result<HashSet<PathBuf>> {
     let file = fs_err::File::open(patch_file.as_ref())?;
@@ -115,6 +116,19 @@ pub(crate) fn apply_patches(
     work_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<(), SourceError> {
+    // Early out to avoid unnecessary work
+    if patches.is_empty() {
+        return Ok(());
+    }
+
+    // Ensure that the working directory is a valid git directory.
+    let git_dir = work_dir.join(".git");
+    let _dot_git_dir = if !git_dir.exists() {
+        Some(TempDotGit::setup(work_dir)?)
+    } else {
+        None
+    };
+
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
 
@@ -124,58 +138,98 @@ pub(crate) fn apply_patches(
             return Err(SourceError::PatchNotFound(patch_file_path));
         }
 
-        // Read the patch content into a string. This also normalizes line endings to LF.
-        let patch_content_for_stdin =
-            fs_err::read_to_string(&patch_file_path).map_err(SourceError::Io)?;
-
         let strip_level = guess_strip_level(&patch_file_path, work_dir)?;
 
         let mut cmd_builder = system_tools
             .call(Tool::Git)
             .map_err(SourceError::GitNotFound)?;
-
         cmd_builder
             .current_dir(work_dir)
             .arg("apply")
             .arg(format!("-p{}", strip_level))
+            .arg("--verbose")
             .arg("--ignore-space-change")
             .arg("--ignore-whitespace")
-            .arg("--recount")
-            .stdin(Stdio::piped())
+            .arg(patch_file_path.as_os_str())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        let mut child_process = cmd_builder.spawn().map_err(SourceError::Io)?;
+        tracing::debug!(
+            "Running: {} {}",
+            cmd_builder.get_program().to_string_lossy(),
+            cmd_builder
+                .get_args()
+                .map(OsStr::to_string_lossy)
+                .format(" ")
+        );
 
-        // Write the patch content to the child process's stdin.
-        {
-            if let Some(mut child_stdin) = child_process.stdin.take() {
-                child_stdin
-                    .write_all(patch_content_for_stdin.as_bytes())
-                    .map_err(SourceError::Io)?;
-            } else {
-                return Err(SourceError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Failed to obtain stdin handle for git apply",
-                )));
-            }
+        let output = cmd_builder.output().map_err(SourceError::Io)?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !output.status.success() {
+            return Err(SourceError::PatchFailed(format!(
+                "{}\n`git apply` failed. The output of the command is:\n\n\t{}\n\nThe command was invoked with:\n\n\t{} {}",
+                patch_path_relative.display(),
+                stderr.lines().format("\n\t"),
+                cmd_builder.get_program().to_string_lossy(),
+                cmd_builder
+                    .get_args()
+                    .map(OsStr::to_string_lossy)
+                    .format(" ")
+            )));
         }
 
-        let output = child_process.wait_with_output().map_err(SourceError::Io)?;
-
-        if !output.status.success() {
-            eprintln!(
-                "Failed to apply patch: {}",
-                patch_file_path.to_string_lossy()
-            );
-            eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
-            eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
-            return Err(SourceError::PatchFailed(
-                patch_file_path.to_string_lossy().to_string(),
-            ));
+        // Sometimes git apply will skip the contents of a patch. This usually is *not* what we
+        // want, so we detect this behavior and return an error.
+        let skipped_patch = stderr
+            .lines()
+            .any(|line| line.starts_with("Skipped patch "));
+        if skipped_patch {
+            return Err(SourceError::PatchFailed(format!(
+                "{}\n`git apply` seems to have skipped some of the contents of the patch. The output of the command is:\n\n\t{}\n\nThe command was invoked with:\n\n\t{} {}",
+                patch_path_relative.display(),
+                stderr.lines().format("\n\t"),
+                cmd_builder.get_program().to_string_lossy(),
+                cmd_builder
+                    .get_args()
+                    .map(OsStr::to_string_lossy)
+                    .format(" ")
+            )));
         }
     }
     Ok(())
+}
+
+/// A temporary .git directory that contains the bare minimum files and
+/// directories needed for git to function as if the directory that contains
+/// the .git directory is a proper git repository.
+struct TempDotGit {
+    path: PathBuf,
+}
+
+impl TempDotGit {
+    /// Creates a temporary .git directory in the specified root directory.
+    fn setup(root: &Path) -> std::io::Result<Self> {
+        // Initialize a temporary .git directory
+        let dot_git = root.join(".git");
+        fs_err::create_dir(&dot_git)?;
+        let dot_git = TempDotGit { path: dot_git };
+
+        // Add the minimum number of files and directories to the .git directory that are needed for
+        // git to work
+        fs_err::create_dir(dot_git.path.join("objects"))?;
+        fs_err::create_dir(dot_git.path.join("refs"))?;
+        fs_err::write(dot_git.path.join("HEAD"), "ref: refs/heads/main")?;
+
+        Ok(dot_git)
+    }
+}
+
+impl Drop for TempDotGit {
+    fn drop(&mut self) {
+        fs_err::remove_dir_all(&self.path).unwrap_or_else(|e| {
+            eprintln!("Failed to remove temporary .git directory: {}", e);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -281,6 +335,29 @@ mod tests {
     fn test_apply_0001_increase_minimum_cmake_version_patch() {
         let (tempdir, _) = setup_patch_test_dir();
 
+        apply_patches(
+            &SystemTools::new(),
+            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+        )
+        .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
+
+        // Read the cmake list file and make sure that it contains `cmake_minimum_required(VERSION 3.12)`
+        let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
+        let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
+    }
+
+    #[test]
+    fn test_apply_git_patch_in_git_ignored() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Initialize a temporary .git directory at the root of the temporary directory. This makes
+        // git take the working directory is in a git repository.
+        let _temp_dot_git = TempDotGit::setup(tempdir.path()).unwrap();
+
+        // Apply the patches in the working directory
         apply_patches(
             &SystemTools::new(),
             &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
