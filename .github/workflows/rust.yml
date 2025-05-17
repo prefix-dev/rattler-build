@@ -128,6 +128,10 @@ jobs:
         shell: bash
         run: 'echo "${HOME}/.cargo/bin" >> $GITHUB_PATH'
 
+      - run: env
+      - run: ls ~/.cargo/bin
+        shell: bash
+
       - name: Install Rust toolchain
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
         run: rustup install
