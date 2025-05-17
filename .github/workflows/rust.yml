@@ -115,6 +115,10 @@ jobs:
           fi
 
       - name: Install Rust toolchain
+        run: rm ~/.cargo/ -rf
+        if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         with:
           toolchain: "1.86.0"
