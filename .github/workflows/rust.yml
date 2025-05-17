@@ -136,6 +136,10 @@ jobs:
         if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
         run: ~/.cargo/bin/rustup.exe install
 
+      - run: ls -ahl ~/.cargo/bin/
+        if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+        shell: bash
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         if: ${{ matrix.target != 'aarch64-pc-windows-msvc' }}
