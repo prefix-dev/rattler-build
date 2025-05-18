@@ -2,7 +2,7 @@
 
 use std::{
     ffi::OsStr,
-    path::{PathBuf, StripPrefixError},
+    path::{Path, PathBuf, StripPrefixError},
 };
 
 use crate::{
@@ -59,6 +59,12 @@ pub enum SourceError {
     #[error("Patch file not found: {0}")]
     PatchNotFound(PathBuf),
 
+    #[error("Patch application error: {0}")]
+    PatchApplyError(#[from] diffy::ApplyError),
+
+    #[error("Failed to parse patch: {0}")]
+    PatchParseFailed(PathBuf),
+
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
@@ -102,6 +108,7 @@ pub async fn fetch_sources(
     directories: &Directories,
     system_tools: &SystemTools,
     tool_configuration: &tool_configuration::Configuration,
+    apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
 ) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
         tracing::info!("No sources to fetch");
@@ -146,7 +153,7 @@ pub async fn fetch_sources(
                 );
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
+                    patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
                 }
             }
             Source::Url(src) => {
@@ -198,7 +205,7 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
+                    patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
                 }
 
                 rendered_sources.push(Source::Url(src.clone()));
@@ -271,7 +278,8 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
+                    patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
+                    // patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Path(src.clone()));
@@ -286,6 +294,7 @@ impl Output {
     pub async fn fetch_sources(
         self,
         tool_configuration: &tool_configuration::Configuration,
+        apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
     ) -> Result<Self, SourceError> {
         let span = tracing::info_span!("Fetching source code");
         let _enter = span.enter();
@@ -297,6 +306,7 @@ impl Output {
             &self.build_configuration.directories,
             &self.system_tools,
             tool_configuration,
+            apply_patch,
         )
         .await?;
 

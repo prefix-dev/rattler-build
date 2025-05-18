@@ -6,6 +6,7 @@ use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec};
 
 use crate::{
+    apply_patch_git,
     metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
     render::solver::load_repodatas,
@@ -115,8 +116,11 @@ pub async fn run_build(
     let output = if output.recipe.cache.is_some() {
         output.build_or_fetch_cache(tool_configuration).await?
     } else {
+        let system_tools = output.system_tools.clone();
         output
-            .fetch_sources(tool_configuration)
+            .fetch_sources(tool_configuration, |wd, p| {
+                apply_patch_git(&system_tools, wd, p)
+            })
             .await
             .into_diagnostic()?
     };

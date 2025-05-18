@@ -74,6 +74,7 @@ use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
+use source::patch::apply_patch_git;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
@@ -1063,7 +1064,13 @@ pub async fn debug_recipe(
             .directories
             .recreate_directories()
             .into_diagnostic()?;
-        let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
+        let system_tools = output.system_tools.clone();
+        let output = output
+            .fetch_sources(&tool_config, |wd, pf| {
+                apply_patch_git(&system_tools, wd, pf)
+            })
+            .await
+            .into_diagnostic()?;
         let output = output
             .resolve_dependencies(&tool_config)
             .await
