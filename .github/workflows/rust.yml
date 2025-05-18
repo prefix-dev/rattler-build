@@ -95,6 +95,8 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
 
       - name: Extract version
         shell: bash
@@ -244,6 +246,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
