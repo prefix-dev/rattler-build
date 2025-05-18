@@ -890,6 +890,10 @@ tests:
       bin:
         - mamba
 
+      # enable strict mode: error if any file in the package is not matched by one of the globs
+      # (default: false)
+      strict: true
+
       # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
       # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
       lib:

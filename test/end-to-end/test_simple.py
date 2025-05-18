@@ -170,6 +170,122 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
 
 
+def test_strict_mode_fail(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that strict mode fails when unmatched files exist"""
+    fail_recipe = """
+package:
+  name: test-strict-fail
+  version: 0.1.0
+
+build:
+  script:
+    - echo "test" > $PREFIX/test.txt
+    - echo "extra" > $PREFIX/extra.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - test.txt
+"""
+    recipe_dir = tmp_path / "recipe-fail"
+    recipe_dir.mkdir()
+    recipe_file = recipe_dir / "recipe.yaml"
+    recipe_file.write_text(fail_recipe)
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipe_dir, output_dir)
+
+
+def test_strict_mode_pass(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that strict mode passes when all files are matched"""
+    pass_recipe = """
+package:
+  name: test-strict-pass
+  version: 0.1.0
+
+build:
+  script:
+    - echo "test" > $PREFIX/test.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - test.txt
+"""
+    recipe_dir = tmp_path / "recipe-pass"
+    recipe_dir.mkdir()
+    recipe_file = recipe_dir / "recipe.yaml"
+    recipe_file.write_text(pass_recipe)
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    rattler_build.build(recipe_dir, output_dir)
+
+
+def test_strict_mode_many_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that strict mode shows all unmatched files, not just the first few"""
+    many_files_recipe = """
+package:
+  name: test-strict-many
+  version: 0.1.0
+
+build:
+  script:
+    - echo "matched" > $PREFIX/matched.txt
+    - echo "unmatched1" > $PREFIX/unmatched1.txt
+    - echo "unmatched2" > $PREFIX/unmatched2.txt
+    - echo "unmatched3" > $PREFIX/unmatched3.txt
+    - echo "unmatched4" > $PREFIX/unmatched4.txt
+    - echo "unmatched5" > $PREFIX/unmatched5.txt
+    - echo "unmatched6" > $PREFIX/unmatched6.txt
+    - echo "unmatched7" > $PREFIX/unmatched7.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - matched.txt
+"""
+    recipe_dir = tmp_path / "recipe-many"
+    recipe_dir.mkdir()
+    recipe_file = recipe_dir / "recipe.yaml"
+    recipe_file.write_text(many_files_recipe)
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    build_args = rattler_build.build_args(
+        recipe_dir, output_dir, extra_args=["--log-style=json"]
+    )
+    result = subprocess.run(
+        [str(rattler_build.path), *build_args], capture_output=True, text=True
+    )
+    assert result.returncode != 0
+
+    logs = []
+    for line in result.stderr.splitlines():
+        if line.strip() and line.strip().startswith("{"):
+            try:
+                logs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    error_output = result.stderr + result.stdout
+    assert "unmatched1.txt" in error_output
+    assert "unmatched2.txt" in error_output
+    assert "unmatched3.txt" in error_output
+    assert "unmatched4.txt" in error_output
+    assert "unmatched5.txt" in error_output
+    assert "unmatched6.txt" in error_output
+    assert "unmatched7.txt" in error_output
+
+
 @pytest.mark.skipif(
     not os.environ.get("PREFIX_DEV_READ_ONLY_TOKEN", ""),
     reason="requires PREFIX_DEV_READ_ONLY_TOKEN",

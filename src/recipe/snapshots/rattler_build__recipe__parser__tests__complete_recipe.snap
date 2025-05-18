@@ -169,6 +169,7 @@ tests:
     include:
     - test.h
     - test.h*
+    strict: false
 - python:
     imports:
     - numpy
