@@ -179,8 +179,13 @@ package:
 
 build:
   script:
-    - echo "test" > $PREFIX/test.txt
-    - echo "extra" > $PREFIX/extra.txt
+    - if: unix
+      then:
+        - echo "test" > $PREFIX/test.txt
+        - echo "extra" > $PREFIX/extra.txt
+      else:
+        - echo "test" > %PREFIX%\\test.txt
+        - echo "extra" > %PREFIX%\\extra.txt
 
 tests:
   - package_contents:
@@ -209,7 +214,11 @@ package:
 
 build:
   script:
-    - echo "test" > $PREFIX/test.txt
+    - if: unix
+      then:
+        - echo "test" > $PREFIX/test.txt
+      else:
+        - echo "test" > %PREFIX%\\test.txt
 
 tests:
   - package_contents:
@@ -237,14 +246,25 @@ package:
 
 build:
   script:
-    - echo "matched" > $PREFIX/matched.txt
-    - echo "unmatched1" > $PREFIX/unmatched1.txt
-    - echo "unmatched2" > $PREFIX/unmatched2.txt
-    - echo "unmatched3" > $PREFIX/unmatched3.txt
-    - echo "unmatched4" > $PREFIX/unmatched4.txt
-    - echo "unmatched5" > $PREFIX/unmatched5.txt
-    - echo "unmatched6" > $PREFIX/unmatched6.txt
-    - echo "unmatched7" > $PREFIX/unmatched7.txt
+    - if: unix
+      then:
+        - echo "matched" > $PREFIX/matched.txt
+        - echo "unmatched1" > $PREFIX/unmatched1.txt
+        - echo "unmatched2" > $PREFIX/unmatched2.txt
+        - echo "unmatched3" > $PREFIX/unmatched3.txt
+        - echo "unmatched4" > $PREFIX/unmatched4.txt
+        - echo "unmatched5" > $PREFIX/unmatched5.txt
+        - echo "unmatched6" > $PREFIX/unmatched6.txt
+        - echo "unmatched7" > $PREFIX/unmatched7.txt
+      else:
+        - echo "matched" > %PREFIX%\\matched.txt
+        - echo "unmatched1" > %PREFIX%\\unmatched1.txt
+        - echo "unmatched2" > %PREFIX%\\unmatched2.txt
+        - echo "unmatched3" > %PREFIX%\\unmatched3.txt
+        - echo "unmatched4" > %PREFIX%\\unmatched4.txt
+        - echo "unmatched5" > %PREFIX%\\unmatched5.txt
+        - echo "unmatched6" > %PREFIX%\\unmatched6.txt
+        - echo "unmatched7" > %PREFIX%\\unmatched7.txt
 
 tests:
   - package_contents:
@@ -264,19 +284,25 @@ tests:
         recipe_dir, output_dir, extra_args=["--log-style=json"]
     )
     result = subprocess.run(
-        [str(rattler_build.path), *build_args], capture_output=True, text=True
+        [str(rattler_build.path), *build_args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     assert result.returncode != 0
 
     logs = []
-    for line in result.stderr.splitlines():
+    stderr = result.stderr if result.stderr else ""
+    for line in stderr.splitlines():
         if line.strip() and line.strip().startswith("{"):
             try:
                 logs.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
 
-    error_output = result.stderr + result.stdout
+    stdout = result.stdout if result.stdout else ""
+    error_output = stderr + stdout
     assert "unmatched1.txt" in error_output
     assert "unmatched2.txt" in error_output
     assert "unmatched3.txt" in error_output
