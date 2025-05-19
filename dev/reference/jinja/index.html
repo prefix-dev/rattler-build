@@ -1478,6 +1478,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#filters" class="md-nav__link">
     <span class="md-ellipsis">
       Filters
@@ -1650,6 +1659,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
   
 </li>
       
@@ -1873,6 +1891,27 @@ error is thrown).</p>
 <ul>
 <li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment
   variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
+</ul>
+<h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">#</a></h2>
+<p>You can write tests using minijinja to check whether objects have certain properties.
+The syntax for a filter is <code>{{ variable is test_name }}</code>.</p>
+<ul>
+<li><code>undefined</code>: Check whether a variable is undefined.</li>
+<li><code>defined</code>: Check whether a variable is defined.</li>
+<li><code>none</code>: Check whether a variable is none.</li>
+<li><code>safe</code>: Check whether a variable is safe.</li>
+<li><code>escaped</code>: Check whether a variable is escaped. Same as <code>is safe</code>.</li>
+<li><code>odd</code>: Check whether a number is odd.</li>
+<li><code>even</code>: Check whether a number is even.</li>
+<li><code>number</code>: Check whether a variable is a number.</li>
+<li><code>integer</code>: Check whether a variable is an integer.</li>
+<li><code>int</code>: Check whether a variable is an integer. Same as <code>is integer</code>.</li>
+<li><code>float</code>: Check whether a variable is a float.</li>
+<li><code>string</code>: Check whether a variable is a string.</li>
+<li><code>sequence</code>: Check whether a variable is a sequence.</li>
+<li><code>boolean</code>: Check whether a variable is a boolean.</li>
+<li><code>startingwith</code>: Check whether a variable is starting with another string: <code>{{ python is startingwith('3.12') }}</code></li>
+<li><code>endingwith</code>: Check whether a variable is starting with another string: <code>{{ python is endingwith('.*') }}</code></li>
 </ul>
 <h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">#</a></h2>
 <p>A feature of <code>jinja</code> is called "filters". Filters are functions that can be
