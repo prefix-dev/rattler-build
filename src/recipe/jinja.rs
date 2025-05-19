@@ -309,6 +309,7 @@ fn default_tests(env: &mut Environment) {
     env.add_test("string", minijinja::tests::is_string);
     env.add_test("sequence", minijinja::tests::is_sequence);
     env.add_test("boolean", minijinja::tests::is_boolean);
+    env.add_test("startingwith", minijinja::tests::is_startingwith);
 
     // operators
     env.add_test("eq", minijinja::tests::is_eq);
