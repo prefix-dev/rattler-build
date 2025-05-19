@@ -36,7 +36,7 @@ impl Default for CopyOptions {
 }
 
 /// Copy metadata from source to destination
-/// `fs.copy` handles permissions, but it won't be called if the file is reflinked
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
 /// We need to deal with permissions and timestamps ourselves
 fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
     let metadata = fs_err::metadata(from)?;
