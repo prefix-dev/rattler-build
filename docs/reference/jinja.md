@@ -208,12 +208,12 @@ The syntax for a filter is `{{ variable is test_name }}`.
 - `defined`: Check whether a variable is defined.
 - `none`: Check whether a variable is none.
 - `safe`: Check whether a variable is safe.
-- `escaped`: Check whether a variable is escaped.
+- `escaped`: Check whether a variable is escaped. Same as `is safe`.
 - `odd`: Check whether a number is odd.
 - `even`: Check whether a number is even.
 - `number`: Check whether a variable is a number.
 - `integer`: Check whether a variable is an integer.
-- `int`: Check whether a variable is an int.
+- `int`: Check whether a variable is an integer. Same as `is integer`.
 - `float`: Check whether a variable is a float.
 - `string`: Check whether a variable is a string.
 - `sequence`: Check whether a variable is a sequence.
