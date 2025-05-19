@@ -1,0 +1,5 @@
+paths:
+  .github/workflows/rust.yml:
+    # https://github.com/rhysd/actionlint/pull/542
+    ignore:
+      - 'label "windows-11-arm" is unknown.+'
