@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    apply_patch_git, env_vars,
+    env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
     recipe::{
@@ -23,6 +23,7 @@ use crate::{
     source::{
         copy_dir::{CopyDir, CopyOptions, copy_file},
         fetch_sources,
+        patch::apply_patch_custom,
     },
 };
 
@@ -178,11 +179,8 @@ impl Output {
                 match serde_json::from_str::<Cache>(&text) {
                     Ok(cache) => {
                         tracing::info!("Restoring cache from {:?}", cache_dir);
-                        let system_tools = self.system_tools.clone();
                         self = self
-                            .fetch_sources(tool_configuration, |wd, p| {
-                                apply_patch_git(&system_tools, wd, p)
-                            })
+                            .fetch_sources(tool_configuration, apply_patch_custom)
                             .await
                             .into_diagnostic()?;
                         return self.restore_cache(cache, cache_dir).await;
@@ -200,7 +198,6 @@ impl Output {
             }
 
             // fetch the sources for the `cache` section
-            let system_tools = self.system_tools.clone();
             let rendered_sources = fetch_sources(
                 self.finalized_cache_sources
                     .as_ref()
@@ -208,7 +205,7 @@ impl Output {
                 &self.build_configuration.directories,
                 &self.system_tools,
                 tool_configuration,
-                |wd, p| apply_patch_git(&system_tools, wd, p),
+                apply_patch_custom,
             )
             .await
             .into_diagnostic()?;
