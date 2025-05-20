@@ -874,9 +874,19 @@ tests:
       # or, checks that there is at least one file matching the specified `glob`
       # pattern inside the prefix
       files:
-        - etc/libmamba/test.txt
-        - etc/libmamba
-        - etc/libmamba/*.mamba.txt
+        exists:
+          - etc/libmamba/test.txt
+          - etc/libmamba
+          - etc/libmamba/*.mamba.txt
+        not_exists:
+          - etc/libmamba/unwanted.txt
+
+      # Note: You can also directly use a list instead of specifying the exists and not_exists fields.
+      # In that case, all globs would treated as if they were in the 'exists' field:
+      # files:
+      #   - etc/libmamba/test.txt
+      #   - etc/libmamba
+      #   - etc/libmamba/*.mamba.txt
 
       # checks for the existence of `mamba/api/__init__.py` inside of the
       # Python site-packages directory (note: also see Python import checks)

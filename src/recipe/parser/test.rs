@@ -14,7 +14,10 @@ use crate::{
     validate_keys,
 };
 
-use super::{FlattenErrors, Script, glob_vec::GlobVec};
+use super::{
+    FlattenErrors, Script,
+    glob_vec::{GlobCheckerVec, GlobVec},
+};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test
@@ -178,9 +181,12 @@ pub enum TestType {
 /// Package content test that compares the contents of the package with the expected contents.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PackageContentsTest {
-    /// file paths, direct and/or globs
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub files: GlobVec,
+    /// File paths using glob patterns to check for existence or non-existence.
+    /// Uses `exists` field for files that must be present and `not_exists` for files that must not be present.
+    /// If any glob in `exists` doesn't match at least one file, the test fails.
+    /// If any glob in `not_exists` matches any file, the test fails.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub files: GlobCheckerVec,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -636,7 +642,7 @@ mod test {
         let test_section = r#"
         tests:
           - package_contents:
-              include:
+              files:
                 exists:
                   - foo.hpp
                 not_exists:
@@ -653,14 +659,14 @@ mod test {
         match &parsed[0] {
             TestType::PackageContents { package_contents } => {
                 let inc: Vec<&str> = package_contents
-                    .include
-                    .include_globs()
+                    .files
+                    .exists_globs()
                     .iter()
                     .map(|g| g.source())
                     .collect();
                 let exc: Vec<&str> = package_contents
-                    .include
-                    .exclude_globs()
+                    .files
+                    .not_exists_globs()
                     .iter()
                     .map(|g| g.source())
                     .collect();

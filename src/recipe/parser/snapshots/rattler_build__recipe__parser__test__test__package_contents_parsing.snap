@@ -3,8 +3,8 @@ source: src/recipe/parser/test.rs
 expression: yaml_serde
 ---
 - package_contents:
-    include:
-      include:
+    files:
+      exists:
       - foo.hpp
-      exclude:
+      not_exists:
       - baz.hpp

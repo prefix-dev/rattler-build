@@ -211,11 +211,24 @@ impl PackageContentsTest {
         Ok(result)
     }
 
-    /// Retrieve the globs for the files section as a vector of (glob, GlobSet) tuples
+    /// Retrieve the exists globs for the files section as a vector of (glob, GlobSet) tuples
     pub fn files_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for file in self.files.include_globs() {
+        for file in self.files.exists_globs() {
+            let glob = Glob::new(file.source())?;
+            let globset = GlobSet::builder().add(glob).build()?;
+            result.push((file.glob().to_string(), globset));
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve the not_exists globs for the files section as a vector of (glob, GlobSet) tuples
+    pub fn files_not_exists_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+
+        for file in self.files.not_exists_globs() {
             let glob = Glob::new(file.source())?;
             let globset = GlobSet::builder().add(glob).build()?;
             result.push((file.glob().to_string(), globset));
@@ -243,6 +256,7 @@ impl PackageContentsTest {
             output.recipe.build().is_python_version_independent(),
         )?;
         let file_globs = self.files_as_globs()?;
+        let file_not_exists_globs = self.files_not_exists_as_globs()?;
 
         fn match_glob<'a>(glob: &GlobSet, paths: &'a Vec<&PathBuf>) -> Vec<&'a PathBuf> {
             let mut matches: Vec<&'a PathBuf> = Vec::new();
@@ -312,7 +326,30 @@ impl PackageContentsTest {
             }
 
             if matches.is_empty() {
-                collected_issues.push(format!("No match for file glob: {}", glob.0));
+                collected_issues.push(format!("No match for file 'exists' glob: {}", glob.0));
+            }
+        }
+
+        for glob in file_not_exists_globs {
+            let matches = match_glob(&glob.1, &paths);
+
+            if matches.is_empty() {
+                tracing::info!(
+                    "{} file not_exists: \"{}\" check passed - no matching files found",
+                    console::style(console::Emoji("✔", "")).green(),
+                    glob.0
+                );
+            } else {
+                collected_issues.push(format!(
+                    "Found matches for file 'not_exists' glob: {} - files should not exist",
+                    glob.0
+                ));
+                for path in &matches[0..std::cmp::min(5, matches.len())] {
+                    tracing::error!("  - {}", path.display());
+                }
+                if matches.len() > 5 {
+                    tracing::error!("... and {} more", matches.len() - 5);
+                }
             }
         }
 
@@ -522,6 +559,20 @@ mod tests {
     #[test]
     fn test_file_globs() {
         let test_case = load_test_case(Path::new("test_files.yaml"));
-        evaluate_test_case(test_case).unwrap();
+        let tests = &test_case.package_contents;
+
+        let exists_globs = tests.files_as_globs().unwrap();
+        if !exists_globs.is_empty() {
+            test_glob_matches(&exists_globs, &test_case.paths).unwrap();
+        }
+
+        let not_exists_globs = tests.files_not_exists_as_globs().unwrap();
+        if !not_exists_globs.is_empty() && !test_case.fail_paths.is_empty() {
+            for (_, glob) in &not_exists_globs {
+                for path in &test_case.fail_paths {
+                    assert!(glob.is_match(path), "{} should match not_exists glob", path);
+                }
+            }
+        }
     }
 }

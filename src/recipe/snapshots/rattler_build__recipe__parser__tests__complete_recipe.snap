@@ -154,8 +154,9 @@ tests:
     - src_file.txt
 - package_contents:
     files:
-    - test.txt
-    - license.txt
+      exists:
+      - test.txt
+      - license.txt
     site_packages:
     - numpy
     - numpy/foo/__init__.py
