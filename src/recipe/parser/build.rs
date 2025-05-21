@@ -692,7 +692,7 @@ impl Default for PrefixDetection {
         Self {
             force_file_type: ForceFileType::default(),
             ignore: AllOrGlobVec::All(false),
-            ignore_binary_files: false,
+            ignore_binary_files: true,
         }
     }
 }

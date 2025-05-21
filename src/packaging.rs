@@ -90,6 +90,10 @@ pub enum PackagingError {
 
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
+
+    /// Error when detecting host prefix in a binary file
+    #[error("Detected host prefix in binary file: {0:?}")]
+    BinaryPrefixDetected(PathBuf),
 }
 
 /// This function copies the license files to the info/licenses folder.

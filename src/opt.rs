@@ -446,6 +446,10 @@ pub struct BuildOpts {
     /// This is useful when building many packages with `--recipe-dir`.`
     #[clap(long)]
     pub continue_on_failure: bool,
+
+    /// Fail the build if binary files with embedded host prefix are detected
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_on_binary_prefix: bool,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -475,6 +479,7 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
+    pub error_on_binary_prefix: bool,
 }
 
 impl BuildData {
@@ -505,6 +510,7 @@ impl BuildData {
         sandbox_configuration: Option<SandboxConfiguration>,
         debug: Debug,
         continue_on_failure: ContinueOnFailure,
+        error_on_binary_prefix: bool,
     ) -> Self {
         Self {
             up_to,
@@ -539,6 +545,7 @@ impl BuildData {
             sandbox_configuration,
             debug,
             continue_on_failure,
+            error_on_binary_prefix,
         }
     }
 }
@@ -584,6 +591,7 @@ impl BuildData {
             opts.sandbox_arguments.into(),
             Debug::new(opts.debug),
             opts.continue_on_failure.into(),
+            opts.error_on_binary_prefix,
         )
     }
 }

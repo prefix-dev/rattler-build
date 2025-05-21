@@ -377,6 +377,10 @@ pub struct BuildConfiguration {
     /// Whether to enable debug output in build scripts
     #[serde(skip_serializing, default)]
     pub debug: Debug,
+
+    /// Whether to error when binary files with host prefix are detected
+    #[serde(skip_serializing, default)]
+    pub error_on_binary_prefix: bool,
 }
 
 impl BuildConfiguration {

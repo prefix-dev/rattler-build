@@ -579,18 +579,113 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     is_win = subdir.startswith("win")
 
     def check_path(p, t):
-        if t == "binary" and is_win or t is None:
-            assert "file_mode" not in p
-            assert "prefix_placeholder" not in p
+        if (t == "binary" and is_win) or t is None:
+            assert "file_mode" not in p, f"Path {p['_path']} should not have file_mode"
+            assert (
+                "prefix_placeholder" not in p
+            ), f"Path {p['_path']} should not have prefix_placeholder"
         else:
-            assert p["file_mode"] == t
-            assert len(p["prefix_placeholder"]) > 10
+            assert (
+                p["file_mode"] == t
+            ), f"Path {p['_path']} expected file_mode {t}, got {p.get('file_mode')}"
+            assert (
+                "prefix_placeholder" in p
+            ), f"Path {p['_path']} should have prefix_placeholder"
+            assert (
+                len(p["prefix_placeholder"]) > 10
+            ), f"Path {p['_path']} prefix_placeholder too short"
 
     paths = json.loads((pkg / "info/paths.json").read_text())
     for p in paths["paths"]:
         path = p["_path"]
         if path == "is_binary/file_with_prefix":
-            check_path(p, "binary")
+            check_path(p, None)
+        elif path == "is_text/file_with_prefix":
+            check_path(p, "text")
+        elif path == "is_binary/file_without_prefix":
+            check_path(p, None)
+        elif path == "is_text/file_without_prefix":
+            check_path(p, None)
+        elif path == "force_text/file_with_prefix":
+            if not is_win:
+                check_path(p, "text")
+            else:
+                # On Windows, the behavior is different - no placeholder
+                check_path(p, None)
+        elif path == "force_text/file_without_prefix":
+            check_path(p, None)
+        elif path == "force_binary/file_with_prefix":
+            check_path(p, None)
+        elif path == "force_binary/file_without_prefix":
+            check_path(p, None)
+        elif path == "ignore/file_with_prefix":
+            check_path(p, None)
+        elif path == "ignore/text_with_prefix":
+            check_path(p, None)
+        elif path == "is_text/file_with_forwardslash_prefix":
+            assert "\\" not in p["prefix_placeholder"]
+            assert "/" in p["prefix_placeholder"]
+            check_path(p, "text")
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Binary prefix detection/erroring is not supported on Windows",
+)
+def test_prefix_detection_error_on_binary_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # This test runs with ignore_binary_files: false in the recipe.
+    # It should FAIL because --error-on-binary-prefix is passed and binary files with prefixes exist.
+    with pytest.raises(subprocess.CalledProcessError):
+        rattler_build.build(
+            recipes / "prefix_detection_binary_error/recipe.yaml",
+            tmp_path,
+            extra_args=["--error-on-binary-prefix"],
+        )
+
+
+def test_prefix_detection_binary_with_warning(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # This test runs with ignore_binary_files: false in the recipe.
+    # Without --error-on-binary-prefix flag, it should succeed with warnings.
+    rattler_build.build(
+        recipes / "prefix_detection_binary_error/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "prefix_detection_binary_error")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/paths.json").exists()
+
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    subdir = index_json["subdir"]
+    is_win = subdir.startswith("win")
+
+    def check_path(p, t):
+        if (t == "binary" and is_win) or t is None:
+            assert "file_mode" not in p, f"Path {p['_path']} should not have file_mode"
+            assert (
+                "prefix_placeholder" not in p
+            ), f"Path {p['_path']} should not have prefix_placeholder"
+        else:
+            assert (
+                p["file_mode"] == t
+            ), f"Path {p['_path']} expected file_mode {t}, got {p.get('file_mode')}"
+            assert (
+                "prefix_placeholder" in p
+            ), f"Path {p['_path']} should have prefix_placeholder"
+            assert (
+                len(p["prefix_placeholder"]) > 10
+            ), f"Path {p['_path']} prefix_placeholder too short"
+
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    for p in paths["paths"]:
+        path = p["_path"]
+        if path == "is_binary/file_with_prefix":
+            check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
         elif path == "is_binary/file_without_prefix":
@@ -605,7 +700,7 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
-            check_path(p, "binary")
+            check_path(p, None)
         elif path == "force_binary/file_without_prefix":
             check_path(p, None)
         elif path == "ignore/file_with_prefix":

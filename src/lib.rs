@@ -391,6 +391,7 @@ pub async fn get_build_output(
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
+                error_on_binary_prefix: build_data.error_on_binary_prefix,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -1025,6 +1026,7 @@ pub async fn debug_recipe(
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
+        error_on_binary_prefix: false,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
