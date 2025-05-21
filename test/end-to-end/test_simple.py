@@ -628,6 +628,10 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             check_path(p, "text")
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Binary prefix detection/erroring is not supported on Windows",
+)
 def test_prefix_detection_error_on_binary_flag(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
