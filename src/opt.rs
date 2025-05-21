@@ -508,7 +508,7 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
-        debug: bool,
+        debug: Debug,
         continue_on_failure: ContinueOnFailure,
         error_on_binary_prefix: bool,
     ) -> Self {
@@ -543,7 +543,7 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug: Debug::new(debug),
+            debug,
             continue_on_failure,
             error_on_binary_prefix,
         }
@@ -589,7 +589,7 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
-            opts.debug,
+            Debug::new(opts.debug),
             opts.continue_on_failure.into(),
             opts.error_on_binary_prefix,
         )
@@ -630,6 +630,14 @@ pub struct TestOpts {
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
 
+    /// The index of the test to run. This is used to run a specific test from the package.
+    #[clap(long)]
+    pub test_index: Option<usize>,
+
+    /// Build test environment and output debug information for manual debugging.
+    #[arg(long)]
+    pub debug: bool,
+
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -642,6 +650,8 @@ pub struct TestData {
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
+    pub test_index: Option<usize>,
+    pub debug: Debug,
 }
 
 impl TestData {
@@ -652,6 +662,8 @@ impl TestData {
             value.package_file,
             value.channels,
             value.compression_threads,
+            Debug::new(value.debug),
+            value.test_index,
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
@@ -661,12 +673,16 @@ impl TestData {
         package_file: PathBuf,
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
+        debug: Debug,
+        test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
         Self {
             package_file,
             channels,
             compression_threads,
+            test_index,
+            debug,
             common,
         }
     }

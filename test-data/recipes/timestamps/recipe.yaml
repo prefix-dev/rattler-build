@@ -1,0 +1,54 @@
+package:
+  name: timestamps-test
+  version: 0.1.0
+
+source:
+  - path: ./oldarchive.tar.gz
+    sha256: 91763f003f247544db90da8c303424001679097fa31814c159fe64af979e7db5
+  - url: https://github.com/xtensor-stack/xtensor/archive/0.23.2.tar.gz
+    sha256: fde26dcf93f5d95996b8cc7e556b84930af41ff699492b7b20b2e3335e12f862
+    target_directory: xtensor
+
+requirements:
+  build:
+    - python 3.12.*
+
+build:
+  script:
+    interpreter: python
+    content: |
+      import os
+      import sys
+      import datetime
+
+      # Check oldfile.txt
+      print("Extracted file timestamp:")
+      file_stats = os.stat("oldfile.txt")
+      print(f"Size: {file_stats.st_size} Modified: {datetime.datetime.fromtimestamp(file_stats.st_mtime)}")
+
+      # Convert timestamp to a more readable format
+      timestamp = datetime.datetime.fromtimestamp(file_stats.st_mtime)
+      print(f"Formatted timestamp: {timestamp}")
+
+      # Verify if the year is 2000
+      year = timestamp.year
+      if year == 2000:
+          print("Verification PASSED: File has the correct year (2000)")
+      else:
+          print(f"Verification FAILED: Expected year 2000, got {year}")
+          sys.exit(1)
+
+      # Check the timestamp of xtensor/CMakeLists.txt
+      xtensor_path = "xtensor/CMakeLists.txt"
+      xtensor_stats = os.stat(xtensor_path)
+      xtensor_timestamp = datetime.datetime.fromtimestamp(xtensor_stats.st_mtime)
+      xtensor_year = xtensor_timestamp.year
+
+      print(f"{xtensor_path} timestamp: {xtensor_timestamp}")
+      print(f"Formatted {xtensor_path} timestamp: {xtensor_year}")
+
+      if xtensor_year == 2021:
+          print(f"Verification PASSED: {xtensor_path} has the correct year (2021)")
+      else:
+          print(f"Verification FAILED: Expected year 2021, got {xtensor_year}")
+          sys.exit(1)

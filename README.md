@@ -81,21 +81,16 @@ executed as subprocess. We plan to reduce the number of external dependencies
 over time by writing what we need in Rust to make `rattler-build` fully
 self-contained.
 
-* `tar` to unpack tarballs downloaded from the internet in a variety of formats.
-  `.gz`, `.bz2` and `.xz` are widely used and one might have to install the
-  compression packages as well (e.g. `gzip`, `bzip2`, ...)
 * `patch` to patch source code after downloading
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require `git`
-  in the future)
+* `git` is required to checkout Git repositories.
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
 
-On Windows, to obtain these dependencies from conda-forge, one can install
-`m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
+On Windows, to obtain these dependencies from conda-forge, one can install `m2-patch`.
 
 ### Documentation
 

@@ -25,12 +25,22 @@ use rattler_shell::{
 
 use super::ExecutionArgs;
 
-pub(crate) const DEBUG_HELP: &str = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+/// The error type for the interpreter
+#[derive(Debug, thiserror::Error)]
+pub enum InterpreterError {
+    /// This error is returned when running in debug mode
+    #[error("Debugging information: {0}")]
+    Debug(String),
+
+    /// This error is returned when the script execution fails or the interpreter is not found
+    #[error("IO Error: {0}")]
+    ExecutionFailed(#[from] std::io::Error),
+}
 
 pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
+    source "((script_path))"
 fi
 ## End of preamble
 "#;
@@ -40,7 +50,7 @@ pub const CMDEXE_PREAMBLE: &str = r#"
 @echo on
 IF "%CONDA_BUILD%" == "" (
     @rem special behavior from conda-build for Windows
-    call ((script_path))
+    call "((script_path))"
 )
 @rem re-enable echo because the activation scripts might have messed with it
 @echo on
@@ -110,7 +120,7 @@ pub trait Interpreter {
         Ok(shell_script.contents()?)
     }
 
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError>;
 
     #[allow(dead_code)]
     async fn find_interpreter(

@@ -3,6 +3,7 @@
 use std::{
     fs::File,
     io::{self, IsTerminal},
+    path::PathBuf,
 };
 
 use clap::{CommandFactory, Parser};
@@ -111,10 +112,15 @@ async fn async_main() -> miette::Result<()> {
             let build_data = BuildData::from_opts_and_config(build_args, config);
 
             // Get all recipe paths and keep tempdir alive until end of the function
-            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir)?;
+            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
 
             if recipe_paths.is_empty() {
-                miette::bail!("Couldn't detect any recipes.")
+                if recipe_dir.is_some() {
+                    tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
+                    return Ok(());
+                } else {
+                    miette::bail!("Couldn't find recipe.")
+                }
             }
 
             if build_data.tui {
@@ -169,9 +175,9 @@ async fn async_main() -> miette::Result<()> {
 }
 
 fn recipe_paths(
-    recipes: Vec<std::path::PathBuf>,
-    recipe_dir: Option<std::path::PathBuf>,
-) -> Result<(Vec<std::path::PathBuf>, Option<TempDir>), miette::Error> {
+    recipes: Vec<PathBuf>,
+    recipe_dir: Option<&PathBuf>,
+) -> Result<(Vec<PathBuf>, Option<TempDir>), miette::Error> {
     let mut recipe_paths = Vec::new();
     let mut temp_dir_opt = None;
     if !std::io::stdin().is_terminal()

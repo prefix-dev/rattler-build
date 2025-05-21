@@ -1,6 +1,7 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
     collections::{HashMap, HashSet},
+    fs::FileTimes,
     path::{Path, PathBuf},
 };
 
@@ -32,6 +33,24 @@ impl Default for CopyOptions {
             buffer_size: 8 * 1024 * 1024,
         }
     }
+}
+
+/// Copy metadata from source to destination
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
+/// We need to deal with permissions and timestamps ourselves
+fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
+    let metadata = fs_err::metadata(from)?;
+
+    // Copy timestamps using std::fs::FileTimes
+    let file_times = FileTimes::new()
+        .set_accessed(metadata.accessed()?)
+        .set_modified(metadata.modified()?);
+
+    let file = std::fs::OpenOptions::new().write(true).open(to)?;
+    file.set_times(file_times)?;
+    file.set_permissions(metadata.permissions())?;
+
+    Ok(())
 }
 
 /// Cross platform way of creating a symlink
@@ -383,13 +402,25 @@ where
     }
 
     // Reflink or copy the file
-    if (reflink_copy::reflink_or_copy(from, &to)?).is_none() {
-        // File has been reflinked, on Linux we need to copy the permissions
-        #[cfg(target_os = "linux")]
-        {
-            let metadata = fs_err::metadata(from)?;
-            let permissions = metadata.permissions();
-            fs_err::set_permissions(to, permissions)?;
+    match reflink_copy::reflink_or_copy(from, &to) {
+        Ok(None) => {
+            // File has been reflinked
+            #[cfg(target_os = "linux")]
+            {
+                copy_metadata(from, to.as_ref())?;
+            }
+        }
+        Ok(Some(_)) => {
+            // File has been copied
+            match copy_metadata(from, to.as_ref()) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::debug!("Failed to copy metadata for {:?} {:?}", to.as_ref(), e);
+                }
+            }
+        }
+        Err(e) => {
+            return Err(e);
         }
     }
 

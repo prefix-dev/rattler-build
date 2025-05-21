@@ -55,7 +55,7 @@ The recipe spec has the following parts:
   build the recipe
 - [x] `build`: defines how to build the recipe and what build number to use
 - [x] `requirements`: defines requirements of the top-level package
-- [x] `test`: defines tests for the top-level package
+- [x] `tests`: defines tests for the top-level package
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
 

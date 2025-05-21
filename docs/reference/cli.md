@@ -308,6 +308,16 @@ These test files are written at "package creation time" and are part of the pack
 	The number of threads to use for compression
 
 
+- `--test-index <TEST_INDEX>`
+
+	The index of the test to run. This is used to run a specific test from the package
+
+
+- `--debug`
+
+	Build test environment and output debug information for manual debugging
+
+
 - `--experimental`
 
 	Enable experimental features
