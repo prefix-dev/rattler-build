@@ -527,7 +527,7 @@ impl Output {
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
-    use super::{PackagingError, create_prefix_placeholder};
+    use super::create_prefix_placeholder;
     use crate::recipe::parser::PrefixDetection;
     use content_inspector::ContentType;
     use rattler_conda_types::Platform;
@@ -583,6 +583,10 @@ mod test {
             &pd,
             true,
         );
-        assert!(matches!(err, Err(PackagingError::BinaryPrefixDetected(_))));
+        assert!(
+            matches!(err, Ok(None)),
+            "Expected Ok(None) due to default behavior change, got {:?}",
+            err
+        );
     }
 }
