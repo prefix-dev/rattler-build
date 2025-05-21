@@ -1,0 +1,26 @@
+package:
+  name: prefix_detection_binary_error
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - python $RECIPE_DIR/../prefix_detection/create_files_with_prefix.py
+    - if: win
+      then:
+        - python %RECIPE_DIR%\..\prefix_detection\create_files_with_prefix.py
+  prefix_detection:
+    ignore:
+      - ignore/*
+    force_file_type:
+      binary:
+        - force_binary/*
+      text:
+        - force_text/*
+    ignore_binary_files: false
+
+requirements:
+  host:
+    - python 3.11.* 

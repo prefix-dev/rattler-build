@@ -105,6 +105,7 @@ pub fn create_prefix_placeholder(
     encoded_prefix: &Path,
     content_type: &ContentType,
     prefix_detection: &PrefixDetection,
+    error_on_binary_prefix: bool,
 ) -> Result<Option<PrefixPlaceholder>, PackagingError> {
     // exclude pyc and pyo files from prefix replacement
     if let Some(ext) = file_path.extension() {
@@ -186,11 +187,17 @@ pub fn create_prefix_placeholder(
                 relative_path
             );
         } else if contains_prefix_binary(file_path, encoded_prefix)? {
-            // Default behavior is to error when host prefix is detected in binary file
             tracing::error!("Detected host prefix in binary file: {:?}", relative_path);
-            return Err(PackagingError::BinaryPrefixDetected(
-                relative_path.to_path_buf(),
-            ));
+            // Only error if the flag is set
+            if error_on_binary_prefix {
+                return Err(PackagingError::BinaryPrefixDetected(
+                    relative_path.to_path_buf(),
+                ));
+            } else {
+                tracing::warn!(
+                    "Continuing despite binary prefix detection (--error-on-binary-prefix not set)"
+                );
+            }
         }
     }
 
@@ -441,6 +448,7 @@ impl Output {
                     &temp_files.encoded_prefix,
                     &content_type,
                     self.recipe.build().prefix_detection(),
+                    self.build_configuration.error_on_binary_prefix,
                 )?;
 
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
@@ -549,6 +557,7 @@ mod test {
             encoded_prefix,
             &ContentType::BINARY,
             &pd,
+            true,
         )
         .unwrap();
         assert!(result.is_none());
@@ -572,6 +581,7 @@ mod test {
             encoded_prefix,
             &ContentType::BINARY,
             &pd,
+            true,
         );
         assert!(matches!(err, Err(PackagingError::BinaryPrefixDetected(_))));
     }
