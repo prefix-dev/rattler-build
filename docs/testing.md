@@ -62,12 +62,8 @@ tests:
   # test the contents of the package.
   - package_contents:
       files:
-        exists:
-          - share/package/*.txt
-          - lib/python*/site-packages/mypackage/*.py
-        not_exists:
-          - lib/python*/site-packages/mypackage/deprecated_module.py
-```
+        - share/package/*.txt
+        - lib/python*/site-packages/mypackage/*.py
 
 ### Testing package contents
 
@@ -77,11 +73,17 @@ It can be very useful as a "sanity check" to ensure that the package contains th
 
 It has multiple sub-keys that help when building cross-platform packages:
 
-- **`files`**: Specifies glob patterns for file existence checks with two subfields:
-  - **`exists`**: A list of globs that should match at least one file in the package. If any pattern doesn't match at least one file, the test fails.
-  - **`not_exists`**: A list of globs that should NOT match any file in the package. If any pattern matches a file, the test fails.
+- **`files`**: Specifies glob patterns for files that should exist in the package. You can provide a simple list of globs that should match at least one file in the package. If any pattern doesn't match at least one file, the test fails.
 
-  > **Note**: You can also specify `files` as a simple list of globs. In that case, all globs are treated as if they were specified in the `exists` field.
+  > **Note**: For more advanced use cases, you can also use the expanded form with `exists` and `not_exists` fields:
+  > ```yaml
+  > files:
+  >   exists:
+  >     - share/package/*.txt
+  >     - lib/python*/site-packages/mypackage/*.py
+  >   not_exists:
+  >     - lib/python*/site-packages/mypackage/deprecated_module.py
+  > ```
 - **`lib`**: matches libraries in the package (`.so`, `.dll`, `.dylib` files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. `foo` will match `libfoo.so`, `libfoo.dylib`, and `foo.dll`).
 - **`include`**: matches files under the `include` directory in the package. You can specify the file name like `foo.h`.
 - **`bin`**: matches files under the `bin` directory in the package. You can specify executable names like `foo` which will match `foo.exe` on Windows and `foo` on Linux and macOS.

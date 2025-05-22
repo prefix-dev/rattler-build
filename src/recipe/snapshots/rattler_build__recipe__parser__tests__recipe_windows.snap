@@ -366,7 +366,7 @@ Recipe {
                                     opts: GlobOptions {
                                         case_insensitive: false,
                                         literal_separator: false,
-                                        backslash_escape: true,
+                                        backslash_escape: false,
                                         empty_alternates: true,
                                     },
                                     tokens: Tokens(
@@ -512,7 +512,7 @@ Recipe {
                                     opts: GlobOptions {
                                         case_insensitive: false,
                                         literal_separator: false,
-                                        backslash_escape: true,
+                                        backslash_escape: false,
                                         empty_alternates: true,
                                     },
                                     tokens: Tokens(
@@ -1823,7 +1823,7 @@ Recipe {
                                     opts: GlobOptions {
                                         case_insensitive: false,
                                         literal_separator: false,
-                                        backslash_escape: true,
+                                        backslash_escape: false,
                                         empty_alternates: true,
                                     },
                                     tokens: Tokens(
