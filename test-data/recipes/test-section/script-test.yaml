@@ -28,8 +28,9 @@ tests:
   - downstream: bar
   - package_contents:
       files:
-        - foo
-        - bar
+        exists:
+          - foo
+          - bar
   - package_contents:
       lib:
         - libfoo.so

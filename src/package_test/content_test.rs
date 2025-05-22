@@ -31,7 +31,7 @@ impl PackageContentsTest {
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
-        for include in self.include.include_globs() {
+        for include in self.include.exists_globs() {
             let glob = if target_platform.is_windows() {
                 format!("Library/include/{}", include.source())
             } else {
@@ -54,7 +54,7 @@ impl PackageContentsTest {
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for bin in self.bin.include_globs() {
+        for bin in self.bin.exists_globs() {
             let bin_raw = bin.source();
             let globset = if target_platform.is_windows() {
                 // This is usually encoded as `PATHEXT` in the environment
@@ -96,7 +96,7 @@ impl PackageContentsTest {
 
         if target_platform.is_windows() {
             // Windows is special because it requires both a `.dll` and a `.bin` file
-            for lib in self.lib.include_globs() {
+            for lib in self.lib.exists_globs() {
                 let raw = lib.source();
                 if raw.ends_with(".dll") {
                     result.push((
@@ -128,7 +128,7 @@ impl PackageContentsTest {
                 }
             }
         } else {
-            for lib in self.lib.include_globs() {
+            for lib in self.lib.exists_globs() {
                 let raw = lib.source();
                 let globset = if target_platform.is_osx() {
                     if raw.ends_with(".dylib") || raw.ends_with(".a") {
@@ -180,7 +180,7 @@ impl PackageContentsTest {
             "lib/python*/site-packages"
         };
 
-        for site_package in self.site_packages.include_globs() {
+        for site_package in self.site_packages.exists_globs() {
             let mut globset = GlobSet::builder();
 
             if site_package.source().contains('/') {
@@ -211,11 +211,24 @@ impl PackageContentsTest {
         Ok(result)
     }
 
-    /// Retrieve the globs for the files section as a vector of (glob, GlobSet) tuples
+    /// Retrieve the exists globs for the files section as a vector of (glob, GlobSet) tuples
     pub fn files_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for file in self.files.include_globs() {
+        for file in self.files.exists_globs() {
+            let glob = Glob::new(file.source())?;
+            let globset = GlobSet::builder().add(glob).build()?;
+            result.push((file.glob().to_string(), globset));
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve the not_exists globs for the files section as a vector of (glob, GlobSet) tuples
+    pub fn files_not_exists_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+
+        for file in self.files.not_exists_globs() {
             let glob = Glob::new(file.source())?;
             let globset = GlobSet::builder().add(glob).build()?;
             result.push((file.glob().to_string(), globset));
@@ -243,6 +256,7 @@ impl PackageContentsTest {
             output.recipe.build().is_python_version_independent(),
         )?;
         let file_globs = self.files_as_globs()?;
+        let file_not_exists_globs = self.files_not_exists_as_globs()?;
 
         fn match_glob<'a>(glob: &GlobSet, paths: &'a Vec<&PathBuf>) -> Vec<&'a PathBuf> {
             let mut matches: Vec<&'a PathBuf> = Vec::new();
@@ -312,7 +326,30 @@ impl PackageContentsTest {
             }
 
             if matches.is_empty() {
-                collected_issues.push(format!("No match for file glob: {}", glob.0));
+                collected_issues.push(format!("No match for file 'exists' glob: {}", glob.0));
+            }
+        }
+
+        for glob in file_not_exists_globs {
+            let matches = match_glob(&glob.1, &paths);
+
+            if matches.is_empty() {
+                tracing::info!(
+                    "{} file not_exists: \"{}\" check passed - no matching files found",
+                    console::style(console::Emoji("✔", "")).green(),
+                    glob.0
+                );
+            } else {
+                collected_issues.push(format!(
+                    "Found matches for file 'not_exists' glob: {} - files should not exist",
+                    glob.0
+                ));
+                for path in &matches[0..std::cmp::min(5, matches.len())] {
+                    tracing::error!("  - {}", path.display());
+                }
+                if matches.len() > 5 {
+                    tracing::error!("... and {} more", matches.len() - 5);
+                }
             }
         }
 
@@ -340,7 +377,7 @@ mod tests {
     use std::path::Path;
 
     use super::PackageContentsTest;
-    use crate::recipe::parser::GlobVec;
+    use crate::recipe::parser::GlobCheckerVec;
     use globset::GlobSet;
     use rattler_conda_types::Platform;
     use serde::Deserialize;
@@ -373,7 +410,7 @@ mod tests {
     #[test]
     fn test_include_globs() {
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"], None),
+            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -385,7 +422,7 @@ mod tests {
         test_glob_matches(&globs, paths).unwrap();
 
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"], None),
+            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -400,7 +437,7 @@ mod tests {
     #[test]
     fn test_wasm_bin_globs() {
         let package_contents = PackageContentsTest {
-            bin: GlobVec::from_vec(vec!["foo", "bar"], None),
+            bin: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -522,6 +559,20 @@ mod tests {
     #[test]
     fn test_file_globs() {
         let test_case = load_test_case(Path::new("test_files.yaml"));
-        evaluate_test_case(test_case).unwrap();
+        let tests = &test_case.package_contents;
+
+        let exists_globs = tests.files_as_globs().unwrap();
+        if !exists_globs.is_empty() {
+            test_glob_matches(&exists_globs, &test_case.paths).unwrap();
+        }
+
+        let not_exists_globs = tests.files_not_exists_as_globs().unwrap();
+        if !not_exists_globs.is_empty() && !test_case.fail_paths.is_empty() {
+            for (_, glob) in &not_exists_globs {
+                for path in &test_case.fail_paths {
+                    assert!(glob.is_match(path), "{} should match not_exists glob", path);
+                }
+            }
+        }
     }
 }

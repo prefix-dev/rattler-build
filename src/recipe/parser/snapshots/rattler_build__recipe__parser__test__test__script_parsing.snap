@@ -30,11 +30,14 @@ expression: yaml_serde
 - downstream: bar
 - package_contents:
     files:
-    - foo
-    - bar
+      exists:
+      - foo
+      - bar
 - package_contents:
     lib:
-    - libfoo.so
-    - libbar.so
+      exists:
+      - libfoo.so
+      - libbar.so
     include:
-    - xtensor/xarray.hpp
+      exists:
+      - xtensor/xarray.hpp

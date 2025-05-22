@@ -878,6 +878,15 @@ tests:
         - etc/libmamba
         - etc/libmamba/*.mamba.txt
 
+      # For more advanced cases, you can use the expanded form with exists and not_exists:
+      # files:
+      #   exists:
+      #     - etc/libmamba/test.txt
+      #     - etc/libmamba
+      #     - etc/libmamba/*.mamba.txt
+      #   not_exists:
+      #     - etc/libmamba/unwanted.txt
+
       # checks for the existence of `mamba/api/__init__.py` inside of the
       # Python site-packages directory (note: also see Python import checks)
       site_packages:
