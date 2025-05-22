@@ -1,4 +1,4 @@
-exclude: '(\.patch|\.diff|\.snap|\.ambr|test-data/recipes/test-parsing/.+|test-data/patch_application/.+)$'
+exclude: '(\.patch|\.diff|\.snap|\.ambr|test-data/recipes/test-parsing/.+|test-data/patch_application/.+|test-data/conda_forge/.+)$'
 
 repos:
   - repo: local
