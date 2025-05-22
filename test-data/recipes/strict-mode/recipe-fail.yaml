@@ -1,0 +1,19 @@
+package:
+  name: test-strict-fail
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "test" > $PREFIX/test.txt
+        - echo "extra" > $PREFIX/extra.txt
+      else:
+        - echo "test" > %PREFIX%\test.txt
+        - echo "extra" > %PREFIX%\extra.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - test.txt
