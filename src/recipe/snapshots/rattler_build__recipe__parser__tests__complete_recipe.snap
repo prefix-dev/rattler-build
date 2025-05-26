@@ -154,26 +154,21 @@ tests:
     - src_file.txt
 - package_contents:
     files:
-      exists:
-      - test.txt
-      - license.txt
+    - test.txt
+    - license.txt
     site_packages:
-      exists:
-      - numpy
-      - numpy/foo/__init__.py
+    - numpy
+    - numpy/foo/__init__.py
     bin:
-      exists:
-      - test
-      - test.exe
-      - foo*
+    - test
+    - test.exe
+    - foo*
     lib:
-      exists:
-      - test
-      - test.so.*
+    - test
+    - test.so.*
     include:
-      exists:
-      - test.h
-      - test.h*
+    - test.h
+    - test.h*
 - python:
     imports:
     - numpy

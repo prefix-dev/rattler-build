@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::recipe::parser::PackageContentsTest;
 use crate::{metadata::Output, package_test::TestError};
 use globset::{Glob, GlobBuilder, GlobSet};
-use rattler_conda_types::{Arch, Platform, package::PathsJson};
+use rattler_conda_types::{Platform, package::PathsJson};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);
@@ -47,6 +47,28 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Retrieve the not_exists globs for the include section as a vector of (glob, GlobSet) tuples
+    pub fn include_not_exists_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+        for include in self.include.not_exists_globs() {
+            let glob = if target_platform.is_windows() {
+                format!("Library/include/{}", include.source())
+            } else {
+                format!("include/{}", include.source())
+            };
+
+            result.push((
+                include.glob().to_string(),
+                GlobSet::builder().add(build_glob(glob)?).build()?,
+            ));
+        }
+
+        Ok(result)
+    }
+
     /// Retrieve the globs for the bin section as a vector of (glob, GlobSet) tuples
     pub fn bin_as_globs(
         &self,
@@ -60,14 +82,53 @@ impl PackageContentsTest {
                 // This is usually encoded as `PATHEXT` in the environment
                 let path_ext = "{,.exe,.bat,.cmd,.com,.ps1}";
                 GlobSet::builder()
-                    .add(build_glob(format!("{bin_raw}{path_ext}"))?)
+                    .add(build_glob(format!("Library/bin/{bin_raw}{path_ext}"))?)
+                    .add(build_glob(format!("Scripts/{bin_raw}{path_ext}"))?)
+                    .add(build_glob(format!("bin/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!(
                         "Library/mingw-w64/bin/{bin_raw}{path_ext}"
                     ))?)
                     .add(build_glob(format!("Library/usr/bin/{bin_raw}{path_ext}"))?)
+                    // Binaries in root directory
+                    .add(build_glob(format!("{bin_raw}{path_ext}"))?)
+                    .build()
+            } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
+                GlobSet::builder()
+                    .add(build_glob(format!("bin/{bin_raw}.js"))?)
+                    .add(build_glob(format!("bin/{bin_raw}.wasm"))?)
+                    .build()
+            } else {
+                GlobSet::builder()
+                    .add(Glob::new(&format!("bin/{bin_raw}"))?)
+                    .build()
+            }?;
+
+            result.push((bin.source().to_string(), globset));
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve the not_exists globs for the bin section as a vector of (glob, GlobSet) tuples
+    pub fn bin_not_exists_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+
+        for bin in self.bin.not_exists_globs() {
+            let bin_raw = bin.source();
+            let globset = if target_platform.is_windows() {
+                let path_ext = "{,.exe,.bat,.cmd,.com,.ps1}";
+                GlobSet::builder()
                     .add(build_glob(format!("Library/bin/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!("Scripts/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!("bin/{bin_raw}{path_ext}"))?)
+                    .add(build_glob(format!(
+                        "Library/mingw-w64/bin/{bin_raw}{path_ext}"
+                    ))?)
+                    .add(build_glob(format!("Library/usr/bin/{bin_raw}{path_ext}"))?)
+                    .add(build_glob(format!("{bin_raw}{path_ext}"))?)
                     .build()
             } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
                 // emscripten build outputs will gonna get .js extension
@@ -141,8 +202,8 @@ impl PackageContentsTest {
                             .add(build_glob(format!("lib/{{,lib}}{raw}.*.dylib"))?)
                             .build()
                     }
-                } else if target_platform.is_linux() || target_platform.arch() == Some(Arch::Wasm32)
-                {
+                } else {
+                    // Linux and WASM32
                     if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a") {
                         GlobSet::builder()
                             .add(Glob::new(&format!("lib/{raw}"))?)
@@ -153,9 +214,79 @@ impl PackageContentsTest {
                             .add(build_glob(format!("lib/{{,lib}}{raw}.so.*"))?)
                             .build()
                     }
+                }?;
+                result.push((raw.to_string(), globset));
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve the not_exists globs for the lib section as a vector of (glob, GlobSet) tuples
+    pub fn lib_not_exists_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+
+        if target_platform.is_windows() {
+            for lib in self.lib.not_exists_globs() {
+                let raw = lib.source();
+                if raw.ends_with(".dll") {
+                    result.push((
+                        raw.to_string(),
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("Library/bin/{raw}"))?)
+                            .build()?,
+                    ));
+                } else if raw.ends_with(".lib") {
+                    result.push((
+                        raw.to_string(),
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("Library/lib/{raw}"))?)
+                            .build()?,
+                    ));
                 } else {
-                    // TODO
-                    unimplemented!("lib_as_globs for target platform: {:?}", target_platform)
+                    result.push((
+                        raw.to_string(),
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("Library/bin/{raw}.dll"))?)
+                            .build()?,
+                    ));
+                    result.push((
+                        raw.to_string(),
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("Library/lib/{raw}.lib"))?)
+                            .build()?,
+                    ));
+                }
+            }
+        } else {
+            for lib in self.lib.not_exists_globs() {
+                let raw = lib.source();
+                let globset = if target_platform.is_osx() {
+                    if raw.ends_with(".dylib") || raw.ends_with(".a") {
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("lib/{raw}"))?)
+                            .build()
+                    } else {
+                        GlobSet::builder()
+                            .add(build_glob(format!("lib/{{,lib}}{raw}.dylib"))?)
+                            .add(build_glob(format!("lib/{{,lib}}{raw}.*.dylib"))?)
+                            .build()
+                    }
+                } else {
+                    // Linux and WASM32
+                    if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a") {
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("lib/{raw}"))?)
+                            .build()
+                    } else {
+                        GlobSet::builder()
+                            .add(build_glob(format!("lib/{{,lib}}{raw}.so"))?)
+                            .add(build_glob(format!("lib/{{,lib}}{raw}.so.*"))?)
+                            .build()
+                    }
                 }?;
                 result.push((raw.to_string(), globset));
             }
@@ -181,6 +312,53 @@ impl PackageContentsTest {
         };
 
         for site_package in self.site_packages.exists_globs() {
+            let mut globset = GlobSet::builder();
+
+            if site_package.source().contains('/') {
+                globset.add(build_glob(format!(
+                    "{site_packages_base}/{}",
+                    site_package.source()
+                ))?);
+            } else {
+                let mut split = site_package.source().split('.').collect::<Vec<_>>();
+                let last_elem = split.pop().unwrap_or_default();
+                let mut site_package_path = split.join("/");
+                if !site_package_path.is_empty() {
+                    site_package_path.push('/');
+                }
+
+                globset.add(build_glob(format!(
+                    "{site_packages_base}/{site_package_path}{last_elem}.py"
+                ))?);
+                globset.add(build_glob(format!(
+                    "{site_packages_base}/{site_package_path}{last_elem}/__init__.py"
+                ))?);
+            };
+
+            let globset = globset.build()?;
+            result.push((site_package.glob().to_string(), globset));
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve the not_exists globs for the site_packages section as a vector of (glob, GlobSet) tuples
+    pub fn site_packages_not_exists_as_globs(
+        &self,
+        target_platform: &Platform,
+        version_independent: bool,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        let mut result = Vec::new();
+
+        let site_packages_base = if version_independent {
+            "site-packages"
+        } else if target_platform.is_windows() {
+            "Lib/site-packages"
+        } else {
+            "lib/python*/site-packages"
+        };
+
+        for site_package in self.site_packages.not_exists_globs() {
             let mut globset = GlobSet::builder();
 
             if site_package.source().contains('/') {
@@ -248,15 +426,63 @@ impl PackageContentsTest {
             .map(|p| &p.relative_path)
             .collect::<Vec<_>>();
 
-        let include_globs = self.include_as_globs(target_platform)?;
-        let bin_globs = self.bin_as_globs(target_platform)?;
-        let lib_globs = self.lib_as_globs(target_platform)?;
-        let site_package_globs = self.site_packages_as_globs(
+        let mut all_exists_globs: Vec<(String, GlobSet, &str)> = Vec::new();
+
+        // Include exists globs
+        for (glob_str, globset) in self.include_as_globs(target_platform)? {
+            all_exists_globs.push((glob_str, globset, "include"));
+        }
+
+        // Bin exists globs
+        for (glob_str, globset) in self.bin_as_globs(target_platform)? {
+            all_exists_globs.push((glob_str, globset, "bin"));
+        }
+
+        // Lib exists globs
+        for (glob_str, globset) in self.lib_as_globs(target_platform)? {
+            all_exists_globs.push((glob_str, globset, "lib"));
+        }
+
+        // Site packages exists globs
+        for (glob_str, globset) in self.site_packages_as_globs(
             target_platform,
             output.recipe.build().is_python_version_independent(),
-        )?;
-        let file_globs = self.files_as_globs()?;
-        let file_not_exists_globs = self.files_not_exists_as_globs()?;
+        )? {
+            all_exists_globs.push((glob_str, globset, "site_packages"));
+        }
+
+        // Files exists globs
+        for (glob_str, globset) in self.files_as_globs()? {
+            all_exists_globs.push((glob_str, globset, "file"));
+        }
+
+        let mut all_not_exists_globs: Vec<(String, GlobSet, &str)> = Vec::new();
+        for (glob_str, globset) in self.include_not_exists_as_globs(target_platform)? {
+            all_not_exists_globs.push((glob_str, globset, "include"));
+        }
+
+        // Bin not_exists globs
+        for (glob_str, globset) in self.bin_not_exists_as_globs(target_platform)? {
+            all_not_exists_globs.push((glob_str, globset, "bin"));
+        }
+
+        // Lib not_exists globs
+        for (glob_str, globset) in self.lib_not_exists_as_globs(target_platform)? {
+            all_not_exists_globs.push((glob_str, globset, "lib"));
+        }
+
+        // Site packages not_exists globs
+        for (glob_str, globset) in self.site_packages_not_exists_as_globs(
+            target_platform,
+            output.recipe.build().is_python_version_independent(),
+        )? {
+            all_not_exists_globs.push((glob_str, globset, "site_packages"));
+        }
+
+        // Files not_exists globs
+        for (glob_str, globset) in self.files_not_exists_as_globs()? {
+            all_not_exists_globs.push((glob_str, globset, "file"));
+        }
 
         fn match_glob<'a>(glob: &GlobSet, paths: &'a Vec<&PathBuf>) -> Vec<&'a PathBuf> {
             let mut matches: Vec<&'a PathBuf> = Vec::new();
@@ -270,79 +496,31 @@ impl PackageContentsTest {
 
         let mut collected_issues = Vec::new();
 
-        for glob in include_globs {
-            let matches = match_glob(&glob.1, &paths);
+        // We are gonna check all exists and not-exists globs in a single pass
+        for (glob_str, globset, section) in &all_exists_globs {
+            let matches = match_glob(globset, &paths);
 
             if !matches.is_empty() {
-                display_success(&matches, &glob.0, "include");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for include glob: {}", glob.0));
+                display_success(&matches, glob_str, section);
+            } else {
+                collected_issues.push(format!("No match for {} glob: {}", section, glob_str));
             }
         }
 
-        for glob in bin_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "bin");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for bin glob: {}", glob.0));
-            }
-        }
-
-        for glob in lib_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "lib");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for lib glob: {}", glob.0));
-            }
-        }
-
-        for glob in site_package_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "site_packages");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for site_package glob: {}", glob.0));
-            }
-        }
-
-        for glob in file_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "file");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for file 'exists' glob: {}", glob.0));
-            }
-        }
-
-        for glob in file_not_exists_globs {
-            let matches = match_glob(&glob.1, &paths);
+        for (glob_str, globset, section) in &all_not_exists_globs {
+            let matches = match_glob(globset, &paths);
 
             if matches.is_empty() {
                 tracing::info!(
-                    "{} file not_exists: \"{}\" check passed - no matching files found",
+                    "{} {} not_exists: \"{}\" check passed - no matching files found",
                     console::style(console::Emoji("✔", "")).green(),
-                    glob.0
+                    section,
+                    glob_str
                 );
             } else {
                 collected_issues.push(format!(
-                    "Found matches for file 'not_exists' glob: {} - files should not exist",
-                    glob.0
+                    "Found matches for {} 'not_exists' glob: {} - files should not exist",
+                    section, glob_str
                 ));
                 for path in &matches[0..std::cmp::min(5, matches.len())] {
                     tracing::error!("  - {}", path.display());

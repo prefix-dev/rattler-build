@@ -427,14 +427,19 @@ impl GlobCheckerVec {
 
 impl Serialize for GlobCheckerVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(2))?;
-        if !self.exists.is_empty() {
-            map.serialize_entry("exists", &self.exists)?;
+        // If only exists globs are present (no not_exists), render as a simple list
+        if self.not_exists.is_empty() && !self.exists.is_empty() {
+            self.exists.serialize(serializer)
+        } else {
+            let mut map = serializer.serialize_map(Some(2))?;
+            if !self.exists.is_empty() {
+                map.serialize_entry("exists", &self.exists)?;
+            }
+            if !self.not_exists.is_empty() {
+                map.serialize_entry("not_exists", &self.not_exists)?;
+            }
+            map.end()
         }
-        if !self.not_exists.is_empty() {
-            map.serialize_entry("not_exists", &self.not_exists)?;
-        }
-        map.end()
     }
 }
 
@@ -846,5 +851,12 @@ mod tests {
         assert_eq!(plain_glob_checker.not_exists_globs().len(), 0);
         assert!(plain_glob_checker.is_match(Path::new("foo")));
         assert!(plain_glob_checker.is_match(Path::new("bar")));
+    }
+
+    #[test]
+    fn test_serialize_only_exists_globs_as_list() {
+        let checker = GlobCheckerVec::from_vec(vec!["foo", "bar"], None);
+        let yaml = serde_yaml::to_string(&checker).unwrap();
+        assert_eq!(yaml, "- foo\n- bar\n");
     }
 }

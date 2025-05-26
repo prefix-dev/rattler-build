@@ -1,11 +1,10 @@
 platform: linux-64
 package_contents:
   files:
-    exists:
-      - assets/**/*.mp3
-      - images/cover.jpg
-      - pkg-config/test.pc
-      - pkg-config/*.pc
+    - assets/**/*.mp3
+    - images/cover.jpg
+    - pkg-config/test.pc
+    - pkg-config/*.pc
 paths:
   - assets/music/track1.mp3
   - assets/music/interpret/track2.mp3
