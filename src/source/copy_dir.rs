@@ -209,6 +209,8 @@ impl<'a> CopyDir<'a> {
             // ignore any .gitignore files from parent directories
             .parents(false)
             .git_ignore(self.use_gitignore)
+            // Always disable .ignore files - they should not affect source copying
+            .ignore(false)
             .hidden(self.hidden)
             .build()
             .filter_map(|entry| {
