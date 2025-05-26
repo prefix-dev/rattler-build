@@ -137,6 +137,7 @@ pub(crate) struct CopyDir<'a> {
     globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
+    use_rattlerbuildignore: bool,
     hidden: bool,
     copy_options: CopyOptions,
 }
@@ -151,6 +152,8 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
+            // use .rattlerbuildignore files by default
+            use_rattlerbuildignore: true,
             // include hidden files by default
             hidden: false,
             copy_options: CopyOptions::default(),
@@ -170,6 +173,12 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn use_git_global(mut self, b: bool) -> Self {
         self.use_git_global = b;
+        self
+    }
+
+    #[allow(unused)]
+    pub fn use_rattlerbuildignore(mut self, b: bool) -> Self {
+        self.use_rattlerbuildignore = b;
         self
     }
 
@@ -203,7 +212,8 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_paths = WalkBuilder::new(self.from_path)
+        let mut walk_builder = WalkBuilder::new(self.from_path);
+        walk_builder
             // disregard global gitignore
             .git_global(self.use_git_global)
             // ignore any .gitignore files from parent directories
@@ -211,7 +221,12 @@ impl<'a> CopyDir<'a> {
             .git_ignore(self.use_gitignore)
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
-            .hidden(self.hidden)
+            .hidden(self.hidden);
+        if self.use_rattlerbuildignore {
+            walk_builder.add_custom_ignore_filename(".rattlerbuildignore");
+        }
+
+        let copied_paths = walk_builder
             .build()
             .filter_map(|entry| {
                 let entry = match entry {

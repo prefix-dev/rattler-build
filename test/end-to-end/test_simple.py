@@ -13,6 +13,7 @@ import pytest
 import requests
 import yaml
 import subprocess
+import shutil
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -1954,3 +1955,31 @@ def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
     index_json = json.loads((pkg / "info/index.json").read_text())
     assert index_json["name"] == "test-url-source-ignore"
     assert index_json["version"] == "1.0.0"
+
+
+def test_rattlerbuildignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that .rattlerbuildignore files are respected during source copying."""
+    test_dir = tmp_path / "rattlerbuildignore-src"
+    test_dir.mkdir()
+    shutil.copy(
+        recipes / "rattlerbuildignore" / "recipe.yaml", test_dir / "recipe.yaml"
+    )
+
+    # Create .rattlerbuildignore
+    (test_dir / ".rattlerbuildignore").write_text("ignored.txt\n*.pyc\n")
+
+    # Create test files
+    (test_dir / "included.txt").write_text("This should be included")
+    (test_dir / "ignored.txt").write_text("This should be ignored")
+    (test_dir / "test.pyc").write_text("This should also be ignored")
+
+    output_dir = tmp_path / "output"
+    rattler_build.build(test_dir, output_dir)
+
+    pkg = get_extracted_package(output_dir, "test-rattlerbuildignore")
+    files_dir = pkg / "files"
+
+    assert (files_dir / "included.txt").exists()
+    assert (files_dir / "recipe.yaml").exists()
+    assert not (files_dir / "ignored.txt").exists()
+    assert not (files_dir / "test.pyc").exists()
