@@ -1937,3 +1937,20 @@ def test_extracted_timestamps(
         recipes / "timestamps/recipe.yaml",
         tmp_path,
     )
+
+
+def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that .ignore files don't affect URL sources."""
+    recipe_path = Path("test-data/recipes/url-source-with-ignore/recipe.yaml")
+
+    # This should succeed since we don't respect .ignore files anymore
+    rattler_build.build(
+        recipe_path,
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "test-url-source-ignore")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "test-url-source-ignore"
+    assert index_json["version"] == "1.0.0"

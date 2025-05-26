@@ -1,0 +1,20 @@
+package:
+  name: test-url-source-ignore
+  version: 1.0.0
+
+source:
+  url: https://github.com/zed-industries/zed/archive/6f918ed99bfa107d496f7e6a7101a956494f3153.tar.gz
+  sha256: 8d9598aa5a7da38661f3968eaf8094a93cd7ae019b2750181c8da14ba13e7c07
+
+build:
+  script:
+    - if: unix
+      then:
+        - test -f tooling/workspace-hack/Cargo.toml || (echo "FAIL: Cargo.toml was ignored!" && exit 1)
+        - echo "SUCCESS: Cargo.toml was not ignored"
+      else:
+        - if not exist tooling\workspace-hack\Cargo.toml (echo FAIL: Cargo.toml was ignored! && exit 1)
+        - echo SUCCESS: Cargo.toml was not ignored
+
+about:
+  summary: Test that .ignore files don't affect URL sources
