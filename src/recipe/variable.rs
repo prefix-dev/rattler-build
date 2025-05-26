@@ -61,6 +61,11 @@ impl Variable {
     pub fn from_string(value: &str) -> Self {
         Variable(Value::from_safe_string(value.to_string()))
     }
+
+    /// Create a variable from a `minijinja::Value`
+    pub fn from_value(value: Value) -> Self {
+        Variable(value)
+    }
 }
 
 impl Display for Variable {
