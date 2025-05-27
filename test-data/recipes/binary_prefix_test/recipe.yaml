@@ -22,7 +22,11 @@ build:
               return 0;
           }
           EOF
-        - gcc test_binary.c -o $PREFIX/bin/test_binary
+        - if: target_platform == "osx-64" or target_platform == "osx-arm64"
+          then:
+            - clang test_binary.c -o $PREFIX/bin/test_binary
+          else:
+            - gcc test_binary.c -o $PREFIX/bin/test_binary
       else:
         - mkdir %PREFIX%\Library\bin
         # A simple executable that contains the prefix
@@ -39,8 +43,11 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('c') }}
-    - gcc
+    - if: target_platform == "osx-64" or target_platform == "osx-arm64"
+      then:
+        - clang
+      else:
+        - gcc
 
 about:
   summary: Test package with binary containing host prefix
