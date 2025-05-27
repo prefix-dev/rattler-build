@@ -1,7 +1,5 @@
 //! Functions to write and create metadata from a given output
 
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
