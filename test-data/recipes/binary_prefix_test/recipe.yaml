@@ -27,17 +27,20 @@ build:
         - mkdir %PREFIX%\Library\bin
         # A simple executable that contains the prefix
         - |
+          setlocal enabledelayedexpansion
+          set "PREFIX_ESC=%PREFIX:\=\\%"
           echo #include ^<stdio.h^> > test_binary.c
           echo int main() { >> test_binary.c
-          echo     const char* prefix = "%PREFIX%"; >> test_binary.c
-          echo     printf("Prefix is: %%s\n", prefix); >> test_binary.c
+          echo     const char* prefix = "!PREFIX_ESC!"; >> test_binary.c
+          echo     printf("Prefix is: %%s\\n", prefix); >> test_binary.c
           echo     return 0; >> test_binary.c
           echo } >> test_binary.c
-        - cl test_binary.c /Fe:%PREFIX%\Library\bin\test_binary.exe
+          gcc test_binary.c -o "%PREFIX%\Library\bin\test_binary.exe"
 
 requirements:
   build:
     - ${{ compiler('c') }}
+    - gcc
 
 about:
   summary: Test package with binary containing host prefix

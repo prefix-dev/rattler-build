@@ -1989,35 +1989,28 @@ def test_error_on_binary_prefix(
 
 
 @pytest.mark.skipif(
-    os.name != "nt", reason="Windows symlink test can only run on Windows"
+    platform.system() != "Linux", reason="Symlink test only runs on Linux"
 )
-def test_error_on_symlinks_windows(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that symlinks are forbidden on Windows by default"""
+def test_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that symlinks work correctly on Linux"""
     recipe_path = recipes / "symlink_test"
-
     args = rattler_build.build_args(recipe_path, tmp_path)
 
-    # Should fail by default on Windows
-    try:
-        rattler_build(*args, stderr=STDOUT)
-        pytest.fail("Expected build to fail with symlink error on Windows")
-    except CalledProcessError as e:
-        output = e.output.decode("utf-8") if e.output else ""
-        assert "symlinks" in output.lower() and "windows systems" in output.lower()
-
-    # Should succeed with --allow-symlinks-on-windows flag
-    shutil.rmtree(tmp_path)
-    tmp_path.mkdir()
-    args = rattler_build.build_args(recipe_path, tmp_path)
-    args = list(args) + ["--allow-symlinks-on-windows"]
     rattler_build(*args)
-    pkg_name = "symlink-test-1.0.0-h"
-    assert any(
-        f.name.startswith(pkg_name)
-        for f in (tmp_path / host_subdir()).glob("*.tar.bz2")
-    )
+    pkg = get_extracted_package(tmp_path, "symlink-test")
+
+    # Verify the symlinks exist and are correct
+    assert (pkg / "bin/symlink_script").exists()
+    assert (pkg / "bin/another_symlink").exists()
+    assert (pkg / "bin/real_script").exists()
+
+    # Verify they are actually symlinks
+    assert (pkg / "bin/symlink_script").is_symlink()
+    assert (pkg / "bin/another_symlink").is_symlink()
+
+    # Verify they point to the right target
+    assert os.readlink(pkg / "bin/symlink_script") == "real_script"
+    assert os.readlink(pkg / "bin/another_symlink") == "real_script"
 
 
 def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
