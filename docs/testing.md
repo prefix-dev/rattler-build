@@ -63,6 +63,15 @@ tests:
   - package_contents:
       files:
         - share/package/*.txt
+
+  # test with strict mode: fails if there are any files not matched by the globs
+  - package_contents:
+      strict: true
+      files:
+        - share/package/*.txt
+        - bin/myapp
+      lib:
+        - mylib
 ```
 
 ### Testing package contents
@@ -78,6 +87,7 @@ It has multiple sub-keys that help when building cross-platform packages:
 - **`include`**: matches files under the `include` directory in the package. You can specify the file name like `foo.h`.
 - **`bin`**: matches files under the `bin` directory in the package. You can specify executable names like `foo` which will match `foo.exe` on Windows and `foo` on Linux and macOS.
 - **`site_packages`**: matches files under the `site-packages` directory in the package. You can specify the import path like `foobar.api` which will match `foobar/api.py` and `foobar/api/__init__.py`.
+- **`strict`**: when set to `true`, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: `false`).
 
 ## Testing existing packages
 

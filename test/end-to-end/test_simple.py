@@ -171,6 +171,67 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
 
 
+def test_strict_mode_fail(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode fails when unmatched files exist"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipe_dir / "recipe-fail.yaml", output_dir)
+
+
+def test_strict_mode_pass(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode passes when all files are matched"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    rattler_build.build(recipe_dir / "recipe-pass.yaml", output_dir)
+
+
+def test_strict_mode_many_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that strict mode shows all unmatched files, not just the first few"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    build_args = rattler_build.build_args(
+        recipe_dir / "recipe-many-files.yaml",
+        output_dir,
+        extra_args=["--log-style=json"],
+    )
+    result = subprocess.run(
+        [str(rattler_build.path), *build_args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert result.returncode != 0
+
+    logs = []
+    stderr = result.stderr if result.stderr else ""
+    for line in stderr.splitlines():
+        if line.strip() and line.strip().startswith("{"):
+            try:
+                logs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    stdout = result.stdout if result.stdout else ""
+    error_output = stderr + stdout
+    assert "unmatched1.txt" in error_output
+    assert "unmatched2.txt" in error_output
+    assert "unmatched3.txt" in error_output
+    assert "unmatched4.txt" in error_output
+    assert "unmatched5.txt" in error_output
+    assert "unmatched6.txt" in error_output
+    assert "unmatched7.txt" in error_output
+
+
 @pytest.mark.skipif(
     not os.environ.get("PREFIX_DEV_READ_ONLY_TOKEN", ""),
     reason="requires PREFIX_DEV_READ_ONLY_TOKEN",
