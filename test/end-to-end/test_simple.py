@@ -1957,16 +1957,16 @@ def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
     assert index_json["version"] == "1.0.0"
 
 
-def test_rattlerbuildignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    """Test that .rattlerbuildignore files are respected during source copying."""
+def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that .condapackageignore files are respected during source copying."""
     test_dir = tmp_path / "rattlerbuildignore-src"
     test_dir.mkdir()
     shutil.copy(
         recipes / "rattlerbuildignore" / "recipe.yaml", test_dir / "recipe.yaml"
     )
 
-    # Create .rattlerbuildignore
-    (test_dir / ".rattlerbuildignore").write_text("ignored.txt\n*.pyc\n")
+    # Create .condapackageignore
+    (test_dir / ".condapackageignore").write_text("ignored.txt\n*.pyc\n")
 
     # Create test files
     (test_dir / "included.txt").write_text("This should be included")

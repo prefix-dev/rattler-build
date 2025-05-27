@@ -137,7 +137,7 @@ pub(crate) struct CopyDir<'a> {
     globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
-    use_rattlerbuildignore: bool,
+    use_condapackageignore: bool,
     hidden: bool,
     copy_options: CopyOptions,
 }
@@ -152,8 +152,8 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
-            // use .rattlerbuildignore files by default
-            use_rattlerbuildignore: true,
+            // use .condapackageignore files by default
+            use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
             copy_options: CopyOptions::default(),
@@ -177,8 +177,8 @@ impl<'a> CopyDir<'a> {
     }
 
     #[allow(unused)]
-    pub fn use_rattlerbuildignore(mut self, b: bool) -> Self {
-        self.use_rattlerbuildignore = b;
+    pub fn use_condapackageignore(mut self, b: bool) -> Self {
+        self.use_condapackageignore = b;
         self
     }
 
@@ -222,8 +222,8 @@ impl<'a> CopyDir<'a> {
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
             .hidden(self.hidden);
-        if self.use_rattlerbuildignore {
-            walk_builder.add_custom_ignore_filename(".rattlerbuildignore");
+        if self.use_condapackageignore {
+            walk_builder.add_custom_ignore_filename(".condapackageignore");
         }
 
         let copied_paths = walk_builder
