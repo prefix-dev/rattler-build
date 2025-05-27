@@ -1649,6 +1649,15 @@ is prepared and do not create a new environment (as we only analyze the contents
 </span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
 </span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
 </span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="w">  </span><span class="c1"># test with strict mode: fails if there are any files not matched by the globs</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="w">      </span><span class="nt">strict</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bin/myapp</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="w">      </span><span class="nt">lib</span><span class="p">:</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mylib</span>
 </span></code></pre></div>
 <h3 id="testing-package-contents">Testing package contents<a class="headerlink" href="#testing-package-contents" title="Permanent link">#</a></h3>
 <p>The <code>package_contents</code> test is a special test that is executed right after the
@@ -1661,6 +1670,7 @@ It can be very useful as a "sanity check" to ensure that the package contains th
 <li><strong><code>include</code></strong>: matches files under the <code>include</code> directory in the package. You can specify the file name like <code>foo.h</code>.</li>
 <li><strong><code>bin</code></strong>: matches files under the <code>bin</code> directory in the package. You can specify executable names like <code>foo</code> which will match <code>foo.exe</code> on Windows and <code>foo</code> on Linux and macOS.</li>
 <li><strong><code>site_packages</code></strong>: matches files under the <code>site-packages</code> directory in the package. You can specify the import path like <code>foobar.api</code> which will match <code>foobar/api.py</code> and <code>foobar/api/__init__.py</code>.</li>
+<li><strong><code>strict</code></strong>: when set to <code>true</code>, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: <code>false</code>).</li>
 </ul>
 <h2 id="testing-existing-packages">Testing existing packages<a class="headerlink" href="#testing-existing-packages" title="Permanent link">#</a></h2>
 <p>The tests from the test section are actually added <em>into</em> your package and
