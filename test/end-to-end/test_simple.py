@@ -1967,7 +1967,6 @@ def test_merge_build_and_host(
     )
 
 
-
 def test_error_on_binary_prefix(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -2019,6 +2018,7 @@ def test_error_on_symlinks_windows(
         f.name.startswith(pkg_name)
         for f in (tmp_path / host_subdir()).glob("*.tar.bz2")
     )
+
 
 def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     # build the package with experimental flag to enable the feature
