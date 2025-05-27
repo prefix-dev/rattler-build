@@ -636,10 +636,6 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/index.json").exists()
     assert (pkg / "info/paths.json").exists()
 
-    index_json = json.loads((pkg / "info/index.json").read_text())
-    subdir = index_json["subdir"]
-    is_win = subdir.startswith("win")
-
     def check_path(p, t):
         if t is None:
             assert "file_mode" not in p
