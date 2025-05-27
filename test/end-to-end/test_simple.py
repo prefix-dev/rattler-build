@@ -641,7 +641,7 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     is_win = subdir.startswith("win")
 
     def check_path(p, t):
-        if t == "binary" and is_win or t is None:
+        if t is None:
             assert "file_mode" not in p
             assert "prefix_placeholder" not in p
         else:
@@ -660,10 +660,7 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "is_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
-            if not is_win:
-                check_path(p, "text")
-            else:
-                check_path(p, None)
+            check_path(p, "text")
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
