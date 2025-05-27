@@ -148,7 +148,9 @@ pub fn get_tool_config(
         .with_continue_on_failure(build_data.continue_on_failure)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
-        .with_allow_insecure_host(build_data.common.allow_insecure_host.clone());
+        .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
+        .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -996,6 +998,8 @@ pub async fn debug_recipe(
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
+        error_prefix_in_binary: false,
+        allow_symlinks_on_windows: false,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

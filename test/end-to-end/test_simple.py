@@ -13,6 +13,7 @@ import pytest
 import requests
 import yaml
 import subprocess
+import shutil
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -1869,4 +1870,57 @@ def test_merge_build_and_host(
     rattler_build.build(
         recipes / "merge_build_and_host/recipe.yaml",
         tmp_path,
+    )
+
+
+def test_error_on_binary_prefix(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --error-prefix-in-binary flag correctly detects prefix in binaries"""
+    recipe_path = recipes / "binary_prefix_test"
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    rattler_build(*args)
+
+    shutil.rmtree(tmp_path)
+    tmp_path.mkdir()
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    args = list(args) + ["--error-prefix-in-binary"]
+
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with binary prefix error")
+    except CalledProcessError as e:
+        output = e.output.decode("utf-8") if e.output else ""
+        assert "Binary file" in output and "contains host prefix" in output
+
+
+@pytest.mark.skipif(
+    os.name != "nt", reason="Windows symlink test can only run on Windows"
+)
+def test_error_on_symlinks_windows(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that symlinks are forbidden on Windows by default"""
+    recipe_path = recipes / "symlink_test"
+
+    args = rattler_build.build_args(recipe_path, tmp_path)
+
+    # Should fail by default on Windows
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with symlink error on Windows")
+    except CalledProcessError as e:
+        output = e.output.decode("utf-8") if e.output else ""
+        assert "symlinks" in output.lower() and "windows systems" in output.lower()
+
+    # Should succeed with --allow-symlinks-on-windows flag
+    shutil.rmtree(tmp_path)
+    tmp_path.mkdir()
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    args = list(args) + ["--allow-symlinks-on-windows"]
+    rattler_build(*args)
+    pkg_name = "symlink-test-1.0.0-h"
+    assert any(
+        f.name.startswith(pkg_name)
+        for f in (tmp_path / host_subdir()).glob("*.tar.bz2")
     )

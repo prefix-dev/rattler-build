@@ -1,0 +1,20 @@
+context:
+  name: symlink-test
+  version: "1.0.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 0
+  script:
+    - mkdir %PREFIX%\Library\bin
+    - echo @echo off > %PREFIX%\Library\bin\real_script.bat
+    - echo echo Hello from real script >> %PREFIX%\Library\bin\real_script.bat
+    - mklink %PREFIX%\Library\bin\symlink_script.bat %PREFIX%\Library\bin\real_script.bat
+    - mklink %PREFIX%\Library\bin\another_symlink.bat %PREFIX%\Library\bin\real_script.bat
+
+about:
+  summary: Test package with symlinks
+  description: This package contains symlinks to test Windows symlink detection
