@@ -40,7 +40,6 @@ requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 rust-src = ">=1.86.0,<1.87"
 boto3 = "*"
-nushell = "==0.104.0"
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
@@ -106,9 +105,5 @@ ruff = ">=0.4.10,<0.5"
 default = { features = [
   "dev",
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
-docs = { features = [
-  "docs",
-], no-default-feature = true, solve-group = "default" }
-lint = { features = [
-  "lint",
-], no-default-feature = true, solve-group = "default" }
+docs = { features = ["docs"], no-default-feature = true }
+lint = { features = ["lint"], solve-group = "default" }

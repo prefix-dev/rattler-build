@@ -7,9 +7,9 @@ use rattler_shell::{
     shell::{self, Shell, ShellEnum},
 };
 
-use crate::script::{ExecutionArgs, interpreter::DEBUG_HELP, run_process_with_replacements};
+use crate::script::{ExecutionArgs, run_process_with_replacements};
 
-use super::{Interpreter, find_interpreter};
+use super::{Interpreter, InterpreterError, find_interpreter};
 
 pub(crate) struct NuShellInterpreter;
 
@@ -23,7 +23,7 @@ if not ("CONDA_BUILD" in $env) {
 "#;
 
 impl Interpreter for NuShellInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let host_shell_type = ShellEnum::default();
         let nushell = ShellEnum::NuShell(Default::default());
 
@@ -104,10 +104,10 @@ impl Interpreter for NuShellInterpreter {
             match find_interpreter("nu", args.build_prefix.as_ref(), &args.execution_platform) {
                 Ok(Some(path)) => path,
                 _ => {
-                    return Err(std::io::Error::new(
+                    return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
                         std::io::ErrorKind::NotFound,
                         "NuShell executable not found in PATH",
-                    ));
+                    )));
                 }
             }
             .to_string_lossy()
@@ -127,11 +127,10 @@ impl Interpreter for NuShellInterpreter {
             let status_code = output.status.code().unwrap_or(1);
             tracing::error!("Script failed with status {}", status_code);
             tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
-            return Err(std::io::Error::new(
+            return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Script failed".to_string(),
-            ));
+            )));
         }
 
         Ok(())

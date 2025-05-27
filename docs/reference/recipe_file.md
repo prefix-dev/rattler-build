@@ -55,7 +55,7 @@ The recipe spec has the following parts:
   build the recipe
 - [x] `build`: defines how to build the recipe and what build number to use
 - [x] `requirements`: defines requirements of the top-level package
-- [x] `test`: defines tests for the top-level package
+- [x] `tests`: defines tests for the top-level package
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
 
@@ -889,6 +889,10 @@ tests:
       # sure things work fine
       bin:
         - mamba
+
+      # enable strict mode: error if any file in the package is not matched by one of the globs
+      # (default: false)
+      strict: true
 
       # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
       # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin

@@ -12,5 +12,5 @@ requirements:
 tests:
   - script: build.nu
     requirements:
-      run:
+      build:
         - nushell

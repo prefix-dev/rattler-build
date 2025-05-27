@@ -4,13 +4,13 @@ use rattler_conda_types::Platform;
 
 use crate::script::{ExecutionArgs, ResolvedScriptContents};
 
-use super::{BashInterpreter, CmdExeInterpreter, Interpreter, find_interpreter};
+use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
 
 pub(crate) struct RInterpreter;
 
 // R interpreter calls either bash or cmd.exe interpreter for activation and then runs R script
 impl Interpreter for RInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let script = args.script.script();
         let r_script = args.work_dir.join("conda_build_script.R");
         tokio::fs::write(&r_script, script).await?;

@@ -2,6 +2,7 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
+    metadata::Debug,
     opt::{
         AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
         CondaForgeData, PrefixData, QuetzData, TestData,
@@ -24,7 +25,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false, debug=false))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -51,6 +52,7 @@ fn build_recipes_py(
     noarch_build_platform: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: bool,
+    debug: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -124,7 +126,7 @@ fn build_recipes_py(
         noarch_build_platform,
         None,
         None,
-        true,
+        Debug::new(debug),
         continue_on_failure.into(),
     );
 
@@ -137,8 +139,9 @@ fn build_recipes_py(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None))]
 fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
@@ -146,6 +149,8 @@ fn test_package_py(
     auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
+    debug: bool,
+    test_index: Option<usize>,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -173,7 +178,14 @@ fn test_package_py(
                 .collect::<PyResult<_>>()?,
         ),
     };
-    let test_data = TestData::new(package_file, channel, compression_threads, common);
+    let test_data = TestData::new(
+        package_file,
+        channel,
+        compression_threads,
+        Debug::new(debug),
+        test_index,
+        common,
+    );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {

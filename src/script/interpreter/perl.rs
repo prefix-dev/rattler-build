@@ -4,13 +4,13 @@ use rattler_conda_types::Platform;
 
 use crate::script::{ExecutionArgs, ResolvedScriptContents};
 
-use super::{BashInterpreter, CmdExeInterpreter, Interpreter, find_interpreter};
+use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
 
 pub(crate) struct PerlInterpreter;
 
 // Perl interpreter calls either bash or cmd.exe interpreter for activation and then runs Perl script
 impl Interpreter for PerlInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let perl_script = args.work_dir.join("conda_build_script.pl");
         tokio::fs::write(&perl_script, args.script.script()).await?;
 

@@ -1,6 +1,7 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
     collections::{HashMap, HashSet},
+    fs::FileTimes,
     path::{Path, PathBuf},
 };
 
@@ -32,6 +33,24 @@ impl Default for CopyOptions {
             buffer_size: 8 * 1024 * 1024,
         }
     }
+}
+
+/// Copy metadata from source to destination
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
+/// We need to deal with permissions and timestamps ourselves
+fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
+    let metadata = fs_err::metadata(from)?;
+
+    // Copy timestamps using std::fs::FileTimes
+    let file_times = FileTimes::new()
+        .set_accessed(metadata.accessed()?)
+        .set_modified(metadata.modified()?);
+
+    let file = std::fs::OpenOptions::new().write(true).open(to)?;
+    file.set_times(file_times)?;
+    file.set_permissions(metadata.permissions())?;
+
+    Ok(())
 }
 
 /// Cross platform way of creating a symlink
@@ -118,6 +137,7 @@ pub(crate) struct CopyDir<'a> {
     globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
+    use_condapackageignore: bool,
     hidden: bool,
     copy_options: CopyOptions,
 }
@@ -132,6 +152,8 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
+            // use .condapackageignore files by default
+            use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
             copy_options: CopyOptions::default(),
@@ -151,6 +173,12 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn use_git_global(mut self, b: bool) -> Self {
         self.use_git_global = b;
+        self
+    }
+
+    #[allow(unused)]
+    pub fn use_condapackageignore(mut self, b: bool) -> Self {
+        self.use_condapackageignore = b;
         self
     }
 
@@ -184,13 +212,21 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_paths = WalkBuilder::new(self.from_path)
+        let mut walk_builder = WalkBuilder::new(self.from_path);
+        walk_builder
             // disregard global gitignore
             .git_global(self.use_git_global)
             // ignore any .gitignore files from parent directories
             .parents(false)
             .git_ignore(self.use_gitignore)
-            .hidden(self.hidden)
+            // Always disable .ignore files - they should not affect source copying
+            .ignore(false)
+            .hidden(self.hidden);
+        if self.use_condapackageignore {
+            walk_builder.add_custom_ignore_filename(".condapackageignore");
+        }
+
+        let copied_paths = walk_builder
             .build()
             .filter_map(|entry| {
                 let entry = match entry {
@@ -383,13 +419,25 @@ where
     }
 
     // Reflink or copy the file
-    if (reflink_copy::reflink_or_copy(from, &to)?).is_none() {
-        // File has been reflinked, on Linux we need to copy the permissions
-        #[cfg(target_os = "linux")]
-        {
-            let metadata = fs_err::metadata(from)?;
-            let permissions = metadata.permissions();
-            fs_err::set_permissions(to, permissions)?;
+    match reflink_copy::reflink_or_copy(from, &to) {
+        Ok(None) => {
+            // File has been reflinked
+            #[cfg(target_os = "linux")]
+            {
+                copy_metadata(from, to.as_ref())?;
+            }
+        }
+        Ok(Some(_)) => {
+            // File has been copied
+            match copy_metadata(from, to.as_ref()) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::debug!("Failed to copy metadata for {:?} {:?}", to.as_ref(), e);
+                }
+            }
+        }
+        Err(e) => {
+            return Err(e);
         }
     }
 

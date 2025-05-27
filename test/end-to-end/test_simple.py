@@ -38,6 +38,39 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that building a package with spaces in output paths works correctly."""
+    output_dir = tmp_path / "Output Space Dir"
+    output_dir.mkdir(exist_ok=True)
+
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe.yaml",
+        output_dir,
+    )
+    pkg = get_extracted_package(output_dir, "spaces-in-paths")
+    assert (pkg / "test.txt").exists()
+    assert (pkg / "dir with spaces").exists()
+    assert (pkg / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
+
+    # Build the recipe with quoted paths on all platforms
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe-with-quotes.yaml",
+        output_dir,
+    )
+    pkg_quoted = get_extracted_package(output_dir, "spaces-in-paths-quotes")
+    assert (pkg_quoted / "test.txt").exists()
+
+    # Check directories with spaces on all platforms
+    assert (pkg_quoted / "dir with spaces").exists()
+    assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg_quoted / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
+
+
 def check_info(folder: Path, expected: Path):
     for f in ["index.json", "about.json", "link.json", "paths.json"]:
         assert (folder / "info" / f).exists()
@@ -136,6 +169,67 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
+
+
+def test_strict_mode_fail(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode fails when unmatched files exist"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipe_dir / "recipe-fail.yaml", output_dir)
+
+
+def test_strict_mode_pass(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode passes when all files are matched"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    rattler_build.build(recipe_dir / "recipe-pass.yaml", output_dir)
+
+
+def test_strict_mode_many_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that strict mode shows all unmatched files, not just the first few"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    build_args = rattler_build.build_args(
+        recipe_dir / "recipe-many-files.yaml",
+        output_dir,
+        extra_args=["--log-style=json"],
+    )
+    result = subprocess.run(
+        [str(rattler_build.path), *build_args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert result.returncode != 0
+
+    logs = []
+    stderr = result.stderr if result.stderr else ""
+    for line in stderr.splitlines():
+        if line.strip() and line.strip().startswith("{"):
+            try:
+                logs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    stdout = result.stdout if result.stdout else ""
+    error_output = stderr + stdout
+    assert "unmatched1.txt" in error_output
+    assert "unmatched2.txt" in error_output
+    assert "unmatched3.txt" in error_output
+    assert "unmatched4.txt" in error_output
+    assert "unmatched5.txt" in error_output
+    assert "unmatched6.txt" in error_output
+    assert "unmatched7.txt" in error_output
 
 
 @pytest.mark.skipif(
@@ -1873,6 +1967,7 @@ def test_merge_build_and_host(
     )
 
 
+
 def test_error_on_binary_prefix(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -1924,3 +2019,81 @@ def test_error_on_symlinks_windows(
         f.name.startswith(pkg_name)
         for f in (tmp_path / host_subdir()).glob("*.tar.bz2")
     )
+
+def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # build the package with experimental flag to enable the feature
+    rattler_build.build(
+        recipes / "empty_folder",
+        tmp_path,
+        extra_args=[
+            "-c",
+            "https://iamasecretusername:123412341234@foobar.com/some-channel",
+            "-c",
+            "https://bizbar.com/t/token1234567/channel-name",
+        ],
+    )
+    pkg = get_extracted_package(tmp_path, "empty_folder")
+    # scan all files to make sure that the secret is not present
+    for file in pkg.rglob("**/*"):
+        if file.is_file():
+            print("Checking file:", file)
+            content = file.read_text()
+            assert "iamasecretusername" not in content, f"Secret found in {file}"
+            assert "123412341234" not in content, f"Secret found in {file}"
+
+            assert "token1234567" not in content, f"Token found in {file}"
+
+
+def test_extracted_timestamps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # simply run the recipe "merge_build_and_host/recipe.yaml"
+    rattler_build.build(
+        recipes / "timestamps/recipe.yaml",
+        tmp_path,
+    )
+
+
+def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that .ignore files don't affect URL sources."""
+    recipe_path = Path("test-data/recipes/url-source-with-ignore/recipe.yaml")
+
+    # This should succeed since we don't respect .ignore files anymore
+    rattler_build.build(
+        recipe_path,
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "test-url-source-ignore")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "test-url-source-ignore"
+    assert index_json["version"] == "1.0.0"
+
+
+def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that .condapackageignore files are respected during source copying."""
+    test_dir = tmp_path / "rattlerbuildignore-src"
+    test_dir.mkdir()
+    shutil.copy(
+        recipes / "rattlerbuildignore" / "recipe.yaml", test_dir / "recipe.yaml"
+    )
+
+    # Create .condapackageignore
+    (test_dir / ".condapackageignore").write_text("ignored.txt\n*.pyc\n")
+
+    # Create test files
+    (test_dir / "included.txt").write_text("This should be included")
+    (test_dir / "ignored.txt").write_text("This should be ignored")
+    (test_dir / "test.pyc").write_text("This should also be ignored")
+
+    output_dir = tmp_path / "output"
+    rattler_build.build(test_dir, output_dir)
+
+    pkg = get_extracted_package(output_dir, "test-rattlerbuildignore")
+    files_dir = pkg / "files"
+
+    assert (files_dir / "included.txt").exists()
+    assert (files_dir / "recipe.yaml").exists()
+    assert not (files_dir / "ignored.txt").exists()
+    assert not (files_dir / "test.pyc").exists()

@@ -366,6 +366,7 @@ Recipe {
                 include: [
                     "xtensor/xarray.hpp{,/**}",
                 ],
+                strict: false,
             },
         },
         Command(

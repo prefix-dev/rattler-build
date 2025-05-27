@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::recipe::parser::PackageContentsTest;
@@ -229,96 +230,69 @@ impl PackageContentsTest {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
         let target_platform = output.target_platform();
-        let paths = paths
-            .paths
-            .iter()
-            .map(|p| &p.relative_path)
-            .collect::<Vec<_>>();
+        let paths: Vec<&PathBuf> = paths.paths.iter().map(|p| &p.relative_path).collect();
 
-        let include_globs = self.include_as_globs(target_platform)?;
-        let bin_globs = self.bin_as_globs(target_platform)?;
-        let lib_globs = self.lib_as_globs(target_platform)?;
-        let site_package_globs = self.site_packages_as_globs(
-            target_platform,
-            output.recipe.build().is_python_version_independent(),
-        )?;
-        let file_globs = self.files_as_globs()?;
+        // Collect all glob patterns
+        let all_globs = [
+            ("include", self.include_as_globs(target_platform)?),
+            ("bin", self.bin_as_globs(target_platform)?),
+            ("lib", self.lib_as_globs(target_platform)?),
+            (
+                "site_packages",
+                self.site_packages_as_globs(
+                    target_platform,
+                    output.recipe.build().is_python_version_independent(),
+                )?,
+            ),
+            ("files", self.files_as_globs()?),
+        ];
 
-        fn match_glob<'a>(glob: &GlobSet, paths: &'a Vec<&PathBuf>) -> Vec<&'a PathBuf> {
-            let mut matches: Vec<&'a PathBuf> = Vec::new();
-            for path in paths {
-                if glob.is_match(path) {
-                    matches.push(path);
+        let mut matched_paths = HashSet::<&PathBuf>::new();
+        let mut issues = Vec::new();
+
+        // Check all globs
+        for (section, globs) in &all_globs {
+            for (glob_str, globset) in globs {
+                let matches: Vec<&PathBuf> = paths
+                    .iter()
+                    .filter(|path| globset.is_match(path))
+                    .copied()
+                    .collect();
+
+                if matches.is_empty() {
+                    issues.push(format!("No match for {} glob: {}", section, glob_str));
+                } else {
+                    display_success(&matches, glob_str, section);
+                    matched_paths.extend(&matches);
                 }
             }
-            matches
         }
 
-        let mut collected_issues = Vec::new();
+        // Check strict mode
+        let strict_mode_issue = if self.strict {
+            let unmatched: Vec<&PathBuf> = paths
+                .iter()
+                .filter(|p| !matched_paths.contains(*p))
+                .copied()
+                .collect();
 
-        for glob in include_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "include");
+            if !unmatched.is_empty() {
+                Some((
+                    format!("Strict mode: {} unmatched files found", unmatched.len()),
+                    unmatched,
+                ))
+            } else {
+                None
             }
+        } else {
+            None
+        };
 
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for include glob: {}", glob.0));
-            }
-        }
-
-        for glob in bin_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "bin");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for bin glob: {}", glob.0));
-            }
-        }
-
-        for glob in lib_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "lib");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for lib glob: {}", glob.0));
-            }
-        }
-
-        for glob in site_package_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "site_packages");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for site_package glob: {}", glob.0));
-            }
-        }
-
-        for glob in file_globs {
-            let matches = match_glob(&glob.1, &paths);
-
-            if !matches.is_empty() {
-                display_success(&matches, &glob.0, "file");
-            }
-
-            if matches.is_empty() {
-                collected_issues.push(format!("No match for file glob: {}", glob.0));
-            }
-        }
-
-        if !collected_issues.is_empty() {
+        if !issues.is_empty() || strict_mode_issue.is_some() {
             tracing::error!("Package content test failed:");
-            for issue in &collected_issues {
+
+            // Print regular issues first
+            for issue in &issues {
                 tracing::error!(
                     "- {} {}",
                     console::style(console::Emoji("❌", " ")).red(),
@@ -326,9 +300,20 @@ impl PackageContentsTest {
                 );
             }
 
-            return Err(TestError::PackageContentTestFailed(
-                collected_issues.join("\n"),
-            ));
+            // Print strict mode issues if any
+            if let Some((message, unmatched)) = &strict_mode_issue {
+                tracing::error!("\nStrict mode violations:");
+                for file in unmatched {
+                    tracing::error!(
+                        "- {} {}",
+                        console::style(console::Emoji("❌", " ")).red(),
+                        file.display()
+                    );
+                }
+                issues.push(message.clone());
+            }
+
+            return Err(TestError::PackageContentTestFailed(issues.join("\n")));
         }
 
         Ok(())
@@ -523,5 +508,21 @@ mod tests {
     fn test_file_globs() {
         let test_case = load_test_case(Path::new("test_files.yaml"));
         evaluate_test_case(test_case).unwrap();
+    }
+
+    #[test]
+    fn test_strict_mode() {
+        let strict_contents = PackageContentsTest {
+            files: GlobVec::from_vec(vec!["matched.txt"], None),
+            strict: true,
+            ..Default::default()
+        };
+        assert!(strict_contents.strict);
+
+        let non_strict_contents = PackageContentsTest {
+            files: GlobVec::from_vec(vec!["*.txt"], None),
+            ..Default::default()
+        };
+        assert!(!non_strict_contents.strict);
     }
 }
