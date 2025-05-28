@@ -45,8 +45,9 @@ tests:
       include:
         - xtensor/xarray.hpp
       files:
-        - share/cmake/xtensor/xtensorConfig.cmake
-        - share/cmake/xtensor/xtensorConfigVersion.cmake
+        exists:
+          - share/cmake/xtensor/xtensorConfig.cmake
+          - share/cmake/xtensor/xtensorConfigVersion.cmake
 
   - script:
       - if: unix or emscripten

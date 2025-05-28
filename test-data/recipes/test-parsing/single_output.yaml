@@ -172,8 +172,9 @@ tests:
         - numpy
         - numpy/foo/__init__.py
       files:
-        - test.txt
-        - license.txt
+        exists:
+          - test.txt
+          - license.txt
   - python:
       imports:
         - numpy

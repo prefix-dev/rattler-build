@@ -37,7 +37,7 @@ pub use self::{
     about::About,
     build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
-    glob_vec::{GlobVec, GlobWithSource},
+    glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
     regex::SerializableRegex,

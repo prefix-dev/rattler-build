@@ -382,9 +382,9 @@ Recipe {
                     "share/cmake/xtensor/xtensorConfig.cmake{,/**}",
                     "share/cmake/xtensor/xtensorConfigVersion.cmake{,/**}",
                 ],
-                site_packages: [],
-                bin: [],
-                lib: [],
+                site_packages: GlobCheckerVec,
+                bin: GlobCheckerVec,
+                lib: GlobCheckerVec,
                 include: [
                     "xtensor/xarray.hpp{,/**}",
                 ],
