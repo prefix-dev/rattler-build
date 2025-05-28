@@ -2059,7 +2059,8 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     # check if the current filesystem is case-insensitive by creating a temporary file with a mixed case name
     test_file = tmp_path / "MixedCaseFile.txt"
     mixed_case_file = tmp_path / "mixedcasefile.txt"
-    # Create the mixed-case files
+
+    # create the mixed-case files
     test_file.write_text("This is a test.")
     case_insensitive = mixed_case_file.exists()
 
@@ -2070,9 +2071,9 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     if case_insensitive:
         # we don't package `cmake/test_file.txt` again, because our dependency already contains `CMake/test_file.txt`
         assert len(paths) == 1
-        assert "TEST.txt" in paths["paths"] or "test.txt" in paths["paths"]
+        assert "TEST.txt" in paths or "test.txt" in paths
     else:
         assert len(paths) == 3
-        assert "cmake/test_file.txt" in paths["paths"]
-        assert "TEST.txt" in paths["paths"]
-        assert "test.txt" in paths["paths"]
+        assert "cmake/test_file.txt" in paths
+        assert "TEST.txt" in paths
+        assert "test.txt" in paths
