@@ -8,3 +8,4 @@ expression: yaml_serde
       - foo.hpp
       not_exists:
       - baz.hpp
+    strict: false
