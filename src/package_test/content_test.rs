@@ -49,13 +49,13 @@ impl PackageContentsTest {
     }
 
     /// Check a list of (glob, GlobSet) against paths, collecting any missing or forbidden matches
-    fn check_globs(
+    fn check_globs<'a>(
         globs: &[(String, GlobSet)],
-        paths: &[&PathBuf],
+        paths: &[&'a PathBuf],
         section: &str,
         expect_exists: bool,
         collected_issues: &mut Vec<String>,
-        matched_paths: &mut HashSet<&PathBuf>,
+        matched_paths: &mut HashSet<&'a PathBuf>,
     ) {
         for (glob_str, globset) in globs {
             let matches: Vec<&PathBuf> = paths
@@ -377,7 +377,14 @@ impl PackageContentsTest {
             ("files", self.files_as_globs(target_platform)?),
         ];
         for (section, globs) in exists_sections {
-            Self::check_globs(&globs, &paths, section, true, &mut collected_issues, &mut matched_paths);
+            Self::check_globs(
+                &globs,
+                &paths,
+                section,
+                true,
+                &mut collected_issues,
+                &mut matched_paths,
+            );
         }
 
         // Check forbidden (not_exists) globs
@@ -395,7 +402,14 @@ impl PackageContentsTest {
             ("files", self.files_not_exists_as_globs(target_platform)?),
         ];
         for (section, globs) in not_exists_sections {
-            Self::check_globs(&globs, &paths, section, false, &mut collected_issues, &mut matched_paths);
+            Self::check_globs(
+                &globs,
+                &paths,
+                section,
+                false,
+                &mut collected_issues,
+                &mut matched_paths,
+            );
         }
 
         // Check strict mode
@@ -443,7 +457,9 @@ impl PackageContentsTest {
                 collected_issues.push(message.clone());
             }
 
-            return Err(TestError::PackageContentTestFailed(collected_issues.join("\n")));
+            return Err(TestError::PackageContentTestFailed(
+                collected_issues.join("\n"),
+            ));
         }
 
         Ok(())
@@ -659,14 +675,14 @@ mod tests {
     #[test]
     fn test_strict_mode() {
         let strict_contents = PackageContentsTest {
-            files: GlobVec::from_vec(vec!["matched.txt"], None),
+            files: GlobCheckerVec::from_vec(vec!["matched.txt"], None),
             strict: true,
             ..Default::default()
         };
         assert!(strict_contents.strict);
 
         let non_strict_contents = PackageContentsTest {
-            files: GlobVec::from_vec(vec!["*.txt"], None),
+            files: GlobCheckerVec::from_vec(vec!["*.txt"], None),
             ..Default::default()
         };
         assert!(!non_strict_contents.strict);

@@ -709,8 +709,8 @@ mod test {
         match &tests[0] {
             TestType::PackageContents { package_contents } => {
                 assert!(package_contents.strict);
-                assert_eq!(package_contents.files.include_globs().len(), 1);
-                assert_eq!(package_contents.bin.include_globs().len(), 1);
+                assert_eq!(package_contents.files.exists_globs().len(), 1);
+                assert_eq!(package_contents.bin.exists_globs().len(), 1);
             }
             _ => panic!("expected package contents test"),
         }
@@ -718,7 +718,7 @@ mod test {
         match &tests[1] {
             TestType::PackageContents { package_contents } => {
                 assert!(!package_contents.strict);
-                assert_eq!(package_contents.files.include_globs().len(), 1);
+                assert_eq!(package_contents.files.exists_globs().len(), 1);
             }
             _ => panic!("expected package contents test"),
         }
