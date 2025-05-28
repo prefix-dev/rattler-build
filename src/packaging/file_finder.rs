@@ -247,7 +247,8 @@ impl TempFiles {
     }
 }
 
-mod tests {
+#[cfg(test)]
+mod test {
     use std::{collections::HashSet, path::PathBuf};
 
     use crate::packaging::file_finder::{check_is_case_sensitive, find_new_files};
