@@ -2069,10 +2069,10 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 
     if case_insensitive:
         # we don't package `cmake/test_file.txt` again, because our dependency already contains `CMake/test_file.txt`
-        assert paths.len() == 1
+        assert len(paths) == 1
         assert "TEST.txt" in paths["paths"] or "test.txt" in paths["paths"]
     else:
-        assert paths.len() == 3
+        assert len(paths) == 3
         assert "cmake/test_file.txt" in paths["paths"]
         assert "TEST.txt" in paths["paths"]
         assert "test.txt" in paths["paths"]
