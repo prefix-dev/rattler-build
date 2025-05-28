@@ -204,6 +204,9 @@ pub struct PackageContentsTest {
     /// Uses `exists` field for headers that must be present and `not_exists` for headers that must not be present.
     #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
     pub include: GlobCheckerVec,
+    /// whether to enable strict mode (error on non-matched files or missing files)
+    #[serde(default)]
+    pub strict: bool,
 }
 
 impl TryConvertNode<Vec<TestType>> for RenderedNode {
@@ -484,7 +487,8 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
             site_packages,
             lib,
             bin,
-            include
+            include,
+            strict
         );
         Ok(package_contents)
     }
@@ -678,6 +682,45 @@ mod test {
                 assert_eq!(exc, vec!["baz.hpp"]);
             }
             _ => panic!("expected a package_contents test"),
+        }
+    }
+
+    #[test]
+    fn test_package_contents_strict_mode() {
+        let test_section = r#"
+        tests:
+          - package_contents:
+              strict: true
+              files:
+                - "**/*.txt"
+              bin:
+                - rust
+          - package_contents:
+              files:
+                - "**/*.txt"
+        "#;
+
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        match &tests[0] {
+            TestType::PackageContents { package_contents } => {
+                assert!(package_contents.strict);
+                assert_eq!(package_contents.files.include_globs().len(), 1);
+                assert_eq!(package_contents.bin.include_globs().len(), 1);
+            }
+            _ => panic!("expected package contents test"),
+        }
+
+        match &tests[1] {
+            TestType::PackageContents { package_contents } => {
+                assert!(!package_contents.strict);
+                assert_eq!(package_contents.files.include_globs().len(), 1);
+            }
+            _ => panic!("expected package contents test"),
         }
     }
 }

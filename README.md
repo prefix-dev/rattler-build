@@ -86,8 +86,7 @@ self-contained.
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require `git`
-  in the future)
+* `git` is required to checkout Git repositories.
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
 

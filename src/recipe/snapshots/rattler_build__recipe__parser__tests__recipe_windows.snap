@@ -2555,6 +2555,7 @@ Recipe {
                         strats: [],
                     },
                 },
+                files: [
             },
         },
         Command(

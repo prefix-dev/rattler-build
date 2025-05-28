@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::recipe::parser::PackageContentsTest;
@@ -54,6 +55,7 @@ impl PackageContentsTest {
         section: &str,
         expect_exists: bool,
         collected_issues: &mut Vec<String>,
+        matched_paths: &mut HashSet<&PathBuf>,
     ) {
         for (glob_str, globset) in globs {
             let matches: Vec<&PathBuf> = paths
@@ -64,6 +66,7 @@ impl PackageContentsTest {
             if expect_exists {
                 if !matches.is_empty() {
                     display_success(&matches, glob_str, section);
+                    matched_paths.extend(&matches);
                 } else {
                     collected_issues.push(format!("No match for {} glob: {}", section, glob_str));
                 }
@@ -356,13 +359,10 @@ impl PackageContentsTest {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
         let target_platform = output.target_platform();
-        let paths = paths
-            .paths
-            .iter()
-            .map(|p| &p.relative_path)
-            .collect::<Vec<_>>();
+        let paths: Vec<&PathBuf> = paths.paths.iter().map(|p| &p.relative_path).collect();
 
         let mut collected_issues = Vec::new();
+        let mut matched_paths = HashSet::<&PathBuf>::new();
         let version_independent = output.recipe.build().is_python_version_independent();
 
         // Check required (exists) globs
@@ -374,10 +374,10 @@ impl PackageContentsTest {
                 "site_packages",
                 self.site_packages_as_globs(target_platform, version_independent)?,
             ),
-            ("file", self.files_as_globs(target_platform)?),
+            ("files", self.files_as_globs(target_platform)?),
         ];
         for (section, globs) in exists_sections {
-            Self::check_globs(&globs, &paths, section, true, &mut collected_issues);
+            Self::check_globs(&globs, &paths, section, true, &mut collected_issues, &mut matched_paths);
         }
 
         // Check forbidden (not_exists) globs
@@ -392,14 +392,36 @@ impl PackageContentsTest {
                 "site_packages",
                 self.site_packages_not_exists_as_globs(target_platform, version_independent)?,
             ),
-            ("file", self.files_not_exists_as_globs(target_platform)?),
+            ("files", self.files_not_exists_as_globs(target_platform)?),
         ];
         for (section, globs) in not_exists_sections {
-            Self::check_globs(&globs, &paths, section, false, &mut collected_issues);
+            Self::check_globs(&globs, &paths, section, false, &mut collected_issues, &mut matched_paths);
         }
 
-        if !collected_issues.is_empty() {
+        // Check strict mode
+        let strict_mode_issue = if self.strict {
+            let unmatched: Vec<&PathBuf> = paths
+                .iter()
+                .filter(|p| !matched_paths.contains(*p))
+                .copied()
+                .collect();
+
+            if !unmatched.is_empty() {
+                Some((
+                    format!("Strict mode: {} unmatched files found", unmatched.len()),
+                    unmatched,
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if !collected_issues.is_empty() || strict_mode_issue.is_some() {
             tracing::error!("Package content test failed:");
+
+            // Print regular issues first
             for issue in &collected_issues {
                 tracing::error!(
                     "- {} {}",
@@ -408,9 +430,20 @@ impl PackageContentsTest {
                 );
             }
 
-            return Err(TestError::PackageContentTestFailed(
-                collected_issues.join("\n"),
-            ));
+            // Print strict mode issues if any
+            if let Some((message, unmatched)) = &strict_mode_issue {
+                tracing::error!("\nStrict mode violations:");
+                for file in unmatched {
+                    tracing::error!(
+                        "- {} {}",
+                        console::style(console::Emoji("❌", " ")).red(),
+                        file.display()
+                    );
+                }
+                collected_issues.push(message.clone());
+            }
+
+            return Err(TestError::PackageContentTestFailed(collected_issues.join("\n")));
         }
 
         Ok(())
@@ -621,5 +654,21 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_strict_mode() {
+        let strict_contents = PackageContentsTest {
+            files: GlobVec::from_vec(vec!["matched.txt"], None),
+            strict: true,
+            ..Default::default()
+        };
+        assert!(strict_contents.strict);
+
+        let non_strict_contents = PackageContentsTest {
+            files: GlobVec::from_vec(vec!["*.txt"], None),
+            ..Default::default()
+        };
+        assert!(!non_strict_contents.strict);
     }
 }

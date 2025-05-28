@@ -9,7 +9,12 @@ use super::{CMDEXE_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
 
 fn print_debug_info(args: &ExecutionArgs) -> String {
     let mut output = String::new();
-    output.push_str("Debug mode enabled - not executing the script. \n\nRun the script with the following arguments:\n");
+    if args.debug.is_enabled() {
+        output.push_str("\nDebug mode enabled - not executing the script.\n\n");
+    } else {
+        output.push_str("\nScript execution failed.\n\n")
+    }
+
     output.push_str(&format!("  Work directory: {}\n", args.work_dir.display()));
     output.push_str(&format!("  Prefix: {}\n", args.run_prefix.display()));
 

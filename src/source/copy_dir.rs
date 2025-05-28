@@ -36,8 +36,8 @@ impl Default for CopyOptions {
 }
 
 /// Copy metadata from source to destination
-/// The call to `fs::copy` already copied the data and the permissions, but
-/// we need to copy the timestamps as well.
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
+/// We need to deal with permissions and timestamps ourselves
 fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
     let metadata = fs_err::metadata(from)?;
 
@@ -48,6 +48,7 @@ fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
 
     let file = std::fs::OpenOptions::new().write(true).open(to)?;
     file.set_times(file_times)?;
+    file.set_permissions(metadata.permissions())?;
 
     Ok(())
 }
@@ -136,6 +137,7 @@ pub(crate) struct CopyDir<'a> {
     globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
+    use_condapackageignore: bool,
     hidden: bool,
     copy_options: CopyOptions,
 }
@@ -150,6 +152,8 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
+            // use .condapackageignore files by default
+            use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
             copy_options: CopyOptions::default(),
@@ -169,6 +173,12 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn use_git_global(mut self, b: bool) -> Self {
         self.use_git_global = b;
+        self
+    }
+
+    #[allow(unused)]
+    pub fn use_condapackageignore(mut self, b: bool) -> Self {
+        self.use_condapackageignore = b;
         self
     }
 
@@ -202,13 +212,21 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_paths = WalkBuilder::new(self.from_path)
+        let mut walk_builder = WalkBuilder::new(self.from_path);
+        walk_builder
             // disregard global gitignore
             .git_global(self.use_git_global)
             // ignore any .gitignore files from parent directories
             .parents(false)
             .git_ignore(self.use_gitignore)
-            .hidden(self.hidden)
+            // Always disable .ignore files - they should not affect source copying
+            .ignore(false)
+            .hidden(self.hidden);
+        if self.use_condapackageignore {
+            walk_builder.add_custom_ignore_filename(".condapackageignore");
+        }
+
+        let copied_paths = walk_builder
             .build()
             .filter_map(|entry| {
                 let entry = match entry {

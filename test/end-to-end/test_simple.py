@@ -13,6 +13,7 @@ import pytest
 import requests
 import yaml
 import subprocess
+import shutil
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -168,6 +169,67 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
+
+
+def test_strict_mode_fail(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode fails when unmatched files exist"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipe_dir / "recipe-fail.yaml", output_dir)
+
+
+def test_strict_mode_pass(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode passes when all files are matched"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    rattler_build.build(recipe_dir / "recipe-pass.yaml", output_dir)
+
+
+def test_strict_mode_many_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that strict mode shows all unmatched files, not just the first few"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    build_args = rattler_build.build_args(
+        recipe_dir / "recipe-many-files.yaml",
+        output_dir,
+        extra_args=["--log-style=json"],
+    )
+    result = subprocess.run(
+        [str(rattler_build.path), *build_args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert result.returncode != 0
+
+    logs = []
+    stderr = result.stderr if result.stderr else ""
+    for line in stderr.splitlines():
+        if line.strip() and line.strip().startswith("{"):
+            try:
+                logs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    stdout = result.stdout if result.stdout else ""
+    error_output = stderr + stdout
+    assert "unmatched1.txt" in error_output
+    assert "unmatched2.txt" in error_output
+    assert "unmatched3.txt" in error_output
+    assert "unmatched4.txt" in error_output
+    assert "unmatched5.txt" in error_output
+    assert "unmatched6.txt" in error_output
+    assert "unmatched7.txt" in error_output
 
 
 @pytest.mark.skipif(
@@ -1937,3 +1999,48 @@ def test_extracted_timestamps(
         recipes / "timestamps/recipe.yaml",
         tmp_path,
     )
+
+
+def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that .ignore files don't affect URL sources."""
+    recipe_path = Path("test-data/recipes/url-source-with-ignore/recipe.yaml")
+
+    # This should succeed since we don't respect .ignore files anymore
+    rattler_build.build(
+        recipe_path,
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "test-url-source-ignore")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "test-url-source-ignore"
+    assert index_json["version"] == "1.0.0"
+
+
+def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that .condapackageignore files are respected during source copying."""
+    test_dir = tmp_path / "rattlerbuildignore-src"
+    test_dir.mkdir()
+    shutil.copy(
+        recipes / "rattlerbuildignore" / "recipe.yaml", test_dir / "recipe.yaml"
+    )
+
+    # Create .condapackageignore
+    (test_dir / ".condapackageignore").write_text("ignored.txt\n*.pyc\n")
+
+    # Create test files
+    (test_dir / "included.txt").write_text("This should be included")
+    (test_dir / "ignored.txt").write_text("This should be ignored")
+    (test_dir / "test.pyc").write_text("This should also be ignored")
+
+    output_dir = tmp_path / "output"
+    rattler_build.build(test_dir, output_dir)
+
+    pkg = get_extracted_package(output_dir, "test-rattlerbuildignore")
+    files_dir = pkg / "files"
+
+    assert (files_dir / "included.txt").exists()
+    assert (files_dir / "recipe.yaml").exists()
+    assert not (files_dir / "ignored.txt").exists()
+    assert not (files_dir / "test.pyc").exists()
