@@ -26,7 +26,8 @@ fn display_success(matches: &[&PathBuf], glob: &str, section: &str) {
 }
 
 /// Section of package contents to build (exists vs not)
-enum Section {
+#[derive(Clone)]
+pub enum Section {
     Include,
     Bin,
     Lib,
@@ -262,61 +263,48 @@ impl PackageContentsTest {
         }
     }
 
-    /// Retrieve the include globs as a vector of (glob, GlobSet) tuples
+    /// Retrieve globs for a section
+    pub fn get_globs_for_section(
+        &self,
+        section: Section,
+        exists: bool,
+        target_platform: &Platform,
+        version_independent: bool,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
+        self.build_section_globs(section, exists, target_platform, version_independent)
+    }
+
+    /// Get include globs that should exist
     pub fn include_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Include, true, target_platform, false)
+        self.get_globs_for_section(Section::Include, true, target_platform, false)
     }
 
-    /// Retrieve the not_exists globs for the include section
-    pub fn include_not_exists_as_globs(
-        &self,
-        target_platform: &Platform,
-    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Include, false, target_platform, false)
-    }
-
-    /// Retrieve the globs for the bin section
+    /// Get bin globs that should exist
     pub fn bin_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Bin, true, target_platform, false)
+        self.get_globs_for_section(Section::Bin, true, target_platform, false)
     }
 
-    /// Retrieve the not_exists globs for the bin section
-    pub fn bin_not_exists_as_globs(
-        &self,
-        target_platform: &Platform,
-    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Bin, false, target_platform, false)
-    }
-
-    /// Retrieve the globs for the lib section
+    /// Get lib globs that should exist
     pub fn lib_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Lib, true, target_platform, false)
+        self.get_globs_for_section(Section::Lib, true, target_platform, false)
     }
 
-    /// Retrieve the not_exists globs for the lib section
-    pub fn lib_not_exists_as_globs(
-        &self,
-        target_platform: &Platform,
-    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Lib, false, target_platform, false)
-    }
-
-    /// Retrieve the globs for the site_packages section
+    /// Get site packages globs that should exist
     pub fn site_packages_as_globs(
         &self,
         target_platform: &Platform,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(
+        self.get_globs_for_section(
             Section::SitePackages,
             true,
             target_platform,
@@ -324,34 +312,20 @@ impl PackageContentsTest {
         )
     }
 
-    /// Retrieve the not_exists globs for the site_packages section
-    pub fn site_packages_not_exists_as_globs(
-        &self,
-        target_platform: &Platform,
-        version_independent: bool,
-    ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(
-            Section::SitePackages,
-            false,
-            target_platform,
-            version_independent,
-        )
-    }
-
-    /// Retrieve the exists globs for the files section
+    /// Get files globs that should exist
     pub fn files_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Files, true, target_platform, false)
+        self.get_globs_for_section(Section::Files, true, target_platform, false)
     }
 
-    /// Retrieve the not_exists globs for the files section
+    /// Get files globs that should not exist
     pub fn files_not_exists_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(Section::Files, false, target_platform, false)
+        self.get_globs_for_section(Section::Files, false, target_platform, false)
     }
 
     /// Run the package content test
@@ -365,47 +339,43 @@ impl PackageContentsTest {
         let mut matched_paths = HashSet::<&PathBuf>::new();
         let version_independent = output.recipe.build().is_python_version_independent();
 
-        // Check required (exists) globs
-        let exists_sections = vec![
-            ("include", self.include_as_globs(target_platform)?),
-            ("bin", self.bin_as_globs(target_platform)?),
-            ("lib", self.lib_as_globs(target_platform)?),
-            (
-                "site_packages",
-                self.site_packages_as_globs(target_platform, version_independent)?,
-            ),
-            ("files", self.files_as_globs(target_platform)?),
+        // Check all sections for both exists and not_exists
+        let sections = [
+            ("include", Section::Include, false),
+            ("bin", Section::Bin, false),
+            ("lib", Section::Lib, false),
+            ("site_packages", Section::SitePackages, version_independent),
+            ("files", Section::Files, false),
         ];
-        for (section, globs) in exists_sections {
+
+        for (section_name, section, version_independent_override) in sections {
+            // Check exists globs
+            let globs = self.get_globs_for_section(
+                section.clone(),
+                true,
+                target_platform,
+                version_independent_override,
+            )?;
             Self::check_globs(
                 &globs,
                 &paths,
-                section,
+                section_name,
                 true,
                 &mut collected_issues,
                 &mut matched_paths,
             );
-        }
 
-        // Check forbidden (not_exists) globs
-        let not_exists_sections = vec![
-            (
-                "include",
-                self.include_not_exists_as_globs(target_platform)?,
-            ),
-            ("bin", self.bin_not_exists_as_globs(target_platform)?),
-            ("lib", self.lib_not_exists_as_globs(target_platform)?),
-            (
-                "site_packages",
-                self.site_packages_not_exists_as_globs(target_platform, version_independent)?,
-            ),
-            ("files", self.files_not_exists_as_globs(target_platform)?),
-        ];
-        for (section, globs) in not_exists_sections {
+            // Check not_exists globs
+            let globs = self.get_globs_for_section(
+                section,
+                false,
+                target_platform,
+                version_independent_override,
+            )?;
             Self::check_globs(
                 &globs,
                 &paths,
-                section,
+                section_name,
                 false,
                 &mut collected_issues,
                 &mut matched_paths,
@@ -470,7 +440,7 @@ impl PackageContentsTest {
 mod tests {
     use std::path::Path;
 
-    use super::PackageContentsTest;
+    use super::{PackageContentsTest, Section};
     use crate::recipe::parser::GlobCheckerVec;
     use globset::GlobSet;
     use rattler_conda_types::Platform;
@@ -509,7 +479,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .include_as_globs(&Platform::Linux64)
+            .get_globs_for_section(Section::Include, true, &Platform::Linux64, false)
             .unwrap();
 
         let paths = &["include/foo".to_string(), "include/bar".to_string()];
@@ -521,7 +491,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .include_as_globs(&Platform::Linux64)
+            .get_globs_for_section(Section::Include, true, &Platform::Linux64, false)
             .unwrap();
 
         let paths = &["lib/foo".to_string(), "asd/bar".to_string()];
@@ -536,7 +506,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .bin_as_globs(&Platform::EmscriptenWasm32)
+            .get_globs_for_section(Section::Bin, true, &Platform::EmscriptenWasm32, false)
             .unwrap();
 
         let paths = &[
@@ -572,7 +542,9 @@ mod tests {
 
         if !tests.include.is_empty() {
             println!("include globs: {:?}", tests.include);
-            let globs = tests.include_as_globs(&test_case.platform).unwrap();
+            let globs = tests
+                .get_globs_for_section(Section::Include, true, &test_case.platform, false)
+                .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
                 test_glob_matches(&globs, &test_case.fail_paths).unwrap_err();
@@ -581,7 +553,9 @@ mod tests {
 
         if !tests.bin.is_empty() {
             println!("bin globs: {:?}", tests.bin);
-            let globs = tests.bin_as_globs(&test_case.platform).unwrap();
+            let globs = tests
+                .get_globs_for_section(Section::Bin, true, &test_case.platform, false)
+                .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
                 test_glob_matches(&globs, &test_case.fail_paths).unwrap_err();
@@ -590,7 +564,9 @@ mod tests {
 
         if !tests.lib.is_empty() {
             println!("lib globs: {:?}", tests.lib);
-            let globs = tests.lib_as_globs(&test_case.platform).unwrap();
+            let globs = tests
+                .get_globs_for_section(Section::Lib, true, &test_case.platform, false)
+                .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
                 test_glob_matches(&globs, &test_case.fail_paths).unwrap_err();
@@ -600,7 +576,7 @@ mod tests {
         if !tests.site_packages.is_empty() {
             println!("site_package globs: {:?}", tests.site_packages);
             let globs = tests
-                .site_packages_as_globs(&test_case.platform, false)
+                .get_globs_for_section(Section::SitePackages, true, &test_case.platform, false)
                 .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
@@ -655,13 +631,15 @@ mod tests {
         let test_case = load_test_case(Path::new("test_files.yaml"));
         let tests = &test_case.package_contents;
 
-        let exists_globs = tests.files_as_globs(&test_case.platform).unwrap();
+        let exists_globs = tests
+            .get_globs_for_section(Section::Files, true, &test_case.platform, false)
+            .unwrap();
         if !exists_globs.is_empty() {
             test_glob_matches(&exists_globs, &test_case.paths).unwrap();
         }
 
         let not_exists_globs = tests
-            .files_not_exists_as_globs(&test_case.platform)
+            .get_globs_for_section(Section::Files, false, &test_case.platform, false)
             .unwrap();
         if !not_exists_globs.is_empty() && !test_case.fail_paths.is_empty() {
             for (_, glob) in &not_exists_globs {

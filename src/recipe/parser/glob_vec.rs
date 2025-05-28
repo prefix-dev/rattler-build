@@ -331,7 +331,7 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
 /// This type is used for file existence checks, particularly in package content tests.
 /// - 'exists': Glob patterns that should match at least one file
 /// - 'not_exists': Glob patterns that should not match any files
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GlobCheckerVec {
     exists: InnerGlobVec,
     not_exists: InnerGlobVec,
@@ -347,6 +347,39 @@ impl Default for GlobCheckerVec {
             not_exists: InnerGlobVec::default(),
             exists_globset: empty_globset.clone(),
             not_exists_globset: empty_globset,
+        }
+    }
+}
+
+impl Debug for GlobCheckerVec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.not_exists.is_empty() && !self.exists.is_empty() {
+            f.debug_list()
+                .entries(self.exists.iter().map(|glob| glob.glob.glob()))
+                .finish()
+        } else {
+            let mut debug_struct = f.debug_struct("GlobCheckerVec");
+            if !self.exists.is_empty() {
+                debug_struct.field(
+                    "exists",
+                    &self
+                        .exists
+                        .iter()
+                        .map(|g| g.glob.glob())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            if !self.not_exists.is_empty() {
+                debug_struct.field(
+                    "not_exists",
+                    &self
+                        .not_exists
+                        .iter()
+                        .map(|g| g.glob.glob())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            debug_struct.finish()
         }
     }
 }
