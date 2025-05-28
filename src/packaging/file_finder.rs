@@ -11,32 +11,34 @@ use walkdir::WalkDir;
 
 use crate::{metadata::Output, recipe::parser::GlobVec};
 
-use super::{PackagingError, file_mapper};
+use super::{PackagingError, file_mapper, normalize_path_for_comparison};
 
 /// A wrapper around PathBuf that implements case-insensitive hashing and equality
 /// when the filesystem is case-insensitive
 #[derive(Debug, Clone)]
 struct CaseInsensitivePath {
-    path: PathBuf,
+    path: String,
 }
 
 impl CaseInsensitivePath {
-    fn new(path: PathBuf) -> Self {
-        Self { path }
+    fn new(path: &Path) -> Self {
+        Self {
+            path: normalize_path_for_comparison(path, true).unwrap(),
+        }
     }
 }
 
 impl std::hash::Hash for CaseInsensitivePath {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Convert to lowercase string for case-insensitive hashing
-        self.path.to_string_lossy().to_lowercase().hash(state);
+        self.path.hash(state);
     }
 }
 
 impl PartialEq for CaseInsensitivePath {
     fn eq(&self, other: &Self) -> bool {
         // Case-insensitive comparison
-        self.path.to_string_lossy().to_lowercase() == other.path.to_string_lossy().to_lowercase()
+        self.path == other.path
     }
 }
 
@@ -109,6 +111,7 @@ fn check_is_case_sensitive() -> Result<bool, io::Error> {
 fn find_new_files(
     current_files: &HashSet<PathBuf>,
     previous_files: &HashSet<PathBuf>,
+    prefix: &Path,
     is_case_sensitive: bool,
 ) -> HashSet<PathBuf> {
     if is_case_sensitive {
@@ -118,17 +121,23 @@ fn find_new_files(
         // On case-insensitive filesystems, use case-aware comparison
         let previous_case_aware: HashSet<CaseInsensitivePath> = previous_files
             .iter()
-            .map(|p| CaseInsensitivePath::new(p.clone()))
+            .map(|p| {
+                CaseInsensitivePath::new(p.strip_prefix(prefix).expect("File should be in prefix"))
+            })
             .collect();
 
-        current_files
-            .iter()
-            .filter(|current_path| {
-                let current_case_aware = CaseInsensitivePath::new((*current_path).clone());
-                !previous_case_aware.contains(&current_case_aware)
+        let current_files = current_files
+            .clone()
+            .into_iter()
+            .filter(|p| {
+                // Only include files that are not in the previous set
+                !previous_case_aware.contains(&CaseInsensitivePath::new(
+                    p.strip_prefix(prefix).expect("File should be in prefix"),
+                ))
             })
-            .cloned()
-            .collect()
+            .collect::<HashSet<_>>();
+
+        current_files
     }
 }
 
@@ -171,7 +180,12 @@ impl Files {
         let current_files = record_files(prefix)?;
 
         // Use case-aware difference calculation
-        let mut difference = find_new_files(&current_files, &previous_files, fs_is_case_sensitive);
+        let mut difference = find_new_files(
+            &current_files,
+            &previous_files,
+            prefix,
+            fs_is_case_sensitive,
+        );
 
         // Filter by files glob if specified
         if !files.is_empty() {
