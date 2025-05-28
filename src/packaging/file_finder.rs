@@ -175,12 +175,9 @@ impl Files {
 
         // Filter by files glob if specified
         if !files.is_empty() {
-            difference = difference
-                .into_iter()
-                .filter(|f| {
-                    files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
-                })
-                .collect();
+            difference.retain(|f| {
+                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            });
         }
 
         // Handle always_include files

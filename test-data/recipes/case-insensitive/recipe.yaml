@@ -2,10 +2,10 @@ recipe:
   name: case-insensitive-test
   version: "1.0.0"
 
-outputs: 
+outputs:
   - package:
       name: c1
-    
+
     build:
       script:
         - if: win
@@ -18,7 +18,7 @@ outputs:
 
   - package:
       name: c2
-    
+
     requirements:
       host:
         - c1
