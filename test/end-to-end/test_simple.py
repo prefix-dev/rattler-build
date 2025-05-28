@@ -2083,3 +2083,27 @@ def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert (files_dir / "recipe.yaml").exists()
     assert not (files_dir / "ignored.txt").exists()
     assert not (files_dir / "test.pyc").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows for symlink testing")
+def test_windows_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that Windows symlinks are created correctly during package building"""
+    rattler_build.build(
+        recipes / "win-symlink-test",
+        tmp_path,
+        extra_args=["--allow-symlinks-on-windows"],
+    )
+    pkg = get_extracted_package(tmp_path, "win-symlink-test")
+
+    # Debug: Print all files in the package
+    print("\nFiles in package:")
+    for f in pkg.rglob("*"):
+        print(f"  {f.relative_to(pkg)}")
+
+    # Verify the target file and executable exist
+    assert (pkg / "lib" / "target.txt").exists()
+    assert (pkg / "bin" / "real_exe.bat").exists()
+
+    # Check if the symlink file exists in the package directory listing
+    bin_dir = pkg / "bin"
+    assert any(f.name == "symlink_to_target.txt" for f in bin_dir.iterdir())

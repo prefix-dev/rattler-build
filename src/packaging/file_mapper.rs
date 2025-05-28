@@ -220,63 +220,55 @@ impl Output {
 
         let metadata = fs::symlink_metadata(path)?;
 
-        // make absolute symlinks relative
-        if metadata.is_symlink() {
+        // Handle symlinks: make absolute symlinks relative and copy the link
+        if metadata.file_type().is_symlink() {
             if target_platform.is_windows() {
-                tracing::warn!("Symlinks need administrator privileges on Windows");
+                tracing::warn!("Symlink creation on Windows requires administrator privileges");
             }
-
-            if let Result::Ok(link) = fs::read_link(path) {
-                tracing::trace!("Copying link: {:?} -> {:?}", path, link);
-            } else {
-                tracing::warn!("Could not read link at {:?}", path);
-            }
-
-            #[cfg(target_family = "unix")]
-            fs::read_link(path).and_then(|target| {
-                if target.is_absolute() && target.starts_with(prefix) {
-                    let rel_target = pathdiff::diff_paths(
-                        target,
-                        path.parent().ok_or(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Could not get parent directory",
-                        ))?,
-                    )
-                    .ok_or(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Could not get relative path",
-                    ))?;
-
-                    tracing::trace!(
-                        "Making symlink relative {:?} -> {:?}",
-                        dest_path,
-                        rel_target
-                    );
-                    symlink(&rel_target, &dest_path).map_err(|e| {
-                        tracing::error!(
-                            "Could not create symlink from {:?} to {:?}: {:?}",
-                            rel_target,
-                            dest_path,
-                            e
-                        );
-                        e
-                    })?;
-                } else {
-                    if target.is_absolute() {
-                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
+            // Read the link target
+            match fs::read_link(path) {
+                Ok(mut target) => {
+                    // If absolute and within the build prefix, make it relative
+                    if target.is_absolute() && target.starts_with(prefix) {
+                        if let Some(parent) = path.parent() {
+                            if let Some(rel) = pathdiff::diff_paths(&target, parent) {
+                                target = rel;
+                            }
+                        }
                     }
-                    symlink(&target, &dest_path).map_err(|e| {
-                        tracing::error!(
-                            "Could not create symlink from {:?} to {:?}: {:?}",
-                            target,
-                            dest_path,
-                            e
-                        );
-                        e
-                    })?;
+                    // Create the symlink at dest_path
+                    #[cfg(unix)]
+                    {
+                        if let Err(e) = fs::os::unix::fs::symlink(&target, &dest_path) {
+                            tracing::warn!(
+                                "Failed to create symlink {:?} -> {:?}: {:?}",
+                                dest_path,
+                                target,
+                                e
+                            );
+                        }
+                    }
+                    #[cfg(windows)]
+                    {
+                        let res = if metadata.file_type().is_dir() {
+                            std::os::windows::fs::symlink_dir(&target, &dest_path)
+                        } else {
+                            std::os::windows::fs::symlink_file(&target, &dest_path)
+                        };
+                        if let Err(e) = res {
+                            tracing::warn!(
+                                "Failed to create symlink {:?} -> {:?}: {:?}",
+                                dest_path,
+                                target,
+                                e
+                            );
+                        }
+                    }
                 }
-                Result::Ok(())
-            })?;
+                Err(e) => {
+                    tracing::warn!("Failed to read symlink {:?}: {:?}", path, e);
+                }
+            }
             Ok(Some(dest_path))
         } else if metadata.is_dir() {
             // skip directories for now
