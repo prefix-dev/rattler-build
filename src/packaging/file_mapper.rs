@@ -2,8 +2,6 @@
 
 use crate::metadata::Output;
 use fs_err as fs;
-#[cfg(target_family = "unix")]
-use fs_err::os::unix::fs::symlink;
 use std::{
     collections::HashSet,
     path::{Component, Path, PathBuf},
