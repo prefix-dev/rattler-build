@@ -233,11 +233,13 @@ impl Output {
                                 target = rel;
                             }
                         }
+                    } else if target.is_absolute() {
+                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
                     }
                     // Create the symlink at dest_path
                     #[cfg(unix)]
                     {
-                        if let Err(e) = fs::os::unix::fs::symlink(&target, &dest_path) {
+                        if let Err(e) = fs_err::os::unix::fs::symlink(&target, &dest_path) {
                             tracing::warn!(
                                 "Failed to create symlink {:?} -> {:?}: {:?}",
                                 dest_path,
@@ -248,10 +250,10 @@ impl Output {
                     }
                     #[cfg(windows)]
                     {
-                        let res = if metadata.file_type().is_dir() {
-                            std::os::windows::fs::symlink_dir(&target, &dest_path)
+                        let res = if target.is_dir() {
+                            fs_err::os::windows::fs::symlink_dir(&target, &dest_path)
                         } else {
-                            std::os::windows::fs::symlink_file(&target, &dest_path)
+                            fs_err::os::windows::fs::symlink_file(&target, &dest_path)
                         };
                         if let Err(e) = res {
                             tracing::warn!(
