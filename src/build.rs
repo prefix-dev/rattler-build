@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, package::PathsJson};
+use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
     metadata::{Output, build_reindexed_channels},
@@ -152,15 +152,16 @@ pub async fn run_build(
 
     // Check for binary prefix if configured
     if tool_configuration.error_prefix_in_binary {
-        tracing::info!("Checking for host prefix in binary files...");
+        tracing::info!("Checking for embedded prefix in binary files...");
         check_for_binary_prefix(&output, &paths_json)?;
     }
 
     // Check for symlinks on Windows if not allowed
-    if output.build_configuration.target_platform.is_windows()
+    if (output.build_configuration.target_platform.is_windows()
+        || output.build_configuration.target_platform == Platform::NoArch)
         && !tool_configuration.allow_symlinks_on_windows
     {
-        tracing::info!("Checking for symlinks in Windows package...");
+        tracing::info!("Checking for symlinks ...");
         check_for_symlinks_on_windows(&output, &paths_json)?;
     }
 
