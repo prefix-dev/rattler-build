@@ -218,6 +218,12 @@ pub struct Configuration {
 
     /// Whether to continue building on failure of a package or stop the build
     pub continue_on_failure: ContinueOnFailure,
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub error_prefix_in_binary: bool,
+
+    /// Whether to allow symlinks in packages on Windows (defaults to false)
+    pub allow_symlinks_on_windows: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -272,6 +278,8 @@ pub struct ConfigurationBuilder {
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
+    error_prefix_in_binary: bool,
+    allow_symlinks_on_windows: bool,
 }
 
 impl Configuration {
@@ -301,6 +309,8 @@ impl ConfigurationBuilder {
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
+            error_prefix_in_binary: false,
+            allow_symlinks_on_windows: false,
         }
     }
 
@@ -317,6 +327,22 @@ impl ConfigurationBuilder {
     pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
         Self {
             continue_on_failure,
+            ..self
+        }
+    }
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub fn with_error_prefix_in_binary(self, error_prefix_in_binary: bool) -> Self {
+        Self {
+            error_prefix_in_binary,
+            ..self
+        }
+    }
+
+    /// Whether to allow symlinks in packages on Windows
+    pub fn with_allow_symlinks_on_windows(self, allow_symlinks_on_windows: bool) -> Self {
+        Self {
+            allow_symlinks_on_windows,
             ..self
         }
     }
@@ -492,6 +518,8 @@ impl ConfigurationBuilder {
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
+            error_prefix_in_binary: self.error_prefix_in_binary,
+            allow_symlinks_on_windows: self.allow_symlinks_on_windows,
         }
     }
 }

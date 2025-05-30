@@ -1,0 +1,54 @@
+context:
+  name: binary-prefix-test
+  version: "1.0.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/bin
+        # C program that embeds the prefix
+        - |
+          cat > test_binary.c << EOF
+          #include <stdio.h>
+          int main() {
+              const char* prefix = "$PREFIX";
+              printf("Prefix is: %s\n", prefix);
+              return 0;
+          }
+          EOF
+        - if: target_platform == "osx-64" or target_platform == "osx-arm64"
+          then:
+            - clang test_binary.c -o $PREFIX/bin/test_binary
+          else:
+            - gcc test_binary.c -o $PREFIX/bin/test_binary
+      else:
+        - mkdir %PREFIX%\Library\bin
+        # A simple executable that contains the prefix
+        - |
+          setlocal enabledelayedexpansion
+          set "PREFIX_ESC=%PREFIX:\=\\%"
+          echo #include ^<stdio.h^> > test_binary.c
+          echo int main() { >> test_binary.c
+          echo     const char* prefix = "!PREFIX_ESC!"; >> test_binary.c
+          echo     printf("Prefix is: %%s\\n", prefix); >> test_binary.c
+          echo     return 0; >> test_binary.c
+          echo } >> test_binary.c
+          gcc test_binary.c -o "%PREFIX%\Library\bin\test_binary.exe"
+
+requirements:
+  build:
+    - if: target_platform == "osx-64" or target_platform == "osx-arm64"
+      then:
+        - clang
+      else:
+        - gcc
+
+about:
+  summary: Test package with binary containing host prefix
+  description: This package intentionally contains a binary with the host prefix embedded

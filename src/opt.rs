@@ -446,6 +446,14 @@ pub struct BuildOpts {
     /// This is useful when building many packages with `--recipe-dir`.`
     #[clap(long)]
     pub continue_on_failure: bool,
+
+    /// Error if the host prefix is detected in any binary files
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_prefix_in_binary: bool,
+
+    /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+    #[arg(long, help_heading = "Modifying result")]
+    pub allow_symlinks_on_windows: bool,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -475,6 +483,8 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
+    pub error_prefix_in_binary: bool,
+    pub allow_symlinks_on_windows: bool,
 }
 
 impl BuildData {
@@ -505,6 +515,8 @@ impl BuildData {
         sandbox_configuration: Option<SandboxConfiguration>,
         debug: Debug,
         continue_on_failure: ContinueOnFailure,
+        error_prefix_in_binary: bool,
+        allow_symlinks_on_windows: bool,
     ) -> Self {
         Self {
             up_to,
@@ -539,6 +551,8 @@ impl BuildData {
             sandbox_configuration,
             debug,
             continue_on_failure,
+            error_prefix_in_binary,
+            allow_symlinks_on_windows,
         }
     }
 }
@@ -584,6 +598,8 @@ impl BuildData {
             opts.sandbox_arguments.into(),
             Debug::new(opts.debug),
             opts.continue_on_failure.into(),
+            opts.error_prefix_in_binary,
+            opts.allow_symlinks_on_windows,
         )
     }
 }
