@@ -205,7 +205,7 @@ pub struct PackageContentsTest {
     #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
     pub include: GlobCheckerVec,
     /// whether to enable strict mode (error on non-matched files or missing files)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub strict: bool,
 }
 

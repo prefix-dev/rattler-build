@@ -75,13 +75,11 @@ impl From<Vec<GlobWithSource>> for InnerGlobVec {
 
 fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
     // first, try to parse as a normal glob so that we get a descriptive error
-    let _ = GlobBuilder::new(glob).backslash_escape(false).build()?;
+    let _ = Glob::new(glob)?;
     if glob.ends_with('/') {
         // we treat folders as globs that match everything in the folder
         Ok(GlobWithSource {
-            glob: GlobBuilder::new(&format!("{glob}**"))
-                .backslash_escape(false)
-                .build()?,
+            glob: Glob::new(&format!("{glob}**"))?,
             source: glob.to_string(),
         })
     } else {
@@ -89,7 +87,6 @@ fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
         Ok(GlobWithSource {
             glob: GlobBuilder::new(&format!("{glob}{{,/**}}"))
                 .empty_alternates(true)
-                .backslash_escape(false)
                 .build()?,
             source: glob.to_string(),
         })
@@ -353,7 +350,9 @@ impl Default for GlobCheckerVec {
 
 impl Debug for GlobCheckerVec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.not_exists.is_empty() && !self.exists.is_empty() {
+        if self.exists.is_empty() && self.not_exists.is_empty() {
+            f.write_str("[]")
+        } else if self.not_exists.is_empty() && !self.exists.is_empty() {
             f.debug_list()
                 .entries(self.exists.iter().map(|glob| glob.glob.glob()))
                 .finish()
