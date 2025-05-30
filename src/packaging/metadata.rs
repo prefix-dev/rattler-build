@@ -1,5 +1,7 @@
 //! Functions to write and create metadata from a given output
 
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
@@ -25,22 +27,33 @@ use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
 
 /// Detect if the file contains the prefix in binary mode.
+#[allow(unused_variables)]
 pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Convert the prefix to a Vec<u8> for binary comparison
-    let prefix_bytes = prefix.to_string_lossy().as_bytes().to_vec();
+    // TODO on Windows check both ascii and utf-8 / 16?
+    #[cfg(target_family = "windows")]
+    {
+        tracing::warn!("Windows is not supported yet for binary prefix checking.");
+        Ok(false)
+    }
 
-    // Open the file
-    let file = File::open(file_path)?;
+    #[cfg(target_family = "unix")]
+    {
+        let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
 
-    // Read the file's content
-    let data = unsafe { memmap2::Mmap::map(&file) }?;
+        // Open the file
+        let file = File::open(file_path)?;
 
-    // Check if the content contains the prefix bytes with memchr
-    let contains_prefix = memchr::memmem::find_iter(data.as_ref(), &prefix_bytes)
-        .next()
-        .is_some();
+        // Read the file's content
+        let data = unsafe { memmap2::Mmap::map(&file) }?;
 
-    Ok(contains_prefix)
+        // Check if the content contains the prefix bytes with memchr
+        let contains_prefix = memchr::memmem::find_iter(data.as_ref(), &prefix_bytes)
+            .next()
+            .is_some();
+
+        Ok(contains_prefix)
+    }
 }
 
 /// This function requires we know the file content we are matching against is
@@ -153,6 +166,14 @@ pub fn create_prefix_placeholder(
         if prefix_detection.ignore_binary_files {
             tracing::info!(
                 "Ignoring binary file for prefix-replacement: {:?}",
+                relative_path
+            );
+            return Ok(None);
+        }
+
+        if target_platform.is_windows() {
+            tracing::debug!(
+                "Binary prefix replacement is not performed fors Windows: {:?}",
                 relative_path
             );
             return Ok(None);
