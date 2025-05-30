@@ -33,7 +33,7 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
     // TODO on Windows check both ascii and utf-8 / 16?
     #[cfg(target_family = "windows")]
     {
-        tracing::warn!("Windows is not supported yet for binary prefix checking.");
+        tracing::debug!("Windows is not supported yet for binary prefix checking.");
         Ok(false)
     }
 
