@@ -281,7 +281,8 @@ mod test {
         .into_iter()
         .collect();
 
-        let new_files = find_new_files(&current_files, &previous_files, true);
+        let prefix = PathBuf::from("/test");
+        let new_files = find_new_files(&current_files, &previous_files, &prefix, true);
 
         // On case-sensitive filesystem, file.txt should be considered new
         assert_eq!(new_files.len(), 1);
@@ -306,7 +307,8 @@ mod test {
         .into_iter()
         .collect();
 
-        let new_files = find_new_files(&current_files, &previous_files, false);
+        let prefix = PathBuf::from("/test");
+        let new_files = find_new_files(&current_files, &previous_files, &prefix, false);
 
         // On case-insensitive filesystem, only NEW.txt should be considered new
         // Both File.txt and file.txt should be considered as existing (matching FILE.TXT)
