@@ -166,7 +166,8 @@ impl Script {
     }
 
     /// Get the environment variables to set in the build environment.
-    pub fn env(&self) -> &IndexMap<String, String> {
+    pub fn env(&self, jinja_config: &JinjaConfig) -> &IndexMap<String, String> {
+        
         &self.env
     }
 

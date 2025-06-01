@@ -283,7 +283,7 @@ impl Script {
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .chain(self.env().clone().into_iter())
+            .chain(self.env(&jinja_config).clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
         // Get the contents of the script.
