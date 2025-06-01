@@ -29,6 +29,8 @@ outputs:
           then:
             - rmdir /S /Q %PREFIX%\CMake\
             - mkdir %PREFIX%\cmake\
+            - echo "foo" > %PREFIX%\TEST.txt
+            - echo "bar" > %PREFIX%\test.txt
             - echo "This is a test file for case insensitivity" > %PREFIX%\cmake\test_file.txt
           else:
             - rm -rf $PREFIX/CMake/
