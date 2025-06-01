@@ -192,7 +192,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
 /// A pin subpackage is a special kind of dependency that is used to depend on
 /// another output (subpackage) of the same recipe. The pin is used to specify
 /// the version range to pin the subpackage to.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PinSubpackage {
     /// The pin value.
     #[serde(flatten)]
@@ -210,7 +210,7 @@ impl PinSubpackage {
 /// a package from a previously resolved environment and applies a version range
 /// to the resolved version (e.g. resolve `python` in the host env to 3.10 and pin in the run
 /// env to `>=3.10,<3.11`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PinCompatible {
     /// The pin value.
     #[serde(flatten)]
@@ -242,7 +242,7 @@ impl Language {
 }
 
 /// A combination of all possible dependencies.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dependency {
     /// A regular matchspec
     Spec(MatchSpec),

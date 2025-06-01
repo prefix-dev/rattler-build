@@ -14,7 +14,7 @@ use crate::{
     validate_keys,
 };
 
-use super::{FlattenErrors, Script, glob_vec::GlobVec};
+use super::{glob_vec::GlobVec, Dependency, FlattenErrors, Script};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test
@@ -22,11 +22,11 @@ use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 pub struct CommandsTestRequirements {
     /// Extra run requirements for the test.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub run: Vec<String>,
+    pub run: Vec<Dependency>,
 
     /// Extra build requirements for the test (e.g. emulators, compilers, ...).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub build: Vec<String>,
+    pub build: Vec<Dependency>,
 }
 
 /// The files that should be copied to the test directory (they are stored in the package)
