@@ -11,7 +11,38 @@ use walkdir::WalkDir;
 
 use crate::{metadata::Output, recipe::parser::GlobVec};
 
-use super::{PackagingError, file_mapper};
+use super::{PackagingError, file_mapper, normalize_path_for_comparison};
+
+/// A wrapper around PathBuf that implements case-insensitive hashing and equality
+/// when the filesystem is case-insensitive
+#[derive(Debug, Clone)]
+struct CaseInsensitivePath {
+    path: String,
+}
+
+impl CaseInsensitivePath {
+    fn new(path: &Path) -> Self {
+        Self {
+            path: normalize_path_for_comparison(path, true).unwrap(),
+        }
+    }
+}
+
+impl std::hash::Hash for CaseInsensitivePath {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Convert to lowercase string for case-insensitive hashing
+        self.path.hash(state);
+    }
+}
+
+impl PartialEq for CaseInsensitivePath {
+    fn eq(&self, other: &Self) -> bool {
+        // Case-insensitive comparison
+        self.path == other.path
+    }
+}
+
+impl Eq for CaseInsensitivePath {}
 
 /// This struct keeps a record of all the files that are new in the prefix (i.e. not present in the previous
 /// conda environment).
@@ -64,6 +95,52 @@ pub fn record_files(directory: &Path) -> Result<HashSet<PathBuf>, io::Error> {
     Ok(res)
 }
 
+// Check if the filesystem is case-sensitive by creating a file with a different case
+// and checking if it exists.
+fn check_is_case_sensitive() -> Result<bool, io::Error> {
+    // Check if the filesystem is case insensitive
+    let tempdir = TempDir::new()?;
+    let file1 = tempdir.path().join("testfile.txt");
+    let file2 = tempdir.path().join("TESTFILE.txt");
+    fs::File::create(&file1)?;
+    Ok(!file2.exists() && file1.exists())
+}
+
+/// Helper function to find files that exist in current_files but not in previous_files,
+/// taking into account case sensitivity
+fn find_new_files(
+    current_files: &HashSet<PathBuf>,
+    previous_files: &HashSet<PathBuf>,
+    prefix: &Path,
+    is_case_sensitive: bool,
+) -> HashSet<PathBuf> {
+    if is_case_sensitive {
+        // On case-sensitive filesystems, use normal set difference
+        current_files.difference(previous_files).cloned().collect()
+    } else {
+        // On case-insensitive filesystems, use case-aware comparison
+        let previous_case_aware: HashSet<CaseInsensitivePath> = previous_files
+            .iter()
+            .map(|p| {
+                CaseInsensitivePath::new(p.strip_prefix(prefix).expect("File should be in prefix"))
+            })
+            .collect();
+
+        let current_files = current_files
+            .clone()
+            .into_iter()
+            .filter(|p| {
+                // Only include files that are not in the previous set
+                !previous_case_aware.contains(&CaseInsensitivePath::new(
+                    p.strip_prefix(prefix).expect("File should be in prefix"),
+                ))
+            })
+            .collect::<HashSet<_>>();
+
+        current_files
+    }
+}
+
 impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
@@ -80,6 +157,8 @@ impl Files {
                 prefix: prefix.to_owned(),
             });
         }
+
+        let fs_is_case_sensitive = check_is_case_sensitive()?;
 
         let previous_files = if prefix.join("conda-meta").exists() {
             let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
@@ -99,16 +178,23 @@ impl Files {
         };
 
         let current_files = record_files(prefix)?;
-        let mut difference = current_files
-            .difference(&previous_files)
-            // If we have an files glob, we only include files that match the glob
-            .filter(|f| {
-                files.is_empty()
-                    || files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
-            })
-            .cloned()
-            .collect::<HashSet<_>>();
 
+        // Use case-aware difference calculation
+        let mut difference = find_new_files(
+            &current_files,
+            &previous_files,
+            prefix,
+            fs_is_case_sensitive,
+        );
+
+        // Filter by files glob if specified
+        if !files.is_empty() {
+            difference.retain(|f| {
+                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            });
+        }
+
+        // Handle always_include files
         if !always_include.is_empty() {
             for file in current_files {
                 let file_without_prefix =
@@ -169,5 +255,77 @@ impl TempFiles {
     /// Return the content type map
     pub const fn content_type_map(&self) -> &HashMap<PathBuf, Option<ContentType>> {
         &self.content_type_map
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{collections::HashSet, path::PathBuf};
+
+    use crate::packaging::file_finder::{check_is_case_sensitive, find_new_files};
+
+    #[test]
+    fn test_find_new_files_case_sensitive() {
+        let current_files: HashSet<PathBuf> = [
+            PathBuf::from("/test/File.txt"),
+            PathBuf::from("/test/file.txt"),
+            PathBuf::from("/test/common.txt"),
+        ]
+        .into_iter()
+        .collect();
+
+        let previous_files: HashSet<PathBuf> = [
+            PathBuf::from("/test/File.txt"),
+            PathBuf::from("/test/common.txt"),
+        ]
+        .into_iter()
+        .collect();
+
+        let prefix = PathBuf::from("/test");
+        let new_files = find_new_files(&current_files, &previous_files, &prefix, true);
+
+        // On case-sensitive filesystem, file.txt should be considered new
+        assert_eq!(new_files.len(), 1);
+        assert!(new_files.contains(&PathBuf::from("/test/file.txt")));
+    }
+
+    #[test]
+    fn test_find_new_files_case_insensitive() {
+        let current_files: HashSet<PathBuf> = [
+            PathBuf::from("/test/File.txt"),
+            PathBuf::from("/test/file.txt"),
+            PathBuf::from("/test/common.txt"),
+            PathBuf::from("/test/NEW.txt"),
+        ]
+        .into_iter()
+        .collect();
+
+        let previous_files: HashSet<PathBuf> = [
+            PathBuf::from("/test/FILE.TXT"), // Different case of File.txt
+            PathBuf::from("/test/common.txt"),
+        ]
+        .into_iter()
+        .collect();
+
+        let prefix = PathBuf::from("/test");
+        let new_files = find_new_files(&current_files, &previous_files, &prefix, false);
+
+        // On case-insensitive filesystem, only NEW.txt should be considered new
+        // Both File.txt and file.txt should be considered as existing (matching FILE.TXT)
+        assert_eq!(new_files.len(), 1);
+        assert!(new_files.contains(&PathBuf::from("/test/NEW.txt")));
+        assert!(!new_files.contains(&PathBuf::from("/test/File.txt")));
+        assert!(!new_files.contains(&PathBuf::from("/test/file.txt")));
+    }
+
+    #[test]
+    fn test_check_is_case_sensitive() {
+        // This test will behave differently on different filesystems
+        let result = check_is_case_sensitive();
+        assert!(result.is_ok());
+
+        // We can't assert the specific value since it depends on the filesystem,
+        // but we can verify the function doesn't panic and returns a boolean
+        let _is_case_sensitive = result.unwrap();
     }
 }
