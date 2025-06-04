@@ -96,14 +96,14 @@ impl PackageContentsTest {
         let mut result = Vec::new();
 
         if target_platform.is_windows() {
-            // Windows is special because it requires both a `.dll` and a `.bin` file
+            // Windows is special because it requires both a `.dll` and either a `.lib` or a `.dll.a` file
             for lib in self.lib.include_globs() {
                 let raw = lib.source();
                 if raw.ends_with(".dll") {
                     result.push((
                         raw.to_string(),
                         GlobSet::builder()
-                            .add(Glob::new(&format!("Library/bin/{raw}"))?)
+                            .add(Glob::new(&format!("Library/bin/{{,lib}}{raw}"))?)
                             .build()?,
                     ));
                 } else if raw.ends_with(".lib") {
@@ -113,17 +113,25 @@ impl PackageContentsTest {
                             .add(Glob::new(&format!("Library/lib/{raw}"))?)
                             .build()?,
                     ));
+                } else if raw.ends_with(".dll.a") {
+                    result.push((
+                        raw.to_string(),
+                        GlobSet::builder()
+                            .add(Glob::new(&format!("Library/lib/lib{raw}"))?)
+                            .build()?,
+                    ));
                 } else {
                     result.push((
                         raw.to_string(),
                         GlobSet::builder()
-                            .add(Glob::new(&format!("Library/bin/{raw}.dll"))?)
+                            .add(Glob::new(&format!("Library/bin/{{,lib}}{raw}.dll"))?)
                             .build()?,
                     ));
                     result.push((
                         raw.to_string(),
                         GlobSet::builder()
                             .add(Glob::new(&format!("Library/lib/{raw}.lib"))?)
+                            .add(Glob::new(&format!("Library/lib/lib{raw}.dll.a"))?)
                             .build()?,
                     ));
                 }
