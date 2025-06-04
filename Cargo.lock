@@ -1589,9 +1589,10 @@ dependencies = [
 [[package]]
 name = "diffy"
 version = "0.4.2"
-source = "git+https://github.com/remimimimimi/diffy.git?branch=patches#94432c9e039dbd8dde9e111c7598067129a73fb7"
+source = "git+https://github.com/wolfv/diffy.git?branch=patches#4a9a2d819dc005a3a7ca0e37822dfd4626d2f341"
 dependencies = [
  "nu-ansi-term 0.50.1",
+ "strsim",
  "thiserror 2.0.12",
 ]
 
