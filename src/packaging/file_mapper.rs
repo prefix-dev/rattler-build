@@ -234,7 +234,9 @@ impl Output {
                             }
                         }
                     } else if target.is_absolute() {
-                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
+                        tracing::warn!(
+                            "Symlink {path:?} points to absolute path {target:?} outside of the $PREFIX",
+                        );
                     }
                     // Create the symlink at dest_path
                     #[cfg(unix)]
