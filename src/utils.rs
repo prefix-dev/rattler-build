@@ -151,6 +151,7 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
         }
 
         // Note: do not use `fs_err` here, it will not give us the correct error code!
+        #[allow(clippy::disallowed_methods)]
         match std::fs::remove_dir_all(path) {
             Ok(_) => return Ok(()),
             Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {

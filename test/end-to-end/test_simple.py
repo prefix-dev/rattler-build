@@ -650,7 +650,12 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     for p in paths["paths"]:
         path = p["_path"]
         if path == "is_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
         elif path == "is_binary/file_without_prefix":
@@ -658,7 +663,12 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "is_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
-            check_path(p, "text")
+            if not win:
+                check_path(p, "text")
+            else:
+                # On Windows, we do not look into binary files (even if forced to text)
+                # and thus we also don't do any prefix replacement
+                check_path(p, None)
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
@@ -1980,6 +1990,12 @@ def test_error_on_binary_prefix(
     tmp_path.mkdir()
     args = rattler_build.build_args(recipe_path, tmp_path)
     args = list(args) + ["--error-prefix-in-binary"]
+
+    if os.name == "nt":
+        # On Windows, we don't deal with binary prefixes in the same way,
+        # so this test is not applicable
+        rattler_build(*args, stderr=STDOUT)
+        return
 
     try:
         rattler_build(*args, stderr=STDOUT)
