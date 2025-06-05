@@ -272,7 +272,7 @@ pub fn git_src(
         Command::new("git")
             .current_dir(&cache_path)
             // make sure that we get the commit, not the annotated tag
-            .args(["rev-parse", &format!("{}^{{commit}}", rev)]),
+            .args(["rev-parse", &format!("{}^0", rev)]),
     )?;
 
     let ref_git = String::from_utf8(output.stdout)
