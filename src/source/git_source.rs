@@ -268,12 +268,26 @@ pub fn git_src(
     }
 
     // Resolve the reference and set the head to the specified revision.
-    let output = run_git_command(
-        Command::new("git")
-            .current_dir(&cache_path)
-            // make sure that we get the commit, not the annotated tag
-            .args(["rev-parse", &format!("\"{}^{{commit}}\"", rev)]),
-    )?;
+    let mut command = Command::new("git");
+    command.current_dir(&cache_path);
+    // make sure that we get the commit, not the annotated tag
+    command.arg("rev-parse");
+
+    let rev_parse_specifier = format!("{}^{{commit}}", rev);
+
+    #[cfg(windows)]
+    let final_arg = {
+        // On Windows, if git is executed via cmd.exe (e.g., a .cmd shim),
+        // special characters like '^' can be misinterpreted.
+        // Enclosing the argument in quotes ensures it's passed correctly.
+        format!("\"{}\"", rev_parse_specifier)
+    };
+    #[cfg(not(windows))]
+    let final_arg = rev_parse_specifier;
+
+    command.arg(final_arg);
+
+    let output = run_git_command(&mut command)?;
 
     let ref_git = String::from_utf8(output.stdout)
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
