@@ -644,6 +644,8 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             assert p["file_mode"] == t
             assert len(p["prefix_placeholder"]) > 10
 
+    win = os.name == "nt"
+
     paths = json.loads((pkg / "info/paths.json").read_text())
     for p in paths["paths"]:
         path = p["_path"]
@@ -660,7 +662,13 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
+
         elif path == "force_binary/file_without_prefix":
             check_path(p, None)
         elif path == "ignore/file_with_prefix":
