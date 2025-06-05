@@ -1,0 +1,10 @@
+---
+source: src/recipe/parser/test.rs
+expression: yaml_serde
+---
+- package_contents:
+    files:
+      exists:
+      - foo.hpp
+      not_exists:
+      - baz.hpp

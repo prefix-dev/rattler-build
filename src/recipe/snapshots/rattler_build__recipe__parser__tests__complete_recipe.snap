@@ -154,6 +154,21 @@ tests:
     - src_file.txt
 - package_contents:
     files:
+      exists:
+      - test.txt
+      - license.txt
+      not_exists:
+      - test2.txt
+      - license2.txt
+    lib:
+      exists:
+      - footest.so
+      - footest.so.*
+      not_exists:
+      - test.so
+      - test.so.*
+- package_contents:
+    files:
     - test.txt
     - license.txt
     site_packages:
@@ -169,7 +184,6 @@ tests:
     include:
     - test.h
     - test.h*
-    strict: false
 - python:
     imports:
     - numpy

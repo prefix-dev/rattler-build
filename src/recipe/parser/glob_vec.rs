@@ -322,6 +322,249 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
     }
 }
 
+/// A special version of GlobVec dedicated to existence/non-existence checks
+/// with appropriately named fields 'exists' and 'not_exists'.
+///
+/// This type is used for file existence checks, particularly in package content tests.
+/// - 'exists': Glob patterns that should match at least one file
+/// - 'not_exists': Glob patterns that should not match any files
+#[derive(Clone)]
+pub struct GlobCheckerVec {
+    exists: InnerGlobVec,
+    not_exists: InnerGlobVec,
+    exists_globset: GlobSet,
+    not_exists_globset: GlobSet,
+}
+
+impl Default for GlobCheckerVec {
+    fn default() -> Self {
+        let empty_globset = globset::GlobSetBuilder::new().build().unwrap();
+        Self {
+            exists: InnerGlobVec::default(),
+            not_exists: InnerGlobVec::default(),
+            exists_globset: empty_globset.clone(),
+            not_exists_globset: empty_globset,
+        }
+    }
+}
+
+impl Debug for GlobCheckerVec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.exists.is_empty() && self.not_exists.is_empty() {
+            f.write_str("[]")
+        } else if self.not_exists.is_empty() && !self.exists.is_empty() {
+            f.debug_list()
+                .entries(self.exists.iter().map(|glob| glob.glob.glob()))
+                .finish()
+        } else {
+            let mut debug_struct = f.debug_struct("GlobCheckerVec");
+            if !self.exists.is_empty() {
+                debug_struct.field(
+                    "exists",
+                    &self
+                        .exists
+                        .iter()
+                        .map(|g| g.glob.glob())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            if !self.not_exists.is_empty() {
+                debug_struct.field(
+                    "not_exists",
+                    &self
+                        .not_exists
+                        .iter()
+                        .map(|g| g.glob.glob())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            debug_struct.finish()
+        }
+    }
+}
+
+impl PartialEq for GlobCheckerVec {
+    fn eq(&self, other: &Self) -> bool {
+        self.exists == other.exists && self.not_exists == other.not_exists
+    }
+}
+
+impl Eq for GlobCheckerVec {}
+
+impl GlobCheckerVec {
+    /// Create a new GlobCheckerVec from vectors of globs
+    fn new(exists: InnerGlobVec, not_exists: InnerGlobVec) -> Result<Self, globset::Error> {
+        let exists_globset = exists.globset()?;
+        let not_exists_globset = not_exists.globset()?;
+        Ok(Self {
+            exists,
+            not_exists,
+            exists_globset,
+            not_exists_globset,
+        })
+    }
+
+    /// Static method to convert a list of globs to a GlobCheckerVec
+    pub fn from_vec(exists: Vec<&str>, not_exists: Option<Vec<&str>>) -> Self {
+        let exists_vec: Vec<GlobWithSource> = exists
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
+
+        let not_exists_vec: Vec<GlobWithSource> = not_exists
+            .unwrap_or_default()
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
+
+        let exists = InnerGlobVec(exists_vec);
+        let exists_globset = exists.globset().unwrap();
+        let not_exists = InnerGlobVec(not_exists_vec);
+        let not_exists_globset = not_exists.globset().unwrap();
+
+        Self {
+            exists,
+            not_exists,
+            exists_globset,
+            not_exists_globset,
+        }
+    }
+
+    /// Returns true if the path matches any exists glob and does not match any not_exists glob
+    /// If there are no globs at all, we match nothing.
+    /// If there is no exists glob, we match everything except the not_exists globs.
+    pub fn is_match(&self, path: &Path) -> bool {
+        if self.exists.is_empty() && self.not_exists.is_empty() {
+            return false;
+        }
+        let is_match = self.exists.is_empty() || self.exists_globset.is_match(path);
+        is_match && (self.not_exists.is_empty() || !self.not_exists_globset.is_match(path))
+    }
+
+    /// Returns true if the checker is empty
+    pub fn is_empty(&self) -> bool {
+        self.exists.is_empty() && self.not_exists.is_empty()
+    }
+
+    /// Returns an iterator over the exists globs
+    pub fn exists_globs(&self) -> &Vec<GlobWithSource> {
+        &self.exists
+    }
+
+    /// Returns an iterator over the not_exists globs
+    pub fn not_exists_globs(&self) -> &Vec<GlobWithSource> {
+        &self.not_exists
+    }
+}
+
+impl Serialize for GlobCheckerVec {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // If only exists globs are present (no not_exists), render as a simple list
+        if self.not_exists.is_empty() && !self.exists.is_empty() {
+            self.exists.serialize(serializer)
+        } else {
+            let mut map = serializer.serialize_map(Some(2))?;
+            if !self.exists.is_empty() {
+                map.serialize_entry("exists", &self.exists)?;
+            }
+            if !self.not_exists.is_empty() {
+                map.serialize_entry("not_exists", &self.not_exists)?;
+            }
+            map.end()
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GlobCheckerVec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum GlobCheckerInput {
+            Map {
+                #[serde(default)]
+                exists: Vec<String>,
+                #[serde(default)]
+                not_exists: Vec<String>,
+            },
+            // If not specified, we will treat the list as 'exists' only
+            List(Vec<String>),
+        }
+
+        let input = GlobCheckerInput::deserialize(deserializer)?;
+
+        match input {
+            GlobCheckerInput::Map { exists, not_exists } => {
+                GlobCheckerVec::new(exists.into(), not_exists.into())
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))
+            }
+            GlobCheckerInput::List(list) => {
+                GlobCheckerVec::new(list.into(), InnerGlobVec::default())
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))
+            }
+        }
+    }
+}
+
+impl TryConvertNode<GlobCheckerVec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<GlobCheckerVec, Vec<PartialParsingError>> {
+        match self {
+            RenderedNode::Mapping(mapping) => mapping.try_convert(name),
+            RenderedNode::Sequence(seq) => {
+                let globs = to_vector_of_globs(seq)?;
+                GlobCheckerVec::new(globs.into(), InnerGlobVec::default())
+                    .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
+            }
+            RenderedNode::Scalar(scalar) => {
+                let glob = to_glob(scalar.as_str()).map_err(|err| {
+                    vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)]
+                })?;
+                GlobCheckerVec::new(vec![glob].into(), InnerGlobVec::default())
+                    .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
+            }
+            RenderedNode::Null(_) => Ok(GlobCheckerVec::default()),
+        }
+    }
+}
+
+impl TryConvertNode<GlobCheckerVec> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<GlobCheckerVec, Vec<PartialParsingError>> {
+        let mut exists = Vec::new();
+        let mut not_exists = Vec::new();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match (key_str, value) {
+                ("exists", RenderedNode::Sequence(seq)) => {
+                    exists = to_vector_of_globs(seq)?;
+                }
+                ("not_exists", RenderedNode::Sequence(seq)) => {
+                    not_exists = to_vector_of_globs(seq)?;
+                }
+                ("exists" | "not_exists", _) => {
+                    return Err(vec![_partialerror!(
+                        *value.span(),
+                        ErrorKind::ExpectedSequence,
+                        label = "expected a list of globs strings for `exists` or `not_exists`"
+                    )]);
+                }
+                _ => {
+                    return Err(vec![_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(key_str.to_string().into()),
+                        help = format!("valid options for {} are `exists` and `not_exists`", name)
+                    )]);
+                }
+            }
+        }
+
+        GlobCheckerVec::new(exists.into(), not_exists.into())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
+    }
+}
+
 /// A GlobVec or a boolean to select all, none, or specific paths.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
@@ -567,5 +810,85 @@ mod tests {
         insta::assert_snapshot!(&globs_none);
         let parsed_again: TestAllOrGlobVec = serde_yaml::from_str(&globs_none).unwrap();
         assert_eq!(parsed_again.globs, AllOrGlobVec::All(false));
+    }
+
+    #[test]
+    fn test_parsing_glob_checker_vec() {
+        let yaml = r#"globs:
+        exists: ["foo", "bar"]
+        not_exists: ["baz/**/qux"]
+        "#;
+        let yaml_root = RenderedNode::parse_yaml(0, yaml)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
+
+        // Now we should use GlobCheckerVec which has exists/not_exists fields
+        let glob_checker: GlobCheckerVec = tests_node.try_convert("globs").unwrap();
+        assert_eq!(glob_checker.exists_globs().len(), 2);
+        assert_eq!(glob_checker.not_exists_globs().len(), 1);
+
+        // Test the paths match correctly
+        assert!(glob_checker.is_match(Path::new("foo")));
+        assert!(glob_checker.is_match(Path::new("bar")));
+        assert!(!glob_checker.is_match(Path::new("baz/qux")));
+        assert!(!glob_checker.is_match(Path::new("baz/some/qux")));
+
+        // Test direct deserialization
+        let yaml_str = r#"
+        exists: ["foo", "bar"]
+        not_exists: ["baz/**/qux"]
+        "#;
+        let glob_checker: GlobCheckerVec = serde_yaml::from_str(yaml_str).unwrap();
+        assert_eq!(glob_checker.exists_globs().len(), 2);
+        assert_eq!(glob_checker.not_exists_globs().len(), 1);
+
+        // Verify paths match as expected after deserialization
+        assert!(glob_checker.is_match(Path::new("foo")));
+        assert!(glob_checker.is_match(Path::new("bar")));
+        assert!(!glob_checker.is_match(Path::new("baz/qux")));
+        assert!(!glob_checker.is_match(Path::new("baz/some/qux")));
+
+        // Test serialization
+        let yaml = serde_yaml::to_string(&glob_checker).unwrap();
+        insta::assert_snapshot!(&yaml);
+
+        // Test default values (empty arrays)
+        let empty_yaml = "{}";
+        let empty_checker: GlobCheckerVec = serde_yaml::from_str(empty_yaml).unwrap();
+        assert!(empty_checker.is_empty());
+        assert_eq!(empty_checker.exists_globs().len(), 0);
+        assert_eq!(empty_checker.not_exists_globs().len(), 0);
+
+        // Test backward compatibility - plain list of globs should be treated as `exists`
+        let plain_list = r#"["foo", "bar"]"#;
+        let legacy_checker: GlobCheckerVec = serde_yaml::from_str(plain_list).unwrap();
+        assert_eq!(legacy_checker.exists_globs().len(), 2);
+        assert_eq!(legacy_checker.not_exists_globs().len(), 0);
+        assert!(legacy_checker.is_match(Path::new("foo")));
+        assert!(legacy_checker.is_match(Path::new("bar")));
+        assert!(!legacy_checker.is_match(Path::new("baz")));
+
+        // Make sure the `try_convert` functionality also handles plain lists
+        let plain_yaml = r#"globs:
+        - foo
+        - bar
+        "#;
+        let plain_yaml_root = RenderedNode::parse_yaml(0, plain_yaml)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let plain_tests_node = plain_yaml_root.as_mapping().unwrap().get("globs").unwrap();
+        let plain_glob_checker: GlobCheckerVec = plain_tests_node.try_convert("globs").unwrap();
+        assert_eq!(plain_glob_checker.exists_globs().len(), 2);
+        assert_eq!(plain_glob_checker.not_exists_globs().len(), 0);
+        assert!(plain_glob_checker.is_match(Path::new("foo")));
+        assert!(plain_glob_checker.is_match(Path::new("bar")));
+    }
+
+    #[test]
+    fn test_serialize_only_exists_globs_as_list() {
+        let checker = GlobCheckerVec::from_vec(vec!["foo", "bar"], None);
+        let yaml = serde_yaml::to_string(&checker).unwrap();
+        assert_eq!(yaml, "- foo\n- bar\n");
     }
 }

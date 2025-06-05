@@ -32,11 +32,9 @@ expression: yaml_serde
     files:
     - foo
     - bar
-    strict: false
 - package_contents:
     lib:
     - libfoo.so
     - libbar.so
     include:
     - xtensor/xarray.hpp
-    strict: false
