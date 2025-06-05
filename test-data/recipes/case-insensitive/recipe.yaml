@@ -1,0 +1,40 @@
+recipe:
+  name: case-insensitive-test
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: c1
+
+    build:
+      script:
+        - if: win
+          then:
+            - mkdir %PREFIX%\CMake\
+            - echo "This is a test file for case insensitivity" > %PREFIX%\CMake\test_file.txt
+          else:
+            - mkdir -p $PREFIX/CMake/
+            - echo "This is a test file for case insensitivity" > $PREFIX/CMake/test_file.txt
+
+  - package:
+      name: c2
+
+    requirements:
+      host:
+        - c1
+
+    build:
+      script:
+        - if: win
+          then:
+            - rmdir /S /Q %PREFIX%\CMake\
+            - mkdir %PREFIX%\cmake\
+            - echo "foo" > %PREFIX%\TEST.txt
+            - echo "bar" > %PREFIX%\test.txt
+            - echo "This is a test file for case insensitivity" > %PREFIX%\cmake\test_file.txt
+          else:
+            - rm -rf $PREFIX/CMake/
+            - mkdir -p $PREFIX/cmake/
+            - echo "foo" > $PREFIX/TEST.txt
+            - echo "bar" > $PREFIX/test.txt
+            - echo "This is a test file for case insensitivity" > $PREFIX/cmake/test_file.txt

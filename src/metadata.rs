@@ -467,7 +467,7 @@ pub struct Output {
     /// Some extra metadata that should be recorded additionally in about.json
     /// Usually it is used during the CI build to record link to the CI job
     /// that created this artifact
-    #[serde(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_meta: Option<BTreeMap<String, Value>>,
 }
 
