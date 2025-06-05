@@ -1645,19 +1645,20 @@ is prepared and do not create a new environment (as we only analyze the contents
 </span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="w">      </span><span class="nt">modules</span><span class="p">:</span>
 </span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">JSON</span>
 </span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="w">  </span><span class="c1"># test the contents of the package. If any of the globs does not match _any_ file, the test fails.</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="w">  </span><span class="c1"># test the contents of the package.</span>
 </span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
 </span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
 </span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="w">  </span><span class="c1"># test with strict mode: fails if there are any files not matched by the globs</span>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="w">      </span><span class="nt">strict</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bin/myapp</span>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="w">      </span><span class="nt">lib</span><span class="p">:</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mylib</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/python*/site-packages/mypackage/*.py</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="w">  </span><span class="c1"># test with strict mode: fails if there are any files not matched by the globs</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="w">      </span><span class="nt">strict</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bin/myapp</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="w">      </span><span class="nt">lib</span><span class="p">:</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mylib</span>
 </span></code></pre></div>
 <h3 id="testing-package-contents">Testing package contents<a class="headerlink" href="#testing-package-contents" title="Permanent link">#</a></h3>
 <p>The <code>package_contents</code> test is a special test that is executed right after the
@@ -1665,13 +1666,23 @@ package is prepared. It does not create a new environment, but instead checks th
 It can be very useful as a "sanity check" to ensure that the package contains the expected files.</p>
 <p>It has multiple sub-keys that help when building cross-platform packages:</p>
 <ul>
-<li><strong><code>files</code></strong>: a list of globs that should match at least one file in the package. If any of the globs do not match, the test fails.</li>
-<li><strong><code>lib</code></strong>: matches libraries in the package (<code>.so</code>, <code>.dll</code>, <code>.dylib</code> files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. <code>foo</code> will match <code>libfoo.so</code>, <code>libfoo.dylib</code>, and <code>foo.dll</code>).</li>
-<li><strong><code>include</code></strong>: matches files under the <code>include</code> directory in the package. You can specify the file name like <code>foo.h</code>.</li>
-<li><strong><code>bin</code></strong>: matches files under the <code>bin</code> directory in the package. You can specify executable names like <code>foo</code> which will match <code>foo.exe</code> on Windows and <code>foo</code> on Linux and macOS.</li>
-<li><strong><code>site_packages</code></strong>: matches files under the <code>site-packages</code> directory in the package. You can specify the import path like <code>foobar.api</code> which will match <code>foobar/api.py</code> and <code>foobar/api/__init__.py</code>.</li>
-<li><strong><code>strict</code></strong>: when set to <code>true</code>, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: <code>false</code>).</li>
+<li><strong><code>files</code></strong>: Specifies glob patterns for files that should exist in the package. You can provide a simple list of globs that should match at least one file in the package. If any pattern doesn't match at least one file, the test fails.</li>
 </ul>
+<blockquote>
+<p><strong>Note</strong>: For more advanced use cases, you can also use the expanded form with <code>exists</code> and <code>not_exists</code> fields:
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">exists</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/package/*.txt</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/python*/site-packages/mypackage/*.py</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">not_exists</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/python*/site-packages/mypackage/deprecated_module.py</span>
+</span></code></pre></div>
+- <strong><code>lib</code></strong>: matches libraries in the package (<code>.so</code>, <code>.dll</code>, <code>.dylib</code> files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. <code>foo</code> will match <code>libfoo.so</code>, <code>libfoo.dylib</code>, and <code>foo.dll</code>).
+- <strong><code>include</code></strong>: matches files under the <code>include</code> directory in the package. You can specify the file name like <code>foo.h</code>.
+- <strong><code>bin</code></strong>: matches files under the <code>bin</code> directory in the package. You can specify executable names like <code>foo</code> which will match <code>foo.exe</code> on Windows and <code>foo</code> on Linux and macOS.
+- <strong><code>site_packages</code></strong>: matches files under the <code>site-packages</code> directory in the package. You can specify the import path like <code>foobar.api</code> which will match <code>foobar/api.py</code> and <code>foobar/api/__init__.py</code>.
+- <strong><code>strict</code></strong>: when set to <code>true</code>, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: <code>false</code>).</p>
+</blockquote>
 <h2 id="testing-existing-packages">Testing existing packages<a class="headerlink" href="#testing-existing-packages" title="Permanent link">#</a></h2>
 <p>The tests from the test section are actually added <em>into</em> your package and
 can also be executed straight from the existing package.</p>
@@ -1679,7 +1690,7 @@ can also be executed straight from the existing package.</p>
 tests independently from building the package. That is also why we are shipping
 a <code>test</code> subcommand that takes as input an existing package and executes the
 tests:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--package-file<span class="w"> </span>./xtensor-0.24.6-h60d57d3_0.tar.bz2
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--package-file<span class="w"> </span>./xtensor-0.24.6-h60d57d3_0.tar.bz2
 </span></code></pre></div>
 <p>Running the above command will extract the package and create a clean
 environment where the package and dependencies are installed. Then the tests are
