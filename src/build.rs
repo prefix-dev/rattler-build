@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec};
+use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
     metadata::{Output, build_reindexed_channels},
@@ -150,6 +150,21 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    // Check for binary prefix if configured
+    if tool_configuration.error_prefix_in_binary {
+        tracing::info!("Checking for embedded prefix in binary files...");
+        check_for_binary_prefix(&output, &paths_json)?;
+    }
+
+    // Check for symlinks on Windows if not allowed
+    if (output.build_configuration.target_platform.is_windows()
+        || output.build_configuration.target_platform == Platform::NoArch)
+        && !tool_configuration.allow_symlinks_on_windows
+    {
+        tracing::info!("Checking for symlinks ...");
+        check_for_symlinks_on_windows(&output, &paths_json)?;
+    }
+
     output.record_artifact(&result, &paths_json);
 
     let span = tracing::info_span!("Running package tests");
@@ -175,4 +190,52 @@ pub async fn run_build(
     }
 
     Ok((output, result))
+}
+
+/// Check if any binary files contain the host prefix
+fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::FileMode;
+
+    for paths_entry in &paths_json.paths {
+        if let Some(prefix_placeholder) = &paths_entry.prefix_placeholder {
+            if prefix_placeholder.file_mode == FileMode::Binary {
+                return Err(miette::miette!(
+                    "Package {} contains Binary file {} which contains host prefix placeholder, which may cause issues when the package is installed to a different location. \
+                    Consider fixing the build process to avoid embedding the host prefix in binaries. \
+                    To allow this, remove the --error-prefix-in-binary flag.",
+                    output.name().as_normalized(),
+                    paths_entry.relative_path.display()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if any files are symlinks on Windows
+fn check_for_symlinks_on_windows(
+    output: &Output,
+    paths_json: &PathsJson,
+) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::PathType;
+
+    let mut symlinks = Vec::new();
+
+    for paths_entry in &paths_json.paths {
+        if paths_entry.path_type == PathType::SoftLink {
+            symlinks.push(paths_entry.relative_path.display().to_string());
+        }
+    }
+
+    if !symlinks.is_empty() {
+        return Err(miette::miette!(
+            "Package {} contains symlinks which are not supported on most Windows systems:\n  - {}\n\
+            To allow symlinks, use the --allow-symlinks-on-windows flag.",
+            output.name().as_normalized(),
+            symlinks.join("\n  - ")
+        ));
+    }
+
+    Ok(())
 }

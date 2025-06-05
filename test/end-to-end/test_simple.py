@@ -636,23 +636,26 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/index.json").exists()
     assert (pkg / "info/paths.json").exists()
 
-    index_json = json.loads((pkg / "info/index.json").read_text())
-    subdir = index_json["subdir"]
-    is_win = subdir.startswith("win")
-
     def check_path(p, t):
-        if t == "binary" and is_win or t is None:
+        if t is None:
             assert "file_mode" not in p
             assert "prefix_placeholder" not in p
         else:
             assert p["file_mode"] == t
             assert len(p["prefix_placeholder"]) > 10
 
+    win = os.name == "nt"
+
     paths = json.loads((pkg / "info/paths.json").read_text())
     for p in paths["paths"]:
         path = p["_path"]
         if path == "is_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
         elif path == "is_binary/file_without_prefix":
@@ -660,14 +663,22 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "is_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
-            if not is_win:
+            if not win:
                 check_path(p, "text")
             else:
+                # On Windows, we do not look into binary files (even if forced to text)
+                # and thus we also don't do any prefix replacement
                 check_path(p, None)
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
+
         elif path == "force_binary/file_without_prefix":
             check_path(p, None)
         elif path == "ignore/file_with_prefix":
@@ -1967,6 +1978,58 @@ def test_merge_build_and_host(
     )
 
 
+def test_error_on_binary_prefix(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --error-prefix-in-binary flag correctly detects prefix in binaries"""
+    recipe_path = recipes / "binary_prefix_test"
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    rattler_build(*args)
+
+    shutil.rmtree(tmp_path)
+    tmp_path.mkdir()
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    args = list(args) + ["--error-prefix-in-binary"]
+
+    if os.name == "nt":
+        # On Windows, we don't deal with binary prefixes in the same way,
+        # so this test is not applicable
+        rattler_build(*args, stderr=STDOUT)
+        return
+
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with binary prefix error")
+    except CalledProcessError as e:
+        output = e.output.decode("utf-8") if e.output else ""
+        assert "Binary file" in output and "contains host prefix" in output
+
+
+@pytest.mark.skipif(
+    platform.system() != "Linux", reason="Symlink test only runs on Linux"
+)
+def test_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that symlinks work correctly on Linux"""
+    recipe_path = recipes / "symlink_test"
+    args = rattler_build.build_args(recipe_path, tmp_path)
+
+    rattler_build(*args)
+    pkg = get_extracted_package(tmp_path, "symlink-test")
+
+    # Verify the symlinks exist and are correct
+    assert (pkg / "bin/symlink_script").exists()
+    assert (pkg / "bin/another_symlink").exists()
+    assert (pkg / "bin/real_script").exists()
+
+    # Verify they are actually symlinks
+    assert (pkg / "bin/symlink_script").is_symlink()
+    assert (pkg / "bin/another_symlink").is_symlink()
+
+    # Verify they point to the right target
+    assert os.readlink(pkg / "bin/symlink_script") == "real_script"
+    assert os.readlink(pkg / "bin/another_symlink") == "real_script"
+
+
 def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     # build the package with experimental flag to enable the feature
     rattler_build.build(
@@ -2044,6 +2107,30 @@ def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert (files_dir / "recipe.yaml").exists()
     assert not (files_dir / "ignored.txt").exists()
     assert not (files_dir / "test.pyc").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows for symlink testing")
+def test_windows_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that Windows symlinks are created correctly during package building"""
+    rattler_build.build(
+        recipes / "win-symlink-test",
+        tmp_path,
+        extra_args=["--allow-symlinks-on-windows"],
+    )
+    pkg = get_extracted_package(tmp_path, "win-symlink-test")
+
+    # Debug: Print all files in the package
+    print("\nFiles in package:")
+    for f in pkg.rglob("*"):
+        print(f"  {f.relative_to(pkg)}")
+
+    # Verify the target file and executable exist
+    assert (pkg / "lib" / "target.txt").exists()
+    assert (pkg / "bin" / "real_exe.bat").exists()
+
+    # Check if the symlink file exists in the package directory listing
+    bin_dir = pkg / "bin"
+    assert any(f.name == "symlink_to_target.txt" for f in bin_dir.iterdir())
 
 
 def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):

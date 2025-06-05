@@ -128,6 +128,8 @@ fn build_recipes_py(
         None,
         Debug::new(debug),
         continue_on_failure.into(),
+        false,
+        false,
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
