@@ -41,7 +41,7 @@ about:
 
 !!! note
     The `${{ compiler(...) }}` functions are very useful in the context of cross-compilation.
-    When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the `target_platform`.
+    When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the `host_platform`.
     The "rendered" compiler will look like `rust_linux-64` when you are targeting the `linux-64` platform.
 
     You can read more about this in the [cross-compilation](../compilers.md) section.
