@@ -12,3 +12,4 @@ site
 # pixi environments
 .pixi
 target-pixi
+*.conda
