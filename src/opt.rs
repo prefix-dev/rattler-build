@@ -70,6 +70,9 @@ pub enum SubCommands {
 
     /// Debug a recipe by setting up the environment without running the build script
     Debug(DebugOpts),
+
+    /// Create a patch for a directory
+    CreatePatch(CreatePatchOpts),
 }
 
 /// Shell completion options.
@@ -1271,4 +1274,12 @@ impl DebugData {
             output_name: opts.output_name,
         }
     }
+}
+
+/// Options for the `create-patch` command.
+#[derive(Parser, Debug, Clone)]
+pub struct CreatePatchOpts {
+    /// Directory where we want to create the patch
+    #[arg(short, long)]
+    pub directory: PathBuf,
 }
