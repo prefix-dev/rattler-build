@@ -22,11 +22,11 @@ use serde::{Deserialize, Serialize};
 use crate::system_tools::SystemTools;
 pub mod checksum;
 pub mod copy_dir;
+pub mod create_patch;
 pub mod extract;
 pub mod git_source;
 pub mod patch;
 pub mod url_source;
-pub mod create_patch;
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -321,7 +321,10 @@ pub async fn fetch_sources(
         sources: rendered_sources.clone(),
     };
     let source_info_path = work_dir.join(".source_info.json");
-    fs::write(&source_info_path, serde_json::to_string(&source_info).expect("should serialize"))?;
+    fs::write(
+        &source_info_path,
+        serde_json::to_string(&source_info).expect("should serialize"),
+    )?;
 
     Ok(rendered_sources)
 }
