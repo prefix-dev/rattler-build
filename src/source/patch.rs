@@ -11,7 +11,7 @@ use std::{
     process::Stdio,
 };
 
-use diffy::{Patch, patches_from_str};
+use diffy::{Patch, patches_from_str_with_config};
 use fs_err::File;
 use walkdir::WalkDir;
 
@@ -36,6 +36,27 @@ fn parse_patches(patches: &Vec<Patch<str>>) -> HashSet<PathBuf> {
     }
 
     affected_files
+}
+
+fn patches_from_str(input: &str) -> Result<Vec<Patch<'_, str>>, diffy::ParsePatchError> {
+    patches_from_str_with_config(
+        input,
+        diffy::ParserConfig {
+            hunk_strategy: diffy::HunkRangeStrategy::Recount,
+        },
+    )
+}
+
+fn apply(base_image: &str, patch: &Patch<'_, str>) -> Result<String, diffy::ApplyError> {
+    diffy::apply_with_config(
+        base_image,
+        patch,
+        &diffy::FuzzyConfig {
+            max_fuzz: 2,
+            ignore_whitespace: true,
+            ignore_case: false,
+        },
+    )
 }
 
 // XXX: This could become a bottleneck as it is called at least twice
@@ -160,8 +181,7 @@ pub(crate) fn apply_patch_custom(
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
-                let new_file_content =
-                    diffy::apply("", &patch).map_err(SourceError::PatchApplyError)?;
+                let new_file_content = apply("", &patch).map_err(SourceError::PatchApplyError)?;
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
@@ -170,8 +190,8 @@ pub(crate) fn apply_patch_custom(
             (Some(o), Some(m)) => {
                 let old_file_content = fs_err::read_to_string(&o).map_err(SourceError::Io)?;
 
-                let new_file_content = diffy::apply(&old_file_content, &patch)
-                    .map_err(SourceError::PatchApplyError)?;
+                let new_file_content =
+                    apply(&old_file_content, &patch).map_err(SourceError::PatchApplyError)?;
 
                 if o != m {
                     fs_err::remove_file(&o).map_err(SourceError::Io)?;
@@ -626,6 +646,8 @@ mod tests {
         // Insane patch format, needs further investigation on why it
         // even works.
         #[exclude("mumps")]
+        // Failed to download source
+        #[exclude("petsc")]
         recipe_dir: PathBuf,
     ) -> miette::Result<()> {
         let prep = match prepare_package(&recipe_dir).await {
