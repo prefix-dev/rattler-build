@@ -3,12 +3,12 @@
 //! from the source cache. Any differences will be written to a patch file.
 
 use fs_err as fs;
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use crate::source::{SourceInformation, SourceError};
 use crate::recipe::parser::Source;
+use crate::source::{SourceError, SourceInformation};
 
 /// Creates a unified diff patch by comparing the current state of files in the work directory
 /// against their original state from the source cache.
@@ -21,9 +21,10 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
     }
 
     // Load the source information from the work directory
-    let source_info: SourceInformation = serde_json::from_reader(
-        fs::File::open(&source_info_path)?
-    ).map_err(|e| SourceError::UnknownError(format!("Failed to read source information: {}", e)))?;
+    let source_info: SourceInformation =
+        serde_json::from_reader(fs::File::open(&source_info_path)?).map_err(|e| {
+            SourceError::UnknownError(format!("Failed to read source information: {}", e))
+        })?;
 
     let patch_path = work_dir.join("changes.patch");
     let mut patch_content = String::new();
@@ -45,7 +46,8 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
                     work_dir.to_path_buf()
                 };
 
-                let diff = create_directory_diff(&original_dir, &target_dir, git_src.target_directory())?;
+                let diff =
+                    create_directory_diff(&original_dir, &target_dir, git_src.target_directory())?;
                 if !diff.is_empty() {
                     patch_content.push_str(&diff);
                 }
@@ -62,7 +64,11 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
                         work_dir.to_path_buf()
                     };
 
-                    let diff = create_directory_diff(&original_dir, &target_dir, url_src.target_directory())?;
+                    let diff = create_directory_diff(
+                        &original_dir,
+                        &target_dir,
+                        url_src.target_directory(),
+                    )?;
                     if !diff.is_empty() {
                         patch_content.push_str(&diff);
                     }
@@ -70,7 +76,7 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
                 // If it has a file_name, it's a single file and likely wasn't modified
             }
             Source::Path(_) => {
-                // Path sources are copied from local filesystem, 
+                // Path sources are copied from local filesystem,
                 // we could compare against the original path if needed
                 // For now, skip as the original is still available
             }
@@ -95,7 +101,11 @@ fn create_directory_diff(
     target_subdir: Option<&PathBuf>,
 ) -> Result<String, SourceError> {
     let mut patch_content = String::new();
-    println!("Creating patch for directories:\nOriginal: {}\nModified: {}", original_dir.display(), modified_dir.display());
+    println!(
+        "Creating patch for directories:\nOriginal: {}\nModified: {}",
+        original_dir.display(),
+        modified_dir.display()
+    );
     // Walk through all files in the modified directory
     for entry in WalkDir::new(modified_dir)
         .into_iter()
@@ -124,15 +134,22 @@ fn create_directory_diff(
 
         if original_file.exists() {
             // Compare existing files
-            let original_content = fs::read_to_string(&original_file)
-                .map_err(|_| SourceError::UnknownError(format!("Failed to read original file: {}", original_file.display())))?;
-            let modified_content = fs::read_to_string(modified_file)
-                .map_err(|_| SourceError::UnknownError(format!("Failed to read modified file: {}", modified_file.display())))?;
+            let original_content = fs::read_to_string(&original_file).map_err(|_| {
+                SourceError::UnknownError(format!(
+                    "Failed to read original file: {}",
+                    original_file.display()
+                ))
+            })?;
+            let modified_content = fs::read_to_string(modified_file).map_err(|_| {
+                SourceError::UnknownError(format!(
+                    "Failed to read modified file: {}",
+                    modified_file.display()
+                ))
+            })?;
 
             if original_content != modified_content {
                 let patch = diffy::create_patch(&original_content, &modified_content);
-            let unified_diff = format!("{}", diffy::PatchFormatter::new()
-                            .fmt_patch(&patch));
+                let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
 
                 // Add proper file headers for the patch
                 patch_content.push_str(&format!(
@@ -144,12 +161,15 @@ fn create_directory_diff(
             }
         } else {
             // This is a new file
-            let modified_content = fs::read_to_string(modified_file)
-                .map_err(|_| SourceError::UnknownError(format!("Failed to read new file: {}", modified_file.display())))?;
+            let modified_content = fs::read_to_string(modified_file).map_err(|_| {
+                SourceError::UnknownError(format!(
+                    "Failed to read new file: {}",
+                    modified_file.display()
+                ))
+            })?;
 
             let patch = diffy::create_patch("", &modified_content);
-            let unified_diff = format!("{}", diffy::PatchFormatter::new()
-                            .fmt_patch(&patch));
+            let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
 
             patch_content.push_str(&format!(
                 "--- /dev/null\n+++ b/{}\n{}",
@@ -176,12 +196,15 @@ fn create_directory_diff(
                 rel_path.to_path_buf()
             };
 
-            let original_content = fs::read_to_string(original_file)
-                .map_err(|_| SourceError::UnknownError(format!("Failed to read deleted file: {}", original_file.display())))?;
+            let original_content = fs::read_to_string(original_file).map_err(|_| {
+                SourceError::UnknownError(format!(
+                    "Failed to read deleted file: {}",
+                    original_file.display()
+                ))
+            })?;
 
             let patch = diffy::create_patch(&original_content, "");
-            let unified_diff = format!("{}", diffy::PatchFormatter::new()
-                            .fmt_patch(&patch));
+            let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
 
             patch_content.push_str(&format!(
                 "--- a/{}\n+++ /dev/null\n{}",
@@ -195,7 +218,10 @@ fn create_directory_diff(
 }
 
 /// Find the git cache directory for a given git source
-fn find_git_cache_dir(cache_dir: &Path, git_src: &crate::recipe::parser::GitSource) -> Result<PathBuf, SourceError> {
+fn find_git_cache_dir(
+    cache_dir: &Path,
+    git_src: &crate::recipe::parser::GitSource,
+) -> Result<PathBuf, SourceError> {
     // This would need to match the logic in git_source::git_src
     // You might need to implement a helper function or store more info in SourceInformation
     // For now, this is a placeholder - you'll need to adapt based on your git caching strategy
@@ -208,12 +234,15 @@ fn find_git_cache_dir(cache_dir: &Path, git_src: &crate::recipe::parser::GitSour
     // if git_cache_dir.exists() {
     //     Ok(git_cache_dir)
     // } else {
-        Err(SourceError::FileNotFound(git_cache_dir))
+    Err(SourceError::FileNotFound(git_cache_dir))
     // }
 }
 
 /// Find the URL cache directory for a given URL source
-fn find_url_cache_dir(cache_dir: &Path, url_src: &crate::recipe::parser::UrlSource) -> Result<PathBuf, SourceError> {
+fn find_url_cache_dir(
+    cache_dir: &Path,
+    url_src: &crate::recipe::parser::UrlSource,
+) -> Result<PathBuf, SourceError> {
     // This should match the logic in url_source::extracted_folder
     // You might need to recreate the cache name logic here
     use crate::source::checksum::Checksum;
@@ -221,11 +250,14 @@ fn find_url_cache_dir(cache_dir: &Path, url_src: &crate::recipe::parser::UrlSour
     let checksum = Checksum::from_url_source(url_src)
         .ok_or_else(|| SourceError::NoChecksum("No checksum for URL source".to_string()))?;
 
-    let first_url = url_src.urls().first()
+    let first_url = url_src
+        .urls()
+        .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
     // Recreate the cache name logic from url_source.rs
-    let filename = first_url.path_segments()
+    let filename = first_url
+        .path_segments()
         .and_then(|segments| segments.filter(|x| !x.is_empty()).next_back())
         .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
