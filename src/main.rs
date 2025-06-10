@@ -10,7 +10,13 @@ use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use pixi_config::Config;
 use rattler_build::{
-    build_recipes, console_utils::init_logging, debug_recipe, get_recipe_path, opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData}, rebuild, run_test, source::create_patch, upload_from_args
+    build_recipes,
+    console_utils::init_logging,
+    debug_recipe, get_recipe_path,
+    opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
+    rebuild, run_test,
+    source::create_patch,
+    upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
 use tokio::fs::read_to_string;
