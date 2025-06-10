@@ -394,7 +394,7 @@ mod tests {
 
     use super::*;
     use line_ending::LineEnding;
-    use miette::{IntoDiagnostic, ensure};
+    use miette::IntoDiagnostic;
     use rstest::*;
 
     use tempfile::TempDir;
@@ -595,11 +595,6 @@ mod tests {
             }
         }
 
-        ensure!(
-            !patchable_outputs.is_empty(),
-            "no patchable outputs found in package"
-        );
-
         Ok((artifacts_dir, patchable_outputs))
     }
 
@@ -650,13 +645,7 @@ mod tests {
         #[exclude("petsc")]
         recipe_dir: PathBuf,
     ) -> miette::Result<()> {
-        let prep = match prepare_package(&recipe_dir).await {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                return Ok(());
-            }
-        };
+        let prep = prepare_package(&recipe_dir).await?;
         let (_tmpdir, patchable_outputs) = prep;
         for (_build_data, tool_configuration, output, sources) in patchable_outputs {
             let directories = output.build_configuration.directories;
