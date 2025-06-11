@@ -2164,3 +2164,41 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "cmake/test_file.txt" in paths
         assert "TEST.txt" in paths
         assert "test.txt" in paths
+
+
+def test_cache_linking_checks(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that cache doesn't cause false positive overdepending errors."""
+    rattler_build.build(
+        recipes / "cache/recipe-linking-checks.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    # Verify the package was created
+    pkg = get_extracted_package(tmp_path, "cache-linking-output")
+    assert pkg.exists()
+    assert (pkg / "bin/program").exists()
+
+
+def test_cache_overdepending_checks(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that cache correctly detects real overdepending errors."""
+    from subprocess import STDOUT
+
+    args = rattler_build.build_args(
+        recipes / "cache/recipe-overdepending.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build(*args, stderr=STDOUT)
+
+    error_output = (
+        exc_info.value.output.decode("utf-8") if exc_info.value.output else ""
+    )
+    # Should have an overdepending error for libcurl since it's not used
+    assert "Overdepending against: libcurl" in error_output
