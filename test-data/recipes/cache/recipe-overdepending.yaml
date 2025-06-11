@@ -29,25 +29,25 @@ cache:
         then: |
           #!/bin/bash
           set -ex
-          
+
           cat <<EOT >> CMakeLists.txt
           cmake_minimum_required(VERSION 3.26)
-          
+
           project(program LANGUAGES CXX)
           add_executable(program main.cpp)
-          
+
           find_package(fmt CONFIG REQUIRED)
           find_package(ZLIB REQUIRED)
           # Note: We find libcurl but don't actually link against it
           find_package(CURL REQUIRED)
-          
+
           target_link_libraries(program PRIVATE fmt::fmt ZLIB::ZLIB)
           EOT
-          
+
           cat <<EOT >> main.cpp
           #include <fmt/format.h>
           #include <zlib.h>
-          
+
           int main(int argc, char **argv)
           {
               fmt::print("Hello from {}\\n", argv[0]);
@@ -56,10 +56,10 @@ cache:
               return 0;
           }
           EOT
-          
+
           cmake . -GNinja -DCMAKE_BUILD_TYPE=Release
           cmake --build . --config Release
-          
+
           echo "=== Checking linked libraries ==="
           if [[ "$target_platform" == linux-* ]]; then
             ldd program || true
@@ -67,14 +67,14 @@ cache:
           elif [[ "$target_platform" == osx-* ]]; then
             otool -L program || true
           fi
-          
+
           echo "=== Running program ==="
           ./program
           mkdir -p $PREFIX/bin
           cp program $PREFIX/bin
         else: |
           @echo off
-          
+
           echo cmake_minimum_required(VERSION 3.26) > CMakeLists.txt
           echo. >> CMakeLists.txt
           echo project(program LANGUAGES CXX) >> CMakeLists.txt
@@ -86,7 +86,7 @@ cache:
           echo find_package(CURL REQUIRED) >> CMakeLists.txt
           echo. >> CMakeLists.txt
           echo target_link_libraries(program PRIVATE fmt::fmt ZLIB::ZLIB) >> CMakeLists.txt
-          
+
           (
           echo #include ^<fmt/format.h^>
           echo #include ^<zlib.h^>
@@ -99,17 +99,17 @@ cache:
           echo     return 0;
           echo }
           ) > main.cpp
-          
+
           cmake . -GNinja -DCMAKE_BUILD_TYPE=Release
           if errorlevel 1 exit 1
-          
+
           cmake --build . --config Release
           if errorlevel 1 exit 1
-          
+
           echo === Running program ===
           program.exe
           if errorlevel 1 exit 1
-          
+
           if not exist %PREFIX%\bin mkdir %PREFIX%\bin
           copy program.exe %PREFIX%\bin\
           if errorlevel 1 exit 1
