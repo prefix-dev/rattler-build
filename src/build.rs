@@ -121,7 +121,7 @@ pub async fn run_build(
             .into_diagnostic()?
     };
 
-    let output = output
+    let mut output = output
         .resolve_dependencies(tool_configuration)
         .await
         .into_diagnostic()?;

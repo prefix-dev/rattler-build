@@ -820,6 +820,7 @@ mod test {
     };
     use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
+    use std::collections::HashMap;
     use std::str::FromStr;
     use url::Url;
 
@@ -893,6 +894,7 @@ mod test {
                     .unwrap(),
                 channel: Some("test".into()),
             }],
+            library_mapping: HashMap::new(),
         };
 
         // test yaml roundtrip

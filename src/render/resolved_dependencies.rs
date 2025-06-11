@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt::{Display, Formatter},
+    path::Path,
     sync::Arc,
 };
 
@@ -9,8 +10,8 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
-    package::RunExportsJson,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, PrefixRecord,
+    RepoDataRecord, package::RunExportsJson,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -245,6 +246,9 @@ pub struct FinalizedRunDependencies {
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
     pub resolved: Vec<RepoDataRecord>,
+    /// Mapping from library names to the packages that provide them
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub library_mapping: HashMap<String, PackageName>,
 }
 
 fn short_channel(channel: Option<&str>) -> String {
@@ -258,6 +262,50 @@ fn short_channel(channel: Option<&str>) -> String {
     } else {
         channel.to_string()
     }
+}
+
+/// Extract library files from a package's metadata in the prefix
+fn extract_library_info_from_prefix(
+    prefix: &Path,
+    package_name: &PackageName,
+) -> Result<Vec<String>, std::io::Error> {
+    let conda_meta = prefix.join("conda-meta");
+    let package_prefix = format!("{}-", package_name.as_normalized());
+    let metadata_path = fs_err::read_dir(&conda_meta)?
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .filter(|name| name.starts_with(&package_prefix) && name.ends_with(".json"))
+                .is_some()
+        })
+        .map(|entry| entry.path());
+
+    let Some(path) = metadata_path else {
+        return Ok(Vec::new());
+    };
+
+    let record = PrefixRecord::from_path(&path)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    let libraries = record
+        .files
+        .into_iter()
+        .filter_map(|path| {
+            let file_name = path.file_name()?.to_str()?;
+            let is_library = file_name.ends_with(".so")
+                || file_name.contains(".so.")
+                || file_name.ends_with(".dylib")
+                || file_name.contains(".dylib.")
+                || file_name.ends_with(".dll")
+                || file_name.ends_with(".pyd");
+
+            is_library.then(|| file_name.to_string())
+        })
+        .collect();
+
+    Ok(libraries)
 }
 
 impl ResolvedDependencies {
@@ -599,8 +647,53 @@ async fn amend_run_exports(
     Ok(())
 }
 
+/// Populate library mappings for resolved dependencies after packages are installed
+pub fn populate_library_mappings(
+    dependencies: &mut FinalizedDependencies,
+    build_prefix: &Path,
+    host_prefix: &Path,
+) -> Result<(), std::io::Error> {
+    // Function to populate library mapping for a given environment
+    fn populate_env_libraries(
+        resolved_deps: &mut ResolvedDependencies,
+        prefix: &Path,
+    ) -> Result<(), std::io::Error> {
+        resolved_deps.library_mapping.clear();
+        for record in &resolved_deps.resolved {
+            match extract_library_info_from_prefix(prefix, &record.package_record.name) {
+                Ok(libraries) => {
+                    for lib in libraries {
+                        resolved_deps
+                            .library_mapping
+                            .insert(lib, record.package_record.name.clone());
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        "Failed to extract library info from {}: {}",
+                        record.package_record.name.as_normalized(),
+                        e
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Populate library mappings for both build and host environments
+    if let Some(build_deps) = &mut dependencies.build {
+        populate_env_libraries(build_deps, build_prefix)?;
+    }
+
+    if let Some(host_deps) = &mut dependencies.host {
+        populate_env_libraries(host_deps, host_prefix)?;
+    }
+
+    Ok(())
+}
+
 pub async fn install_environments(
-    output: &Output,
+    build_config: &BuildConfiguration,
     dependencies: &FinalizedDependencies,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
@@ -612,8 +705,8 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.build_platform.platform,
-        &output.build_configuration.directories.build_prefix,
+        build_config.build_platform.platform,
+        &build_config.directories.build_prefix,
         tool_configuration,
     )
     .await?;
@@ -625,8 +718,8 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.host_platform.platform,
-        &output.build_configuration.directories.host_prefix,
+        build_config.host_platform.platform,
+        &build_config.directories.host_prefix,
         tool_configuration,
     )
     .await?;
@@ -742,6 +835,7 @@ pub(crate) async fn resolve_dependencies(
         Some(ResolvedDependencies {
             specs: build_env_specs,
             resolved,
+            library_mapping: HashMap::new(), // Will be populated after installation
         })
     } else {
         None
@@ -838,6 +932,7 @@ pub(crate) async fn resolve_dependencies(
         Some(ResolvedDependencies {
             specs: host_env_specs,
             resolved,
+            library_mapping: HashMap::new(), // Will be populated after installation
         })
     } else {
         None
@@ -1008,15 +1103,25 @@ impl Output {
     /// Install the environments of the outputs. Assumes that the dependencies
     /// for the environment have already been resolved.
     pub async fn install_environments(
-        &self,
+        &mut self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
         let dependencies = self
             .finalized_dependencies
-            .as_ref()
+            .as_mut()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-        install_environments(self, dependencies, tool_configuration).await
+        install_environments(&self.build_configuration, dependencies, tool_configuration).await?;
+
+        // Populate library mappings after packages are installed
+        populate_library_mappings(
+            dependencies,
+            &self.build_configuration.directories.build_prefix,
+            &self.build_configuration.directories.host_prefix,
+        )
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
+
+        Ok(())
     }
 }
 

@@ -1,0 +1,127 @@
+# Test for cache overdepending issue where false warnings occur
+# when dependencies are used but not installed in the current prefix
+schema_version: 1
+
+recipe:
+  name: cache-overdepending-test
+  version: "1.0.0"
+
+build:
+  number: 0
+
+cache:
+  source:
+    path: .
+  requirements:
+    build:
+      - cmake
+      - ninja
+      - ${{ compiler('cxx') }}
+      - if: linux
+        then: sysroot_linux-64
+    host:
+      - fmt
+      - zlib  # This will be used
+      - libcurl  # This will NOT be used - should trigger overdepending warning
+  build:
+    script:
+      - if: unix
+        then: |
+          #!/bin/bash
+          set -ex
+          
+          cat <<EOT >> CMakeLists.txt
+          cmake_minimum_required(VERSION 3.26)
+          
+          project(program LANGUAGES CXX)
+          add_executable(program main.cpp)
+          
+          find_package(fmt CONFIG REQUIRED)
+          find_package(ZLIB REQUIRED)
+          # Note: We find libcurl but don't actually link against it
+          find_package(CURL REQUIRED)
+          
+          target_link_libraries(program PRIVATE fmt::fmt ZLIB::ZLIB)
+          EOT
+          
+          cat <<EOT >> main.cpp
+          #include <fmt/format.h>
+          #include <zlib.h>
+          
+          int main(int argc, char **argv)
+          {
+              fmt::print("Hello from {}\\n", argv[0]);
+              fmt::print("zlib version: {}\\n", zlibVersion());
+              // Note: We're NOT using libcurl here
+              return 0;
+          }
+          EOT
+          
+          cmake . -GNinja -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+          
+          echo "=== Checking linked libraries ==="
+          if [[ "$target_platform" == linux-* ]]; then
+            ldd program || true
+            readelf -d program | grep NEEDED || true
+          elif [[ "$target_platform" == osx-* ]]; then
+            otool -L program || true
+          fi
+          
+          echo "=== Running program ==="
+          ./program
+          mkdir -p $PREFIX/bin
+          cp program $PREFIX/bin
+        else: |
+          @echo off
+          
+          echo cmake_minimum_required(VERSION 3.26) > CMakeLists.txt
+          echo. >> CMakeLists.txt
+          echo project(program LANGUAGES CXX) >> CMakeLists.txt
+          echo add_executable(program main.cpp) >> CMakeLists.txt
+          echo. >> CMakeLists.txt
+          echo find_package(fmt CONFIG REQUIRED) >> CMakeLists.txt
+          echo find_package(ZLIB REQUIRED) >> CMakeLists.txt
+          echo # Note: We find libcurl but don't actually link against it >> CMakeLists.txt
+          echo find_package(CURL REQUIRED) >> CMakeLists.txt
+          echo. >> CMakeLists.txt
+          echo target_link_libraries(program PRIVATE fmt::fmt ZLIB::ZLIB) >> CMakeLists.txt
+          
+          (
+          echo #include ^<fmt/format.h^>
+          echo #include ^<zlib.h^>
+          echo.
+          echo int main(int argc, char **argv^)
+          echo {
+          echo     fmt::print("Hello from {}\\n", argv[0]^);
+          echo     fmt::print("zlib version: {}\\n", zlibVersion(^)^);
+          echo     // Note: We're NOT using libcurl here
+          echo     return 0;
+          echo }
+          ) > main.cpp
+          
+          cmake . -GNinja -DCMAKE_BUILD_TYPE=Release
+          if errorlevel 1 exit 1
+          
+          cmake --build . --config Release
+          if errorlevel 1 exit 1
+          
+          echo === Running program ===
+          program.exe
+          if errorlevel 1 exit 1
+          
+          if not exist %PREFIX%\bin mkdir %PREFIX%\bin
+          copy program.exe %PREFIX%\bin\
+          if errorlevel 1 exit 1
+
+outputs:
+  - package:
+      name: cache-overdepending-output
+      version: "1.0.0"
+    build:
+      files:
+        - bin/
+      # Enable strict checks to make the test fail on overdepending
+      dynamic_linking:
+        overlinking_behavior: error
+        overdepending_behavior: error
