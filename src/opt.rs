@@ -566,22 +566,26 @@ impl BuildData {
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
             opts.host_platform,
-            opts.channels.or(config.clone().and_then(|config| {
-                if config.default_channels.is_empty() {
-                    None
-                } else {
-                    Some(config.default_channels)
-                }
-            })),
+            opts.channels.or_else(|| {
+                config.as_ref().and_then(|config| {
+                    if config.default_channels.is_empty() {
+                        None
+                    } else {
+                        Some(config.default_channels.clone())
+                    }
+                })
+            }),
             opts.variant_config,
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format.or(config
-                .clone()
-                .and_then(|config| config.build.package_format)),
+            opts.package_format.or_else(|| {
+                config
+                    .as_ref()
+                    .and_then(|config| config.build.package_format.clone())
+            }),
             opts.compression_threads,
             opts.io_concurrency_limit,
             opts.no_include_recipe,
