@@ -13,7 +13,6 @@ use std::{
 
 use diffy::{Patch, patches_from_str_with_config};
 use fs_err::File;
-use walkdir::WalkDir;
 
 fn parse_patches(patches: &Vec<Patch<str>>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
@@ -59,20 +58,6 @@ fn apply(base_image: &str, patch: &Patch<'_, str>) -> Result<String, diffy::Appl
     )
 }
 
-// XXX: This could become a bottleneck as it is called at least twice
-// for the same directory, but currently not major performance
-// regressions observed.
-/// Try to find path as a subdirectory path of some directory. Returns
-/// shortest matching path if one exists.
-fn find_as_subdir(p: &Path, sub: &Path) -> Option<PathBuf> {
-    WalkDir::new(p)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().ends_with(sub))
-        .map(|e| e.path().to_owned())
-        .min_by(|a, b| a.components().count().cmp(&b.components().count()))
-}
-
 // Returns number by which all patch paths must be stripped to be
 // successfully applied, or returns and error if no such number could
 // be determined.
@@ -87,13 +72,10 @@ fn guess_strip_level(patch: &Vec<Patch<str>>, work_dir: &Path) -> Result<usize, 
         .unwrap_or(0);
 
     for strip_level in 0..max_components {
-        let all_paths_exist = patched_files
-            .iter()
-            .map(|p| {
-                let path: PathBuf = p.components().skip(strip_level).collect();
-                find_as_subdir(work_dir, &path)
-            })
-            .all(|p| p.map(|p| p.exists()).unwrap_or(false));
+        let all_paths_exist = patched_files.iter().all(|p| {
+            let path: PathBuf = p.components().skip(strip_level).collect();
+            work_dir.join(path).exists()
+        });
         if all_paths_exist {
             return Ok(strip_level);
         }
@@ -106,10 +88,6 @@ fn guess_strip_level(patch: &Vec<Patch<str>>, work_dir: &Path) -> Result<usize, 
     // not, but may be incorrect otherwise, if original file does not
     // exist.
     Ok(1)
-
-    // Err(SourceError::PatchFailed(String::from(
-    //     "can't find files to be patched",
-    // )))
 }
 
 fn custom_patch_stripped_paths(
@@ -168,8 +146,8 @@ pub(crate) fn apply_patch_custom(
     for patch in patches {
         let file_paths = custom_patch_stripped_paths(&patch, strip_level);
         let absolute_file_paths = (
-            file_paths.0.and_then(|o| find_as_subdir(work_dir, &o)),
-            file_paths.1.and_then(|m| find_as_subdir(work_dir, &m)),
+            file_paths.0.map(|o| work_dir.join(&o)),
+            file_paths.1.map(|m| work_dir.join(&m)),
         );
 
         tracing::debug!(
@@ -673,39 +651,46 @@ mod tests {
                 .into_diagnostic()?;
 
             // Apply patches to both directories.
-            let patches = sources
-                .iter()
-                .flat_map(|s| s.patches().iter().cloned())
-                .collect::<Vec<PathBuf>>();
+            for source in sources {
+                let patches = source.patches().to_vec();
+                let target_directory = source.target_directory();
 
-            let git_res = apply_patches(
-                patches.as_slice(),
-                &original_sources_dir_path,
-                &recipe_dir,
-                |wd, p| apply_patch_git(&system_tools, wd, p),
-            );
+                let (original_source_dir_path, copy_source_dir_path) = match target_directory {
+                    Some(td) => (
+                        &original_sources_dir_path.join(td),
+                        &copy_sources_dir_path.join(td),
+                    ),
+                    None => (&original_sources_dir_path, &copy_sources_dir_path),
+                };
+                let git_res = apply_patches(
+                    patches.as_slice(),
+                    original_source_dir_path,
+                    &recipe_dir,
+                    |wd, p| apply_patch_git(&system_tools, wd, p),
+                );
 
-            let custom_res = apply_patches(
-                patches.as_slice(),
-                &copy_sources_dir_path,
-                &recipe_dir,
-                apply_patch_custom,
-            );
+                let custom_res = apply_patches(
+                    patches.as_slice(),
+                    copy_source_dir_path,
+                    &recipe_dir,
+                    apply_patch_custom,
+                );
 
-            if let Ok(difference) =
-                show_dir_difference(&original_sources_dir_path, &copy_sources_dir_path)
-            {
-                if !difference.trim().is_empty() {
-                    // If we panic on just nonempty difference then
-                    // there are 4 more tests failing, because git
-                    // does not apply patches. Specifically
-                    // `hf_transfer`, `lua`, `nordugrid_arc`,
-                    // `openjph`.
-                    eprintln!("Directories are different:\n{}", difference);
+                if let Ok(difference) =
+                    show_dir_difference(&original_sources_dir_path, &copy_sources_dir_path)
+                {
+                    if !difference.trim().is_empty() {
+                        // If we panic on just nonempty difference then
+                        // there are 4 more tests failing, because git
+                        // does not apply patches. Specifically
+                        // `hf_transfer`, `lua`, `nordugrid_arc`,
+                        // `openjph`.
+                        eprintln!("Directories are different:\n{}", difference);
+                    }
                 }
-            }
 
-            assert!(custom_res.is_ok(), "Results:\n{:#?}", [git_res, custom_res]);
+                assert!(custom_res.is_ok(), "Results:\n{:#?}", [git_res, custom_res]);
+            }
         }
 
         Ok(())
