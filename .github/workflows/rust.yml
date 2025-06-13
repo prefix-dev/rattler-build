@@ -40,6 +40,10 @@ jobs:
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
+      - name: Run patch apply tests
+        # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
+        run: cargo test --features=tui,recipe-generation --verbose -- --nocapture --ignored
 
   build:
     name: Build ${{ matrix.target }}

@@ -609,6 +609,7 @@ mod tests {
     /// 3. Patch original work dir using `git apply`.
     /// 4. Patch temporary work dir using custom patch application.
     /// 5. Compare directories.
+    #[ignore]
     #[rstest]
     #[tokio::test]
     async fn test_package_from_conda_forge(
