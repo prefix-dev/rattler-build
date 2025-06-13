@@ -4,6 +4,8 @@ use indexmap::IndexSet;
 use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use url::Url;
 
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::{
@@ -17,7 +19,7 @@ use crate::{
     render::pin::Pin,
 };
 
-use super::Recipe;
+use super::{GitRev, Recipe};
 
 /// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -241,6 +243,127 @@ impl Language {
     }
 }
 
+/// A git dependency pointing to a git repository
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GitDependency {
+    /// The git URL
+    pub git: Url,
+    /// Optional revision (branch, tag, or commit)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rev: Option<String>,
+    /// Optional subdirectory within the repository
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subdirectory: Option<PathBuf>,
+}
+
+impl GitDependency {
+    /// Extract a package name from the git URL synchronously.
+    /// Returns None as git operations require async/network access.
+    pub fn package_name(&self) -> Option<String> {
+        None
+    }
+
+    /// Asynchronously fetch the git repository and extract the package name from its recipe
+    pub async fn fetch_package_name(
+        &self,
+        system_tools: &crate::system_tools::SystemTools,
+        cache_dir: &std::path::Path,
+    ) -> Result<rattler_conda_types::PackageName, String> {
+        use crate::{
+            recipe::parser::{GitRev, GitSource, GitUrl},
+            source::git_source::git_src,
+        };
+
+        let cache_key = format!(
+            "{}_{}",
+            self.git.path().trim_start_matches('/').replace('/', "_"),
+            self.rev.as_deref().unwrap_or("HEAD")
+        );
+
+        let git_cache_dir = cache_dir.join("git_deps").join(&cache_key);
+        fs_err::create_dir_all(&git_cache_dir)
+            .map_err(|e| format!("Failed to create cache directory: {}", e))?;
+
+        let git_source = GitSource {
+            url: GitUrl::Url(self.git.clone()),
+            rev: self.rev.as_deref().map_or(GitRev::Head, GitRev::from),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+        };
+
+        git_src(system_tools, &git_source, &git_cache_dir, &git_cache_dir)
+            .map_err(|e| format!("Git operation failed: {}", e))?;
+
+        let recipe_base_path = self
+            .subdirectory
+            .as_ref()
+            .map_or(git_cache_dir.clone(), |subdir| git_cache_dir.join(subdir));
+
+        PathDependency {
+            path: recipe_base_path,
+        }
+        .package_name()
+        .and_then(|name| rattler_conda_types::PackageName::try_from(name).ok())
+        .ok_or_else(|| "Failed to parse recipe or extract package name".to_string())
+    }
+}
+
+/// A path dependency pointing to a local package
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PathDependency {
+    /// The path to the local package
+    pub path: PathBuf,
+}
+
+impl PathDependency {
+    /// Extract a package name from the path by reading the recipe file
+    /// Returns None if the recipe cannot be read or parsed
+    pub fn package_name(&self) -> Option<String> {
+        use crate::recipe::parser::{Recipe, SelectorConfig};
+        use crate::{get_recipe_path, source_code::Source};
+        use rattler_conda_types::Platform;
+
+        let recipe_path = get_recipe_path(&self.path).ok()?;
+        let source = Source::from_path(&recipe_path).ok()?;
+        let current_platform = Platform::current();
+
+        Recipe::from_yaml(
+            source,
+            SelectorConfig {
+                target_platform: current_platform,
+                host_platform: current_platform,
+                build_platform: current_platform,
+                hash: None,
+                variant: Default::default(),
+                experimental: false,
+                allow_undefined: false,
+                recipe_path: Some(recipe_path),
+            },
+        )
+        .ok()
+        .map(|recipe| recipe.package.name.as_normalized().to_string())
+    }
+}
+
+impl Dependency {
+    /// Extract the package name from a dependency.
+    /// Returns None if the package name cannot be determined (e.g., for git dependencies
+    /// that require async operations, or path dependencies with no valid recipe).
+    pub fn package_name(&self) -> Option<PackageName> {
+        match self {
+            Dependency::Spec(spec) => spec.name.clone(),
+            Dependency::PinSubpackage(pin) => Some(pin.pin_value().name.clone()),
+            Dependency::PinCompatible(pin) => Some(pin.pin_value().name.clone()),
+            Dependency::Git(_) => None,
+            Dependency::Path(path) => path
+                .package_name()
+                .and_then(|name| PackageName::try_from(name).ok()),
+        }
+    }
+}
+
 /// A combination of all possible dependencies.
 #[derive(Debug, Clone)]
 pub enum Dependency {
@@ -250,6 +373,10 @@ pub enum Dependency {
     PinSubpackage(PinSubpackage),
     /// A pin_compatible dependency
     PinCompatible(PinCompatible),
+    /// A git dependency
+    Git(GitDependency),
+    /// A path dependency
+    Path(PathDependency),
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
@@ -302,6 +429,8 @@ impl<'de> Deserialize<'de> for Dependency {
         enum RawDependency {
             PinSubpackage(PinSubpackage),
             PinCompatible(PinCompatible),
+            Git(GitDependency),
+            Path(PathDependency),
         }
 
         #[derive(Deserialize)]
@@ -317,6 +446,8 @@ impl<'de> Deserialize<'de> for Dependency {
             RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
+            RawSpec::Explicit(RawDependency::Git(dep)) => Dependency::Git(dep),
+            RawSpec::Explicit(RawDependency::Path(dep)) => Dependency::Path(dep),
         })
     }
 }
@@ -331,6 +462,8 @@ impl Serialize for Dependency {
         enum RawDependency<'a> {
             PinSubpackage(&'a PinSubpackage),
             PinCompatible(&'a PinCompatible),
+            Git(&'a GitDependency),
+            Path(&'a PathDependency),
         }
 
         #[derive(Serialize)]
@@ -344,6 +477,8 @@ impl Serialize for Dependency {
             Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
             Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
             Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
+            Dependency::Git(dep) => RawSpec::Explicit(RawDependency::Git(dep)),
+            Dependency::Path(dep) => RawSpec::Explicit(RawDependency::Path(dep)),
         };
 
         raw.serialize(serializer)
@@ -616,6 +751,25 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
     }
 }
 
+// Helper for GitRev string conversion
+impl From<&str> for GitRev {
+    fn from(s: &str) -> Self {
+        match s {
+            "HEAD" => GitRev::Head,
+            s if s.starts_with("refs/tags/") => {
+                GitRev::Tag(s.trim_start_matches("refs/tags/").to_string())
+            }
+            s if s.starts_with("refs/heads/") => {
+                GitRev::Branch(s.trim_start_matches("refs/heads/").to_string())
+            }
+            s if s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit()) => {
+                GitRev::Commit(s.to_string())
+            }
+            s => GitRev::Branch(s.to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
@@ -679,5 +833,76 @@ mod test {
     fn test_deserialize_pin() {
         let pin = "{ pin_subpackage: { name: foo, upper_bound: x.x.x, lower_bound: x.x, exact: true, spec: foo }}";
         let _: Dependency = serde_yaml::from_str(pin).unwrap();
+    }
+
+    #[test]
+    fn test_git_dependency_returns_none() {
+        let git_dep = GitDependency {
+            git: Url::parse("https://github.com/user/repo.git").unwrap(),
+            rev: Some("main".to_string()),
+            subdirectory: None,
+        };
+        assert_eq!(git_dep.package_name(), None);
+    }
+
+    #[test]
+    fn test_path_dependency_package_name() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        fs_err::write(
+            &recipe_path,
+            r#"
+package:
+  name: test-package
+  version: 1.0.0
+"#,
+        )
+        .unwrap();
+
+        let path_dep = PathDependency {
+            path: temp_dir.path().to_path_buf(),
+        };
+
+        assert_eq!(path_dep.package_name(), Some("test-package".to_string()));
+    }
+
+    #[test]
+    fn test_path_dependency_no_recipe() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let path_dep = PathDependency {
+            path: temp_dir.path().to_path_buf(),
+        };
+        assert_eq!(path_dep.package_name(), None);
+    }
+
+    #[test]
+    fn test_path_dependency_invalid_recipe() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        fs_err::write(&recipe_path, "invalid yaml content {{{").unwrap();
+
+        let path_dep = PathDependency {
+            path: temp_dir.path().to_path_buf(),
+        };
+        assert_eq!(path_dep.package_name(), None);
+    }
+
+    #[test]
+    fn test_git_rev_from_str() {
+        assert!(matches!(GitRev::from("HEAD"), GitRev::Head));
+        assert!(matches!(GitRev::from("refs/tags/v1.0.0"), GitRev::Tag(s) if s == "v1.0.0"));
+        assert!(matches!(GitRev::from("refs/heads/main"), GitRev::Branch(s) if s == "main"));
+
+        let commit_sha = "a".repeat(40);
+        assert!(matches!(GitRev::from(commit_sha.as_str()), GitRev::Commit(s) if s == commit_sha));
+        assert!(
+            matches!(GitRev::from("feature-branch"), GitRev::Branch(s) if s == "feature-branch")
+        );
     }
 }

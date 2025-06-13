@@ -9,8 +9,8 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
-    package::RunExportsJson,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, ParseStrictness,
+    Platform, RepoDataRecord, package::RunExportsJson,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,7 @@ use crate::{
         solver::{install_packages, solve_environment},
     },
     run_exports::{RunExportExtractor, RunExportExtractorError},
+    system_tools::SystemTools,
     tool_configuration,
     tool_configuration::Configuration,
 };
@@ -439,6 +440,11 @@ pub struct FinalizedDependencies {
     pub run: FinalizedRunDependencies,
 }
 
+/// Helper function to create a MatchSpec from a package name string
+fn package_name_to_match_spec(name: &str) -> Result<MatchSpec, ResolveError> {
+    MatchSpec::from_str(name, ParseStrictness::Lenient).map_err(ResolveError::MatchSpecParseError)
+}
+
 #[derive(Error, Debug)]
 pub enum ResolveError {
     #[error("Failed to get finalized dependencies")]
@@ -471,81 +477,117 @@ pub enum ResolveError {
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and
 /// compiler dependencies
-pub fn apply_variant(
+pub async fn apply_variant(
     raw_specs: &[Dependency],
     build_configuration: &BuildConfiguration,
+    system_tools: &SystemTools,
     compatibility_specs: &HashMap<PackageName, PackageRecord>,
     build_time: bool,
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
     let subpackages = &build_configuration.subpackages;
 
-    raw_specs
-        .iter()
-        .map(|s| {
-            match s {
-                Dependency::Spec(m) => {
-                    let m = m.clone();
-                    if build_time && m.version.is_none() && m.build.is_none() {
-                        if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
-                                // if the variant starts with an alphanumeric character,
-                                // we have to add a '=' to the version spec
-                                let mut spec = version.to_string();
+    use futures::future::try_join_all;
 
-                                // check if all characters are alphanumeric or ., in that case add
-                                // a '=' to get "startswith" behavior
-                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={spec}");
-                                }
+    let futures = raw_specs.iter().map(|s| async move {
+        match s {
+            Dependency::Spec(m) => {
+                let m = m.clone();
+                if build_time && m.version.is_none() && m.build.is_none() {
+                    if let Some(name) = &m.name {
+                        if let Some(version) = variant.get(&name.into()) {
+                            // if the variant starts with an alphanumeric character,
+                            // we have to add a '=' to the version spec
+                            let mut spec = version.to_string();
 
-                                let variant = name.as_normalized().to_string();
-                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
-                                    ResolveError::VariantSpecParseError(variant.clone(), e)
-                                })?;
-
-                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
-
-                                return Ok(VariantDependency { spec, variant }.into());
+                            // check if all characters are alphanumeric or ., in that case add
+                            // a '=' to get "startswith" behavior
+                            if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                                spec = format!("={spec}");
                             }
+
+                            let variant = name.as_normalized().to_string();
+                            let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
+                                ResolveError::VariantSpecParseError(variant.clone(), e)
+                            })?;
+
+                            let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                            return Ok(VariantDependency { spec, variant }.into());
                         }
                     }
-                    Ok(SourceDependency { spec: m }.into())
                 }
-                Dependency::PinSubpackage(pin) => {
-                    let name = &pin.pin_value().name;
-                    let subpackage = subpackages
-                        .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
-                    let pinned = pin
-                        .pin_value()
-                        .apply(&subpackage.version, &subpackage.build_string)?;
-                    Ok(PinSubpackageDependency {
-                        spec: pinned,
-                        name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
-                    }
-                    .into())
-                }
-                Dependency::PinCompatible(pin) => {
-                    let name = &pin.pin_value().name;
-                    let pin_package = compatibility_specs
-                        .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
-
-                    let pinned = pin
-                        .pin_value()
-                        .apply(&pin_package.version, &pin_package.build)?;
-                    Ok(PinCompatibleDependency {
-                        spec: pinned,
-                        name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
-                    }
-                    .into())
-                }
+                Ok(SourceDependency { spec: m }.into())
             }
-        })
-        .collect()
+            Dependency::PinSubpackage(pin) => {
+                let name = &pin.pin_value().name;
+                let subpackage = subpackages
+                    .get(name)
+                    .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                let pinned = pin
+                    .pin_value()
+                    .apply(&subpackage.version, &subpackage.build_string)?;
+                Ok(PinSubpackageDependency {
+                    spec: pinned,
+                    name: name.as_normalized().to_string(),
+                    args: pin.pin_value().args.clone(),
+                }
+                .into())
+            }
+            Dependency::PinCompatible(pin) => {
+                let name = &pin.pin_value().name;
+                let pin_package = compatibility_specs
+                    .get(name)
+                    .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+
+                let pinned = pin
+                    .pin_value()
+                    .apply(&pin_package.version, &pin_package.build)?;
+                Ok(PinCompatibleDependency {
+                    spec: pinned,
+                    name: name.as_normalized().to_string(),
+                    args: pin.pin_value().args.clone(),
+                }
+                .into())
+            }
+            Dependency::Git(git) => {
+                let cache_dir = &build_configuration
+                    .directories
+                    .build_prefix
+                    .parent()
+                    .unwrap_or(&build_configuration.directories.build_prefix)
+                    .join("src_cache");
+
+                let package_name = git
+                    .fetch_package_name(system_tools, cache_dir)
+                    .await
+                    .map_err(|e| {
+                        ResolveError::DependencyResolutionError(anyhow::anyhow!(
+                            "Failed to process git dependency {}: {}",
+                            git.git,
+                            e
+                        ))
+                    })?;
+
+                let spec = package_name_to_match_spec(package_name.as_normalized())?;
+                Ok(SourceDependency { spec }.into())
+            }
+            Dependency::Path(path) => {
+                let package_name = path.package_name().ok_or_else(|| {
+                    ResolveError::DependencyResolutionError(anyhow::anyhow!(
+                        "Cannot read recipe from path dependency: {}. \
+                         Make sure the path contains a valid recipe.yaml file.",
+                        path.path.display()
+                    ))
+                })?;
+
+                let spec = package_name_to_match_spec(&package_name)?;
+                Ok(SourceDependency { spec }.into())
+            }
+        }
+    });
+
+    try_join_all(futures).await
 }
 
 /// Collect run exports from the package cache and add them to the package
@@ -634,35 +676,73 @@ pub async fn install_environments(
     Ok(())
 }
 
+/// Helper function to render a single run export
+async fn render_single_run_export(
+    run_export: &[Dependency],
+    build_configuration: &BuildConfiguration,
+    system_tools: &SystemTools,
+    compatibility_specs: &HashMap<PackageName, PackageRecord>,
+) -> Result<Vec<String>, ResolveError> {
+    let rendered = apply_variant(
+        run_export,
+        build_configuration,
+        system_tools,
+        compatibility_specs,
+        false,
+    )
+    .await?;
+    Ok(rendered
+        .iter()
+        .map(|dep| dep.spec().to_string())
+        .collect::<Vec<_>>())
+}
+
 /// This function renders the run exports into `RunExportsJson` format
 /// This function applies any variant information or `pin_subpackage`
 /// specifications to the run exports.
-fn render_run_exports(
+async fn render_run_exports(
     output: &Output,
     compatibility_specs: &HashMap<PackageName, PackageRecord>,
 ) -> Result<RunExportsJson, ResolveError> {
-    let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
-        let rendered = apply_variant(
-            run_export,
-            &output.build_configuration,
-            compatibility_specs,
-            false,
-        )?;
-        Ok(rendered
-            .iter()
-            .map(|dep| dep.spec().to_string())
-            .collect::<Vec<_>>())
-    };
-
     let run_exports = output.recipe.requirements().run_exports();
 
     if !run_exports.is_empty() {
         Ok(RunExportsJson {
-            strong: render_run_exports(run_exports.strong())?,
-            weak: render_run_exports(run_exports.weak())?,
-            noarch: render_run_exports(run_exports.noarch())?,
-            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
-            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
+            strong: render_single_run_export(
+                run_exports.strong(),
+                &output.build_configuration,
+                &output.system_tools,
+                compatibility_specs,
+            )
+            .await?,
+            weak: render_single_run_export(
+                run_exports.weak(),
+                &output.build_configuration,
+                &output.system_tools,
+                compatibility_specs,
+            )
+            .await?,
+            noarch: render_single_run_export(
+                run_exports.noarch(),
+                &output.build_configuration,
+                &output.system_tools,
+                compatibility_specs,
+            )
+            .await?,
+            strong_constrains: render_single_run_export(
+                run_exports.strong_constraints(),
+                &output.build_configuration,
+                &output.system_tools,
+                compatibility_specs,
+            )
+            .await?,
+            weak_constrains: render_single_run_export(
+                run_exports.weak_constraints(),
+                &output.build_configuration,
+                &output.system_tools,
+                compatibility_specs,
+            )
+            .await?,
         })
     } else {
         Ok(RunExportsJson::default())
@@ -693,9 +773,11 @@ pub(crate) async fn resolve_dependencies(
         let build_env_specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
+            &output.system_tools,
             &compatibility_specs,
             true,
-        )?;
+        )
+        .await?;
 
         let match_specs = build_env_specs
             .iter()
@@ -751,9 +833,11 @@ pub(crate) async fn resolve_dependencies(
     let mut host_env_specs = apply_variant(
         requirements.host(),
         &output.build_configuration,
+        &output.system_tools,
         &compatibility_specs,
         true,
-    )?;
+    )
+    .await?;
 
     // Apply the strong run exports from the build environment to the host
     // environment
@@ -791,9 +875,11 @@ pub(crate) async fn resolve_dependencies(
         let specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
+            &output.system_tools,
             &compatibility_specs,
             true,
-        )?;
+        )
+        .await?;
         match_specs.extend(specs.iter().map(|s| s.spec().clone()));
     }
 
@@ -846,16 +932,20 @@ pub(crate) async fn resolve_dependencies(
     let mut depends = apply_variant(
         &requirements.run,
         &output.build_configuration,
+        &output.system_tools,
         &compatibility_specs,
         false,
-    )?;
+    )
+    .await?;
 
     let mut constraints = apply_variant(
         &requirements.run_constraints,
         &output.build_configuration,
+        &output.system_tools,
         &compatibility_specs,
         false,
-    )?;
+    )
+    .await?;
 
     // add in dependencies from the finalized cache
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
@@ -883,7 +973,7 @@ pub(crate) async fn resolve_dependencies(
             .collect();
     }
 
-    let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
+    let rendered_run_exports = render_run_exports(output, &compatibility_specs).await?;
 
     let mut host_run_exports = HashMap::new();
 
