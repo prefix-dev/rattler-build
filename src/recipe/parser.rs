@@ -22,10 +22,15 @@ use crate::{
 mod about;
 mod build;
 mod cache;
+mod cache_output;
+mod common_output;
 mod glob_vec;
 mod helper;
 mod output;
+mod output_v2;
+mod output_with_inherit;
 mod package;
+mod parsing_utils;
 mod regex;
 mod requirements;
 mod script;
@@ -37,9 +42,18 @@ pub use self::{
     about::About,
     build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
+    cache_output::{CacheBuild, CacheOutput, CacheRequirements},
+    common_output::{ALLOWED_KEYS_MULTI_OUTPUTS, DEEP_MERGE_KEYS, InheritSpec},
     glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
+    output_v2::{find_outputs_v2, resolve_inheritance},
+    output_with_inherit::{OutputType, OutputWithInherit},
     package::{OutputPackage, Package},
+    parsing_utils::{
+        StandardTryConvert, invalid_field_error, missing_field_error, parse_bool,
+        parse_optional_string, parse_required_string, validate_mapping_keys,
+        validate_multi_output_root_keys,
+    },
     regex::SerializableRegex,
     requirements::{
         Dependency, IgnoreRunExports, Language, PinCompatible, PinSubpackage, Requirements,
