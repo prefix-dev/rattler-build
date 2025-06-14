@@ -26,7 +26,7 @@ pub struct CacheOutput {
     /// Sources for this cache output
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
-    /// Build configuration for the cache  
+    /// Build configuration for the cache
     pub build: CacheBuild,
     /// Requirements for building the cache (only build and host allowed)
     pub requirements: CacheRequirements,
