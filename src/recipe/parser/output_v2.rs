@@ -16,7 +16,7 @@ use super::common_output::{
     merge_rendered_mapping_if_not_exists, parse_root_as_mapping_rendered,
     validate_outputs_sequence_rendered,
 };
-use super::output_with_inherit::{OutputType, OutputWithInherit};
+use super::output_parser::{Output, OutputType};
 
 /// Convert a vector of PartialParsingError to a single ParsingError
 fn convert_errors<S: SourceCode>(errors: Vec<PartialParsingError>, src: S) -> ParsingError<S> {
@@ -192,11 +192,8 @@ pub fn find_outputs_v2<S: SourceCode>(src: S) -> Result<Vec<OutputType>, Parsing
             }
 
             let processed_output_node = RenderedNode::from(processed_map);
-            let output_with_inherit: OutputWithInherit =
-                match TryConvertNode::<OutputWithInherit>::try_convert(
-                    &processed_output_node,
-                    "output",
-                ) {
+            let output_with_inherit: Output =
+                match TryConvertNode::<Output>::try_convert(&processed_output_node, "output") {
                     Ok(output) => output,
                     Err(err) => return Err(convert_errors(err, src.clone())),
                 };
@@ -324,6 +321,17 @@ outputs:
         assert!(matches!(&outputs[0], OutputType::Cache(_)));
         assert!(matches!(&outputs[1], OutputType::Package(_)));
         assert!(matches!(&outputs[2], OutputType::Package(_)));
+
+        // Check that packages have the cache in their caches list (inheritance is already resolved in find_outputs_v2)
+        if let OutputType::Package(pkg) = &outputs[1] {
+            assert_eq!(pkg.caches.len(), 1);
+            assert_eq!(pkg.caches[0].name, "foo-cache");
+        }
+
+        if let OutputType::Package(pkg) = &outputs[2] {
+            assert_eq!(pkg.caches.len(), 1);
+            assert_eq!(pkg.caches[0].name, "foo-cache");
+        }
     }
 
     #[test]

@@ -9,12 +9,13 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::cache_output::CacheOutput;
 use super::common_output::InheritSpec;
 use super::{About, Build, OutputPackage, Requirements, Source, TestType};
 
 /// An output that can inherit from a cache
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputWithInherit {
+pub struct Output {
     /// Package information for this output
     pub package: OutputPackage,
 
@@ -41,6 +42,10 @@ pub struct OutputWithInherit {
     /// About information
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub about: Option<About>,
+
+    /// List of caches that this output depends on (in the right order)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub caches: Vec<CacheOutput>,
 }
 
 /// Represents the type of output in a multi-output recipe
@@ -48,9 +53,9 @@ pub struct OutputWithInherit {
 #[serde(untagged)]
 pub enum OutputType {
     /// A cache output that produces intermediate artifacts
-    Cache(Box<super::cache_output::CacheOutput>),
+    Cache(Box<CacheOutput>),
     /// A regular package output that may inherit from cache
-    Package(Box<OutputWithInherit>),
+    Package(Box<Output>),
 }
 
 impl TryConvertNode<OutputType> for RenderedNode {
@@ -83,16 +88,16 @@ impl TryConvertNode<OutputType> for RenderedNode {
     }
 }
 
-impl TryConvertNode<OutputWithInherit> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<OutputWithInherit, Vec<PartialParsingError>> {
+impl TryConvertNode<Output> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Output, Vec<PartialParsingError>> {
         self.as_mapping()
             .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
-impl TryConvertNode<OutputWithInherit> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<OutputWithInherit, Vec<PartialParsingError>> {
+impl TryConvertNode<Output> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<Output, Vec<PartialParsingError>> {
         let mut package = None;
         let mut inherit = None;
         let mut source = Vec::new();
@@ -141,7 +146,7 @@ impl TryConvertNode<OutputWithInherit> for RenderedMappingNode {
             )]
         })?;
 
-        Ok(OutputWithInherit {
+        Ok(Output {
             package,
             inherit,
             source,
@@ -149,18 +154,19 @@ impl TryConvertNode<OutputWithInherit> for RenderedMappingNode {
             requirements,
             tests,
             about,
+            caches: Vec::new(), // Caches will be populated during inheritance resolution
         })
     }
 }
 
-impl OutputWithInherit {
+impl Output {
     /// Check if this output inherits from top-level
     pub fn inherits_from_toplevel(&self) -> bool {
         self.inherit.is_none()
     }
 
     /// Apply inheritance from a cache output
-    pub fn apply_cache_inheritance(&mut self, cache: &super::cache_output::CacheOutput) {
+    pub fn apply_cache_inheritance(&mut self, cache: &CacheOutput) {
         let script_backup = self.build.script.clone();
         self.build.script = script_backup;
 
@@ -172,5 +178,8 @@ impl OutputWithInherit {
                 }
             }
         }
+
+        // Add the cache to the list of dependencies
+        self.caches.push(cache.clone());
     }
 }

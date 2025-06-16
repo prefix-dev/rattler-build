@@ -27,8 +27,8 @@ mod common_output;
 mod glob_vec;
 mod helper;
 mod output;
+mod output_parser;
 mod output_v2;
-mod output_with_inherit;
 mod package;
 mod parsing_utils;
 mod regex;
@@ -46,8 +46,8 @@ pub use self::{
     common_output::{ALLOWED_KEYS_MULTI_OUTPUTS, DEEP_MERGE_KEYS, InheritSpec},
     glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
+    output_parser::{Output, OutputType},
     output_v2::{find_outputs_v2, resolve_inheritance},
-    output_with_inherit::{OutputType, OutputWithInherit},
     package::{OutputPackage, Package},
     parsing_utils::{
         StandardTryConvert, invalid_field_error, missing_field_error, parse_bool,

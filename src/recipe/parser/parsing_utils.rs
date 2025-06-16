@@ -2,7 +2,7 @@
 //!
 //! This module provides shared functionality for parsing YAML nodes into
 //! strongly-typed structures, reducing duplication across cache_output.rs,
-//! output_with_inherit.rs, and other parsing modules.
+//! output_parser.rs, and other parsing modules.
 
 use crate::{
     _partialerror,
@@ -14,7 +14,7 @@ use crate::{
 
 /// A trait for types that can be parsed from a RenderedNode using a standard pattern
 pub trait StandardTryConvert: Sized {
-    /// The name to use in error messages (e.g., "CacheOutput", "OutputWithInherit")
+    /// The name to use in error messages (e.g., "CacheOutput", "Output")
     const TYPE_NAME: &'static str;
 
     /// Convert from a RenderedMappingNode
