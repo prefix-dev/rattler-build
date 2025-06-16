@@ -1,8 +1,8 @@
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
+use serde_with::{OneOrMany, serde_as};
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use super::write_recipe;
 use crate::recipe_generator::serialize::{self, ScriptTest, SourceElement, Test};
@@ -38,8 +38,19 @@ struct CpanRelease {
     author: String,
     distribution: String,
     name: String,
+    r#abstract: Option<String>,
+    license: Option<Vec<String>>,
+    metadata: Option<CpanReleaseMetadata>,
+    resources: Option<CpanResources>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+struct CpanReleaseMetadata {
+    resources: Option<CpanResources>,
+    author: Option<Vec<String>>,
+}
+
+#[serde_as]
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
 struct CpanModule {
@@ -47,25 +58,12 @@ struct CpanModule {
     version: Option<String>,
     documentation: Option<String>,
     r#abstract: Option<String>,
+    #[serde_as(as = "OneOrMany<_>")]
     author: Vec<String>,
     authorized: bool,
     indexed: bool,
     status: String,
     distribution: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-struct CpanDistribution {
-    name: String,
-    version: String,
-    r#abstract: Option<String>,
-    author: Vec<String>,
-    license: Vec<String>,
-    resources: Option<CpanResources>,
-    dependency: Option<Vec<CpanDependency>>,
-    #[serde(rename = "provides")]
-    modules: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -92,14 +90,6 @@ struct CpanBugtracker {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct CpanDependency {
-    module: String,
-    phase: String,
-    relationship: String,
-    version: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
 struct MetaCpanResponse<T> {
     hits: MetaCpanHits<T>,
 }
@@ -120,31 +110,12 @@ struct MetaCpanHit<T> {
 #[derive(Debug, Clone)]
 pub struct CpanMetadata {
     release: CpanRelease,
-    distribution: Option<CpanDistribution>,
+    #[allow(dead_code)]
     modules: Vec<CpanModule>,
 }
 
 fn format_perl_package_name(name: &str) -> String {
     format!("perl-{}", name.to_lowercase().replace("::", "-"))
-}
-
-fn format_perl_dependency(dep: &CpanDependency) -> Option<String> {
-    // Skip perl core modules and development dependencies
-    if dep.phase == "develop" || dep.phase == "x_Dist_Zilla" {
-        return None;
-    }
-
-    let package_name = format_perl_package_name(&dep.module);
-
-    if let Some(version) = &dep.version {
-        if version == "0" || version.is_empty() {
-            Some(package_name)
-        } else {
-            Some(format!("{} >={}", package_name, version))
-        }
-    } else {
-        Some(package_name)
-    }
 }
 
 fn map_perl_license(licenses: &[String]) -> Option<String> {
@@ -192,7 +163,7 @@ async fn fetch_cpan_metadata(
     opts: &CpanOpts,
     client: &reqwest::Client,
 ) -> miette::Result<CpanMetadata> {
-    // First, get the release information
+    // First, try to get the release information assuming it's a distribution name
     let release_url = if let Some(version) = &opts.version {
         format!(
             "https://fastapi.metacpan.org/v1/release/{}/{}",
@@ -202,26 +173,67 @@ async fn fetch_cpan_metadata(
         format!("https://fastapi.metacpan.org/v1/release/{}", opts.package)
     };
 
-    let release: CpanRelease = client
-        .get(&release_url)
-        .send()
-        .await
-        .into_diagnostic()
-        .wrap_err("Failed to fetch release information")?
-        .json()
-        .await
-        .into_diagnostic()
-        .wrap_err("Failed to parse release response")?;
+    let release_response = client.get(&release_url).send().await.into_diagnostic()?;
 
-    // Get distribution information
-    let dist_url = format!(
-        "https://fastapi.metacpan.org/v1/distribution/{}",
-        release.distribution
-    );
+    let release: CpanRelease = if release_response.status().is_success() {
+        release_response
+            .json()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to parse release response")?
+    } else {
+        // If release lookup failed, it might be a module name instead of distribution name
+        // Try to find the distribution that contains this module
+        let module_url = format!("https://fastapi.metacpan.org/v1/module/{}", opts.package);
+        let module_response = client
+            .get(&module_url)
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to fetch module information")?;
 
-    let distribution: Option<CpanDistribution> = match client.get(&dist_url).send().await {
-        Ok(resp) => resp.json().await.ok(),
-        Err(_) => None,
+        if !module_response.status().is_success() {
+            return Err(miette::miette!(
+                "Cannot find distribution or module named '{}'. Check if the name is correct.",
+                opts.package
+            ));
+        }
+
+        // Parse the module response to get the distribution name
+        let module_data: serde_json::Value = module_response
+            .json()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to parse module response")?;
+
+        let distribution_name = module_data
+            .get("distribution")
+            .and_then(|d| d.as_str())
+            .ok_or_else(|| miette::miette!("Module response missing distribution field"))?;
+
+        // Now fetch the release using the correct distribution name
+        let dist_release_url = if let Some(version) = &opts.version {
+            format!(
+                "https://fastapi.metacpan.org/v1/release/{}/{}",
+                distribution_name, version
+            )
+        } else {
+            format!(
+                "https://fastapi.metacpan.org/v1/release/{}",
+                distribution_name
+            )
+        };
+
+        client
+            .get(&dist_release_url)
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to fetch release information for distribution")?
+            .json()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to parse distribution release response")?
     };
 
     // Get modules in this distribution
@@ -248,11 +260,7 @@ async fn fetch_cpan_metadata(
         .map(|hit| hit.source)
         .collect();
 
-    Ok(CpanMetadata {
-        release,
-        distribution,
-        modules,
-    })
+    Ok(CpanMetadata { release, modules })
 }
 
 pub async fn create_cpan_recipe(
@@ -262,7 +270,7 @@ pub async fn create_cpan_recipe(
     let mut recipe = serialize::Recipe::default();
 
     // Set package name and version
-    recipe.package.name = format_perl_package_name(&metadata.release.name);
+    recipe.package.name = format_perl_package_name(&metadata.release.distribution);
     recipe.package.version = metadata.release.version.clone();
 
     // Add version to context
@@ -279,7 +287,6 @@ pub async fn create_cpan_recipe(
     recipe.source.push(source);
 
     // Set build requirements
-    recipe.requirements.build.push("perl".to_string());
     recipe.requirements.build.push("make".to_string());
 
     // Host requirements
@@ -288,31 +295,7 @@ pub async fn create_cpan_recipe(
     // Runtime requirements
     recipe.requirements.run.push("perl".to_string());
 
-    // Add dependencies
-    if let Some(dist) = &metadata.distribution {
-        if let Some(dependencies) = &dist.dependency {
-            for dep in dependencies {
-                if let Some(formatted_dep) = format_perl_dependency(dep) {
-                    match (dep.phase.as_str(), dep.relationship.as_str()) {
-                        ("configure", "requires") | ("build", "requires") => {
-                            recipe.requirements.build.push(formatted_dep);
-                        }
-                        ("runtime", "requires") => {
-                            recipe.requirements.run.push(formatted_dep);
-                        }
-                        ("test", "requires") => {
-                            // Add test dependencies as comments
-                            recipe
-                                .requirements
-                                .run
-                                .push(format!("# test: {}", formatted_dep));
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
+    // TODO: Add dependencies parsing from release.dependency if needed
 
     // Set build script
     recipe.build.script = r#"perl Makefile.PL INSTALLDIRS=vendor
@@ -320,26 +303,90 @@ make
 make install"#
         .to_string();
 
-    // Set metadata
-    if let Some(dist) = &metadata.distribution {
-        recipe.about.summary = dist.r#abstract.clone();
-        recipe.about.license = map_perl_license(&dist.license);
+    // Detect if package should be noarch
+    // Most Perl packages are noarch unless they contain XS (C extensions)
+    // Heuristics: check if package name contains common XS indicators
+    let package_name = &metadata.release.distribution;
+    let is_likely_xs = package_name.contains("XS") || 
+                      package_name.contains("Fast") ||
+                      package_name.contains("DB") ||
+                      package_name.contains("Crypt") ||
+                      // Add more XS indicators as needed
+                      false;
 
-        if let Some(resources) = &dist.resources {
-            recipe.about.homepage = resources.homepage.clone();
-            if let Some(repo) = &resources.repository {
-                recipe.about.repository = repo.web.clone().or_else(|| repo.url.clone());
+    if !is_likely_xs {
+        recipe.build.noarch = Some("generic".to_string());
+    }
+
+    // Set metadata from release
+    if let Some(abstract_text) = &metadata.release.r#abstract {
+        recipe.about.summary = Some(abstract_text.clone());
+    }
+
+    if let Some(licenses) = &metadata.release.license {
+        recipe.about.license = map_perl_license(licenses);
+    }
+
+    // Get resources from release metadata or top-level
+    let resources = metadata.release.resources.as_ref().or_else(|| {
+        metadata
+            .release
+            .metadata
+            .as_ref()
+            .and_then(|m| m.resources.as_ref())
+    });
+
+    if let Some(resources) = resources {
+        recipe.about.homepage = resources.homepage.clone();
+        if let Some(repo) = &resources.repository {
+            recipe.about.repository = repo.web.clone().or_else(|| repo.url.clone());
+        }
+
+        // Add bugtracker URL if available
+        if let Some(bugtracker) = &resources.bugtracker {
+            if recipe.about.repository.is_none() {
+                recipe.about.repository = bugtracker.web.clone();
             }
         }
     }
 
-    // Add basic test
-    let main_module = metadata
-        .modules
-        .iter()
-        .find(|m| m.name == metadata.release.name)
-        .map(|m| m.name.clone())
-        .unwrap_or_else(|| metadata.release.name.clone());
+    // Add author information
+    if let Some(metadata) = &metadata.release.metadata {
+        if let Some(authors) = &metadata.author {
+            if !authors.is_empty() {
+                let authors_str = authors.join(", ");
+                recipe.about.description = Some(format!("By {}", authors_str));
+            }
+        }
+    }
+
+    // Add additional metadata from modules if not already set
+    if !metadata.modules.is_empty() {
+        let main_module = &metadata.modules[0];
+        if recipe.about.summary.is_none() && main_module.r#abstract.is_some() {
+            recipe.about.summary = main_module.r#abstract.clone();
+        }
+
+        if let Some(doc) = &main_module.documentation {
+            // Convert module documentation to MetaCPAN URL
+            recipe.about.documentation = Some(format!(
+                "https://metacpan.org/pod/{}",
+                doc.replace("::", "%3A%3A")
+            ));
+        }
+    }
+
+    // Set homepage to MetaCPAN page if not already set
+    if recipe.about.homepage.is_none() {
+        recipe.about.homepage = Some(format!(
+            "https://metacpan.org/release/{}/{}",
+            metadata.release.author, metadata.release.name
+        ));
+    }
+
+    // Add basic test - for simplicity, just use the distribution name converted to module format
+    // This works for most cases: DBI -> DBI, Perl-Tidy -> Perl::Tidy, etc.
+    let main_module = metadata.release.distribution.replace("-", "::");
 
     recipe.tests.push(Test::Script(ScriptTest {
         script: vec![format!(
@@ -381,24 +428,8 @@ pub async fn generate_cpan_recipe(opts: &CpanOpts) -> miette::Result<()> {
     }
 
     if opts.tree {
-        if let Some(dist) = &metadata.distribution {
-            if let Some(dependencies) = &dist.dependency {
-                for dep in dependencies {
-                    if dep.phase == "runtime" && dep.relationship == "requires" {
-                        let dep_name = dep.module.replace("::", "-");
-                        if !PathBuf::from(format_perl_package_name(&dep_name)).exists() {
-                            let child_opts = CpanOpts {
-                                package: dep.module.clone(),
-                                version: None,
-                                write: opts.write,
-                                tree: false, // Avoid infinite recursion
-                            };
-                            generate_cpan_recipe(&child_opts).await?;
-                        }
-                    }
-                }
-            }
-        }
+        // TODO: Implement dependency tree generation
+        eprintln!("Warning: --tree option not yet implemented for CPAN packages");
     }
 
     Ok(())
