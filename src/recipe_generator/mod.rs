@@ -1,11 +1,12 @@
-//! Module for generating recipes for Python (PyPI) or R (CRAN) packages
+//! Module for generating recipes for Python (PyPI), R (CRAN), or Perl (CPAN) packages
 use clap::Parser;
 
+mod cpan;
 mod cran;
-
 mod pypi;
 mod serialize;
 
+use cpan::{CpanOpts, generate_cpan_recipe};
 use cran::{CranOpts, generate_r_recipe};
 use pypi::PyPIOpts;
 pub use serialize::write_recipe;
@@ -20,6 +21,9 @@ pub enum Source {
 
     /// Generate a recipe for an R package from CRAN
     Cran(CranOpts),
+
+    /// Generate a recipe for a Perl package from CPAN
+    Cpan(CpanOpts),
 }
 
 /// Options for generating a recipe
@@ -35,6 +39,7 @@ pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
     match args.source {
         Source::Pypi(opts) => generate_pypi_recipe(&opts).await?,
         Source::Cran(opts) => generate_r_recipe(&opts).await?,
+        Source::Cpan(opts) => generate_cpan_recipe(&opts).await?,
     }
 
     Ok(())
