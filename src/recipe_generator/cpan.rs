@@ -5,7 +5,7 @@ use serde_with::{OneOrMany, serde_as};
 use std::collections::HashMap;
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{self, ScriptTest, SourceElement, Test};
+use crate::recipe_generator::serialize::{self, ScriptTest, Test, UrlSourceElement};
 
 #[derive(Debug, Clone, Parser)]
 pub struct CpanOpts {
@@ -279,12 +279,12 @@ pub async fn create_cpan_recipe(
         .insert("version".to_string(), metadata.release.version.clone());
 
     // Set source
-    let source = SourceElement {
+    let source = UrlSourceElement {
         url: vec![metadata.release.download_url.clone()],
         sha256: metadata.release.checksum_sha256.clone(),
         md5: metadata.release.checksum_md5.clone(),
     };
-    recipe.source.push(source);
+    recipe.source.push(source.into());
 
     // Set build requirements
     recipe.requirements.build.push("make".to_string());

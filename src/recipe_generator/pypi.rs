@@ -8,7 +8,9 @@ use std::path::PathBuf;
 use zip::ZipArchive;
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{self, PythonTest, PythonTestInner, Test};
+use crate::recipe_generator::serialize::{
+    self, PythonTest, PythonTestInner, Test, UrlSourceElement,
+};
 
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
@@ -357,11 +359,14 @@ pub async fn create_recipe(
         metadata.release.url.clone()
     };
 
-    recipe.source.push(serialize::SourceElement {
-        url: vec![release_url.replace(metadata.info.version.as_str(), "${{ version }}")],
-        sha256: metadata.release.digests.get("sha256").cloned(),
-        md5: None,
-    });
+    recipe.source.push(
+        UrlSourceElement {
+            url: vec![release_url.replace(metadata.info.version.as_str(), "${{ version }}")],
+            sha256: metadata.release.digests.get("sha256").cloned(),
+            md5: None,
+        }
+        .into(),
+    );
 
     if let Some(wheel_url) = &metadata.wheel_url {
         if let Some(entry_points) = extract_entry_points_from_wheel(wheel_url, client).await? {

@@ -8,7 +8,8 @@ use rattler_conda_types::PackageName;
 use serde::Deserialize;
 
 use crate::recipe_generator::serialize::{
-    About, Build, Requirements, SourceElement, Test, ScriptTest, write_recipe, Recipe, Python,
+    About, Build, GitSourceElement, Python, Recipe, Requirements, ScriptTest, SourceElement, Test,
+    UrlSourceElement, write_recipe,
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -26,34 +27,7 @@ pub struct LuarocksOpts {
     pub write_to: PathBuf,
 }
 
-const LUAROCKS_API_URL: &str = "https://luarocks.org/modules";
-
-#[derive(Debug, Deserialize)]
-pub struct LuarocksManifest {
-    pub version: String,
-    pub arch: String,
-    pub dependencies: BTreeMap<String, String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LuarocksModule {
-    pub module: String,
-    pub name: String,
-    pub summary: String,
-    pub description: Option<String>,
-    pub homepage: Option<String>,
-    pub license: Option<String>,
-    pub maintainer: Option<String>,
-    pub versions: Vec<LuarocksVersion>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LuarocksVersion {
-    pub version: String,
-    pub rockspec_url: String,
-    pub source_url: Option<String>,
-}
-
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct LuarocksRockspec {
     pub package: String,
@@ -64,6 +38,7 @@ pub struct LuarocksRockspec {
     pub build: Option<RockspecBuild>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct RockspecSource {
     pub url: String,
@@ -75,6 +50,7 @@ pub struct RockspecSource {
     pub branch: Option<String>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct RockspecDescription {
     pub summary: Option<String>,
@@ -84,6 +60,7 @@ pub struct RockspecDescription {
     pub maintainer: Option<String>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct RockspecBuild {
     #[serde(rename = "type")]
@@ -105,12 +82,15 @@ pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()>
                 return fetch_and_generate_from_module(module, None, opts).await;
             }
             [module, version] => {
-                // Module and version  
+                // Module and version
                 return fetch_and_generate_from_module(module, Some(version), opts).await;
             }
             [author, module, version] => {
                 // Construct direct rockspec URL
-                format!("https://luarocks.org/manifests/{}/{}-{}.rockspec", author, module, version)
+                format!(
+                    "https://luarocks.org/manifests/{}/{}-{}.rockspec",
+                    author, module, version
+                )
             }
             _ => {
                 return Err(miette::miette!(
@@ -154,19 +134,24 @@ async fn fetch_and_generate_from_module(
         .into_diagnostic()?;
 
     // Extract the first module link from search results
-    let module_link_pattern = regex::Regex::new(r#"<a class="title" href="/modules/([^/]+)/([^"]+)">([^<]+)</a>"#)
-        .unwrap();
-    
+    let module_link_pattern =
+        regex::Regex::new(r#"<a class="title" href="/modules/([^/]+)/([^"]+)">([^<]+)</a>"#)
+            .unwrap();
+
     let module_match = module_link_pattern
         .captures(&response)
         .ok_or_else(|| miette::miette!("Module '{}' not found on LuaRocks", module))?;
-    
+
     let author = &module_match[1];
     let found_module = &module_match[2];
-    
+
     // Verify this is the module we're looking for
     if found_module != module {
-        return Err(miette::miette!("Expected module '{}' but found '{}'", module, found_module));
+        return Err(miette::miette!(
+            "Expected module '{}' but found '{}'",
+            module,
+            found_module
+        ));
     }
 
     // Get the module page to find versions
@@ -179,9 +164,9 @@ async fn fetch_and_generate_from_module(
         .into_diagnostic()?;
 
     // Extract version information
-    let version_pattern = regex::Regex::new(r#"<a href="/modules/[^/]+/[^/]+/([^"]+)">([^<]+)</a>"#)
-        .unwrap();
-    
+    let version_pattern =
+        regex::Regex::new(r#"<a href="/modules/[^/]+/[^/]+/([^"]+)">([^<]+)</a>"#).unwrap();
+
     let target_version = if let Some(v) = version {
         v.to_string()
     } else {
@@ -197,11 +182,14 @@ async fn fetch_and_generate_from_module(
                 }
             })
             .collect();
-        
+
         if versions.is_empty() {
-            return Err(miette::miette!("No stable versions found for module '{}'", module));
+            return Err(miette::miette!(
+                "No stable versions found for module '{}'",
+                module
+            ));
         }
-        
+
         // Take the first version (should be latest)
         versions.into_iter().next().unwrap()
     };
@@ -251,9 +239,10 @@ fn parse_rockspec(content: &str) -> miette::Result<LuarocksRockspec> {
 
 fn parse_rockspec_with_lua(content: &str) -> miette::Result<LuarocksRockspec> {
     use std::process::Command;
-    
+
     // Create a Lua script that loads the rockspec and outputs JSON
-    let lua_script = format!(r#"
+    let lua_script = format!(
+        r#"
 -- Load the rockspec
 {}
 
@@ -285,30 +274,32 @@ if result.dependencies then
     end
 end
 print("ROCKSPEC_END")
-"#, content);
+"#,
+        content
+    );
 
     // Write Lua script to temporary file
     let temp_file = std::env::temp_dir().join(format!("rockspec_{}.lua", std::process::id()));
     std::fs::write(&temp_file, lua_script).into_diagnostic()?;
-    
+
     // Execute Lua
     let output = Command::new("lua")
         .arg(&temp_file)
         .output()
         .into_diagnostic()?;
-    
+
     // Clean up temp file
     let _ = std::fs::remove_file(&temp_file);
-    
+
     if !output.status.success() {
         return Err(miette::miette!(
             "Lua execution failed: {}",
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    
+
     let output_str = String::from_utf8_lossy(&output.stdout);
-    
+
     // Parse the output
     let mut rockspec = LuarocksRockspec {
         package: String::new(),
@@ -332,7 +323,7 @@ print("ROCKSPEC_END")
         dependencies: Vec::new(),
         build: None,
     };
-    
+
     let mut in_rockspec_section = false;
     for line in output_str.lines() {
         if line == "ROCKSPEC_START" {
@@ -345,62 +336,121 @@ print("ROCKSPEC_END")
         if !in_rockspec_section {
             continue;
         }
-        
+
         if let Some((key, value)) = line.split_once('=') {
             match key {
                 "package" => rockspec.package = value.to_string(),
                 "version" => rockspec.version = value.to_string(),
                 "source_url" => rockspec.source.url = value.to_string(),
-                "source_tag" => if !value.is_empty() { rockspec.source.tag = Some(value.to_string()); },
-                "source_branch" => if !value.is_empty() { rockspec.source.branch = Some(value.to_string()); },
-                "source_md5" => if !value.is_empty() { rockspec.source.md5 = Some(value.to_string()); },
-                "source_sha256" => if !value.is_empty() { rockspec.source.sha256 = Some(value.to_string()); },
-                "desc_summary" => if !value.is_empty() { rockspec.description.summary = Some(value.trim().to_string()); },
-                "desc_detailed" => if !value.is_empty() { 
-                    // Clean up multiline descriptions by normalizing whitespace
-                    let cleaned = value.lines()
-                        .map(|line| line.trim())
-                        .filter(|line| !line.is_empty())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    if !cleaned.is_empty() {
-                        rockspec.description.detailed = Some(cleaned);
+                "source_tag" => {
+                    if !value.is_empty() {
+                        rockspec.source.tag = Some(value.to_string());
                     }
-                },
-                "desc_homepage" => if !value.is_empty() { rockspec.description.homepage = Some(value.to_string()); },
-                "desc_license" => if !value.is_empty() { rockspec.description.license = Some(value.to_string()); },
+                }
+                "source_branch" => {
+                    if !value.is_empty() {
+                        rockspec.source.branch = Some(value.to_string());
+                    }
+                }
+                "source_md5" => {
+                    if !value.is_empty() {
+                        rockspec.source.md5 = Some(value.to_string());
+                    }
+                }
+                "source_sha256" => {
+                    if !value.is_empty() {
+                        rockspec.source.sha256 = Some(value.to_string());
+                    }
+                }
+                "desc_summary" => {
+                    if !value.is_empty() {
+                        rockspec.description.summary = Some(value.trim().to_string());
+                    }
+                }
+                "desc_detailed" => {
+                    if !value.is_empty() {
+                        // Clean up multiline descriptions by normalizing whitespace
+                        let cleaned = value
+                            .lines()
+                            .map(|line| line.trim())
+                            .filter(|line| !line.is_empty())
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        if !cleaned.is_empty() {
+                            rockspec.description.detailed = Some(cleaned);
+                        }
+                    }
+                }
+                "desc_homepage" => {
+                    if !value.is_empty() {
+                        rockspec.description.homepage = Some(value.to_string());
+                    }
+                }
+                "desc_license" => {
+                    if !value.is_empty() {
+                        rockspec.description.license = Some(value.to_string());
+                    }
+                }
                 "dependency" => rockspec.dependencies.push(value.to_string()),
                 _ => {}
             }
         }
     }
-    
+
     Ok(rockspec)
 }
 
-
+/// Check if a URL is a git repository URL
+fn is_git_url(url: &str) -> bool {
+    url.contains("git+")
+        || url.ends_with(".git")
+        || url.contains("github.com")
+        || url.contains("gitlab.com")
+        || url.contains("bitbucket.org")
+        || url.starts_with("git://")
+        || url.starts_with("git@")
+}
 
 fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
     let package_name = normalize_lua_name(&rockspec.package)?;
-    
+
     // Extract version without rockspec suffix
-    let version = rockspec.version.split('-').next().unwrap_or(&rockspec.version);
+    let version = rockspec
+        .version
+        .split('-')
+        .next()
+        .unwrap_or(&rockspec.version);
 
     let mut context = IndexMap::new();
     context.insert("version".to_string(), version.to_string());
     context.insert("name".to_string(), package_name.as_normalized().to_string());
 
+    // Determine source type and create appropriate SourceElement
+    let source_element: SourceElement = if is_git_url(&rockspec.source.url) {
+        // Git source
+        GitSourceElement {
+            git: rockspec.source.url.clone(),
+            branch: rockspec.source.branch.clone(),
+            tag: rockspec.source.tag.clone(),
+        }
+        .into()
+    } else {
+        // Regular URL source
+        UrlSourceElement {
+            url: vec![rockspec.source.url.clone()],
+            md5: rockspec.source.md5.clone(),
+            sha256: rockspec.source.sha256.clone(),
+        }
+        .into()
+    };
+
     let mut recipe = Recipe {
         context,
         package: crate::recipe_generator::serialize::Package {
             name: package_name.as_normalized().to_string(),
-            version: "{{ version }}".to_string(),
+            version: "${{ version }}".to_string(),
         },
-        source: vec![SourceElement {
-            url: vec![rockspec.source.url.clone()],
-            md5: rockspec.source.md5.clone(),
-            sha256: rockspec.source.sha256.clone(),
-        }],
+        source: vec![source_element],
         build: Build {
             script: "luarocks install ${{ name }} ${{ version }} --tree=${{ PREFIX }}".to_string(),
             python: Python::default(),
@@ -412,9 +462,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             run: vec!["lua".to_string()],
         },
         tests: vec![Test::Script(ScriptTest {
-            script: vec![
-                format!("lua -e \"require('{}')\"", rockspec.package),
-            ],
+            script: vec![format!("lua -e \"require('{}')\"", rockspec.package)],
         })],
         about: About {
             homepage: rockspec.description.homepage.clone(),
@@ -433,7 +481,10 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
                 continue;
             }
             let dep_name = normalize_lua_name(dep)?;
-            recipe.requirements.run.push(dep_name.as_normalized().to_string());
+            recipe
+                .requirements
+                .run
+                .push(dep_name.as_normalized().to_string());
         }
     }
 
@@ -442,32 +493,34 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
 
 fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
     // Extract just the package name, removing version constraints and extra whitespace
-    let name_part = name.split_whitespace()
+    let name_part = name
+        .split_whitespace()
         .next()
         .unwrap_or(name)
         .split(&['>', '<', '=', '~'][..])
         .next()
         .unwrap_or(name);
-    
+
     // Clean up the name - keep only alphanumeric, hyphens, and underscores
-    let clean_name: String = name_part.chars()
+    let clean_name: String = name_part
+        .chars()
         .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         .collect::<String>()
         .trim()
         .to_string();
-    
+
     // Don't add lua- prefix for base lua
     if clean_name == "lua" {
         return PackageName::try_from("lua".to_string()).into_diagnostic();
     }
-    
+
     // Convert to conda-friendly name, but don't double-prefix lua-
     let normalized = if clean_name.starts_with("lua-") || clean_name.starts_with("lua_") {
         format!("lua-{}", &clean_name[4..].replace('_', "-").to_lowercase())
     } else {
         format!("lua-{}", clean_name.replace('_', "-").to_lowercase())
     };
-    
+
     PackageName::try_from(normalized).into_diagnostic()
 }
 
@@ -513,21 +566,42 @@ mod tests {
         assert_eq!(map_license(Some("MIT")), Some("MIT".to_string()));
         assert_eq!(map_license(Some("mit")), Some("MIT".to_string()));
         assert_eq!(map_license(Some("MIT/X11")), Some("MIT".to_string()));
-        
+
         assert_eq!(map_license(Some("Apache")), Some("Apache-2.0".to_string()));
-        assert_eq!(map_license(Some("Apache-2.0")), Some("Apache-2.0".to_string()));
-        assert_eq!(map_license(Some("apache 2.0")), Some("Apache-2.0".to_string()));
-        
+        assert_eq!(
+            map_license(Some("Apache-2.0")),
+            Some("Apache-2.0".to_string())
+        );
+        assert_eq!(
+            map_license(Some("apache 2.0")),
+            Some("Apache-2.0".to_string())
+        );
+
         assert_eq!(map_license(Some("BSD")), Some("BSD-3-Clause".to_string()));
-        assert_eq!(map_license(Some("3-clause bsd")), Some("BSD-3-Clause".to_string()));
-        
-        assert_eq!(map_license(Some("GPL")), Some("GPL-2.0-or-later".to_string()));
-        assert_eq!(map_license(Some("GPLv2")), Some("GPL-2.0-or-later".to_string()));
-        assert_eq!(map_license(Some("GPLv3")), Some("GPL-3.0-or-later".to_string()));
-        
+        assert_eq!(
+            map_license(Some("3-clause bsd")),
+            Some("BSD-3-Clause".to_string())
+        );
+
+        assert_eq!(
+            map_license(Some("GPL")),
+            Some("GPL-2.0-or-later".to_string())
+        );
+        assert_eq!(
+            map_license(Some("GPLv2")),
+            Some("GPL-2.0-or-later".to_string())
+        );
+        assert_eq!(
+            map_license(Some("GPLv3")),
+            Some("GPL-3.0-or-later".to_string())
+        );
+
         // Test unmapped license
-        assert_eq!(map_license(Some("Custom License")), Some("Custom License".to_string()));
-        
+        assert_eq!(
+            map_license(Some("Custom License")),
+            Some("Custom License".to_string())
+        );
+
         // Test None
         assert_eq!(map_license(None), None);
     }
@@ -549,14 +623,23 @@ description = {
 dependencies = { "lua >= 5.1" }"#;
 
         let rockspec = parse_rockspec(sample_rockspec).unwrap();
-        
+
         assert_eq!(rockspec.package, "luasocket");
         assert_eq!(rockspec.version, "3.0rc1-2");
-        assert_eq!(rockspec.source.url, "https://github.com/diegonehab/luasocket/archive/v3.0-rc1.tar.gz");
+        assert_eq!(
+            rockspec.source.url,
+            "https://github.com/diegonehab/luasocket/archive/v3.0-rc1.tar.gz"
+        );
         assert_eq!(rockspec.source.md5, Some("abc123".to_string()));
         assert_eq!(rockspec.source.sha256, Some("def456".to_string()));
-        assert_eq!(rockspec.description.summary, Some("Network support for the Lua language".to_string()));
-        assert_eq!(rockspec.description.homepage, Some("http://w3.impa.br/~diego/software/luasocket/".to_string()));
+        assert_eq!(
+            rockspec.description.summary,
+            Some("Network support for the Lua language".to_string())
+        );
+        assert_eq!(
+            rockspec.description.homepage,
+            Some("http://w3.impa.br/~diego/software/luasocket/".to_string())
+        );
         assert_eq!(rockspec.description.license, Some("MIT".to_string()));
         assert_eq!(rockspec.dependencies, vec!["lua >= 5.1"]);
     }
@@ -587,28 +670,53 @@ dependencies = { "lua >= 5.1" }"#;
         };
 
         let recipe = rockspec_to_recipe(&rockspec).unwrap();
-        
+
         assert_eq!(recipe.package.name, "lua-luasocket");
-        assert_eq!(recipe.package.version, "{{ version }}");
+        assert_eq!(recipe.package.version, "${{ version }}");
         assert_eq!(recipe.context.get("version"), Some(&"3.0rc1".to_string()));
-        assert_eq!(recipe.context.get("name"), Some(&"lua-luasocket".to_string()));
-        
+        assert_eq!(
+            recipe.context.get("name"),
+            Some(&"lua-luasocket".to_string())
+        );
+
         assert_eq!(recipe.source.len(), 1);
-        assert_eq!(recipe.source[0].url, vec!["https://github.com/diegonehab/luasocket/archive/v3.0-rc1.tar.gz"]);
-        assert_eq!(recipe.source[0].md5, Some("abc123".to_string()));
-        assert_eq!(recipe.source[0].sha256, Some("def456".to_string()));
-        
-        assert_eq!(recipe.build.script, "luarocks install {{ name }} {{ version }} --tree=$PREFIX");
-        
+        match &recipe.source[0] {
+            SourceElement::Url(url_source) => {
+                assert_eq!(
+                    url_source.url,
+                    vec!["https://github.com/diegonehab/luasocket/archive/v3.0-rc1.tar.gz"]
+                );
+                assert_eq!(url_source.md5, Some("abc123".to_string()));
+                assert_eq!(url_source.sha256, Some("def456".to_string()));
+            }
+            SourceElement::Git(git_source) => {
+                panic!("Expected URL source, got Git source: {:?}", git_source);
+            }
+        }
+
+        assert_eq!(
+            recipe.build.script,
+            "luarocks install ${{ name }} ${{ version }} --tree=${{ PREFIX }}"
+        );
+
         assert!(recipe.requirements.build.contains(&"luarocks".to_string()));
         assert!(recipe.requirements.host.contains(&"lua".to_string()));
         assert!(recipe.requirements.run.contains(&"lua".to_string()));
-        
-        assert_eq!(recipe.about.summary, Some("Network support for the Lua language".to_string()));
-        assert_eq!(recipe.about.description, Some("Detailed description".to_string()));
-        assert_eq!(recipe.about.homepage, Some("http://w3.impa.br/~diego/software/luasocket/".to_string()));
+
+        assert_eq!(
+            recipe.about.summary,
+            Some("Network support for the Lua language".to_string())
+        );
+        assert_eq!(
+            recipe.about.description,
+            Some("Detailed description".to_string())
+        );
+        assert_eq!(
+            recipe.about.homepage,
+            Some("http://w3.impa.br/~diego/software/luasocket/".to_string())
+        );
         assert_eq!(recipe.about.license, Some("MIT".to_string()));
-        
+
         // Check test command
         match &recipe.tests[0] {
             Test::Script(script_test) => {
@@ -634,5 +742,67 @@ dependencies = { "lua >= 5.1" }"#;
             assert!(true);
         }
         // If network fails, we don't fail the test since it's environment dependent
+    }
+
+    #[test]
+    fn test_is_git_url() {
+        // Git URLs that should be detected
+        assert!(is_git_url("https://github.com/user/repo.git"));
+        assert!(is_git_url("https://github.com/user/repo"));
+        assert!(is_git_url("https://gitlab.com/user/repo.git"));
+        assert!(is_git_url("https://bitbucket.org/user/repo"));
+        assert!(is_git_url("git://github.com/user/repo.git"));
+        assert!(is_git_url("git@github.com:user/repo.git"));
+        assert!(is_git_url("git+https://github.com/user/repo.git"));
+
+        // Regular URLs that should not be detected as git
+        assert!(!is_git_url("https://example.com/file.tar.gz"));
+        assert!(!is_git_url(
+            "https://pypi.org/packages/source/p/package/package-1.0.tar.gz"
+        ));
+        assert!(!is_git_url("ftp://ftp.example.com/file.zip"));
+    }
+
+    #[test]
+    fn test_git_source_conversion() {
+        let rockspec = LuarocksRockspec {
+            package: "lua-cjson".to_string(),
+            version: "2.1.0-1".to_string(),
+            source: RockspecSource {
+                url: "https://github.com/mpx/lua-cjson.git".to_string(),
+                md5: None,
+                sha256: None,
+                file: None,
+                dir: None,
+                tag: Some("2.1.0".to_string()),
+                branch: None,
+            },
+            description: RockspecDescription {
+                summary: Some("Fast JSON encoding/parsing".to_string()),
+                detailed: None,
+                homepage: Some("https://github.com/mpx/lua-cjson".to_string()),
+                license: Some("MIT".to_string()),
+                maintainer: None,
+            },
+            dependencies: vec!["lua >= 5.1".to_string()],
+            build: None,
+        };
+
+        let recipe = rockspec_to_recipe(&rockspec).unwrap();
+
+        // Verify git source structure
+        assert_eq!(recipe.source.len(), 1);
+
+        match &recipe.source[0] {
+            SourceElement::Url(_) => panic!("Expected Git source, got URL source"),
+            SourceElement::Git(git_source) => {
+                assert_eq!(
+                    git_source.git,
+                    "https://github.com/mpx/lua-cjson.git".to_string()
+                );
+                assert_eq!(git_source.tag, Some("2.1.0".to_string()));
+                assert!(git_source.branch.is_none());
+            }
+        }
     }
 }
