@@ -30,8 +30,9 @@ tests:
       include:
         - xtensor/xarray.hpp
       files:
-        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
-        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
+        - "**/share/cmake/xtensor/xtensorConfig.cmake"
+        - "**/share/cmake/xtensor/xtensorConfigVersion.cmake"
+
 about:
   homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause

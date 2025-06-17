@@ -58,7 +58,7 @@ pub enum SubCommands {
     Completion(ShellCompletion),
 
     #[cfg(feature = "recipe-generation")]
-    /// Generate a recipe from PyPI or CRAN
+    /// Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
     GenerateRecipe(GenerateRecipeOpts),
 
     /// Handle authentication to external channels
