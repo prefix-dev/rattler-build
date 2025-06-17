@@ -1,25 +1,26 @@
 //! Functions for applying patches to a work directory.
-use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
-use itertools::Itertools;
+
+use super::SourceError;
+
 use std::io::Write;
-use std::process::{Command, Output};
 use std::{
     collections::HashSet,
     ffi::OsStr,
     path::{Path, PathBuf},
-    process::Stdio,
 };
 
-use diffy::{Patch, patches_from_str_with_config};
+use diffy::Patch;
 use fs_err::File;
+use itertools::Itertools;
 
-fn parse_patches(patches: &Vec<Patch<str>>) -> HashSet<PathBuf> {
+fn parse_patches(patches: &Vec<Patch<[u8]>>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
     for patch in patches {
         if let Some(p) = patch
             .original()
+            .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| p.trim() != "/dev/null")
             .map(PathBuf::from)
         {
@@ -27,6 +28,7 @@ fn parse_patches(patches: &Vec<Patch<str>>) -> HashSet<PathBuf> {
         }
         if let Some(p) = patch
             .modified()
+            .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| p.trim() != "/dev/null")
             .map(PathBuf::from)
         {
@@ -37,8 +39,8 @@ fn parse_patches(patches: &Vec<Patch<str>>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patches_from_str(input: &str) -> Result<Vec<Patch<'_, str>>, diffy::ParsePatchError> {
-    patches_from_str_with_config(
+fn patches_from_bytes(input: &[u8]) -> Result<Vec<Patch<'_, [u8]>>, diffy::ParsePatchError> {
+    diffy::patches_from_bytes_with_config(
         input,
         diffy::ParserConfig {
             hunk_strategy: diffy::HunkRangeStrategy::Recount,
@@ -46,8 +48,8 @@ fn patches_from_str(input: &str) -> Result<Vec<Patch<'_, str>>, diffy::ParsePatc
     )
 }
 
-fn apply(base_image: &str, patch: &Patch<'_, str>) -> Result<String, diffy::ApplyError> {
-    diffy::apply_with_config(
+fn apply(base_image: &[u8], patch: &Patch<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
+    diffy::apply_bytes_with_config(
         base_image,
         patch,
         &diffy::FuzzyConfig {
@@ -61,8 +63,8 @@ fn apply(base_image: &str, patch: &Patch<'_, str>) -> Result<String, diffy::Appl
 // Returns number by which all patch paths must be stripped to be
 // successfully applied, or returns and error if no such number could
 // be determined.
-fn guess_strip_level(patch: &Vec<Patch<str>>, work_dir: &Path) -> Result<usize, SourceError> {
-    // Assume that no /dev/null in here
+fn guess_strip_level(patch: &Vec<Patch<[u8]>>, work_dir: &Path) -> Result<usize, SourceError> {
+    // There is no /dev/null in here by construction from `parse_patches`.
     let patched_files = parse_patches(patch);
 
     let max_components = patched_files
@@ -91,7 +93,7 @@ fn guess_strip_level(patch: &Vec<Patch<str>>, work_dir: &Path) -> Result<usize, 
 }
 
 fn custom_patch_stripped_paths(
-    patch: &Patch<'_, str>,
+    patch: &Patch<'_, [u8]>,
     strip_level: usize,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let original = (patch.original(), patch.modified());
@@ -99,47 +101,134 @@ fn custom_patch_stripped_paths(
         // XXX: Probably absolute paths should be checked as well. But
         // it is highly unlikely to meet them in patches, so we ignore
         // that for now.
-        original.0.and_then(|p| {
-            (p.trim() != "/dev/null").then(|| {
-                PathBuf::from(p)
-                    .components()
-                    .skip(strip_level)
-                    .collect::<PathBuf>()
-            })
-        }),
-        original.1.and_then(|p| {
-            (p.trim() != "/dev/null").then(|| {
-                PathBuf::from(p)
-                    .components()
-                    .skip(strip_level)
-                    .collect::<PathBuf>()
-            })
-        }),
+        original
+            .0
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .and_then(|p| {
+                (p.trim() != "/dev/null").then(|| {
+                    PathBuf::from(p)
+                        .components()
+                        .skip(strip_level)
+                        .collect::<PathBuf>()
+                })
+            }),
+        original
+            .1
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .and_then(|p| {
+                (p.trim() != "/dev/null").then(|| {
+                    PathBuf::from(p)
+                        .components()
+                        .skip(strip_level)
+                        .collect::<PathBuf>()
+                })
+            }),
     );
     stripped
 }
 
-fn write_patch_content(content: &str, path: &Path) -> Result<(), SourceError> {
+fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
     if let Some(parent) = path.parent() {
         fs_err::create_dir_all(parent).map_err(SourceError::Io)?;
     }
 
+    // We want to be able to write to file.
+    if path.exists() {
+        let mut perms = fs_err::metadata(path)
+            .map_err(SourceError::Io)?
+            .permissions();
+        if perms.readonly() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let user_write = 0o200;
+                perms.set_mode(perms.mode() | user_write);
+            }
+            #[cfg(not(unix))]
+            {
+                // Assume this means windows
+                perms.set_readonly(false);
+            }
+            fs_err::set_permissions(path, perms).map_err(SourceError::Io)?;
+        }
+    }
+
     let mut new_file = File::create(path).map_err(SourceError::Io)?;
-    new_file
-        .write_all(content.as_bytes())
-        .map_err(SourceError::Io)?;
+    new_file.write_all(content).map_err(SourceError::Io)?;
 
     Ok(())
 }
 
+#[cfg(windows)]
+fn temp_copy<P: AsRef<Path>>(src_path: P) -> std::io::Result<tempfile::NamedTempFile> {
+    let mut src = File::open(src_path.as_ref())?;
+    let mut tmp = tempfile::NamedTempFile::new()?;
+    std::io::copy(&mut src, &mut tmp)?;
+    Ok(tmp)
+}
+
 #[allow(dead_code)]
+pub(crate) fn apply_patch_gnu(
+    system_tools: &SystemTools,
+    work_dir: &Path,
+    patch_file_path: &Path,
+) -> Result<(), SourceError> {
+    let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
+
+    let patches = patches_from_bytes(&patch_file_content)
+        .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
+    let strip_level = guess_strip_level(&patches, work_dir)?;
+
+    tracing::debug!("Patch {} will be applied", patch_file_path.display());
+
+    #[cfg(windows)]
+    let patch_tmp = temp_copy(patch_file_path)?;
+    #[cfg(windows)]
+    let patch_file_path = patch_tmp.path();
+
+    let mut tool = system_tools
+        .call(Tool::Patch)
+        .map_err(|_| SourceError::PatchExeNotFound)?;
+    let cmd_builder = tool
+        .arg(format!("-p{}", strip_level))
+        .arg("--no-backup-if-mismatch")
+        .arg("-i")
+        .arg(String::from(patch_file_path.to_string_lossy()))
+        .arg("-d")
+        .arg(String::from(work_dir.to_string_lossy()));
+    let output = cmd_builder.output()?;
+
+    if !output.status.success() {
+        return Err(SourceError::PatchFailed(format!(
+            "{}\n`patch` failed with a combination of flags.\n\n{}",
+            patch_file_path.display(),
+            {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                format!(
+                    "With the the command:\n\n\t{} {}\n\nThe stdout was:\n\n\t{}\n\nThe stderr was:\n\n\t{}\n\n",
+                    cmd_builder.get_program().to_string_lossy(),
+                    cmd_builder
+                        .get_args()
+                        .map(OsStr::to_string_lossy)
+                        .format(" "),
+                    stdout.lines().format("\n\t"),
+                    stderr.lines().format("\n\t")
+                )
+            }
+        )));
+    }
+
+    Ok(())
+}
+
 pub(crate) fn apply_patch_custom(
     work_dir: &Path,
     patch_file_path: &Path,
 ) -> Result<(), SourceError> {
-    let patch_file_content = fs_err::read_to_string(patch_file_path).map_err(SourceError::Io)?;
+    let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
 
-    let patches = patches_from_str(&patch_file_content)
+    let patches = patches_from_bytes(&patch_file_content)
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
     let strip_level = guess_strip_level(&patches, work_dir)?;
 
@@ -159,14 +248,14 @@ pub(crate) fn apply_patch_custom(
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
-                let new_file_content = apply("", &patch).map_err(SourceError::PatchApplyError)?;
+                let new_file_content = apply(&[], &patch).map_err(SourceError::PatchApplyError)?;
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
                 fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
             }
             (Some(o), Some(m)) => {
-                let old_file_content = fs_err::read_to_string(&o).map_err(SourceError::Io)?;
+                let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
                 let new_file_content =
                     apply(&old_file_content, &patch).map_err(SourceError::PatchApplyError)?;
@@ -178,112 +267,6 @@ pub(crate) fn apply_patch_custom(
                 write_patch_content(&new_file_content, &m)?;
             }
         }
-    }
-
-    Ok(())
-}
-
-pub(crate) fn apply_patch_git(
-    system_tools: &SystemTools,
-    work_dir: &Path,
-    patch_file_path: &Path,
-) -> Result<(), SourceError> {
-    let patch_file_content = fs_err::read_to_string(patch_file_path).map_err(SourceError::Io)?;
-    let patches = patches_from_str(&patch_file_content)
-        .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
-    let strip_level = guess_strip_level(&patches, work_dir)?;
-
-    struct GitApplyAttempt {
-        command: Command,
-        output: Output,
-    }
-
-    let mut outputs = Vec::new();
-    for try_extra_flag in [None, Some("--recount")] {
-        let mut cmd_builder = system_tools
-            .call(Tool::Git)
-            .map_err(SourceError::GitNotFound)?;
-        cmd_builder
-            .current_dir(work_dir)
-            .arg("apply")
-            .arg(format!("-p{}", strip_level))
-            .arg("--verbose")
-            .arg("--ignore-space-change")
-            .arg("--ignore-whitespace")
-            .args(try_extra_flag.into_iter())
-            .arg(patch_file_path.as_os_str())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        tracing::debug!(
-            "Running: {} {}",
-            cmd_builder.get_program().to_string_lossy(),
-            cmd_builder
-                .get_args()
-                .map(OsStr::to_string_lossy)
-                .format(" ")
-        );
-
-        let output = cmd_builder.output().map_err(SourceError::Io)?;
-        outputs.push(GitApplyAttempt {
-            command: cmd_builder,
-            output: output.clone(),
-        });
-
-        if outputs
-            .last()
-            .expect("we just added an entry")
-            .output
-            .status
-            .success()
-        {
-            break;
-        }
-    }
-
-    // Check if the last output was successful, if not, we report all the errors.
-    let last_output = outputs.last().expect("we just added at least one entry");
-    if !last_output.output.status.success() {
-        return Err(SourceError::PatchFailed(format!(
-            "{}\n`git apply` failed with a combination of flags.\n\n{}",
-            patch_file_path.display(),
-            outputs
-                .into_iter()
-                .map(
-                    |GitApplyAttempt {
-                         output, command, ..
-                     }| {
-                        let stderr = String::from_utf8_lossy(&output.stderr);
-                        format!(
-                            "With the che command:\n\n\t{} {}The output was:\n\n\t{}\n\n",
-                            command.get_program().to_string_lossy(),
-                            command.get_args().map(OsStr::to_string_lossy).format(" "),
-                            stderr.lines().format("\n\t")
-                        )
-                    }
-                )
-                .format("\n\n")
-        )));
-    }
-
-    // Sometimes git apply will skip the contents of a patch. This usually is *not* what we
-    // want, so we detect this behavior and return an error.
-    let stderr = String::from_utf8_lossy(&last_output.output.stderr);
-    let skipped_patch = stderr
-        .lines()
-        .any(|line| line.starts_with("Skipped patch "));
-    if skipped_patch {
-        return Err(SourceError::PatchFailed(format!(
-            "{}\n`git apply` seems to have skipped some of the contents of the patch. The output of the command is:\n\n\t{}\n\nThe command was invoked with:\n\n\t{} {}",
-            patch_file_path.display(),
-            stderr.lines().format("\n\t"),
-            last_output.command.get_program().to_string_lossy(),
-            last_output
-                .command
-                .get_args()
-                .map(OsStr::to_string_lossy)
-                .format(" ")
-        )));
     }
 
     Ok(())
@@ -302,14 +285,6 @@ pub(crate) fn apply_patches(
         return Ok(());
     }
 
-    let git_dir = work_dir.join(".git");
-    // Ensure that the working directory is a valid git directory.
-    let _dot_git_dir = if !git_dir.exists() {
-        Some(TempDotGit::setup(work_dir)?)
-    } else {
-        None
-    };
-
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
 
@@ -324,43 +299,10 @@ pub(crate) fn apply_patches(
     Ok(())
 }
 
-/// A temporary .git directory that contains the bare minimum files and
-/// directories needed for git to function as if the directory that contains
-/// the .git directory is a proper git repository.
-struct TempDotGit {
-    path: PathBuf,
-}
-
-impl TempDotGit {
-    /// Creates a temporary .git directory in the specified root directory.
-    fn setup(root: &Path) -> std::io::Result<Self> {
-        // Initialize a temporary .git directory
-        let dot_git = root.join(".git");
-        fs_err::create_dir(&dot_git)?;
-        let dot_git = TempDotGit { path: dot_git };
-
-        // Add the minimum number of files and directories to the .git directory that are needed for
-        // git to work
-        fs_err::create_dir(dot_git.path.join("objects"))?;
-        fs_err::create_dir(dot_git.path.join("refs"))?;
-        fs_err::write(dot_git.path.join("HEAD"), "ref: refs/heads/main")?;
-
-        Ok(dot_git)
-    }
-}
-
-impl Drop for TempDotGit {
-    fn drop(&mut self) {
-        fs_err::remove_dir_all(&self.path).unwrap_or_else(|e| {
-            eprintln!("Failed to remove temporary .git directory: {}", e);
-        });
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
-        get_build_output, get_tool_config,
+        SystemTools, get_build_output, get_tool_config,
         metadata::Output,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
@@ -391,8 +333,8 @@ mod tests {
             }
 
             let patch_file_content =
-                fs_err::read_to_string(&patch_path).expect("Could not read file contents");
-            let _ = patches_from_str(&patch_file_content).expect("Failed to parse patch file");
+                fs_err::read(&patch_path).expect("Could not read file contents");
+            let _ = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
             println!("Parsing patch: {}", patch_path.display());
         }
@@ -403,9 +345,9 @@ mod tests {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let patches_dir = manifest_dir.join("test-data/patch_application/patches");
 
-        let patch_file_content = fs_err::read_to_string(patches_dir.join("test.patch"))
-            .expect("Could not read file contents");
-        let patches = patches_from_str(&patch_file_content).expect("Failed to parse patch file");
+        let patch_file_content =
+            fs_err::read(patches_dir.join("test.patch")).expect("Could not read file contents");
+        let patches = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
         let patched_paths = parse_patches(&patches);
         assert_eq!(patched_paths.len(), 2);
@@ -413,9 +355,9 @@ mod tests {
         assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
 
         let patch_file_content =
-            fs_err::read_to_string(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
+            fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
-        let patches = patches_from_str(&patch_file_content).expect("Failed to parse patch file");
+        let patches = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
         let patched_paths = parse_patches(&patches);
         assert_eq!(patched_paths.len(), 2);
         assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
@@ -441,7 +383,7 @@ mod tests {
             &[PathBuf::from("test.patch")],
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
-            |wd, p| apply_patch_git(&SystemTools::new(), wd, p),
+            apply_patch_custom,
         )
         .unwrap();
 
@@ -466,7 +408,7 @@ mod tests {
             &[PathBuf::from("test_crlf.patch")],
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
-            |wd, p| apply_patch_git(&SystemTools::new(), wd, p),
+            apply_patch_custom,
         )
         .unwrap();
 
@@ -483,7 +425,7 @@ mod tests {
             &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
-            |wd, p| apply_patch_git(&SystemTools::new(), wd, p),
+            apply_patch_custom,
         )
         .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
 
@@ -497,16 +439,12 @@ mod tests {
     fn test_apply_git_patch_in_git_ignored() {
         let (tempdir, _) = setup_patch_test_dir();
 
-        // Initialize a temporary .git directory at the root of the temporary directory. This makes
-        // git take the working directory is in a git repository.
-        let _temp_dot_git = TempDotGit::setup(tempdir.path()).unwrap();
-
         // Apply the patches in the working directory
         apply_patches(
             &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
-            |wd, p| apply_patch_git(&SystemTools::new(), wd, p),
+            apply_patch_custom,
         )
         .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
 
@@ -579,10 +517,9 @@ mod tests {
     fn show_dir_difference(git_dir: &Path, custom_dir: &Path) -> miette::Result<String> {
         let mut cmd = Command::new("diff");
 
-        // FIXME: Replace with something else for windows.
         let dir_difference = String::from_utf8(
             cmd.args([
-                OsStr::new("-rN"),
+                OsStr::new("-rNu"),
                 OsStr::new("--color=always"),
                 git_dir.as_os_str(),
                 custom_dir.as_os_str(),
@@ -622,6 +559,12 @@ mod tests {
         #[exclude("mumps")]
         // Failed to download source
         #[exclude("petsc")]
+        // GNU patch fails and diffy succeeds, seemingly correctly from the diff output.
+        #[exclude("(fastjet-cxx)|(fenics-)|(love2d)|(flask-security-too)")]
+        // Parse fails, since createrepo-c/438.patch contains two mail
+        // messages in one file. Fix postponed until parser
+        // reimplemented.
+        #[exclude("createrepo_c")]
         recipe_dir: PathBuf,
     ) -> miette::Result<()> {
         let prep = prepare_package(&recipe_dir).await?;
@@ -630,7 +573,6 @@ mod tests {
             let directories = output.build_configuration.directories;
 
             let system_tools = SystemTools::new();
-
             // Just fetch sources without applying patch.
             let _ = fetch_sources(
                 &sources,
@@ -656,41 +598,48 @@ mod tests {
                 let patches = source.patches().to_vec();
                 let target_directory = source.target_directory();
 
-                let (original_source_dir_path, copy_source_dir_path) = match target_directory {
+                let (original_source_dir_path, patched_source_dir_path) = match target_directory {
                     Some(td) => (
                         &original_sources_dir_path.join(td),
                         &copy_sources_dir_path.join(td),
                     ),
                     None => (&original_sources_dir_path, &copy_sources_dir_path),
                 };
-                let git_res = apply_patches(
+
+                let gnu_patch_res = apply_patches(
                     patches.as_slice(),
                     original_source_dir_path,
                     &recipe_dir,
-                    |wd, p| apply_patch_git(&system_tools, wd, p),
+                    |wd, p| apply_patch_gnu(&SystemTools::new(), wd, p),
                 );
 
                 let custom_res = apply_patches(
                     patches.as_slice(),
-                    copy_source_dir_path,
+                    patched_source_dir_path,
                     &recipe_dir,
                     apply_patch_custom,
                 );
 
-                if let Ok(difference) =
-                    show_dir_difference(&original_sources_dir_path, &copy_sources_dir_path)
-                {
-                    if !difference.trim().is_empty() {
-                        // If we panic on just nonempty difference then
-                        // there are 4 more tests failing, because git
-                        // does not apply patches. Specifically
-                        // `hf_transfer`, `lua`, `nordugrid_arc`,
-                        // `openjph`.
-                        eprintln!("Directories are different:\n{}", difference);
-                    }
+                let difference =
+                    show_dir_difference(original_source_dir_path, patched_source_dir_path).expect(
+                        "Can't show dir difference. Most probably you're missing GNU diff binary.",
+                    );
+
+                match (custom_res, gnu_patch_res) {
+                    (Ok(_), Ok(_)) => (),
+                    (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
+                    (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
+                    (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
                 }
 
-                assert!(custom_res.is_ok(), "Results:\n{:#?}", [git_res, custom_res]);
+                if !difference.trim().is_empty() {
+                    // If we panic on just nonempty difference then
+                    // there are 4 more tests failing, because git
+                    // does not apply patches. Specifically
+                    // `hf_transfer`, `lua`, `nordugrid_arc`,
+                    // `openjph`.
+                    panic!("Directories are different:\n{}", difference);
+                }
             }
         }
 

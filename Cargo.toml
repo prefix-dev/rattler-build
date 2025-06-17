@@ -201,6 +201,7 @@ tracing-test = "0.2.5"
 tracing-indicatif = "0.3.9"
 serial_test = "3.2.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
+pretty_assertions = "1.4.1"
 
 [[bench]]
 name = "line_breaks"

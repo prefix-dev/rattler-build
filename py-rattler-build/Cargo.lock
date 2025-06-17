@@ -1462,7 +1462,7 @@ dependencies = [
 [[package]]
 name = "diffy"
 version = "0.4.2"
-source = "git+https://github.com/remimimimimi/diffy.git?branch=patches#52626e0bd360a59eb01d758928fa1725f8e893ab"
+source = "git+https://github.com/remimimimimi/diffy.git?branch=patches#75c620fc52bb5a7661288017591105682cf24b46"
 dependencies = [
  "nu-ansi-term 0.50.1",
  "strsim",
