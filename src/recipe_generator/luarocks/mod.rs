@@ -1,11 +1,14 @@
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+//! Implements logic to generate a rattler-build recipe from a LuaRocks rockspec
+//! file.
+
+use std::{collections::BTreeMap, io::Write, path::PathBuf};
 
 use clap::Parser;
 use indexmap::IndexMap;
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::PackageName;
 use serde::Deserialize;
+use tempfile::NamedTempFile;
 
 use crate::recipe_generator::serialize::{
     About, Build, GitSourceElement, Python, Recipe, Requirements, ScriptTest, SourceElement, Test,
@@ -66,7 +69,7 @@ pub struct RockspecBuild {
     #[serde(rename = "type")]
     pub build_type: Option<String>,
     pub modules: Option<BTreeMap<String, serde_json::Value>>,
-    pub install: Option<BTreeMap<String, Vec<String>>>,
+    pub install: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()> {
@@ -240,47 +243,62 @@ fn parse_rockspec(content: &str) -> miette::Result<LuarocksRockspec> {
 fn parse_rockspec_with_lua(content: &str) -> miette::Result<LuarocksRockspec> {
     use std::process::Command;
 
+    let (mut rock_spec_file, rock_spec_file_path) = NamedTempFile::new()
+        .into_diagnostic()
+        .context("failed to create a temporary file for rockspec")?
+        .into_parts();
+    rock_spec_file
+        .write_all(content.as_bytes())
+        .into_diagnostic()
+        .context("failed to write rockspec content to temporary file")?;
+    drop(rock_spec_file);
+
     // Create a Lua script that loads the rockspec and outputs JSON
     let lua_script = format!(
         r#"
--- Load the rockspec
-{}
+-- Include a simple library to write json output
+{json_lua}
 
--- Create a table with the parsed values
-local result = {{
-    package = package or "",
-    version = version or "",
-    source = source or {{}},
-    description = description or {{}},
-    dependencies = dependencies or {{}}
-}}
-
--- Convert to JSON-like format that we can parse easily
-print("ROCKSPEC_START")
-print("package=" .. (result.package or ""))
-print("version=" .. (result.version or ""))
-print("source_url=" .. (result.source.url or ""))
-print("source_tag=" .. (result.source.tag or ""))
-print("source_branch=" .. (result.source.branch or ""))
-print("source_md5=" .. (result.source.md5 or ""))
-print("source_sha256=" .. (result.source.sha256 or ""))
-print("desc_summary=" .. (result.description.summary or ""))
-print("desc_detailed=" .. (result.description.detailed or ""))
-print("desc_homepage=" .. (result.description.homepage or ""))
-print("desc_license=" .. (result.description.license or ""))
-if result.dependencies then
-    for i, dep in ipairs(result.dependencies) do
-        print("dependency=" .. dep)
-    end
+-- Parse the rockspec file
+local rockspecFile = "{rockspec_file_path}"
+local origPackage = package
+local ok, _ = pcall(dofile, rockspecFile)
+if not ok then
+   error("ERROR: could not load rockspecFile " .. tostring(rockspecFile))
 end
-print("ROCKSPEC_END")
+
+-- Resolve name clash
+if origPackage == package then
+   package = nil
+end
+
+-- Output the rockspec in a format that can be parsed by Rust
+local out = {{
+   rockspec_format=rockspec_format,
+   package=package,
+   version=version,
+   description=description,
+   supported_platforms=supported_platforms,
+   dependencies=dependencies,
+   external_dependencies=external_dependencies,
+   source=source,
+   build=build,
+   modules=modules,
+}}
+print("ROCKSPEC_START")
+print(json.encode(out))
 "#,
-        content
+        json_lua = include_str!("json.lua"),
+        rockspec_file_path = if cfg!(windows) {
+            rock_spec_file_path.to_string_lossy().replace("\\", "\\\\")
+        } else {
+            rock_spec_file_path.to_string_lossy().into_owned()
+        },
     );
 
     // Write Lua script to temporary file
     let temp_file = std::env::temp_dir().join(format!("rockspec_{}.lua", std::process::id()));
-    std::fs::write(&temp_file, lua_script).into_diagnostic()?;
+    fs_err::write(&temp_file, lua_script).into_diagnostic()?;
 
     // Execute Lua
     let output = Command::new("lua")
@@ -288,116 +306,32 @@ print("ROCKSPEC_END")
         .output()
         .into_diagnostic()?;
 
-    // Clean up temp file
-    let _ = std::fs::remove_file(&temp_file);
-
     if !output.status.success() {
         return Err(miette::miette!(
-            "Lua execution failed: {}",
+            "Lua execution failed:\n{}",
             String::from_utf8_lossy(&output.stderr)
         ));
     }
 
+    // Clean up temp file
+    let _ = fs_err::remove_file(&temp_file);
+
     let output_str = String::from_utf8_lossy(&output.stdout);
-
-    // Parse the output
-    let mut rockspec = LuarocksRockspec {
-        package: String::new(),
-        version: String::new(),
-        source: RockspecSource {
-            url: String::new(),
-            md5: None,
-            sha256: None,
-            file: None,
-            dir: None,
-            tag: None,
-            branch: None,
-        },
-        description: RockspecDescription {
-            summary: None,
-            detailed: None,
-            homepage: None,
-            license: None,
-            maintainer: None,
-        },
-        dependencies: Vec::new(),
-        build: None,
-    };
-
-    let mut in_rockspec_section = false;
-    for line in output_str.lines() {
-        if line == "ROCKSPEC_START" {
-            in_rockspec_section = true;
-            continue;
-        }
-        if line == "ROCKSPEC_END" {
-            break;
-        }
-        if !in_rockspec_section {
-            continue;
-        }
-
-        if let Some((key, value)) = line.split_once('=') {
-            match key {
-                "package" => rockspec.package = value.to_string(),
-                "version" => rockspec.version = value.to_string(),
-                "source_url" => rockspec.source.url = value.to_string(),
-                "source_tag" => {
-                    if !value.is_empty() {
-                        rockspec.source.tag = Some(value.to_string());
-                    }
-                }
-                "source_branch" => {
-                    if !value.is_empty() {
-                        rockspec.source.branch = Some(value.to_string());
-                    }
-                }
-                "source_md5" => {
-                    if !value.is_empty() {
-                        rockspec.source.md5 = Some(value.to_string());
-                    }
-                }
-                "source_sha256" => {
-                    if !value.is_empty() {
-                        rockspec.source.sha256 = Some(value.to_string());
-                    }
-                }
-                "desc_summary" => {
-                    if !value.is_empty() {
-                        rockspec.description.summary = Some(value.trim().to_string());
-                    }
-                }
-                "desc_detailed" => {
-                    if !value.is_empty() {
-                        // Clean up multiline descriptions by normalizing whitespace
-                        let cleaned = value
-                            .lines()
-                            .map(|line| line.trim())
-                            .filter(|line| !line.is_empty())
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        if !cleaned.is_empty() {
-                            rockspec.description.detailed = Some(cleaned);
-                        }
-                    }
-                }
-                "desc_homepage" => {
-                    if !value.is_empty() {
-                        rockspec.description.homepage = Some(value.to_string());
-                    }
-                }
-                "desc_license" => {
-                    if !value.is_empty() {
-                        rockspec.description.license = Some(value.to_string());
-                    }
-                }
-                "dependency" => rockspec.dependencies.push(value.to_string()),
-                _ => {}
-            }
-        }
+    let json_section = output_str
+        .find("ROCKSPEC_START")
+        .map(|pos| output_str.split_at(pos + 14).1)
+        .unwrap_or_default()
+        .trim();
+    if json_section.is_empty() {
+        return Err(miette::miette!("No rockspec data found in Lua output"));
     }
 
-    Ok(rockspec)
+    match serde_json::from_str(json_section) {
+        Ok(rockspec) => Ok(rockspec),
+        Err(e) => Err(miette::miette!(
+            "Failed to parse rockspec from Lua output: {e}\n\nOutput:\n{json_section}",
+        )),
+    }
 }
 
 /// Check if a URL is a git repository URL
@@ -462,14 +396,12 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             host: vec!["lua".to_string()],
             run: vec!["lua".to_string()],
         },
-        tests: vec![Test::Script(ScriptTest {
-            script: vec![format!("lua -e \"require('{}')\"", rockspec.package)],
-        })],
+        tests: vec![generate_require_test(rockspec)],
         about: About {
             homepage: rockspec.description.homepage.clone(),
             license: map_license(rockspec.description.license.as_deref()),
-            summary: rockspec.description.summary.clone(),
-            description: rockspec.description.detailed.clone(),
+            summary: rockspec.description.summary.as_deref().map(str::trim).map(ToOwned::to_owned).clone(),
+            description: rockspec.description.detailed.as_deref().map(str::trim).map(ToOwned::to_owned).clone(),
             ..Default::default()
         },
     };
@@ -492,8 +424,31 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
     Ok(recipe)
 }
 
+/// Generates a `Test` for the recipe that tries to `require(..)` all modules
+/// defined in the rockspec.
+fn generate_require_test(spec: &LuarocksRockspec) -> Test {
+    // Try to get module names from the build.modules field if present
+    let mut modules = Vec::new();
+    if let Some(build) = &spec.build {
+        if let Some(mods) = &build.modules {
+            modules.extend(mods.keys().cloned());
+        }
+    }
+    // If no modules found, fall back to the package name
+    if modules.is_empty() {
+        modules.push(spec.package.clone());
+    }
+    // Generate a lua require test for each module
+    let script = modules
+        .into_iter()
+        .map(|m| format!("lua -e \"require('{}')\"", m))
+        .collect();
+    Test::Script(ScriptTest { script })
+}
+
 fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
-    // Extract just the package name, removing version constraints and extra whitespace
+    // Extract just the package name, removing version constraints and extra
+    // whitespace
     let name_part = name
         .split_whitespace()
         .next()
@@ -724,6 +679,50 @@ dependencies = { "lua >= 5.1" }"#;
         }
     }
 
+    #[test]
+    fn test_generate_require_test_with_modules() {
+        use std::collections::BTreeMap;
+        let mut modules = BTreeMap::new();
+        modules.insert("mod1".to_string(), serde_json::json!({}));
+        modules.insert("mod2".to_string(), serde_json::json!({}));
+        let rockspec = LuarocksRockspec {
+            package: "somepkg".to_string(),
+            version: "1.0-1".to_string(),
+            source: RockspecSource {
+                url: "https://example.com/somepkg-1.0.tar.gz".to_string(),
+                md5: None,
+                sha256: None,
+                file: None,
+                dir: None,
+                tag: None,
+                branch: None,
+            },
+            description: RockspecDescription {
+                summary: Some("desc".to_string()),
+                detailed: None,
+                homepage: None,
+                license: None,
+                maintainer: None,
+            },
+            dependencies: vec![],
+            build: Some(RockspecBuild {
+                build_type: Some("builtin".to_string()),
+                modules: Some(modules),
+                install: None,
+            }),
+        };
+        let test = generate_require_test(&rockspec);
+        match test {
+            Test::Script(script_test) => {
+                assert_eq!(
+                    script_test.script,
+                    vec!["lua -e \"require('mod1')\"", "lua -e \"require('mod2')\""]
+                );
+            }
+            _ => panic!("Expected Script test"),
+        }
+    }
+
     // Integration test that requires network access
     #[tokio::test]
     async fn test_fetch_rockspec() {
@@ -739,7 +738,8 @@ dependencies = { "lua >= 5.1" }"#;
             // If we can reach the test endpoint, basic fetch functionality works
             assert!(true);
         }
-        // If network fails, we don't fail the test since it's environment dependent
+        // If network fails, we don't fail the test since it's environment
+        // dependent
     }
 
     #[test]
