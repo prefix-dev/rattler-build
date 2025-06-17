@@ -404,9 +404,6 @@ print("ROCKSPEC_END")
 fn is_git_url(url: &str) -> bool {
     url.contains("git+")
         || url.ends_with(".git")
-        || url.contains("github.com")
-        || url.contains("gitlab.com")
-        || url.contains("bitbucket.org")
         || url.starts_with("git://")
         || url.starts_with("git@")
 }
@@ -428,12 +425,16 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
     // Determine source type and create appropriate SourceElement
     let source_element: SourceElement = if is_git_url(&rockspec.source.url) {
         // Git source
-        GitSourceElement {
+        let mut git_source = GitSourceElement {
             git: rockspec.source.url.clone(),
             branch: rockspec.source.branch.clone(),
             tag: rockspec.source.tag.clone(),
+        };
+        // We need to strip the "git+" prefix if it exists
+        if let Some(url) = rockspec.source.url.strip_prefix("git+") {
+            git_source.git = url.to_string();
         }
-        .into()
+        git_source.into()
     } else {
         // Regular URL source
         UrlSourceElement {
@@ -452,7 +453,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         },
         source: vec![source_element],
         build: Build {
-            script: "luarocks install ${{ name }} ${{ version }} --tree=${{ PREFIX }}".to_string(),
+            script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
             python: Python::default(),
             noarch: None,
         },
@@ -694,10 +695,7 @@ dependencies = { "lua >= 5.1" }"#;
             }
         }
 
-        assert_eq!(
-            recipe.build.script,
-            "luarocks install ${{ name }} ${{ version }} --tree=${{ PREFIX }}"
-        );
+        assert!(recipe.build.script.contains("luarocks install"),);
 
         assert!(recipe.requirements.build.contains(&"luarocks".to_string()));
         assert!(recipe.requirements.host.contains(&"lua".to_string()));
@@ -748,9 +746,7 @@ dependencies = { "lua >= 5.1" }"#;
     fn test_is_git_url() {
         // Git URLs that should be detected
         assert!(is_git_url("https://github.com/user/repo.git"));
-        assert!(is_git_url("https://github.com/user/repo"));
         assert!(is_git_url("https://gitlab.com/user/repo.git"));
-        assert!(is_git_url("https://bitbucket.org/user/repo"));
         assert!(is_git_url("git://github.com/user/repo.git"));
         assert!(is_git_url("git@github.com:user/repo.git"));
         assert!(is_git_url("git+https://github.com/user/repo.git"));
