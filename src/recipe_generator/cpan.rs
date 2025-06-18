@@ -517,12 +517,10 @@ make install"#
     // Most Perl packages are noarch unless they contain XS (C extensions)
     // Heuristics: check if package name contains common XS indicators
     let package_name = &metadata.release.distribution;
-    let is_likely_xs = package_name.contains("XS") || 
-                      package_name.contains("Fast") ||
-                      package_name.contains("DB") ||
-                      package_name.contains("Crypt") ||
-                      // Add more XS indicators as needed
-                      false;
+    let is_likely_xs = package_name.contains("XS")
+        || package_name.contains("Fast")
+        || package_name.contains("DB")
+        || package_name.contains("Crypt");
 
     if !is_likely_xs {
         recipe.build.noarch = Some("generic".to_string());
