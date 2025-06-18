@@ -958,7 +958,13 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     path_to_recipe = recipes / "double_license"
     args = rattler_build.build_args(path_to_recipe, tmp_path)
     output = rattler_build(*args, stderr=STDOUT)
-    assert "warning License file from source directory was overwritten" in output
+    assert "warning License file 'license.txt' from work directory was overwritten by license file from recipe directory" in output
+
+    pkg = get_extracted_package(tmp_path, "double_license")
+    assert (pkg / "info/licenses/license.txt").exists()
+    assert (pkg / "info/licenses/recipe_license.txt").exists()
+    assert (pkg / "info/licenses/prefix-license.txt").exists()
+    assert (pkg / "info/licenses/source-license.txt").exists()
 
 
 @pytest.mark.skipif(
