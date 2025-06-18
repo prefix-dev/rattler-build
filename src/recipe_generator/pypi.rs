@@ -451,7 +451,7 @@ pub async fn create_recipe(
 
 #[async_recursion::async_recursion]
 pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
-    eprintln!("Generating recipe for {}", opts.package);
+    tracing::info!("Generating recipe for {}", opts.package);
     let client = reqwest::Client::new();
 
     let metadata = fetch_pypi_metadata(opts, &client).await?;

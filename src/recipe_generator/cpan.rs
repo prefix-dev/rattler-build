@@ -2,7 +2,11 @@ use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
 use serde_with::{OneOrMany, serde_as};
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    process::Command,
+    sync::OnceLock,
+};
 
 use super::write_recipe;
 use crate::recipe_generator::serialize::{self, ScriptTest, Test, UrlSourceElement};
@@ -27,6 +31,15 @@ pub struct CpanOpts {
 
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
+struct CpanDependency {
+    module: String,
+    phase: String,
+    relationship: String,
+    version: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct CpanRelease {
     version: String,
     status: String,
@@ -42,6 +55,7 @@ struct CpanRelease {
     license: Option<Vec<String>>,
     metadata: Option<CpanReleaseMetadata>,
     resources: Option<CpanResources>,
+    dependency: Option<Vec<CpanDependency>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -114,7 +128,196 @@ pub struct CpanMetadata {
     modules: Vec<CpanModule>,
 }
 
+static CORE_MODULES: OnceLock<HashSet<String>> = OnceLock::new();
+
+fn get_core_modules_from_perl() -> Result<HashSet<String>, std::io::Error> {
+    let output = Command::new("perl")
+        .arg("-e")
+        .arg(
+            "use Module::CoreList; \
+             my @modules = grep {Module::CoreList::is_core($_)} Module::CoreList->find_modules(qr/.*/); \
+             print join \"\\n\", @modules;"
+        )
+        .output()?;
+
+    if !output.status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "Perl command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ));
+    }
+
+    let modules_text = String::from_utf8_lossy(&output.stdout);
+    let modules: HashSet<String> = modules_text
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    Ok(modules)
+}
+
+fn get_fallback_core_modules() -> HashSet<String> {
+    // Fallback list of common Perl core modules
+    const CORE_MODULES_FALLBACK: &[&str] = &[
+        "strict",
+        "warnings",
+        "Carp",
+        "Exporter",
+        "File::Spec",
+        "File::Path",
+        "File::Copy",
+        "File::Find",
+        "Data::Dumper",
+        "Scalar::Util",
+        "List::Util",
+        "FindBin",
+        "lib",
+        "base",
+        "constant",
+        "vars",
+        "utf8",
+        "Encode",
+        "POSIX",
+        "Fcntl",
+        "Socket",
+        "IO::Handle",
+        "IO::File",
+        "Time::Local",
+        "Getopt::Long",
+        "Getopt::Std",
+        "Pod::Usage",
+        "Test::More",
+        "Test::Simple",
+        "File::Basename",
+        "File::Temp",
+        "Digest::MD5",
+        "MIME::Base64",
+        "Storable",
+        "Sys::Hostname",
+        "Text::ParseWords",
+        "Text::Tabs",
+        "Text::Wrap",
+        "Time::HiRes",
+        "AutoLoader",
+        "Benchmark",
+        "Config",
+        "Errno",
+        "ExtUtils::MakeMaker",
+        "Fcntl",
+        "Getopt::Std",
+        "IO",
+        "IPC::Open2",
+        "IPC::Open3",
+        "Math::BigFloat",
+        "Math::BigInt",
+        "Net::Ping",
+        "Symbol",
+        "Tie::Array",
+        "Tie::Hash",
+        "XSLoader",
+        // Add more as needed based on common core modules
+    ];
+
+    CORE_MODULES_FALLBACK
+        .iter()
+        .map(|&s| s.to_string())
+        .collect()
+}
+
+fn initialize_core_modules() -> &'static HashSet<String> {
+    CORE_MODULES.get_or_init(|| match get_core_modules_from_perl() {
+        Ok(modules) => {
+            tracing::info!(
+                "Successfully loaded {} core modules from system Perl",
+                modules.len()
+            );
+            modules
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Warning: Failed to get core modules from system Perl: {}",
+                e
+            );
+            tracing::warn!("Falling back to hardcoded core module list.");
+            tracing::warn!("Consider installing Perl with: pixi global install perl");
+            get_fallback_core_modules()
+        }
+    })
+}
+
+fn is_core_module(module: &str) -> bool {
+    let core_modules = initialize_core_modules();
+    core_modules.contains(module)
+}
+
+fn process_dependencies(dependencies: &[CpanDependency]) -> (Vec<String>, Vec<String>) {
+    let mut host_deps = Vec::new();
+    let mut run_deps = Vec::new();
+
+    for dep in dependencies {
+        // Skip develop dependencies
+        if dep.phase == "develop" {
+            continue;
+        }
+
+        // Only process "requires" relationships
+        if dep.relationship != "requires" {
+            continue;
+        }
+
+        // Skip core modules
+        if is_core_module(&dep.module) {
+            continue;
+        }
+
+        let conda_name = format_perl_package_name(&dep.module);
+
+        // Add version constraint if specified
+        let dep_spec = if let Some(version) = &dep.version {
+            if version != "0" && !version.is_empty() && version != "undef" {
+                format!("{} >={}", conda_name, version)
+            } else {
+                conda_name
+            }
+        } else {
+            conda_name
+        };
+
+        match dep.phase.as_str() {
+            "build" | "configure" => {
+                if !host_deps.contains(&dep_spec) {
+                    host_deps.push(dep_spec);
+                }
+            }
+            "runtime" => {
+                if !run_deps.contains(&dep_spec) {
+                    run_deps.push(dep_spec);
+                }
+            }
+            _ => {
+                // Default to runtime for unknown phases
+                if !host_deps.contains(&dep_spec) {
+                    host_deps.push(dep_spec.clone());
+                }
+                if !run_deps.contains(&dep_spec) {
+                    run_deps.push(dep_spec);
+                }
+            }
+        }
+    }
+
+    (host_deps, run_deps)
+}
+
 fn format_perl_package_name(name: &str) -> String {
+    if name == "perl" {
+        return "perl".to_string();
+    }
+
     format!("perl-{}", name.to_lowercase().replace("::", "-"))
 }
 
@@ -295,7 +498,14 @@ pub async fn create_cpan_recipe(
     // Runtime requirements
     recipe.requirements.run.push("perl".to_string());
 
-    // TODO: Add dependencies parsing from release.dependency if needed
+    // Process dependencies
+    if let Some(dependencies) = &metadata.release.dependency {
+        let (host_deps, run_deps) = process_dependencies(dependencies);
+
+        // Add dependencies to appropriate sections
+        recipe.requirements.host.extend(host_deps);
+        recipe.requirements.run.extend(run_deps);
+    }
 
     // Set build script
     recipe.build.script = r#"perl Makefile.PL INSTALLDIRS=vendor
@@ -400,7 +610,7 @@ make install"#
 
 #[async_recursion::async_recursion]
 pub async fn generate_cpan_recipe(opts: &CpanOpts) -> miette::Result<()> {
-    eprintln!("Generating recipe for {}", opts.package);
+    tracing::info!("Generating recipe for {}", opts.package);
     let client = reqwest::Client::new();
 
     let metadata = fetch_cpan_metadata(opts, &client).await?;

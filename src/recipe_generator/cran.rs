@@ -204,7 +204,7 @@ const R_BUILTINS: &[&str] = &[
 #[async_recursion::async_recursion]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let package = &opts.package;
-    eprintln!("Generating R recipe for {}", package);
+    tracing::info!("Generating R recipe for {}", package);
     let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
         "https://{universe}.r-universe.dev/api/packages/{}",
