@@ -512,7 +512,7 @@ impl Match {
     }
 
     #[inline]
-    fn get_matched(&self) -> bool {
+    pub(crate) fn get_matched(&self) -> bool {
         self.matched
     }
 

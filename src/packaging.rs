@@ -105,15 +105,6 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let mut glob_matched: HashMap<String, bool> = output
-            .recipe
-            .about()
-            .license_file
-            .include_globs()
-            .iter()
-            .map(|glob| (glob.source().to_string(), false))
-            .collect();
-
         let copy_dir_work = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
@@ -154,26 +145,22 @@ fn copy_license_files(
             .map(PathBuf::from)
             .collect::<HashSet<PathBuf>>();
 
-        // Check if any files were copied for each glob pattern
-        for glob in output.recipe.about().license_file.include_globs() {
-            let glob_pattern = glob.glob();
-            let glob_str = glob.source();
+        // Check which globs didn't match any files
+        let mut missing_globs = Vec::new();
 
-            for file in &copied_files {
-                if let Ok(relative_path) = file.strip_prefix(&licenses_folder) {
-                    if glob_pattern.compile_matcher().is_match(relative_path) {
-                        glob_matched.insert(glob_str.to_string(), true);
-                        break;
+        // Check globs from both work and recipe dir results
+        for (glob_str, match_obj) in copy_dir_work.include_globs() {
+            if !match_obj.get_matched() {
+                // Check if it matched in the recipe dir
+                if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
+                    if !recipe_match.get_matched() {
+                        missing_globs.push(glob_str.clone());
                     }
+                } else {
+                    missing_globs.push(glob_str.clone());
                 }
             }
         }
-
-        let missing_globs: Vec<String> = glob_matched
-            .into_iter()
-            .filter(|(_, matched)| !matched)
-            .map(|(glob, _)| glob)
-            .collect();
 
         if !missing_globs.is_empty() {
             let error_str = format!(
