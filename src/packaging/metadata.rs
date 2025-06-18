@@ -582,7 +582,9 @@ mod test {
         assert_eq!(cleaned_url, "https://foobar.com/mychannel/");
     }
 
+    #[cfg(unix)]
     use std::io::Write;
+
     #[test]
     fn contains_prefix_text_positive() {
         let tmp = tempfile::tempdir().unwrap();
