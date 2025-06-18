@@ -38,6 +38,36 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+def test_missing_license_file(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a specified license file is missing."""
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build.build(recipes / "missing_license_file", tmp_path)
+
+    output = exc_info.value.output
+    if output:
+        output = output.decode() if isinstance(output, bytes) else output
+        assert "No license files were copied" in output
+        assert (
+            "The following license files were not found: does-not-exist.txt" in output
+        )
+
+
+def test_missing_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a license glob pattern matches no files."""
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build.build(recipes / "missing_license_glob", tmp_path)
+
+    output = exc_info.value.output
+    if output:
+        output = output.decode() if isinstance(output, bytes) else output
+        assert "No license files were copied" in output
+        assert "The following license files were not found: *.license" in output
+
+
 def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that building a package with spaces in output paths works correctly."""
     output_dir = tmp_path / "Output Space Dir"

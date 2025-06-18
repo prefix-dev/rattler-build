@@ -105,7 +105,16 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let mut glob_matched: HashMap<String, bool> = output
+            .recipe
+            .about()
+            .license_file
+            .include_globs()
+            .iter()
+            .map(|glob| (glob.source().to_string(), false))
+            .collect();
+
+        let copy_dir_work = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -113,10 +122,9 @@ fn copy_license_files(
         .use_gitignore(false)
         .run()?;
 
-        let copied_files_work_dir = copy_dir.copied_paths();
-        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
+        let copied_files_work_dir = copy_dir_work.copied_paths();
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let copy_dir_recipe = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
@@ -125,8 +133,7 @@ fn copy_license_files(
         .overwrite(true)
         .run()?;
 
-        let copied_files_recipe_dir = copy_dir.copied_paths();
-        let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
+        let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
 
         // if a file was copied from the recipe dir, and the work dir, we should
         // issue a warning
@@ -147,10 +154,34 @@ fn copy_license_files(
             .map(PathBuf::from)
             .collect::<HashSet<PathBuf>>();
 
-        if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            let warn_str = "No include glob matched for copying license files";
-            tracing::warn!(warn_str);
-            output.record_warning(warn_str);
+        // Check if any files were copied for each glob pattern
+        for glob in output.recipe.about().license_file.include_globs() {
+            let glob_pattern = glob.glob();
+            let glob_str = glob.source();
+
+            for file in &copied_files {
+                if let Ok(relative_path) = file.strip_prefix(&licenses_folder) {
+                    if glob_pattern.compile_matcher().is_match(relative_path) {
+                        glob_matched.insert(glob_str.to_string(), true);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let missing_globs: Vec<String> = glob_matched
+            .into_iter()
+            .filter(|(_, matched)| !matched)
+            .map(|(glob, _)| glob)
+            .collect();
+
+        if !missing_globs.is_empty() {
+            let error_str = format!(
+                "The following license files were not found: {}",
+                missing_globs.join(", ")
+            );
+            tracing::error!(error_str);
+            return Err(PackagingError::LicensesNotFound);
         }
 
         if copied_files.is_empty() {

@@ -463,6 +463,7 @@ impl CopyDirResult {
         &mut self.include_globs
     }
 
+    #[allow(unused)]
     pub fn any_include_glob_matched(&self) -> bool {
         self.include_globs.values().any(|m| m.get_matched())
     }

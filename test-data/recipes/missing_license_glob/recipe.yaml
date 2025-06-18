@@ -1,0 +1,12 @@
+package:
+  name: missing-license-glob
+  version: '0.1.0'
+
+build:
+  script:
+    - echo "test content" > README.md
+    - echo "another file" > NOTICE
+
+about:
+  license_file:
+    - "*.license"  # This glob won't match anything
