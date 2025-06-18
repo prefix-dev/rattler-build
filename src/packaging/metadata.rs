@@ -546,8 +546,9 @@ mod test {
     use rattler_conda_types::{ChannelUrl, Platform};
     use url::Url;
 
-    use super::create_prefix_placeholder;
+    use super::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
     use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
+    use fs_err as fs;
 
     #[test]
     fn detect_prefix() {
@@ -577,5 +578,52 @@ mod test {
             ChannelUrl::from(Url::parse("https://user:password@foobar.com/mychannel").unwrap());
         let cleaned_url = clean_url(&url);
         assert_eq!(cleaned_url, "https://foobar.com/mychannel/");
+    }
+
+    use std::io::Write;
+    #[test]
+    fn contains_prefix_text_positive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix_path = tmp.path().join("my_prefix");
+        let file_path = tmp.path().join("example.txt");
+        let content = format!("This file lives in {} directory", prefix_path.display());
+        fs::write(&file_path, content).unwrap();
+
+        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        assert_eq!(found, Some(prefix_path.to_string_lossy().to_string()));
+    }
+
+    #[test]
+    fn contains_prefix_text_negative() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix_path = tmp.path().join("absent_prefix");
+        let file_path = tmp.path().join("note.txt");
+        fs::write(&file_path, "nothing to see here").unwrap();
+        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        assert!(found.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn contains_prefix_binary_unix() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix_binary");
+        let file_path = tmp.path().join("binfile.bin");
+
+        // write arbitrary binary data including the prefix bytes
+        let mut f = fs::File::create(&file_path).unwrap();
+        f.write_all(b"random bytes ").unwrap();
+        f.write_all(prefix.as_os_str().as_bytes()).unwrap();
+        f.write_all(b" tail").unwrap();
+        drop(f);
+
+        assert!(contains_prefix_binary(&file_path, &prefix).unwrap());
+
+        // File without the prefix should return false
+        let other = tmp.path().join("noprefix.bin");
+        fs::write(&other, b"just binary").unwrap();
+        assert!(!contains_prefix_binary(&other, &prefix).unwrap());
     }
 }
