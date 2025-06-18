@@ -38,6 +38,30 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+def test_missing_license_file(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a specified license file is missing."""
+    try:
+        rattler_build.build(recipes / "missing_license_file", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
+
+
+def test_missing_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a license glob pattern matches no files."""
+    try:
+        rattler_build.build(recipes / "missing_license_glob", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
+
+
 def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that building a package with spaces in output paths works correctly."""
     output_dir = tmp_path / "Output Space Dir"

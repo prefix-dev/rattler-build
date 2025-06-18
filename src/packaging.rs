@@ -105,7 +105,7 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let copy_dir_work = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -113,10 +113,9 @@ fn copy_license_files(
         .use_gitignore(false)
         .run()?;
 
-        let copied_files_work_dir = copy_dir.copied_paths();
-        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
+        let copied_files_work_dir = copy_dir_work.copied_paths();
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let copy_dir_recipe = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
@@ -125,8 +124,7 @@ fn copy_license_files(
         .overwrite(true)
         .run()?;
 
-        let copied_files_recipe_dir = copy_dir.copied_paths();
-        let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
+        let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
 
         // if a file was copied from the recipe dir, and the work dir, we should
         // issue a warning
@@ -147,10 +145,30 @@ fn copy_license_files(
             .map(PathBuf::from)
             .collect::<HashSet<PathBuf>>();
 
-        if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            let warn_str = "No include glob matched for copying license files";
-            tracing::warn!(warn_str);
-            output.record_warning(warn_str);
+        // Check which globs didn't match any files
+        let mut missing_globs = Vec::new();
+
+        // Check globs from both work and recipe dir results
+        for (glob_str, match_obj) in copy_dir_work.include_globs() {
+            if !match_obj.get_matched() {
+                // Check if it matched in the recipe dir
+                if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
+                    if !recipe_match.get_matched() {
+                        missing_globs.push(glob_str.clone());
+                    }
+                } else {
+                    missing_globs.push(glob_str.clone());
+                }
+            }
+        }
+
+        if !missing_globs.is_empty() {
+            let error_str = format!(
+                "The following license files were not found: {}",
+                missing_globs.join(", ")
+            );
+            tracing::error!(error_str);
+            return Err(PackagingError::LicensesNotFound);
         }
 
         if copied_files.is_empty() {
