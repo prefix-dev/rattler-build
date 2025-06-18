@@ -165,7 +165,7 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::CreatePatch(opts)) => {
-            let _ = create_patch::create_patch(opts.directory);
+            let _ = create_patch::create_patch(opts.directory, &opts.name, opts.overwrite);
             Ok(())
         }
         None => {

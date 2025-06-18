@@ -1282,4 +1282,12 @@ pub struct CreatePatchOpts {
     /// Directory where we want to create the patch
     #[arg(short, long)]
     pub directory: PathBuf,
+
+    /// The name for the patch file to create.
+    #[arg(long, default_value = "changes")]
+    pub name: String,
+
+    /// Whether to overwrite the patch file if it already exists.
+    #[arg(long, default_value = "false")]
+    pub overwrite: bool,
 }

@@ -2,60 +2,87 @@
 //! We take all files found in this directory and compare them to the original files
 //! from the source cache. Any differences will be written to a patch file.
 
+use diffy::DiffOptions;
 use fs_err as fs;
-use std::io::Write;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::recipe::parser::Source;
 use crate::source::{SourceError, SourceInformation};
 
+/// Error type for generating patches
+#[derive(Debug, Error)]
+pub enum GeneratePatchError {
+    /// Error when the source was not
+    #[error("Source error: {0}")]
+    SourceError(#[from] SourceError),
+
+    /// Error when the source information file cannot be read
+    #[error("Failed to read source information: {0}")]
+    SourceInfoReadError(String),
+
+    /// Error when the patch file already exists
+    #[error("Patch file already exists: {0}")]
+    PatchFileAlreadyExists(PathBuf),
+
+    /// An IO error occurred when reading or writing files
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    /// Error when the path cannot be stripped of its prefix
+    #[error("Failed to strip prefix from path: {0}")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
+}
+
 /// Creates a unified diff patch by comparing the current state of files in the work directory
 /// against their original state from the source cache.
-pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
+pub fn create_patch<P: AsRef<Path>>(
+    work_dir: P,
+    name: &str,
+    overwrite: bool,
+) -> Result<(), GeneratePatchError> {
     let work_dir = work_dir.as_ref();
     let source_info_path = work_dir.join(".source_info.json");
 
     if !source_info_path.exists() {
-        return Err(SourceError::FileNotFound(source_info_path));
+        return Err(GeneratePatchError::SourceInfoReadError(
+            "Source information file not found".to_string(),
+        ));
     }
 
     // Load the source information from the work directory
     let source_info: SourceInformation =
         serde_json::from_reader(fs::File::open(&source_info_path)?).map_err(|e| {
-            SourceError::UnknownError(format!("Failed to read source information: {}", e))
+            GeneratePatchError::SourceInfoReadError(format!(
+                "Failed to parse source information: {}",
+                e
+            ))
         })?;
 
-    let patch_path = work_dir.join("changes.patch");
-    let mut patch_content = String::new();
+    let ignored_files = vec![
+        OsStr::new(".source_info.json"), // Ignore the source info file itself
+        OsStr::new("conda_build.sh"),    // Ignore conda build script
+        OsStr::new("conda_build.bat"),   // Ignore conda build script for Windows
+        OsStr::new("build_env.sh"),      // Ignore build environment script
+        OsStr::new("build_env.bat"),     // Ignore build environment script for Windows
+    ];
 
-    // Get the cache directory (assuming it's relative to the recipe directory)
-    // let recipe_dir = source_info.recipe_path.parent()
-    //     .ok_or_else(|| SourceError::UnknownError("Invalid recipe path".to_string()))?;
-    // let cache_dir = recipe_dir.join("../output/src_cache"); // Adjust this path as needed
-
-    let cache_dir = source_info.source_cache.clone();
+    let cache_dir = source_info.source_cache;
 
     for source in &source_info.sources {
-        match source {
-            Source::Git(git_src) => {
-                let original_dir = find_git_cache_dir(&cache_dir, git_src)?;
-                let target_dir = if let Some(target) = git_src.target_directory() {
-                    work_dir.join(target)
-                } else {
-                    work_dir.to_path_buf()
-                };
+        let mut patch_content = String::new();
 
-                let diff =
-                    create_directory_diff(&original_dir, &target_dir, git_src.target_directory())?;
-                if !diff.is_empty() {
-                    patch_content.push_str(&diff);
-                }
+        match source {
+            Source::Git(_git_src) => {
+                // Git sources can be diffed pretty easily so I think we can just not care about them for now
+                tracing::warn!("Generating patch for git source is not implemented yet.");
             }
             Source::Url(url_src) => {
                 // For URL sources, we need to find the extracted cache directory
-                println!("Processing URL source: {:?}", url_src);
                 if url_src.file_name().is_none() {
+                    tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
                     let original_dir = find_url_cache_dir(&cache_dir, url_src)?;
                     let target_dir = if let Some(target) = url_src.target_directory() {
@@ -68,9 +95,16 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
                         &original_dir,
                         &target_dir,
                         url_src.target_directory(),
+                        &ignored_files,
                     )?;
+
                     if !diff.is_empty() {
                         patch_content.push_str(&diff);
+                    }
+
+                    // Parse the patch content with diffy and print it colored
+                    if !diff.is_empty() {
+                        tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
                     }
                 }
                 // If it has a file_name, it's a single file and likely wasn't modified
@@ -79,17 +113,31 @@ pub fn create_patch<P: AsRef<Path>>(work_dir: P) -> Result<(), SourceError> {
                 // Path sources are copied from local filesystem,
                 // we could compare against the original path if needed
                 // For now, skip as the original is still available
+                tracing::warn!("Generating patch for path source is not implemented yet.");
             }
         }
-    }
 
-    if patch_content.is_empty() {
-        println!("No changes detected - no patch file created");
-        return Ok(());
-    }
+        if patch_content.is_empty() {
+            tracing::info!("No changes detected for source: {:?}", source);
+            continue; // Skip if no changes were detected
+        }
 
-    fs::write(&patch_path, patch_content)?;
-    println!("Created patch file at: {}", patch_path.display());
+        // Write the patch content to a file
+        let recipe_dir = source_info
+            .recipe_path
+            .parent()
+            .expect("Recipe path should have a parent");
+
+        let patch_file_name = format!("{}.patch", name);
+        let patch_path = recipe_dir.join(patch_file_name);
+
+        if patch_path.exists() && !overwrite {
+            return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
+        }
+
+        fs::write(&patch_path, patch_content)?;
+        tracing::info!("Created patch file at: {}", patch_path.display());
+    }
 
     Ok(())
 }
@@ -99,13 +147,10 @@ fn create_directory_diff(
     original_dir: &Path,
     modified_dir: &Path,
     target_subdir: Option<&PathBuf>,
-) -> Result<String, SourceError> {
+    ignored_files: &[&OsStr],
+) -> Result<String, GeneratePatchError> {
     let mut patch_content = String::new();
-    println!(
-        "Creating patch for directories:\nOriginal: {}\nModified: {}",
-        original_dir.display(),
-        modified_dir.display()
-    );
+
     // Walk through all files in the modified directory
     for entry in WalkDir::new(modified_dir)
         .into_iter()
@@ -114,8 +159,12 @@ fn create_directory_diff(
     {
         let modified_file = entry.path();
 
-        // Skip the source info file
-        if modified_file.file_name() == Some(std::ffi::OsStr::new(".source_info.json")) {
+        if ignored_files
+            .iter()
+            .any(|f| modified_file.file_name().map_or(false, |name| &name == f))
+        {
+            // Skip ignored files
+            tracing::debug!("Skipping ignored file: {}", modified_file.display());
             continue;
         }
 
@@ -133,30 +182,36 @@ fn create_directory_diff(
         };
 
         if original_file.exists() {
-            // Compare existing files
-            let original_content = fs::read_to_string(&original_file).map_err(|_| {
-                SourceError::UnknownError(format!(
-                    "Failed to read original file: {}",
-                    original_file.display()
-                ))
-            })?;
-            let modified_content = fs::read_to_string(modified_file).map_err(|_| {
-                SourceError::UnknownError(format!(
-                    "Failed to read modified file: {}",
+            // Compare existing files, first by modification time and size
+            let modified_metadata = fs::metadata(modified_file)?;
+            let original_metadata = fs::metadata(&original_file)?;
+            if modified_metadata.modified().is_err()
+                || original_metadata.modified().is_err()
+                || modified_metadata.len() != original_metadata.len()
+            {
+                // If the file has been modified, create a patch
+                tracing::debug!(
+                    "File changed: {} -> {}",
+                    original_file.display(),
                     modified_file.display()
-                ))
-            })?;
+                );
+            } else {
+                // If the file hasn't changed, skip it
+                continue;
+            }
+
+            let original_content = fs::read_to_string(&original_file)?;
+            let modified_content = fs::read_to_string(modified_file)?;
 
             if original_content != modified_content {
-                let patch = diffy::create_patch(&original_content, &modified_content);
-                let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
+                let patch = DiffOptions::default()
+                    .set_original_filename(format!("a/{}", patch_path.display()))
+                    .set_modified_filename(format!("b/{}", patch_path.display()))
+                    .create_patch(&original_content, &modified_content);
 
-                // Add proper file headers for the patch
                 patch_content.push_str(&format!(
-                    "--- a/{}\n+++ b/{}\n{}",
-                    patch_path.display(),
-                    patch_path.display(),
-                    unified_diff
+                    "{}",
+                    diffy::PatchFormatter::new().fmt_patch(&patch)
                 ));
             }
         } else {
@@ -168,13 +223,14 @@ fn create_directory_diff(
                 ))
             })?;
 
-            let patch = diffy::create_patch("", &modified_content);
-            let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
+            let patch = DiffOptions::default()
+                .set_original_filename("/dev/null")
+                .set_modified_filename(format!("b/{}", patch_path.display()))
+                .create_patch("", &modified_content);
 
             patch_content.push_str(&format!(
-                "--- /dev/null\n+++ b/{}\n{}",
-                patch_path.display(),
-                unified_diff
+                "{}",
+                diffy::PatchFormatter::new().fmt_patch(&patch)
             ));
         }
     }
@@ -203,39 +259,19 @@ fn create_directory_diff(
                 ))
             })?;
 
-            let patch = diffy::create_patch(&original_content, "");
-            let unified_diff = format!("{}", diffy::PatchFormatter::new().fmt_patch(&patch));
+            let patch = DiffOptions::default()
+                .set_original_filename(format!("a/{}", patch_path.display()))
+                .set_modified_filename("/dev/null")
+                .create_patch(&original_content, "");
 
             patch_content.push_str(&format!(
-                "--- a/{}\n+++ /dev/null\n{}",
-                patch_path.display(),
-                unified_diff
+                "{}",
+                diffy::PatchFormatter::new().fmt_patch(&patch)
             ));
         }
     }
 
     Ok(patch_content)
-}
-
-/// Find the git cache directory for a given git source
-fn find_git_cache_dir(
-    cache_dir: &Path,
-    git_src: &crate::recipe::parser::GitSource,
-) -> Result<PathBuf, SourceError> {
-    // This would need to match the logic in git_source::git_src
-    // You might need to implement a helper function or store more info in SourceInformation
-    // For now, this is a placeholder - you'll need to adapt based on your git caching strategy
-    // let repo_name = git_src.url().path_segments()
-    //     .and_then(|segments| segments.last())
-    //     .and_then(|name| name.strip_suffix(".git"))
-    //     .unwrap_or("unknown");
-
-    let git_cache_dir = cache_dir.join("git").join("bla");
-    // if git_cache_dir.exists() {
-    //     Ok(git_cache_dir)
-    // } else {
-    Err(SourceError::FileNotFound(git_cache_dir))
-    // }
 }
 
 /// Find the URL cache directory for a given URL source
