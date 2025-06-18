@@ -546,7 +546,9 @@ mod test {
     use rattler_conda_types::{ChannelUrl, Platform};
     use url::Url;
 
-    use super::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
+    #[cfg(unix)]
+    use super::contains_prefix_binary;
+    use super::{contains_prefix_text, create_prefix_placeholder};
     use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
     use fs_err as fs;
 
