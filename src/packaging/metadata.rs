@@ -548,6 +548,7 @@ mod test {
 
     #[cfg(unix)]
     use super::contains_prefix_binary;
+    use super::fs;
     use super::{contains_prefix_text, create_prefix_placeholder};
     use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
 
