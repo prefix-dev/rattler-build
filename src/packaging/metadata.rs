@@ -551,6 +551,8 @@ mod test {
     use super::{contains_prefix_text, create_prefix_placeholder};
     use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
     use fs_err as fs;
+    #[cfg(unix)]
+    use std::io::Write;
 
     #[test]
     fn detect_prefix() {
