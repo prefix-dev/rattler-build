@@ -9,7 +9,7 @@ use sha2::Sha256;
 use url::Url;
 
 use crate::recipe_generator::{
-    serialize::{self, ScriptTest, SourceElement, Test},
+    serialize::{self, ScriptTest, Test, UrlSourceElement},
     write_recipe,
 };
 #[allow(non_snake_case)]
@@ -204,7 +204,7 @@ const R_BUILTINS: &[&str] = &[
 #[async_recursion::async_recursion]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let package = &opts.package;
-    eprintln!("Generating R recipe for {}", package);
+    tracing::info!("Generating R recipe for {}", package);
     let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
         "https://{universe}.r-universe.dev/api/packages/{}",
@@ -239,12 +239,12 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
 
     let sha256 = fetch_package_sha256sum(&url).await?;
 
-    let source = SourceElement {
+    let source = UrlSourceElement {
         url: vec![url.to_string(), url_archive.to_string()],
         md5: None,
         sha256: Some(format!("{:x}", sha256)),
     };
-    recipe.source.push(source);
+    recipe.source.push(source.into());
 
     recipe.build.script = "R CMD INSTALL --build .".to_string();
 
