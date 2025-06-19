@@ -66,10 +66,9 @@ use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{
     GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-    package::ArchiveType,
+    compression_level::CompressionLevel, package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
