@@ -1847,7 +1847,7 @@ dependencies = [
 [[package]]
 name = "file_url"
 version = "0.2.5"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -4063,7 +4063,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.34.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4207,7 +4207,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.3.20"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -4238,7 +4238,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.35.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "chrono",
  "core-foundation 0.10.0",
@@ -4277,7 +4277,7 @@ dependencies = [
 [[package]]
 name = "rattler_config"
 version = "0.1.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "console",
  "dirs",
@@ -4296,7 +4296,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.1.2"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "blake2",
  "digest",
@@ -4313,7 +4313,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.23.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4346,7 +4346,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.9"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "quote",
  "syn",
@@ -4355,7 +4355,7 @@ dependencies = [
 [[package]]
 name = "rattler_menuinst"
 version = "0.2.10"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "chrono",
  "configparser",
@@ -4384,7 +4384,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.25.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4412,7 +4412,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.22.39"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "bzip2",
  "chrono",
@@ -4441,7 +4441,7 @@ dependencies = [
 [[package]]
 name = "rattler_pty"
 version = "0.2.1"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "libc",
  "nix",
@@ -4451,7 +4451,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.10"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4461,7 +4461,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.23.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4518,7 +4518,7 @@ dependencies = [
 [[package]]
 name = "rattler_sandbox"
 version = "0.1.8"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "birdcage",
  "clap",
@@ -4529,7 +4529,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.23.2"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "anyhow",
  "enum_dispatch",
@@ -4549,7 +4549,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "2.1.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "chrono",
  "futures",
@@ -4566,7 +4566,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.0.13"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "archspec",
  "libloading",
@@ -5556,7 +5556,7 @@ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.1.0"
-source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#880929fbd69a722e6cab94b9b59c268aa4a98044"
+source = "git+https://github.com/wolfv/rattler?branch=rattler-config-ii#8e6c61b689779cc06426645043f602567d659cd0"
 dependencies = [
  "tokio",
 ]

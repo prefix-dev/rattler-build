@@ -7,13 +7,16 @@ use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
-use rattler_config::config::build::PackageFormatAndCompression;
+use rattler_config::config::{build::PackageFormatAndCompression, s3::S3Options};
 use rattler_networking::{mirror_middleware, s3_middleware};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{Value, json};
 use tracing::warn;
 use url::Url;
+
+/// The configuration type for rattler-build - just extends rattler / pixi config and can load the same TOML files.
+pub type Config = rattler_config::config::ConfigBase<()>;
 
 #[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
@@ -224,20 +227,40 @@ pub struct CommonData {
     pub allow_insecure_host: Option<Vec<String>>,
 }
 
+fn compute_s3_config<M>(s3_options: &M) -> HashMap<String, s3_middleware::S3Config>
+where
+    M: IntoIterator<Item = (String, S3Options)> + Clone,
+{
+    s3_options
+        .clone()
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                k,
+                s3_middleware::S3Config::Custom {
+                    endpoint_url: v.endpoint_url,
+                    region: v.region,
+                    force_path_style: v.force_path_style,
+                },
+            )
+        })
+        .collect()
+}
+
 impl CommonData {
     /// Create a new instance of `CommonData`
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
-        config: pixi_config::Config,
+        config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
-        tracing::debug!("Using mirrors: {:?}", config.mirror_map());
+        tracing::debug!("Using mirrors: {:?}", config.mirrors);
 
         fn ensure_trailing_slash(url: &url::Url) -> url::Url {
             if url.path().ends_with('/') {
@@ -250,7 +273,7 @@ impl CommonData {
             }
         }
 
-        for (key, value) in config.mirror_map() {
+        for (key, value) in &config.mirrors {
             let mut mirrors = Vec::new();
             for v in value {
                 mirrors.push(mirror_middleware::Mirror {
@@ -264,7 +287,7 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
-        let s3_config = config.compute_s3_config();
+        let s3_config = compute_s3_config(&config.s3_options);
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
@@ -276,7 +299,7 @@ impl CommonData {
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: pixi_config::Config) -> Self {
+    fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -560,20 +583,16 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
             opts.host_platform,
             opts.channels.or_else(|| {
-                config.as_ref().and_then(|config| {
-                    if config.default_channels.is_empty() {
-                        None
-                    } else {
-                        Some(config.default_channels.clone())
-                    }
-                })
+                config
+                    .as_ref()
+                    .and_then(|config| config.default_channels.clone())
             }),
             opts.variant_config,
             opts.ignore_recipe_variants,
@@ -669,7 +688,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -740,7 +759,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -1257,7 +1276,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: DebugOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
