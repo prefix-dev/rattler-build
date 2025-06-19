@@ -78,7 +78,7 @@ async fn async_main() -> miette::Result<()> {
     };
 
     let config = if let Some(config_path) = app.config_file {
-        Some(Config::load_from_files(&config_path).into_diagnostic()?)
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
     } else {
         None
     };
