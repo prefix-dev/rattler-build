@@ -1462,7 +1462,7 @@ dependencies = [
 [[package]]
 name = "diffy"
 version = "0.4.2"
-source = "git+https://github.com/remimimimimi/diffy.git?branch=patches#75c620fc52bb5a7661288017591105682cf24b46"
+source = "git+https://github.com/remimimimimi/diffy.git?branch=master#b3f8a7ce61f7ebdc97afe9fc468db5d7e6bbc369"
 dependencies = [
  "nu-ansi-term 0.50.1",
  "strsim",
@@ -2290,7 +2290,7 @@ dependencies = [
 [[package]]
 name = "http-range-client"
 version = "0.9.0"
-source = "git+https://github.com/remimimimimi/http-range-client.git#2e7dd3ac5dfe57be1630ac40d15a777bb13339a7"
+source = "git+https://github.com/pka/http-range-client.git#b3ab3efd54b657f728686189495b1afa75d38fb7"
 dependencies = [
  "async-trait",
  "byteorder",

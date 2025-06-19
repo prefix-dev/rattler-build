@@ -181,6 +181,7 @@ pub(crate) fn apply_patch_gnu(
 
     tracing::debug!("Patch {} will be applied", patch_file_path.display());
 
+    // GNU patch treats some paths incorrectly on windows
     #[cfg(windows)]
     let patch_tmp = temp_copy(patch_file_path)?;
     #[cfg(windows)]
@@ -303,18 +304,18 @@ pub(crate) fn apply_patches(
 mod tests {
     use crate::{
         SystemTools, get_build_output, get_tool_config,
-        metadata::Output,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
         script::SandboxArguments,
-        source::{copy_dir::CopyDir, fetch_sources},
+        source::{copy_dir::CopyDir, fetch_source},
         tool_configuration::Configuration,
     };
-    use std::{ffi::OsStr, process::Command};
+    use std::{ffi::OsStr, process::Command, sync::LazyLock};
 
     use super::*;
     use line_ending::LineEnding;
     use miette::IntoDiagnostic;
+    use regex::Regex;
     use rstest::*;
 
     use tempfile::TempDir;
@@ -454,13 +455,10 @@ mod tests {
         assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
     }
 
-    type PatchableSource = (BuildData, Configuration, Output, Vec<Source>);
-    type PatchablePkg = (TempDir, Vec<PatchableSource>);
-
     /// Prepare all information needed to test patches for package info path.
-    async fn prepare_package(recipe_dir: &Path) -> miette::Result<PatchablePkg> {
+    async fn prepare_sources(recipe_dir: &Path) -> miette::Result<(Configuration, Vec<Source>)> {
         let artifacts_dir = tempfile::tempdir().unwrap();
-        let artifacts_dir_path = artifacts_dir.path();
+        let artifacts_dir_path = artifacts_dir.path().join("original");
         let recipe_path = recipe_dir.join("recipe.yaml");
 
         let opts = BuildOpts {
@@ -474,7 +472,7 @@ mod tests {
             common: CommonOpts {
                 use_zstd: true,
                 use_bz2: true,
-                output_dir: Some(artifacts_dir_path.to_path_buf()),
+                output_dir: Some(artifacts_dir_path),
                 ..Default::default()
             },
             sandbox_arguments: SandboxArguments {
@@ -491,46 +489,95 @@ mod tests {
 
         let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
 
-        let mut patchable_outputs = vec![];
+        let mut patchable_sources = vec![];
         for output in outputs {
-            let mut pkg_sources = vec![];
             let sources = output.recipe.sources();
             for source in sources {
                 if !source.patches().is_empty() {
-                    pkg_sources.push(source.clone())
+                    patchable_sources.push(source.clone())
                 }
-            }
-
-            if !pkg_sources.is_empty() {
-                patchable_outputs.push((
-                    build_data.clone(),
-                    tool_config.clone(),
-                    output,
-                    pkg_sources,
-                ))
             }
         }
 
-        Ok((artifacts_dir, patchable_outputs))
+        patchable_sources.dedup();
+
+        Ok((tool_config, patchable_sources))
     }
 
-    fn show_dir_difference(git_dir: &Path, custom_dir: &Path) -> miette::Result<String> {
+    fn show_dir_difference(common_parent: &Path) -> miette::Result<String> {
         let mut cmd = Command::new("diff");
-
-        let dir_difference = String::from_utf8(
-            cmd.args([
+        // So snapshots doesn't change all the time
+        let original_dir = PathBuf::from("./original");
+        let copy_dir = PathBuf::from("./copy");
+        let stdout = cmd
+            .current_dir(common_parent)
+            .args([
                 OsStr::new("-rNu"),
-                OsStr::new("--color=always"),
-                git_dir.as_os_str(),
-                custom_dir.as_os_str(),
+                OsStr::new("--color=auto"),
+                original_dir.as_os_str(),
+                copy_dir.as_os_str(),
             ])
             .output()
             .into_diagnostic()?
-            .stdout,
-        )
-        .into_diagnostic()?;
+            .stdout;
 
-        Ok(dir_difference)
+        static RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?m)^(?<fileonly>(\+\+\+|---) .*)\t.*$").unwrap());
+
+        let dir_difference = String::from_utf8(stdout).unwrap();
+        let dir_difference = RE.replace_all(&dir_difference, "$fileonly");
+
+        Ok(dir_difference.to_string())
+    }
+
+    /// Applied patches is vector of strip level and diffs from one patch file.
+    fn snapshot_patched_files(
+        package_name: &str,
+        applied_patches: &Vec<(usize, Vec<Patch<'_, [u8]>>)>,
+        comparison_dir: &Path,
+    ) -> miette::Result<()> {
+        let mut patch_results = vec![];
+        for (strip_level, patchset) in applied_patches.iter() {
+            for patch in patchset.iter() {
+                let file_paths = custom_patch_stripped_paths(patch, *strip_level);
+                let absolute_file_paths = (
+                    file_paths.0.map(|o| comparison_dir.join("copy").join(&o)),
+                    file_paths.1.map(|m| comparison_dir.join("copy").join(&m)),
+                );
+
+                #[derive(Debug)]
+                #[allow(dead_code)]
+                enum PatchResult {
+                    Created(bool),
+                    Deleted(bool),
+                    Modified(String),
+                }
+
+                match absolute_file_paths {
+                    (None, None) => (), // Assume that it will do nothing.
+                    (None, Some(m)) => {
+                        patch_results.push((patch, PatchResult::Created(m.exists())))
+                    }
+
+                    (Some(o), None) => {
+                        patch_results.push((patch, PatchResult::Deleted(!o.exists())))
+                    }
+                    (Some(_), Some(m)) => {
+                        let modified_file_contents = fs_err::read(m).into_diagnostic()?;
+                        let modified_file_debug_representation =
+                            String::from_utf8(modified_file_contents)
+                                .unwrap_or_else(|e| format!("{:#?}", e.into_bytes()));
+                        patch_results.push((
+                            patch,
+                            PatchResult::Modified(modified_file_debug_representation),
+                        ))
+                    }
+                }
+            }
+        }
+        insta::assert_debug_snapshot!(package_name, patch_results);
+
+        Ok(())
     }
 
     /// Compare custom patch application with reference git patch application.
@@ -560,79 +607,102 @@ mod tests {
         // Failed to download source
         #[exclude("petsc")]
         // GNU patch fails and diffy succeeds, seemingly correctly from the diff output.
-        #[exclude("(fastjet-cxx)|(fenics-)|(love2d)|(flask-security-too)")]
+        #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)")]
         // Parse fails, since createrepo-c/438.patch contains two mail
         // messages in one file. Fix postponed until parser
         // reimplemented.
         #[exclude("createrepo_c")]
         recipe_dir: PathBuf,
     ) -> miette::Result<()> {
-        let prep = prepare_package(&recipe_dir).await?;
-        let (_tmpdir, patchable_outputs) = prep;
-        for (_build_data, tool_configuration, output, sources) in patchable_outputs {
-            let directories = output.build_configuration.directories;
+        let snapshot_tested = ["love2d"];
+        let pkg_name = recipe_dir.as_path().file_name().unwrap().to_str().unwrap();
+        let is_snapshot_test = snapshot_tested.contains(&pkg_name);
 
-            let system_tools = SystemTools::new();
-            // Just fetch sources without applying patch.
-            let _ = fetch_sources(
-                &sources,
-                &directories,
-                &system_tools,
-                &tool_configuration,
+        let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
+        for source in sources {
+            let comparison_dir = tempfile::tempdir().into_diagnostic()?;
+
+            // If you rename these, don't forget to change names in `show_dir_difference`.
+            let original_dir = comparison_dir.path().join("original");
+            fs_err::create_dir(&original_dir).into_diagnostic()?;
+            let copy_dir = comparison_dir.path().join("copy");
+            fs_err::create_dir(&copy_dir).into_diagnostic()?;
+            let cache_src = comparison_dir.path().join("cache");
+            fs_err::create_dir(&cache_src).into_diagnostic()?;
+
+            let mut _rendered_sources = vec![];
+
+            // Fetch source
+            fetch_source(
+                &source,
+                &mut _rendered_sources,
+                &original_dir,
+                &recipe_dir,
+                &cache_src,
+                &SystemTools::new(),
+                &tool_config,
                 |_, _| Ok(()),
             )
             .await
             .into_diagnostic()?;
 
-            // This directory will contain newly fetched sources to which we want to apply patches.
-            let original_sources_dir_path = directories.work_dir;
             // Create copy of that directory.
-            let copy_sources_dir = tempfile::tempdir().into_diagnostic()?;
-            let copy_sources_dir_path = copy_sources_dir.path().to_path_buf();
-            CopyDir::new(&original_sources_dir_path, &copy_sources_dir_path)
+            CopyDir::new(&original_dir, &copy_dir)
                 .run()
                 .into_diagnostic()?;
 
-            // Apply patches to both directories.
-            for source in sources {
-                let patches = source.patches().to_vec();
-                let target_directory = source.target_directory();
+            let patches = source.patches().to_vec();
+            let target_directory = source.target_directory();
 
-                let (original_source_dir_path, patched_source_dir_path) = match target_directory {
-                    Some(td) => (
-                        &original_sources_dir_path.join(td),
-                        &copy_sources_dir_path.join(td),
-                    ),
-                    None => (&original_sources_dir_path, &copy_sources_dir_path),
-                };
+            let (original_source_dir_path, patched_source_dir_path) = match target_directory {
+                Some(td) => (&original_dir.join(td), &copy_dir.join(td)),
+                None => (&original_dir, &copy_dir),
+            };
 
-                let gnu_patch_res = apply_patches(
+            let gnu_patch_res = if !is_snapshot_test {
+                apply_patches(
                     patches.as_slice(),
                     original_source_dir_path,
                     &recipe_dir,
                     |wd, p| apply_patch_gnu(&SystemTools::new(), wd, p),
-                );
+                )
+            } else {
+                Ok(())
+            };
 
-                let custom_res = apply_patches(
-                    patches.as_slice(),
-                    patched_source_dir_path,
-                    &recipe_dir,
-                    apply_patch_custom,
-                );
+            let custom_res = apply_patches(
+                patches.as_slice(),
+                patched_source_dir_path,
+                &recipe_dir,
+                apply_patch_custom,
+            );
 
-                let difference =
-                    show_dir_difference(original_source_dir_path, patched_source_dir_path).expect(
-                        "Can't show dir difference. Most probably you're missing GNU diff binary.",
-                    );
+            match (custom_res, gnu_patch_res) {
+                (Ok(_), Ok(_)) => (),
+                (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
+                (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
+                (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
+            }
 
-                match (custom_res, gnu_patch_res) {
-                    (Ok(_), Ok(_)) => (),
-                    (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
-                    (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
-                    (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
-                }
+            let difference = show_dir_difference(comparison_dir.path())
+                .expect("Can't show dir difference. Most probably you're missing GNU diff binary.");
 
-                if !difference.trim().is_empty() {
+            if !difference.trim().is_empty() {
+                if is_snapshot_test {
+                    let patches_file_content = patches
+                        .iter()
+                        .map(|pp| fs_err::read(recipe_dir.join(pp)))
+                        .collect::<Result<Vec<_>, _>>()
+                        .into_diagnostic()?;
+                    let mut patch_files = vec![];
+                    for patch_file_content in patches_file_content.iter() {
+                        let patches = patches_from_bytes(patch_file_content).into_diagnostic()?;
+                        let strip_level = guess_strip_level(&patches, original_source_dir_path)
+                            .into_diagnostic()?;
+                        patch_files.push((strip_level, patches));
+                    }
+                    snapshot_patched_files(pkg_name, &patch_files, comparison_dir.path())?;
+                } else {
                     // If we panic on just nonempty difference then
                     // there are 4 more tests failing, because git
                     // does not apply patches. Specifically

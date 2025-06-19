@@ -181,8 +181,8 @@ retry-policies = "0.4.0"
 strum = "0.27.1"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
-diffy = { git = "https://github.com/remimimimimi/diffy.git", branch = "patches" }
-http-range-client = { git = "https://github.com/remimimimimi/http-range-client.git", default-features = false, features = [
+diffy = { git = "https://github.com/remimimimimi/diffy.git", branch = "master" }
+http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
 ] }
