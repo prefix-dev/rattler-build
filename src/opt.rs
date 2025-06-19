@@ -1290,4 +1290,16 @@ pub struct CreatePatchOpts {
     /// Whether to overwrite the patch file if it already exists.
     #[arg(long, default_value = "false")]
     pub overwrite: bool,
+
+    /// Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided.
+    #[arg(long, value_name = "DIR")]
+    pub patch_dir: Option<PathBuf>,
+
+    /// Comma-separated list of file names (or glob patterns) that should be excluded from the diff.
+    #[arg(long, value_delimiter = ',')]
+    pub exclude: Option<Vec<String>>,
+
+    /// Perform a dry-run: analyse changes and log the diff, but don't write the patch file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
 }

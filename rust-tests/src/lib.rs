@@ -3,6 +3,7 @@ mod tests {
     use duct::cmd;
     use fs_err as fs;
     use rattler_package_streaming::read::extract_tar_bz2;
+    use serde_json::json;
     use std::{
         collections::HashMap,
         ffi::{OsStr, OsString},
@@ -706,5 +707,364 @@ requirements:
         let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("No license files were copied"));
         assert!(output.contains("The following license files were not found: *.license"));
+    }
+
+    /// Ensures that modifications to an existing file are picked up and written to the patch.
+    #[test]
+    fn test_create_patch() {
+        let tmp = tmp("test_create_patch");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("test.txt"), "hello\n").unwrap();
+
+        fs::write(work_dir.join("test.txt"), "hello world\n").unwrap();
+
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [
+                {
+                    "url": "https://example.com/example.tar.gz",
+                    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                }
+            ]
+        });
+
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        assert!(patch_path.exists());
+
+        let patch_content = fs::read_to_string(patch_path).unwrap();
+        assert!(patch_content.contains("+hello world"));
+    }
+
+    /// Verifies that a brand-new file added in the work directory is represented in the generated patch.
+    #[test]
+    fn test_create_patch_new_file() {
+        let tmp = tmp("test_create_patch_new_file");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+
+        fs::write(work_dir.join("added.txt"), "brand new file\n").unwrap();
+
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        assert!(patch_path.exists());
+        let patch_content = fs::read_to_string(patch_path).unwrap();
+        assert!(patch_content.contains("b/added.txt"));
+        assert!(patch_content.contains("brand new file"));
+    }
+
+    /// Confirms that deletions (a file present in the original cache but missing in the work directory) are recorded.
+    #[test]
+    fn test_create_patch_deleted_file() {
+        let tmp = tmp("test_create_patch_deleted_file");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("obsolete.txt"), "to be deleted\n").unwrap();
+
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        assert!(patch_path.exists());
+        let patch_content = fs::read_to_string(patch_path).unwrap();
+        assert!(patch_content.contains("a/obsolete.txt"));
+        assert!(patch_content.contains("/dev/null"));
+    }
+
+    /// Checks the no-op scenario: when there are no changes, no patch file should be created.
+    #[test]
+    fn test_create_patch_no_changes() {
+        let tmp = tmp("test_create_patch_no_changes");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("same.txt"), "identical\n").unwrap();
+
+        fs::write(work_dir.join("same.txt"), "identical\n").unwrap();
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        // No changes -> patch file should NOT exist
+        assert!(!patch_path.exists());
+    }
+
+    /// Ensures that `--patch-dir` places the patch file into the requested directory rather than the default.
+    #[test]
+    fn test_create_patch_custom_output_dir() {
+        let tmp = tmp("test_create_patch_custom_output_dir");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+        let out_dir = tmp.as_dir().join("patches");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        // Original cache dir with file
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("foo.txt"), "foo\n").unwrap();
+
+        // Modify file in work_dir
+        fs::write(work_dir.join("foo.txt"), "foo bar\n").unwrap();
+
+        // Minimal recipe so patch path can be resolved
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        // .source_info.json setup
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        // Call create-patch specifying custom directory
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--patch-dir",
+            out_dir.to_str().unwrap(),
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = out_dir.join("changes.patch");
+        assert!(patch_path.exists());
+    }
+
+    /// Tests that files passed via `--exclude` are not included in the generated diff.
+    #[test]
+    fn test_create_patch_exclude() {
+        let tmp = tmp("test_create_patch_exclude");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        // Original cache
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("ignored.txt"), "ignore me\n").unwrap();
+        fs::write(orig_dir.join("included.txt"), "include me\n").unwrap();
+
+        // Modify both files in work_dir
+        fs::write(work_dir.join("ignored.txt"), "ignore me changed\n").unwrap();
+        fs::write(work_dir.join("included.txt"), "include me changed\n").unwrap();
+
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--exclude",
+            "ignored.txt",
+            "--name",
+            "changes",
+            "--overwrite",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        assert!(patch_path.exists());
+
+        let content = fs::read_to_string(patch_path).unwrap();
+        // Ensure diff contains included.txt change but not ignored.txt
+        assert!(content.contains("included.txt"));
+        assert!(!content.contains("ignored.txt"));
+    }
+
+    /// Confirms that `--dry-run` prevents writing the patch file even when diffs are detected.
+    #[test]
+    fn test_create_patch_dry_run() {
+        let tmp = tmp("test_create_patch_dry_run");
+        let cache_dir = tmp.as_dir().join("cache");
+        let work_dir = tmp.as_dir().join("work");
+        let recipe_dir = tmp.as_dir().join("recipe");
+
+        fs::create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        let orig_dir_name = "example_01234567";
+        let orig_dir = cache_dir.join(orig_dir_name);
+        fs::create_dir_all(&orig_dir).unwrap();
+        fs::write(orig_dir.join("file.txt"), "hello\n").unwrap();
+
+        // Modify
+        fs::write(work_dir.join("file.txt"), "hello world\n").unwrap();
+
+        let recipe_path = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_path, "package:\n  name: dummy\n").unwrap();
+
+        let source_info = json!({
+            "recipe_path": recipe_path.to_str().unwrap(),
+            "source_cache": cache_dir.to_str().unwrap(),
+            "sources": [{
+                "url": "https://example.com/example.tar.gz",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }]
+        });
+        fs::write(work_dir.join(".source_info.json"), source_info.to_string()).unwrap();
+
+        let rattler_build = rattler().with_args([
+            "create-patch",
+            "--directory",
+            work_dir.to_str().unwrap(),
+            "--name",
+            "changes",
+            "--dry-run",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let patch_path = recipe_dir.join("changes.patch");
+        // Dry-run should not create the patch
+        assert!(!patch_path.exists());
     }
 }
