@@ -346,7 +346,13 @@ fn build_globset(patterns: &[String]) -> Result<GlobSet, GeneratePatchError> {
     use globset::GlobSetBuilder;
     let mut builder = GlobSetBuilder::new();
     for pat in patterns {
+        // Add original pattern
         builder.add(Glob::new(pat)?);
+        // If pattern has no path separator, also match it anywhere in the tree
+        if !pat.contains('/') && !pat.contains('\\') {
+            let anywhere = format!("**/{}", pat);
+            builder.add(Glob::new(&anywhere)?);
+        }
     }
     Ok(builder.build()?)
 }
