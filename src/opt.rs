@@ -6,10 +6,11 @@ use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
-use rattler_config::config::{build::PackageFormatAndCompression, s3::S3Options};
+use rattler_conda_types::{
+    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
+};
+use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::{mirror_middleware, s3_middleware};
-use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{Value, json};
 use tracing::warn;
@@ -227,26 +228,6 @@ pub struct CommonData {
     pub allow_insecure_host: Option<Vec<String>>,
 }
 
-fn compute_s3_config<M>(s3_options: &M) -> HashMap<String, s3_middleware::S3Config>
-where
-    M: IntoIterator<Item = (String, S3Options)> + Clone,
-{
-    s3_options
-        .clone()
-        .into_iter()
-        .map(|(k, v)| {
-            (
-                k,
-                s3_middleware::S3Config::Custom {
-                    endpoint_url: v.endpoint_url,
-                    region: v.region,
-                    force_path_style: v.force_path_style,
-                },
-            )
-        })
-        .collect()
-}
-
 impl CommonData {
     /// Create a new instance of `CommonData`
     pub fn new(
@@ -287,7 +268,7 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
-        let s3_config = compute_s3_config(&config.s3_options);
+        let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options);
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,

@@ -17,10 +17,10 @@ use indicatif::HumanBytes;
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
     VersionWithSource,
+    compression_level::CompressionLevel,
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
 };
 use rattler_index::{IndexFsConfig, index_fs};
-use rattler_package_streaming::write::CompressionLevel;
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use rattler_virtual_packages::{
@@ -243,7 +243,7 @@ impl PackagingSettings {
     /// and the selected archive type.
     pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
-            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
+            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 

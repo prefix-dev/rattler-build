@@ -115,11 +115,10 @@ clap_complete_nushell = "4.5.5"
 tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
 
 tar = "0.4.44"
-zip = { version = "2.6.1", default-features = false, features = [
-  "flate2",
+zip = { version = "4.1.0", default-features = false, features = [
   "deflate",
 ] }
-bzip2 = "0.5.2"
+bzip2 = "0.6.0"
 base64 = "0.22.1"
 flate2 = "1.1.1"
 xz2 = "0.1.7"
@@ -157,7 +156,7 @@ rattler_digest = { version = "1.1.1", default-features = false, features = [
   "serde",
 ] }
 rattler_index = { version = "0.23.0", default-features = false }
-rattler_networking = { version = "0.25.0", default-features = false, features = ["s3"] }
+rattler_networking = { version = "0.25.0", default-features = false, features = ["s3", "rattler_config"] }
 rattler_redaction = { version = "0.1.10" }
 rattler_repodata_gateway = { version = "0.23.0", default-features = false, features = [
   "gateway",
