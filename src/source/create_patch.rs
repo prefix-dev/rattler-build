@@ -4,6 +4,7 @@
 
 use diffy::DiffOptions;
 use fs_err as fs;
+use globset::{Glob, GlobSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -34,6 +35,10 @@ pub enum GeneratePatchError {
     /// Error when the path cannot be stripped of its prefix
     #[error("Failed to strip prefix from path: {0}")]
     StripPrefixError(#[from] std::path::StripPrefixError),
+
+    /// Error in user supplied glob pattern
+    #[error("Invalid glob pattern: {0}")]
+    GlobPatternError(#[from] globset::Error),
 }
 
 /// Creates a unified diff patch by comparing the current state of files in the work directory
@@ -42,6 +47,9 @@ pub fn create_patch<P: AsRef<Path>>(
     work_dir: P,
     name: &str,
     overwrite: bool,
+    output_dir: Option<&Path>,
+    exclude_patterns: &[String],
+    dry_run: bool,
 ) -> Result<(), GeneratePatchError> {
     let work_dir = work_dir.as_ref();
     let source_info_path = work_dir.join(".source_info.json");
@@ -61,13 +69,18 @@ pub fn create_patch<P: AsRef<Path>>(
             ))
         })?;
 
-    let ignored_files = vec![
+    // Default ignored files that we never want to include in the diff.  The
+    // caller can supply additional file names via `--exclude`.
+    let ignored_files: Vec<&OsStr> = vec![
         OsStr::new(".source_info.json"), // Ignore the source info file itself
         OsStr::new("conda_build.sh"),    // Ignore conda build script
         OsStr::new("conda_build.bat"),   // Ignore conda build script for Windows
         OsStr::new("build_env.sh"),      // Ignore build environment script
         OsStr::new("build_env.bat"),     // Ignore build environment script for Windows
     ];
+
+    // compile glob patterns from user exclusions
+    let glob_set = build_globset(exclude_patterns)?;
 
     let cache_dir = source_info.source_cache;
 
@@ -96,6 +109,7 @@ pub fn create_patch<P: AsRef<Path>>(
                         &target_dir,
                         url_src.target_directory(),
                         &ignored_files,
+                        &glob_set,
                     )?;
 
                     if !diff.is_empty() {
@@ -122,21 +136,31 @@ pub fn create_patch<P: AsRef<Path>>(
             continue; // Skip if no changes were detected
         }
 
-        // Write the patch content to a file
+        // Determine directory where we should write the patch
         let recipe_dir = source_info
             .recipe_path
             .parent()
             .expect("Recipe path should have a parent");
+        let target_dir = output_dir.unwrap_or(recipe_dir);
 
         let patch_file_name = format!("{}.patch", name);
-        let patch_path = recipe_dir.join(patch_file_name);
+        let patch_path = target_dir.join(patch_file_name);
 
         if patch_path.exists() && !overwrite {
             return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
         }
 
-        fs::write(&patch_path, patch_content)?;
-        tracing::info!("Created patch file at: {}", patch_path.display());
+        if dry_run {
+            tracing::info!(
+                "[dry-run] Would create patch file at: {} ({} bytes)",
+                patch_path.display(),
+                patch_content.len()
+            );
+        } else {
+            fs::create_dir_all(target_dir)?;
+            fs::write(&patch_path, patch_content)?;
+            tracing::info!("Created patch file at: {}", patch_path.display());
+        }
     }
 
     Ok(())
@@ -148,6 +172,7 @@ fn create_directory_diff(
     modified_dir: &Path,
     target_subdir: Option<&PathBuf>,
     ignored_files: &[&OsStr],
+    glob_set: &GlobSet,
 ) -> Result<String, GeneratePatchError> {
     let mut patch_content = String::new();
 
@@ -161,7 +186,8 @@ fn create_directory_diff(
 
         if ignored_files
             .iter()
-            .any(|f| modified_file.file_name().map_or(false, |name| &name == f))
+            .any(|f| modified_file.file_name().is_some_and(|name| &name == f))
+            || glob_set.is_match(modified_file)
         {
             // Skip ignored files
             tracing::debug!("Skipping ignored file: {}", modified_file.display());
@@ -172,11 +198,11 @@ fn create_directory_diff(
         let rel_path = modified_file.strip_prefix(modified_dir)?;
 
         // Find the corresponding original file
-        let original_file = original_dir.join(&rel_path);
+        let original_file = original_dir.join(rel_path);
 
         // Create the patch path (for display in the patch)
         let patch_path = if let Some(subdir) = target_subdir {
-            PathBuf::from(subdir).join(&rel_path)
+            PathBuf::from(subdir).join(rel_path)
         } else {
             rel_path.to_path_buf()
         };
@@ -243,11 +269,15 @@ fn create_directory_diff(
     {
         let original_file = entry.path();
         let rel_path = original_file.strip_prefix(original_dir)?;
-        let modified_file = modified_dir.join(&rel_path);
+        let modified_file = modified_dir.join(rel_path);
 
         if !modified_file.exists() {
+            if glob_set.is_match(original_file) {
+                continue;
+            }
+
             let patch_path = if let Some(subdir) = target_subdir {
-                PathBuf::from(subdir).join(&rel_path)
+                PathBuf::from(subdir).join(rel_path)
             } else {
                 rel_path.to_path_buf()
             };
@@ -309,4 +339,14 @@ fn find_url_cache_dir(
     } else {
         Err(SourceError::FileNotFound(extracted_dir))
     }
+}
+
+/// Build a GlobSet matcher from patterns, returning an empty matcher if the list is empty.
+fn build_globset(patterns: &[String]) -> Result<GlobSet, GeneratePatchError> {
+    use globset::GlobSetBuilder;
+    let mut builder = GlobSetBuilder::new();
+    for pat in patterns {
+        builder.add(Glob::new(pat)?);
+    }
+    Ok(builder.build()?)
 }

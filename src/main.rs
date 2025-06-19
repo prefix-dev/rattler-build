@@ -165,7 +165,15 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::CreatePatch(opts)) => {
-            let _ = create_patch::create_patch(opts.directory, &opts.name, opts.overwrite);
+            let exclude_vec = opts.exclude.clone().unwrap_or_default();
+            let _ = create_patch::create_patch(
+                opts.directory,
+                &opts.name,
+                opts.overwrite,
+                opts.patch_dir.as_deref(),
+                &exclude_vec,
+                opts.dry_run,
+            );
             Ok(())
         }
         None => {
