@@ -64,11 +64,11 @@ pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
     GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
     package::ArchiveType,
 };
+use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
@@ -753,7 +753,7 @@ pub async fn rebuild(
 
     rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
 
-    let temp_dir = temp_folder.into_path();
+    let temp_dir = temp_folder.keep();
 
     tracing::info!("Extracted recipe to: {:?}", temp_dir);
 

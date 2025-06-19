@@ -124,7 +124,7 @@ base64 = "0.22.1"
 flate2 = "1.1.1"
 xz2 = "0.1.7"
 zstd = "0.13.3"
-toml = "0.8.22"
+toml = "0.8.23"
 memmap2 = "0.9.5"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = "0.5.4"
@@ -144,37 +144,37 @@ opendal = { version = "0.53.1", default-features = false, features = [
 ] }
 
 # Rattler crates
-pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
-rattler = { version = "0.33.5", default-features = false, features = [
+rattler_config = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler = { version = "0.34.0", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
 rattler_cache = { version = "0.3.17", default-features = false }
-rattler_conda_types = { version = "0.32.0", default-features = false, features = [
+rattler_conda_types = { version = "0.35.0", default-features = false, features = [
   "rayon",
 ] }
 rattler_digest = { version = "1.1.1", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.22.5", default-features = false }
-rattler_networking = { version = "0.22.12", default-features = false }
+rattler_index = { version = "0.23.0", default-features = false }
+rattler_networking = { version = "0.25.0", default-features = false, features = ["s3"] }
 rattler_redaction = { version = "0.1.10" }
-rattler_repodata_gateway = { version = "0.22.5", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.23.0", default-features = false, features = [
   "gateway",
 ] }
 rattler_sandbox = { version = "0.1.7", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.26", default-features = false, features = [
+rattler_shell = { version = "0.23.2", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.4.5", default-features = false, features = [
+rattler_solve = { version = "2.1.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
 rattler_virtual_packages = { version = "2.0.10", default-features = false }
 rattler_package_streaming = { version = "0.22.36", default-features = false }
-rattler_menuinst = "0.2.7"
+rattler_menuinst = "0.2.10"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
@@ -212,17 +212,17 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-# rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_index = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
-# rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+rattler = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_index = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }
+rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "rattler-config-ii" }

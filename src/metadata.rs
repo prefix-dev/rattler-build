@@ -19,7 +19,7 @@ use rattler_conda_types::{
     VersionWithSource,
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
 };
-use rattler_index::index_fs;
+use rattler_index::{IndexFsConfig, index_fs};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
@@ -771,17 +771,21 @@ pub async fn build_reindexed_channels(
         ),
     );
 
+    let index_config = IndexFsConfig {
+        channel: output_dir.clone(),
+        target_platform: Some(build_configuration.target_platform),
+        repodata_patch: None,
+        write_zst: false,
+        write_shards: false,
+        force: false,
+        max_parallel: num_cpus::get_physical(),
+        multi_progress: None,
+    };
+
     // Reindex the output channel from the files on disk
-    index_fs(
-        output_dir,
-        Some(build_configuration.target_platform),
-        None,
-        false,
-        num_cpus::get_physical(),
-        None,
-    )
-    .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    index_fs(index_config)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(iter::once(output_channel.base_url)
         .chain(build_configuration.channels.iter().cloned())
