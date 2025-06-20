@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 
 from helpers import RattlerBuild, setup_patch_test_environment
 
@@ -199,4 +198,4 @@ def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):
 
     patch_path = paths["recipe_dir"] / "changes.patch"
     # Dry-run should not create the patch
-    assert not patch_path.exists() 
+    assert not patch_path.exists()
