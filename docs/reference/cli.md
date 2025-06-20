@@ -242,6 +242,16 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Enable debug output in build scripts
 
 
+- `--error-prefix-in-binary`
+
+	Error if the host prefix is detected in any binary files
+
+
+- `--allow-symlinks-on-windows`
+
+	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+
+
 ###### **Sandbox arguments**
 
 - `--sandbox`
