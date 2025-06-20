@@ -19,7 +19,7 @@ use tokio::io::AsyncWriteExt;
 use super::{SourceError, checksum::Checksum, extract::is_tarball};
 
 /// Splits a path into stem and extension, handling special cases like .tar.gz
-fn split_path(path: &Path) -> std::io::Result<(String, String)> {
+pub(crate) fn split_path(path: &Path) -> std::io::Result<(String, String)> {
     let stem = path
         .file_stem()
         .and_then(|s| s.to_str())
