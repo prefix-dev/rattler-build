@@ -18,7 +18,8 @@ use crate::{
         parser::{Dependency, Requirements, Source},
     },
     render::resolved_dependencies::{
-        FinalizedDependencies, install_environments, resolve_dependencies,
+        FinalizedDependencies, install_environments, populate_library_mappings,
+        resolve_dependencies,
     },
     source::{
         copy_dir::{CopyDir, CopyOptions, copy_file},
@@ -218,14 +219,26 @@ impl Output {
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
 
-            let finalized_dependencies =
+            let mut finalized_dependencies =
                 resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
                     .await
                     .unwrap();
 
-            install_environments(&self, &finalized_dependencies, tool_configuration)
-                .await
-                .into_diagnostic()?;
+            install_environments(
+                &self.build_configuration,
+                &finalized_dependencies,
+                tool_configuration,
+            )
+            .await
+            .into_diagnostic()?;
+
+            // Populate library mappings after packages are installed
+            populate_library_mappings(
+                &mut finalized_dependencies,
+                &self.build_configuration.directories.build_prefix,
+                &self.build_configuration.directories.host_prefix,
+            )
+            .into_diagnostic()?;
 
             let selector_config = self.build_configuration.selector_config();
             let mut jinja = Jinja::new(selector_config.clone());

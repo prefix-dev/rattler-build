@@ -1068,7 +1068,7 @@ pub async fn debug_recipe(
             .recreate_directories()
             .into_diagnostic()?;
         let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
-        let output = output
+        let mut output = output
             .resolve_dependencies(&tool_config)
             .await
             .into_diagnostic()?;
