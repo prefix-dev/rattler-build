@@ -16,6 +16,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
+* `create-patch` — Create a patch for a directory
 
 ##### **Options:**
 
@@ -959,6 +960,48 @@ Debug a recipe by setting up the environment without running the build script
 - `--output-dir <OUTPUT_DIR>`
 
 	Output directory for build artifacts.
+
+
+
+
+
+### `create-patch`
+
+Create a patch for a directory
+
+**Usage:** `rattler-build create-patch [OPTIONS] --directory <DIRECTORY>`
+
+##### **Options:**
+
+- `-d`, `--directory <DIRECTORY>`
+
+	Directory where we want to create the patch
+
+
+- `--name <NAME>`
+
+	The name for the patch file to create
+
+	- Default value: `changes`
+
+- `--overwrite`
+
+	Whether to overwrite the patch file if it already exists
+
+
+- `--patch-dir <DIR>`
+
+	Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided
+
+
+- `--exclude <EXCLUDE>`
+
+	Comma-separated list of file names (or glob patterns) that should be excluded from the diff
+
+
+- `--dry-run`
+
+	Perform a dry-run: analyse changes and log the diff, but don't write the patch file
 
 
 
