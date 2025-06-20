@@ -28,7 +28,8 @@ rattler-build create-patch --directory . --name fix-typo
 source:
   - url: https://example.com/package.tar.gz
     sha256: abc123...
-  - path: fix-typo.patch
+    patches:
+      - fix-typo.patch
 ```
 
 ## Command options
