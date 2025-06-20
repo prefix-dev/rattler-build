@@ -38,8 +38,27 @@ jobs:
           toolchain: "1.86.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
+      - name: Set up GNU patch on Windows
+        # Needed to use GNU patch instead of Strawberry Perl patch
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
+        run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
+      - uses: prefix-dev/setup-pixi@v0.8.8
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
+        with:
+          cache: true
+      - name: Set up GNU patch on MacOS
+        # Needed to use GNU patch instead of whatever is builtin on macos (1 test fails)
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
+        run: pixi global install patch=2.7.6
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
+      - name: Run patch apply tests
+        # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
+        run: |
+          patch --version
+          cargo test --features=tui,recipe-generation --verbose -- --nocapture --ignored
 
   build:
     name: Build ${{ matrix.target }}
@@ -95,6 +114,8 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
 
       - name: Extract version
         shell: bash
@@ -244,6 +265,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
