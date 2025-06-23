@@ -1,0 +1,39 @@
+package:
+  name: rattler-build
+  # version: "${{ env.get('PIXI_BUILD_RUST_VERSION', default='0.1.0dev') }}"
+  version: "0.0.0dev" # NOTE: how to set this automatically?
+
+source:
+  path: .
+
+requirements:
+  build:
+    - ${{ compiler('rust') }}
+    - ${{ compiler('c') }}
+  host:
+    - ${{ "openssl" if linux }}
+  run:
+    - ${{ "patchelf" if linux }}
+
+build:
+  script:
+    - if: osx and x86_64
+      then:
+        - if [[ "${MACOSX_SDK_VERSION}" != "11.0" ]]; then exit 1; fi
+        # use the default linker for macOS as we are hitting a bug with the conda-forge linker
+        - unset CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER
+    - if: unix
+      then:
+        # Unix recipe
+        - export OPENSSL_DIR="$PREFIX"
+        - cargo install --locked --bin rattler-build --root ${PREFIX} --path . --no-track
+      else:
+        # Win recipe
+        # hack: path too long for pixi_config subpackage, https://github.com/prefix-dev/pixi/issues/3691
+        - set CARGO_HOME=C:\.cargo
+        - md %CARGO_HOME%
+        - cargo install --locked --bins --root %PREFIX% --path . --no-track
+        - if errorlevel 1 exit 1
+
+tests:
+  - script: rattler-build --help
