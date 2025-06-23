@@ -15,7 +15,7 @@ use crate::{
 
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use rattler_conda_types::PackageName;
+use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -199,38 +199,71 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         return system_libs.build();
     }
 
-    // Always add core system libraries that are provided by the OS
-    // These are the libraries that are always available and don't need to be packaged
-    let core_system_libs = [
-        "libc.so*",
-        "libc-*.so",
-        "libm.so*",
-        "libm-*.so",
-        "libdl.so*",
-        "libdl-*.so",
-        "libpthread.so*",
-        "libpthread-*.so",
-        "librt.so*",
-        "librt-*.so",
-        "ld-linux*.so*",
-        "ld64.so*",
-        "libresolv.so*",
-        "libresolv-*.so",
-        "libnsl.so*",
-        "libnsl-*.so",
-        "libutil.so*",
-        "libutil-*.so",
-        "libcrypt.so*",
-        "libcrypt-*.so",
-    ];
+    // Try to locate a `sysroot_<platform>` package in either the regular build
+    // dependencies *or* the cache build dependencies. The first one found is
+    // used to derive the list of system libraries.
+    let mut sysroot_package = output
+        .finalized_dependencies
+        .as_ref()
+        .and_then(|deps| deps.build.as_ref())
+        .and_then(|deps| {
+            deps.resolved.iter().find(|v| {
+                v.file_name.starts_with(&format!(
+                    "sysroot_{}",
+                    output.build_configuration.target_platform
+                ))
+            })
+        })
+        .cloned();
 
-    for pattern in &core_system_libs {
-        system_libs.add(Glob::new(pattern)?);
+    if sysroot_package.is_none() {
+        sysroot_package = output
+            .finalized_cache_dependencies
+            .as_ref()
+            .and_then(|deps| deps.build.as_ref())
+            .and_then(|deps| {
+                deps.resolved.iter().find(|v| {
+                    v.file_name.starts_with(&format!(
+                        "sysroot_{}",
+                        output.build_configuration.target_platform
+                    ))
+                })
+            })
+            .cloned();
     }
 
-    // Note: We intentionally do NOT add libraries from sysroot packages to the system_libs.
-    // The sysroot package contains many libraries that are not true system libraries
-    // (e.g., libz, libssl, etc.) that should be detected as overlinking if not in dependencies.
+    if let Some(sysroot_package) = sysroot_package {
+        let prefix_record_name = format!(
+            "conda-meta/{}-{}-{}.json",
+            sysroot_package.package_record.name.as_normalized(),
+            sysroot_package.package_record.version,
+            sysroot_package.package_record.build
+        );
+
+        let sysroot_path = output
+            .build_configuration
+            .directories
+            .build_prefix
+            .join(prefix_record_name);
+
+        if let Ok(record) = PrefixRecord::from_path(&sysroot_path) {
+            // match all shared objects (e.g. libfoo.so, libfoo.so.1.2)
+            let so_glob = Glob::new("*.so*")?.compile_matcher();
+            for file in record.files {
+                if let Some(file_name) = file.file_name() {
+                    if so_glob.is_match(file_name) {
+                        system_libs.add(Glob::new(&file_name.to_string_lossy())?);
+                    }
+                }
+            }
+        } else {
+            // If the prefix record cannot be found, continue without adding patterns.
+            tracing::debug!("sysroot prefix record not found at {:?}", sysroot_path);
+        }
+    }
+
+    // If no sysroot package was found, we fall back to an empty set – in that case every
+    // linked library will be validated against the run dependencies.
 
     system_libs.build()
 }
@@ -258,9 +291,14 @@ pub fn perform_linking_checks(
         if let Some(host) = &deps.host {
             library_mapping.extend(host.library_mapping.clone());
         }
-        // Note: We intentionally do NOT include build dependencies here.
-        // Libraries from build dependencies should not be linked against by host binaries.
-        // If a host binary links against a build dependency library, it's overlinking.
+
+        if let Some(build) = &deps.build {
+            for (lib, pkg) in &build.library_mapping {
+                if pkg.as_normalized().starts_with("sysroot_") {
+                    library_mapping.insert(lib.clone(), pkg.clone());
+                }
+            }
+        }
     }
 
     // Also merge in library mapping from cache dependencies if available
@@ -268,7 +306,14 @@ pub fn perform_linking_checks(
         if let Some(host) = &cache_deps.host {
             library_mapping.extend(host.library_mapping.clone());
         }
-        // Note: We intentionally do NOT include cache build dependencies here.
+
+        if let Some(build) = &cache_deps.build {
+            for (lib, pkg) in &build.library_mapping {
+                if pkg.as_normalized().starts_with("sysroot_") {
+                    library_mapping.insert(lib.clone(), pkg.clone());
+                }
+            }
+        }
     }
 
     // check all DSOs and what they are linking
@@ -373,10 +418,14 @@ pub fn perform_linking_checks(
                         package_str
                     );
 
-                    // Check if this package is in our run dependencies
-                    // We need to check both:
-                    // 1. Direct match: dependency name == package name
-                    // 2. Run export match: source package == package name
+                    if package_str.starts_with("sysroot_") {
+                        link_info.linked_packages.push(LinkedPackage {
+                            name: lib.to_path_buf(),
+                            link_origin: LinkOrigin::System,
+                        });
+                        continue 'library_loop;
+                    }
+
                     let dependency_match = dep_to_source.iter().find(|(dep_name, source_pkg)| {
                         dep_name.as_str() == package_str || source_pkg.as_str() == package_str
                     });
