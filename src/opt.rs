@@ -176,7 +176,7 @@ impl App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Default)]
 pub struct CommonOpts {
     /// Output directory for build artifacts.
     #[clap(
@@ -312,7 +312,7 @@ impl FromStr for ChannelPriorityWrapper {
 }
 
 /// Build options.
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Default)]
 pub struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the
     /// current directory.
