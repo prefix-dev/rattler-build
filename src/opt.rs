@@ -268,7 +268,7 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
-        let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options);
+        let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
