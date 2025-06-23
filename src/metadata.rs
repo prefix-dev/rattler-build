@@ -895,6 +895,7 @@ mod test {
                 channel: Some("test".into()),
             }],
             library_mapping: HashMap::new(),
+            package_nature: HashMap::new(),
         };
 
         // test yaml roundtrip

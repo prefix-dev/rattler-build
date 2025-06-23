@@ -33,6 +33,8 @@ use crate::{
     tool_configuration::Configuration,
 };
 
+use crate::post_process::package_nature::{PackageNature, PrefixInfo};
+
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -249,6 +251,9 @@ pub struct ResolvedDependencies {
     /// Mapping from library names to the packages that provide them
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub library_mapping: HashMap<String, PackageName>,
+    /// Mapping from package names to their PackageNature (DSO library, interpreter, ...)
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub package_nature: HashMap<PackageName, PackageNature>,
 }
 
 fn short_channel(channel: Option<&str>) -> String {
@@ -659,13 +664,33 @@ pub fn populate_library_mappings(
         prefix: &Path,
     ) -> Result<(), std::io::Error> {
         resolved_deps.library_mapping.clear();
+
+        // Create PrefixInfo once for lazy lookups
+        let prefix_info = PrefixInfo::from_prefix(prefix)?;
+
         for record in &resolved_deps.resolved {
             match extract_library_info_from_prefix(prefix, &record.package_record.name) {
                 Ok(libraries) => {
+                    // Insert libraries -> package mapping
                     for lib in libraries {
                         resolved_deps
                             .library_mapping
                             .insert(lib, record.package_record.name.clone());
+                    }
+
+                    // Lazily get package nature from PrefixInfo
+                    if !resolved_deps
+                        .package_nature
+                        .contains_key(&record.package_record.name)
+                    {
+                        if let Some(nature) = prefix_info
+                            .package_to_nature
+                            .get(&record.package_record.name)
+                        {
+                            resolved_deps
+                                .package_nature
+                                .insert(record.package_record.name.clone(), nature.clone());
+                        }
                     }
                 }
                 Err(e) => {
@@ -836,6 +861,7 @@ pub(crate) async fn resolve_dependencies(
             specs: build_env_specs,
             resolved,
             library_mapping: HashMap::new(), // Will be populated after installation
+            package_nature: HashMap::new(),
         })
     } else {
         None
@@ -933,6 +959,7 @@ pub(crate) async fn resolve_dependencies(
             specs: host_env_specs,
             resolved,
             library_mapping: HashMap::new(), // Will be populated after installation
+            package_nature: HashMap::new(),
         })
     } else {
         None

@@ -13,6 +13,7 @@
 // | "non-library"
 
 use rattler_conda_types::{PackageName, PrefixRecord};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -21,7 +22,7 @@ use std::{
 };
 
 /// The nature of a package
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum PackageNature {
     /// Libraries
     RunExportsLibrary,

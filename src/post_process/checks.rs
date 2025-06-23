@@ -4,13 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::windows::link::WIN_ALLOWLIST;
 use crate::{
     metadata::Output,
-    post_process::{package_nature::PrefixInfo, relink::RelinkError},
-};
-use crate::{
+    post_process::relink::RelinkError,
     post_process::{package_nature::PackageNature, relink},
-    windows::link::WIN_ALLOWLIST,
 };
 
 use crate::render::resolved_dependencies::RunExportDependency;
@@ -276,13 +274,6 @@ pub fn perform_linking_checks(
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let system_libs = find_system_libs(output)?;
 
-    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
-
-    let (resolved_run_dependencies, dep_to_source) =
-        resolved_run_dependencies_with_sources(output, &prefix_info.package_to_nature);
-    tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
-    tracing::trace!("Dependency to source mapping: {dep_to_source:#?}",);
-
     // Get library mapping from finalized dependencies
     let mut library_mapping = HashMap::new();
 
@@ -316,6 +307,32 @@ pub fn perform_linking_checks(
         }
     }
 
+    // Combine package -> nature information from all resolved environments
+    let mut package_to_nature = HashMap::new();
+
+    if let Some(deps) = &output.finalized_dependencies {
+        if let Some(host) = &deps.host {
+            package_to_nature.extend(host.package_nature.clone());
+        }
+        if let Some(build) = &deps.build {
+            package_to_nature.extend(build.package_nature.clone());
+        }
+    }
+
+    if let Some(cache_deps) = &output.finalized_cache_dependencies {
+        if let Some(host) = &cache_deps.host {
+            package_to_nature.extend(host.package_nature.clone());
+        }
+        if let Some(build) = &cache_deps.build {
+            package_to_nature.extend(build.package_nature.clone());
+        }
+    }
+
+    let (resolved_run_dependencies, dep_to_source) =
+        resolved_run_dependencies_with_sources(output, &package_to_nature);
+    tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
+    tracing::trace!("Dependency to source mapping: {dep_to_source:#?}",);
+
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
     let host_prefix = output.prefix();
@@ -334,17 +351,10 @@ pub fn perform_linking_checks(
                     }
 
                     let lib = resolved.as_ref().unwrap_or(lib);
-                    if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                        if let Some(package) = prefix_info
-                            .path_to_package
-                            .get(&libpath.to_path_buf().into())
-                        {
-                            if let Some(nature) = prefix_info.package_to_nature.get(package) {
-                                // Only take shared libraries into account.
-                                if nature == &PackageNature::DSOLibrary {
-                                    file_dsos.push((libpath.to_path_buf(), package.clone()));
-                                }
-                            }
+                    if let Some(lib_file_name) = lib.file_name().and_then(|n| n.to_str()) {
+                        if let Some(package) = library_mapping.get(lib_file_name) {
+                            let lib_rel = lib.strip_prefix(host_prefix).unwrap_or(lib);
+                            file_dsos.push((lib_rel.to_path_buf(), package.clone()));
                         }
                     }
                 }
