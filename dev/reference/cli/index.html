@@ -872,6 +872,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../../create_patch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Creating patches
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../tips_and_tricks/" class="md-nav__link">
         
   
@@ -1458,6 +1481,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#create-patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      create-patch
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1633,6 +1665,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#create-patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      create-patch
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1676,6 +1717,7 @@
 <li><code>generate-recipe</code> — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks</li>
 <li><code>auth</code> — Handle authentication to external channels</li>
 <li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
+<li><code>create-patch</code> — Create a patch for a directory</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -2435,6 +2477,39 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
 <p>Output directory for build artifacts.</p>
+</li>
+</ul>
+<h3 id="create-patch"><code>create-patch</code><a class="headerlink" href="#create-patch" title="Permanent link">#</a></h3>
+<p>Create a patch for a directory</p>
+<p><strong>Usage:</strong> <code>rattler-build create-patch [OPTIONS] --directory &lt;DIRECTORY&gt;</code></p>
+<h5 id="options_17"><strong>Options:</strong><a class="headerlink" href="#options_17" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-d</code>, <code>--directory &lt;DIRECTORY&gt;</code></p>
+<p>Directory where we want to create the patch</p>
+</li>
+<li>
+<p><code>--name &lt;NAME&gt;</code></p>
+<p>The name for the patch file to create</p>
+<ul>
+<li>Default value: <code>changes</code></li>
+</ul>
+</li>
+<li>
+<p><code>--overwrite</code></p>
+<p>Whether to overwrite the patch file if it already exists</p>
+</li>
+<li>
+<p><code>--patch-dir &lt;DIR&gt;</code></p>
+<p>Optional directory where the patch file should be written. Defaults to the recipe directory determined from <code>.source_info.json</code> if not provided</p>
+</li>
+<li>
+<p><code>--exclude &lt;EXCLUDE&gt;</code></p>
+<p>Comma-separated list of file names (or glob patterns) that should be excluded from the diff</p>
+</li>
+<li>
+<p><code>--dry-run</code></p>
+<p>Perform a dry-run: analyse changes and log the diff, but don't write the patch file</p>
 </li>
 </ul>
 <hr/>
