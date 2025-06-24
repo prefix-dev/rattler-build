@@ -28,7 +28,7 @@ tokio = { version = "1.45.1", features = [
   "process",
 ] }
 rattler_conda_types = "0.35.1"
-pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
+rattler_config = "0.1.0"
 clap = "4.5.40"
 url = "2.5.4"
 

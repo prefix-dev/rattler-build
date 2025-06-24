@@ -12,10 +12,10 @@ use ::rattler_build::{
     upload,
 };
 use clap::ValueEnum;
-use pixi_config::PackageFormatAndCompression;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
+use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 use url::Url;
 
 // Bind the get version function to the Python module
@@ -59,7 +59,7 @@ fn build_recipes_py(
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     // todo: allow custom config here
-    let config = pixi_config::Config::default();
+    let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         output_dir,
         false,
@@ -159,7 +159,7 @@ fn test_package_py(
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     // todo: allow custom config here
-    let config = pixi_config::Config::default();
+    let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         None,
         false,
