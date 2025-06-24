@@ -92,7 +92,12 @@ pub(crate) fn copy_file(
     let path = from.as_ref();
     let dest_path = to.as_ref();
 
-    if path.is_dir() {
+    // if file is a symlink, copy it as a symlink
+    if path.is_symlink() {
+        let link_target = fs_err::read_link(path)?;
+        create_symlink(link_target, dest_path)?;
+        Ok(())
+    } else if path.is_dir() {
         create_dir_all_cached(dest_path, paths_created)?;
         Ok(())
     } else {
@@ -101,24 +106,17 @@ pub(crate) fn copy_file(
             create_dir_all_cached(parent, paths_created)?;
         }
 
-        // if file is a symlink, copy it as a symlink
-        if path.is_symlink() {
-            let link_target = fs_err::read_link(path)?;
-            create_symlink(link_target, dest_path)?;
-            Ok(())
-        } else {
-            if dest_path.exists() {
-                if !(options.overwrite || options.skip_exist) {
-                    tracing::error!("File already exists: {:?}", dest_path);
-                } else if options.skip_exist {
-                    tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
-                } else if options.overwrite {
-                    tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
-                }
+        if dest_path.exists() {
+            if !(options.overwrite || options.skip_exist) {
+                tracing::error!("File already exists: {:?}", dest_path);
+            } else if options.skip_exist {
+                tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
+            } else if options.overwrite {
+                tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
             }
-            reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
-            Ok(())
         }
+        reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
+        Ok(())
     }
 }
 
@@ -293,7 +291,11 @@ impl<'a> CopyDir<'a> {
                     let stripped_path = path.strip_prefix(self.from_path)?;
                     let dest_path = self.to_path.join(stripped_path);
 
-                    if path.is_dir() {
+                    if path.is_symlink() {
+                        let link_target = fs_err::read_link(path)?;
+                        create_symlink(link_target, &dest_path)?;
+                        return Ok(Some(dest_path));
+                    } else if path.is_dir() {
                         create_dir_all_cached(&dest_path, paths_created)?;
                         Ok(Some(dest_path))
                     } else {
@@ -302,32 +304,23 @@ impl<'a> CopyDir<'a> {
                             create_dir_all_cached(parent, paths_created)?;
                         }
 
-                        // if file is a symlink, copy it as a symlink
-                        if path.is_symlink() {
-                            let link_target = fs_err::read_link(path)?;
-                            #[cfg(unix)]
-                            fs_err::os::unix::fs::symlink(link_target, &dest_path)?;
-                            #[cfg(windows)]
-                            std::os::windows::fs::symlink_file(link_target, &dest_path)?;
-                        } else {
-                            if dest_path.exists() {
-                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
-                                    tracing::error!("File already exists: {:?}", dest_path);
-                                } else if self.copy_options.skip_exist {
-                                    tracing::warn!(
-                                        "File already exists! Skipping file: {:?}",
-                                        dest_path
-                                    );
-                                } else if self.copy_options.overwrite {
-                                    tracing::warn!(
-                                        "File already exists! Overwriting file: {:?}",
-                                        dest_path
-                                    );
-                                }
+                        if dest_path.exists() {
+                            if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                tracing::error!("File already exists: {:?}", dest_path);
+                            } else if self.copy_options.skip_exist {
+                                tracing::warn!(
+                                    "File already exists! Skipping file: {:?}",
+                                    dest_path
+                                );
+                            } else if self.copy_options.overwrite {
+                                tracing::warn!(
+                                    "File already exists! Overwriting file: {:?}",
+                                    dest_path
+                                );
                             }
-                            reflink_or_copy(path, &dest_path, &self.copy_options)
-                                .map_err(SourceError::FileSystemError)?;
                         }
+                        reflink_or_copy(path, &dest_path, &self.copy_options)
+                            .map_err(SourceError::FileSystemError)?;
 
                         Ok(Some(dest_path))
                     }
@@ -674,6 +667,65 @@ mod test {
         assert_eq!(
             fs::read_link(broken_symlink_dest).unwrap(),
             std::path::PathBuf::from("/does/not/exist")
+        );
+    }
+
+    #[test]
+    fn test_copy_symlinked_directory() {
+        #[cfg(windows)]
+        {
+            // check if we have permissions to create symlinks
+            let tmp_dir = tempfile::TempDir::new().unwrap();
+            let test_symlink = tmp_dir.path().join("test_symlink");
+            if std::os::windows::fs::symlink_dir("does_not_exist", &test_symlink).is_err() {
+                return;
+            }
+        }
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+        fs::create_dir_all(&dir).unwrap();
+
+        // Create a target directory with some content
+        let target_dir = tmp_dir.path().join("target_dir");
+        fs::create_dir_all(&target_dir).unwrap();
+        fs::write(target_dir.join("file_in_target.txt"), "content").unwrap();
+
+        // Create a symlink to the directory
+        let symlinked_dir = tmp_dir.path().join("symlinked_dir");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target_dir, &symlinked_dir).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&target_dir, &symlinked_dir).unwrap();
+
+        // Add a regular file as well
+        fs::write(tmp_dir.path().join("regular_file.txt"), "regular content").unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+
+        let _copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        // Check that the symlinked directory was copied as a symlink
+        let dest_symlinked_dir = dest_dir.path().join("symlinked_dir");
+        assert!(dest_symlinked_dir.exists());
+        assert!(dest_symlinked_dir.is_symlink());
+
+        // The symlink should point to the same relative path
+        let link_target = fs::read_link(&dest_symlinked_dir).unwrap();
+        assert_eq!(link_target, target_dir);
+
+        // Verify other files were copied
+        assert!(dest_dir.path().join("regular_file.txt").exists());
+        assert!(dest_dir.path().join("target_dir").exists());
+        assert!(
+            dest_dir
+                .path()
+                .join("target_dir")
+                .join("file_in_target.txt")
+                .exists()
         );
     }
 }
