@@ -13,7 +13,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `rebuild` — Rebuild a package from a package file instead of a recipe
 * `upload` — Upload a package
 * `completion` — Generate shell completion script
-* `generate-recipe` — Generate a recipe from PyPI or CRAN
+* `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
 
@@ -668,7 +668,7 @@ Generate shell completion script
 
 ### `generate-recipe`
 
-Generate a recipe from PyPI or CRAN
+Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 
 **Usage:** `rattler-build generate-recipe <COMMAND>`
 
@@ -676,6 +676,8 @@ Generate a recipe from PyPI or CRAN
 
 * `pypi` — Generate a recipe for a Python package from PyPI
 * `cran` — Generate a recipe for an R package from CRAN
+* `cpan` — Generate a recipe for a Perl package from CPAN
+* `luarocks` — Generate a recipe for a Lua package from LuaRocks
 
 
 
@@ -748,6 +750,65 @@ Generate a recipe for an R package from CRAN
 
 	Whether to write the recipe to a folder
 
+
+
+
+
+#### `cpan`
+
+Generate a recipe for a Perl package from CPAN
+
+**Usage:** `rattler-build generate-recipe cpan [OPTIONS] <PACKAGE>`
+
+##### **Arguments:**
+
+- `<PACKAGE>`
+
+	Name of the package to generate
+
+
+
+##### **Options:**
+
+- `--version <VERSION>`
+
+	Select a version of the package to generate (defaults to latest)
+
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a folder
+
+
+- `-t`, `--tree`
+
+	Whether to generate recipes for all dependencies
+
+
+
+
+
+#### `luarocks`
+
+Generate a recipe for a Lua package from LuaRocks
+
+**Usage:** `rattler-build generate-recipe luarocks [OPTIONS] <ROCK>`
+
+##### **Arguments:**
+
+- `<ROCK>`
+
+	Luarocks package to generate recipe for. Can be specified as: - module (fetches latest version) - module/version - author/module/version - Direct rockspec URL
+
+
+
+##### **Options:**
+
+- `-w`, `--write-to <WRITE_TO>`
+
+	Where to write the recipe to
+
+	- Default value: `.`
 
 
 
