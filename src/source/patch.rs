@@ -10,15 +10,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy::Patch;
+use diffy::{Diff, Patch};
 use fs_err::File;
 use itertools::Itertools;
 
-fn parse_patches(patches: &Vec<Patch<[u8]>>) -> HashSet<PathBuf> {
+fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
-    for patch in patches {
-        if let Some(p) = patch
+    for diff in patch {
+        if let Some(p) = diff
             .original()
             .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| p.trim() != "/dev/null")
@@ -26,7 +26,7 @@ fn parse_patches(patches: &Vec<Patch<[u8]>>) -> HashSet<PathBuf> {
         {
             affected_files.insert(p);
         }
-        if let Some(p) = patch
+        if let Some(p) = diff
             .modified()
             .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| p.trim() != "/dev/null")
@@ -39,8 +39,8 @@ fn parse_patches(patches: &Vec<Patch<[u8]>>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patches_from_bytes(input: &[u8]) -> Result<Vec<Patch<'_, [u8]>>, diffy::ParsePatchError> {
-    diffy::patches_from_bytes_with_config(
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<[u8]>, diffy::ParsePatchError> {
+    diffy::patch_from_bytes_with_config(
         input,
         diffy::ParserConfig {
             hunk_strategy: diffy::HunkRangeStrategy::Recount,
@@ -48,14 +48,17 @@ fn patches_from_bytes(input: &[u8]) -> Result<Vec<Patch<'_, [u8]>>, diffy::Parse
     )
 }
 
-fn apply(base_image: &[u8], patch: &Patch<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
+fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
     diffy::apply_bytes_with_config(
         base_image,
-        patch,
-        &diffy::FuzzyConfig {
-            max_fuzz: 2,
-            ignore_whitespace: true,
-            ignore_case: false,
+        diff,
+        &diffy::ApplyConfig {
+            fuzzy_config: diffy::FuzzyConfig {
+                max_fuzz: 2,
+                ignore_whitespace: true,
+                ignore_case: false,
+            },
+            ..Default::default()
         },
     )
 }
@@ -63,9 +66,9 @@ fn apply(base_image: &[u8], patch: &Patch<'_, [u8]>) -> Result<Vec<u8>, diffy::A
 // Returns number by which all patch paths must be stripped to be
 // successfully applied, or returns and error if no such number could
 // be determined.
-fn guess_strip_level(patch: &Vec<Patch<[u8]>>, work_dir: &Path) -> Result<usize, SourceError> {
-    // There is no /dev/null in here by construction from `parse_patches`.
-    let patched_files = parse_patches(patch);
+fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, SourceError> {
+    // There is no /dev/null in here by construction from `parse_patch`.
+    let patched_files = parse_patch(patch);
 
     let max_components = patched_files
         .iter()
@@ -93,10 +96,10 @@ fn guess_strip_level(patch: &Vec<Patch<[u8]>>, work_dir: &Path) -> Result<usize,
 }
 
 fn custom_patch_stripped_paths(
-    patch: &Patch<'_, [u8]>,
+    diff: &Diff<'_, [u8]>,
     strip_level: usize,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
-    let original = (patch.original(), patch.modified());
+    let original = (diff.original(), diff.modified());
     let stripped = (
         // XXX: Probably absolute paths should be checked as well. But
         // it is highly unlikely to meet them in patches, so we ignore
@@ -175,9 +178,9 @@ pub(crate) fn apply_patch_gnu(
 ) -> Result<(), SourceError> {
     let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
 
-    let patches = patches_from_bytes(&patch_file_content)
+    let patch = patch_from_bytes(&patch_file_content)
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
-    let strip_level = guess_strip_level(&patches, work_dir)?;
+    let strip_level = guess_strip_level(&patch, work_dir)?;
 
     tracing::debug!("Patch {} will be applied", patch_file_path.display());
 
@@ -229,12 +232,12 @@ pub(crate) fn apply_patch_custom(
 ) -> Result<(), SourceError> {
     let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
 
-    let patches = patches_from_bytes(&patch_file_content)
+    let patch = patch_from_bytes(&patch_file_content)
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
-    let strip_level = guess_strip_level(&patches, work_dir)?;
+    let strip_level = guess_strip_level(&patch, work_dir)?;
 
-    for patch in patches {
-        let file_paths = custom_patch_stripped_paths(&patch, strip_level);
+    for diff in patch {
+        let file_paths = custom_patch_stripped_paths(&diff, strip_level);
         let absolute_file_paths = (
             file_paths.0.map(|o| work_dir.join(&o)),
             file_paths.1.map(|m| work_dir.join(&m)),
@@ -249,7 +252,7 @@ pub(crate) fn apply_patch_custom(
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
-                let new_file_content = apply(&[], &patch).map_err(SourceError::PatchApplyError)?;
+                let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
@@ -259,7 +262,7 @@ pub(crate) fn apply_patch_custom(
                 let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
                 let new_file_content =
-                    apply(&old_file_content, &patch).map_err(SourceError::PatchApplyError)?;
+                    apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
 
                 if o != m {
                     fs_err::remove_file(&o).map_err(SourceError::Io)?;
@@ -335,7 +338,7 @@ mod tests {
 
             let patch_file_content =
                 fs_err::read(&patch_path).expect("Could not read file contents");
-            let _ = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+            let _ = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
             println!("Parsing patch: {}", patch_path.display());
         }
@@ -348,9 +351,9 @@ mod tests {
 
         let patch_file_content =
             fs_err::read(patches_dir.join("test.patch")).expect("Could not read file contents");
-        let patches = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+        let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
-        let patched_paths = parse_patches(&patches);
+        let patched_paths = parse_patch(&patch);
         assert_eq!(patched_paths.len(), 2);
         assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
         assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
@@ -358,8 +361,8 @@ mod tests {
         let patch_file_content =
             fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
-        let patches = patches_from_bytes(&patch_file_content).expect("Failed to parse patch file");
-        let patched_paths = parse_patches(&patches);
+        let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+        let patched_paths = parse_patch(&patch);
         assert_eq!(patched_paths.len(), 2);
         assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
         assert!(patched_paths.contains(&PathBuf::from("b/CMakeLists.txt")));
@@ -512,7 +515,8 @@ mod tests {
         let stdout = cmd
             .current_dir(common_parent)
             .args([
-                OsStr::new("-rNu"),
+                OsStr::new("-rNul"),
+                OsStr::new("--strip-trailing-cr"),
                 OsStr::new("--color=auto"),
                 original_dir.as_os_str(),
                 copy_dir.as_os_str(),
@@ -533,7 +537,7 @@ mod tests {
     /// Applied patches is vector of strip level and diffs from one patch file.
     fn snapshot_patched_files(
         package_name: &str,
-        applied_patches: &Vec<(usize, Vec<Patch<'_, [u8]>>)>,
+        applied_patches: &Vec<(usize, Vec<Diff<'_, [u8]>>)>,
         comparison_dir: &Path,
     ) -> miette::Result<()> {
         let mut patch_results = vec![];
@@ -696,7 +700,7 @@ mod tests {
                         .into_diagnostic()?;
                     let mut patch_files = vec![];
                     for patch_file_content in patches_file_content.iter() {
-                        let patches = patches_from_bytes(patch_file_content).into_diagnostic()?;
+                        let patches = patch_from_bytes(patch_file_content).into_diagnostic()?;
                         let strip_level = guess_strip_level(&patches, original_source_dir_path)
                             .into_diagnostic()?;
                         patch_files.push((strip_level, patches));
