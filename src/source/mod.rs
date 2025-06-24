@@ -202,7 +202,9 @@ pub(crate) async fn fetch_source(
             rendered_sources.push(Source::Url(src.clone()));
         }
         Source::Path(src) => {
-            let src_path = recipe_dir.join(src.path()).canonicalize()?;
+            let rel_src_path = src.path();
+            tracing::debug!("Processing source path '{}'", rel_src_path.display());
+            let src_path = fs::canonicalize(recipe_dir.join(rel_src_path))?;
             tracing::info!("Fetching source from path: {}", src_path.display());
 
             let dest_dir = if let Some(target_directory) = src.target_directory() {
