@@ -304,7 +304,7 @@ impl<'a> CopyDir<'a> {
                         }
 
                         create_symlink(link_target, &dest_path)?;
-                        return Ok(Some(dest_path));
+                        Ok(Some(dest_path))
                     } else if path.is_dir() {
                         create_dir_all_cached(&dest_path, paths_created)?;
                         Ok(Some(dest_path))
