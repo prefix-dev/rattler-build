@@ -1689,7 +1689,7 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 [[package]]
 name = "diffy"
 version = "0.4.2"
-source = "git+https://github.com/remimimimimi/diffy.git?branch=master#7df4c4f70309e6e20bb7a6222e5644aa0d4129a2"
+source = "git+https://github.com/prefix-dev/diffy.git?branch=master#da81bf4ceb4a5b9e6f9c43616a4a74aabf50a29b"
 dependencies = [
  "nu-ansi-term 0.50.1",
  "strsim",
