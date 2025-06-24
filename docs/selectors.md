@@ -166,9 +166,9 @@ string: ${{ "foobar" if USE_OPENMP else "bla" }}
 
 ```yaml
 string: |
-  {% if USE_OPENMP %} 
+  {% if USE_OPENMP %}
      blablabla
-  {% else %} 
+  {% else %}
      blabla
   {% endif %}
 ```
