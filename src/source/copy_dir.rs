@@ -92,9 +92,14 @@ pub(crate) fn copy_file(
     let path = from.as_ref();
     let dest_path = to.as_ref();
 
-    // if file is a symlink, copy it as a symlink
+    // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
     if path.is_symlink() {
         let link_target = fs_err::read_link(path)?;
+
+        if let Some(parent) = dest_path.parent() {
+            create_dir_all_cached(parent, paths_created)?;
+        }
+
         create_symlink(link_target, dest_path)?;
         Ok(())
     } else if path.is_dir() {
@@ -293,6 +298,11 @@ impl<'a> CopyDir<'a> {
 
                     if path.is_symlink() {
                         let link_target = fs_err::read_link(path)?;
+
+                        if let Some(parent) = dest_path.parent() {
+                            create_dir_all_cached(parent, paths_created)?;
+                        }
+
                         create_symlink(link_target, &dest_path)?;
                         return Ok(Some(dest_path));
                     } else if path.is_dir() {
