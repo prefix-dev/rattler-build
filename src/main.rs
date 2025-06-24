@@ -8,16 +8,14 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
-use pixi_config::Config;
 use rattler_build::{
     build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
-    opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
+    opt::{App, BuildData, Config, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
     rebuild, run_test, upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
-use tokio::fs::read_to_string;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -80,10 +78,7 @@ async fn async_main() -> miette::Result<()> {
     };
 
     let config = if let Some(config_path) = app.config_file {
-        let config_str = read_to_string(&config_path).await.into_diagnostic()?;
-        let (config, _unused_keys) =
-            Config::from_toml(config_str.as_str(), Some(&config_path.clone()))?;
-        Some(config)
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
     } else {
         None
     };

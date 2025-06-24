@@ -1,5 +1,6 @@
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use rattler_build::script::CrLfNormalizer;
+use std::hint::black_box;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::Decoder;
 

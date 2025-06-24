@@ -433,17 +433,16 @@ pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
             .span()
             .start()
             .cloned()
-            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
-        _ => marked_yaml::Marker::new(0, 0, 0),
+            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0, 0)),
+        _ => marked_yaml::Marker::new(0, 0, 0, 0),
     }
 }
 
 /// Convert a [`marked_yaml::Span`] to a [`SourceSpan`].
 pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceSpan {
-    let marked_start = span
-        .start()
-        .copied()
-        .unwrap_or_else(|| marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX));
+    let marked_start = span.start().copied().unwrap_or_else(|| {
+        marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX)
+    });
     let marked_end = span.end().copied();
 
     let start = SourceOffset::from_location(src, marked_start.line(), marked_start.column());

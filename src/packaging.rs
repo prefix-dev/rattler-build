@@ -11,11 +11,10 @@ use fs_err::File;
 use metadata::clean_url;
 use rattler_conda_types::{
     ChannelUrl, Platform,
+    compression_level::CompressionLevel,
     package::{ArchiveType, PackageFile, PathsJson},
 };
-use rattler_package_streaming::write::{
-    CompressionLevel, write_conda_package, write_tar_bz2_package,
-};
+use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_package};
 use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;

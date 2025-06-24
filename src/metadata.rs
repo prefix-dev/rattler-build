@@ -17,10 +17,10 @@ use indicatif::HumanBytes;
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
     VersionWithSource,
+    compression_level::CompressionLevel,
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
 };
-use rattler_index::index_fs;
-use rattler_package_streaming::write::CompressionLevel;
+use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use rattler_virtual_packages::{
@@ -243,7 +243,7 @@ impl PackagingSettings {
     /// and the selected archive type.
     pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
-            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
+            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
@@ -771,17 +771,21 @@ pub async fn build_reindexed_channels(
         ),
     );
 
+    let index_config = IndexFsConfig {
+        channel: output_dir.clone(),
+        target_platform: Some(build_configuration.target_platform),
+        repodata_patch: None,
+        write_zst: false,
+        write_shards: false,
+        force: false,
+        max_parallel: num_cpus::get_physical(),
+        multi_progress: None,
+    };
+
     // Reindex the output channel from the files on disk
-    index_fs(
-        output_dir,
-        Some(build_configuration.target_platform),
-        None,
-        false,
-        num_cpus::get_physical(),
-        None,
-    )
-    .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    index_fs(index_config)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(iter::once(output_channel.base_url)
         .chain(build_configuration.channels.iter().cloned())
