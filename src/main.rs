@@ -13,7 +13,9 @@ use rattler_build::{
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
     opt::{App, BuildData, Config, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
-    rebuild, run_test, upload_from_args,
+    rebuild, run_test,
+    source::create_patch,
+    upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
 
@@ -160,6 +162,18 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Debug(opts)) => {
             let debug_data = DebugData::from_opts_and_config(opts, config);
             debug_recipe(debug_data, &log_handler).await?;
+            Ok(())
+        }
+        Some(SubCommands::CreatePatch(opts)) => {
+            let exclude_vec = opts.exclude.clone().unwrap_or_default();
+            let _ = create_patch::create_patch(
+                opts.directory,
+                &opts.name,
+                opts.overwrite,
+                opts.patch_dir.as_deref(),
+                &exclude_vec,
+                opts.dry_run,
+            );
             Ok(())
         }
         None => {

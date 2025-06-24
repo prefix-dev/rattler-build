@@ -17,10 +17,12 @@ use crate::{
 };
 
 use fs_err as fs;
+use serde::{Deserialize, Serialize};
 
 use crate::system_tools::SystemTools;
 pub mod checksum;
 pub mod copy_dir;
+pub mod create_patch;
 pub mod extract;
 pub mod git_source;
 pub mod patch;
@@ -311,7 +313,33 @@ pub async fn fetch_sources(
         )
         .await?;
     }
+
+    // add a hidden JSON file with the source information
+    let source_info = SourceInformation {
+        recipe_path: directories.recipe_path.clone(),
+        source_cache: cache_src.clone(),
+        sources: rendered_sources.clone(),
+    };
+    let source_info_path = work_dir.join(".source_info.json");
+    fs::write(
+        &source_info_path,
+        serde_json::to_string(&source_info).expect("should serialize"),
+    )?;
+
     Ok(rendered_sources)
+}
+
+/// Represents the source information for a recipe, including the path to the recipe and the sources used
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceInformation {
+    /// The path to the recipe file
+    pub recipe_path: PathBuf,
+
+    /// Path to the source cache directory
+    pub source_cache: PathBuf,
+
+    /// The sources used in the recipe
+    pub sources: Vec<Source>,
 }
 
 impl Output {
