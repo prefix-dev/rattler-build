@@ -1,10 +1,11 @@
 use anyhow::Result;
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use fs_err as fs;
 use memmap2::Mmap;
 use minijinja::Value as MiniJinjaValue;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
+use std::hint::black_box;
 use std::io::BufReader;
 use std::path::Path;
 

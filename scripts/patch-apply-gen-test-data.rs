@@ -10,7 +10,10 @@ use anyhow::Context;
 use http_range_client::HttpReader;
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
 use rattler_package_streaming::seek::stream_conda_info;
-use rattler_repodata_gateway::{fetch, sparse::{PackageFormatSelection, SparseRepoData}, Gateway};
+use rattler_repodata_gateway::{
+    Gateway, fetch,
+    sparse::{PackageFormatSelection, SparseRepoData},
+};
 use reqwest::Client;
 use reqwest_middleware::ClientWithMiddleware;
 use tokio::task::JoinSet;

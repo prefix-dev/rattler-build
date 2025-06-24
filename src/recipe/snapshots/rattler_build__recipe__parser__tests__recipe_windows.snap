@@ -98,6 +98,7 @@ Recipe {
                         start: Some(
                             Marker {
                                 source: 0,
+                                character: [FILTERED],
                                 line: 16,
                                 column: 9,
                             },
