@@ -1449,6 +1449,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "diffy"
+version = "0.4.2"
+source = "git+https://github.com/remimimimimi/diffy.git?branch=master#7df4c4f70309e6e20bb7a6222e5644aa0d4129a2"
+dependencies = [
+ "nu-ansi-term 0.50.1",
+ "strsim",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2219,6 +2229,19 @@ dependencies = [
  "reqwest",
  "serde",
  "time",
+]
+
+[[package]]
+name = "http-range-client"
+version = "0.9.0"
+source = "git+https://github.com/pka/http-range-client.git#b3ab3efd54b657f728686189495b1afa75d38fb7"
+dependencies = [
+ "async-trait",
+ "byteorder",
+ "bytes",
+ "read-logger",
+ "reqwest",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3078,6 +3101,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nu-ansi-term"
+version = "0.50.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4a28e057d01f97e61255210fcff094d74ed0466038633e95017f5beb68e4399"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "num"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3917,6 +3949,7 @@ dependencies = [
  "comfy-table",
  "console",
  "content_inspector",
+ "diffy",
  "dunce",
  "flate2",
  "fs-err",
@@ -3924,6 +3957,7 @@ dependencies = [
  "globset",
  "goblin",
  "hex",
+ "http-range-client",
  "ignore",
  "indexmap 2.9.0",
  "indicatif",
@@ -4404,6 +4438,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7f715a23c7db804b71eb9162a9cf210b89e99db9c3649a2a038d13b7594a99"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4552,6 +4595,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.10",
@@ -5862,7 +5906,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8189decb5ac0fa7bc8b96b7cb9b2701d60d48805aca84a238004d665fcc4008"
 dependencies = [
  "matchers",
- "nu-ansi-term",
+ "nu-ansi-term 0.46.0",
  "once_cell",
  "regex",
  "serde",
