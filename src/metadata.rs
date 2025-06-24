@@ -682,6 +682,63 @@ impl Output {
         }
         Ok(())
     }
+
+    /// Return a view that merges the finalized dependencies of this output
+    /// with those of the optional cache build.
+    ///
+    /// * `run` comes from the main `finalized_dependencies` (cache runs are
+    ///   irrelevant for the final artefact).
+    /// * `host` / `build` environments are taken from the main dependencies if
+    ///   present, otherwise from the cache. If both are present we merge their
+    ///   fields (union of `resolved`, `specs`, `library_mapping`,
+    ///   `package_nature`).
+    pub fn merged_finalized_dependencies(
+        &self,
+    ) -> Option<crate::render::resolved_dependencies::FinalizedDependencies> {
+        use crate::render::resolved_dependencies::ResolvedDependencies;
+
+        fn merge_env(
+            mut primary: Option<ResolvedDependencies>,
+            secondary: &Option<ResolvedDependencies>,
+        ) -> Option<ResolvedDependencies> {
+            match (primary.as_mut(), secondary) {
+                (Some(dst), Some(src)) => {
+                    // merge specs
+                    dst.specs.extend(src.specs.clone());
+                    let additional_resolved: Vec<_> = src
+                        .resolved
+                        .iter()
+                        .filter(|&r| {
+                            !dst.resolved.iter().any(|existing| {
+                                existing.package_record.name == r.package_record.name
+                                    && existing.package_record.version == r.package_record.version
+                                    && existing.package_record.build == r.package_record.build
+                            })
+                        })
+                        .cloned()
+                        .collect();
+
+                    dst.resolved.extend(additional_resolved);
+                    // merge library mapping / package nature (simple union)
+                    dst.library_mapping.extend(src.library_mapping.clone());
+                    dst.package_nature.extend(src.package_nature.clone());
+                    primary
+                }
+                (None, Some(src)) => Some(src.clone()),
+                _ => primary,
+            }
+        }
+
+        let primary = self.finalized_dependencies.as_ref()?;
+        let mut merged = primary.clone();
+
+        if let Some(cache_deps) = &self.finalized_cache_dependencies {
+            merged.build = merge_env(merged.build.take(), &cache_deps.build);
+            merged.host = merge_env(merged.host.take(), &cache_deps.host);
+        }
+
+        Some(merged)
+    }
 }
 
 impl Output {

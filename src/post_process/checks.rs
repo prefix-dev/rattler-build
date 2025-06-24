@@ -11,7 +11,7 @@ use crate::{
     post_process::{package_nature::PackageNature, relink},
 };
 
-use crate::render::resolved_dependencies::RunExportDependency;
+use crate::render::resolved_dependencies::{FinalizedDependencies, RunExportDependency};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
 
@@ -266,6 +266,36 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
     system_libs.build()
 }
 
+/// Extend the provided `library_mapping` and `package_to_nature` maps with the
+/// information contained in a `FinalizedDependencies` instance. This helper
+/// avoids duplicating the same merging logic for the regular dependencies and
+/// the optional cache dependencies.
+fn extend_mappings_from_finalized(
+    deps: &Option<FinalizedDependencies>,
+    library_mapping: &mut HashMap<String, PackageName>,
+    package_to_nature: &mut HashMap<PackageName, PackageNature>,
+) {
+    let Some(deps) = deps else { return };
+
+    if let Some(host) = &deps.host {
+        library_mapping.extend(host.library_mapping.clone());
+        package_to_nature.extend(host.package_nature.clone());
+    }
+
+    // For the build environment we (currently) only need the sysroot packages
+    // to resolve system libraries. Therefore we filter explicitly for
+    // `sysroot_` packages when merging the library mapping. The package nature
+    // information can be copied as-is.
+    if let Some(build) = &deps.build {
+        for (lib, pkg) in &build.library_mapping {
+            if pkg.as_normalized().starts_with("sysroot_") {
+                library_mapping.insert(lib.clone(), pkg.clone());
+            }
+        }
+        package_to_nature.extend(build.package_nature.clone());
+    }
+}
+
 pub fn perform_linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
@@ -276,56 +306,11 @@ pub fn perform_linking_checks(
 
     // Get library mapping from finalized dependencies
     let mut library_mapping = HashMap::new();
-
-    // Collect from regular dependencies
-    if let Some(deps) = &output.finalized_dependencies {
-        if let Some(host) = &deps.host {
-            library_mapping.extend(host.library_mapping.clone());
-        }
-
-        if let Some(build) = &deps.build {
-            for (lib, pkg) in &build.library_mapping {
-                if pkg.as_normalized().starts_with("sysroot_") {
-                    library_mapping.insert(lib.clone(), pkg.clone());
-                }
-            }
-        }
-    }
-
-    // Also merge in library mapping from cache dependencies if available
-    if let Some(cache_deps) = &output.finalized_cache_dependencies {
-        if let Some(host) = &cache_deps.host {
-            library_mapping.extend(host.library_mapping.clone());
-        }
-
-        if let Some(build) = &cache_deps.build {
-            for (lib, pkg) in &build.library_mapping {
-                if pkg.as_normalized().starts_with("sysroot_") {
-                    library_mapping.insert(lib.clone(), pkg.clone());
-                }
-            }
-        }
-    }
-
-    // Combine package -> nature information from all resolved environments
     let mut package_to_nature = HashMap::new();
 
-    if let Some(deps) = &output.finalized_dependencies {
-        if let Some(host) = &deps.host {
-            package_to_nature.extend(host.package_nature.clone());
-        }
-        if let Some(build) = &deps.build {
-            package_to_nature.extend(build.package_nature.clone());
-        }
-    }
-
-    if let Some(cache_deps) = &output.finalized_cache_dependencies {
-        if let Some(host) = &cache_deps.host {
-            package_to_nature.extend(host.package_nature.clone());
-        }
-        if let Some(build) = &cache_deps.build {
-            package_to_nature.extend(build.package_nature.clone());
-        }
+    // Merge information from the regular dependencies and (if present) from the cache
+    if let Some(merged) = output.merged_finalized_dependencies() {
+        extend_mappings_from_finalized(&Some(merged), &mut library_mapping, &mut package_to_nature);
     }
 
     let (resolved_run_dependencies, dep_to_source) =
