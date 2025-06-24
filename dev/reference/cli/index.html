@@ -1673,7 +1673,7 @@
 <li><code>rebuild</code> — Rebuild a package from a package file instead of a recipe</li>
 <li><code>upload</code> — Upload a package</li>
 <li><code>completion</code> — Generate shell completion script</li>
-<li><code>generate-recipe</code> — Generate a recipe from PyPI or CRAN</li>
+<li><code>generate-recipe</code> — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks</li>
 <li><code>auth</code> — Handle authentication to external channels</li>
 <li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
 </ul>
@@ -2217,12 +2217,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 </ul>
 <h3 id="generate-recipe"><code>generate-recipe</code><a class="headerlink" href="#generate-recipe" title="Permanent link">#</a></h3>
-<p>Generate a recipe from PyPI or CRAN</p>
+<p>Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks</p>
 <p><strong>Usage:</strong> <code>rattler-build generate-recipe &lt;COMMAND&gt;</code></p>
 <h5 id="subcommands_2"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_2" title="Permanent link">#</a></h5>
 <ul>
 <li><code>pypi</code> — Generate a recipe for a Python package from PyPI</li>
 <li><code>cran</code> — Generate a recipe for an R package from CRAN</li>
+<li><code>cpan</code> — Generate a recipe for a Perl package from CPAN</li>
+<li><code>luarocks</code> — Generate a recipe for a Lua package from LuaRocks</li>
 </ul>
 <h4 id="pypi"><code>pypi</code><a class="headerlink" href="#pypi" title="Permanent link">#</a></h4>
 <p>Generate a recipe for a Python package from PyPI</p>
@@ -2278,6 +2280,51 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Whether to write the recipe to a folder</p>
 </li>
 </ul>
+<h4 id="cpan"><code>cpan</code><a class="headerlink" href="#cpan" title="Permanent link">#</a></h4>
+<p>Generate a recipe for a Perl package from CPAN</p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe cpan [OPTIONS] &lt;PACKAGE&gt;</code></p>
+<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE&gt;</code></p>
+<p>Name of the package to generate</p>
+</li>
+</ul>
+<h5 id="options_13"><strong>Options:</strong><a class="headerlink" href="#options_13" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--version &lt;VERSION&gt;</code></p>
+<p>Select a version of the package to generate (defaults to latest)</p>
+</li>
+<li>
+<p><code>-w</code>, <code>--write</code></p>
+<p>Whether to write the recipe to a folder</p>
+</li>
+<li>
+<p><code>-t</code>, <code>--tree</code></p>
+<p>Whether to generate recipes for all dependencies</p>
+</li>
+</ul>
+<h4 id="luarocks"><code>luarocks</code><a class="headerlink" href="#luarocks" title="Permanent link">#</a></h4>
+<p>Generate a recipe for a Lua package from LuaRocks</p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe luarocks [OPTIONS] &lt;ROCK&gt;</code></p>
+<h5 id="arguments_4"><strong>Arguments:</strong><a class="headerlink" href="#arguments_4" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;ROCK&gt;</code></p>
+<p>Luarocks package to generate recipe for. Can be specified as: - module (fetches latest version) - module/version - author/module/version - Direct rockspec URL</p>
+</li>
+</ul>
+<h5 id="options_14"><strong>Options:</strong><a class="headerlink" href="#options_14" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-w</code>, <code>--write-to &lt;WRITE_TO&gt;</code></p>
+<p>Where to write the recipe to</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
+</li>
+</ul>
 <h3 id="auth"><code>auth</code><a class="headerlink" href="#auth" title="Permanent link">#</a></h3>
 <p>Handle authentication to external channels</p>
 <p><strong>Usage:</strong> <code>rattler-build auth &lt;COMMAND&gt;</code></p>
@@ -2289,14 +2336,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="login"><code>login</code><a class="headerlink" href="#login" title="Permanent link">#</a></h4>
 <p>Store authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth login [OPTIONS] &lt;HOST&gt;</code></p>
-<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
+<h5 id="arguments_5"><strong>Arguments:</strong><a class="headerlink" href="#arguments_5" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
 <p>The host to authenticate with (e.g. repo.prefix.dev)</p>
 </li>
 </ul>
-<h5 id="options_13"><strong>Options:</strong><a class="headerlink" href="#options_13" title="Permanent link">#</a></h5>
+<h5 id="options_15"><strong>Options:</strong><a class="headerlink" href="#options_15" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--token &lt;TOKEN&gt;</code></p>
@@ -2330,7 +2377,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="logout"><code>logout</code><a class="headerlink" href="#logout" title="Permanent link">#</a></h4>
 <p>Remove authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth logout &lt;HOST&gt;</code></p>
-<h5 id="arguments_4"><strong>Arguments:</strong><a class="headerlink" href="#arguments_4" title="Permanent link">#</a></h5>
+<h5 id="arguments_6"><strong>Arguments:</strong><a class="headerlink" href="#arguments_6" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
@@ -2340,7 +2387,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="debug"><code>debug</code><a class="headerlink" href="#debug" title="Permanent link">#</a></h3>
 <p>Debug a recipe by setting up the environment without running the build script</p>
 <p><strong>Usage:</strong> <code>rattler-build debug [OPTIONS] --recipe &lt;RECIPE&gt;</code></p>
-<h5 id="options_14"><strong>Options:</strong><a class="headerlink" href="#options_14" title="Permanent link">#</a></h5>
+<h5 id="options_16"><strong>Options:</strong><a class="headerlink" href="#options_16" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>

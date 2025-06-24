@@ -752,6 +752,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#alternatives-for-scalar-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives for scalar fields
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1536,6 +1545,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#alternatives-for-scalar-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives for scalar fields
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1725,6 +1743,17 @@ Some notable options are:</p>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux</span>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and not linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is not linux</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and (linux or osx)</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux or osx</span>
+</span></code></pre></div>
+<h3 id="alternatives-for-scalar-fields">Alternatives for scalar fields<a class="headerlink" href="#alternatives-for-scalar-fields" title="Permanent link">#</a></h3>
+<p>Some fields accept scalars rather than lists, and selectors cannot be used. Alternatives include:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;foobar&quot; if USE_OPENMP else &quot;bla&quot; }}</span>
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="no">{% if USE_OPENMP %}</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">     </span><span class="no">blablabla</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="no">{% else %}</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">     </span><span class="no">blabla</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="no">{% endif %}</span>
 </span></code></pre></div>
 
 
