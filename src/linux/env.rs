@@ -47,3 +47,46 @@ pub fn default_env_vars(
 
     vars
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    #[test]
+    #[serial]
+    fn build_and_ld_run_path_defaults() {
+        let tmp_prefix = tempfile::tempdir().unwrap();
+        unsafe { std::env::remove_var("LD_RUN_PATH") };
+
+        let vars = default_env_vars(tmp_prefix.path(), &Platform::Linux64);
+        let build_val = vars
+            .get("BUILD")
+            .and_then(|o| o.as_ref())
+            .expect("BUILD missing");
+        assert!(build_val.contains(std::env::consts::ARCH));
+        assert!(build_val.contains("cos"));
+        assert_eq!(
+            vars.get("CMAKE_GENERATOR"),
+            Some(&Some("Unix Makefiles".to_string()))
+        );
+
+        let expected_ld = tmp_prefix.path().join("lib").to_string_lossy().to_string();
+        assert_eq!(vars.get("LD_RUN_PATH"), Some(&Some(expected_ld)));
+    }
+
+    #[test]
+    #[serial]
+    fn ld_run_path_env_preserved() {
+        let tmp_prefix = tempfile::tempdir().unwrap();
+        unsafe { std::env::set_var("LD_RUN_PATH", "/custom/lib") };
+
+        let vars = default_env_vars(tmp_prefix.path(), &Platform::Linux64);
+        assert_eq!(
+            vars.get("LD_RUN_PATH"),
+            Some(&Some("/custom/lib".to_string()))
+        );
+
+        unsafe { std::env::remove_var("LD_RUN_PATH") };
+    }
+}
