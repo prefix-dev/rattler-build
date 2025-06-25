@@ -306,11 +306,11 @@ pub(crate) fn apply_patches(
 #[cfg(test)]
 mod tests {
     use crate::{
-        SystemTools, get_build_output, get_tool_config,
+        get_build_output, get_tool_config,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
         script::SandboxArguments,
-        source::{copy_dir::CopyDir, fetch_source},
+        source::copy_dir::CopyDir,
         tool_configuration::Configuration,
     };
     use std::{ffi::OsStr, process::Command, sync::LazyLock};

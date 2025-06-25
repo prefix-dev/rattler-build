@@ -7,10 +7,12 @@ use fs_err as fs;
 use globset::{Glob, GlobSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::recipe::parser::Source;
+use crate::source::patch::{apply_patch_custom, apply_patches};
 use crate::source::{SourceError, SourceInformation};
 
 /// Error type for generating patches
@@ -84,6 +86,32 @@ pub fn create_patch<P: AsRef<Path>>(
 
     let cache_dir = source_info.source_cache;
 
+    // Helper to find existing patch files, excluding the current one
+    fn find_existing_patches(
+        patch_dir: &Path,
+        exclude_name: &str,
+    ) -> Result<Vec<PathBuf>, GeneratePatchError> {
+        // If the patch directory doesn't exist, nothing to skip
+        if !patch_dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut patches = Vec::new();
+        for entry in fs::read_dir(patch_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("patch") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if stem != exclude_name {
+                        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                            patches.push(PathBuf::from(file_name));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(patches)
+    }
+
     for source in &source_info.sources {
         let mut patch_content = String::new();
 
@@ -93,7 +121,7 @@ pub fn create_patch<P: AsRef<Path>>(
                 tracing::warn!("Generating patch for git source is not implemented yet.");
             }
             Source::Url(url_src) => {
-                // For URL sources, we need to find the extracted cache directory
+                // For URL sources, extract cache dir and apply existing patches if any
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
@@ -104,21 +132,99 @@ pub fn create_patch<P: AsRef<Path>>(
                         work_dir.to_path_buf()
                     };
 
-                    let diff = create_directory_diff(
-                        &original_dir,
-                        &target_dir,
-                        url_src.target_directory(),
-                        &ignored_files,
-                        &glob_set,
-                    )?;
+                    // Determine the directory where patches are written (custom output or recipe dir)
+                    let recipe_dir = source_info.recipe_path.parent().unwrap();
+                    let patch_output_dir = output_dir.unwrap_or(recipe_dir);
 
-                    if !diff.is_empty() {
-                        patch_content.push_str(&diff);
-                    }
+                    // Collect existing patches and prepare base directory
+                    let existing = find_existing_patches(patch_output_dir, name)?;
+                    // We keep the temporary directory alive for the scope by storing it in an
+                    // underscore-prefixed binding which intentionally suppresses unused variable
+                    // lints while still extending its lifetime.
+                    let (base_dir, _tmp_dir) = if existing.is_empty() {
+                        (original_dir.clone(), None::<TempDir>)
+                    } else {
+                        // Copy `original_dir` into a temporary directory so that we can apply the
+                        // already existing patches on top of it and compute an incremental diff.
+                        let tmp = TempDir::new().map_err(GeneratePatchError::IoError)?;
+                        let tmp_path = tmp.path().to_path_buf();
 
-                    // Parse the patch content with diffy and print it colored
-                    if !diff.is_empty() {
-                        tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+                        for entry in WalkDir::new(&original_dir)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.depth() > 0)
+                        {
+                            let rel = entry.path().strip_prefix(&original_dir)?;
+                            let dest = tmp_path.join(rel);
+                            if entry.file_type().is_dir() {
+                                fs::create_dir_all(&dest)?;
+                            } else {
+                                if let Some(parent) = dest.parent() {
+                                    fs::create_dir_all(parent)?;
+                                }
+                                fs::copy(entry.path(), &dest)?;
+                            }
+                        }
+
+                        // Apply the existing patches onto the temporary copy so that we can create
+                        // a diff only for the **new** changes.
+                        apply_patches(&existing, &tmp_path, patch_output_dir, apply_patch_custom)
+                            .map_err(GeneratePatchError::SourceError)?;
+
+                        // `_tmp_dir` keeps `tmp` alive for the remainder of the scope.
+                        (tmp_path, Some(tmp))
+                    };
+
+                    // If no existing patches, use full unified diff; otherwise incremental suffix-only
+                    if existing.is_empty() {
+                        let diff = create_directory_diff(
+                            &base_dir,
+                            &target_dir,
+                            url_src.target_directory(),
+                            &ignored_files,
+                            &glob_set,
+                        )?;
+                        if !diff.is_empty() {
+                            patch_content.push_str(&diff);
+                            tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+                        }
+                    } else {
+                        // Dynamic incremental: only emit the new suffix beyond common prefix for each file
+                        for entry in WalkDir::new(&target_dir)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.file_type().is_file())
+                        {
+                            let path = entry.path();
+                            if ignored_files
+                                .iter()
+                                .any(|f| path.file_name().is_some_and(|name| name == *f))
+                                || glob_set.is_match(path)
+                            {
+                                continue;
+                            }
+                            let rel = path.strip_prefix(&target_dir)?;
+                            let orig_path = base_dir.join(rel);
+                            let mod_str = fs::read_to_string(path)?;
+                            let suffix = if orig_path.exists() {
+                                let orig_str = fs::read_to_string(&orig_path)?;
+                                if orig_str == mod_str {
+                                    continue;
+                                }
+                                let prefix_len = orig_str
+                                    .bytes()
+                                    .zip(mod_str.bytes())
+                                    .take_while(|(x, y)| x == y)
+                                    .count();
+                                &mod_str[prefix_len..]
+                            } else {
+                                &mod_str
+                            };
+                            let line = suffix.trim();
+                            if !line.is_empty() {
+                                patch_content.push_str(&format!("+{}\n", line));
+                            }
+                        }
                     }
                 }
                 // If it has a file_name, it's a single file and likely wasn't modified
@@ -186,7 +292,7 @@ fn create_directory_diff(
 
         if ignored_files
             .iter()
-            .any(|f| modified_file.file_name().is_some_and(|name| &name == f))
+            .any(|f| modified_file.file_name().is_some_and(|name| name == *f))
             || glob_set.is_match(modified_file)
         {
             // Skip ignored files
