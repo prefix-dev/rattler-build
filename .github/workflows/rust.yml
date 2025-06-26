@@ -58,7 +58,7 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
         run: |
           patch --version
-          cargo test --features=tui,recipe-generation --verbose -- --nocapture --ignored
+          cargo test --features=tui,recipe-generation,patch-test-extra --verbose -- --nocapture --ignored
 
   build:
     name: Build ${{ matrix.target }}
