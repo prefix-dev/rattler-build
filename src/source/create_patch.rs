@@ -5,6 +5,7 @@
 use diffy::DiffOptions;
 use fs_err as fs;
 use globset::{Glob, GlobSet};
+use miette::Diagnostic;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -14,7 +15,7 @@ use crate::recipe::parser::Source;
 use crate::source::{SourceError, SourceInformation};
 
 /// Error type for generating patches
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum GeneratePatchError {
     /// Error when the source was not
     #[error("Source error: {0}")]
