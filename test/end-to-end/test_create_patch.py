@@ -199,3 +199,38 @@ def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):
     patch_path = paths["recipe_dir"] / "changes.patch"
     # Dry-run should not create the patch
     assert not patch_path.exists()
+
+
+def test_create_patch_always_prints_colored_diff(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Ensures that create-patch prints a colored diff even when not using --dry-run."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_always_color_output",
+        cache_files={"test.txt": "hello\n"},
+        work_files={"test.txt": "hello world\n"},
+    )
+
+    # Run create-patch normally (without --dry-run)
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+    # Should succeed and write patch file
+    assert result.returncode == 0
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+
+    # The colored diff should appear in stderr
+    stderr = result.stderr
+    # Check for ANSI escape code indicating color output
+    assert "\x1b[" in stderr
+    # Ensure diff headers and content are present in logs
+    assert "a/test.txt" in stderr
+    assert "b/test.txt" in stderr
+    assert "+hello world" in stderr
