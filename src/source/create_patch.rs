@@ -84,35 +84,10 @@ pub fn create_patch<P: AsRef<Path>>(
     // compile glob patterns from user exclusions
     let glob_set = build_globset(exclude_patterns)?;
 
-    let cache_dir = source_info.source_cache;
+    let mut updated_source_info = source_info.clone();
+    let cache_dir = &source_info.source_cache;
 
-    // Helper to find existing patch files, excluding the current one
-    fn find_existing_patches(
-        patch_dir: &Path,
-        exclude_name: &str,
-    ) -> Result<Vec<PathBuf>, GeneratePatchError> {
-        // If the patch directory doesn't exist, nothing to skip
-        if !patch_dir.exists() {
-            return Ok(Vec::new());
-        }
-        let mut patches = Vec::new();
-        for entry in fs::read_dir(patch_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("patch") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    if stem != exclude_name {
-                        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                            patches.push(PathBuf::from(file_name));
-                        }
-                    }
-                }
-            }
-        }
-        Ok(patches)
-    }
-
-    for source in &source_info.sources {
+    for (source_idx, source) in source_info.sources.iter().enumerate() {
         let mut patch_content = String::new();
 
         match source {
@@ -125,7 +100,7 @@ pub fn create_patch<P: AsRef<Path>>(
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
-                    let original_dir = find_url_cache_dir(&cache_dir, url_src)?;
+                    let original_dir = find_url_cache_dir(cache_dir, url_src)?;
                     let target_dir = if let Some(target) = url_src.target_directory() {
                         work_dir.join(target)
                     } else {
@@ -136,12 +111,13 @@ pub fn create_patch<P: AsRef<Path>>(
                     let recipe_dir = source_info.recipe_path.parent().unwrap();
                     let patch_output_dir = output_dir.unwrap_or(recipe_dir);
 
-                    // Collect existing patches and prepare base directory
-                    let existing = find_existing_patches(patch_output_dir, name)?;
+                    // Use existing patches from the source information
+                    let existing_patches = url_src.patches();
+                    
                     // We keep the temporary directory alive for the scope by storing it in an
                     // underscore-prefixed binding which intentionally suppresses unused variable
                     // lints while still extending its lifetime.
-                    let (base_dir, _tmp_dir) = if existing.is_empty() {
+                    let (base_dir, _tmp_dir) = if existing_patches.is_empty() {
                         (original_dir.clone(), None::<TempDir>)
                     } else {
                         // Copy `original_dir` into a temporary directory so that we can apply the
@@ -168,7 +144,7 @@ pub fn create_patch<P: AsRef<Path>>(
 
                         // Apply the existing patches onto the temporary copy so that we can create
                         // a diff only for the **new** changes.
-                        apply_patches(&existing, &tmp_path, patch_output_dir, apply_patch_custom)
+                        apply_patches(existing_patches, &tmp_path, patch_output_dir, apply_patch_custom)
                             .map_err(GeneratePatchError::SourceError)?;
 
                         // `_tmp_dir` keeps `tmp` alive for the remainder of the scope.
@@ -176,7 +152,7 @@ pub fn create_patch<P: AsRef<Path>>(
                     };
 
                     // If no existing patches, use full unified diff; otherwise incremental suffix-only
-                    if existing.is_empty() {
+                    if existing_patches.is_empty() {
                         let diff = create_directory_diff(
                             &base_dir,
                             &target_dir,
@@ -266,7 +242,36 @@ pub fn create_patch<P: AsRef<Path>>(
             fs::create_dir_all(target_dir)?;
             fs::write(&patch_path, patch_content)?;
             tracing::info!("Created patch file at: {}", patch_path.display());
+            
+            // Update the source information to include the newly created patch
+            let patch_file_name = PathBuf::from(format!("{}.patch", name));
+            match &mut updated_source_info.sources[source_idx] {
+                Source::Url(url_src) => {
+                    if !url_src.patches.contains(&patch_file_name) {
+                        url_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Git(git_src) => {
+                    if !git_src.patches.contains(&patch_file_name) {
+                        git_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Path(path_src) => {
+                    if !path_src.patches.contains(&patch_file_name) {
+                        path_src.patches.push(patch_file_name);
+                    }
+                }
+            }
         }
+    }
+
+    // Write updated source information back to .source_info.json if any patches were created
+    if !dry_run {
+        let source_info_path = work_dir.join(".source_info.json");
+        fs::write(
+            &source_info_path,
+            serde_json::to_string(&updated_source_info).expect("should serialize"),
+        )?;
     }
 
     Ok(())
