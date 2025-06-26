@@ -166,15 +166,22 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::CreatePatch(opts)) => {
             let exclude_vec = opts.exclude.clone().unwrap_or_default();
-            let _ = create_patch::create_patch(
+            match create_patch::create_patch(
                 opts.directory,
                 &opts.name,
                 opts.overwrite,
                 opts.patch_dir.as_deref(),
                 &exclude_vec,
                 opts.dry_run,
-            );
-            Ok(())
+            ) {
+                Ok(()) => Ok(()),
+                Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
+                    tracing::warn!("Not writing patch file, already exists: {}", path.display());
+                    tracing::warn!("Use --overwrite to replace the existing patch file.");
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
+            }
         }
         None => {
             _ = App::command().print_long_help();
