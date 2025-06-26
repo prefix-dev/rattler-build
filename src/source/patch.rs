@@ -305,20 +305,31 @@ pub(crate) fn apply_patches(
 
 #[cfg(test)]
 mod tests {
+    use crate::source::copy_dir::CopyDir;
+
+    #[cfg(feature = "patch-test-extra")]
     use crate::{
         SystemTools, get_build_output, get_tool_config,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
         script::SandboxArguments,
-        source::{copy_dir::CopyDir, fetch_source},
+        source::fetch_source,
         tool_configuration::Configuration,
     };
+
+    #[cfg(feature = "patch-test-extra")]
     use std::{ffi::OsStr, process::Command, sync::LazyLock};
 
     use super::*;
     use line_ending::LineEnding;
+
+    #[cfg(feature = "patch-test-extra")]
     use miette::IntoDiagnostic;
+
+    #[cfg(feature = "patch-test-extra")]
     use regex::Regex;
+
+    #[cfg(feature = "patch-test-extra")]
     use rstest::*;
 
     use tempfile::TempDir;
@@ -459,6 +470,7 @@ mod tests {
     }
 
     /// Prepare all information needed to test patches for package info path.
+    #[cfg(feature = "patch-test-extra")]
     async fn prepare_sources(recipe_dir: &Path) -> miette::Result<(Configuration, Vec<Source>)> {
         let artifacts_dir = tempfile::tempdir().unwrap();
         let artifacts_dir_path = artifacts_dir.path().join("original");
@@ -507,6 +519,7 @@ mod tests {
         Ok((tool_config, patchable_sources))
     }
 
+    #[cfg(feature = "patch-test-extra")]
     fn show_dir_difference(common_parent: &Path) -> miette::Result<String> {
         let mut cmd = Command::new("diff");
         // So snapshots doesn't change all the time
@@ -535,6 +548,7 @@ mod tests {
     }
 
     /// Applied patches is vector of strip level and diffs from one patch file.
+    #[cfg(feature = "patch-test-extra")]
     fn snapshot_patched_files(
         package_name: &str,
         applied_patches: &Vec<(usize, Vec<Diff<'_, [u8]>>)>,
@@ -597,6 +611,7 @@ mod tests {
     /// 3. Patch original work dir using `git apply`.
     /// 4. Patch temporary work dir using custom patch application.
     /// 5. Compare directories.
+    #[cfg(feature = "patch-test-extra")]
     #[ignore]
     #[rstest]
     #[tokio::test]
