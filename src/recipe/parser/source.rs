@@ -473,7 +473,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `target_directory`"
+                        help = "valid fields for URL `source` are `url`, `sha256` (optional), `md5` (optional), `patches`, `file_name` and `target_directory`"
                     )])
                 }
             }
@@ -488,13 +488,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
             )]
         })?;
 
-        if md5.is_none() && sha256.is_none() {
-            return Err(vec![_partialerror!(
-                *self.span(),
-                ErrorKind::MissingField("sha256 or md5".into()),
-                help = "URL `source` must have a `sha256` or `md5` checksum field"
-            )]);
-        }
+        // Checksums are now optional - we'll rely on metadata and filename for cache management
 
         Ok(UrlSource {
             url,
