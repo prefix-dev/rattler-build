@@ -17,6 +17,7 @@ test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snaps
 ] }
 test = "cargo test"
 test-slow = "cargo test --release"
+test-patch-extra = "cargo test --features patch-test-extra"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
 generate-cli-docs = "mkdir src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"

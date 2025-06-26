@@ -44,6 +44,7 @@ recipe-generation = []
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 # but in order to be able to publish to crates we remove this feature
 generate-cli-docs = []
+patch-test-extra = []
 
 [[bin]]
 name = "rattler-build"
