@@ -158,7 +158,7 @@ pub fn create_patch<P: AsRef<Path>>(
             );
         } else {
             fs::create_dir_all(target_dir)?;
-            fs::write(&patch_path, patch_content)?;
+            fs::write(&patch_path, &patch_content)?;
             tracing::info!("Created patch file at: {}", patch_path.display());
         }
     }
@@ -239,6 +239,12 @@ fn create_directory_diff(
                     "{}",
                     diffy::PatchFormatter::new().fmt_patch(&patch)
                 ));
+
+                // Print colored diff to stderr for immediate feedback
+                tracing::info!(
+                    "{}",
+                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                );
             }
         } else {
             // This is a new file
@@ -258,6 +264,11 @@ fn create_directory_diff(
                 "{}",
                 diffy::PatchFormatter::new().fmt_patch(&patch)
             ));
+
+            tracing::info!(
+                "{}",
+                diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+            );
         }
     }
 
@@ -298,6 +309,11 @@ fn create_directory_diff(
                 "{}",
                 diffy::PatchFormatter::new().fmt_patch(&patch)
             ));
+
+            tracing::info!(
+                "{}",
+                diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+            );
         }
     }
 
