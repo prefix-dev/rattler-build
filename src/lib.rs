@@ -879,13 +879,14 @@ pub fn sort_build_outputs_topologically(
             .get(output.name())
             .expect("We just inserted it");
         for dep in output.recipe.requirements().run_build_host() {
-            let dep_name = match dep {
-                Dependency::Spec(spec) => spec
-                    .name
-                    .clone()
-                    .expect("MatchSpec should always have a name"),
-                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+            let Some(dep_name) = dep.package_name() else {
+                if let Dependency::Git(git) = dep {
+                    tracing::warn!(
+                        "Git dependency {} cannot be resolved in build order calculation",
+                        git.git
+                    );
+                }
+                continue;
             };
 
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
