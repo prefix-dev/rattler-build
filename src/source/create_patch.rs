@@ -121,39 +121,11 @@ pub fn create_patch<P: AsRef<Path>>(
                     let (base_dir, _tmp_dir) = if existing_patches.is_empty() {
                         (original_dir.clone(), None::<TempDir>)
                     } else {
-                        // Copy `original_dir` into a temporary directory so that we can apply the
-                        // already existing patches on top of it and compute an incremental diff.
-                        let tmp = TempDir::new().map_err(GeneratePatchError::IoError)?;
-                        let tmp_path = tmp.path().to_path_buf();
-
-                        for entry in WalkDir::new(&original_dir)
-                            .into_iter()
-                            .filter_map(|e| e.ok())
-                            .filter(|e| e.depth() > 0)
-                        {
-                            let rel = entry.path().strip_prefix(&original_dir)?;
-                            let dest = tmp_path.join(rel);
-                            if entry.file_type().is_dir() {
-                                fs::create_dir_all(&dest)?;
-                            } else {
-                                if let Some(parent) = dest.parent() {
-                                    fs::create_dir_all(parent)?;
-                                }
-                                fs::copy(entry.path(), &dest)?;
-                            }
-                        }
-
-                        // Apply the existing patches onto the temporary copy so that we can create
-                        // a diff only for the **new** changes.
-                        apply_patches(
+                        let (tmp_path, tmp) = prepare_patched_source_dir(
+                            &original_dir,
                             existing_patches,
-                            &tmp_path,
                             patch_output_dir,
-                            apply_patch_custom,
-                        )
-                        .map_err(GeneratePatchError::SourceError)?;
-
-                        // `_tmp_dir` keeps `tmp` alive for the remainder of the scope.
+                        )?;
                         (tmp_path, Some(tmp))
                     };
 
@@ -285,6 +257,32 @@ pub fn create_patch<P: AsRef<Path>>(
     }
 
     Ok(())
+}
+
+/// Prepares a temporary directory with the original source code and applies existing patches.
+/// This is used to create a base for generating a new patch against.
+fn prepare_patched_source_dir(
+    original_dir: &Path,
+    existing_patches: &[PathBuf],
+    patch_output_dir: &Path,
+) -> Result<(PathBuf, TempDir), GeneratePatchError> {
+    let tmp = TempDir::new().map_err(GeneratePatchError::IoError)?;
+    let tmp_path = tmp.path().to_path_buf();
+
+    crate::source::copy_dir::CopyDir::new(original_dir, &tmp_path)
+        .use_gitignore(false)
+        .run()
+        .map_err(GeneratePatchError::SourceError)?;
+
+    apply_patches(
+        existing_patches,
+        &tmp_path,
+        patch_output_dir,
+        apply_patch_custom,
+    )
+    .map_err(GeneratePatchError::SourceError)?;
+
+    Ok((tmp_path, tmp))
 }
 
 /// Creates a unified diff between two directories
