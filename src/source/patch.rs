@@ -12,6 +12,7 @@ use std::{
 
 use diffy::{Diff, Patch};
 use fs_err::File;
+use fs_err::read;
 use itertools::Itertools;
 
 fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
@@ -303,6 +304,56 @@ pub(crate) fn apply_patches(
     Ok(())
 }
 
+/// Summarized statistics of patch operations.
+#[derive(Debug, Default)]
+pub struct PatchStats {
+    /// Files that have been modified (both original and modified exist).
+    pub changed: Vec<PathBuf>,
+    /// Files that have been added (original is /dev/null).
+    pub added: Vec<PathBuf>,
+    /// Files that have been removed (modified is /dev/null).
+    pub removed: Vec<PathBuf>,
+}
+
+/// Summarize a single diff into added, removed, and changed files.
+pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats, SourceError> {
+    let mut stats = PatchStats::default();
+    let strip_level = guess_strip_level(diff, work_dir)?;
+    for hunk in diff {
+        let (orig_path, mod_path) = custom_patch_stripped_paths(hunk, strip_level);
+        match (orig_path, mod_path) {
+            // Both original and modified exist: record original (prefix stripped) as changed file
+            (Some(orig), Some(_mod)) => stats.changed.push(orig),
+            // Only modified exists: new file added
+            (None, Some(modified)) => stats.added.push(modified),
+            // Only original exists: file removed
+            (Some(orig), None) => stats.removed.push(orig),
+            _ => {}
+        }
+    }
+    Ok(stats)
+}
+
+/// Summarize multiple patch files by reading and parsing each patch.
+pub fn summarize_patches(
+    patches: &[PathBuf],
+    work_dir: &Path,
+    patch_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let mut total = PatchStats::default();
+    for patch_file in patches {
+        let full_path = patch_dir.join(patch_file);
+        let data = read(&full_path)?;
+        let patch = patch_from_bytes(&data)
+            .map_err(|_| SourceError::PatchParseFailed(full_path.clone()))?;
+        let stats = summarize_patch(&patch, work_dir)?;
+        total.changed.extend(stats.changed);
+        total.added.extend(stats.added);
+        total.removed.extend(stats.removed);
+    }
+    Ok(total)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::source::copy_dir::CopyDir;
@@ -580,7 +631,7 @@ mod tests {
                     (Some(o), None) => {
                         patch_results.push((patch, PatchResult::Deleted(!o.exists())))
                     }
-                    (Some(_), Some(m)) => {
+                    (Some(o), Some(m)) => {
                         let modified_file_contents = fs_err::read(m).into_diagnostic()?;
                         let modified_file_debug_representation =
                             String::from_utf8(modified_file_contents)

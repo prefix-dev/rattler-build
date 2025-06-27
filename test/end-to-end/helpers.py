@@ -198,3 +198,33 @@ def check_build_output(
     _, err = capfd.readouterr()
     print(err)  # to debug in case it fails
     assert string_to_check in err
+
+
+def write_simple_text_patch(
+    recipe_dir: Path,
+    filename: str = "initial.patch",
+    *,
+    old: str = "hello",
+    new: str = "hello world",
+    target_file: str = "test.txt",
+) -> None:
+    """Write a simple unified diff patch that replaces *old* with *new* in *target_file*.
+
+    It gets written to ``recipe_dir / filename``.
+    """
+
+    import textwrap
+
+    patch_content = textwrap.dedent(
+        f"""
+        diff --git a/{target_file} b/{target_file}
+        index e69de29..4d1745a 100644
+        --- a/{target_file}
+        +++ b/{target_file}
+        @@ -1 +1 @@
+        -{old}
+        +{new}
+        """
+    ).lstrip()
+
+    (recipe_dir / filename).write_text(patch_content)

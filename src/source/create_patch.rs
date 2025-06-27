@@ -13,7 +13,7 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::recipe::parser::Source;
-use crate::source::patch::{apply_patch_custom, apply_patches};
+use crate::source::patch::{apply_patch_custom, apply_patches, summarize_patches};
 use crate::source::{SourceError, SourceInformation};
 
 /// Error type for generating patches
@@ -118,18 +118,27 @@ pub fn create_patch<P: AsRef<Path>>(
                     // We keep the temporary directory alive for the scope by storing it in an
                     // underscore-prefixed binding which intentionally suppresses unused variable
                     // lints while still extending its lifetime.
-                    let (base_dir, _tmp_dir) = if existing_patches.is_empty() {
-                        (original_dir.clone(), None::<TempDir>)
-                    } else {
+                    let mut base_dir = original_dir.clone();
+                    let mut _tmp_dir: Option<TempDir> = None;
+                    if !existing_patches.is_empty() {
                         let (tmp_path, tmp) = prepare_patched_source_dir(
                             &original_dir,
                             existing_patches,
                             patch_output_dir,
                         )?;
-                        (tmp_path, Some(tmp))
-                    };
+                        base_dir = tmp_path;
+                        _tmp_dir = Some(tmp);
+                        let stats =
+                            summarize_patches(existing_patches, &target_dir, patch_output_dir)?;
+                        tracing::info!(
+                            "Existing patches summary: files_changed={:?}, files_added={:?}, files_removed={:?}",
+                            stats.changed,
+                            stats.added,
+                            stats.removed
+                        );
+                    }
 
-                    // If no existing patches, use full unified diff; otherwise incremental suffix-only
+                    // If no existing patches, use full unified diff; otherwise incremental unified diff
                     if existing_patches.is_empty() {
                         let diff = create_directory_diff(
                             &base_dir,
@@ -143,41 +152,20 @@ pub fn create_patch<P: AsRef<Path>>(
                             tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
                         }
                     } else {
-                        // Dynamic incremental: only emit the new suffix beyond common prefix for each file
-                        for entry in WalkDir::new(&target_dir)
-                            .into_iter()
-                            .filter_map(|e| e.ok())
-                            .filter(|e| e.file_type().is_file())
-                        {
-                            let path = entry.path();
-                            if ignored_files
-                                .iter()
-                                .any(|f| path.file_name().is_some_and(|name| name == *f))
-                                || glob_set.is_match(path)
-                            {
-                                continue;
-                            }
-                            let rel = path.strip_prefix(&target_dir)?;
-                            let orig_path = base_dir.join(rel);
-                            let mod_str = fs::read_to_string(path)?;
-                            let suffix = if orig_path.exists() {
-                                let orig_str = fs::read_to_string(&orig_path)?;
-                                if orig_str == mod_str {
-                                    continue;
-                                }
-                                let prefix_len = orig_str
-                                    .bytes()
-                                    .zip(mod_str.bytes())
-                                    .take_while(|(x, y)| x == y)
-                                    .count();
-                                &mod_str[prefix_len..]
-                            } else {
-                                &mod_str
-                            };
-                            let line = suffix.trim();
-                            if !line.is_empty() {
-                                patch_content.push_str(&format!("+{}\n", line));
-                            }
+                        // Generate an incremental unified diff between the already-patched base and the current work directory.
+                        // Because `base_dir` already includes all existing patches, the resulting patch only contains *new* edits.
+
+                        let diff = create_directory_diff(
+                            &base_dir,
+                            &target_dir,
+                            url_src.target_directory(),
+                            &ignored_files,
+                            &glob_set,
+                        )?;
+
+                        if !diff.is_empty() {
+                            patch_content.push_str(&diff);
+                            tracing::info!("Created incremental patch ({} bytes)", diff.len());
                         }
                     }
                 }
