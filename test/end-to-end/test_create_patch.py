@@ -1,7 +1,8 @@
+import json
 from pathlib import Path
 
 
-from helpers import RattlerBuild, setup_patch_test_environment
+from helpers import RattlerBuild, setup_patch_test_environment, write_simple_text_patch
 
 
 def test_create_patch_modified_file(rattler_build: RattlerBuild, tmp_path: Path):
@@ -276,3 +277,56 @@ def test_create_patch_already_exists_no_overwrite(
     stderr = result.stderr
     assert "Not writing patch file, already exists" in stderr
     assert str(patch_path) in stderr
+
+
+def test_create_patch_incremental_with_existing(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """If a file has already been changed by an existing patch, the new patch should only
+    include *new* changes beyond that, not duplicate the original ones."""
+
+    # Initial cache content is `hello`.
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_incremental",
+        cache_files={"test.txt": "hello\n"},
+        work_files={"test.txt": "hello universe\n"},
+    )
+
+    # Write an existing patch that modifies hello -> hello world.
+    existing_patch_name = "initial.patch"
+    write_simple_text_patch(paths["recipe_dir"], existing_patch_name)
+
+    si_path = paths["work_dir"] / ".source_info.json"
+    source_info = json.loads(si_path.read_text())
+    source_info["sources"][0]["patches"] = [existing_patch_name]
+    si_path.write_text(json.dumps(source_info))
+
+    # Run create-patch to generate a new incremental patch capturing the change from
+    # `hello world` -> `hello universe`.
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--name",
+        "incremental",
+        "--overwrite",
+    )
+
+    assert result.returncode == 0
+
+    new_patch = paths["recipe_dir"] / "incremental.patch"
+    assert new_patch.exists()
+
+    content = new_patch.read_text()
+
+    # The new patch should contain the word `universe` (incremental update)
+    assert "+hello universe" in content or "+universe" in content
+
+    # It should contain the *removal* of the old line but must not *re-add* it
+    assert "-hello world" in content
+    assert "+hello world" not in content
+
+    # It should be a proper unified diff containing the expected headers for the modified file
+    assert "--- a/test.txt" in content
+    assert "+++ b/test.txt" in content

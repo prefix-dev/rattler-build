@@ -8,10 +8,12 @@ use globset::{Glob, GlobSet};
 use miette::Diagnostic;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::recipe::parser::Source;
+use crate::source::patch::{apply_patch_custom, apply_patches, summarize_patches};
 use crate::source::{SourceError, SourceInformation};
 
 /// Error type for generating patches
@@ -83,9 +85,10 @@ pub fn create_patch<P: AsRef<Path>>(
     // compile glob patterns from user exclusions
     let glob_set = build_globset(exclude_patterns)?;
 
-    let cache_dir = source_info.source_cache;
+    let mut updated_source_info = source_info.clone();
+    let cache_dir = &source_info.source_cache;
 
-    for source in &source_info.sources {
+    for (source_idx, source) in source_info.sources.iter().enumerate() {
         let mut patch_content = String::new();
 
         match source {
@@ -94,32 +97,76 @@ pub fn create_patch<P: AsRef<Path>>(
                 tracing::warn!("Generating patch for git source is not implemented yet.");
             }
             Source::Url(url_src) => {
-                // For URL sources, we need to find the extracted cache directory
+                // For URL sources, extract cache dir and apply existing patches if any
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
-                    let original_dir = find_url_cache_dir(&cache_dir, url_src)?;
+                    let original_dir = find_url_cache_dir(cache_dir, url_src)?;
                     let target_dir = if let Some(target) = url_src.target_directory() {
                         work_dir.join(target)
                     } else {
                         work_dir.to_path_buf()
                     };
 
-                    let diff = create_directory_diff(
-                        &original_dir,
-                        &target_dir,
-                        url_src.target_directory(),
-                        &ignored_files,
-                        &glob_set,
-                    )?;
+                    // Determine the directory where patches are written (custom output or recipe dir)
+                    let recipe_dir = source_info.recipe_path.parent().unwrap();
+                    let patch_output_dir = output_dir.unwrap_or(recipe_dir);
 
-                    if !diff.is_empty() {
-                        patch_content.push_str(&diff);
+                    // Use existing patches from the source information
+                    let existing_patches = url_src.patches();
+
+                    // We keep the temporary directory alive for the scope by storing it in an
+                    // underscore-prefixed binding which intentionally suppresses unused variable
+                    // lints while still extending its lifetime.
+                    let mut base_dir = original_dir.clone();
+                    let mut _tmp_dir: Option<TempDir> = None;
+                    if !existing_patches.is_empty() {
+                        let (tmp_path, tmp) = prepare_patched_source_dir(
+                            &original_dir,
+                            existing_patches,
+                            patch_output_dir,
+                        )?;
+                        base_dir = tmp_path;
+                        _tmp_dir = Some(tmp);
+                        let stats =
+                            summarize_patches(existing_patches, &target_dir, patch_output_dir)?;
+                        tracing::info!(
+                            "Existing patches summary: files_changed={:?}, files_added={:?}, files_removed={:?}",
+                            stats.changed,
+                            stats.added,
+                            stats.removed
+                        );
                     }
 
-                    // Parse the patch content with diffy and print it colored
-                    if !diff.is_empty() {
-                        tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+                    // If no existing patches, use full unified diff; otherwise incremental unified diff
+                    if existing_patches.is_empty() {
+                        let diff = create_directory_diff(
+                            &base_dir,
+                            &target_dir,
+                            url_src.target_directory(),
+                            &ignored_files,
+                            &glob_set,
+                        )?;
+                        if !diff.is_empty() {
+                            patch_content.push_str(&diff);
+                            tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+                        }
+                    } else {
+                        // Generate an incremental unified diff between the already-patched base and the current work directory.
+                        // Because `base_dir` already includes all existing patches, the resulting patch only contains *new* edits.
+
+                        let diff = create_directory_diff(
+                            &base_dir,
+                            &target_dir,
+                            url_src.target_directory(),
+                            &ignored_files,
+                            &glob_set,
+                        )?;
+
+                        if !diff.is_empty() {
+                            patch_content.push_str(&diff);
+                            tracing::info!("Created incremental patch ({} bytes)", diff.len());
+                        }
                     }
                 }
                 // If it has a file_name, it's a single file and likely wasn't modified
@@ -132,11 +179,6 @@ pub fn create_patch<P: AsRef<Path>>(
             }
         }
 
-        if patch_content.is_empty() {
-            tracing::info!("No changes detected for source: {:?}", source);
-            continue; // Skip if no changes were detected
-        }
-
         // Determine directory where we should write the patch
         let recipe_dir = source_info
             .recipe_path
@@ -146,6 +188,15 @@ pub fn create_patch<P: AsRef<Path>>(
 
         let patch_file_name = format!("{}.patch", name);
         let patch_path = target_dir.join(patch_file_name);
+
+        if patch_content.is_empty() {
+            tracing::info!("No changes detected for source: {:?}", source);
+            // Even if there are no changes, check if patch file exists and warn user
+            if patch_path.exists() && !overwrite {
+                return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
+            }
+            continue; // Skip if no changes were detected
+        }
 
         if patch_path.exists() && !overwrite {
             return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
@@ -161,10 +212,65 @@ pub fn create_patch<P: AsRef<Path>>(
             fs::create_dir_all(target_dir)?;
             fs::write(&patch_path, &patch_content)?;
             tracing::info!("Created patch file at: {}", patch_path.display());
+
+            // Update the source information to include the newly created patch
+            let patch_file_name = PathBuf::from(format!("{}.patch", name));
+            match &mut updated_source_info.sources[source_idx] {
+                Source::Url(url_src) => {
+                    if !url_src.patches.contains(&patch_file_name) {
+                        url_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Git(git_src) => {
+                    if !git_src.patches.contains(&patch_file_name) {
+                        git_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Path(path_src) => {
+                    if !path_src.patches.contains(&patch_file_name) {
+                        path_src.patches.push(patch_file_name);
+                    }
+                }
+            }
         }
     }
 
+    // Write updated source information back to .source_info.json if any patches were created
+    if !dry_run {
+        let source_info_path = work_dir.join(".source_info.json");
+        fs::write(
+            &source_info_path,
+            serde_json::to_string(&updated_source_info).expect("should serialize"),
+        )?;
+    }
+
     Ok(())
+}
+
+/// Prepares a temporary directory with the original source code and applies existing patches.
+/// This is used to create a base for generating a new patch against.
+fn prepare_patched_source_dir(
+    original_dir: &Path,
+    existing_patches: &[PathBuf],
+    patch_output_dir: &Path,
+) -> Result<(PathBuf, TempDir), GeneratePatchError> {
+    let tmp = TempDir::new().map_err(GeneratePatchError::IoError)?;
+    let tmp_path = tmp.path().to_path_buf();
+
+    crate::source::copy_dir::CopyDir::new(original_dir, &tmp_path)
+        .use_gitignore(false)
+        .run()
+        .map_err(GeneratePatchError::SourceError)?;
+
+    apply_patches(
+        existing_patches,
+        &tmp_path,
+        patch_output_dir,
+        apply_patch_custom,
+    )
+    .map_err(GeneratePatchError::SourceError)?;
+
+    Ok((tmp_path, tmp))
 }
 
 /// Creates a unified diff between two directories
@@ -187,7 +293,7 @@ fn create_directory_diff(
 
         if ignored_files
             .iter()
-            .any(|f| modified_file.file_name().is_some_and(|name| &name == f))
+            .any(|f| modified_file.file_name().is_some_and(|name| name == *f))
             || glob_set.is_match(modified_file)
         {
             // Skip ignored files
