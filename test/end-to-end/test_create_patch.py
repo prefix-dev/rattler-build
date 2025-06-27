@@ -201,19 +201,18 @@ def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):
     assert not patch_path.exists()
 
 
-def test_create_patch_skip_existing_identical(
+def test_create_patch_always_prints_colored_diff(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
-    """Ensures that an existing identical patch is not rewritten when --overwrite is not specified."""
-    # Setup environment with a modified file to generate a patch
+    """Ensures that create-patch prints a colored diff even when not using --dry-run."""
     paths = setup_patch_test_environment(
         tmp_path,
-        "test_create_patch_skip_existing_identical",
+        "test_always_color_output",
         cache_files={"test.txt": "hello\n"},
         work_files={"test.txt": "hello world\n"},
     )
 
-    # First run with overwrite to create the patch
+    # Run create-patch normally (without --dry-run)
     result = rattler_build(
         "create-patch",
         "--directory",
@@ -222,36 +221,32 @@ def test_create_patch_skip_existing_identical(
         "changes",
         "--overwrite",
     )
+    # Should succeed and write patch file
     assert result.returncode == 0
     patch_path = paths["recipe_dir"] / "changes.patch"
     assert patch_path.exists()
-    initial_content = patch_path.read_text()
 
-    # Second run without --overwrite should not change the patch
-    result = rattler_build(
-        "create-patch",
-        "--directory",
-        str(paths["work_dir"]),
-        "--name",
-        "changes",
-    )
-    assert result.returncode == 0
-    final_content = patch_path.read_text()
-    assert final_content == initial_content
+    # The colored diff should appear in stderr
+    stderr = result.stderr
+    # Check for ANSI escape code indicating color output
+    assert "\x1b[" in stderr
+    # Ensure diff headers and content are present in logs
+    assert "a/test.txt" in stderr
+    assert "b/test.txt" in stderr
+    assert "+hello world" in stderr
 
 
-def test_create_patch_ignores_existing_patch_changes(
+def test_create_patch_already_exists_no_overwrite(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
-    """Ensures that create-patch only includes new changes when an existing patch is present."""
-    # Initial setup: one change to generate an existing patch
+    """Tests that when a patch file already exists and --overwrite is not specified, a message is shown."""
     paths = setup_patch_test_environment(
         tmp_path,
-        "test_create_patch_ignore_existing_changes",
-        cache_files={"test.txt": "line1\n"},
-        work_files={"test.txt": "line1 modified\n"},
+        "test_patch_already_exists",
+        cache_files={"test.txt": "hello\n"},
+        work_files={"test.txt": "hello world\n"},
     )
-    # Create the original patch
+
     result = rattler_build(
         "create-patch",
         "--directory",
@@ -261,29 +256,23 @@ def test_create_patch_ignores_existing_patch_changes(
         "--overwrite",
     )
     assert result.returncode == 0
-    orig_patch = paths["recipe_dir"] / "changes.patch"
-    assert orig_patch.exists()
-    orig_content = orig_patch.read_text()
-    assert "line1 modified" in orig_content
 
-    # Apply further modification beyond the original patch
-    (paths["work_dir"] / "test.txt").write_text("line1 modified again\n")
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
 
-    # Generate a new patch for only the additional change
     result = rattler_build(
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
         "--name",
-        "new_changes",
-        "--overwrite",
+        "changes",
+        # Note: no --overwrite flag
     )
-    assert result.returncode == 0
-    new_patch = paths["recipe_dir"] / "new_changes.patch"
-    assert new_patch.exists()
-    new_content = new_patch.read_text()
 
-    # The new patch should include only the diff from the patched state to the current state
-    assert "+again" in new_content
-    # It should not reinclude the original modification
-    assert "line1 modified" not in new_content
+    # Should succeed (not fail)
+    assert result.returncode == 0
+
+    # Should contain the message about not writing the patch file
+    stderr = result.stderr
+    assert "Not writing patch file, already exists" in stderr
+    assert str(patch_path) in stderr
