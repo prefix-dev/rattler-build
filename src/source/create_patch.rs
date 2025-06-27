@@ -219,11 +219,6 @@ pub fn create_patch<P: AsRef<Path>>(
             }
         }
 
-        if patch_content.is_empty() {
-            tracing::info!("No changes detected for source: {:?}", source);
-            continue; // Skip if no changes were detected
-        }
-
         // Determine directory where we should write the patch
         let recipe_dir = source_info
             .recipe_path
@@ -233,6 +228,15 @@ pub fn create_patch<P: AsRef<Path>>(
 
         let patch_file_name = format!("{}.patch", name);
         let patch_path = target_dir.join(patch_file_name);
+
+        if patch_content.is_empty() {
+            tracing::info!("No changes detected for source: {:?}", source);
+            // Even if there are no changes, check if patch file exists and warn user
+            if patch_path.exists() && !overwrite {
+                return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
+            }
+            continue; // Skip if no changes were detected
+        }
 
         if patch_path.exists() && !overwrite {
             return Err(GeneratePatchError::PatchFileAlreadyExists(patch_path));
