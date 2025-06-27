@@ -114,7 +114,7 @@ pub fn create_patch<P: AsRef<Path>>(
 
                     // Use existing patches from the source information
                     let existing_patches = url_src.patches();
-                    
+
                     // We keep the temporary directory alive for the scope by storing it in an
                     // underscore-prefixed binding which intentionally suppresses unused variable
                     // lints while still extending its lifetime.
@@ -145,8 +145,13 @@ pub fn create_patch<P: AsRef<Path>>(
 
                         // Apply the existing patches onto the temporary copy so that we can create
                         // a diff only for the **new** changes.
-                        apply_patches(existing_patches, &tmp_path, patch_output_dir, apply_patch_custom)
-                            .map_err(GeneratePatchError::SourceError)?;
+                        apply_patches(
+                            existing_patches,
+                            &tmp_path,
+                            patch_output_dir,
+                            apply_patch_custom,
+                        )
+                        .map_err(GeneratePatchError::SourceError)?;
 
                         // `_tmp_dir` keeps `tmp` alive for the remainder of the scope.
                         (tmp_path, Some(tmp))
@@ -243,7 +248,7 @@ pub fn create_patch<P: AsRef<Path>>(
             fs::create_dir_all(target_dir)?;
             fs::write(&patch_path, &patch_content)?;
             tracing::info!("Created patch file at: {}", patch_path.display());
-            
+
             // Update the source information to include the newly created patch
             let patch_file_name = PathBuf::from(format!("{}.patch", name));
             match &mut updated_source_info.sources[source_idx] {
