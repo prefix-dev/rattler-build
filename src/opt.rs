@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
+use chrono;
 use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
@@ -461,6 +462,10 @@ pub struct BuildOpts {
     /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
+
+    /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -492,6 +497,7 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildData {
@@ -524,6 +530,7 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         Self {
             up_to,
@@ -560,6 +567,7 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            exclude_newer,
         }
     }
 }
@@ -607,6 +615,7 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.exclude_newer,
         )
     }
 }
@@ -628,6 +637,18 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse a datetime string in RFC3339 format
+fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|e| {
+            format!(
+                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+                s, e
+            )
+        })
 }
 
 /// Test options.

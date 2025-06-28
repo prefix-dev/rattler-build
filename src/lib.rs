@@ -393,6 +393,7 @@ pub async fn get_build_output(
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
+                exclude_newer: build_data.exclude_newer,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -585,6 +586,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
+                        exclude_newer: output.build_configuration.exclude_newer,
                     },
                     None,
                 )
@@ -722,6 +724,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         debug: test_data.debug,
+        exclude_newer: None,
     };
 
     let package_name = package_file
@@ -1029,6 +1032,7 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        exclude_newer: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

@@ -377,6 +377,9 @@ pub struct BuildConfiguration {
     /// Whether to enable debug output in build scripts
     #[serde(skip_serializing, default)]
     pub debug: Debug,
+    /// Exclude packages newer than this date from the solver
+    #[serde(skip_serializing, default)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildConfiguration {

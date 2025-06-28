@@ -710,6 +710,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -806,6 +807,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
         .map_err(ResolveError::from)?;
