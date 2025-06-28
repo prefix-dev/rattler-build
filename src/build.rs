@@ -117,7 +117,12 @@ pub async fn run_build(
         output.build_or_fetch_cache(tool_configuration).await?
     } else {
         output
-            .fetch_sources(tool_configuration, apply_patch_custom)
+            .fetch_sources_with_update_mode(
+                tool_configuration,
+                apply_patch_custom,
+                tool_configuration.update_sha256,
+                tool_configuration.update_version.as_deref(),
+            )
             .await
             .into_diagnostic()?
     };

@@ -1,6 +1,6 @@
 context:
   name: xtensor
-  version: 0.24.6
+  version: 0.26.0
 
 package:
   name: ${{ name|lower }}

@@ -12,6 +12,7 @@ pub mod opt;
 pub mod package_test;
 pub mod packaging;
 pub mod recipe;
+pub mod recipe_updater;
 pub mod render;
 pub mod script;
 pub mod selectors;
@@ -150,7 +151,9 @@ pub fn get_tool_config(
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
-        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows);
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_update_sha256(build_data.update_sha256)
+        .with_update_version(build_data.update_version.clone());
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -1029,6 +1032,8 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        update_sha256: false,
+        update_version: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

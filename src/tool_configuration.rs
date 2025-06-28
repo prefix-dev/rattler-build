@@ -224,6 +224,12 @@ pub struct Configuration {
 
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
+
+    /// Whether to update SHA256 checksums in recipe files when validation fails
+    pub update_sha256: bool,
+
+    /// Version to update in recipe files and URLs
+    pub update_version: Option<String>,
 }
 
 /// Get the authentication storage from the given file
@@ -280,6 +286,8 @@ pub struct ConfigurationBuilder {
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    update_sha256: bool,
+    update_version: Option<String>,
 }
 
 impl Configuration {
@@ -311,6 +319,8 @@ impl ConfigurationBuilder {
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
             allow_symlinks_on_windows: false,
+            update_sha256: false,
+            update_version: None,
         }
     }
 
@@ -343,6 +353,22 @@ impl ConfigurationBuilder {
     pub fn with_allow_symlinks_on_windows(self, allow_symlinks_on_windows: bool) -> Self {
         Self {
             allow_symlinks_on_windows,
+            ..self
+        }
+    }
+
+    /// Whether to update SHA256 checksums in recipe files when validation fails
+    pub fn with_update_sha256(self, update_sha256: bool) -> Self {
+        Self {
+            update_sha256,
+            ..self
+        }
+    }
+
+    /// Version to update in recipe files and URLs
+    pub fn with_update_version(self, update_version: Option<String>) -> Self {
+        Self {
+            update_version,
             ..self
         }
     }
@@ -520,6 +546,8 @@ impl ConfigurationBuilder {
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            update_sha256: self.update_sha256,
+            update_version: self.update_version,
         }
     }
 }

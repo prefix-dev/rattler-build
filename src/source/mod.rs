@@ -114,6 +114,8 @@ pub(crate) async fn fetch_source(
     system_tools: &SystemTools,
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
+    update_sha256: bool,
+    recipe_path: Option<&Path>,
 ) -> Result<(), SourceError> {
     match &src {
         Source::Git(src) => {
@@ -155,7 +157,14 @@ pub(crate) async fn fetch_source(
                 .and_then(|mut segments| segments.next_back().map(|last| last.to_string()))
                 .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
-            let res = url_source::url_src(src, cache_src, tool_configuration).await?;
+            let res = url_source::url_src_with_update_mode(
+                src,
+                cache_src,
+                tool_configuration,
+                update_sha256,
+                recipe_path,
+            )
+            .await?;
 
             let dest_dir = if let Some(target_directory) = src.target_directory() {
                 work_dir.join(target_directory)
@@ -289,6 +298,28 @@ pub async fn fetch_sources(
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
 ) -> Result<Vec<Source>, SourceError> {
+    fetch_sources_with_update_mode(
+        sources,
+        directories,
+        system_tools,
+        tool_configuration,
+        apply_patch,
+        false,
+        None,
+    )
+    .await
+}
+
+/// Fetches all sources in a list of sources and applies specified patches with update mode support
+pub async fn fetch_sources_with_update_mode(
+    sources: &[Source],
+    directories: &Directories,
+    system_tools: &SystemTools,
+    tool_configuration: &tool_configuration::Configuration,
+    apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
+    update_sha256: bool,
+    recipe_path: Option<&Path>,
+) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
         tracing::info!("No sources to fetch");
         return Ok(Vec::new());
@@ -312,6 +343,8 @@ pub async fn fetch_sources(
             system_tools,
             tool_configuration,
             apply_patch,
+            update_sha256,
+            recipe_path,
         )
         .await?;
     }
@@ -351,10 +384,45 @@ impl Output {
         tool_configuration: &tool_configuration::Configuration,
         apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
     ) -> Result<Self, SourceError> {
+        self.fetch_sources_with_update_mode(tool_configuration, apply_patch, false, None)
+            .await
+    }
+
+    /// Fetches the sources for the given output with update mode support
+    pub async fn fetch_sources_with_update_mode(
+        self,
+        tool_configuration: &tool_configuration::Configuration,
+        apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
+        update_sha256: bool,
+        update_version: Option<&str>,
+    ) -> Result<Self, SourceError> {
         let span = tracing::info_span!("Fetching source code");
         let _enter = span.enter();
 
-        let rendered_sources = fetch_sources(
+        // Handle version updating first if requested
+        let recipe_path = self.build_configuration.directories.recipe_path.clone();
+        if let Some(new_version) = update_version {
+            tracing::info!("Updating recipe version to: {}", new_version);
+            let mut updater =
+                crate::recipe_updater::RecipeUpdater::load(&recipe_path).map_err(|e| {
+                    SourceError::UnknownError(format!(
+                        "Failed to load recipe for version updating: {}",
+                        e
+                    ))
+                })?;
+
+            updater.update_version(new_version).map_err(|e| {
+                SourceError::UnknownError(format!("Failed to update version in recipe: {}", e))
+            })?;
+
+            updater.save().map_err(|e| {
+                SourceError::UnknownError(format!("Failed to save version-updated recipe: {}", e))
+            })?;
+
+            tracing::info!("Recipe version updated and saved");
+        }
+
+        let rendered_sources = fetch_sources_with_update_mode(
             self.finalized_sources
                 .as_deref()
                 .unwrap_or(self.recipe.sources()),
@@ -362,6 +430,8 @@ impl Output {
             &self.system_tools,
             tool_configuration,
             apply_patch,
+            update_sha256,
+            Some(&recipe_path),
         )
         .await?;
 

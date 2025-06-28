@@ -221,10 +221,12 @@ fn copy_with_progress(
     Ok(copied)
 }
 
-pub(crate) async fn url_src(
+pub(crate) async fn url_src_with_update_mode(
     source: &UrlSource,
     cache_dir: &Path,
     tool_configuration: &tool_configuration::Configuration,
+    update_sha256: bool,
+    recipe_path: Option<&Path>,
 ) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
     let checksum = Checksum::from_url_source(source).ok_or_else(|| {
@@ -252,7 +254,50 @@ pub(crate) async fn url_src(
             }
 
             if !checksum.validate(&local_path) {
-                return Err(SourceError::ValidationFailed);
+                if update_sha256 && recipe_path.is_some() {
+                    tracing::info!(
+                        "Checksum validation failed for local file, but --update-sha256 is enabled. Updating recipe with correct checksum."
+                    );
+
+                    // Calculate the actual checksum
+                    let actual_checksum = crate::recipe_updater::calculate_sha256(&local_path)
+                        .map_err(|e| {
+                            SourceError::UnknownError(format!(
+                                "Failed to calculate checksum: {}",
+                                e
+                            ))
+                        })?;
+
+                    // Update the recipe file
+                    let mut updater = crate::recipe_updater::RecipeUpdater::load(
+                        recipe_path.unwrap(),
+                    )
+                    .map_err(|e| {
+                        SourceError::UnknownError(format!(
+                            "Failed to load recipe for updating: {}",
+                            e
+                        ))
+                    })?;
+
+                    let updates = vec![(url.to_string(), actual_checksum)];
+                    updater.update_sha256(&updates).map_err(|e| {
+                        SourceError::UnknownError(format!(
+                            "Failed to update SHA256 in recipe: {}",
+                            e
+                        ))
+                    })?;
+
+                    updater.save().map_err(|e| {
+                        SourceError::UnknownError(format!("Failed to save updated recipe: {}", e))
+                    })?;
+
+                    tracing::info!(
+                        "Recipe updated with correct SHA256 checksum for local file: {}",
+                        url
+                    );
+                } else {
+                    return Err(SourceError::ValidationFailed);
+                }
             }
 
             // copy file to cache
@@ -273,9 +318,57 @@ pub(crate) async fn url_src(
                         tracing::info!("Downloaded file from {}", url);
 
                         if !checksum.validate(&cache_name) {
-                            tracing::error!("Checksum validation failed!");
-                            fs::remove_file(&cache_name)?;
-                            return Err(SourceError::ValidationFailed);
+                            if update_sha256 && recipe_path.is_some() {
+                                tracing::info!(
+                                    "Checksum validation failed, but --update-sha256 is enabled. Updating recipe with correct checksum."
+                                );
+
+                                // Calculate the actual checksum
+                                let actual_checksum = crate::recipe_updater::calculate_sha256(
+                                    &cache_name,
+                                )
+                                .map_err(|e| {
+                                    SourceError::UnknownError(format!(
+                                        "Failed to calculate checksum: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                // Update the recipe file
+                                let mut updater = crate::recipe_updater::RecipeUpdater::load(
+                                    recipe_path.unwrap(),
+                                )
+                                .map_err(|e| {
+                                    SourceError::UnknownError(format!(
+                                        "Failed to load recipe for updating: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                let updates = vec![(url.to_string(), actual_checksum)];
+                                updater.update_sha256(&updates).map_err(|e| {
+                                    SourceError::UnknownError(format!(
+                                        "Failed to update SHA256 in recipe: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                updater.save().map_err(|e| {
+                                    SourceError::UnknownError(format!(
+                                        "Failed to save updated recipe: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                tracing::info!(
+                                    "Recipe updated with correct SHA256 checksum for URL: {}",
+                                    url
+                                );
+                            } else {
+                                tracing::error!("Checksum validation failed!");
+                                fs::remove_file(&cache_name)?;
+                                return Err(SourceError::ValidationFailed);
+                            }
                         }
                     }
                     Err(e) => {

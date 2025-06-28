@@ -646,6 +646,8 @@ mod tests {
                 &SystemTools::new(),
                 &tool_config,
                 |_, _| Ok(()),
+                false, // update_sha256
+                None,  // recipe_path
             )
             .await
             .into_diagnostic()?;

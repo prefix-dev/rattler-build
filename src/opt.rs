@@ -461,6 +461,14 @@ pub struct BuildOpts {
     /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
+
+    /// Update sha256 checksums in recipe files when validation fails
+    #[arg(long, help_heading = "Recipe updating")]
+    pub update_sha256: bool,
+
+    /// Update version in recipe files and URLs (e.g. --update-version 1.2.3)
+    #[arg(long, help_heading = "Recipe updating")]
+    pub update_version: Option<String>,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -492,6 +500,8 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub update_sha256: bool,
+    pub update_version: Option<String>,
 }
 
 impl BuildData {
@@ -524,6 +534,8 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        update_sha256: bool,
+        update_version: Option<String>,
     ) -> Self {
         Self {
             up_to,
@@ -560,6 +572,8 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            update_sha256,
+            update_version,
         }
     }
 }
@@ -607,6 +621,8 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.update_sha256,
+            opts.update_version,
         )
     }
 }
