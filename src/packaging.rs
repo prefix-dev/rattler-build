@@ -295,17 +295,15 @@ fn normalize_path_for_comparison(
 ) -> Result<String, PathNormalizationError> {
     let estimated_capacity = path.as_os_str().len() * 6 / 5 + path.components().count();
     let mut normalized = String::with_capacity(estimated_capacity);
-    let mut first = true;
 
     for c in path.components() {
         match c {
             Component::CurDir => continue,
             Component::RootDir => {
                 normalized.push(MAIN_SEPARATOR);
-                first = false;
             }
-            _ => {
-                if !first {
+            Component::Prefix(_) | Component::ParentDir | Component::Normal(_) => {
+                if !normalized.is_empty() && !normalized.ends_with(MAIN_SEPARATOR) {
                     normalized.push(MAIN_SEPARATOR);
                 }
 
@@ -314,15 +312,9 @@ fn normalize_path_for_comparison(
                     _ => c.as_os_str(),
                 };
 
-                let component_type = if matches!(c, Component::Prefix(_)) {
-                    "Prefix"
-                } else {
-                    "Component"
-                };
                 let component_str = os_str.to_str().ok_or_else(|| {
                     PathNormalizationError::InvalidUnicode(format!(
-                        "{}: {}",
-                        component_type,
+                        "Path component contains invalid Unicode: {}",
                         os_str.to_string_lossy()
                     ))
                 })?;
@@ -343,26 +335,22 @@ where
     I: IntoIterator<Item = P>,
     P: AsRef<Path>,
 {
-    let paths_vec: Vec<P> = paths.into_iter().collect();
-    let mut lc_map: HashMap<String, Vec<PathBuf>> = HashMap::with_capacity(paths_vec.len() / 2);
+    let mut lc_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
-    for path_ref in &paths_vec {
+    for path_ref in paths {
         let path = path_ref.as_ref();
-        let case_folded = match normalize_path_for_comparison(path, true) {
-            Ok(normalized) => normalized,
-            Err(err) => {
-                tracing::warn!(
-                    "Failed to normalize path for comparison: {}: {}",
-                    path.display(),
-                    err
-                );
-                path.display().to_string().to_lowercase()
-            }
-        };
+        let case_folded = normalize_path_for_comparison(path, true).unwrap_or_else(|err| {
+            tracing::warn!(
+                "Failed to normalize path for comparison: {}: {}",
+                path.display(),
+                err
+            );
+            path.display().to_string().to_lowercase()
+        });
 
         lc_map
             .entry(case_folded)
-            .or_insert_with(|| Vec::with_capacity(1))
+            .or_default()
             .push(path.to_path_buf());
     }
 
@@ -370,23 +358,13 @@ where
         .into_values()
         .filter(|group| group.len() > 1)
         .map(|group| {
-            let mut unique_vec: Vec<PathBuf> = if group.len() <= 4 {
-                let mut unique = Vec::with_capacity(group.len());
-                for path in group {
-                    if !unique.iter().any(|p| p == &path) {
-                        unique.push(path);
-                    }
-                }
-                unique
-            } else {
-                let mut unique_set = HashSet::with_capacity(group.len());
-                group.into_iter().for_each(|path| {
-                    unique_set.insert(path);
-                });
-                unique_set.into_iter().collect()
-            };
-            unique_vec.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
-            unique_vec
+            let mut unique_paths: Vec<PathBuf> = group
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            unique_paths.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
+            unique_paths
         })
         .collect();
 
@@ -638,5 +616,144 @@ mod packaging_tests {
         ];
         let groups = find_case_insensitive_collisions(&files);
         assert_eq!(groups.len(), 1);
+    }
+
+    #[test]
+    fn test_slash_collision() {
+        let files = vec![
+            Path::new("path/to/text/file.py"),
+            Path::new("path/to/textfile.py"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 0);
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_basic() {
+        let path = Path::new("foo/bar/baz.txt");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar/baz.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_lowercase() {
+        let path = Path::new("Foo/BAR/Baz.TXT");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        assert_eq!(normalized, "foo/bar/baz.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_unicode() {
+        let path = Path::new("straße/café");
+        let normalized_case_sensitive = normalize_path_for_comparison(path, false).unwrap();
+        let normalized_case_insensitive = normalize_path_for_comparison(path, true).unwrap();
+
+        assert_eq!(normalized_case_sensitive, "straße/café");
+        assert_eq!(normalized_case_insensitive, "strasse/café");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_unicode_equivalence() {
+        // Test that different Unicode representations normalize to the same result
+        let path1 = Path::new("café"); // é as single character
+        let path2 = Path::new("cafe\u{0301}"); // e + combining acute accent
+
+        let norm1 = normalize_path_for_comparison(path1, false).unwrap();
+        let norm2 = normalize_path_for_comparison(path2, false).unwrap();
+
+        assert_eq!(norm1, norm2);
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_empty_path() {
+        let path = Path::new("");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_single_component() {
+        let path = Path::new("file.txt");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "file.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_current_dir() {
+        let path = Path::new("./foo/bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // Current directory components should be skipped
+        assert_eq!(normalized, "foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_parent_dir() {
+        let path = Path::new("../foo/bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "../foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_absolute_path() {
+        let path = Path::new("/foo/bar/baz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "/foo/bar/baz");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_with_separators() {
+        let path = Path::new("foo//bar///baz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // Multiple separators should be normalized to single separators
+        assert_eq!(normalized, "foo/bar/baz");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_trailing_separator() {
+        let path = Path::new("foo/bar/");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_case_folding_special_chars() {
+        // Test German ß -> SS conversion in case folding
+        let path = Path::new("straße");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        assert_eq!(normalized, "strasse");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_complex_path() {
+        let path = Path::new("./Foo/../Bar/./Baz.TXT");
+        let normalized_case_sensitive = normalize_path_for_comparison(path, false).unwrap();
+        let normalized_case_insensitive = normalize_path_for_comparison(path, true).unwrap();
+
+        // Current dir components (.) are skipped, but parent dir (..) and other components are preserved
+        assert_eq!(normalized_case_sensitive, "Foo/../Bar/Baz.TXT");
+        assert_eq!(normalized_case_insensitive, "foo/../bar/baz.txt");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_windows_prefix() {
+        let path = Path::new("C:\\foo\\bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // On Windows, backslashes should be normalized to forward slashes
+        assert_eq!(normalized, "C:/foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_preserves_path_structure() {
+        // Ensure that the original failing test case works correctly
+        let path1 = Path::new("path/to/text/file.py");
+        let path2 = Path::new("path/to/textfile.py");
+
+        let norm1 = normalize_path_for_comparison(path1, true).unwrap();
+        let norm2 = normalize_path_for_comparison(path2, true).unwrap();
+
+        assert_ne!(norm1, norm2);
+        assert_eq!(norm1, "path/to/text/file.py");
+        assert_eq!(norm2, "path/to/textfile.py");
     }
 }
