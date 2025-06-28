@@ -499,7 +499,8 @@ mod tests {
             ..Default::default()
         };
 
-        let build_data: BuildData = BuildData::from_opts_and_config(opts, None);
+        let build_data: BuildData = BuildData::from_opts_and_config(opts, None)
+            .map_err(|e| CreatePatchError::Generic(e.into()))?;
         let tool_config: Configuration = get_tool_config(&build_data, &None).unwrap();
 
         let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;

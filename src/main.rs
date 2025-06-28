@@ -106,7 +106,8 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Build(build_args)) => {
             let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
-            let build_data = BuildData::from_opts_and_config(build_args, config);
+            let build_data = BuildData::from_opts_and_config(build_args, config)
+                .map_err(|e| miette::miette!("{}", e))?;
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;

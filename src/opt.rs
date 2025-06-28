@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
+use chrono;
 use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
@@ -461,6 +462,10 @@ pub struct BuildOpts {
     /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
+
+    /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+    #[arg(long, help_heading = "Modifying result")]
+    pub exclude_newer: Option<String>,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -492,6 +497,7 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildData {
@@ -524,6 +530,7 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         Self {
             up_to,
@@ -560,6 +567,7 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            exclude_newer,
         }
     }
 }
@@ -567,8 +575,23 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
-        Self::new(
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Result<Self, String> {
+        let exclude_newer = if let Some(date_str) = &opts.exclude_newer {
+            Some(
+                chrono::DateTime::parse_from_rfc3339(date_str)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .map_err(|e| {
+                        format!(
+                            "Failed to parse --exclude-newer date '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+                            date_str, e
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
@@ -607,7 +630,8 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
-        )
+            exclude_newer,
+        ))
     }
 }
 
