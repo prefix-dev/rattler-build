@@ -3,7 +3,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
-    path::{Component, MAIN_SEPARATOR, Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use fs_err as fs;
@@ -296,15 +296,17 @@ fn normalize_path_for_comparison(
     let estimated_capacity = path.as_os_str().len() * 6 / 5 + path.components().count();
     let mut normalized = String::with_capacity(estimated_capacity);
 
+    let separator = '/';
+
     for c in path.components() {
         match c {
             Component::CurDir => continue,
             Component::RootDir => {
-                normalized.push(MAIN_SEPARATOR);
+                normalized.push(separator);
             }
             Component::Prefix(_) | Component::ParentDir | Component::Normal(_) => {
-                if !normalized.is_empty() && !normalized.ends_with(MAIN_SEPARATOR) {
-                    normalized.push(MAIN_SEPARATOR);
+                if !normalized.is_empty() && !normalized.ends_with(separator) {
+                    normalized.push(separator);
                 }
 
                 let os_str = match c {
