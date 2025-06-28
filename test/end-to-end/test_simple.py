@@ -1576,8 +1576,8 @@ about:
         r"\n  - case_test/case-file.txt"
     )
 
-    assert (
-        re.search(collision_warning_pattern, output, flags=re.IGNORECASE)
+    assert re.search(
+        collision_warning_pattern, output, flags=re.IGNORECASE
     ), f"Case collision warning not found in build output. Output contains:\n{output}"
 
 
