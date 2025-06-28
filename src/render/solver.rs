@@ -57,6 +57,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
     tracing::info!("\n{table}");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn solve_environment(
     name: &str,
     specs: &[MatchSpec],

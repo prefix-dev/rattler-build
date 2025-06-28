@@ -464,8 +464,8 @@ pub struct BuildOpts {
     pub allow_symlinks_on_windows: bool,
 
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
-    #[arg(long, help_heading = "Modifying result")]
-    pub exclude_newer: Option<String>,
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -575,23 +575,8 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Result<Self, String> {
-        let exclude_newer = if let Some(date_str) = &opts.exclude_newer {
-            Some(
-                chrono::DateTime::parse_from_rfc3339(date_str)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                    .map_err(|e| {
-                        format!(
-                            "Failed to parse --exclude-newer date '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
-                            date_str, e
-                        )
-                    })?,
-            )
-        } else {
-            None
-        };
-
-        Ok(Self::new(
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
+        Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
@@ -630,8 +615,8 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
-            exclude_newer,
-        ))
+            opts.exclude_newer,
+        )
     }
 }
 
@@ -652,6 +637,18 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse a datetime string in RFC3339 format
+fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|e| {
+            format!(
+                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+                s, e
+            )
+        })
 }
 
 /// Test options.
