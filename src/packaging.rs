@@ -582,7 +582,13 @@ impl Output {
 #[cfg(test)]
 mod packaging_tests {
     use super::*;
+    use std::ffi::OsStr;
     use std::path::Path;
+
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+    #[cfg(windows)]
+    use std::os::windows::ffi::OsStrExt;
 
     #[test]
     fn test_find_case_insensitive_collisions_detects() {
@@ -757,5 +763,52 @@ mod packaging_tests {
         assert_ne!(norm1, norm2);
         assert_eq!(norm1, "path/to/text/file.py");
         assert_eq!(norm2, "path/to/textfile.py");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_invalid_unicode_windows() {
+        // Invalid UTF-16 sequence
+        let invalid_utf16: &[u16] = &[0x0043, 0x003A, 0xD800, 0x005C];
+        let path = Path::new(OsStr::from_wide(invalid_utf16));
+
+        let result = normalize_path_for_comparison(path, false);
+        assert!(matches!(
+            result,
+            Err(PathNormalizationError::InvalidUnicode(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_normalize_path_for_comparison_invalid_unicode_unix() {
+        // Invalid UTF-8 sequence
+        let invalid_utf8: &[u8] = &[0x66, 0x6f, 0x80, 0x6f];
+        let path = Path::new(OsStr::from_bytes(invalid_utf8));
+
+        let result = normalize_path_for_comparison(path, false);
+        assert!(matches!(
+            result,
+            Err(PathNormalizationError::InvalidUnicode(_))
+        ));
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_turkish_i() {
+        // Test Turkish 'İ' (I with dot) case folding
+        let path = Path::new("İstanbul");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        // Note: According to Unicode case-folding rules, `İ` (U+0130) maps to
+        // `i` followed by COMBINING DOT ABOVE (U+0307). Therefore the
+        // normalized representation contains this combining mark.
+        assert_eq!(normalized, "i\u{0307}stanbul");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_mixed_separators() {
+        let path = Path::new(r"foo/baraz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar/baz");
     }
 }
