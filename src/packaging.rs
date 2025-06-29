@@ -582,13 +582,14 @@ impl Output {
 #[cfg(test)]
 mod packaging_tests {
     use super::*;
-    use std::ffi::OsStr;
     use std::path::Path;
 
     #[cfg(unix)]
+    use std::ffi::OsStr;
+    #[cfg(unix)]
     use std::os::unix::ffi::OsStrExt;
     #[cfg(windows)]
-    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::ffi::OsStringExt;
 
     #[test]
     fn test_find_case_insensitive_collisions_detects() {
@@ -770,7 +771,8 @@ mod packaging_tests {
     fn test_normalize_path_for_comparison_invalid_unicode_windows() {
         // Invalid UTF-16 sequence
         let invalid_utf16: &[u16] = &[0x0043, 0x003A, 0xD800, 0x005C];
-        let path = Path::new(OsStr::from_wide(invalid_utf16));
+        let os_string = std::ffi::OsString::from_wide(invalid_utf16);
+        let path = Path::new(&os_string);
 
         let result = normalize_path_for_comparison(path, false);
         assert!(matches!(
