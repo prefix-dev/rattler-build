@@ -809,7 +809,7 @@ mod packaging_tests {
     #[cfg(windows)]
     #[test]
     fn test_normalize_path_for_comparison_mixed_separators() {
-        let path = Path::new(r"foo/baraz");
+        let path = Path::new(r"foo/bar\baz");
         let normalized = normalize_path_for_comparison(path, false).unwrap();
         assert_eq!(normalized, "foo/bar/baz");
     }
