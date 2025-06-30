@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1569,11 +1570,14 @@ about:
         "regular-file.txt" in extracted_files_list
     ), "regular-file.txt not found in package"
 
-    collision_warning_pattern1 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/CASE-FILE.txt, case_test/case-file.txt"
-    collision_warning_pattern2 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/case-file.txt, case_test/CASE-FILE.txt"
+    collision_warning_pattern = (
+        r"Mixed-case filenames detected, case-insensitive filesystems may break:"
+        r"\n  - case_test/CASE-FILE.txt"
+        r"\n  - case_test/case-file.txt"
+    )
 
-    assert (
-        collision_warning_pattern1 in output or collision_warning_pattern2 in output
+    assert re.search(
+        collision_warning_pattern, output, flags=re.IGNORECASE
     ), f"Case collision warning not found in build output. Output contains:\n{output}"
 
 

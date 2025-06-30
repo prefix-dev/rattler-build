@@ -457,9 +457,9 @@ pub fn package_conda(
             .iter()
             .map(|p| p.display().to_string())
             .collect::<Vec<_>>()
-            .join(", ");
+            .join("\n  - ");
         let warn_str = format!(
-            "Mixed-case filenames detected, case-insensitive filesystems may break: {}",
+            "Mixed-case filenames detected, case-insensitive filesystems may break:\n  - {}",
             list
         );
         tracing::error!(warn_str);
