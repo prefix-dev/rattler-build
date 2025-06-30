@@ -9,7 +9,7 @@ use scroll::Pwrite;
 use scroll::ctx::SizeWith;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
@@ -43,7 +43,52 @@ impl Relinker for SharedObject {
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
             Err(e) => return Err(e.into()),
         }
-        Ok(ELFMAG.iter().eq(signature.iter()))
+
+        // Check if it's an ELF file
+        if !ELFMAG.iter().eq(signature.iter()) {
+            return Ok(false);
+        }
+
+        // It's an ELF file, now check the file type
+        // ELF header is at least 52 bytes for 32-bit, 64 bytes for 64-bit
+        // We need to read the e_ident to determine the class (32/64 bit)
+        file.rewind()?;
+        let mut header_buf = vec![0u8; 64]; // Read enough for 64-bit header
+        match file.read_exact(&mut header_buf) {
+            Ok(_) => {}
+            Err(_) => return Ok(false), // Not a complete ELF file
+        }
+
+        // Parse just enough to get the file type
+        use goblin::elf::header::{ET_DYN, ET_EXEC};
+        use scroll::Pread;
+
+        // The 5th byte (EI_CLASS) tells us if it's 32 or 64 bit
+        let _is_64bit = header_buf[4] == 2;
+
+        // The 6th byte (EI_DATA) tells us the endianness
+        let endianness = if header_buf[5] == 1 {
+            scroll::LE
+        } else {
+            scroll::BE
+        };
+
+        // e_type is at offset 16 in the header (same for both 32 and 64 bit)
+        let e_type: u16 = header_buf.pread_with(16, endianness)?;
+
+        // Only process executables and shared libraries
+        // Skip relocatable files (ET_REL = 1, which are .o files)
+        let should_relink = matches!(e_type, ET_EXEC | ET_DYN);
+
+        if !should_relink {
+            tracing::debug!(
+                "Skipping ELF file with type 0x{:x}: {}",
+                e_type,
+                path.display()
+            );
+        }
+
+        Ok(should_relink)
     }
 
     /// Create a new shared object from a path
@@ -417,6 +462,41 @@ mod test {
     // binary path: test-data/binary_files/tmp/zlink
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_file_type_detection() -> Result<(), RelinkError> {
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+
+        // Test that object files are not recognized as valid for relinking
+        let object_file = test_data.join("simple_linux.o");
+        if object_file.exists() {
+            assert!(
+                !SharedObject::test_file(&object_file)?,
+                "Object files should not be valid for relinking"
+            );
+        }
+
+        // Test that shared libraries are recognized as valid
+        let so_file = test_data.join("simple_linux.so");
+        if so_file.exists() {
+            assert!(
+                SharedObject::test_file(&so_file)?,
+                "Shared libraries should be valid for relinking"
+            );
+        }
+
+        // Test existing binary that we know is valid
+        let binary_file = test_data.join("zlink");
+        if binary_file.exists() {
+            assert!(
+                SharedObject::test_file(&binary_file)?,
+                "Executables should be valid for relinking"
+            );
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn relink_patchelf() -> Result<(), RelinkError> {
         if which::which("patchelf").is_err() {
