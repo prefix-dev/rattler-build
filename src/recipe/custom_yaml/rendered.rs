@@ -256,6 +256,10 @@ impl RenderedScalarNode {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.source != String::new() && self.value == String::new()
+    }
+
     pub fn new_blank() -> Self {
         Self::new(
             marked_yaml::Span::new_blank(),
