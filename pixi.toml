@@ -117,7 +117,7 @@ lint = { features = ["lint"], solve-group = "default" }
 # pixi build
 
 [package.build]
-backend = { name = "pixi-build-rattler-build", version = "0.1.*" }
+backend = { name = "pixi-build-rust", version = "0.1.*" }
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
