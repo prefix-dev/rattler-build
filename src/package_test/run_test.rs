@@ -235,6 +235,8 @@ pub struct TestConfiguration {
     pub output_dir: PathBuf,
     /// Debug mode yes, or no
     pub debug: Debug,
+    /// Exclude packages newer than this date from the solver
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -430,6 +432,7 @@ pub async fn run_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -614,6 +617,7 @@ impl PythonTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -710,6 +714,7 @@ impl PerlTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -782,6 +787,7 @@ impl CommandsTest {
                 &config.tool_configuration,
                 config.channel_priority,
                 config.solve_strategy,
+                config.exclude_newer,
             )
             .await
             .map_err(TestError::TestEnvironmentSetup)?;
@@ -817,6 +823,7 @@ impl CommandsTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -892,6 +899,7 @@ impl DownstreamTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await;
 
@@ -977,6 +985,7 @@ impl RTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
