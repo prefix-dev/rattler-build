@@ -37,13 +37,13 @@ jobs:
         with:
           toolchain: "1.86.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.8.8
+      - uses: prefix-dev/setup-pixi@v0.8.10
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         with:
           cache: true
@@ -151,7 +151,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@9ba3ac3fd006a70c6e186a683577abc1ccf0ff3a # v2
+        uses: taiki-e/install-action@a27ef18d36cfa66b0af3a360104621793b41c036 # v2
         with:
           tool: cross
 
