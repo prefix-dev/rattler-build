@@ -330,3 +330,38 @@ def test_create_patch_incremental_with_existing(
     # It should be a proper unified diff containing the expected headers for the modified file
     assert "--- a/test.txt" in content
     assert "+++ b/test.txt" in content
+
+
+def test_create_patch_nested_subdirectories(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Ensures nested subdirectory files are diffed correctly."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_nested",
+        cache_files={},
+        work_files={},
+    )
+    orig_dir = paths["cache_dir"] / "example_01234567"
+    work_dir = paths["work_dir"]
+    nested_cache = orig_dir / "dir" / "nested"
+    nested_cache.mkdir(parents=True)
+    (nested_cache / "file.txt").write_text("hello\n")
+    nested_work = work_dir / "dir" / "nested"
+    nested_work.mkdir(parents=True)
+    (nested_work / "file.txt").write_text("hello universe\n")
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(work_dir),
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+    assert result.returncode == 0
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+    content = patch_path.read_text()
+    assert "a/dir/nested/file.txt" in content
+    assert "b/dir/nested/file.txt" in content
+    assert "+hello universe" in content
