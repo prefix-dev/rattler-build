@@ -12,6 +12,7 @@ from .rattler_build import (
 
 from pathlib import Path
 from typing import List, Union
+from datetime import datetime
 
 __all__ = [
     "rattler_build_version",
@@ -56,6 +57,9 @@ def build_recipes(
     allow_insecure_host: Union[List[str], None] = None,
     continue_on_failure: bool = False,
     debug: bool = False,
+    error_prefix_in_binary: bool = False,
+    allow_symlinks_on_windows: bool = False,
+    exclude_newer: Union[datetime, None] = None,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -86,6 +90,9 @@ def build_recipes(
         allow_insecure_host: Allow insecure hosts for the build.
         continue_on_failure: Continue building other recipes even if one fails. (default: False)
         debug: Enable or disable debug mode. (default: False)
+        error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
+        allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
+        exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
 
     Returns:
         None
@@ -117,6 +124,9 @@ def build_recipes(
         allow_insecure_host,
         continue_on_failure,
         debug,
+        error_prefix_in_binary,
+        allow_symlinks_on_windows,
+        exclude_newer,
     )
 
 
