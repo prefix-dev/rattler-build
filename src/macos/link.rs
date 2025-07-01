@@ -1,6 +1,9 @@
 //! Relink a dylib to use relative paths for rpaths
 use fs_err::File;
 use goblin::mach::Mach;
+use goblin::mach::header::{
+    Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE, SIZEOF_HEADER_32, SIZEOF_HEADER_64,
+};
 use indexmap::IndexSet;
 use memmap2::MmapMut;
 use scroll::Pread;
@@ -29,8 +32,8 @@ pub struct Dylib {
 }
 
 impl Relinker for Dylib {
-    /// only parse the magic number of a file and check if it
-    /// is a Mach-O file
+    /// Parse the magic number of a file and check if it
+    /// is a Mach-O file that should be relinked.
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
         let mut buf: [u8; 4] = [0; 4];
@@ -47,10 +50,10 @@ impl Relinker for Dylib {
             Ok((_, Some(ctx))) => {
                 // It's a valid Mach-O file, now read just enough for the header
                 // Mach-O header is 28 bytes for 32-bit, 32 bytes for 64-bit
-                let header_size = if ctx.container == goblin::container::Container::Big {
-                    32 // 64-bit header
+                let header_size = if ctx.container.is_big() {
+                    SIZEOF_HEADER_64 // 64-bit header
                 } else {
-                    28 // 32-bit header
+                    SIZEOF_HEADER_32 // 32-bit header
                 };
 
                 // Read the full header from the beginning
@@ -59,7 +62,6 @@ impl Relinker for Dylib {
                 file.read_exact(&mut header_buf)?;
 
                 // Parse just the header to get the filetype
-                use goblin::mach::header::{Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE};
                 let header: Header = header_buf.pread_with(0, ctx)?;
 
                 // Only process dynamic libraries, bundles, and executables
