@@ -234,3 +234,45 @@ def test_create_patch_always_prints_colored_diff(
     assert "a/test.txt" in stderr
     assert "b/test.txt" in stderr
     assert "+hello world" in stderr
+
+
+def test_create_patch_already_exists_no_overwrite(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Tests that when a patch file already exists and --overwrite is not specified, a message is shown."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_patch_already_exists",
+        cache_files={"test.txt": "hello\n"},
+        work_files={"test.txt": "hello world\n"},
+    )
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+    assert result.returncode == 0
+
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--name",
+        "changes",
+        # Note: no --overwrite flag
+    )
+
+    # Should succeed (not fail)
+    assert result.returncode == 0
+
+    # Should contain the message about not writing the patch file
+    stderr = result.stderr
+    assert "Not writing patch file, already exists" in stderr
+    assert str(patch_path) in stderr

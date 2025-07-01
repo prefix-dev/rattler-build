@@ -1,18 +1,22 @@
 mod bash;
 mod cmd_exe;
+mod nodejs;
 mod nushell;
 mod perl;
 mod python;
 mod r;
+mod ruby;
 
 use std::path::PathBuf;
 
 pub(crate) use bash::BashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
+pub(crate) use nodejs::NodeJsInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;
 pub(crate) use python::PythonInterpreter;
 pub(crate) use r::RInterpreter;
+pub(crate) use ruby::RubyInterpreter;
 
 use rattler_conda_types::Platform;
 use rattler_shell::{

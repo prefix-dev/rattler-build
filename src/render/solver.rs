@@ -57,6 +57,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
     tracing::info!("\n{table}");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn solve_environment(
     name: &str,
     specs: &[MatchSpec],
@@ -65,6 +66,7 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
@@ -105,6 +107,7 @@ pub async fn solve_environment(
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
+        exclude_newer,
         ..SolverTask::from_iter(&repo_data)
     };
 
@@ -131,6 +134,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
@@ -140,6 +144,7 @@ pub async fn create_environment(
         tool_configuration,
         channel_priority,
         solve_strategy,
+        exclude_newer,
     )
     .await?;
 

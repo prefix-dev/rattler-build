@@ -53,6 +53,11 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
+/// Checks whether file has a known archive extension (including zip)
+pub fn is_archive(file_name: &str) -> bool {
+    is_tarball(file_name) || file_name.ends_with(".zip")
+}
+
 fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
     match ext
         .and_then(OsStr::to_str)

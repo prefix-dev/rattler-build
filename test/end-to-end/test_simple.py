@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1569,11 +1570,14 @@ about:
         "regular-file.txt" in extracted_files_list
     ), "regular-file.txt not found in package"
 
-    collision_warning_pattern1 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/CASE-FILE.txt, case_test/case-file.txt"
-    collision_warning_pattern2 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/case-file.txt, case_test/CASE-FILE.txt"
+    collision_warning_pattern = (
+        r"Mixed-case filenames detected, case-insensitive filesystems may break:"
+        r"\n  - case_test/CASE-FILE.txt"
+        r"\n  - case_test/case-file.txt"
+    )
 
-    assert (
-        collision_warning_pattern1 in output or collision_warning_pattern2 in output
+    assert re.search(
+        collision_warning_pattern, output, flags=re.IGNORECASE
     ), f"Case collision warning not found in build output. Output contains:\n{output}"
 
 
@@ -2193,3 +2197,76 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "cmake/test_file.txt" in paths
         assert "TEST.txt" in paths
         assert "test.txt" in paths
+
+
+def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+
+def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_extension_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "ruby-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-imports-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-imports-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-nodejs-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-test")
+
+    assert (pkg / "info/index.json").exists()

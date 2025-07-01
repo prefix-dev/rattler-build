@@ -253,6 +253,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
 
 
+- `--exclude-newer <EXCLUDE_NEWER>`
+
+	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+
+
 ###### **Sandbox arguments**
 
 - `--sandbox`
