@@ -8,8 +8,8 @@ use crate::script::interpreter::Interpreter;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
-    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NuShellInterpreter,
-    PerlInterpreter, PythonInterpreter, RInterpreter,
+    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NodeJsInterpreter,
+    NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter, RubyInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -309,6 +309,35 @@ impl Script {
             interpreter = "nushell";
         }
 
+        // Select interpreter based on file extension
+        if let Some(path) = contents.path() {
+            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+                match ext {
+                    "py" if interpreter == "bash" || interpreter == "cmd" => {
+                        tracing::info!("Using python interpreter for .py script");
+                        interpreter = "python";
+                    }
+                    "pl" if interpreter == "bash" || interpreter == "cmd" => {
+                        tracing::info!("Using perl interpreter for .pl script");
+                        interpreter = "perl";
+                    }
+                    "r" if interpreter == "bash" || interpreter == "cmd" => {
+                        tracing::info!("Using rscript interpreter for .r script");
+                        interpreter = "rscript";
+                    }
+                    "rb" if interpreter == "bash" || interpreter == "cmd" => {
+                        tracing::info!("Using ruby interpreter for .rb script");
+                        interpreter = "ruby";
+                    }
+                    "js" if interpreter == "bash" || interpreter == "cmd" => {
+                        tracing::info!("Using nodejs interpreter for .js script");
+                        interpreter = "nodejs";
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         let secrets = self
             .secrets()
             .iter()
@@ -359,6 +388,8 @@ impl Script {
             "python" => PythonInterpreter.run(exec_args).await?,
             "perl" => PerlInterpreter.run(exec_args).await?,
             "rscript" => RInterpreter.run(exec_args).await?,
+            "ruby" => RubyInterpreter.run(exec_args).await?,
+            "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -375,7 +406,8 @@ impl Script {
 impl Output {
     /// Add environment variables from the variant to the environment variables.
     fn env_vars_from_variant(&self) -> HashMap<String, Option<String>> {
-        let languages: HashSet<&str> = HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON"]);
+        let languages: HashSet<&str> =
+            HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON", "RUBY", "NODEJS"]);
         self.variant()
             .iter()
             .filter_map(|(k, v)| {

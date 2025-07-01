@@ -33,7 +33,7 @@ use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, Script,
+        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest, Script,
         ScriptContent, TestType,
     },
     render::solver::create_environment,
@@ -493,6 +493,10 @@ pub async fn run_test(
                 }
                 TestType::R { r } => {
                     r.run_test(&pkg, &package_folder, &test_prefix, &config)
+                        .await?
+                }
+                TestType::Ruby { ruby } => {
+                    ruby.run_test(&pkg, &package_folder, &test_prefix, &config)
                         .await?
                 }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
@@ -1002,6 +1006,78 @@ impl RTest {
         let script = Script {
             content: ScriptContent::Command(libraries.clone()),
             interpreter: Some("rscript".into()),
+            ..Script::default()
+        };
+
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
+        script
+            .run_script(
+                Default::default(),
+                &test_folder,
+                path,
+                &test_prefix,
+                None,
+                None,
+                None,
+                config.debug,
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+impl RubyTest {
+    /// Execute the Ruby test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running Ruby test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["ruby".parse().unwrap(), match_spec];
+
+        let test_prefix = prefix.join("test_env");
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            &test_prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+            config.exclude_newer,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut requires = String::new();
+        tracing::info!("Testing Ruby requires:\n");
+
+        for module in &self.requires {
+            writeln!(requires, "require '{}'", module)?;
+            tracing::info!("  require '{}'", module);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(requires.clone()),
+            interpreter: Some("ruby".into()),
             ..Script::default()
         };
 
