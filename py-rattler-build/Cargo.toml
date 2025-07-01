@@ -20,7 +20,7 @@ pyo3 = { version = "0.25.1", features = [
   "abi3-py38",
   "extension-module",
   "multiple-pymethods",
-  "chrono"
+  "chrono",
 ] }
 tokio = { version = "1.45.1", features = [
   "rt",

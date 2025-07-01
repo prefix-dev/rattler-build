@@ -57,7 +57,7 @@ def build_recipes(
     allow_insecure_host: Union[List[str], None] = None,
     continue_on_failure: bool = False,
     debug: bool = False,
-    error_prefix_in_binary : bool = False,
+    error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     exclude_newer: Union[datetime, None] = None,
 ) -> None:
