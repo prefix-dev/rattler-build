@@ -45,6 +45,15 @@ pub enum GeneratePatchError {
     GlobPatternError(#[from] globset::Error),
 }
 
+/// Convert a path to forward slash format for patch files.
+/// Patch files always use forward slashes regardless of platform.
+fn path_to_patch_format(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 /// Creates a unified diff patch by comparing the current state of files in the work directory
 /// against their original state from the source cache.
 pub fn create_patch<P: AsRef<Path>>(
@@ -252,8 +261,8 @@ fn create_directory_diff(
             Some(original_content) => {
                 if original_content != modified_content {
                     let patch = DiffOptions::default()
-                        .set_original_filename(format!("a/{}", patch_path.display()))
-                        .set_modified_filename(format!("b/{}", patch_path.display()))
+                        .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
+                        .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                         .create_patch(&original_content, &modified_content);
                     let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
                     patch_content.push_str(&formatted);
@@ -267,7 +276,7 @@ fn create_directory_diff(
                 // New file
                 let patch = DiffOptions::default()
                     .set_original_filename("/dev/null")
-                    .set_modified_filename(format!("b/{}", patch_path.display()))
+                    .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                     .create_patch("", &modified_content);
                 let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
                 patch_content.push_str(&formatted);
@@ -306,7 +315,7 @@ fn create_directory_diff(
                 patch_output_dir,
             )? {
                 let patch = DiffOptions::default()
-                    .set_original_filename(format!("a/{}", patch_path.display()))
+                    .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch(&original_content, "");
                 let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
