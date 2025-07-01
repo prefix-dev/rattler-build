@@ -30,6 +30,8 @@ pub enum PackageNature {
     /// Interpreters
     InterpreterR,
     InterpreterPython,
+    InterpreterRuby,
+    InterpreterNodeJs,
     /// R or Python library with DSOs
     PluginLibraryR,
     PluginLibraryPython,
@@ -53,22 +55,20 @@ pub fn is_dso(file: &Path) -> bool {
 
 impl PackageNature {
     pub fn from_prefix_record(prefix_record: &PrefixRecord) -> Self {
-        if prefix_record
+        let package_name = prefix_record
             .repodata_record
             .package_record
             .name
-            .as_normalized()
-            == "python"
-        {
+            .as_normalized();
+
+        if package_name == "python" {
             return PackageNature::InterpreterPython;
-        } else if prefix_record
-            .repodata_record
-            .package_record
-            .name
-            .as_normalized()
-            == "r-base"
-        {
+        } else if package_name == "r-base" {
             return PackageNature::InterpreterR;
+        } else if package_name == "ruby" {
+            return PackageNature::InterpreterRuby;
+        } else if package_name == "nodejs" {
+            return PackageNature::InterpreterNodeJs;
         }
         let run_exports_json = PathBuf::from("info/run_exports.json");
         if prefix_record.files.contains(&run_exports_json) {
