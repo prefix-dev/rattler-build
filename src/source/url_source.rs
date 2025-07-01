@@ -1,21 +1,22 @@
 //! This module contains the implementation of the fetching for a `UrlSource` struct.
 
+use crate::{
+    console_utils::LoggingOutputHandler,
+    recipe::parser::UrlSource,
+    source::extract::{extract_tar, extract_zip, is_archive},
+    tool_configuration::{self, APP_USER_AGENT},
+};
+use chrono;
 use fs_err as fs;
+use reqwest_middleware::Error as MiddlewareError;
 use serde::{Deserialize, Serialize};
+use std::hash::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::{
     ffi::OsStr,
     io::{Read as _, Write as _},
     path::{Path, PathBuf},
 };
-
-use crate::{
-    console_utils::LoggingOutputHandler,
-    recipe::parser::UrlSource,
-    source::extract::{extract_tar, extract_zip},
-    tool_configuration::{self, APP_USER_AGENT},
-};
-use chrono;
-use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
 
 use super::{SourceError, checksum::Checksum, extract::is_tarball};
@@ -38,29 +39,43 @@ struct DownloadMetadata {
 }
 
 /// Splits a path into stem and extension, handling special cases like .tar.gz
+/// Only splits known archive extensions, otherwise uses .archive as fallback
 pub(crate) fn split_path(path: &Path) -> std::io::Result<(String, String)> {
-    let stem = path
-        .file_stem()
+    let filename = path
+        .file_name()
         .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid path stem"))?;
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid filename"))?;
 
-    let (stem_no_tar, is_tar) = if let Some(s) = stem.strip_suffix(".tar") {
-        (s, true)
+    // Check if this is a known archive format
+    if is_archive(filename) {
+        // Handle compound extensions like .tar.gz, .tar.bz2, etc.
+        let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid path stem")
+        })?;
+
+        let (stem_no_tar, is_tar) = if let Some(s) = stem.strip_suffix(".tar") {
+            (s, true)
+        } else {
+            (stem, false)
+        };
+
+        let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+        let full_extension = if is_tar {
+            format!(".tar.{}", extension)
+        } else if !extension.is_empty() {
+            format!(".{}", extension)
+        } else {
+            String::new()
+        };
+
+        Ok((stem_no_tar.replace('.', "_"), full_extension))
     } else {
-        (stem, false)
-    };
-
-    let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-
-    let full_extension = if is_tar {
-        format!(".tar.{}", extension)
-    } else if !extension.is_empty() {
-        format!(".{}", extension)
-    } else {
-        String::new()
-    };
-
-    Ok((stem_no_tar.replace('.', "_"), full_extension))
+        // For non-archive files or version-like names, just use the whole filename as stem
+        // and .archive as extension
+        let clean_filename = filename.replace('.', "_");
+        Ok((clean_filename, ".archive".to_string()))
+    }
 }
 
 /// Generates a cache name using actual filename (from Content-Disposition or URL)
@@ -81,31 +96,13 @@ fn cache_name_from_actual_filename(
         checksum.to_hex()[..8].to_string()
     } else {
         // Use a simple hash of the URL for cache differentiation
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         url.to_string().hash(&mut hasher);
         format!("{:x}", hasher.finish())[..8].to_string()
     };
 
     // Special handling for GitHub tarball URLs when no actual filename is provided
-    let (final_stem, final_extension) = if actual_filename.is_none()
-        && url.to_string().contains("github.com")
-        && url.to_string().contains("tarball")
-    {
-        // For GitHub API tarballs without Content-Disposition, use the URL path as-is for the stem and add .tar.gz
-        (
-            filename.replace('.', "_"),
-            if with_extension {
-                ".tar.gz".to_string()
-            } else {
-                String::new()
-            },
-        )
-    } else {
-        let (stem, extension) = split_path(Path::new(filename)).ok()?;
-        (stem, extension)
-    };
+    let (final_stem, mut final_extension) = split_path(Path::new(filename)).ok()?;
 
     Some(if with_extension {
         format!("{}_{}{}", final_stem, cache_suffix, final_extension)
@@ -525,12 +522,17 @@ mod tests {
     #[test]
     fn test_split_filename() {
         let test_cases = vec![
+            // Known archive formats - should split normally
             ("example.tar.gz", ("example", ".tar.gz")),
             ("example.tar.bz2", ("example", ".tar.bz2")),
             ("example.zip", ("example", ".zip")),
             ("example.tar", ("example", ".tar")),
-            ("example", ("example", "")),
             (".hidden.tar.gz", ("_hidden", ".tar.gz")),
+            // Version-like names - should use .archive extension
+            ("2.1.2", ("2_1_2", ".archive")),
+            ("example.1", ("example_1", ".archive")),
+            ("example", ("example", ".archive")),
+            ("1.0.0-beta.1", ("1_0_0-beta_1", ".archive")),
         ];
 
         for (filename, expected) in test_cases {
