@@ -313,7 +313,7 @@ impl Relinker for Dylib {
             // run builtin relink. If it fails, try install_name_tool
             if let Err(e) = relink(&self.path, &changes) {
                 assert!(self.path.exists());
-                tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
+                tracing::debug!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
             codesign(&self.path, system_tools)?;
@@ -630,22 +630,18 @@ mod tests {
         let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
 
         // Test that object files are not recognized as valid for relinking
-        let object_file = test_data.join("simple.o");
-        if object_file.exists() {
-            assert!(
-                !Dylib::test_file(&object_file)?,
-                "Object files should not be valid for relinking"
-            );
-        }
+        let object_file = test_data.join("simple-macho.o");
+        assert!(
+            !Dylib::test_file(&object_file)?,
+            "Object files should not be valid for relinking"
+        );
 
         // Test that dynamic libraries are recognized as valid
         let dylib_file = test_data.join("simple.dylib");
-        if dylib_file.exists() {
-            assert!(
-                Dylib::test_file(&dylib_file)?,
-                "Dynamic libraries should be valid for relinking"
-            );
-        }
+        assert!(
+            Dylib::test_file(&dylib_file)?,
+            "Dynamic libraries should be valid for relinking"
+        );
 
         // Test existing binary that we know is valid
         let binary_file = test_data.join("zlink-macos");
