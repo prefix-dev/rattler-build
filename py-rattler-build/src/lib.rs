@@ -25,7 +25,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false, debug=false))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -53,6 +53,9 @@ fn build_recipes_py(
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: bool,
     debug: bool,
+    error_prefix_in_binary: bool,
+    allow_symlinks_on_windows: bool,
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -121,15 +124,16 @@ fn build_recipes_py(
         no_include_recipe,
         test,
         common,
-        false,
+        false, // TUI disabled
         skip_existing,
         noarch_build_platform,
         None,
         None,
         Debug::new(debug),
         continue_on_failure.into(),
-        false,
-        false,
+        error_prefix_in_binary,
+        allow_symlinks_on_windows,
+        exclude_newer,
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
