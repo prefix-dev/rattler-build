@@ -473,7 +473,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256` (optional), `md5` (optional), `patches`, `file_name` and `target_directory`"
+                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `target_directory`"
                     )])
                 }
             }
@@ -487,8 +487,6 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                 help = "URL `source` must have a `url` field"
             )]
         })?;
-
-        // Checksums are now optional - we'll rely on metadata and filename for cache management
 
         Ok(UrlSource {
             url,
