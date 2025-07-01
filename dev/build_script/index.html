@@ -776,6 +776,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using ruby
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using nodejs
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1590,6 +1608,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using ruby
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using nodejs
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1707,9 +1743,11 @@ for your script.</p>
 <li><code>python</code></li>
 <li><code>perl</code></li>
 <li><code>rscript</code> (for R scripts)</li>
+<li><code>ruby</code></li>
+<li><code>node</code> or <code>nodejs</code> (for NodeJS scripts)</li>
 </ul>
 <p><code>rattler-build</code> automatically detects the interpreter based on the file extension
-(<code>.sh</code>, <code>.bat</code>, <code>.nu</code>, <code>.py</code>, <code>.pl</code>, <code>.r</code>) or you can specify it in the
+(<code>.sh</code>, <code>.bat</code>, <code>.nu</code>, <code>.py</code>, <code>.pl</code>, <code>.r</code>, <code>.rb</code>, <code>.js</code>) or you can specify it in the
 <code>interpreter</code> key in the <code>script</code> section of your recipe.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myscript.py</span><span class="w">  </span><span class="c1"># automatically selects the Python interpreter</span>
@@ -1753,6 +1791,36 @@ Linux with the same syntax.</p>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span></code></pre></div>
+<h3 id="using-ruby">Using <code>ruby</code><a class="headerlink" href="#using-ruby" title="Permanent link">#</a></h3>
+<p>In order to use <code>ruby</code> you can select the <code>interpreter: ruby</code> or have a
+<code>build.rb</code> file in your recipe directory and <code>ruby</code> in the
+<code>requirements/build</code> section.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ruby</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="no">puts &quot;Hello from Ruby!&quot;</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Note: it&#39;s required to have `ruby` in the `build` section of your recipe!</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ruby</span>
+</span></code></pre></div>
+<h3 id="using-nodejs">Using <code>nodejs</code><a class="headerlink" href="#using-nodejs" title="Permanent link">#</a></h3>
+<p>In order to use <code>nodejs</code> you can select the <code>interpreter: nodejs</code> (or <code>node</code>) or have a
+<code>build.js</code> file in your recipe directory and <code>nodejs</code> in the
+<code>requirements/build</code> section.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nodejs</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="no">console.log(&quot;Hello from NodeJS!&quot;);</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Note: it&#39;s required to have `nodejs` in the `build` section of your recipe!</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nodejs</span>
 </span></code></pre></div>
 <h2 id="default-environment-variables-set-during-the-build-process">Default environment variables set during the build process<a class="headerlink" href="#default-environment-variables-set-during-the-build-process" title="Permanent link">#</a></h2>
 <p>During the build process, the following environment variables are set, on
