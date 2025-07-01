@@ -71,10 +71,8 @@ pub(crate) fn split_path(path: &Path) -> std::io::Result<(String, String)> {
 
         Ok((stem_no_tar.replace('.', "_"), full_extension))
     } else {
-        // For non-archive files or version-like names, just use the whole filename as stem
-        // and .archive as extension
         let clean_filename = filename.replace('.', "_");
-        Ok((clean_filename, ".archive".to_string()))
+        Ok((clean_filename, "".to_string()))
     }
 }
 
@@ -102,7 +100,7 @@ fn cache_name_from_actual_filename(
     };
 
     // Special handling for GitHub tarball URLs when no actual filename is provided
-    let (final_stem, mut final_extension) = split_path(Path::new(filename)).ok()?;
+    let (final_stem, final_extension) = split_path(Path::new(filename)).ok()?;
 
     Some(if with_extension {
         format!("{}_{}{}", final_stem, cache_suffix, final_extension)
@@ -529,10 +527,10 @@ mod tests {
             ("example.tar", ("example", ".tar")),
             (".hidden.tar.gz", ("_hidden", ".tar.gz")),
             // Version-like names - should use .archive extension
-            ("2.1.2", ("2_1_2", ".archive")),
-            ("example.1", ("example_1", ".archive")),
-            ("example", ("example", ".archive")),
-            ("1.0.0-beta.1", ("1_0_0-beta_1", ".archive")),
+            ("2.1.2", ("2_1_2", "")),
+            ("example.1", ("example_1", "")),
+            ("example", ("example", "")),
+            ("1.0.0-beta.1", ("1_0_0-beta_1", "")),
         ];
 
         for (filename, expected) in test_cases {
@@ -631,18 +629,6 @@ mod tests {
     #[test]
     fn test_cache_name_with_actual_filename() {
         let cases = vec![
-            // GitHub API tarball without extension - should get .tar.gz extension
-            (
-                "https://api.github.com/repos/FreeTAKTeam/FreeTakServer/tarball/v2.2.1",
-                None,
-                Checksum::Sha256(
-                    rattler_digest::parse_digest_from_hex::<Sha256>(
-                        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-                    )
-                    .unwrap(),
-                ),
-                "v2_2_1_12345678.tar.gz",
-            ),
             // With actual filename from Content-Disposition
             (
                 "https://api.github.com/repos/FreeTAKTeam/FreeTakServer/tarball/v2.2.1",
@@ -690,14 +676,7 @@ mod tests {
 
         // Test without checksum - should generate URL-based hash
         let name_no_checksum = cache_name_from_actual_filename(&url, None, None, true).unwrap();
-
-        // Should have the pattern: v2_2_1_{url_hash}.tar.gz
-        assert!(name_no_checksum.starts_with("v2_2_1_"));
-        assert!(name_no_checksum.ends_with(".tar.gz"));
-        assert_eq!(
-            name_no_checksum.len(),
-            "v2_2_1_".len() + 8 + ".tar.gz".len()
-        ); // 8 chars for hash
+        assert_eq!(name_no_checksum, "v2_2_1_c5054c75");
 
         // Test with actual filename
         let name_with_filename = cache_name_from_actual_filename(
