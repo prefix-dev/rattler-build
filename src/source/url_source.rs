@@ -185,7 +185,7 @@ async fn save_download_metadata(
 
     tokio::fs::write(&metadata_path, json_content)
         .await
-        .map_err(|e| SourceError::Io(e))?;
+        .map_err(SourceError::Io)?;
 
     tracing::debug!("Saved download metadata to: {}", metadata_path.display());
     Ok(())
@@ -311,7 +311,7 @@ fn extract_to_cache(
         .unwrap_or_else(|| {
             path.extension()
                 .and_then(|ext| ext.to_str())
-                .map_or(false, |ext| is_tarball(ext))
+                .is_some_and(is_tarball)
         });
 
     if is_tarball {
@@ -434,7 +434,7 @@ pub(crate) async fn url_src(
             let metadata = fs::metadata(&cache_name);
             let is_valid_cache = metadata.is_ok()
                 && metadata?.is_file()
-                && checksum.as_ref().map_or(true, |c| c.validate(&cache_name));
+                && checksum.as_ref().is_none_or(|c| c.validate(&cache_name));
 
             if is_valid_cache {
                 tracing::info!("Found valid source cache file.");
