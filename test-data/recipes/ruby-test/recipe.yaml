@@ -8,20 +8,20 @@ build:
     interpreter: ruby
     content: |
       puts "Testing Ruby Interpreter"
-      
+
       # Create test data and output file
       test_data = [
         { name: "package1", version: "1.0" },
         { name: "package2", version: "2.0" }
       ]
-      
+
       # Write output to a file
       File.open("#{ENV['PREFIX']}/ruby_test_output.txt", "w") do |file|
         test_data.each do |pkg|
           file.puts "#{pkg[:name]}: #{pkg[:version]}"
         end
       end
-      
+
       puts "Ruby test completed successfully"
 
 requirements:
