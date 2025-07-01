@@ -2198,6 +2198,7 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "TEST.txt" in paths
         assert "test.txt" in paths
 
+
 def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "ruby-test/recipe.yaml",
@@ -2219,7 +2220,9 @@ def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/index.json").exists()
 
 
-def test_ruby_extension_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_ruby_extension_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
     rattler_build.build(
         recipes / "ruby-extension-test/recipe.yaml",
         tmp_path,
@@ -2227,6 +2230,7 @@ def test_ruby_extension_test(rattler_build: RattlerBuild, recipes: Path, tmp_pat
     pkg = get_extracted_package(tmp_path, "ruby-extension-test")
 
     assert (pkg / "info/index.json").exists()
+
 
 def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
@@ -2236,7 +2240,8 @@ def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     pkg = get_extracted_package(tmp_path, "ruby-imports-test")
 
     assert (pkg / "info/index.json").exists()
-    
+
+
 def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "simple-nodejs-test/recipe.yaml",
