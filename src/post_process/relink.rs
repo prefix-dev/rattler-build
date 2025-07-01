@@ -188,6 +188,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         if !relocation_config.is_match(p) {
             continue;
         }
+
         if is_valid_file(target_platform, p)? {
             let relinker = get_relinker(target_platform, p)?;
             if !target_platform.is_windows() {
