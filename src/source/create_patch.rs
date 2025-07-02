@@ -54,6 +54,18 @@ fn path_to_patch_format(path: &Path) -> String {
         .join("/")
 }
 
+/// Determine if a file is binary using the existing content type detection.
+fn is_binary_file(path: &Path) -> Result<bool, GeneratePatchError> {
+    use crate::packaging::content_type;
+
+    let content_type = content_type(path).map_err(GeneratePatchError::IoError)?;
+
+    match content_type {
+        Some(ct) => Ok(!ct.is_text()),
+        None => Ok(false),
+    }
+}
+
 /// Creates a unified diff patch by comparing the current state of files in the work directory
 /// against their original state from the source cache.
 pub fn create_patch<P: AsRef<Path>>(
@@ -251,7 +263,16 @@ fn create_directory_diff(
         let patch_path = target_subdir
             .map(|sub| sub.join(rel_path))
             .unwrap_or_else(|| rel_path.to_path_buf());
-        let modified_content = fs::read_to_string(modified_file)?;
+        // Check if this is a binary file using content inspection
+        if is_binary_file(modified_file)? {
+            tracing::warn!("Skipping binary file: {}", modified_file.display());
+            continue;
+        }
+
+        let modified_content = match fs::read_to_string(modified_file) {
+            Ok(s) => s,
+            Err(e) => return Err(GeneratePatchError::IoError(e)),
+        };
         match get_patched_content_for_file(
             rel_path,
             original_dir,
@@ -308,6 +329,16 @@ fn create_directory_diff(
             let patch_path = target_subdir
                 .map(|sub| sub.join(rel_path))
                 .unwrap_or_else(|| rel_path.to_path_buf());
+            if is_binary_file(original_file)? {
+                tracing::warn!("Skipping binary file deletion: {}", original_file.display());
+                let patch = DiffOptions::default()
+                    .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
+                    .set_modified_filename("/dev/null")
+                    .create_patch("", "");
+                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                patch_content.push_str(&formatted);
+                continue;
+            }
             if let Some(original_content) = get_patched_content_for_file(
                 rel_path,
                 original_dir,
@@ -394,7 +425,9 @@ fn get_patched_content_for_file(
     fn read_optional(path: &Path) -> Result<Option<String>, GeneratePatchError> {
         match fs::read_to_string(path) {
             Ok(s) => Ok(Some(s)),
-            Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+            Err(e) if e.kind() == ErrorKind::NotFound || e.kind() == ErrorKind::InvalidData => {
+                Ok(None)
+            }
             Err(e) => Err(GeneratePatchError::IoError(e)),
         }
     }

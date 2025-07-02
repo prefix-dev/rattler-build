@@ -365,3 +365,78 @@ def test_create_patch_nested_subdirectories(
     assert "a/dir/nested/file.txt" in content
     assert "b/dir/nested/file.txt" in content
     assert "+hello universe" in content
+
+
+def test_create_patch_skips_binary_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Ensures that binary files are skipped and do not cause errors or appear in the patch."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_skips_binary",
+        cache_files={"text.txt": "hello\n"},
+        work_files={"text.txt": "hello world\n"},
+    )
+
+    orig_dir = paths["cache_dir"] / "example_01234567"
+    work_dir = paths["work_dir"]
+    binary_cache = orig_dir / "binary.bin"
+    binary_cache.write_bytes(b"\x00\xff\x00\xff")
+    binary_work = work_dir / "binary.bin"
+    binary_work.write_bytes(b"\x00\xff\x00\xfa")
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(work_dir),
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+    assert result.returncode == 0
+
+    # Check patch file
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+    content = patch_path.read_text()
+    # Ensure only text diff is included
+    assert "text.txt" in content
+    assert "binary.bin" not in content
+
+    # Ensure skip warning is logged
+    stderr = result.stderr
+    assert "Skipping binary file" in stderr
+
+
+def test_create_patch_binary_file_deletion(rattler_build: RattlerBuild, tmp_path: Path):
+    """Ensures that deleting a binary file logs the skip and emits a deletion header to /dev/null."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_binary_deletion",
+        cache_files={},
+        work_files={},
+    )
+
+    orig_dir = paths["cache_dir"] / "example_01234567"
+    work_dir = paths["work_dir"]
+    deleted_bin = orig_dir / "binary_delete.bin"
+    deleted_bin.write_bytes(b"\x00\xff\x00\xff")
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(work_dir),
+        "--name",
+        "delete-bin",
+        "--overwrite",
+    )
+    assert result.returncode == 0
+
+    patch_path = paths["recipe_dir"] / "delete-bin.patch"
+    assert patch_path.exists()
+    content = patch_path.read_text()
+    # Deletion header should reference the binary file and /dev/null
+    assert "--- a/binary_delete.bin" in content
+    assert "+++ /dev/null" in content
+
+    stderr = result.stderr
+    # Should warn about skipping binary file deletion
+    assert "Skipping binary file deletion" in stderr
