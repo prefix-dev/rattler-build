@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output, run
-from typing import Any, Optional
+from typing import Any, Optional, List
 from conda_package_handling.api import extract
 
 
@@ -145,6 +145,7 @@ def setup_patch_test_environment(
     recipe_content: str = "package:\n  name: dummy\n",
     source_url: str = "https://example.com/example.tar.gz",
     source_sha256: str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    patches: Optional[List[str]] = None,
 ) -> dict[str, Path]:
     cache_dir = tmp_path / test_name / "cache"
     work_dir = tmp_path / test_name / "work"
@@ -169,10 +170,14 @@ def setup_patch_test_environment(
     recipe_path = recipe_dir / "recipe.yaml"
     recipe_path.write_text(recipe_content)
 
+    # Build source info, optionally including patches
+    source_entry: dict[str, Any] = {"url": source_url, "sha256": source_sha256}
+    if patches:
+        source_entry["patches"] = patches
     source_info = {
         "recipe_path": str(recipe_path),
         "source_cache": str(cache_dir),
-        "sources": [{"url": source_url, "sha256": source_sha256}],
+        "sources": [source_entry],
     }
     (work_dir / ".source_info.json").write_text(json.dumps(source_info))
 

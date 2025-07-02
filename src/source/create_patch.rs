@@ -6,6 +6,7 @@ use diffy::DiffOptions;
 use fs_err as fs;
 use globset::{Glob, GlobSet};
 use miette::Diagnostic;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -244,6 +245,24 @@ fn create_directory_diff(
 ) -> Result<String, GeneratePatchError> {
     let mut patch_content = String::new();
 
+    // Build a map from file paths to their patches
+    let mut file_patch_map: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    for patch in existing_patches {
+        let stats = summarize_patches(&[patch.clone()], original_dir, patch_output_dir)
+            .map_err(GeneratePatchError::SourceError)?;
+        for path in stats
+            .changed
+            .iter()
+            .chain(stats.added.iter())
+            .chain(stats.removed.iter())
+        {
+            file_patch_map
+                .entry(path.clone())
+                .or_default()
+                .push(patch.clone());
+        }
+    }
+
     // Compare modified files
     for entry in WalkDir::new(modified_dir)
         .into_iter()
@@ -273,10 +292,15 @@ fn create_directory_diff(
             Ok(s) => s,
             Err(e) => return Err(GeneratePatchError::IoError(e)),
         };
+        // Determine only the patches relevant to this file
+        let applicable_patches = file_patch_map
+            .get(rel_path)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
         match get_patched_content_for_file(
             rel_path,
             original_dir,
-            existing_patches,
+            applicable_patches,
             patch_output_dir,
         )? {
             Some(original_content) => {
@@ -326,6 +350,11 @@ fn create_directory_diff(
         }
         let modified_file = modified_dir.join(rel_path);
         if !modified_file.exists() {
+            // Only apply patches for files that were actually touched
+            let applicable_patches = file_patch_map
+                .get(rel_path)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
             let patch_path = target_subdir
                 .map(|sub| sub.join(rel_path))
                 .unwrap_or_else(|| rel_path.to_path_buf());
@@ -342,7 +371,7 @@ fn create_directory_diff(
             if let Some(original_content) = get_patched_content_for_file(
                 rel_path,
                 original_dir,
-                existing_patches,
+                applicable_patches,
                 patch_output_dir,
             )? {
                 let patch = DiffOptions::default()
