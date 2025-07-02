@@ -37,7 +37,7 @@ pub mod rebuild;
 pub mod recipe_generator;
 mod run_exports;
 mod unix;
-pub mod upload;
+use rattler_upload::upload;
 mod windows;
 
 mod package_cache_reporter;
@@ -81,6 +81,7 @@ use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
+use rattler_upload::upload::opt::{QuetzData, PrefixData, ServerType, UploadOpts, AnacondaData, ArtifactoryData, CondaForgeData };
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {

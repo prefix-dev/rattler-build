@@ -4,19 +4,20 @@ use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
     opt::{
-        AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
-        CondaForgeData, PrefixData, QuetzData, TestData,
+        ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
+        TestData,
     },
     run_test,
-    tool_configuration::{self, SkipExisting, TestStrategy},
-    upload,
+    tool_configuration::{self, SkipExisting, TestStrategy}
 };
+use::rattler_upload::upload;
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 use url::Url;
+use rattler_upload::upload::opt::{ PrefixData, QuetzData, AnacondaData, CondaForgeData };
 
 // Bind the get version function to the Python module
 #[pyfunction]
