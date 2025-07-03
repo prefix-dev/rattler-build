@@ -142,7 +142,7 @@ opendal = { version = "0.53.3", default-features = false, features = [
 ] }
 
 # Rattler crates
-rattler_config = { version = "0.1.0" }
+rattler_config = { version = "0.2.0" }
 rattler = { version = "0.34.2", default-features = false, features = [
   "cli-tools",
   "indicatif",
@@ -154,7 +154,7 @@ rattler_conda_types = { version = "0.35.1", default-features = false, features =
 rattler_digest = { version = "1.1.3", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.23.1", default-features = false }
+rattler_index = { version = "0.24.1", default-features = false }
 rattler_networking = { version = "0.25.1", default-features = false, features = [
   "s3",
   "rattler_config",
@@ -166,7 +166,7 @@ rattler_repodata_gateway = { version = "0.23.2", default-features = false, featu
 rattler_sandbox = { version = "0.1.9", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.23.4", default-features = false, features = [
+rattler_shell = { version = "0.24.1", default-features = false, features = [
   "sysinfo",
 ] }
 rattler_solve = { version = "2.1.1", default-features = false, features = [
