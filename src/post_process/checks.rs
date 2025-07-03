@@ -167,12 +167,12 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
 
     if output.build_configuration.target_platform.is_osx() {
         let default_sysroot = vec![
-            "*.dylib",  // Match any dylib in X11
+            "*.dylib", // Match any dylib in X11
             "libSystem.B.dylib",
             "libcrypto.0.9.8.dylib",
             "libobjc.A.dylib",
             // e.g. /System/Library/Frameworks/AGL.framework/*
-            "*.framework/*",  // Match any framework
+            "*.framework/*", // Match any framework
         ];
 
         if let Some(sysroot) = output
