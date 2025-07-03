@@ -1,19 +1,22 @@
 mod bash;
 mod cmd_exe;
+mod nodejs;
 mod nushell;
 mod perl;
 mod python;
 mod r;
+mod ruby;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub(crate) use bash::BashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
+pub(crate) use nodejs::NodeJsInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;
 pub(crate) use python::PythonInterpreter;
 pub(crate) use r::RInterpreter;
-
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{
@@ -22,6 +25,7 @@ use rattler_shell::{
     },
     shell::{self, Shell},
 };
+pub(crate) use ruby::RubyInterpreter;
 
 use super::ExecutionArgs;
 
@@ -32,7 +36,8 @@ pub enum InterpreterError {
     #[error("Debugging information: {0}")]
     Debug(String),
 
-    /// This error is returned when the script execution fails or the interpreter is not found
+    /// This error is returned when the script execution fails or the
+    /// interpreter is not found
     #[error("IO Error: {0}")]
     ExecutionFailed(#[from] std::io::Error),
 }
@@ -91,11 +96,13 @@ pub trait Interpreter {
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 
         let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
+        let current_env = std::env::vars().collect::<HashMap<_, _>>();
 
         let activation_vars = ActivationVariables {
             conda_prefix,
             path: None,
             path_modification_behavior: PathModificationBehavior::Prepend,
+            current_env: current_env.clone(),
         };
 
         let host_activation = host_prefix_activator.activation(activation_vars)?;
@@ -108,6 +115,7 @@ pub trait Interpreter {
                 conda_prefix: None,
                 path: None,
                 path_modification_behavior: PathModificationBehavior::Prepend,
+                current_env,
             };
 
             let build_activation = build_prefix_activator.activation(activation_vars)?;

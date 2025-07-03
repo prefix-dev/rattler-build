@@ -4,15 +4,44 @@ use indexmap::IndexMap;
 use serde::Serialize;
 use serde_with::{OneOrMany, formats::PreferOne, serde_as};
 
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum SourceElement {
+    Url(UrlSourceElement),
+    Git(GitSourceElement),
+}
+
+impl From<UrlSourceElement> for SourceElement {
+    fn from(url: UrlSourceElement) -> Self {
+        SourceElement::Url(url)
+    }
+}
+
+impl From<GitSourceElement> for SourceElement {
+    fn from(git: GitSourceElement) -> Self {
+        SourceElement::Git(git)
+    }
+}
+
 #[serde_as]
 #[derive(Default, Debug, Serialize)]
-pub struct SourceElement {
+pub struct UrlSourceElement {
     #[serde_as(as = "OneOrMany<_, PreferOne>")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub url: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub md5: Option<String>,
+}
+
+#[derive(Default, Debug, Serialize)]
+pub struct GitSourceElement {
+    pub git: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
 }
 
 #[derive(Default, Debug, Serialize)]

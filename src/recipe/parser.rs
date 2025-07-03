@@ -49,7 +49,7 @@ pub use self::{
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest, TestType,
+        PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest, TestType,
     },
 };
 
@@ -391,7 +391,11 @@ mod tests {
 
         let unix_recipe = Recipe::from_yaml(recipe, selector_config_unix);
         assert!(unix_recipe.is_ok());
-        insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"character: \d+", "character: [FILTERED]");
+        settings.bind(|| {
+            insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+        });
     }
 
     #[test]
@@ -406,7 +410,11 @@ mod tests {
 
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
         assert!(win_recipe.is_ok());
-        insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"character: \d+", "character: [FILTERED]");
+        settings.bind(|| {
+            insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
+        });
     }
 
     #[test]

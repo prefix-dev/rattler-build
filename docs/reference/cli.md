@@ -13,9 +13,10 @@ This document contains the help content for the `rattler-build` command-line pro
 * `rebuild` — Rebuild a package from a package file instead of a recipe
 * `upload` — Upload a package
 * `completion` — Generate shell completion script
-* `generate-recipe` — Generate a recipe from PyPI or CRAN
+* `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
+* `create-patch` — Create a patch for a directory
 
 ##### **Options:**
 
@@ -240,6 +241,21 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--debug`
 
 	Enable debug output in build scripts
+
+
+- `--error-prefix-in-binary`
+
+	Error if the host prefix is detected in any binary files
+
+
+- `--allow-symlinks-on-windows`
+
+	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+
+
+- `--exclude-newer <EXCLUDE_NEWER>`
+
+	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
 
 
 ###### **Sandbox arguments**
@@ -658,7 +674,7 @@ Generate shell completion script
 
 ### `generate-recipe`
 
-Generate a recipe from PyPI or CRAN
+Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 
 **Usage:** `rattler-build generate-recipe <COMMAND>`
 
@@ -666,6 +682,8 @@ Generate a recipe from PyPI or CRAN
 
 * `pypi` — Generate a recipe for a Python package from PyPI
 * `cran` — Generate a recipe for an R package from CRAN
+* `cpan` — Generate a recipe for a Perl package from CPAN
+* `luarocks` — Generate a recipe for a Lua package from LuaRocks
 
 
 
@@ -738,6 +756,65 @@ Generate a recipe for an R package from CRAN
 
 	Whether to write the recipe to a folder
 
+
+
+
+
+#### `cpan`
+
+Generate a recipe for a Perl package from CPAN
+
+**Usage:** `rattler-build generate-recipe cpan [OPTIONS] <PACKAGE>`
+
+##### **Arguments:**
+
+- `<PACKAGE>`
+
+	Name of the package to generate
+
+
+
+##### **Options:**
+
+- `--version <VERSION>`
+
+	Select a version of the package to generate (defaults to latest)
+
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a folder
+
+
+- `-t`, `--tree`
+
+	Whether to generate recipes for all dependencies
+
+
+
+
+
+#### `luarocks`
+
+Generate a recipe for a Lua package from LuaRocks
+
+**Usage:** `rattler-build generate-recipe luarocks [OPTIONS] <ROCK>`
+
+##### **Arguments:**
+
+- `<ROCK>`
+
+	Luarocks package to generate recipe for. Can be specified as: - module (fetches latest version) - module/version - author/module/version - Direct rockspec URL
+
+
+
+##### **Options:**
+
+- `-w`, `--write-to <WRITE_TO>`
+
+	Where to write the recipe to
+
+	- Default value: `.`
 
 
 
@@ -888,6 +965,48 @@ Debug a recipe by setting up the environment without running the build script
 - `--output-dir <OUTPUT_DIR>`
 
 	Output directory for build artifacts.
+
+
+
+
+
+### `create-patch`
+
+Create a patch for a directory
+
+**Usage:** `rattler-build create-patch [OPTIONS] --directory <DIRECTORY>`
+
+##### **Options:**
+
+- `-d`, `--directory <DIRECTORY>`
+
+	Directory where we want to create the patch
+
+
+- `--name <NAME>`
+
+	The name for the patch file to create
+
+	- Default value: `changes`
+
+- `--overwrite`
+
+	Whether to overwrite the patch file if it already exists
+
+
+- `--patch-dir <DIR>`
+
+	Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided
+
+
+- `--exclude <EXCLUDE>`
+
+	Comma-separated list of file names (or glob patterns) that should be excluded from the diff
+
+
+- `--dry-run`
+
+	Perform a dry-run: analyse changes and log the diff, but don't write the patch file
 
 
 

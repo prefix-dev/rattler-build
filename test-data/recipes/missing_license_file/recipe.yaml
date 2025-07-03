@@ -1,0 +1,12 @@
+package:
+  name: missing-license-file
+  version: '0.1.0'
+
+build:
+  script:
+    - echo "test content" > LICENSE
+
+about:
+  license_file:
+    - LICENSE
+    - does-not-exist.txt

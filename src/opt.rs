@@ -2,18 +2,23 @@
 
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
+use chrono;
 use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use pixi_config::PackageFormatAndCompression;
-use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
+use rattler_conda_types::{
+    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
+};
+use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::{mirror_middleware, s3_middleware};
-use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{Value, json};
 use tracing::warn;
 use url::Url;
+
+/// The configuration type for rattler-build - just extends rattler / pixi config and can load the same TOML files.
+pub type Config = rattler_config::config::ConfigBase<()>;
 
 #[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
@@ -58,7 +63,7 @@ pub enum SubCommands {
     Completion(ShellCompletion),
 
     #[cfg(feature = "recipe-generation")]
-    /// Generate a recipe from PyPI or CRAN
+    /// Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
     GenerateRecipe(GenerateRecipeOpts),
 
     /// Handle authentication to external channels
@@ -66,6 +71,9 @@ pub enum SubCommands {
 
     /// Debug a recipe by setting up the environment without running the build script
     Debug(DebugOpts),
+
+    /// Create a patch for a directory
+    CreatePatch(CreatePatchOpts),
 }
 
 /// Shell completion options.
@@ -176,7 +184,7 @@ impl App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Default)]
 pub struct CommonOpts {
     /// Output directory for build artifacts.
     #[clap(
@@ -230,14 +238,14 @@ impl CommonData {
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
-        config: pixi_config::Config,
+        config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
-        tracing::debug!("Using mirrors: {:?}", config.mirror_map());
+        tracing::debug!("Using mirrors: {:?}", config.mirrors);
 
         fn ensure_trailing_slash(url: &url::Url) -> url::Url {
             if url.path().ends_with('/') {
@@ -250,7 +258,7 @@ impl CommonData {
             }
         }
 
-        for (key, value) in config.mirror_map() {
+        for (key, value) in &config.mirrors {
             let mut mirrors = Vec::new();
             for v in value {
                 mirrors.push(mirror_middleware::Mirror {
@@ -264,7 +272,7 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
-        let s3_config = config.compute_s3_config();
+        let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
@@ -276,7 +284,7 @@ impl CommonData {
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: pixi_config::Config) -> Self {
+    fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -312,7 +320,7 @@ impl FromStr for ChannelPriorityWrapper {
 }
 
 /// Build options.
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Default)]
 pub struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the
     /// current directory.
@@ -454,6 +462,10 @@ pub struct BuildOpts {
     /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
+
+    /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -485,6 +497,7 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildData {
@@ -517,6 +530,7 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         Self {
             up_to,
@@ -553,6 +567,7 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            exclude_newer,
         }
     }
 }
@@ -560,28 +575,28 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
             opts.host_platform,
-            opts.channels.or(config.clone().and_then(|config| {
-                if config.default_channels.is_empty() {
-                    None
-                } else {
-                    Some(config.default_channels)
-                }
-            })),
+            opts.channels.or_else(|| {
+                config
+                    .as_ref()
+                    .and_then(|config| config.default_channels.clone())
+            }),
             opts.variant_config,
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format.or(config
-                .clone()
-                .and_then(|config| config.build.package_format)),
+            opts.package_format.or_else(|| {
+                config
+                    .as_ref()
+                    .and_then(|config| config.build.package_format.clone())
+            }),
             opts.compression_threads,
             opts.io_concurrency_limit,
             opts.no_include_recipe,
@@ -600,6 +615,7 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.exclude_newer,
         )
     }
 }
@@ -621,6 +637,18 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse a datetime string in RFC3339 format
+fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|e| {
+            format!(
+                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+                s, e
+            )
+        })
 }
 
 /// Test options.
@@ -665,7 +693,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -736,7 +764,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -1253,7 +1281,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: DebugOpts, config: Option<pixi_config::Config>) -> Self {
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
@@ -1267,4 +1295,32 @@ impl DebugData {
             output_name: opts.output_name,
         }
     }
+}
+
+/// Options for the `create-patch` command.
+#[derive(Parser, Debug, Clone)]
+pub struct CreatePatchOpts {
+    /// Directory where we want to create the patch
+    #[arg(short, long)]
+    pub directory: PathBuf,
+
+    /// The name for the patch file to create.
+    #[arg(long, default_value = "changes")]
+    pub name: String,
+
+    /// Whether to overwrite the patch file if it already exists.
+    #[arg(long, default_value = "false")]
+    pub overwrite: bool,
+
+    /// Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided.
+    #[arg(long, value_name = "DIR")]
+    pub patch_dir: Option<PathBuf>,
+
+    /// Comma-separated list of file names (or glob patterns) that should be excluded from the diff.
+    #[arg(long, value_delimiter = ',')]
+    pub exclude: Option<Vec<String>>,
+
+    /// Perform a dry-run: analyse changes and log the diff, but don't write the patch file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
 }

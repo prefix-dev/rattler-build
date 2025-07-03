@@ -1,0 +1,48 @@
+package:
+  name: nodejs-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: nodejs
+    content: |
+      console.log("Testing NodeJS Interpreter");
+
+      const fs = require('fs');
+      const path = require('path');
+
+      // Create test data and output file
+      const testData = [
+        { name: "package1", version: "1.0" },
+        { name: "package2", version: "2.0" }
+      ];
+
+      // Write output to a file
+      const outputPath = path.join(process.env.PREFIX, 'nodejs_test_output.txt');
+      const output = testData.map(pkg => `${pkg.name}: ${pkg.version}`).join('\n');
+
+      fs.writeFileSync(outputPath, output);
+
+      console.log("NodeJS test completed successfully");
+
+requirements:
+  host:
+    - nodejs
+
+tests:
+  - script:
+      - if: unix
+        then:
+          - test -f $PREFIX/nodejs_test_output.txt
+          - grep "package1: 1.0" $PREFIX/nodejs_test_output.txt
+          - grep "package2: 2.0" $PREFIX/nodejs_test_output.txt
+      - if: win
+        then:
+          - if not exist %PREFIX%\nodejs_test_output.txt exit 1
+          - findstr "package1: 1.0" %PREFIX%\nodejs_test_output.txt
+          - findstr "package2: 2.0" %PREFIX%\nodejs_test_output.txt
+
+about:
+  summary: Test package for NodeJS interpreter support
+  license: MIT

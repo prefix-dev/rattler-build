@@ -64,16 +64,16 @@ pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
     GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-    package::ArchiveType,
+    compression_level::CompressionLevel, package::ArchiveType,
 };
-use rattler_package_streaming::write::CompressionLevel;
+use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
+use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
@@ -393,6 +393,7 @@ pub async fn get_build_output(
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
+                exclude_newer: build_data.exclude_newer,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -585,6 +586,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
+                        exclude_newer: output.build_configuration.exclude_newer,
                     },
                     None,
                 )
@@ -722,6 +724,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         debug: test_data.debug,
+        exclude_newer: None,
     };
 
     let package_name = package_file
@@ -752,7 +755,7 @@ pub async fn rebuild(
 
     rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
 
-    let temp_dir = temp_folder.into_path();
+    let temp_dir = temp_folder.keep();
 
     tracing::info!("Extracted recipe to: {:?}", temp_dir);
 
@@ -1029,6 +1032,7 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        exclude_newer: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
@@ -1067,8 +1071,11 @@ pub async fn debug_recipe(
             .directories
             .recreate_directories()
             .into_diagnostic()?;
-        let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
-        let mut output = output
+        let output = output
+            .fetch_sources(&tool_config, apply_patch_custom)
+            .await
+            .into_diagnostic()?;
+        let output = output
             .resolve_dependencies(&tool_config)
             .await
             .into_diagnostic()?;

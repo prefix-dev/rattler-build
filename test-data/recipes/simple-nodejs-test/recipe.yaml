@@ -1,0 +1,18 @@
+package:
+  name: simple-nodejs-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: nodejs
+    content: |
+      console.log("NodeJS interpreter working!");
+
+requirements:
+  build:
+    - nodejs
+
+about:
+  summary: Simple test for NodeJS interpreter
+  license: MIT

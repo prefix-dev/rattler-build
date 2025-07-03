@@ -42,9 +42,6 @@ pub struct About {
     /// The license file(s) of the package.
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub license_file: GlobVec,
-    /// The license URL of the package.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub license_url: Option<Url>,
     /// The summary of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
@@ -84,7 +81,6 @@ impl TryConvertNode<About> for RenderedMappingNode {
             license,
             license_family,
             license_file,
-            license_url,
             summary,
             description,
             prelink_message

@@ -8,16 +8,16 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
-use pixi_config::Config;
 use rattler_build::{
     build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
-    opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
-    rebuild, run_test, upload_from_args,
+    opt::{App, BuildData, Config, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
+    rebuild, run_test,
+    source::create_patch,
+    upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
-use tokio::fs::read_to_string;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -80,10 +80,7 @@ async fn async_main() -> miette::Result<()> {
     };
 
     let config = if let Some(config_path) = app.config_file {
-        let config_str = read_to_string(&config_path).await.into_diagnostic()?;
-        let (config, _unused_keys) =
-            Config::from_toml(config_str.as_str(), Some(&config_path.clone()))?;
-        Some(config)
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
     } else {
         None
     };
@@ -166,6 +163,25 @@ async fn async_main() -> miette::Result<()> {
             let debug_data = DebugData::from_opts_and_config(opts, config);
             debug_recipe(debug_data, &log_handler).await?;
             Ok(())
+        }
+        Some(SubCommands::CreatePatch(opts)) => {
+            let exclude_vec = opts.exclude.clone().unwrap_or_default();
+            match create_patch::create_patch(
+                opts.directory,
+                &opts.name,
+                opts.overwrite,
+                opts.patch_dir.as_deref(),
+                &exclude_vec,
+                opts.dry_run,
+            ) {
+                Ok(()) => Ok(()),
+                Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
+                    tracing::warn!("Not writing patch file, already exists: {}", path.display());
+                    tracing::warn!("Use --overwrite to replace the existing patch file.");
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
+            }
         }
         None => {
             _ = App::command().print_long_help();
