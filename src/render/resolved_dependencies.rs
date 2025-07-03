@@ -405,6 +405,29 @@ impl ResolvedDependencies {
         }
         result
     }
+
+    /// Merge library-level metadata from `other` into `self`.
+    ///
+    /// Only the `library_mapping` (shared-object name → package) and
+    /// `package_nature` (DSO library vs interpreter, …) maps are combined. We
+    /// deliberately ignore the raw specs and resolved records because
+    /// downstream linking checks only need to know *which* package a library
+    /// comes from, not the full solver context.
+    fn absorb(&mut self, other: &ResolvedDependencies) {
+        self.library_mapping.extend(
+            other
+                .library_mapping
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+
+        self.package_nature.extend(
+            other
+                .package_nature
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+    }
 }
 
 impl FinalizedRunDependencies {
@@ -490,6 +513,36 @@ pub struct FinalizedDependencies {
     pub build: Option<ResolvedDependencies>,
     pub host: Option<ResolvedDependencies>,
     pub run: FinalizedRunDependencies,
+}
+
+impl FinalizedDependencies {
+    /// Merge the build and host dependencies from `other` into `self`.
+    ///
+    /// For each environment (`build`, `host`) we perform a shallow merge:
+    /// 1. If the primary has the environment, its `library_mapping` and
+    ///    `package_nature` maps are extended with entries from `other`.
+    /// 2. If the primary is `None` while `other` has the environment, we take
+    ///    a clone of `other`.
+    /// 3. Otherwise the primary value stays untouched.
+    pub fn merge_with(&self, other: &FinalizedDependencies) -> FinalizedDependencies {
+        let mut merged = self.clone();
+
+        let merge_env = |dst: &mut Option<ResolvedDependencies>,
+                         src: &Option<ResolvedDependencies>| {
+            match (dst.as_mut(), src) {
+                (Some(d), Some(s)) => d.absorb(s),
+                (None, Some(s)) => {
+                    *dst = Some(s.clone());
+                }
+                _ => {}
+            }
+        };
+
+        merge_env(&mut merged.build, &other.build);
+        merge_env(&mut merged.host, &other.host);
+
+        merged
+    }
 }
 
 #[derive(Error, Debug)]
