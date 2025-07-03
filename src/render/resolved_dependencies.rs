@@ -414,12 +414,30 @@ impl ResolvedDependencies {
     /// downstream linking checks only need to know *which* package a library
     /// comes from, not the full solver context.
     fn absorb(&mut self, other: &ResolvedDependencies) {
-        self.library_mapping.extend(
-            other
-                .library_mapping
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone())),
-        );
+        // On Windows, we need to handle case-insensitive comparison for library names
+        #[cfg(windows)]
+        {
+            for (lib_name, pkg_name) in &other.library_mapping {
+                if !self
+                    .library_mapping
+                    .keys()
+                    .any(|k| k.eq_ignore_ascii_case(lib_name))
+                {
+                    self.library_mapping
+                        .insert(lib_name.clone(), pkg_name.clone());
+                }
+            }
+        }
+
+        #[cfg(not(windows))]
+        {
+            self.library_mapping.extend(
+                other
+                    .library_mapping
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            );
+        }
 
         self.package_nature.extend(
             other
