@@ -18,9 +18,10 @@ use std::{
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    Channel, ChannelUrl, MatchSpec, ParseStrictness,
     package::{ArchiveIdentifier, IndexJson, PackageFile},
 };
+use rattler_conda_types::platform::Platform;
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_shell::{
     activation::ActivationError,

@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
+use rattler_conda_types::{Channel, MatchSpec, platform, package::PathsJson};
 
 use crate::{
     apply_patch_custom,
@@ -159,7 +159,7 @@ pub async fn run_build(
 
     // Check for symlinks on Windows if not allowed
     if (output.build_configuration.target_platform.is_windows()
-        || output.build_configuration.target_platform == Platform::NoArch)
+        || output.build_configuration.target_platform == platform::Platform::NoArch)
         && !tool_configuration.allow_symlinks_on_windows
     {
         tracing::info!("Checking for symlinks ...");
