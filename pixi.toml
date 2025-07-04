@@ -33,7 +33,6 @@ deploy-dev = "mike deploy --push dev devel"
 [dependencies]
 openssl = "3.*"
 rust = ">=1.86.0,<1.87"
-compilers = "1.6.0.*"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
 cmake = "3.27.6.*"
@@ -77,24 +76,27 @@ tbump = "*"
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
 
-
 [target.linux-64.dependencies]
+compilers = "1.6.0.*"
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 patchelf = ">=0.17.2,<0.18"
 
 [target.osx-64.dependencies]
+compilers = "1.6.0.*"
 patchelf = ">=0.18.0,<0.19"
 
 [target.osx-arm64.dependencies]
+compilers = "1.6.0.*"
 patchelf = ">=0.18.0,<0.19"
+
+[target.win-64.dependencies]
+vs2022_win-64 = ">=19.44.35207"
 
 [target.linux-64.activation]
 scripts = ["scripts/activate.sh"]
 [target.osx-arm64.activation]
 scripts = ["scripts/activate.sh"]
-[target.win-64.dependencies]
-vs2022_win-64 = ">=19.44.35207"
 
 [target.win-64.activation]
 scripts = ["scripts/activate.bat"]
