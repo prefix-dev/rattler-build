@@ -4,16 +4,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::windows::link::WIN_ALLOWLIST;
 use crate::{
     metadata::Output,
-    post_process::{package_nature::PrefixInfo, relink::RelinkError},
-};
-use crate::{
+    post_process::relink::RelinkError,
     post_process::{package_nature::PackageNature, relink},
-    windows::link::WIN_ALLOWLIST,
 };
 
-use crate::render::resolved_dependencies::RunExportDependency;
+use crate::render::resolved_dependencies::{FinalizedDependencies, RunExportDependency};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
 
@@ -109,51 +107,72 @@ impl fmt::Display for LinkedPackage {
     }
 }
 
-/// Returns the list of resolved run dependencies.
-fn resolved_run_dependencies(
+/// Returns the list of resolved run dependencies and a mapping from dependency names to source packages.
+fn resolved_run_dependencies_with_sources(
     output: &Output,
     package_to_nature_map: &HashMap<PackageName, PackageNature>,
-) -> Vec<String> {
-    output
+) -> (Vec<String>, HashMap<String, String>) {
+    let mut deps = Vec::new();
+    let mut dep_to_source = HashMap::new();
+
+    for dep in output
         .finalized_dependencies
         .clone()
         .expect("failed to get the finalized dependencies")
         .run
         .depends
         .iter()
-        .filter(|dep| {
-            if let Some(RunExportDependency { from, .. }) = dep.as_run_export() {
-                from != &String::from("build")
-            } else {
-                true
+    {
+        // Filter out run exports from build environments
+        if let Some(RunExportDependency {
+            from,
+            source_package,
+            ..
+        }) = dep.as_run_export()
+        {
+            if from == &String::from("build") || from == &String::from("cache-build") {
+                continue;
             }
-        })
-        .flat_map(|dep| {
+
             if let Some(package_name) = &dep.spec().name {
                 if let Some(nature) = package_to_nature_map.get(package_name) {
                     if nature != &PackageNature::DSOLibrary {
-                        return None;
+                        continue;
                     }
                 }
-                dep.spec().name.to_owned().map(|v| v.as_source().to_owned())
-            } else {
-                None
+                let dep_name = package_name.as_source().to_owned();
+                deps.push(dep_name.clone());
+                // Map the dependency name to its source package
+                dep_to_source.insert(dep_name, source_package.clone());
             }
-        })
-        .collect()
+        } else if let Some(package_name) = &dep.spec().name {
+            if let Some(nature) = package_to_nature_map.get(package_name) {
+                if nature != &PackageNature::DSOLibrary {
+                    continue;
+                }
+            }
+            let dep_name = package_name.as_source().to_owned();
+            deps.push(dep_name.clone());
+            // For non-run-export deps, the source is the same as the dependency
+            dep_to_source.insert(dep_name.clone(), dep_name);
+        }
+    }
+
+    (deps, dep_to_source)
 }
 
-/// Returns the system libraries found in sysroot.
+/// Returns the system libraries patterns.
 fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
     let mut system_libs = GlobSetBuilder::new();
+
     if output.build_configuration.target_platform.is_osx() {
         let default_sysroot = vec![
-            "/opt/X11/**/*.dylib",
-            "/usr/lib/libSystem.B.dylib",
-            "/usr/lib/libcrypto.0.9.8.dylib",
-            "/usr/lib/libobjc.A.dylib",
+            "*.dylib", // Match any dylib in X11
+            "libSystem.B.dylib",
+            "libcrypto.0.9.8.dylib",
+            "libobjc.A.dylib",
             // e.g. /System/Library/Frameworks/AGL.framework/*
-            "/System/Library/Frameworks/*.framework/*",
+            "*.framework/*", // Match any framework
         ];
 
         if let Some(sysroot) = output
@@ -178,20 +197,40 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         return system_libs.build();
     }
 
-    if let Some(sysroot_package) = output
+    // Try to locate a `sysroot_<platform>` package in either the regular build
+    // dependencies *or* the cache build dependencies. The first one found is
+    // used to derive the list of system libraries.
+    let mut sysroot_package = output
         .finalized_dependencies
-        .clone()
-        .expect("failed to get the finalized dependencies")
-        .build
+        .as_ref()
+        .and_then(|deps| deps.build.as_ref())
         .and_then(|deps| {
-            deps.resolved.into_iter().find(|v| {
+            deps.resolved.iter().find(|v| {
                 v.file_name.starts_with(&format!(
                     "sysroot_{}",
                     output.build_configuration.target_platform
                 ))
             })
         })
-    {
+        .cloned();
+
+    if sysroot_package.is_none() {
+        sysroot_package = output
+            .finalized_cache_dependencies
+            .as_ref()
+            .and_then(|deps| deps.build.as_ref())
+            .and_then(|deps| {
+                deps.resolved.iter().find(|v| {
+                    v.file_name.starts_with(&format!(
+                        "sysroot_{}",
+                        output.build_configuration.target_platform
+                    ))
+                })
+            })
+            .cloned();
+    }
+
+    if let Some(sysroot_package) = sysroot_package {
         let prefix_record_name = format!(
             "conda-meta/{}-{}-{}.json",
             sysroot_package.package_record.name.as_normalized(),
@@ -204,17 +243,57 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             .directories
             .build_prefix
             .join(prefix_record_name);
-        let record = PrefixRecord::from_path(sysroot_path).unwrap();
-        let so_glob = Glob::new("*.so*")?.compile_matcher();
-        for file in record.files {
-            if let Some(file_name) = file.file_name() {
-                if so_glob.is_match(file_name) {
-                    system_libs.add(Glob::new(&file_name.to_string_lossy())?);
+
+        if let Ok(record) = PrefixRecord::from_path(&sysroot_path) {
+            // match all shared objects (e.g. libfoo.so, libfoo.so.1.2)
+            let so_glob = Glob::new("*.so*")?.compile_matcher();
+            for file in record.files {
+                if let Some(file_name) = file.file_name() {
+                    if so_glob.is_match(file_name) {
+                        system_libs.add(Glob::new(&file_name.to_string_lossy())?);
+                    }
                 }
             }
+        } else {
+            // If the prefix record cannot be found, continue without adding patterns.
+            tracing::debug!("sysroot prefix record not found at {:?}", sysroot_path);
         }
     }
+
+    // If no sysroot package was found, we fall back to an empty set – in that case every
+    // linked library will be validated against the run dependencies.
+
     system_libs.build()
+}
+
+/// Extend the provided `library_mapping` and `package_to_nature` maps with the
+/// information contained in a `FinalizedDependencies` instance. This helper
+/// avoids duplicating the same merging logic for the regular dependencies and
+/// the optional cache dependencies.
+fn extend_mappings_from_finalized(
+    deps: &Option<FinalizedDependencies>,
+    library_mapping: &mut HashMap<String, PackageName>,
+    package_to_nature: &mut HashMap<PackageName, PackageNature>,
+) {
+    let Some(deps) = deps else { return };
+
+    if let Some(host) = &deps.host {
+        library_mapping.extend(host.library_mapping.clone());
+        package_to_nature.extend(host.package_nature.clone());
+    }
+
+    // For the build environment we (currently) only need the sysroot packages
+    // to resolve system libraries. Therefore we filter explicitly for
+    // `sysroot_` packages when merging the library mapping. The package nature
+    // information can be copied as-is.
+    if let Some(build) = &deps.build {
+        for (lib, pkg) in &build.library_mapping {
+            if pkg.as_normalized().starts_with("sysroot_") {
+                library_mapping.insert(lib.clone(), pkg.clone());
+            }
+        }
+        package_to_nature.extend(build.package_nature.clone());
+    }
 }
 
 pub fn perform_linking_checks(
@@ -225,11 +304,19 @@ pub fn perform_linking_checks(
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let system_libs = find_system_libs(output)?;
 
-    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+    // Get library mapping from finalized dependencies
+    let mut library_mapping = HashMap::new();
+    let mut package_to_nature = HashMap::new();
 
-    let resolved_run_dependencies =
-        resolved_run_dependencies(output, &prefix_info.package_to_nature);
+    // Merge information from the regular dependencies and (if present) from the cache
+    if let Some(merged) = output.merged_finalized_dependencies() {
+        extend_mappings_from_finalized(&Some(merged), &mut library_mapping, &mut package_to_nature);
+    }
+
+    let (resolved_run_dependencies, dep_to_source) =
+        resolved_run_dependencies_with_sources(output, &package_to_nature);
     tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
+    tracing::trace!("Dependency to source mapping: {dep_to_source:#?}",);
 
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
@@ -249,17 +336,10 @@ pub fn perform_linking_checks(
                     }
 
                     let lib = resolved.as_ref().unwrap_or(lib);
-                    if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                        if let Some(package) = prefix_info
-                            .path_to_package
-                            .get(&libpath.to_path_buf().into())
-                        {
-                            if let Some(nature) = prefix_info.package_to_nature.get(package) {
-                                // Only take shared libraries into account.
-                                if nature == &PackageNature::DSOLibrary {
-                                    file_dsos.push((libpath.to_path_buf(), package.clone()));
-                                }
-                            }
+                    if let Some(lib_file_name) = lib.file_name().and_then(|n| n.to_str()) {
+                        if let Some(package) = library_mapping.get(lib_file_name) {
+                            let lib_rel = lib.strip_prefix(host_prefix).unwrap_or(lib);
+                            file_dsos.push((lib_rel.to_path_buf(), package.clone()));
                         }
                     }
                 }
@@ -285,6 +365,9 @@ pub fn perform_linking_checks(
     }
     tracing::trace!("Package files: {package_files:#?}");
 
+    // Track dependencies found in cache builds
+    let mut cache_matched_deps: HashSet<String> = HashSet::new();
+
     let mut linked_packages = Vec::new();
     for package in package_files.iter() {
         let mut link_info = PackageLinkInfo {
@@ -293,7 +376,7 @@ pub fn perform_linking_checks(
         };
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
-        for lib in &package.shared_libraries {
+        'library_loop: for lib in &package.shared_libraries {
             let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
 
             // skip @self on macOS
@@ -310,15 +393,6 @@ pub fn perform_linking_checks(
                 continue;
             }
 
-            // Check if the library is one of the system libraries (i.e. comes from sysroot).
-            if system_libs.is_match(lib) {
-                link_info.linked_packages.push(LinkedPackage {
-                    name: lib.to_path_buf(),
-                    link_origin: LinkOrigin::System,
-                });
-                continue;
-            }
-
             // Check if the package itself has the shared library.
             if new_files.iter().any(|file| file.ends_with(lib)) {
                 link_info.linked_packages.push(LinkedPackage {
@@ -326,6 +400,81 @@ pub fn perform_linking_checks(
                     link_origin: LinkOrigin::PackageItself,
                 });
                 continue;
+            }
+
+            // Use library mapping to find which package provides this library
+            if let Some(lib_name) = lib.file_name().and_then(|n| n.to_str()) {
+                tracing::debug!("Looking up library {} in mapping", lib_name);
+                if let Some(package_name) = library_mapping.get(lib_name) {
+                    let package_str = package_name.as_normalized();
+                    tracing::debug!(
+                        "Found library {} belongs to package {}",
+                        lib_name,
+                        package_str
+                    );
+
+                    if package_str.starts_with("sysroot_") {
+                        link_info.linked_packages.push(LinkedPackage {
+                            name: lib.to_path_buf(),
+                            link_origin: LinkOrigin::System,
+                        });
+                        continue 'library_loop;
+                    }
+
+                    let dependency_match = dep_to_source.iter().find(|(dep_name, source_pkg)| {
+                        #[cfg(windows)]
+                        {
+                            dep_name.eq_ignore_ascii_case(package_str)
+                                || source_pkg.eq_ignore_ascii_case(package_str)
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            dep_name.as_str() == package_str || source_pkg.as_str() == package_str
+                        }
+                    });
+
+                    if let Some((dep_name, _)) = dependency_match {
+                        link_info.linked_packages.push(LinkedPackage {
+                            name: lib.to_path_buf(),
+                            link_origin: LinkOrigin::ForeignPackage(dep_name.clone()),
+                        });
+
+                        // Track that this dependency is used (for cache builds)
+                        if output.finalized_cache_dependencies.is_some() {
+                            cache_matched_deps.insert(dep_name.clone());
+                        }
+
+                        continue 'library_loop;
+                    }
+                    // If the library is from a conda package but not in run dependencies,
+                    // this is overlinking
+                    tracing::debug!(
+                        "Library {} from package {} not in run dependencies",
+                        lib_name,
+                        package_str
+                    );
+                } else {
+                    tracing::debug!("Library {} not found in mapping", lib_name);
+                }
+            }
+
+            // Check if the library is one of the system libraries (i.e. comes from sysroot).
+            // We only consider core system libraries that are always available
+            // This check comes AFTER library mapping to avoid marking conda-provided libraries as system
+            if let Some(file_name) = lib.file_name() {
+                let file_name_str = file_name.to_string_lossy();
+                tracing::info!("Checking if {} is a system library", file_name_str);
+
+                if system_libs.is_match(file_name) {
+                    tracing::info!("{} matched as system library", file_name_str);
+                    link_info.linked_packages.push(LinkedPackage {
+                        name: lib.to_path_buf(),
+                        link_origin: LinkOrigin::System,
+                    });
+                    continue;
+                } else {
+                    tracing::info!("{} did not match system library patterns", file_name_str);
+                }
             }
 
             // Check if we allow overlinking.
@@ -370,7 +519,8 @@ pub fn perform_linking_checks(
 
     // If there are any unused run dependencies then it is "overdepending".
     for run_dependency in resolved_run_dependencies.iter() {
-        if !package_files
+        // Check if the dependency is used in linked_dsos
+        let used_in_linked_dsos = package_files
             .iter()
             .map(|package| {
                 package
@@ -379,8 +529,34 @@ pub fn perform_linking_checks(
                     .map(|v| v.as_source().to_string())
                     .collect::<Vec<String>>()
             })
-            .any(|libraries| libraries.contains(run_dependency))
-        {
+            .any(|libraries| {
+                #[cfg(windows)]
+                {
+                    libraries
+                        .iter()
+                        .any(|lib| lib.eq_ignore_ascii_case(run_dependency))
+                }
+                #[cfg(not(windows))]
+                {
+                    libraries.contains(run_dependency)
+                }
+            });
+
+        // Also check if it was matched in cache builds (case-insensitive on Windows)
+        let used_in_cache = {
+            #[cfg(windows)]
+            {
+                cache_matched_deps
+                    .iter()
+                    .any(|dep| dep.eq_ignore_ascii_case(run_dependency))
+            }
+            #[cfg(not(windows))]
+            {
+                cache_matched_deps.contains(run_dependency)
+            }
+        };
+
+        if !used_in_linked_dsos && !used_in_cache {
             if dynamic_linking.error_on_overdepending() {
                 return Err(LinkingCheckError::Overdepending {
                     package: PathBuf::from(run_dependency),
