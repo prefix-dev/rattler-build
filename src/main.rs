@@ -12,12 +12,13 @@ use rattler_build::{
     build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
-    opt::{App, BuildData, Config, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
+    opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
     rebuild, run_test,
     source::create_patch,
     upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
+use rattler_upload::upload::opt::{Config};
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
