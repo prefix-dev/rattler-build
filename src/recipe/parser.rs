@@ -55,6 +55,8 @@ pub use self::{
 
 use crate::recipe::{custom_yaml::Node, variable::Variable};
 
+use super::custom_yaml::string_to_bool;
+
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
@@ -149,19 +151,29 @@ impl Recipe {
                 help = "`context` values must always be scalars (booleans, integers or strings) or uniform lists of scalars"
             )]
         })?;
-        let rendered: Option<ScalarNode> = val.render(jinja, &format!("context.{}", k.as_str()))?;
-        if let Some(rendered) = rendered {
-            let variable = if let Some(value) = rendered.as_bool() {
-                Variable::from(value)
-            } else if let Some(value) = rendered.as_integer() {
-                Variable::from(value)
+
+        let (value, can_coerce) = jinja.render_to_value(val).map_err(|err| {
+            vec![_partialerror!(
+                *val.span(),
+                ErrorKind::JinjaRendering(err),
+                help = "failed to render jinja expression"
+            )]
+        })?;
+
+        // See if we have to coerce a string-type to a boolean or integer
+        if can_coerce && value.as_str().is_some() {
+            // let's see if the value should be an integer or a boolean
+            let stringified = value.to_string();
+            if let Some(boolean) = string_to_bool(&stringified) {
+                return Ok(Some(Variable::from(boolean)));
+            } else if let Ok(integer) = stringified.parse::<i64>() {
+                return Ok(Some(Variable::from(integer)));
             } else {
-                Variable::from_string(&rendered)
-            };
-            Ok(Some(variable))
-        } else {
-            Ok(None)
+                return Ok(Some(Variable::from_string(&stringified)));
+            }
         }
+
+        Ok(Some(Variable::from_value(value)))
     }
 
     /// Create recipes from a YAML [`Node`] structure.
@@ -182,7 +194,6 @@ impl Recipe {
 
         // add context values
         let mut context: IndexMap<String, Variable> = IndexMap::new();
-
         if let Some(context_map) = root_node.get("context") {
             let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
@@ -234,6 +245,7 @@ impl Recipe {
                     continue;
                 };
                 context.insert(k.as_str().to_string(), variable.clone());
+
                 // also immediately insert into jinja context so that the value can be used
                 // in later jinja expressions
                 jinja
