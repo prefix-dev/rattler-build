@@ -44,6 +44,7 @@ pub const WIN_ALLOWLIST: &[&str] = &[
     "SHELL32.dll",
     "USER32.dll",
     "USERENV.dll",
+    "VCRUNTIME140.dll",
     "WINHTTP.dll",
     "WS2_32.dll",
     "ntdll.dll",

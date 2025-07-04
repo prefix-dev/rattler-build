@@ -15,6 +15,7 @@ import requests
 import yaml
 import subprocess
 import shutil
+import sys
 from helpers import (
     RattlerBuild,
     check_build_output,
@@ -2212,7 +2213,11 @@ def test_cache_linking_checks(
     # Verify the package was created
     pkg = get_extracted_package(tmp_path, "cache-linking-output")
     assert pkg.exists()
-    assert (pkg / "bin/program").exists()
+    # On Windows, the executable will have a .exe extension
+    if sys.platform.startswith("win32"):
+        assert (pkg / "bin/program.exe").exists()
+    else:
+        assert (pkg / "bin/program").exists()
 
 
 def test_cache_overdepending_checks(
