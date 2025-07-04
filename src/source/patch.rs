@@ -147,9 +147,18 @@ fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
                 let user_write = 0o200;
                 perms.set_mode(perms.mode() | user_write);
             }
-            #[cfg(not(unix))]
+            #[cfg(windows)]
             {
-                // Assume this means windows
+                // On Windows, set_readonly(false) is the correct way to make a file writable
+                // It sets the FILE_ATTRIBUTE_READONLY attribute to false
+                #[allow(clippy::permissions_set_readonly_false)]
+                {
+                    perms.set_readonly(false);
+                }
+            }
+            #[cfg(not(any(unix, windows)))]
+            {
+                // Fallback for other platforms
                 perms.set_readonly(false);
             }
             fs_err::set_permissions(path, perms).map_err(SourceError::Io)?;

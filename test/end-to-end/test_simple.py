@@ -2238,14 +2238,9 @@ def test_cache_overdepending_checks(
     error_output = (
         exc_info.value.output.decode("utf-8") if exc_info.value.output else ""
     )
-    # Check for platform-specific overlinking error
-    if platform.system() == "Windows":
-        assert "Overlinking against: VCRUNTIME140.dll" in error_output
-    else:  # Linux
-        error_lines = error_output.split("\n")
-        assert any(
-            "Overdepending against: libcurl" in line for line in error_lines[-5:]
-        )
+    # Check for overdepending error
+    error_lines = error_output.split("\n")
+    assert any("Overdepending against: libcurl" in line for line in error_lines[-5:])
 
 
 def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
