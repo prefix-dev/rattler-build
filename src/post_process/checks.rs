@@ -277,15 +277,16 @@ fn extend_mappings_from_finalized(
 ) {
     let Some(deps) = deps else { return };
 
+    // Only include sysroot_ packages from both host and build environments
     if let Some(host) = &deps.host {
-        library_mapping.extend(host.library_mapping.clone());
+        for (lib, pkg) in &host.library_mapping {
+            if pkg.as_normalized().starts_with("sysroot_") {
+                library_mapping.insert(lib.clone(), pkg.clone());
+            }
+        }
         package_to_nature.extend(host.package_nature.clone());
     }
 
-    // For the build environment we (currently) only need the sysroot packages
-    // to resolve system libraries. Therefore we filter explicitly for
-    // `sysroot_` packages when merging the library mapping. The package nature
-    // information can be copied as-is.
     if let Some(build) = &deps.build {
         for (lib, pkg) in &build.library_mapping {
             if pkg.as_normalized().starts_with("sysroot_") {
@@ -304,13 +305,39 @@ pub fn perform_linking_checks(
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let system_libs = find_system_libs(output)?;
 
-    // Get library mapping from finalized dependencies
+    // Try to load post-process-mappings.json from the cache directory if it exists
     let mut library_mapping = HashMap::new();
     let mut package_to_nature = HashMap::new();
-
-    // Merge information from the regular dependencies and (if present) from the cache
-    if let Some(merged) = output.merged_finalized_dependencies() {
-        extend_mappings_from_finalized(&Some(merged), &mut library_mapping, &mut package_to_nature);
+    let mut used_cache_file = false;
+    let cache_dir = &output.build_configuration.directories.cache_dir;
+    let mappings_path = cache_dir.join("post-process-mappings.json");
+    if mappings_path.exists() {
+        match fs_err::read_to_string(&mappings_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<crate::cache::PostProcessMappings>(&s).ok())
+        {
+            Some(mappings) => {
+                library_mapping = mappings.library_mapping;
+                package_to_nature = mappings.package_to_nature;
+                used_cache_file = true;
+                tracing::info!("Loaded post-process-mappings.json from cache");
+            }
+            None => {
+                tracing::warn!(
+                    "Failed to load or parse post-process-mappings.json, falling back to in-memory computation"
+                );
+            }
+        }
+    }
+    if !used_cache_file {
+        // Merge information from the regular dependencies and (if present) from the cache
+        if let Some(merged) = output.merged_finalized_dependencies() {
+            extend_mappings_from_finalized(
+                &Some(merged),
+                &mut library_mapping,
+                &mut package_to_nature,
+            );
+        }
     }
 
     let (resolved_run_dependencies, dep_to_source) =

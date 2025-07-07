@@ -6,6 +6,7 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -13,6 +14,7 @@ use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
+    post_process::package_nature::PackageNature,
     recipe::{
         Jinja,
         parser::{Dependency, Requirements, Source},
@@ -61,6 +63,15 @@ pub struct Cache {
     /// The prefix that was used at build time (needs to be replaced when
     /// restoring the files)
     pub prefix: PathBuf,
+}
+
+/// Struct to hold post-process mappings for cache reuse
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostProcessMappings {
+    /// Mapping from library names to the packages that provide them
+    pub library_mapping: std::collections::HashMap<String, PackageName>,
+    /// Mapping from package names to their PackageNature
+    pub package_to_nature: std::collections::HashMap<PackageName, PackageNature>,
 }
 
 impl Output {
@@ -239,6 +250,30 @@ impl Output {
                 &mut finalized_dependencies,
                 &self.build_configuration.directories.build_prefix,
                 &self.build_configuration.directories.host_prefix,
+            )
+            .into_diagnostic()?;
+
+            // Write post-process-mappings.json to the cache folder
+            fs::create_dir_all(&cache_dir).into_diagnostic()?;
+            let post_process_mappings = PostProcessMappings {
+                library_mapping: finalized_dependencies
+                    .host
+                    .iter()
+                    .chain(finalized_dependencies.build.iter())
+                    .flat_map(|env| env.library_mapping.clone().into_iter())
+                    .filter(|(_lib, pkg)| pkg.as_normalized().starts_with("sysroot_"))
+                    .collect(),
+                package_to_nature: finalized_dependencies
+                    .host
+                    .iter()
+                    .chain(finalized_dependencies.build.iter())
+                    .flat_map(|env| env.package_nature.clone())
+                    .collect(),
+            };
+            let mappings_path = cache_dir.join("post-process-mappings.json");
+            fs::write(
+                &mappings_path,
+                serde_json::to_string_pretty(&post_process_mappings).unwrap(),
             )
             .into_diagnostic()?;
 
