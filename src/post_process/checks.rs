@@ -13,7 +13,7 @@ use crate::{
 
 use crate::render::resolved_dependencies::{FinalizedDependencies, RunExportDependency};
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use rattler_conda_types::{PackageName, PrefixRecord};
+use rattler_conda_types::{PackageName, PrefixRecord, RepoDataRecord};
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -197,38 +197,26 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         return system_libs.build();
     }
 
-    // Try to locate a `sysroot_<platform>` package in either the regular build
-    // dependencies *or* the cache build dependencies. The first one found is
-    // used to derive the list of system libraries.
-    let mut sysroot_package = output
-        .finalized_dependencies
-        .as_ref()
-        .and_then(|deps| deps.build.as_ref())
-        .and_then(|deps| {
-            deps.resolved.iter().find(|v| {
-                v.file_name.starts_with(&format!(
-                    "sysroot_{}",
-                    output.build_configuration.target_platform
-                ))
-            })
-        })
-        .cloned();
-
-    if sysroot_package.is_none() {
-        sysroot_package = output
-            .finalized_cache_dependencies
-            .as_ref()
-            .and_then(|deps| deps.build.as_ref())
-            .and_then(|deps| {
-                deps.resolved.iter().find(|v| {
-                    v.file_name.starts_with(&format!(
-                        "sysroot_{}",
-                        output.build_configuration.target_platform
-                    ))
-                })
-            })
-            .cloned();
+    // Helper to locate a `sysroot_<platform>` package in the build deps of the given
+    // finalized dependency set.
+    fn find_sysroot<'a>(
+        deps: &'a Option<FinalizedDependencies>,
+        platform: &rattler_conda_types::Platform,
+    ) -> Option<&'a RepoDataRecord> {
+        let build = deps.as_ref()?.build.as_ref()?;
+        build
+            .resolved
+            .iter()
+            .find(|rec| rec.file_name.starts_with(&format!("sysroot_{}", platform)))
     }
+
+    // Try both the regular and the cache dependencies
+    let sysroot_package = [
+        &output.finalized_dependencies,
+        &output.finalized_cache_dependencies,
+    ]
+    .into_iter()
+    .find_map(|deps| find_sysroot(deps, &output.build_configuration.target_platform));
 
     if let Some(sysroot_package) = sysroot_package {
         let prefix_record_name = format!(
