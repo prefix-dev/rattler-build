@@ -13,6 +13,7 @@
 // | "non-library"
 
 use rattler_conda_types::{PackageName, PrefixRecord};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -21,7 +22,7 @@ use std::{
 };
 
 /// The nature of a package
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum PackageNature {
     /// Libraries
     RunExportsLibrary,
@@ -164,6 +165,8 @@ impl Eq for CaseInsensitivePathBuf {}
 pub(crate) struct PrefixInfo {
     pub package_to_nature: HashMap<PackageName, PackageNature>,
     pub path_to_package: HashMap<CaseInsensitivePathBuf, PackageName>,
+    /// List of library file names (e.g. "libz.so") provided by each package
+    pub library_files: HashMap<PackageName, Vec<String>>,
 }
 
 impl PrefixInfo {
@@ -186,9 +189,24 @@ impl PrefixInfo {
 
                     for file in record.files {
                         prefix_info.path_to_package.insert(
-                            file.into(),
+                            CaseInsensitivePathBuf::from(file.clone()),
                             record.repodata_record.package_record.name.clone(),
                         );
+
+                        // Collect library file names provided by this record once here
+                        if is_dso(&file) {
+                            let file_name = file
+                                .file_name()
+                                .and_then(|f| f.to_str())
+                                .unwrap_or_default()
+                                .to_string();
+
+                            prefix_info
+                                .library_files
+                                .entry(record.repodata_record.package_record.name.clone())
+                                .or_default()
+                                .push(file_name);
+                        }
                     }
                 }
             }

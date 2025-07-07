@@ -274,5 +274,5 @@ def test_create_patch_already_exists_no_overwrite(
 
     # Should contain the message about not writing the patch file
     stderr = result.stderr
-    assert "Not writing patch file, already exists" in stderr
-    assert str(patch_path) in stderr
+    assert "Not writing patch file, already exists:" in stderr
+    assert "Use --overwrite to replace the existing patch file" in stderr

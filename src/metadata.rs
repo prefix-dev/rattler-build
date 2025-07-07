@@ -685,6 +685,27 @@ impl Output {
         }
         Ok(())
     }
+
+    /// Return a view that merges the finalized dependencies of this output
+    /// with those of the optional cache build.
+    ///
+    /// * `run` comes from the main `finalized_dependencies` (cache runs are
+    ///   irrelevant for the final artefact).
+    /// * `host` / `build` environments are taken from the main dependencies if
+    ///   present, otherwise from the cache. If both are present we merge their
+    ///   fields (union of `resolved`, `specs`, `library_mapping`,
+    ///   `package_nature`).
+    pub fn merged_finalized_dependencies(
+        &self,
+    ) -> Option<crate::render::resolved_dependencies::FinalizedDependencies> {
+        let primary = self.finalized_dependencies.as_ref()?;
+
+        if let Some(cache_deps) = &self.finalized_cache_dependencies {
+            Some(primary.merge_with(cache_deps))
+        } else {
+            Some(primary.clone())
+        }
+    }
 }
 
 impl Output {
@@ -827,6 +848,7 @@ mod test {
     };
     use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
+    use std::collections::HashMap;
     use std::str::FromStr;
     use url::Url;
 
@@ -900,6 +922,8 @@ mod test {
                     .unwrap(),
                 channel: Some("test".into()),
             }],
+            library_mapping: HashMap::new(),
+            package_nature: HashMap::new(),
         };
 
         // test yaml roundtrip

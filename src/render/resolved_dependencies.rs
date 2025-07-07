@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt::{Display, Formatter},
+    path::Path,
     sync::Arc,
 };
 
@@ -31,6 +32,8 @@ use crate::{
     tool_configuration,
     tool_configuration::Configuration,
 };
+
+use crate::post_process::package_nature::{PackageNature, PrefixInfo};
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -245,6 +248,12 @@ pub struct FinalizedRunDependencies {
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
     pub resolved: Vec<RepoDataRecord>,
+    /// Mapping from library names to the packages that provide them
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub library_mapping: HashMap<String, PackageName>,
+    /// Mapping from package names to their PackageNature (DSO library, interpreter, ...)
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub package_nature: HashMap<PackageName, PackageNature>,
 }
 
 fn short_channel(channel: Option<&str>) -> String {
@@ -352,6 +361,29 @@ impl ResolvedDependencies {
         }
         result
     }
+
+    /// Merge library-level metadata from `other` into `self`.
+    ///
+    /// Only the `library_mapping` (shared-object name → package) and
+    /// `package_nature` (DSO library vs interpreter, …) maps are combined. We
+    /// deliberately ignore the raw specs and resolved records because
+    /// downstream linking checks only need to know *which* package a library
+    /// comes from, not the full solver context.
+    fn absorb(&mut self, other: &ResolvedDependencies) {
+        self.library_mapping.extend(
+            other
+                .library_mapping
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+
+        self.package_nature.extend(
+            other
+                .package_nature
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+    }
 }
 
 impl FinalizedRunDependencies {
@@ -437,6 +469,36 @@ pub struct FinalizedDependencies {
     pub build: Option<ResolvedDependencies>,
     pub host: Option<ResolvedDependencies>,
     pub run: FinalizedRunDependencies,
+}
+
+impl FinalizedDependencies {
+    /// Merge the build and host dependencies from `other` into `self`.
+    ///
+    /// For each environment (`build`, `host`) we perform a shallow merge:
+    /// 1. If the primary has the environment, its `library_mapping` and
+    ///    `package_nature` maps are extended with entries from `other`.
+    /// 2. If the primary is `None` while `other` has the environment, we take
+    ///    a clone of `other`.
+    /// 3. Otherwise the primary value stays untouched.
+    pub fn merge_with(&self, other: &FinalizedDependencies) -> FinalizedDependencies {
+        let mut merged = self.clone();
+
+        let merge_env = |dst: &mut Option<ResolvedDependencies>,
+                         src: &Option<ResolvedDependencies>| {
+            match (dst.as_mut(), src) {
+                (Some(d), Some(s)) => d.absorb(s),
+                (None, Some(s)) => {
+                    *dst = Some(s.clone());
+                }
+                _ => {}
+            }
+        };
+
+        merge_env(&mut merged.build, &other.build);
+        merge_env(&mut merged.host, &other.host);
+
+        merged
+    }
 }
 
 #[derive(Error, Debug)]
@@ -599,8 +661,65 @@ async fn amend_run_exports(
     Ok(())
 }
 
+/// Populate library mappings for resolved dependencies after packages are installed
+pub fn populate_library_mappings(
+    dependencies: &mut FinalizedDependencies,
+    build_prefix: &Path,
+    host_prefix: &Path,
+) -> Result<(), std::io::Error> {
+    // Function to populate library mapping for a given environment
+    fn populate_env_libraries(
+        resolved_deps: &mut ResolvedDependencies,
+        prefix: &Path,
+    ) -> Result<(), std::io::Error> {
+        // Clear any previous mappings first.
+        resolved_deps.library_mapping.clear();
+
+        // Build a single PrefixInfo to reuse parsed metadata.
+        let prefix_info = PrefixInfo::from_prefix(prefix)?;
+
+        for record in &resolved_deps.resolved {
+            if let Some(libraries) = prefix_info.library_files.get(&record.package_record.name) {
+                // Insert libraries -> package mapping
+                for lib in libraries {
+                    resolved_deps
+                        .library_mapping
+                        .insert(lib.clone(), record.package_record.name.clone());
+                }
+            }
+
+            // Lazily get package nature from PrefixInfo
+            if !resolved_deps
+                .package_nature
+                .contains_key(&record.package_record.name)
+            {
+                if let Some(nature) = prefix_info
+                    .package_to_nature
+                    .get(&record.package_record.name)
+                {
+                    resolved_deps
+                        .package_nature
+                        .insert(record.package_record.name.clone(), nature.clone());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Populate library mappings for both build and host environments
+    if let Some(build_deps) = &mut dependencies.build {
+        populate_env_libraries(build_deps, build_prefix)?;
+    }
+
+    if let Some(host_deps) = &mut dependencies.host {
+        populate_env_libraries(host_deps, host_prefix)?;
+    }
+
+    Ok(())
+}
+
 pub async fn install_environments(
-    output: &Output,
+    build_config: &BuildConfiguration,
     dependencies: &FinalizedDependencies,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
@@ -612,8 +731,8 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.build_platform.platform,
-        &output.build_configuration.directories.build_prefix,
+        build_config.build_platform.platform,
+        &build_config.directories.build_prefix,
         tool_configuration,
     )
     .await?;
@@ -625,8 +744,8 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.host_platform.platform,
-        &output.build_configuration.directories.host_prefix,
+        build_config.host_platform.platform,
+        &build_config.directories.host_prefix,
         tool_configuration,
     )
     .await?;
@@ -743,6 +862,8 @@ pub(crate) async fn resolve_dependencies(
         Some(ResolvedDependencies {
             specs: build_env_specs,
             resolved,
+            library_mapping: HashMap::new(), // Will be populated after installation
+            package_nature: HashMap::new(),
         })
     } else {
         None
@@ -840,6 +961,8 @@ pub(crate) async fn resolve_dependencies(
         Some(ResolvedDependencies {
             specs: host_env_specs,
             resolved,
+            library_mapping: HashMap::new(), // Will be populated after installation
+            package_nature: HashMap::new(),
         })
     } else {
         None
@@ -1010,15 +1133,25 @@ impl Output {
     /// Install the environments of the outputs. Assumes that the dependencies
     /// for the environment have already been resolved.
     pub async fn install_environments(
-        &self,
+        &mut self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
         let dependencies = self
             .finalized_dependencies
-            .as_ref()
+            .as_mut()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-        install_environments(self, dependencies, tool_configuration).await
+        install_environments(&self.build_configuration, dependencies, tool_configuration).await?;
+
+        // Populate library mappings after packages are installed
+        populate_library_mappings(
+            dependencies,
+            &self.build_configuration.directories.build_prefix,
+            &self.build_configuration.directories.host_prefix,
+        )
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
+
+        Ok(())
     }
 }
 

@@ -1075,7 +1075,7 @@ pub async fn debug_recipe(
             .fetch_sources(&tool_config, apply_patch_custom)
             .await
             .into_diagnostic()?;
-        let output = output
+        let mut output = output
             .resolve_dependencies(&tool_config)
             .await
             .into_diagnostic()?;
