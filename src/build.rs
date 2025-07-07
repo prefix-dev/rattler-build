@@ -127,7 +127,7 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-    output
+    let output = output
         .install_environments(tool_configuration)
         .await
         .into_diagnostic()?;

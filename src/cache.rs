@@ -109,7 +109,11 @@ impl Output {
                     .into(),
             );
 
-            let cache_key = (cache, selected_variant, self.prefix());
+            let cache_key = (
+                cache,
+                selected_variant,
+                &self.build_configuration.directories.host_prefix,
+            );
             // serialize to json and hash
             let mut hasher = Sha256::new();
             cache_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
@@ -126,9 +130,13 @@ impl Output {
         cache_dir: PathBuf,
     ) -> Result<Output, miette::Error> {
         let cache_prefix_dir = cache_dir.join("prefix");
-        let copied_prefix = CopyDir::new(&cache_prefix_dir, self.prefix())
-            .run()
-            .into_diagnostic()?;
+        let copied_prefix = CopyDir::new(
+            &cache_prefix_dir,
+            self.prefix()
+                .expect("the host prefix must be initialized before calling this function"),
+        )
+        .run()
+        .into_diagnostic()?;
 
         // restore the work dir files
         let cache_dir_work = cache_dir.join("work_dir");
@@ -212,7 +220,11 @@ impl Output {
 
             let target_platform = self.build_configuration.target_platform;
             let mut env_vars = env_vars::vars(&self, "BUILD");
-            env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+            env_vars.extend(env_vars::os_vars(
+                self.prefix()
+                    .expect("the host prefix must be available before calling this function"),
+                &target_platform,
+            ));
 
             // Reindex the channels
             let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
@@ -225,9 +237,13 @@ impl Output {
                     .await
                     .unwrap();
 
-            install_environments(&self, &finalized_dependencies, tool_configuration)
-                .await
-                .into_diagnostic()?;
+            let (host_prefix, build_prefix) = install_environments(
+                &self.build_configuration,
+                &finalized_dependencies,
+                tool_configuration,
+            )
+            .await
+            .into_diagnostic()?;
 
             let selector_config = self.build_configuration.selector_config();
             let mut jinja = Jinja::new(selector_config.clone());
@@ -238,7 +254,7 @@ impl Output {
             let build_prefix = if cache.build.merge_build_and_host_envs {
                 None
             } else {
-                Some(&self.build_configuration.directories.build_prefix)
+                Some(build_prefix.path())
             };
 
             cache
@@ -248,7 +264,7 @@ impl Output {
                     env_vars,
                     &self.build_configuration.directories.work_dir,
                     &self.build_configuration.directories.recipe_dir,
-                    &self.build_configuration.directories.host_prefix,
+                    host_prefix.path(),
                     build_prefix,
                     Some(jinja),
                     None, // sandbox config
@@ -259,7 +275,7 @@ impl Output {
 
             // find the new files in the prefix and add them to the cache
             let new_files = Files::from_prefix(
-                self.prefix(),
+                host_prefix.path(),
                 cache.build.always_include_files(),
                 cache.build.files(),
             )
@@ -280,7 +296,7 @@ impl Output {
                     continue;
                 }
                 let stripped = file
-                    .strip_prefix(self.prefix())
+                    .strip_prefix(host_prefix.path())
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
@@ -302,15 +318,15 @@ impl Output {
                 finalized_sources: rendered_sources.clone(),
                 prefix_files: copied_files,
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
-                prefix: self.prefix().to_path_buf(),
+                prefix: host_prefix.to_path_buf(),
             };
 
             let cache_file = cache_dir.join("cache.json");
             fs::write(cache_file, serde_json::to_string(&cache).unwrap()).into_diagnostic()?;
 
             // remove prefix to get it in pristine state and restore the cache
-            fs::remove_dir_all(self.prefix()).into_diagnostic()?;
-            let _ = CopyDir::new(&prefix_cache_dir, self.prefix())
+            fs::remove_dir_all(host_prefix.path()).into_diagnostic()?;
+            let _ = CopyDir::new(&prefix_cache_dir, host_prefix.path())
                 .run()
                 .into_diagnostic()?;
 

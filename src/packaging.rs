@@ -92,8 +92,9 @@ pub enum PackagingError {
 }
 
 /// This function copies the license files to the info/licenses folder.
-/// License files are selected from the recipe directory and the source (work) folder.
-/// If the same file is found in both locations, the file from the recipe directory is used.
+/// License files are selected from the recipe directory and the source (work)
+/// folder. If the same file is found in both locations, the file from the
+/// recipe directory is used.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
@@ -270,8 +271,9 @@ pub enum PathNormalizationError {
 
 /// Normalizes a component string for comparison.
 ///
-/// This helper function applies Unicode normalization (NFKC) and optional case folding to a path component.
-/// When case folding is applied, it's done in a way that properly handles special Unicode cases.
+/// This helper function applies Unicode normalization (NFKC) and optional case
+/// folding to a path component. When case folding is applied, it's done in a
+/// way that properly handles special Unicode cases.
 fn normalize_component(component_str: &str, to_lowercase: bool) -> String {
     if to_lowercase {
         let normalized = component_str.nfkc().collect::<String>();
@@ -570,7 +572,9 @@ impl Output {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
         let files_after = Files::from_prefix(
-            &self.build_configuration.directories.host_prefix,
+            self.prefix()
+                .expect("the prefix must have been set at this point")
+                .path(),
             self.recipe.build().always_include_files(),
             self.recipe.build().files(),
         )?;
@@ -581,15 +585,15 @@ impl Output {
 
 #[cfg(test)]
 mod packaging_tests {
-    use super::*;
-    use std::path::Path;
-
     #[cfg(unix)]
     use std::ffi::OsStr;
     #[cfg(unix)]
     use std::os::unix::ffi::OsStrExt;
     #[cfg(windows)]
     use std::os::windows::ffi::OsStringExt;
+    use std::path::Path;
+
+    use super::*;
 
     #[test]
     fn test_find_case_insensitive_collisions_detects() {
@@ -738,7 +742,8 @@ mod packaging_tests {
         let normalized_case_sensitive = normalize_path_for_comparison(path, false).unwrap();
         let normalized_case_insensitive = normalize_path_for_comparison(path, true).unwrap();
 
-        // Current dir components (.) are skipped, but parent dir (..) and other components are preserved
+        // Current dir components (.) are skipped, but parent dir (..) and other
+        // components are preserved
         assert_eq!(normalized_case_sensitive, "Foo/../Bar/Baz.TXT");
         assert_eq!(normalized_case_insensitive, "foo/../bar/baz.txt");
     }

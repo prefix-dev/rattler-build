@@ -11,6 +11,7 @@ use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
+use rattler_conda_types::prefix::Prefix;
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
 use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
 use url::Url;
@@ -306,7 +307,7 @@ pub async fn install_packages(
     target_platform: Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Prefix> {
     // Make sure the target prefix exists, regardless of whether we'll actually
     // install anything in there.
     let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix).with_context(|| {
@@ -371,5 +372,5 @@ pub async fn install_packages(
         console::style(console::Emoji("✔", "")).green(),
     );
 
-    Ok(())
+    Ok(prefix)
 }

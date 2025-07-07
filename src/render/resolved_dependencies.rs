@@ -10,7 +10,7 @@ use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
-    package::RunExportsJson,
+    package::RunExportsJson, prefix::Prefix,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -600,38 +600,39 @@ async fn amend_run_exports(
 }
 
 pub async fn install_environments(
-    output: &Output,
+    build_config: &BuildConfiguration,
     dependencies: &FinalizedDependencies,
     tool_configuration: &tool_configuration::Configuration,
-) -> Result<(), ResolveError> {
+) -> Result<(Prefix, Prefix), ResolveError> {
     const EMPTY_RECORDS: Vec<RepoDataRecord> = Vec::new();
-    install_packages(
+
+    let build_prefix = install_packages(
         "build",
         dependencies
             .build
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.build_platform.platform,
-        &output.build_configuration.directories.build_prefix,
+        build_config.build_platform.platform,
+        &build_config.directories.build_prefix,
         tool_configuration,
     )
     .await?;
 
-    install_packages(
+    let host_prefix = install_packages(
         "host",
         dependencies
             .host
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.host_platform.platform,
-        &output.build_configuration.directories.host_prefix,
+        build_config.host_platform.platform,
+        &build_config.directories.host_prefix,
         tool_configuration,
     )
     .await?;
 
-    Ok(())
+    Ok((build_prefix, host_prefix))
 }
 
 /// This function renders the run exports into `RunExportsJson` format
@@ -1010,15 +1011,26 @@ impl Output {
     /// Install the environments of the outputs. Assumes that the dependencies
     /// for the environment have already been resolved.
     pub async fn install_environments(
-        &self,
+        self,
         tool_configuration: &Configuration,
-    ) -> Result<(), ResolveError> {
+    ) -> Result<Self, ResolveError> {
+        if self.finalized_host_prefix.is_some() || self.finalized_build_prefix.is_some() {
+            return Ok(self);
+        }
+
         let dependencies = self
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-        install_environments(self, dependencies, tool_configuration).await
+        let (build_prefix, host_prefix) =
+            install_environments(&self.build_configuration, dependencies, tool_configuration)
+                .await?;
+        Ok(Self {
+            finalized_build_prefix: Some(build_prefix),
+            finalized_host_prefix: Some(host_prefix),
+            ..self
+        })
     }
 }
 

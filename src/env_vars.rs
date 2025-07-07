@@ -1,13 +1,14 @@
-//! Functions to collect environment variables that are used during the build process.
-use std::path::{Path, PathBuf};
-use std::{collections::HashMap, env};
+//! Functions to collect environment variables that are used during the build
+//! process.
+use std::{
+    collections::HashMap,
+    env,
+    path::{Path, PathBuf},
+};
 
 use rattler_conda_types::Platform;
 
-use crate::linux;
-use crate::macos;
-use crate::metadata::Output;
-use crate::windows;
+use crate::{linux, macos, metadata::Output, windows};
 
 macro_rules! insert {
     ($map:expr, $key:expr, $value:expr) => {
@@ -28,7 +29,8 @@ fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> Path
     get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
 }
 
-/// Returns a map of environment variables for Python that are used in the build process.
+/// Returns a map of environment variables for Python that are used in the build
+/// process.
 ///
 /// Variables:
 /// - `PYTHON`: path to Python executable
@@ -40,12 +42,15 @@ fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> Path
 /// - `NPY_DISTUTILS_APPEND_FLAGS`: 1 (https://github.com/conda/conda-build/pull/3015)
 pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
+    let prefix = output
+        .prefix()
+        .expect("host prefix must have been installed at this point");
 
     if output.host_platform().platform.is_windows() {
-        let python = output.prefix().join("python.exe");
+        let python = prefix.path().join("python.exe");
         insert!(result, "PYTHON", python.to_string_lossy());
     } else {
-        let python = output.prefix().join("bin/python");
+        let python = prefix.path().join("bin/python");
         insert!(result, "PYTHON", python.to_string_lossy());
     }
 
@@ -65,16 +70,10 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     if let Some(py_ver) = python_version {
         let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
         let py_ver_str = py_ver.join(".");
-        let stdlib_dir = get_stdlib_dir(
-            output.prefix(),
-            output.host_platform().platform,
-            &py_ver_str,
-        );
-        let site_packages_dir = get_sitepackages_dir(
-            output.prefix(),
-            output.host_platform().platform,
-            &py_ver_str,
-        );
+        let stdlib_dir =
+            get_stdlib_dir(prefix.path(), output.host_platform().platform, &py_ver_str);
+        let site_packages_dir =
+            get_sitepackages_dir(prefix.path(), output.host_platform().platform, &py_ver_str);
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
@@ -93,26 +92,29 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
-/// Returns a map of environment variables for R that are used in the build process.
+/// Returns a map of environment variables for R that are used in the build
+/// process.
 ///
 /// Variables:
 /// - R_VER: R version (major.minor), e.g. 4.0
 /// - R: Path to R executable
 /// - R_USER: Path to R user directory
-///
 pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
+    let host_prefix = output
+        .prefix()
+        .expect("host prefix must have been installed at this point");
 
     if let Some(r_ver) = output.variant().get(&"r-base".into()) {
         insert!(result, "R_VER", r_ver);
 
         let r_bin = if output.host_platform().platform.is_windows() {
-            output.prefix().join("Scripts/R.exe")
+            host_prefix.path().join("Scripts/R.exe")
         } else {
-            output.prefix().join("bin/R")
+            host_prefix.path().join("bin/R")
         };
 
-        let r_user = output.prefix().join("Libs/R");
+        let r_user = host_prefix.path().join("Libs/R");
 
         insert!(result, "R", r_bin.to_string_lossy());
         insert!(result, "R_USER", r_user.to_string_lossy());
@@ -135,7 +137,8 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 ///
 /// Variables:
 /// - CPU_COUNT: Number of CPUs
-/// - SHLIB_EXT: Shared library extension for platform (e.g. Linux -> .so, Windows -> .dll, macOS -> .dylib)
+/// - SHLIB_EXT: Shared library extension for platform (e.g. Linux -> .so,
+///   Windows -> .dll, macOS -> .dylib)
 ///
 /// Forwards the following environment variables:
 /// - PATH: Path where executables are found
@@ -216,17 +219,17 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     }
 
     let directories = &output.build_configuration.directories;
-    insert!(
-        vars,
-        "CONDA_DEFAULT_ENV",
-        directories.host_prefix.to_string_lossy()
-    );
-    insert!(vars, "PREFIX", directories.host_prefix.to_string_lossy());
-    insert!(
-        vars,
-        "BUILD_PREFIX",
-        directories.build_prefix.to_string_lossy()
-    );
+    if let Some(host_prefix) = &output.finalized_host_prefix {
+        insert!(
+            vars,
+            "CONDA_DEFAULT_ENV",
+            host_prefix.path().to_string_lossy()
+        );
+        insert!(vars, "PREFIX", host_prefix.path().to_string_lossy());
+    }
+    if let Some(build_prefix) = &output.finalized_build_prefix {
+        insert!(vars, "BUILD_PREFIX", build_prefix.path().to_string_lossy());
+    }
     insert!(vars, "RECIPE_DIR", directories.recipe_dir.to_string_lossy());
     insert!(vars, "SRC_DIR", directories.work_dir.to_string_lossy());
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());
@@ -238,7 +241,8 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     // Note that pip env "NO" variables are inverted logic.
     //    PIP_NO_BUILD_ISOLATION=False means don't use build isolation.
     insert!(vars, "PIP_NO_BUILD_ISOLATION", "False");
-    // Some other env vars to have pip ignore dependencies. We supply them ourselves instead.
+    // Some other env vars to have pip ignore dependencies. We supply them ourselves
+    // instead.
     insert!(vars, "PIP_NO_DEPENDENCIES", "True");
     insert!(vars, "PIP_IGNORE_INSTALLED", "True");
 
@@ -306,8 +310,9 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 
     vars.extend(language_vars(output));
 
-    // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
-    // this value will be taken from the previous package for rebuild purposes
+    // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured
+    // timestamp this value will be taken from the previous package for rebuild
+    // purposes
     let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 

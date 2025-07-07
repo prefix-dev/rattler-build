@@ -19,6 +19,7 @@ use rattler_conda_types::{
     VersionWithSource,
     compression_level::CompressionLevel,
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
+    prefix::Prefix,
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::SubdirSelection;
@@ -317,7 +318,8 @@ impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
     }
 }
 
-/// A newtype wrapper around a boolean indicating whether debug output is enabled
+/// A newtype wrapper around a boolean indicating whether debug output is
+/// enabled
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Debug(bool);
 
@@ -462,6 +464,15 @@ pub struct Output {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finalized_cache_sources: Option<Vec<Source>>,
 
+    /// The location of the host prefix, this is `None` if this has not yet been
+    /// created yet.
+    #[serde(skip)]
+    pub finalized_host_prefix: Option<Prefix>,
+    /// The location of the build prefix, this is `None` if this has not yet
+    /// been created yet.
+    #[serde(skip)]
+    pub finalized_build_prefix: Option<Prefix>,
+
     /// Summary of the build
     #[serde(skip)]
     pub build_summary: Arc<Mutex<BuildSummary>>,
@@ -539,8 +550,8 @@ impl Output {
     }
 
     /// Shorthand to retrieve the host prefix for this output
-    pub fn prefix(&self) -> &Path {
-        &self.build_configuration.directories.host_prefix
+    pub fn prefix(&self) -> Option<&Prefix> {
+        self.finalized_host_prefix.as_ref()
     }
 
     /// Shorthand to retrieve the build prefix for this output
@@ -818,6 +829,8 @@ mod tests {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use chrono::TimeZone;
     use fs_err as fs;
     use insta::assert_yaml_snapshot;
@@ -827,7 +840,6 @@ mod test {
     };
     use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
-    use std::str::FromStr;
     use url::Url;
 
     use super::{Directories, Output};

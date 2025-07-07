@@ -4,18 +4,23 @@
 //!   - Fixing up the shebangs in scripts
 //!   - Compiling `.py` files to `.pyc` files
 //!   - Replacing the contents of `.dist-info/INSTALLER` files with "conda"
+use std::{
+    collections::HashSet,
+    io::{self, BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    process::Command,
+};
+
 use fs_err as fs;
 use rattler::install::{PythonInfo, get_windows_launcher, python_entry_point_template};
 use rattler_conda_types::Platform;
-use std::collections::HashSet;
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use crate::metadata::Output;
-use crate::packaging::{PackagingError, TempFiles};
-use crate::recipe::parser::GlobVec;
-use crate::utils::to_forward_slash_lossy;
+use crate::{
+    metadata::Output,
+    packaging::{PackagingError, TempFiles},
+    recipe::parser::GlobVec,
+    utils::to_forward_slash_lossy,
+};
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
     if target_platform.is_windows() {
@@ -25,8 +30,8 @@ pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
     }
 }
 
-/// Given a list of files and the path to a Python interpreter, we try to compile any `.py` files
-/// to `.pyc` files by invoking the Python interpreter.
+/// Given a list of files and the path to a Python interpreter, we try to
+/// compile any `.py` files to `.pyc` files by invoking the Python interpreter.
 pub fn compile_pyc(
     output: &Output,
     paths: &HashSet<PathBuf>,
@@ -41,7 +46,10 @@ pub fn compile_pyc(
         )
     } else {
         python_bin(
-            &build_config.directories.host_prefix,
+            output
+                .prefix()
+                .expect("host prefix must be available for pyc compilation")
+                .path(),
             &build_config.host_platform.platform,
         )
     };
@@ -76,8 +84,8 @@ pub fn compile_pyc(
         cache_path
     };
 
-    // for each file that does not have a corresponding `.pyc` file we try to compile it
-    // by invoking Python
+    // for each file that does not have a corresponding `.pyc` file we try to
+    // compile it by invoking Python
     let mut py_files = vec![];
     let mut pyc_files = vec![];
     for entry in paths {
@@ -152,7 +160,8 @@ pub fn compile_pyc(
 }
 
 /// Find any .dist-info/INSTALLER files and replace the contents with "conda"
-/// This is to prevent pip from trying to uninstall the package when it is installed with conda
+/// This is to prevent pip from trying to uninstall the package when it is
+/// installed with conda
 pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf>, PackagingError> {
     let name = output.name();
     let version = output.version();
@@ -289,7 +298,8 @@ fn fix_shebang(
     Ok(())
 }
 
-/// Create the python entry point script for the recipe. Overwrites any existing entry points.
+/// Create the python entry point script for the recipe. Overwrites any existing
+/// entry points.
 pub(crate) fn create_entry_points(
     output: &Output,
     tmp_dir_path: &Path,
@@ -316,9 +326,13 @@ pub(crate) fn create_entry_points(
                 ))
             })?;
 
+    let host_prefix = output
+        .prefix()
+        .expect("host prefix must be valid at this point")
+        .path();
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
-            &output.prefix().to_string_lossy(),
+            &host_prefix.to_string_lossy(),
             output.target_platform().is_windows(),
             ep,
             &python_info,
@@ -355,7 +369,7 @@ pub(crate) fn create_entry_points(
             {
                 fix_shebang(
                     &script_path,
-                    output.prefix(),
+                    host_prefix,
                     output.recipe.build().python().use_python_app_entrypoint,
                 )?;
             }

@@ -858,7 +858,7 @@ impl CommandsTest {
                 &test_dir,
                 path,
                 &run_prefix,
-                build_prefix.as_ref(),
+                build_prefix.as_deref(),
                 None,
                 None,
                 config.debug,
