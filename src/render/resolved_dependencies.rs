@@ -10,8 +10,8 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, PrefixRecord,
-    RepoDataRecord, package::RunExportsJson,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
+    package::RunExportsJson,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -267,50 +267,6 @@ fn short_channel(channel: Option<&str>) -> String {
     } else {
         channel.to_string()
     }
-}
-
-/// Extract library files from a package's metadata in the prefix
-fn extract_library_info_from_prefix(
-    prefix: &Path,
-    package_name: &PackageName,
-) -> Result<Vec<String>, std::io::Error> {
-    let conda_meta = prefix.join("conda-meta");
-    let package_prefix = format!("{}-", package_name.as_normalized());
-    let metadata_path = fs_err::read_dir(&conda_meta)?
-        .filter_map(Result::ok)
-        .find(|entry| {
-            entry
-                .file_name()
-                .to_str()
-                .filter(|name| name.starts_with(&package_prefix) && name.ends_with(".json"))
-                .is_some()
-        })
-        .map(|entry| entry.path());
-
-    let Some(path) = metadata_path else {
-        return Ok(Vec::new());
-    };
-
-    let record = PrefixRecord::from_path(&path)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-
-    let libraries = record
-        .files
-        .into_iter()
-        .filter_map(|path| {
-            let file_name = path.file_name()?.to_str()?;
-            let is_library = file_name.ends_with(".so")
-                || file_name.contains(".so.")
-                || file_name.ends_with(".dylib")
-                || file_name.contains(".dylib.")
-                || file_name.ends_with(".dll")
-                || file_name.ends_with(".pyd");
-
-            is_library.then(|| file_name.to_string())
-        })
-        .collect();
-
-    Ok(libraries)
 }
 
 impl ResolvedDependencies {
@@ -716,42 +672,34 @@ pub fn populate_library_mappings(
         resolved_deps: &mut ResolvedDependencies,
         prefix: &Path,
     ) -> Result<(), std::io::Error> {
+        // Clear any previous mappings first.
         resolved_deps.library_mapping.clear();
 
-        // Create PrefixInfo once for lazy lookups
+        // Build a single PrefixInfo to reuse parsed metadata.
         let prefix_info = PrefixInfo::from_prefix(prefix)?;
 
         for record in &resolved_deps.resolved {
-            match extract_library_info_from_prefix(prefix, &record.package_record.name) {
-                Ok(libraries) => {
-                    // Insert libraries -> package mapping
-                    for lib in libraries {
-                        resolved_deps
-                            .library_mapping
-                            .insert(lib, record.package_record.name.clone());
-                    }
-
-                    // Lazily get package nature from PrefixInfo
-                    if !resolved_deps
-                        .package_nature
-                        .contains_key(&record.package_record.name)
-                    {
-                        if let Some(nature) = prefix_info
-                            .package_to_nature
-                            .get(&record.package_record.name)
-                        {
-                            resolved_deps
-                                .package_nature
-                                .insert(record.package_record.name.clone(), nature.clone());
-                        }
-                    }
+            if let Some(libraries) = prefix_info.library_files.get(&record.package_record.name) {
+                // Insert libraries -> package mapping
+                for lib in libraries {
+                    resolved_deps
+                        .library_mapping
+                        .insert(lib.clone(), record.package_record.name.clone());
                 }
-                Err(e) => {
-                    tracing::debug!(
-                        "Failed to extract library info from {}: {}",
-                        record.package_record.name.as_normalized(),
-                        e
-                    );
+            }
+
+            // Lazily get package nature from PrefixInfo
+            if !resolved_deps
+                .package_nature
+                .contains_key(&record.package_record.name)
+            {
+                if let Some(nature) = prefix_info
+                    .package_to_nature
+                    .get(&record.package_record.name)
+                {
+                    resolved_deps
+                        .package_nature
+                        .insert(record.package_record.name.clone(), nature.clone());
                 }
             }
         }
