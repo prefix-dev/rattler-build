@@ -274,19 +274,16 @@ fn extend_mappings_from_finalized(
     deps: &Option<FinalizedDependencies>,
     library_mapping: &mut HashMap<String, PackageName>,
     package_to_nature: &mut HashMap<PackageName, PackageNature>,
+    _output: &crate::metadata::Output,
 ) {
     let Some(deps) = deps else { return };
 
-    // Only include sysroot_ packages from both host and build environments
+    // All host libraries
     if let Some(host) = &deps.host {
-        for (lib, pkg) in &host.library_mapping {
-            if pkg.as_normalized().starts_with("sysroot_") {
-                library_mapping.insert(lib.clone(), pkg.clone());
-            }
-        }
+        library_mapping.extend(host.library_mapping.clone());
         package_to_nature.extend(host.package_nature.clone());
     }
-
+    // Only sysroot_ packages from build
     if let Some(build) = &deps.build {
         for (lib, pkg) in &build.library_mapping {
             if pkg.as_normalized().starts_with("sysroot_") {
@@ -336,6 +333,7 @@ pub fn perform_linking_checks(
                 &Some(merged),
                 &mut library_mapping,
                 &mut package_to_nature,
+                output,
             );
         }
     }
