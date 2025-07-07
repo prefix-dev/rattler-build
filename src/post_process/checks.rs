@@ -422,15 +422,7 @@ pub fn perform_linking_checks(
                     }
 
                     let dependency_match = dep_to_source.iter().find(|(dep_name, source_pkg)| {
-                        #[cfg(windows)]
-                        {
-                            dep_name.eq_ignore_ascii_case(package_str)
-                                || source_pkg.eq_ignore_ascii_case(package_str)
-                        }
-                        #[cfg(not(windows))]
-                        {
-                            dep_name.as_str() == package_str || source_pkg.as_str() == package_str
-                        }
+                        dep_name.as_str() == package_str || source_pkg.as_str() == package_str
                     });
 
                     if let Some((dep_name, _)) = dependency_match {
@@ -529,32 +521,10 @@ pub fn perform_linking_checks(
                     .map(|v| v.as_source().to_string())
                     .collect::<Vec<String>>()
             })
-            .any(|libraries| {
-                #[cfg(windows)]
-                {
-                    libraries
-                        .iter()
-                        .any(|lib| lib.eq_ignore_ascii_case(run_dependency))
-                }
-                #[cfg(not(windows))]
-                {
-                    libraries.contains(run_dependency)
-                }
-            });
+            .any(|libraries| libraries.contains(run_dependency));
 
-        // Also check if it was matched in cache builds (case-insensitive on Windows)
-        let used_in_cache = {
-            #[cfg(windows)]
-            {
-                cache_matched_deps
-                    .iter()
-                    .any(|dep| dep.eq_ignore_ascii_case(run_dependency))
-            }
-            #[cfg(not(windows))]
-            {
-                cache_matched_deps.contains(run_dependency)
-            }
-        };
+        // Also check if it was matched in cache builds
+        let used_in_cache = cache_matched_deps.contains(run_dependency);
 
         if !used_in_linked_dsos && !used_in_cache {
             if dynamic_linking.error_on_overdepending() {

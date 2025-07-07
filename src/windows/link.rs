@@ -95,7 +95,7 @@ impl Relinker for Dll {
             if WIN_ALLOWLIST.iter().any(|&sys_dll| {
                 lib.file_name()
                     .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
+                    .map(|n| n == sys_dll)
                     .unwrap_or(false)
             }) {
                 continue;
@@ -203,7 +203,7 @@ mod tests {
         let has_kernel32 = libraries.iter().any(|lib| {
             lib.file_name()
                 .and_then(|n| n.to_str())
-                .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
+                .map(|n| n == "KERNEL32.dll")
                 .unwrap_or(false)
         });
         assert!(has_kernel32, "Expected KERNEL32.dll dependency");
@@ -213,7 +213,7 @@ mod tests {
             !resolved.iter().any(|(lib, _)| lib
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
+                .map(|n| n == "KERNEL32.dll")
                 .unwrap_or(false)),
             "System DLLs should be filtered out during resolution"
         );
@@ -237,14 +237,14 @@ mod tests {
             let is_system = WIN_ALLOWLIST.iter().any(|&sys_dll| {
                 path.file_name()
                     .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
+                    .map(|n| n == sys_dll)
                     .unwrap_or(false)
             });
 
-            match dll.to_lowercase().as_str() {
-                "kernel32.dll"
-                | "c:\\windows\\system32\\kernel32.dll"
-                | "d:\\some\\path\\kernel32.dll" => {
+            match dll {
+                "KERNEL32.dll"
+                | "C:\\Windows\\System32\\KERNEL32.dll"
+                | "D:\\Some\\Path\\KERNEL32.dll" => {
                     assert!(is_system, "Expected {} to be identified as system DLL", dll);
                 }
                 _ => {
