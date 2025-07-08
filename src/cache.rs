@@ -132,8 +132,7 @@ impl Output {
         let cache_prefix_dir = cache_dir.join("prefix");
         let copied_prefix = CopyDir::new(
             &cache_prefix_dir,
-            self.prefix()
-                .expect("the host prefix must be initialized before calling this function"),
+            &self.build_configuration.directories.host_prefix,
         )
         .run()
         .into_diagnostic()?;
@@ -218,14 +217,6 @@ impl Output {
             .await
             .into_diagnostic()?;
 
-            let target_platform = self.build_configuration.target_platform;
-            let mut env_vars = env_vars::vars(&self, "BUILD");
-            env_vars.extend(env_vars::os_vars(
-                self.prefix()
-                    .expect("the host prefix must be available before calling this function"),
-                &target_platform,
-            ));
-
             // Reindex the channels
             let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
                 .await
@@ -237,6 +228,8 @@ impl Output {
                     .await
                     .unwrap();
 
+            // Install the environment and temporary act as if thats the environment for
+            // this output.
             let (host_prefix, build_prefix) = install_environments(
                 &self.build_configuration,
                 &finalized_dependencies,
@@ -244,6 +237,8 @@ impl Output {
             )
             .await
             .into_diagnostic()?;
+            self.finalized_host_prefix = Some(host_prefix.clone());
+            self.finalized_build_prefix = Some(build_prefix.clone());
 
             let selector_config = self.build_configuration.selector_config();
             let mut jinja = Jinja::new(selector_config.clone());
@@ -256,6 +251,10 @@ impl Output {
             } else {
                 Some(build_prefix.path())
             };
+
+            let target_platform = self.build_configuration.target_platform;
+            let mut env_vars = env_vars::vars(&self, "BUILD");
+            env_vars.extend(env_vars::os_vars(host_prefix.path(), &target_platform));
 
             cache
                 .build
@@ -333,6 +332,10 @@ impl Output {
             Ok(Output {
                 finalized_cache_dependencies: Some(finalized_dependencies),
                 finalized_cache_sources: Some(rendered_sources),
+
+                // Reset these fields to ensure we reinstall the environments.
+                finalized_host_prefix: None,
+                finalized_build_prefix: None,
                 ..self
             })
         } else {
