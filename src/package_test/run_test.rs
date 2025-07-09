@@ -12,7 +12,6 @@ use std::{
     fmt::Write as fmt_write,
     io::Write,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 use fs_err as fs;

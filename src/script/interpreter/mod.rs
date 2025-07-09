@@ -28,7 +28,6 @@ use rattler_shell::{
 pub(crate) use ruby::RubyInterpreter;
 
 use super::ExecutionArgs;
-use std::collections::HashMap;
 
 /// The error type for the interpreter
 #[derive(Debug, thiserror::Error)]
@@ -97,7 +96,6 @@ pub trait Interpreter {
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 
         let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-        let current_env = std::env::vars().collect::<HashMap<_, _>>();
 
         let current_env = std::env::vars().collect::<HashMap<_, _>>();
         let activation_vars = ActivationVariables {
