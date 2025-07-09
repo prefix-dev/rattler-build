@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, platform, package::PathsJson};
+use rattler_conda_types::{Channel, MatchSpec, package::PathsJson, platform};
 
 use crate::{
     apply_patch_custom,

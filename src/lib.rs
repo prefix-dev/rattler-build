@@ -81,7 +81,9 @@ use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
-use rattler_upload::upload::opt::{QuetzData, PrefixData, ServerType, UploadOpts, AnacondaData, ArtifactoryData, CondaForgeData };
+use rattler_upload::upload::opt::{
+    AnacondaData, ArtifactoryData, CondaForgeData, PrefixData, QuetzData, ServerType, UploadOpts,
+};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {

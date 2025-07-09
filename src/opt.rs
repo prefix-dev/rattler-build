@@ -13,9 +13,9 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::{mirror_middleware, s3_middleware};
 use rattler_solve::ChannelPriority;
+use rattler_upload::upload::opt::{Config, UploadOpts};
 use serde_json::{Value, json};
 use url::Url;
-use rattler_upload::upload::opt::{UploadOpts, Config};
 
 #[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
@@ -23,7 +23,7 @@ use crate::{
     console_utils::{Color, LogStyle},
     metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
-    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy}
+    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 
 /// Application subcommands.
@@ -788,7 +788,6 @@ impl RebuildData {
         }
     }
 }
-
 
 /// Options for uploading to a Anaconda.org server
 #[derive(Clone, Debug, PartialEq, Parser)]

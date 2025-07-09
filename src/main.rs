@@ -17,8 +17,8 @@ use rattler_build::{
     source::create_patch,
     upload_from_args,
 };
+use rattler_upload::upload::opt::Config;
 use tempfile::{TempDir, tempdir};
-use rattler_upload::upload::opt::{Config};
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
