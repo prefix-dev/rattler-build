@@ -94,10 +94,20 @@ pub(crate) fn copy_file(
 
     // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
     if path.is_symlink() {
-        let link_target = fs_err::read_link(path)?;
+        let mut link_target = fs_err::read_link(path)?;
 
         if let Some(parent) = dest_path.parent() {
             create_dir_all_cached(parent, paths_created)?;
+        }
+
+        // If the link target is absolute, try to make it relative to the parent directory
+        if link_target.is_absolute() {
+            if let Some(parent) = dest_path.parent() {
+                // Try to make the link target relative to the parent directory
+                if let Some(target_file) = link_target.file_name() {
+                    link_target = PathBuf::from(target_file);
+                }
+            }
         }
 
         create_symlink(link_target, dest_path)?;

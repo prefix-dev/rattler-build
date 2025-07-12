@@ -902,14 +902,8 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         if let Some(cache_host_env) = &cache.host {
             let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
+            let filtered =
+                output_ignore_run_exports.filter(&cache_host_run_exports, "cache-host")?;
             host_run_exports.extend(&filtered);
         }
     }
@@ -931,25 +925,32 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         // add in the run exports from the cache
         // filter run dependencies that came from run exports
-        let ignore_run_exports = requirements.ignore_run_exports(None);
-        // Note: these run exports are already filtered
-        let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
+        let ignore_run_exports = &output_ignore_run_exports;
+        // Note: these run exports are already filtered internally
+        let cache_run_exports = cache.run.depends.iter().filter(|c| match c {
             DependencyInfo::RunExport(run_export) => {
                 let source_package: Option<PackageName> = run_export.source_package.parse().ok();
                 let spec_name = &run_export.spec.name;
 
-                let by_name = spec_name
-                    .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
+                let by_name = run_export
+                    .source_package
+                    .parse::<PackageName>()
+                    .map(|n| {
+                        // Compare normalized names to avoid dash/underscore mismatches
+                        ignore_run_exports.by_name().iter().any(|bn| bn == &n)
+                    })
                     .unwrap_or(false);
                 let by_package = source_package
                     .map(|s| ignore_run_exports.from_package().contains(&s))
                     .unwrap_or(false);
 
+                // only include run_exports not ignored
                 !by_name && !by_package
             }
             _ => false,
         });
+        // extend run dependencies with filtered cache run_exports
+        depends.extend(cache_run_exports.cloned());
     }
 
     let run_specs = FinalizedRunDependencies {

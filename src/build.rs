@@ -3,6 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
+use rattler_conda_types::prefix::Prefix;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
@@ -113,39 +114,52 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
+    // Perform cache build or normal build; skip cache when ignore_run_exports is specified for this output
+    let mut output = output;
+    let output_ignore = output.recipe.requirements.ignore_run_exports(None);
+    if output.recipe.cache.is_some() && output_ignore.is_empty() {
+        // Cache build: build or restore cache, populating prefix files
+        output = output.build_or_fetch_cache(tool_configuration).await?;
+        // Mark host prefix for packaging to work
+        let host_prefix = Prefix::create(directories.host_prefix.clone())
+            .into_diagnostic()
+            .context("failed to create host prefix")?;
+        // Promote cache dependencies to run dependencies for packaging
+        let cache_deps = output.finalized_cache_dependencies.clone();
+        output = Output {
+            finalized_host_prefix: Some(host_prefix),
+            finalized_dependencies: cache_deps,
+            ..output
+        };
     } else {
-        output
+        // Normal build: fetch sources, resolve deps, install envs, run build script
+        output = output
             .fetch_sources(tool_configuration, apply_patch_custom)
             .await
-            .into_diagnostic()?
-    };
-
-    let output = output
-        .resolve_dependencies(tool_configuration)
-        .await
-        .into_diagnostic()?;
-
-    let output = output
-        .install_environments(tool_configuration)
-        .await
-        .into_diagnostic()?;
-
-    match output.run_build_script().await {
-        Ok(_) => {}
-        Err(InterpreterError::Debug(info)) => {
-            tracing::info!("{}", info);
-            return Err(miette::miette!(
-                "Script not executed because debug mode is enabled"
-            ));
-        }
-        Err(InterpreterError::ExecutionFailed(_)) => {
-            return Err(miette::miette!("Script failed to execute"));
+            .into_diagnostic()?;
+        output = output
+            .resolve_dependencies(tool_configuration)
+            .await
+            .into_diagnostic()?;
+        output = output
+            .install_environments(tool_configuration)
+            .await
+            .into_diagnostic()?;
+        match output.run_build_script().await {
+            Ok(_) => {}
+            Err(InterpreterError::Debug(info)) => {
+                tracing::info!("{}", info);
+                return Err(miette::miette!(
+                    "Script not executed because debug mode is enabled"
+                ));
+            }
+            Err(InterpreterError::ExecutionFailed(_)) => {
+                return Err(miette::miette!("Script failed to execute"));
+            }
         }
     }
 
-    // Package all the new files
+    // Package all the new files (common for cache and normal builds)
     let (result, paths_json) = output
         .create_package(tool_configuration)
         .await

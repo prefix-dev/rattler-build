@@ -417,7 +417,139 @@ pub fn package_conda(
     tracing::info!("Writing metadata for package");
     tmp.add_files(output.write_metadata(&tmp)?);
 
-    // TODO move things below also to metadata.rs
+    // For cache builds, override the package files to only include cache files that match the recipe's build.files pattern
+    if output.recipe.cache.is_some() {
+        use crate::cache::Cache as RuntimeCache;
+        use fs_err as fs;
+        // Compute cache directory and load runtime cache.json
+        let cache_key_hex = output.cache_key().map_err(|e| {
+            PackagingError::InvalidMetadata(format!("could not get cache key: {:?}", e))
+        })?;
+        let cache_dir = output
+            .build_configuration
+            .directories
+            .cache_dir
+            .join(format!("bld_{}", cache_key_hex));
+        let runtime_cache_file = cache_dir.join("cache.json");
+
+        tracing::info!("DEBUG: cache_dir: {:?}", cache_dir);
+
+        if runtime_cache_file.exists() {
+            let runtime_json = fs::read_to_string(&runtime_cache_file)?;
+            tracing::info!("DEBUG: runtime_json: {}", runtime_json);
+            let runtime_cache: RuntimeCache = serde_json::from_str(&runtime_json)?;
+            tracing::info!(
+                "DEBUG: runtime_cache.prefix_files: {:?}",
+                runtime_cache.prefix_files
+            );
+
+            // Copy cache files to temporary directory
+            let _prefix_path = output
+                .prefix()
+                .expect("the prefix must have been set at this point")
+                .path();
+            let prefix_cache_dir = cache_dir.join("prefix");
+
+            // Clear existing files and content type map
+            tmp.clear();
+
+            // Only add cache files that match the build.files pattern
+            let build_files_globs = output.recipe.build().files();
+            let mut cache_files_to_include = Vec::new();
+
+            for cache_file in &runtime_cache.prefix_files {
+                let source_path = prefix_cache_dir.join(cache_file);
+                let dest_path = tmp.temp_dir.path().join(cache_file);
+
+                if source_path.exists() {
+                    // Check if this cache file matches the build.files pattern
+                    if build_files_globs.is_match(cache_file) {
+                        // Create parent directories if they don't exist
+                        if let Some(parent) = dest_path.parent() {
+                            fs::create_dir_all(parent)?;
+                        }
+
+                        // Check if source is a symlink
+                        let source_meta = fs::symlink_metadata(&source_path)?;
+                        if source_meta.is_symlink() {
+                            // Read the link target
+                            let mut link_target = fs::read_link(&source_path)?;
+                            // Convert absolute targets to relative filename, and strip leading ./ for relative targets
+                            if link_target.is_absolute() {
+                                if let Some(filename) = link_target.file_name() {
+                                    link_target = PathBuf::from(filename);
+                                }
+                            } else {
+                                // If relative symlink starts with "./", remove it
+                                if let Some(s) = link_target.to_str() {
+                                    if s.starts_with("./") {
+                                        link_target = PathBuf::from(&s[2..]);
+                                    }
+                                }
+                            }
+                            // Create the symlink
+                            // Remove existing file/symlink if it exists
+                            if dest_path.exists() || dest_path.is_symlink() {
+                                fs::remove_file(&dest_path)?;
+                            }
+                            #[cfg(unix)]
+                            std::os::unix::fs::symlink(&link_target, &dest_path)?;
+                            #[cfg(windows)]
+                            if source_meta.is_dir() {
+                                std::os::windows::fs::symlink_dir(&link_target, &dest_path)?;
+                            } else {
+                                std::os::windows::fs::symlink_file(&link_target, &dest_path)?;
+                            }
+                            // Verify that the symlink was created correctly
+                            let dest_meta = fs::symlink_metadata(&dest_path)?;
+                            if !dest_meta.is_symlink() {
+                                return Err(PackagingError::IoError(std::io::Error::new(
+                                    std::io::ErrorKind::Other,
+                                    format!("Failed to create symlink at {:?}", dest_path),
+                                )));
+                            }
+                        } else {
+                            // Regular file, use fs::copy
+                            fs::copy(&source_path, &dest_path)?;
+                        }
+
+                        tracing::info!(
+                            "DEBUG: copied cache file {:?} -> {:?} (matches build.files)",
+                            source_path,
+                            dest_path
+                        );
+
+                        cache_files_to_include.push(dest_path);
+                    } else {
+                        tracing::info!(
+                            "DEBUG: filtering out cache file {:?} (doesn't match build.files)",
+                            cache_file
+                        );
+                    }
+                } else {
+                    tracing::warn!("DEBUG: cache file not found at {:?}", source_path);
+                }
+            }
+
+            // Add only the filtered cache files
+            tmp.add_files(cache_files_to_include);
+
+            // Regenerate metadata files since we cleared them
+            tmp.add_files(output.write_metadata(&tmp)?);
+
+            tracing::info!(
+                "DEBUG: replaced temp files with {} cache files",
+                tmp.files.len()
+            );
+        } else {
+            tracing::warn!(
+                "DEBUG: runtime cache file not found at {:?}",
+                runtime_cache_file
+            );
+        }
+    }
+
+    // Copying license files
     tracing::info!("Copying license files");
     if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
         tmp.add_files(license_files);
@@ -571,6 +703,17 @@ impl Output {
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
+        // For cache builds, remove any conda-meta to ensure new cache files are detected
+        if self.recipe.cache.is_some() {
+            let prefix_path = self
+                .prefix()
+                .expect("the prefix must have been set at this point")
+                .path();
+            let meta_dir = prefix_path.join("conda-meta");
+            if fs::metadata(&meta_dir).is_ok() {
+                fs::remove_dir_all(&meta_dir)?;
+            }
+        }
         let files_after = Files::from_prefix(
             self.prefix()
                 .expect("the prefix must have been set at this point")

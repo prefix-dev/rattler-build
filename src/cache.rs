@@ -222,9 +222,20 @@ impl Output {
                 .await
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
+            // Merge output-specific ignore_run_exports into cache requirements for cache build stage
+            let mut cache_requirements = cache.requirements.clone();
+            let output_ignore = self.recipe.requirements.ignore_run_exports(None);
+            cache_requirements
+                .ignore_run_exports
+                .by_name
+                .extend(output_ignore.by_name.iter().cloned());
+            cache_requirements
+                .ignore_run_exports
+                .from_package
+                .extend(output_ignore.from_package.iter().cloned());
 
             let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
+                resolve_dependencies(&cache_requirements, &self, &channels, tool_configuration)
                     .await
                     .unwrap();
 
