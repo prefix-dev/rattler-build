@@ -10,7 +10,7 @@ use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
-    package::RunExportsJson,
+    package::RunExportsJson, prefix::Prefix,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -600,38 +600,39 @@ async fn amend_run_exports(
 }
 
 pub async fn install_environments(
-    output: &Output,
+    build_config: &BuildConfiguration,
     dependencies: &FinalizedDependencies,
     tool_configuration: &tool_configuration::Configuration,
-) -> Result<(), ResolveError> {
+) -> Result<(Prefix, Prefix), ResolveError> {
     const EMPTY_RECORDS: Vec<RepoDataRecord> = Vec::new();
-    install_packages(
+
+    let build_prefix = install_packages(
         "build",
         dependencies
             .build
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.build_platform.platform,
-        &output.build_configuration.directories.build_prefix,
+        build_config.build_platform.platform,
+        &build_config.directories.build_prefix,
         tool_configuration,
     )
     .await?;
 
-    install_packages(
+    let host_prefix = install_packages(
         "host",
         dependencies
             .host
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        output.build_configuration.host_platform.platform,
-        &output.build_configuration.directories.host_prefix,
+        build_config.host_platform.platform,
+        &build_config.directories.host_prefix,
         tool_configuration,
     )
     .await?;
 
-    Ok(())
+    Ok((build_prefix, host_prefix))
 }
 
 /// This function renders the run exports into `RunExportsJson` format
@@ -901,14 +902,8 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         if let Some(cache_host_env) = &cache.host {
             let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
+            let filtered =
+                output_ignore_run_exports.filter(&cache_host_run_exports, "cache-host")?;
             host_run_exports.extend(&filtered);
         }
     }
@@ -930,25 +925,32 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         // add in the run exports from the cache
         // filter run dependencies that came from run exports
-        let ignore_run_exports = requirements.ignore_run_exports(None);
-        // Note: these run exports are already filtered
-        let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
+        let ignore_run_exports = &output_ignore_run_exports;
+        // Note: these run exports are already filtered internally
+        let cache_run_exports = cache.run.depends.iter().filter(|c| match c {
             DependencyInfo::RunExport(run_export) => {
                 let source_package: Option<PackageName> = run_export.source_package.parse().ok();
                 let spec_name = &run_export.spec.name;
 
-                let by_name = spec_name
-                    .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
+                let by_name = run_export
+                    .source_package
+                    .parse::<PackageName>()
+                    .map(|n| {
+                        // Compare normalized names to avoid dash/underscore mismatches
+                        ignore_run_exports.by_name().iter().any(|bn| bn == &n)
+                    })
                     .unwrap_or(false);
                 let by_package = source_package
                     .map(|s| ignore_run_exports.from_package().contains(&s))
                     .unwrap_or(false);
 
+                // only include run_exports not ignored
                 !by_name && !by_package
             }
             _ => false,
         });
+        // extend run dependencies with filtered cache run_exports
+        depends.extend(cache_run_exports.cloned());
     }
 
     let run_specs = FinalizedRunDependencies {
@@ -1010,15 +1012,26 @@ impl Output {
     /// Install the environments of the outputs. Assumes that the dependencies
     /// for the environment have already been resolved.
     pub async fn install_environments(
-        &self,
+        self,
         tool_configuration: &Configuration,
-    ) -> Result<(), ResolveError> {
+    ) -> Result<Self, ResolveError> {
+        if self.finalized_host_prefix.is_some() || self.finalized_build_prefix.is_some() {
+            return Ok(self);
+        }
+
         let dependencies = self
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-        install_environments(self, dependencies, tool_configuration).await
+        let (build_prefix, host_prefix) =
+            install_environments(&self.build_configuration, dependencies, tool_configuration)
+                .await?;
+        Ok(Self {
+            finalized_build_prefix: Some(build_prefix),
+            finalized_host_prefix: Some(host_prefix),
+            ..self
+        })
     }
 }
 
