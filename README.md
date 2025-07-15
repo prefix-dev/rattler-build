@@ -81,7 +81,6 @@ executed as subprocess. We plan to reduce the number of external dependencies
 over time by writing what we need in Rust to make `rattler-build` fully
 self-contained.
 
-* `patch` to patch source code after downloading
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
@@ -89,8 +88,6 @@ self-contained.
 * `git` is required to checkout Git repositories.
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
-
-On Windows, to obtain these dependencies from conda-forge, one can install `m2-patch`.
 
 ### Documentation
 
