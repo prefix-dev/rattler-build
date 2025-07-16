@@ -1,5 +1,5 @@
 //! Helpers to extract archives
-use std::{ffi::OsStr, io::BufRead, path::Path};
+use std::{ffi::OsStr, io::BufRead, io::Read, path::Path};
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -55,7 +55,7 @@ pub fn is_tarball(file_name: &str) -> bool {
 
 /// Checks whether file has a known archive extension (including zip)
 pub fn is_archive(file_name: &str) -> bool {
-    is_tarball(file_name) || file_name.ends_with(".zip")
+    is_tarball(file_name) || file_name.ends_with(".zip") || file_name.ends_with(".7z")
 }
 
 fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
@@ -183,6 +183,42 @@ pub(crate) fn extract_zip(
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
     progress_bar.finish_with_message("Extracted...");
 
+    Ok(())
+}
+
+/// Extracts a 7zip archive to the specified target directory.
+pub(crate) fn extract_7z(
+    archive: impl AsRef<Path>,
+    target_directory: impl AsRef<Path>,
+    log_handler: &LoggingOutputHandler,
+) -> Result<(), SourceError> {
+    use sevenz_rust::decompress_file;
+
+    let archive = archive.as_ref();
+    let target_directory = target_directory.as_ref();
+    fs::create_dir_all(target_directory)?;
+
+    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
+    let progress_bar = log_handler.add_progress_bar(
+        indicatif::ProgressBar::new(len)
+            .with_prefix("Extracting 7z")
+            .with_style(log_handler.default_bytes_style()),
+    );
+
+    let file = File::open(archive)?;
+    let reader = progress_bar.wrap_read(file);
+
+    // 7z extraction is not streaming, so we must use a temp file
+    let tmp_path = tempfile::Builder::new()
+        .suffix(".7z")
+        .tempfile_in(target_directory)?
+        .into_temp_path();
+    fs::write(&tmp_path, reader.bytes().collect::<Result<Vec<_>, _>>()?)?;
+
+    decompress_file(&tmp_path, target_directory)
+        .map_err(|e| SourceError::SevenZipExtractionError(e.to_string()))?;
+
+    progress_bar.finish_with_message("Extracted...");
     Ok(())
 }
 

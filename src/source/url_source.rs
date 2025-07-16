@@ -3,7 +3,7 @@
 use crate::{
     console_utils::LoggingOutputHandler,
     recipe::parser::UrlSource,
-    source::extract::{extract_tar, extract_zip, is_archive},
+    source::extract::{extract_7z, extract_tar, extract_zip, is_archive},
     tool_configuration::{self, APP_USER_AGENT},
 };
 use chrono;
@@ -301,6 +301,10 @@ fn extract_to_cache(
         .map(|name| name.ends_with(".zip"))
         .unwrap_or_else(|| path.extension() == Some(OsStr::new("zip")));
 
+    let is_7zip = actual_file_name
+        .map(|name| name.ends_with(".7z"))
+        .unwrap_or_else(|| path.extension() == Some(OsStr::new("7z")));
+
     let is_tarball = actual_file_name
         .map(|name| is_tarball(name))
         .unwrap_or_else(|| {
@@ -316,6 +320,10 @@ fn extract_to_cache(
     } else if is_zip {
         tracing::info!("Extracting zip file to cache: {}", path.display());
         extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    } else if is_7zip {
+        tracing::info!("Extracting 7zip file to cache: {}", path.display());
+        extract_7z(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
     }
 

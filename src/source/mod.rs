@@ -10,7 +10,7 @@ use crate::{
     recipe::parser::{GitRev, GitSource, Source},
     source::{
         checksum::Checksum,
-        extract::{extract_tar, extract_zip, is_tarball},
+        extract::{extract_7z, extract_tar, extract_zip, is_tarball},
     },
     system_tools::ToolError,
     tool_configuration,
@@ -75,6 +75,9 @@ pub enum SourceError {
 
     #[error("Failed to extract zip archive: {0}")]
     ZipExtractionError(String),
+
+    #[error("Failed to extract 7zip archive: {0}")]
+    SevenZipExtractionError(String),
 
     #[error("Failed to read from zip: {0}")]
     InvalidZip(String),
@@ -249,6 +252,9 @@ pub(crate) async fn fetch_source(
             } else if src_path.extension() == Some(OsStr::new("zip")) {
                 extract_zip(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
                 tracing::info!("Extracted zip to {}", dest_dir.display());
+            } else if src_path.extension() == Some(OsStr::new("7z")) {
+                extract_7z(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
+                tracing::info!("Extracted 7zip to {}", dest_dir.display());
             } else if let Some(file_name) = src
                 .file_name()
                 .cloned()
