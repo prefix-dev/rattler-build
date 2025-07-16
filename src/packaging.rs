@@ -6,8 +6,11 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use console;
+
 use fs_err as fs;
 use fs_err::File;
+use indicatif::HumanBytes;
 use metadata::clean_url;
 use rattler_conda_types::{
     ChannelUrl, Platform,
@@ -380,6 +383,146 @@ where
 /// dependencies finalized before calling this function.
 ///
 /// The `local_channel_dir` is the path to the local channel / output directory.
+/// Print enhanced file listing with sizes, symlink targets, and warnings
+fn print_enhanced_file_listing(
+    files: &[&Path],
+    tmp: &TempFiles,
+    _output: &Output,
+) -> Result<(), PackagingError> {
+    let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
+
+    // Get all path entries for path checks
+    let path_entries: Vec<rattler_conda_types::package::PathsEntry> = files
+        .iter()
+        .map(|f| {
+            let full_path = tmp.temp_dir.path().join(f);
+            let metadata = fs::metadata(&full_path).unwrap_or_else(|_| {
+                // Create a dummy metadata for directories or if file doesn't exist
+                fs::metadata(".").unwrap()
+            });
+
+            let path_type = if full_path.is_symlink() {
+                rattler_conda_types::package::PathType::SoftLink
+            } else if full_path.is_dir() {
+                rattler_conda_types::package::PathType::Directory
+            } else {
+                rattler_conda_types::package::PathType::HardLink
+            };
+
+            rattler_conda_types::package::PathsEntry {
+                relative_path: f.to_path_buf(),
+                path_type,
+                sha256: None,
+                prefix_placeholder: None,
+                no_link: false,
+                size_in_bytes: if path_type == rattler_conda_types::package::PathType::Directory {
+                    None
+                } else {
+                    Some(metadata.len())
+                },
+            }
+        })
+        .collect();
+
+    // Get warnings for each path
+    let mut path_warnings: std::collections::HashMap<PathBuf, Vec<String>> =
+        std::collections::HashMap::new();
+
+    // Individual path checks
+    for entry in &path_entries {
+        let mut warnings = Vec::new();
+        let path = &entry.relative_path;
+
+        // Check for non-ASCII characters
+        if let Some(path_str) = path.to_str() {
+            if !path_str.is_ascii() {
+                warnings.push("Contains non-ASCII characters".to_string());
+            }
+            if path_str.contains(' ') {
+                warnings.push("Contains spaces".to_string());
+            }
+            if path_str.len() > 255 {
+                warnings.push(format!("Path too long ({} > 255)", path_str.len()));
+            }
+        }
+
+        if !warnings.is_empty() {
+            path_warnings.insert(path.clone(), warnings);
+        }
+    }
+
+    // Print each file with enhanced information
+    for file in files {
+        let full_path = tmp.temp_dir.path().join(file);
+        let is_info = file.components().next() == Some(Component::Normal("info".as_ref()));
+        let normalized_path = normalize_path(file);
+
+        // Get file size
+        let size_info = if let Ok(metadata) = fs::metadata(&full_path) {
+            if full_path.is_dir() {
+                " (dir)".to_string()
+            } else {
+                format!(" ({})", HumanBytes(metadata.len()))
+            }
+        } else {
+            "".to_string()
+        };
+
+        // Check if it's a symlink and get target
+        let symlink_info = if full_path.is_symlink() {
+            match fs::read_link(&full_path) {
+                Ok(target) => {
+                    let target_str = target.display().to_string();
+                    format!(" -> {}", console::style(target_str).cyan())
+                }
+                Err(_) => " -> <invalid symlink>".to_string(),
+            }
+        } else {
+            "".to_string()
+        };
+
+        // Format the main file entry
+        let file_entry = if is_info {
+            format!(
+                "  - {}{}{}",
+                console::style(&normalized_path).dim(),
+                console::style(&size_info).dim(),
+                symlink_info
+            )
+        } else if full_path.is_symlink() {
+            format!(
+                "  - {}{}{}",
+                console::style(&normalized_path).magenta(),
+                console::style(&size_info).dim(),
+                symlink_info
+            )
+        } else {
+            format!(
+                "  - {}{}{}",
+                normalized_path,
+                console::style(&size_info).dim(),
+                symlink_info
+            )
+        };
+
+        tracing::info!("{}", file_entry);
+
+        // Print warnings for this file
+        if let Some(warnings) = path_warnings.get(&file.to_path_buf()) {
+            for warning in warnings {
+                tracing::warn!("    ╰─ ⚠  {}", console::style(warning).yellow());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// This function creates a conda package from the given output. It will
+/// create a conda package from that. Note that the output needs to have its
+/// dependencies finalized before calling this function.
+///
+/// The `local_channel_dir` is the path to the local channel / output directory.
 pub fn package_conda(
     output: &Output,
     tool_configuration: &tool_configuration::Configuration,
@@ -435,7 +578,7 @@ pub fn package_conda(
         tmp.add_files(vec![info_folder.join("link.json")]);
     }
 
-    // print sorted files
+    // print sorted files with enhanced information
     tracing::info!("\nFiles in package:\n");
     let mut files = tmp
         .files
@@ -466,15 +609,7 @@ pub fn package_conda(
         output.record_warning(&warn_str);
     }
 
-    let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
-
-    files.iter().for_each(|f| {
-        if f.components().next() == Some(Component::Normal("info".as_ref())) {
-            tracing::info!("  - {}", console::style(normalize_path(f)).dim())
-        } else {
-            tracing::info!("  - {}", normalize_path(f))
-        }
-    });
+    print_enhanced_file_listing(&files, &tmp, output)?;
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());

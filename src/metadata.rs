@@ -1,7 +1,7 @@
 //! All the metadata that makes up a recipe file
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::{self, Display, Formatter},
     io::Write,
     iter,
@@ -11,6 +11,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use console;
 use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
@@ -435,6 +436,103 @@ pub struct BuildSummary {
     pub paths: Option<PathsJson>,
     ///  Whether the build was successful or not
     pub failed: bool,
+    /// Package size statistics
+    pub package_stats: Option<PackageStats>,
+}
+
+/// Statistics about the packaged files
+#[derive(Debug, Clone)]
+pub struct PackageStats {
+    /// Compressed size of the package
+    pub compressed_size: u64,
+    /// Uncompressed size of all files
+    pub uncompressed_size: u64,
+    /// Number of files in the package
+    pub file_count: usize,
+    /// Number of directories in the package
+    pub directory_count: usize,
+    /// Number of compiled files (based on extensions)
+    pub compiled_file_count: usize,
+    /// Size breakdown by file extension
+    pub size_by_extension: Vec<(String, u64, f64)>, // (extension, size, percentage)
+    /// List of largest files (up to 10)
+    pub largest_files: Vec<(String, u64)>, // (path, size)
+}
+
+impl PackageStats {
+    /// Calculate package statistics from PathsJson and compressed size
+    pub fn from_paths_json(paths_json: &PathsJson, compressed_size: u64) -> Self {
+        let mut uncompressed_size = 0u64;
+        let mut file_count = 0;
+        let mut directory_count = 0;
+        let mut compiled_file_count = 0;
+        let mut size_by_extension: HashMap<String, u64> = HashMap::new();
+        let mut all_files: Vec<(String, u64)> = Vec::new();
+
+        // Compiled file extensions (common binary/compiled formats)
+        let compiled_extensions = [
+            "so", "dylib", "dll", "exe", "o", "obj", "lib", "a", "pyc", "pyo", "whl",
+        ];
+
+        for entry in &paths_json.paths {
+            let size = entry.size_in_bytes.unwrap_or(0);
+            uncompressed_size += size;
+
+            match entry.path_type {
+                rattler_conda_types::package::PathType::Directory => {
+                    directory_count += 1;
+                }
+                _ => {
+                    file_count += 1;
+                    let path_str = entry.relative_path.to_string_lossy();
+                    all_files.push((path_str.to_string(), size));
+
+                    // Get file extension
+                    let extension = if let Some(extension) = entry.relative_path.extension() {
+                        extension.to_string_lossy().to_lowercase()
+                    } else {
+                        "no-extension".to_string()
+                    };
+
+                    // Check if it's a compiled file
+                    if compiled_extensions.contains(&extension.as_str()) {
+                        compiled_file_count += 1;
+                    }
+
+                    // Add to size by extension
+                    *size_by_extension.entry(extension).or_insert(0) += size;
+                }
+            }
+        }
+
+        // Sort extensions by size (largest first)
+        let mut size_by_extension: Vec<(String, u64, f64)> = size_by_extension
+            .into_iter()
+            .map(|(ext, size)| {
+                let percentage = if uncompressed_size > 0 {
+                    (size as f64 / uncompressed_size as f64) * 100.0
+                } else {
+                    0.0
+                };
+                (ext, size, percentage)
+            })
+            .collect();
+        size_by_extension.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Get top 10 largest files
+        all_files.sort_by(|a, b| b.1.cmp(&a.1));
+        let largest_files = all_files.into_iter().take(10).collect();
+
+        Self {
+            compressed_size,
+            uncompressed_size,
+            file_count,
+            directory_count,
+            compiled_file_count,
+            size_by_extension,
+            largest_files,
+        }
+    }
 }
 
 /// A output. This is the central element that is passed to the `run_build`
@@ -525,6 +623,12 @@ impl Output {
         let mut summary = self.build_summary.lock().unwrap();
         summary.artifact = Some(artifact.to_path_buf());
         summary.paths = Some(paths.clone());
+
+        // Calculate package statistics
+        if let Ok(metadata) = fs::metadata(artifact) {
+            let compressed_size = metadata.len();
+            summary.package_stats = Some(PackageStats::from_paths_json(paths, compressed_size));
+        }
     }
 
     /// Record the end of the build
@@ -592,6 +696,12 @@ impl Output {
         } else {
             tracing::info!("No artifact was created");
         }
+
+        // Print enhanced package statistics
+        if let Some(stats) = &summary.package_stats {
+            self.print_package_stats(stats);
+        }
+
         tracing::info!("{}", self);
 
         if !summary.warnings.is_empty() {
@@ -685,6 +795,103 @@ impl Output {
         }
         Ok(())
     }
+
+    /// Print enhanced package statistics
+    fn print_package_stats(&self, stats: &PackageStats) {
+        let compression_ratio = if stats.uncompressed_size > 0 {
+            if stats.compressed_size <= stats.uncompressed_size {
+                ((stats.uncompressed_size - stats.compressed_size) as f64
+                    / stats.uncompressed_size as f64)
+                    * 100.0
+            } else {
+                // Handle case where compressed size is larger than uncompressed (overhead)
+                -((stats.compressed_size - stats.uncompressed_size) as f64
+                    / stats.uncompressed_size as f64)
+                    * 100.0
+            }
+        } else {
+            0.0
+        };
+
+        tracing::info!("");
+        tracing::info!("{}", console::style("┌─ Package Statistics").bold().blue());
+        tracing::info!("│");
+        tracing::info!("├─ {}", console::style("File Size").bold().cyan());
+        tracing::info!(
+            "│  ├─ compressed size: {}",
+            console::style(HumanBytes(stats.compressed_size)).green()
+        );
+        tracing::info!(
+            "│  ├─ uncompressed size: {}",
+            console::style(HumanBytes(stats.uncompressed_size)).green()
+        );
+        tracing::info!(
+            "│  └─ compression space saving: {}",
+            if compression_ratio >= 0.0 {
+                console::style(format!("{:.1}%", compression_ratio)).green()
+            } else {
+                console::style(format!("{:.1}%", compression_ratio)).red()
+            }
+        );
+        tracing::info!("│");
+        tracing::info!("├─ {}", console::style("Contents").bold().cyan());
+        tracing::info!(
+            "│  ├─ directories: {}",
+            console::style(stats.directory_count).yellow()
+        );
+        tracing::info!(
+            "│  └─ files: {} ({} compiled)",
+            console::style(stats.file_count).yellow(),
+            console::style(stats.compiled_file_count).magenta()
+        );
+
+        if !stats.size_by_extension.is_empty() {
+            tracing::info!("│");
+            tracing::info!("├─ {}", console::style("Size by Extension").bold().cyan());
+            let total_extensions = stats.size_by_extension.len();
+            for (i, (extension, size, percentage)) in stats.size_by_extension.iter().enumerate() {
+                let display_ext = if extension == "no-extension" {
+                    "no-extension".to_string()
+                } else {
+                    format!(".{}", extension)
+                };
+                let connector = if i == total_extensions - 1 {
+                    "└─"
+                } else {
+                    "├─"
+                };
+                tracing::info!(
+                    "│  {} {} - {} ({})",
+                    connector,
+                    console::style(&display_ext).white(),
+                    console::style(HumanBytes(*size)).green(),
+                    console::style(format!("{:.1}%", percentage)).dim()
+                );
+            }
+        }
+
+        if !stats.largest_files.is_empty() {
+            tracing::info!("│");
+            tracing::info!("├─ {}", console::style("Largest Files").bold().cyan());
+            let total_files = stats.largest_files.len();
+            for (i, (path, size)) in stats.largest_files.iter().enumerate() {
+                let connector = if i == total_files - 1 {
+                    "└─"
+                } else {
+                    "├─"
+                };
+                tracing::info!(
+                    "│  {} {} {}",
+                    connector,
+                    console::style(format!("({})", HumanBytes(*size))).green(),
+                    console::style(path).white()
+                );
+            }
+        }
+
+        tracing::info!("└─");
+        tracing::info!("");
+    }
 }
 
 impl Output {
@@ -752,6 +959,12 @@ impl Output {
 impl Display for Output {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.format_table_with_option(f, comfy_table::presets::UTF8_FULL, false)
+    }
+}
+
+impl crate::post_process::path_checks::WarningRecorder for Output {
+    fn record_warning(&self, warning: &str) {
+        self.record_warning(warning);
     }
 }
 
