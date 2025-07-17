@@ -157,11 +157,6 @@ async fn get_actual_filename(
     Ok(None)
 }
 
-/// Determines if a file should be extracted based on its name
-fn should_extract_file(filename: &str) -> bool {
-    is_tarball(filename) || filename.ends_with(".zip")
-}
-
 /// Saves download metadata as JSON file
 async fn save_download_metadata(
     cache_file: &Path,
@@ -312,7 +307,7 @@ fn extract_to_cache(
                 .and_then(|ext| ext.to_str())
                 .is_some_and(is_tarball)
         });
-
+    println!("hello");
     if is_tarball {
         tracing::info!("Extracting tar file to cache: {}", path.display());
         extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
@@ -493,12 +488,10 @@ pub(crate) async fn url_src(
             // Use actual filename to determine if we should extract
             let should_extract = actual_filename
                 .as_ref()
-                .map(|name| should_extract_file(name))
+                .map(|name| is_archive(name))
                 .unwrap_or_else(|| {
                     // Fallback to checking the cache file extension if no filename available
-                    should_extract_file(
-                        &cache_name.file_name().unwrap_or_default().to_string_lossy(),
-                    )
+                    is_archive(&cache_name.file_name().unwrap_or_default().to_string_lossy())
                 });
 
             if should_extract {
@@ -570,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn test_should_extract_file() {
+    fn test_is_archive() {
         let test_cases = vec![
             ("file.tar.gz", true),
             ("file.tar.bz2", true),
@@ -584,7 +577,7 @@ mod tests {
 
         for (filename, expected) in test_cases {
             assert_eq!(
-                should_extract_file(filename),
+                is_archive(filename),
                 expected,
                 "Failed for filename: {}",
                 filename
