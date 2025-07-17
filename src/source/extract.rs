@@ -192,7 +192,7 @@ pub(crate) fn extract_7z(
     target_directory: impl AsRef<Path>,
     log_handler: &LoggingOutputHandler,
 ) -> Result<(), SourceError> {
-    use sevenz_rust::decompress_file;
+    use sevenz_rust2::decompress_file;
 
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
