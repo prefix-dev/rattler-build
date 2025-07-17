@@ -307,7 +307,6 @@ fn extract_to_cache(
                 .and_then(|ext| ext.to_str())
                 .is_some_and(is_tarball)
         });
-    println!("hello");
     if is_tarball {
         tracing::info!("Extracting tar file to cache: {}", path.display());
         extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
