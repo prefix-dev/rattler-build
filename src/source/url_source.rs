@@ -564,6 +564,7 @@ mod tests {
     #[test]
     fn test_is_archive() {
         let test_cases = vec![
+            ("file.7z", true),
             ("file.tar.gz", true),
             ("file.tar.bz2", true),
             ("file.tar.xz", true),
