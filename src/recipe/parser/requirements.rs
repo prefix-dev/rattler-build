@@ -1,4 +1,6 @@
 //! Parsing for the requirements section of the recipe.
+use std::collections::BTreeMap;
+
 use crate::recipe::parser::FlattenErrors;
 use indexmap::IndexSet;
 use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
@@ -42,6 +44,11 @@ pub struct Requirements {
     /// at runtime.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run: Vec<Dependency>,
+
+    /// Extra requirement groups that can be enabled / disabled by the user.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extras: BTreeMap<String, Vec<String>>,
+
     /// Constrains are optional runtime requirements that are used to constrain the
     /// environment that is resolved. They are not installed by default, but when
     /// installed they will have to conform to the constrains specified here.
@@ -182,7 +189,8 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
             run,
             run_constraints,
             run_exports,
-            ignore_run_exports
+            ignore_run_exports,
+            extras
         );
 
         Ok(requirements)

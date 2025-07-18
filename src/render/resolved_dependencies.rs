@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Display, Formatter},
     sync::Arc,
 };
@@ -355,7 +355,12 @@ impl ResolvedDependencies {
 }
 
 impl FinalizedRunDependencies {
-    pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
+    pub fn to_table(
+        &self,
+        extras: &BTreeMap<String, Vec<String>>,
+        table: comfy_table::Table,
+        long: bool,
+    ) -> comfy_table::Table {
         let mut table = table;
         table
             .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
@@ -418,6 +423,36 @@ impl FinalizedRunDependencies {
             }
         }
 
+        // Add extras section if available
+        if !extras.is_empty() {
+            if has_previous_section {
+                table.add_row(vec!["", ""]);
+            }
+
+            let mut row = comfy_table::Row::new();
+            row.add_cell(
+                comfy_table::Cell::new("Extras").add_attribute(comfy_table::Attribute::Bold),
+            );
+            table.add_row(row);
+
+            extras.iter().for_each(|(extra_name, items)| {
+                if !items.is_empty() {
+                    // Add a subheader for each extra
+                    let mut extra_row = comfy_table::Row::new();
+                    extra_row.add_cell(
+                        comfy_table::Cell::new(&format!("  {}", extra_name))
+                            .add_attribute(comfy_table::Attribute::Italic),
+                    );
+                    table.add_row(extra_row);
+
+                    // Add each item under the extra
+                    items.iter().for_each(|item| {
+                        table.add_row(vec!["    ", item]);
+                    });
+                }
+            });
+        }
+
         table
     }
 }
@@ -428,7 +463,7 @@ impl Display for FinalizedRunDependencies {
         table
             .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
             .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
-        write!(f, "{}", self.to_table(table, false))
+        write!(f, "{}", self.to_table(&BTreeMap::new(), table, false))
     }
 }
 

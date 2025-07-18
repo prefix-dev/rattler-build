@@ -321,7 +321,7 @@ impl Output {
                 self.name().as_normalized()
             );
         }
-
+        println!("Adding extras: {:?}", self.recipe.requirements.extras);
         Ok(IndexJson {
             name: self
                 .name()
@@ -351,6 +351,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .dedup()
                 .collect(),
+            extras: self.recipe.requirements.extras.clone(),
             noarch,
             track_features,
             features: None,
