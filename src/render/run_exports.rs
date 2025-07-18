@@ -49,16 +49,20 @@ impl IgnoreRunExports {
                 .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
                 .filter_map(|result| match result {
                     Ok(spec) => {
-                        if spec
+                        // Check if the spec should be kept based on `by_name` filter.
+                        // We compare the *normalized* representation of the package names to
+                        // avoid mismatches between dashes/underscores or case differences.
+                        let keep = spec
                             .name
                             .as_ref()
-                            .map(|n| !self.by_name().contains(n))
-                            .unwrap_or(false)
-                        {
-                            Some(Ok(spec))
-                        } else {
-                            None
-                        }
+                            .map(|n| {
+                                // If any entry in `by_name` equals `n` (PackageName equality treats
+                                // dashes and underscores as identical), filter it out.
+                                !self.by_name().iter().any(|bn| bn == n)
+                            })
+                            .unwrap_or(false);
+
+                        if keep { Some(Ok(spec)) } else { None }
                     }
                     Err(e) => Some(Err(e)),
                 })
@@ -74,6 +78,12 @@ impl IgnoreRunExports {
         };
 
         for (name, run_export) in run_export_map.iter() {
+            // If the entire run_export comes from a package whose name is ignored via `by_name`,
+            // skip it altogether.
+            if self.by_name().contains(name) {
+                continue;
+            }
+
             if self.from_package().contains(name) {
                 continue;
             }

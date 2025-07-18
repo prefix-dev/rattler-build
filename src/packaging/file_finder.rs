@@ -73,7 +73,36 @@ pub struct TempFiles {
 /// Determine the content type of a path by reading the first 1024 bytes of the file
 /// and checking for a BOM or NULL-byte.
 pub fn content_type(path: &Path) -> Result<Option<ContentType>, io::Error> {
-    if path.is_dir() || path.is_symlink() {
+    let meta = fs::symlink_metadata(path)?;
+    if meta.is_dir() {
+        return Ok(None);
+    }
+
+    // If it's a symlink, check if it points to a library file
+    if meta.file_type().is_symlink() {
+        let target = fs::read_link(path)?;
+        // If the target is relative, resolve it relative to the symlink's parent directory
+        let resolved_target = if target.is_relative() {
+            if let Some(parent) = path.parent() {
+                parent.join(&target)
+            } else {
+                target
+            }
+        } else {
+            target
+        };
+
+        // Check if the target exists and is a directory
+        if resolved_target.exists() {
+            if resolved_target.is_dir() {
+                // Symlink to directory: return None
+                return Ok(None);
+            }
+            // Symlink to file: get content type of the target
+            return content_type(&resolved_target);
+        }
+
+        // If the target doesn't exist, return None
         return Ok(None);
     }
 
@@ -240,6 +269,12 @@ impl Files {
 }
 
 impl TempFiles {
+    /// Clear all files and content type information
+    pub fn clear(&mut self) {
+        self.files.clear();
+        self.content_type_map.clear();
+    }
+
     /// Add files to the TempFiles struct
     pub fn add_files<I>(&mut self, files: I)
     where
@@ -247,7 +282,7 @@ impl TempFiles {
     {
         for f in files {
             self.content_type_map
-                .insert(f.clone(), content_type(&f).unwrap_or(None));
+                .insert(f.clone(), content_type(&f).ok().flatten());
             self.files.insert(f);
         }
     }

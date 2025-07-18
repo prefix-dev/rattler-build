@@ -14,6 +14,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
+use pathdiff::diff_paths;
 
 /// The copy options for the copy_dir function.
 pub struct CopyOptions {
@@ -94,7 +95,15 @@ pub(crate) fn copy_file(
 
     // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
     if path.is_symlink() {
-        let link_target = fs_err::read_link(path)?;
+        let mut link_target = fs_err::read_link(path)?;
+
+        // If the link target is absolute, try to make it relative to the parent directory
+        if link_target.is_absolute() {
+            if let Some(parent) = dest_path.parent() {
+                // Try to make the link target relative to the parent directory
+                link_target = diff_paths(&link_target, parent).unwrap_or(link_target);
+            }
+        }
 
         if let Some(parent) = dest_path.parent() {
             create_dir_all_cached(parent, paths_created)?;
@@ -297,7 +306,14 @@ impl<'a> CopyDir<'a> {
                     let dest_path = self.to_path.join(stripped_path);
 
                     if path.is_symlink() {
-                        let link_target = fs_err::read_link(path)?;
+                        let mut link_target = fs_err::read_link(path)?;
+                        if link_target.is_absolute() {
+                            if let Some(parent) = dest_path.parent() {
+                                // Make the link target relative to the parent directory
+                                link_target =
+                                    diff_paths(&link_target, parent).unwrap_or(link_target);
+                            }
+                        }
 
                         if let Some(parent) = dest_path.parent() {
                             create_dir_all_cached(parent, paths_created)?;
