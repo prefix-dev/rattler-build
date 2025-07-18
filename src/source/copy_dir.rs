@@ -690,7 +690,11 @@ mod test {
         assert_eq!(copy_dir.copied_paths().len(), 3);
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
-        let expected_target = std::path::PathBuf::from("../../does/not/exist");
+        let expected_target = pathdiff::diff_paths(
+            std::path::Path::new("/does/not/exist"),
+            broken_symlink_dest.parent().unwrap(),
+        )
+        .unwrap();
         assert_eq!(fs::read_link(broken_symlink_dest).unwrap(), expected_target);
     }
 
