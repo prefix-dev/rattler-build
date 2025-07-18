@@ -296,7 +296,7 @@ fn extract_to_cache(
         .map(|name| name.ends_with(".zip"))
         .unwrap_or_else(|| path.extension() == Some(OsStr::new("zip")));
 
-    let is_7zip = actual_file_name
+    let is_7z = actual_file_name
         .map(|name| name.ends_with(".7z"))
         .unwrap_or_else(|| path.extension() == Some(OsStr::new("7z")));
 
@@ -315,8 +315,8 @@ fn extract_to_cache(
         tracing::info!("Extracting zip file to cache: {}", path.display());
         extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
-    } else if is_7zip {
-        tracing::info!("Extracting 7zip file to cache: {}", path.display());
+    } else if is_7z {
+        tracing::info!("Extracting 7z file to cache: {}", path.display());
         extract_7z(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
     }

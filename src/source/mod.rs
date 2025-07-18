@@ -76,7 +76,7 @@ pub enum SourceError {
     #[error("Failed to extract zip archive: {0}")]
     ZipExtractionError(String),
 
-    #[error("Failed to extract 7zip archive: {0}")]
+    #[error("Failed to extract 7z archive: {0}")]
     SevenZipExtractionError(String),
 
     #[error("Failed to read from zip: {0}")]
@@ -254,7 +254,7 @@ pub(crate) async fn fetch_source(
                 tracing::info!("Extracted zip to {}", dest_dir.display());
             } else if src_path.extension() == Some(OsStr::new("7z")) {
                 extract_7z(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                tracing::info!("Extracted 7zip to {}", dest_dir.display());
+                tracing::info!("Extracted 7z to {}", dest_dir.display());
             } else if let Some(file_name) = src
                 .file_name()
                 .cloned()

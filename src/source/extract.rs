@@ -186,7 +186,7 @@ pub(crate) fn extract_zip(
     Ok(())
 }
 
-/// Extracts a 7zip archive to the specified target directory.
+/// Extracts a 7z archive to the specified target directory.
 pub(crate) fn extract_7z(
     archive: impl AsRef<Path>,
     target_directory: impl AsRef<Path>,
