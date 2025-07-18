@@ -14,7 +14,6 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
-use pathdiff::diff_paths;
 
 /// The copy options for the copy_dir function.
 pub struct CopyOptions {
