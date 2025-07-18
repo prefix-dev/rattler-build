@@ -187,6 +187,7 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
   "reqwest-sync",
   "rustls-tls",
 ] }
+sevenz-rust2 = "0.16.2"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { version = "0.10.9", features = ["asm"] }
