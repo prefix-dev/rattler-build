@@ -399,6 +399,8 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
+            finalized_host_prefix: None,
+            finalized_build_prefix: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
@@ -1079,7 +1081,7 @@ pub async fn debug_recipe(
             .resolve_dependencies(&tool_config)
             .await
             .into_diagnostic()?;
-        output
+        let output = output
             .install_environments(&tool_config)
             .await
             .into_diagnostic()?;

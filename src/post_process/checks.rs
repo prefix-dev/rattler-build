@@ -224,8 +224,11 @@ pub fn perform_linking_checks(
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let system_libs = find_system_libs(output)?;
+    let host_prefix = output
+        .prefix()
+        .expect("prefix must have been installed at this point");
 
-    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+    let prefix_info = PrefixInfo::from_prefix(host_prefix.path())?;
 
     let resolved_run_dependencies =
         resolved_run_dependencies(output, &prefix_info.package_to_nature);
@@ -233,7 +236,6 @@ pub fn perform_linking_checks(
 
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
-    let host_prefix = output.prefix();
     let mut package_files = Vec::new();
     for file in new_files.iter() {
         // Parse the DSO to get the list of libraries it links to
@@ -241,7 +243,7 @@ pub fn perform_linking_checks(
             Ok(relinker) => {
                 let mut file_dsos = Vec::new();
 
-                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix);
+                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix.path());
                 for (lib, resolved) in &resolved_libraries {
                     // filter out @self on macOS
                     if target_platform.is_osx() && lib.to_str() == Some("self") {
@@ -249,7 +251,7 @@ pub fn perform_linking_checks(
                     }
 
                     let lib = resolved.as_ref().unwrap_or(lib);
-                    if let Ok(libpath) = lib.strip_prefix(host_prefix) {
+                    if let Ok(libpath) = lib.strip_prefix(host_prefix.path()) {
                         if let Some(package) = prefix_info
                             .path_to_package
                             .get(&libpath.to_path_buf().into())
@@ -294,7 +296,7 @@ pub fn perform_linking_checks(
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
         for lib in &package.shared_libraries {
-            let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
+            let lib = lib.strip_prefix(host_prefix.path()).unwrap_or(lib);
 
             // skip @self on macOS
             if target_platform.is_osx() && lib.to_str() == Some("self") {

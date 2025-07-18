@@ -1,12 +1,17 @@
 //! Module for running scripts in different interpreters.
 mod interpreter;
 mod sandbox;
-pub use interpreter::InterpreterError;
-pub use sandbox::{SandboxArguments, SandboxConfiguration};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::OsStr,
+    io,
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 
-use crate::script::interpreter::Interpreter;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
+pub use interpreter::InterpreterError;
 use interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NodeJsInterpreter,
     NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter, RubyInterpreter,
@@ -15,14 +20,7 @@ use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
-use std::{
-    collections::HashMap,
-    collections::HashSet,
-    ffi::OsStr,
-    io,
-    path::{Path, PathBuf},
-    process::Stdio,
-};
+pub use sandbox::{SandboxArguments, SandboxConfiguration};
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tokio_util::{
     bytes::BytesMut,
@@ -37,6 +35,7 @@ use crate::{
         Jinja,
         parser::{Script, ScriptContent},
     },
+    script::interpreter::Interpreter,
 };
 
 /// Arguments for executing a script in a given interpreter.
@@ -68,9 +67,10 @@ pub struct ExecutionArgs {
 }
 
 impl ExecutionArgs {
-    /// Returns strings that should be replaced. The template argument can be used to specify
-    /// a nice "variable" syntax, e.g. "$((var))" for bash or "%((var))%" for cmd.exe. The `var` part
-    /// will be replaced with the actual variable name.
+    /// Returns strings that should be replaced. The template argument can be
+    /// used to specify a nice "variable" syntax, e.g. "$((var))" for bash
+    /// or "%((var))%" for cmd.exe. The `var` part will be replaced with the
+    /// actual variable name.
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
         if let Some(build_prefix) = &self.build_prefix {
@@ -190,9 +190,9 @@ impl Script {
                     ))
                 }
             }
-            // The scripts content was specified but it is still ambiguous whether it is a path or the
-            // contents of the string. Try to read the file as a script but fall back to using the string
-            // as the contents itself if the file is missing.
+            // The scripts content was specified but it is still ambiguous whether it is a path or
+            // the contents of the string. Try to read the file as a script but fall
+            // back to using the string as the contents itself if the file is missing.
             ScriptContent::CommandOrPath(path) => {
                 if path.contains('\n') {
                     Ok(ResolvedScriptContents::Inline(path.clone()))
@@ -243,7 +243,7 @@ impl Script {
         work_dir: &Path,
         recipe_dir: &Path,
         run_prefix: &Path,
-        build_prefix: Option<&PathBuf>,
+        build_prefix: Option<&Path>,
         mut jinja_config: Option<Jinja>,
         sandbox_config: Option<&SandboxConfiguration>,
         debug: Debug,
@@ -423,10 +423,10 @@ impl Output {
 
     /// Helper method to prepare build script execution arguments
     async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
-        let host_prefix = self.build_configuration.directories.host_prefix.clone();
+        let host_prefix = self.prefix().expect("host prefix must be available").path();
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+        env_vars.extend(env_vars::os_vars(host_prefix, &target_platform));
         env_vars.extend(self.env_vars_from_variant());
 
         let selector_config = self.build_configuration.selector_config();
@@ -451,7 +451,7 @@ impl Output {
                 .collect(),
             secrets: IndexMap::new(),
             build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: host_prefix,
+            run_prefix: host_prefix.to_path_buf(),
             execution_platform: Platform::current(),
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
@@ -459,11 +459,13 @@ impl Output {
         })
     }
 
-    /// Run the build script for the output as defined in the recipe's build section.
+    /// Run the build script for the output as defined in the recipe's build
+    /// section.
     ///
-    /// This method executes the build script with the configured environment variables,
-    /// working directory, and other build settings. The script execution respects the
-    /// configured interpreter (bash/cmd/nushell) and sandbox settings.
+    /// This method executes the build script with the configured environment
+    /// variables, working directory, and other build settings. The script
+    /// execution respects the configured interpreter (bash/cmd/nushell) and
+    /// sandbox settings.
     ///
     /// # Errors
     ///
@@ -479,7 +481,12 @@ impl Output {
         let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
             None
         } else {
-            Some(&self.build_configuration.directories.build_prefix)
+            Some(
+                self.finalized_build_prefix
+                    .as_ref()
+                    .expect("build prefix must be available")
+                    .path(),
+            )
         };
 
         self.recipe
@@ -493,7 +500,7 @@ impl Output {
                     .collect(),
                 &self.build_configuration.directories.work_dir,
                 &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
+                self.prefix().expect("prefix must be available"),
                 build_prefix,
                 Some(
                     Jinja::new(self.build_configuration.selector_config())
@@ -509,9 +516,10 @@ impl Output {
 
     /// Create the build script files without executing them.
     ///
-    /// This method generates the build script and environment setup files in the working
-    /// directory but does not execute them. This is useful for debugging or when you want
-    /// to inspect or modify the scripts before running them manually.
+    /// This method generates the build script and environment setup files in
+    /// the working directory but does not execute them. This is useful for
+    /// debugging or when you want to inspect or modify the scripts before
+    /// running them manually.
     ///
     /// The method creates two files:
     /// - A build environment setup file (`build_env.sh`/`build_env.bat`)
@@ -570,7 +578,8 @@ impl Output {
     }
 }
 
-/// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
+/// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline
+/// (\n) bytes.
 pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
     FramedRead::new(reader, CrLfNormalizer::default())
         .into_async_read()
@@ -620,8 +629,9 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
-/// Spawns a process and replaces the given strings in the output with the given replacements.
-/// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
+/// Spawns a process and replaces the given strings in the output with the given
+/// replacements. This is used to replace the host prefix with $PREFIX and the
+/// build prefix with $BUILD_PREFIX
 async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
@@ -642,7 +652,8 @@ async fn run_process_with_replacements(
             )
         }
 
-        // If the platform is not supported, log a warning and run the command without sandboxing
+        // If the platform is not supported, log a warning and run the command without
+        // sandboxing
         #[cfg(not(any(
             all(target_os = "linux", target_arch = "x86_64"),
             all(target_os = "linux", target_arch = "aarch64"),
@@ -731,8 +742,9 @@ async fn run_process_with_replacements(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio_util::bytes::BytesMut;
+
+    use super::*;
 
     #[test]
     fn test_crlf_normalizer_no_crlf() {
@@ -791,7 +803,8 @@ mod tests {
     fn test_crlf_normalizer_with_split_crlf() {
         let mut normalizer = CrLfNormalizer::default();
 
-        // decoder gets the \r until final part of the buffer so that it doesnt try to solve it as none
+        // decoder gets the \r until final part of the buffer so that it doesnt try to
+        // solve it as none
         let mut buffer1 = BytesMut::from("line1\r");
         let result1 = normalizer.decode(&mut buffer1).unwrap();
         assert!(result1.is_some());
