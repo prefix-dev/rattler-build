@@ -677,7 +677,7 @@ mod test {
 
         let broken_symlink = tmp_dir.path().join("broken_symlink");
         #[cfg(unix)]
-        std::os::unix::fs::symlink("/does/not/exist", broken_symlink).unwrap();
+        std::os::unix::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
         #[cfg(windows)]
         std::os::windows::fs::symlink_file("/does/not/exist", &broken_symlink).unwrap();
 
@@ -695,7 +695,13 @@ mod test {
             broken_symlink_dest.parent().unwrap(),
         )
         .unwrap();
-        assert_eq!(fs::read_link(broken_symlink_dest).unwrap(), expected_target);
+        let actual_target = fs::read_link(&broken_symlink_dest).unwrap();
+        println!("broken_symlink_dest: {:?}", broken_symlink_dest);
+        println!("expected_target: {:?}", expected_target);
+        println!("actual_target: {:?}", actual_target);
+        println!("current_dir: {:?}", std::env::current_dir().unwrap());
+        println!("temp_dir: {:?}", tmp_dir.path());
+        assert_eq!(actual_target, expected_target);
     }
 
     #[test]
