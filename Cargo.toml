@@ -142,7 +142,9 @@ opendal = { version = "0.53.3", default-features = false, features = [
 ] }
 
 # Rattler crates
-rattler_upload = { version = "0.1.0", default-features = false, features = ["s3"] }
+rattler_upload = { version = "0.1.0", default-features = false, features = [
+  "s3",
+] }
 rattler_config = { version = "0.2.0" }
 rattler = { version = "0.34.2", default-features = false, features = [
   "cli-tools",
