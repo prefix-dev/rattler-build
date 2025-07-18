@@ -690,10 +690,8 @@ mod test {
         assert_eq!(copy_dir.copied_paths().len(), 3);
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
-        assert_eq!(
-            fs::read_link(broken_symlink_dest).unwrap(),
-            std::path::PathBuf::from("/does/not/exist")
-        );
+        let expected_target = std::path::PathBuf::from("../../does/not/exist");
+        assert_eq!(fs::read_link(broken_symlink_dest).unwrap(), expected_target);
     }
 
     #[test]
@@ -741,7 +739,9 @@ mod test {
 
         // The symlink should point to the same relative path
         let link_target = fs::read_link(&dest_symlinked_dir).unwrap();
-        assert_eq!(link_target, target_dir);
+        let expected_target =
+            pathdiff::diff_paths(&target_dir, dest_symlinked_dir.parent().unwrap()).unwrap();
+        assert_eq!(link_target, expected_target);
 
         // Verify other files were copied
         assert!(dest_dir.path().join("regular_file.txt").exists());
