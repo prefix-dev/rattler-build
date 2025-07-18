@@ -736,11 +736,14 @@ impl Output {
             }
 
             if !finalized_dependencies.run.depends.is_empty() {
+                let extras = &self.recipe.requirements.extras;
                 writeln!(f, "Run dependencies:")?;
                 writeln!(
                     f,
                     "{}\n",
-                    finalized_dependencies.run.to_table(template(), long)
+                    finalized_dependencies
+                        .run
+                        .to_table(extras, template(), long)
                 )?;
             }
         }
