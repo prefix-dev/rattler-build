@@ -1,5 +1,5 @@
 //! Helpers to extract archives
-use std::{ffi::OsStr, io::BufRead, io::Read, path::Path};
+use std::{ffi::OsStr, io::BufRead, path::Path};
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -192,8 +192,6 @@ pub(crate) fn extract_7z(
     target_directory: impl AsRef<Path>,
     log_handler: &LoggingOutputHandler,
 ) -> Result<(), SourceError> {
-    use sevenz_rust2::decompress_file;
-
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
     fs::create_dir_all(target_directory)?;
@@ -206,17 +204,14 @@ pub(crate) fn extract_7z(
     );
 
     let file = File::open(archive)?;
-    let reader = progress_bar.wrap_read(file);
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let wrapped = progress_bar.wrap_read(buf_reader);
 
-    // 7z extraction is not streaming, so we must use a temp file
-    let tmp_path = tempfile::Builder::new()
-        .suffix(".7z")
-        .tempfile_in(target_directory)?
-        .into_temp_path();
-    fs::write(&tmp_path, reader.bytes().collect::<Result<Vec<_>, _>>()?)?;
-
-    decompress_file(&tmp_path, target_directory)
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
+    sevenz_rust2::decompress(wrapped, &tmp_extraction_dir)
         .map_err(|e| SourceError::SevenZipExtractionError(e.to_string()))?;
+
+    move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
 
     progress_bar.finish_with_message("Extracted...");
     Ok(())

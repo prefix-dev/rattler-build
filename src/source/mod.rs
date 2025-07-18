@@ -82,6 +82,9 @@ pub enum SourceError {
     #[error("Failed to read from zip: {0}")]
     InvalidZip(String),
 
+    #[error("Failed to read from 7z: {0}")]
+    Invalid7z(String),
+
     #[error("Failed to run git command: {0}")]
     GitError(String),
 
