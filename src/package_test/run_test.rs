@@ -16,7 +16,7 @@ use std::{
 
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::platform::Platform;
+use rattler_conda_types::Platform;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness,
     package::{ArchiveIdentifier, IndexJson, PackageFile},
