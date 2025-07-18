@@ -15,9 +15,9 @@ use rattler_build::{
     opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
     rebuild, run_test,
     source::create_patch,
-    upload_from_args,
 };
 use rattler_upload::upload::opt::Config;
+use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {

@@ -12,13 +12,13 @@ use std::{
     fmt::Write as fmt_write,
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::Platform;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, ParseStrictness,
+    Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     package::{ArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::{IndexFsConfig, index_fs};
