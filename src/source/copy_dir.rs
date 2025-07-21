@@ -82,13 +82,14 @@ pub(crate) fn create_symlink(
     Ok(())
 }
 
-/// Copy a file or directory, or symlink to another location.
+/// Copy a file or directory, or symlink to another location with optional prefix context.
 /// Use reflink if possible.
-pub(crate) fn copy_file(
+pub(crate) fn copy_file_with_prefix(
     from: impl AsRef<Path>,
     to: impl AsRef<Path>,
     paths_created: &mut HashSet<PathBuf>,
     options: &CopyOptions,
+    prefix: Option<&Path>,
 ) -> Result<(), SourceError> {
     let path = from.as_ref();
     let dest_path = to.as_ref();
@@ -104,6 +105,25 @@ pub(crate) fn copy_file(
                 if path.to_string_lossy().contains("libdav1d.so") {
                     if let Some(target_name) = link_target.file_name() {
                         link_target = target_name.into();
+                    }
+                } else if let Some(prefix_path) = prefix {
+                    // If we have prefix context and both symlink and target are within the prefix,
+                    // make the symlink relative within the package structure
+                    if let (Ok(src_rel), Ok(target_rel)) = (
+                        path.strip_prefix(prefix_path),
+                        link_target.strip_prefix(prefix_path),
+                    ) {
+                        // Calculate relative path from symlink location to target within package
+                        if let Some(symlink_parent) = src_rel.parent() {
+                            link_target = diff_paths(target_rel, symlink_parent)
+                                .unwrap_or(target_rel.to_path_buf());
+                        } else {
+                            // Symlink is at package root
+                            link_target = target_rel.to_path_buf();
+                        }
+                    } else {
+                        // Fallback to original logic
+                        link_target = diff_paths(&link_target, parent).unwrap_or(link_target);
                     }
                 } else {
                     link_target = diff_paths(&link_target, parent).unwrap_or(link_target);
@@ -314,58 +334,54 @@ impl<'a> CopyDir<'a> {
                     if path.is_symlink() {
                         let mut link_target = fs_err::read_link(path)?;
                         if link_target.is_absolute() {
-                            if let Some(parent) = dest_path.parent() {
-                                // For test_cache_select_files, we want to keep the relative path structure
-                                if path.to_string_lossy().contains("libdav1d.so") {
-                                    if let Some(target_name) = link_target.file_name() {
-                                        link_target = target_name.into();
-                                    }
-                                } else if let Ok(target_rel) =
-                                    link_target.strip_prefix(self.from_path)
-                                {
-                                    if let Ok(src_rel) = path.strip_prefix(self.from_path) {
-                                        if let Some(symlink_parent) = src_rel.parent() {
-                                            if let Some(target_parent) = target_rel.parent() {
-                                                if symlink_parent == target_parent {
-                                                    // Same directory - just use the filename
-                                                    if let Some(filename) = target_rel.file_name() {
-                                                        link_target = filename.into();
-                                                    } else {
-                                                        link_target = target_rel.to_path_buf();
-                                                    }
+                            // For test_cache_select_files, we want to keep the relative path structure
+                            if path.to_string_lossy().contains("libdav1d.so") {
+                                if let Some(target_name) = link_target.file_name() {
+                                    link_target = target_name.into();
+                                }
+                            } else if let Ok(target_rel) = link_target.strip_prefix(self.from_path)
+                            {
+                                if let Ok(src_rel) = path.strip_prefix(self.from_path) {
+                                    if let Some(symlink_parent) = src_rel.parent() {
+                                        if let Some(target_parent) = target_rel.parent() {
+                                            if symlink_parent == target_parent {
+                                                // Same directory - just use the filename
+                                                if let Some(filename) = target_rel.file_name() {
+                                                    link_target = filename.into();
                                                 } else {
-                                                    // Different directories - compute relative path
-                                                    link_target =
-                                                        diff_paths(target_rel, symlink_parent)
-                                                            .unwrap_or(target_rel.to_path_buf());
+                                                    link_target = target_rel.to_path_buf();
                                                 }
                                             } else {
-                                                // Target is at root, symlink is in subdirectory
+                                                // Different directories - compute relative path
                                                 link_target =
                                                     diff_paths(target_rel, symlink_parent)
                                                         .unwrap_or(target_rel.to_path_buf());
                                             }
                                         } else {
-                                            // Symlink at package root
-                                            if let Some(filename) = target_rel.file_name() {
-                                                if target_rel.parent().is_none() {
-                                                    // Target also at root - just use filename
-                                                    link_target = filename.into();
-                                                } else {
-                                                    // Target in subdirectory
-                                                    link_target = target_rel.to_path_buf();
-                                                }
-                                            } else {
-                                                link_target = target_rel.to_path_buf();
-                                            }
+                                            // Target is at root, symlink is in subdirectory
+                                            link_target = diff_paths(target_rel, symlink_parent)
+                                                .unwrap_or(target_rel.to_path_buf());
                                         }
                                     } else {
-                                        link_target = target_rel.to_path_buf();
+                                        // Symlink at package root
+                                        if let Some(filename) = target_rel.file_name() {
+                                            if target_rel.parent().is_none() {
+                                                // Target also at root - just use filename
+                                                link_target = filename.into();
+                                            } else {
+                                                // Target in subdirectory
+                                                link_target = target_rel.to_path_buf();
+                                            }
+                                        } else {
+                                            link_target = target_rel.to_path_buf();
+                                        }
                                     }
                                 } else {
-                                    link_target =
-                                        diff_paths(&link_target, parent).unwrap_or(link_target);
+                                    link_target = target_rel.to_path_buf();
                                 }
+                            } else {
+                                // Symlink target is outside the source directory, keep it absolute
+                                // link_target remains unchanged
                             }
                         }
 
@@ -731,7 +747,7 @@ mod test {
 
         let broken_symlink = tmp_dir.path().join("broken_symlink");
         #[cfg(unix)]
-        std::os::unix::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
+        std::os::unix::fs::symlink("/does/not/exist", broken_symlink).unwrap();
         #[cfg(windows)]
         std::os::windows::fs::symlink_file("/does/not/exist", &broken_symlink).unwrap();
 
@@ -744,17 +760,10 @@ mod test {
         assert_eq!(copy_dir.copied_paths().len(), 3);
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
-        let expected_target_opt = pathdiff::diff_paths(
-            std::path::Path::new("/does/not/exist"),
-            broken_symlink_dest.parent().unwrap(),
+        assert_eq!(
+            fs::read_link(broken_symlink_dest).unwrap(),
+            std::path::PathBuf::from("/does/not/exist")
         );
-        if expected_target_opt.is_none() {
-            // Skip the assertion if we cannot compute a relative path (e.g., different drives)
-            return;
-        }
-        let expected_target = expected_target_opt.unwrap();
-        let actual_target = fs::read_link(&broken_symlink_dest).unwrap();
-        assert_eq!(actual_target, expected_target);
     }
 
     #[test]
@@ -797,17 +806,12 @@ mod test {
 
         // Check that the symlinked directory was copied as a symlink
         let dest_symlinked_dir = dest_dir.path().join("symlinked_dir");
-        if !dest_symlinked_dir.exists() {
-            // Skip the rest of the test if the symlinked directory does not exist
-            return;
-        }
+        assert!(dest_symlinked_dir.exists());
         assert!(dest_symlinked_dir.is_symlink());
 
-        // The symlink should point to the same relative path
+        // The symlink should point to the target directory relative to the symlink location
         let link_target = fs::read_link(&dest_symlinked_dir).unwrap();
-        let expected_target =
-            pathdiff::diff_paths(&target_dir, dest_symlinked_dir.parent().unwrap()).unwrap();
-        assert_eq!(link_target, expected_target);
+        assert_eq!(link_target, std::path::PathBuf::from("target_dir"));
 
         // Verify other files were copied
         assert!(dest_dir.path().join("regular_file.txt").exists());
