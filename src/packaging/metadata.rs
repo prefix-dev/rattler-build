@@ -401,10 +401,11 @@ impl Output {
                 continue;
             }
 
-            if !p.exists() {
-                if p.is_symlink() {
-                    // check if the file is in the prefix
-                    if let Ok(link_target) = p.read_link() {
+            // Handle symlinks first, regardless of whether they exist or are broken
+            if meta.is_symlink() {
+                if let Ok(link_target) = p.read_link() {
+                    // For broken symlinks, validate the target should be relative
+                    if !p.exists() {
                         if link_target.is_relative() {
                             let Some(relative_path_parent) = relative_path.parent() else {
                                 tracing::warn!("could not get parent of symlink {:?}", &p);
@@ -412,7 +413,8 @@ impl Output {
                             };
 
                             let resolved_path = temp_files
-                                .encoded_prefix
+                                .temp_dir
+                                .path()
                                 .join(relative_path_parent)
                                 .join(&link_target);
 
@@ -422,8 +424,6 @@ impl Output {
                                     &p,
                                     &link_target
                                 );
-
-                                // Think about continuing here or packaging broken symlinks
                                 continue;
                             }
                         } else {
@@ -432,16 +432,17 @@ impl Output {
                                 &p,
                                 link_target
                             );
-                            // skip absolute symlinks outside the prefix
                             continue;
                         }
-                    } else {
-                        tracing::warn!("could not read symlink {:?}", &p);
                     }
+                    // Valid symlink, will be processed below
                 } else {
-                    tracing::warn!("file does not exist: {:?}", &p);
+                    tracing::warn!("could not read symlink {:?}", &p);
                     continue;
                 }
+            } else if !p.exists() {
+                tracing::warn!("file does not exist: {:?}", &p);
+                continue;
             }
 
             if meta.is_dir() {

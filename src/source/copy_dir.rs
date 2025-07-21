@@ -320,6 +320,48 @@ impl<'a> CopyDir<'a> {
                                     if let Some(target_name) = link_target.file_name() {
                                         link_target = target_name.into();
                                     }
+                                } else if let Ok(target_rel) =
+                                    link_target.strip_prefix(self.from_path)
+                                {
+                                    if let Ok(src_rel) = path.strip_prefix(self.from_path) {
+                                        if let Some(symlink_parent) = src_rel.parent() {
+                                            if let Some(target_parent) = target_rel.parent() {
+                                                if symlink_parent == target_parent {
+                                                    // Same directory - just use the filename
+                                                    if let Some(filename) = target_rel.file_name() {
+                                                        link_target = filename.into();
+                                                    } else {
+                                                        link_target = target_rel.to_path_buf();
+                                                    }
+                                                } else {
+                                                    // Different directories - compute relative path
+                                                    link_target =
+                                                        diff_paths(target_rel, symlink_parent)
+                                                            .unwrap_or(target_rel.to_path_buf());
+                                                }
+                                            } else {
+                                                // Target is at root, symlink is in subdirectory
+                                                link_target =
+                                                    diff_paths(target_rel, symlink_parent)
+                                                        .unwrap_or(target_rel.to_path_buf());
+                                            }
+                                        } else {
+                                            // Symlink at package root
+                                            if let Some(filename) = target_rel.file_name() {
+                                                if target_rel.parent().is_none() {
+                                                    // Target also at root - just use filename
+                                                    link_target = filename.into();
+                                                } else {
+                                                    // Target in subdirectory
+                                                    link_target = target_rel.to_path_buf();
+                                                }
+                                            } else {
+                                                link_target = target_rel.to_path_buf();
+                                            }
+                                        }
+                                    } else {
+                                        link_target = target_rel.to_path_buf();
+                                    }
                                 } else {
                                     link_target =
                                         diff_paths(&link_target, parent).unwrap_or(link_target);
