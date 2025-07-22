@@ -83,11 +83,19 @@ pub(crate) fn create_symlink(
                 .unwrap_or(false)
         };
 
-        if is_dir {
-            std::os::windows::fs::symlink_dir(original, link)?;
+        // Try directory symlink first if we think it's a directory, otherwise try file first
+        // If the first attempt fails, try the other type as a fallback
+        let result = if is_dir {
+            std::os::windows::fs::symlink_dir(original, link)
         } else {
-            // Try file symlink first, fallback to directory symlink if it fails
-            if std::os::windows::fs::symlink_file(original, link).is_err() {
+            std::os::windows::fs::symlink_file(original, link)
+        };
+
+        if result.is_err() {
+            // Fallback: try the opposite type
+            if is_dir {
+                std::os::windows::fs::symlink_file(original, link)?;
+            } else {
                 std::os::windows::fs::symlink_dir(original, link)?;
             }
         }
