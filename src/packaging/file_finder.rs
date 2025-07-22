@@ -240,6 +240,12 @@ impl Files {
 }
 
 impl TempFiles {
+    /// Clear all files and content type information
+    pub fn clear(&mut self) {
+        self.files.clear();
+        self.content_type_map.clear();
+    }
+
     /// Add files to the TempFiles struct
     pub fn add_files<I>(&mut self, files: I)
     where
