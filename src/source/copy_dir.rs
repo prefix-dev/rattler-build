@@ -72,10 +72,24 @@ pub(crate) fn create_symlink(
     fs_err::os::unix::fs::symlink(original, link)?;
     #[cfg(windows)]
     {
-        if original.is_dir() {
+        // Try to determine if the target is a directory
+        let is_dir = if original.is_absolute() {
+            original.is_dir()
+        } else {
+            // For relative paths, check if target exists relative to the symlink's parent
+            link.parent()
+                .and_then(|parent| parent.join(original).canonicalize().ok())
+                .map(|p| p.is_dir())
+                .unwrap_or(false)
+        };
+
+        if is_dir {
             std::os::windows::fs::symlink_dir(original, link)?;
         } else {
-            std::os::windows::fs::symlink_file(original, link)?;
+            // Try file symlink first, fallback to directory symlink if it fails
+            if std::os::windows::fs::symlink_file(original, link).is_err() {
+                std::os::windows::fs::symlink_dir(original, link)?;
+            }
         }
     }
 
