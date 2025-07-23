@@ -4,7 +4,7 @@ package:
 
 build:
   number: 0
-  script: build.js  # Should auto-detect NodeJS interpreter
+  script: build.js # Should auto-detect NodeJS interpreter
 
 requirements:
   build:

@@ -13,7 +13,7 @@ build:
         - python %RECIPE_DIR%\create_files_with_prefix.py
   prefix_detection:
     ignore:
-      - ignore/*  # ignore all files in this directory
+      - ignore/* # ignore all files in this directory
     force_file_type:
       binary:
         - force_binary/*

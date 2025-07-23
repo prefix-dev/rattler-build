@@ -34,7 +34,7 @@ tests:
       imports:
         - rich
   - script:
-    - pip check
+      - pip check
     requirements:
       run:
         - pip

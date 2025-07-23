@@ -1,6 +1,6 @@
 package:
-    name: ament_package
-    version: "0.14.0"
+  name: ament_package
+  version: "0.14.0"
 
 source:
   git: https://github.com/ros2-gbp/ament_package-release.git

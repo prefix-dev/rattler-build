@@ -7,9 +7,9 @@ build:
   script:
     - if: unix
       then:
-       - python $RECIPE_DIR/test.py
+        - python $RECIPE_DIR/test.py
       else:
-       - python %RECIPE_DIR%\test.py
+        - python %RECIPE_DIR%\test.py
 
 requirements:
   build:

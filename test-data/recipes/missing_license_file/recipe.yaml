@@ -1,6 +1,6 @@
 package:
   name: missing-license-file
-  version: '0.1.0'
+  version: "0.1.0"
 
 build:
   script:

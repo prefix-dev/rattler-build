@@ -1,6 +1,6 @@
 package:
   name: missing-license-glob
-  version: '0.1.0'
+  version: "0.1.0"
 
 build:
   script:
@@ -9,4 +9,4 @@ build:
 
 about:
   license_file:
-    - "*.license"  # This glob won't match anything
+    - "*.license" # This glob won't match anything

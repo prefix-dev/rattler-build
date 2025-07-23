@@ -17,12 +17,12 @@ outputs:
       - script:
           - if: unix
             then:
-            - if [ -f "$PREFIX/fail.txt" ]; then
+              - if [ -f "$PREFIX/fail.txt" ]; then
                 echo "Failing test in downstream package";
                 exit 1;
-              fi
+                fi
           - if: win
             then:
-            - if exist "%PREFIX%\\fail.txt" (
+              - if exist "%PREFIX%\\fail.txt" (
                 echo "Failing test in downstream package" && exit /b 1
-              )
+                )
