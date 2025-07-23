@@ -508,6 +508,14 @@ mod tests {
     }
 
     #[test]
+    fn test_7z_source() {
+        let tmp = tmp("test_7z_source");
+        let rattler_build = rattler().build(recipes().join("7z-source"), tmp.as_dir(), None, None);
+
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
     fn test_dry_run_cf_upload() {
         let tmp = tmp("test_polarify");
         let variant = recipes().join("polarify").join("linux_64_.yaml");

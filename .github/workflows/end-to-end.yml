@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "src/**"
       - "Cargo.*"
@@ -29,7 +29,7 @@ jobs:
   run_tests:
     strategy:
       matrix:
-        os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
       fail-fast: false
 
     name: Run tests
@@ -41,7 +41,7 @@ jobs:
         with:
           workspaces: ". -> target-pixi"
           key: ${{ hashFiles('pixi.lock') }}
-      - uses: prefix-dev/setup-pixi@v0.8.11
+      - uses: prefix-dev/setup-pixi@v0.8.12
       # build in release mode so that it's reasonably fast to run the tests
       - run: pixi run build-release
       - run: pixi run test-ci

@@ -2,7 +2,7 @@ name: Python bindings CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
@@ -11,10 +11,10 @@ on:
       - Cargo.*
 
       # When something in the bindings themselves changes
-      - 'py-rattler-build/**/*'
+      - "py-rattler-build/**/*"
 
       # Or when this workflow changes
-      - '.github/workflows/python-bindings.yml'
+      - ".github/workflows/python-bindings.yml"
   workflow_dispatch:
 
 concurrency:
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: recursive
-      - uses: prefix-dev/setup-pixi@v0.8.11
+      - uses: prefix-dev/setup-pixi@v0.8.12
         with:
           manifest-path: py-rattler-build/pixi.toml
       - name: Check formatting
