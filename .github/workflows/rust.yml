@@ -155,6 +155,7 @@ jobs:
         run: |
           # Cross has warnings and we don't want that to stop the build
           unset RUSTFLAGS
+          # Cross hasn't made a release since 2023, so we use `main` instead
           cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Show version information (Rust, cargo, GCC)
