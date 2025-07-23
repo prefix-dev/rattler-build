@@ -142,17 +142,17 @@ opendal = { version = "0.53.3", default-features = false, features = [
 ] }
 
 # Rattler crates
-rattler_config = { version = "0.2.0" }
-rattler = { version = "0.34.2", default-features = false, features = [
+rattler_config = { version = "0.2.4" }
+rattler = { version = "0.34.8", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.21", default-features = false }
-rattler_conda_types = { version = "0.35.1", default-features = false, features = [
+rattler_cache = { version = "0.3.27", default-features = false }
+rattler_conda_types = { version = "0.36.0", default-features = false, features = [
   "rayon",
   "experimental_extras",
 ] }
-rattler_digest = { version = "1.1.3", default-features = false, features = [
+rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
 rattler_index = { version = "0.24.1", default-features = false }
@@ -214,18 +214,18 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-rattler = { path = "../rattler/crates/rattler" }
-rattler_sandbox = { path = "../rattler/crates/rattler_sandbox" }
-rattler_cache = { path = "../rattler/crates/rattler_cache" }
-rattler_config = { path = "../rattler/crates/rattler_config" }
-rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
-rattler_digest = { path = "../rattler/crates/rattler_digest" }
-rattler_index = { path = "../rattler/crates/rattler_index" }
-rattler_networking = { path = "../rattler/crates/rattler_networking" }
-rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
-rattler_shell = { path = "../rattler/crates/rattler_shell" }
-rattler_solve = { path = "../rattler/crates/rattler_solve" }
-rattler_redaction = { path = "../rattler/crates/rattler_redaction" }
-rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
-rattler_menuinst = { path = "../rattler/crates/rattler_menuinst" }
+rattler = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_config = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_index = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }
+rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "resolvo-condition" }

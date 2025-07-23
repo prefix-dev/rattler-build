@@ -351,7 +351,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .dedup()
                 .collect(),
-            extras: self.recipe.requirements.extras.clone(),
+            experimental_extra_depends: self.recipe.requirements.extras.clone(),
             noarch,
             track_features,
             features: None,
