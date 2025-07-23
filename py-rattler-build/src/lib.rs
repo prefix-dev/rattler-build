@@ -3,17 +3,19 @@ use std::{path::PathBuf, str::FromStr};
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
-    opt::{ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData, TestData},
+    opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{self, SkipExisting, TestStrategy},
 };
-use ::rattler_upload::upload;
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
-use rattler_upload::upload::opt::{AnacondaData, CondaForgeData, PrefixData, QuetzData};
+use rattler_upload::upload;
+use rattler_upload::upload::opt::{
+    AnacondaData, ArtifactoryData, CondaForgeData, PrefixData, QuetzData,
+};
 use url::Url;
 
 // Bind the get version function to the Python module
@@ -217,7 +219,10 @@ fn upload_package_to_quetz_py(
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        if let Err(e) = upload::upload_package_to_quetz(&store, &package_files, quetz_data).await {
+        if let Err(e) =
+            rattler_upload::upload::upload_package_to_quetz(&store, &package_files, quetz_data)
+                .await
+        {
             return Err(PyRuntimeError::new_err(e.to_string()));
         }
         Ok(())
