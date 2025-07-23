@@ -153,6 +153,7 @@ jobs:
         if: matrix.use-cross
         shell: bash
         run: |
+          # Cross has warnings and we don't want that to stop the build
           unset RUSTFLAGS
           cargo install cross --git https://github.com/cross-rs/cross
 
