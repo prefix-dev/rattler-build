@@ -1,4 +1,4 @@
-name: pre-commit
+name: lint
 
 on:
   push:
@@ -22,5 +22,5 @@ jobs:
         uses: prefix-dev/setup-pixi@v0.8.12
         with:
           environments: lint
-      - name: pre-commit
-        run: pixi run pre-commit-run --color=always --show-diff-on-failure
+      - name: lint (if this step fails, please 'pixi run lint' locally and push the changes)
+        run: pixi run lint
