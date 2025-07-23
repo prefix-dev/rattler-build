@@ -18,4 +18,4 @@ outputs:
             - chmod +x $PREFIX/bin/dummy-x
     tests:
       - script:
-        - dummy-x
+          - dummy-x

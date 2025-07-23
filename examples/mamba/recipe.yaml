@@ -1,5 +1,3 @@
-
-
 context:
   name: mamba
   libmamba_version: "1.5.8"
@@ -59,22 +57,22 @@ outputs:
         # - ${{ "python" if win }}
     tests:
       - script:
-        - if: unix
-          then:
-            - test -d ${PREFIX}/include/mamba  # [unix]
-            - test -f ${PREFIX}/include/mamba/version.hpp  # [unix]
-            - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfig.cmake  # [unix]
-            - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfigVersion.cmake  # [unix]
-            - test -e ${PREFIX}/lib/libmamba${SHLIB_EXT}  # [unix]
-          else:
-            - if not exist %LIBRARY_PREFIX%\include\mamba\version.hpp (exit 1)  # [win]
-            - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfig.cmake (exit 1)  # [win]
-            - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfigVersion.cmake (exit 1)  # [win]
-            - if not exist %LIBRARY_PREFIX%\bin\libmamba.dll (exit 1)  # [win]
-            - if not exist %LIBRARY_PREFIX%\lib\libmamba.lib (exit 1)  # [win]
-        # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MAJOR ${{ libmamba_version_split[0] }}"  # [unix]
-        # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MINOR ${{ libmamba_version_split[1] }}"  # [unix]
-        # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_PATCH ${{ libmamba_version_split[2] }}"  # [unix]
+          - if: unix
+            then:
+              - test -d ${PREFIX}/include/mamba # [unix]
+              - test -f ${PREFIX}/include/mamba/version.hpp # [unix]
+              - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfig.cmake # [unix]
+              - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfigVersion.cmake # [unix]
+              - test -e ${PREFIX}/lib/libmamba${SHLIB_EXT} # [unix]
+            else:
+              - if not exist %LIBRARY_PREFIX%\include\mamba\version.hpp (exit 1) # [win]
+              - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfig.cmake (exit 1) # [win]
+              - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfigVersion.cmake (exit 1) # [win]
+              - if not exist %LIBRARY_PREFIX%\bin\libmamba.dll (exit 1) # [win]
+              - if not exist %LIBRARY_PREFIX%\lib\libmamba.lib (exit 1) # [win]
+  # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MAJOR ${{ libmamba_version_split[0] }}"  # [unix]
+  # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MINOR ${{ libmamba_version_split[1] }}"  # [unix]
+  # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_PATCH ${{ libmamba_version_split[2] }}"  # [unix]
 
   - package:
       name: libmambapy
@@ -156,23 +154,23 @@ outputs:
           imports:
             - mamba
       - script:
-        - mamba --help
-        # for some reason tqdm doesn't have a proper colorama dependency so pip check fails
-        # but that's completely unrelated to mamba
-        - python -c "import mamba._version; assert mamba._version.__version__ == '${{ mamba_version }}'"
+          - mamba --help
+          # for some reason tqdm doesn't have a proper colorama dependency so pip check fails
+          # but that's completely unrelated to mamba
+          - python -c "import mamba._version; assert mamba._version.__version__ == '${{ mamba_version }}'"
 
-        - if: win
-          then:
-            - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1)  # [win]
-        - if: linux
-          then:
-            - test -f ${PREFIX}/etc/profile.d/mamba.sh
-            # these tests work when run on win, but for some reason not during conda build
-            - mamba create -n test_py2 python=2.7 --dry-run
-            - mamba install xtensor xsimd -c conda-forge --dry-run
-        - if: unix
-          then:
-            - test -f ${PREFIX}/condabin/mamba
+          - if: win
+            then:
+              - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1) # [win]
+          - if: linux
+            then:
+              - test -f ${PREFIX}/etc/profile.d/mamba.sh
+              # these tests work when run on win, but for some reason not during conda build
+              - mamba create -n test_py2 python=2.7 --dry-run
+              - mamba install xtensor xsimd -c conda-forge --dry-run
+          - if: unix
+            then:
+              - test -f ${PREFIX}/condabin/mamba
 
 about:
   homepage: https://github.com/mamba-org/mamba

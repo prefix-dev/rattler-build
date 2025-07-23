@@ -4,7 +4,7 @@ package:
 
 build:
   number: 0
-  script: build.rb  # Should auto-detect Ruby interpreter
+  script: build.rb # Should auto-detect Ruby interpreter
 
 requirements:
   build:

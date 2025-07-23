@@ -46,12 +46,12 @@ jobs:
           working-directory: py-rattler-build
           command: sdist
           args: --out dist
-    #   - name: "Test sdist"
-    #     run: |
-    #       rustup default $(cat rust-toolchain)
-    #       cd py-rattler-build
-    #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-    #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
+      #   - name: "Test sdist"
+      #     run: |
+      #       rustup default $(cat rust-toolchain)
+      #       cd py-rattler-build
+      #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+      #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload sdist"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -69,10 +69,10 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
-#         There are a number of issues with cross compiling ring to windows on aarch64.
-#         For now, we just won't build a wheel, we will revisit this in the future.
-#          - target: aarch64-pc-windows-msvc
-#            arch: x64
+    #         There are a number of issues with cross compiling ring to windows on aarch64.
+    #         For now, we just won't build a wheel, we will revisit this in the future.
+    #          - target: aarch64-pc-windows-msvc
+    #            arch: x64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
@@ -158,7 +158,7 @@ jobs:
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
-          manylinux: '2_28'
+          manylinux: "2_28"
           args: --release --out dist  --no-default-features --features rustls-tls
       - uses: uraimo/run-on-arch-action@1c358dc49363439f8c563ce8f93005f7fe76b849 # v3
         if: matrix.platform.arch != 'ppc64'
@@ -179,7 +179,6 @@ jobs:
         with:
           name: linux-wheels-${{ matrix.platform.target }}
           path: py-rattler-build/dist
-
 
   musllinux:
     runs-on: ubuntu-latest
@@ -274,7 +273,7 @@ jobs:
           path: py-rattler-build/dist
 
   macos-x86_64:
-    runs-on: macos-13   # x86_64 runner
+    runs-on: macos-13 # x86_64 runner
     name: Python Build x86_64-macos
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -368,7 +367,7 @@ jobs:
       - windows
       - linux
       - linux-cross
-    #   - linux-cross-native-tls
+      #   - linux-cross-native-tls
       - musllinux
       - musllinux-cross
       - validate-tag

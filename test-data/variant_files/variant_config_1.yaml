@@ -1,18 +1,14 @@
 zip_keys:
-  -
-    - c_compiler_version
+  - - c_compiler_version
     - cxx_compiler_version
     - fortran_compiler_version
     - docker_image
-  -
-    - cudnn
+  - - cudnn
     - cuda_compiler_version
-  -
-    - python
+  - - python
     - numpy
     - python_impl
-  -
-    - arrow_cpp
+  - - arrow_cpp
     - libarrow
 
 pin_run_as_build:
@@ -53,18 +49,18 @@ liblapacke:
   - 3.9 *netlib
 blas_impl:
   - openblas
-  - mkl          # [x86 or x86_64]
-  - blis         # [x86 or x86_64]
+  - mkl # [x86 or x86_64]
+  - blis # [x86 or x86_64]
 
 # this output was dropped as of libabseil 20230125
 abseil_cpp:
-  - '20220623.0'
+  - "20220623.0"
 alsa_lib:
   - 1.2.8
 arb:
-  - '2.23'
+  - "2.23"
 arpack:
-  - '3.7'
+  - "3.7"
 # keep in sync with libarrow
 arrow_cpp:
   - 11.0.0
