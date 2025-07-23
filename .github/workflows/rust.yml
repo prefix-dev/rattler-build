@@ -151,9 +151,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@c07504cae06f832dc8de08911c9a9c5cddb0d2d3 # v2
-        with:
-          tool: cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Show version information (Rust, cargo, GCC)
         run: |
