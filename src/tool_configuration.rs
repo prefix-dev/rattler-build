@@ -224,6 +224,11 @@ pub struct Configuration {
 
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
+
+    /// Whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler-build
+    /// to execute scripts / bundle up files.
+    pub environments_externally_managed: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -280,6 +285,7 @@ pub struct ConfigurationBuilder {
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    environments_externally_managed: bool,
 }
 
 impl Configuration {
@@ -311,6 +317,7 @@ impl ConfigurationBuilder {
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
             allow_symlinks_on_windows: false,
+            environments_externally_managed: false,
         }
     }
 
@@ -468,6 +475,19 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler
+    /// to execute scripts / bundle up files.
+    pub fn with_environments_externally_managed(
+        self,
+        environments_externally_managed: bool,
+    ) -> Self {
+        Self {
+            environments_externally_managed,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
@@ -520,6 +540,7 @@ impl ConfigurationBuilder {
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            environments_externally_managed: self.environments_externally_managed,
         }
     }
 }

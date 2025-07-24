@@ -1013,6 +1013,10 @@ impl Output {
         &self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
+        if tool_configuration.environments_externally_managed {
+            return Ok(());
+        }
+
         let dependencies = self
             .finalized_dependencies
             .as_ref()
