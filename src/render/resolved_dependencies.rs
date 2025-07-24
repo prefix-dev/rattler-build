@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter}, sync::Arc,
 };
 
 use indicatif::HumanBytes;
@@ -9,7 +9,7 @@ use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
 };
-use rattler_repodata_gateway::RunExportExtractorError;
+use rattler_repodata_gateway::{RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
@@ -713,10 +713,8 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                tool_configuration.repodata_gateway.ensure_run_exports(
-                    &mut resolved,
-                    PackageCacheReporter::new(
+            .wrap_in_progress_async_with_progress("Collecting run exports", async |pb| {
+                let reporter: Arc<(dyn RunExportsReporter + Send)> = Arc::new(PackageCacheReporter::new(
                         tool_configuration
                             .fancy_log_handler
                             .multi_progress()
@@ -727,8 +725,11 @@ pub(crate) async fn resolve_dependencies(
                         tool_configuration
                             .fancy_log_handler
                             .with_indent_levels("  "),
-                    ),
-                )
+                    ));
+                tool_configuration.repodata_gateway.ensure_run_exports(
+                    &mut resolved,
+                    Some(reporter),
+                ).await
             })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
@@ -812,10 +813,8 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                tool_configuration.repodata_gateway.ensure_run_exports(
-                    &mut resolved,
-                    PackageCacheReporter::new(
+            .wrap_in_progress_async_with_progress("Collecting run exports", async |pb| {
+                let reporter: Arc<(dyn RunExportsReporter + Send)> = Arc::new(PackageCacheReporter::new(
                         tool_configuration
                             .fancy_log_handler
                             .multi_progress()
@@ -826,8 +825,11 @@ pub(crate) async fn resolve_dependencies(
                         tool_configuration
                             .fancy_log_handler
                             .with_indent_levels("  "),
-                    ),
-                )
+                    ));
+                tool_configuration.repodata_gateway.ensure_run_exports(
+                    &mut resolved,
+                    Some(reporter),
+                ).await
             })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;

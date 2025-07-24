@@ -50,7 +50,7 @@ impl PackageCacheReporter {
     /// Adds a new package to the reporter. Returns a
     /// `PackageCacheReporterEntry` which can be passed to any of the cache
     /// functions of a package cache to track progress.
-    pub fn add(&mut self, record: &RepoDataRecord) -> PackageCacheReporterEntry {
+    pub fn add(&self, record: &RepoDataRecord) -> PackageCacheReporterEntry {
         let mut inner = self.inner.lock().unwrap();
 
         let entry = ProgressEntry {
@@ -76,10 +76,8 @@ impl PackageCacheReporter {
 }
 
 impl RunExportsReporter for PackageCacheReporter {
-    type PackageCacheReporterEntry = PackageCacheReporterEntry;
-
-    fn add(&mut self, record: &RepoDataRecord) -> Self::PackageCacheReporterEntry {
-        self.add(record)
+    fn add(&self, record: &RepoDataRecord) -> Arc<dyn CacheReporter> {
+        Arc::new(self.add(record))
     }
 }
 
