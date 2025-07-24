@@ -151,9 +151,12 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@c99cc51b309eee71a866715cfa08c922f11cf898 # v2
-        with:
-          tool: cross
+        shell: bash
+        run: |
+          # Cross has warnings and we don't want that to stop the build
+          unset RUSTFLAGS
+          # Cross hasn't made a release since 2023, so we use `main` instead
+          cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Show version information (Rust, cargo, GCC)
         run: |
