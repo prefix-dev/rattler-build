@@ -69,24 +69,6 @@ pub fn contains_prefix_text(
     // mmap the file
     let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
-    // Check for POSIX-style PREFIX placeholder first (priority order)
-    // This handles the case where files contain $PREFIX (cross-platform standard)
-    if memchr::memmem::find_iter(mmap.as_ref(), b"$PREFIX")
-        .next()
-        .is_some()
-    {
-        return Ok(Some("$PREFIX".to_string()));
-    }
-
-    // Check for Windows-style PREFIX placeholder  
-    // This handles the case where files contain %PREFIX% (Windows-specific)
-    if memchr::memmem::find_iter(mmap.as_ref(), b"%PREFIX%")
-        .next()
-        .is_some()
-    {
-        return Ok(Some("%PREFIX%".to_string()));
-    }
-
     // Check if the content contains the prefix with memchr
     let prefix_string = prefix.to_string_lossy().to_string();
     if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
@@ -108,6 +90,17 @@ pub fn contains_prefix_text(
             .is_some()
         {
             return Ok(Some(forward_slash.to_string()));
+        }
+
+        // Check for JSON-escaped backslashes (C:\path becomes C:\\path in JSON)
+        let escaped_backslash = prefix_string.replace('\\', "\\\\");
+        if escaped_backslash != prefix_string {
+            if memchr::memmem::find_iter(mmap.as_ref(), &escaped_backslash)
+                .next()
+                .is_some()
+            {
+                return Ok(Some(escaped_backslash));
+            }
         }
     }
 
@@ -627,85 +620,31 @@ mod test {
     }
 
     #[test]
-    fn contains_prefix_text_posix_placeholder() {
+    fn contains_prefix_text_windows_json_escaped() {
         let tmp = tempfile::tempdir().unwrap();
-        let prefix_path = tmp.path().join("some_prefix");
-        let file_path = tmp.path().join("config.json");
-        let content = r#"{"executable": "$PREFIX/bin/python"}"#;
-        fs::write(&file_path, content).unwrap();
-
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert_eq!(found, Some("$PREFIX".to_string()));
-    }
-
-    #[test]
-    fn contains_prefix_text_windows_placeholder() {
-        let tmp = tempfile::tempdir().unwrap();
-        let prefix_path = tmp.path().join("some_prefix");
-        let file_path = tmp.path().join("config.json");
-        let content = r#"{"executable": "%PREFIX%\\bin\\python.exe"}"#;
-        fs::write(&file_path, content).unwrap();
-
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
-        assert_eq!(found, Some("%PREFIX%".to_string()));
-    }
-
-    #[test]
-    fn contains_prefix_text_windows_placeholder_forward_slash() {
-        let tmp = tempfile::tempdir().unwrap();
-        let prefix_path = tmp.path().join("some_prefix");
-        let file_path = tmp.path().join("kernel.json");
-        let content = r#"{"argv": ["%PREFIX%/python.exe", "-m", "ipykernel_launcher"]}"#;
-        fs::write(&file_path, content).unwrap();
-
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
-        assert_eq!(found, Some("%PREFIX%".to_string()));
-    }
-
-    #[test]
-    fn contains_prefix_text_ipykernel_scenario() {
-        // This test specifically reproduces the issue scenario described in #1788
-        let tmp = tempfile::tempdir().unwrap();
-        let prefix_path = tmp.path().join("D:\\bld\\bld\\rattler-build_ipykernel_1753108933\\h_env");
         let file_path = tmp.path().join("kernel.json");
         
-        // Simulate the scenario where a file contains a Windows-style %PREFIX% path
-        // that's been converted to forward slashes (the "rewritten" state)
-        let content = r#"{
+        // Simulate a Windows prefix path
+        let prefix_path = std::path::Path::new("C:\\bld\\env");
+        
+        // Create JSON content with escaped backslashes (as would appear in real JSON files)
+        let json_content = r#"{
   "argv": [
-    "%PREFIX%/python.exe",
+    "C:\\bld\\env\\python.exe",
     "-m",
     "ipykernel_launcher",
     "-f",
     "{connection_file}"
   ],
   "display_name": "Python 3 (ipykernel)",
-  "language": "python",
-  "metadata": {
-    "debugger": true
-  }
+  "language": "python"
 }"#;
-        fs::write(&file_path, content).unwrap();
-
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
-        assert_eq!(found, Some("%PREFIX%".to_string()));
-    }
-
-    #[test]
-    fn contains_prefix_text_priority_order() {
-        // Test that POSIX style takes priority when both patterns are present
-        let tmp = tempfile::tempdir().unwrap();
-        let prefix_path = tmp.path().join("some_prefix");
-        let file_path = tmp.path().join("mixed.json");
-        let content = r#"{"posix": "$PREFIX/bin", "windows": "%PREFIX%\\Scripts"}"#;
-        fs::write(&file_path, content).unwrap();
-
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert_eq!(found, Some("$PREFIX".to_string()));
         
-        // Should be the same on Windows too - POSIX takes priority
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
-        assert_eq!(found, Some("$PREFIX".to_string()));
+        fs::write(&file_path, json_content).unwrap();
+        
+        let found = contains_prefix_text(&file_path, prefix_path, &Platform::Win64).unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap(), "C:\\\\bld\\\\env");
     }
 
     #[cfg(unix)]
