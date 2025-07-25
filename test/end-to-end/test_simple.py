@@ -721,6 +721,30 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             check_path(p, "text")
 
 
+@pytest.mark.skipif(
+    os.name != "nt", reason="Windows-specific prefix normalization test"
+)
+def test_mixed_prefix_formats(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that files with both backslash and forward slash prefixes are handled correctly on Windows."""
+    rattler_build.build(recipes / "mixed_prefix_formats", tmp_path)
+    pkg = get_extracted_package(tmp_path, "mixed_prefix_formats")
+
+    paths = json.loads((pkg / "info/paths.json").read_text())
+
+    # Should detect prefix in both files
+    kernel_json = next(
+        p for p in paths["paths"] if p["_path"] == "mixed_formats/kernel.json"
+    )
+    config_txt = next(
+        p for p in paths["paths"] if p["_path"] == "mixed_formats/config.txt"
+    )
+
+    assert "prefix_placeholder" in kernel_json
+    assert "prefix_placeholder" in config_txt
+
+
 def test_empty_folder(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "empty_folder"
     (path_to_recipe / "empty_folder_in_recipe").mkdir(parents=True, exist_ok=True)

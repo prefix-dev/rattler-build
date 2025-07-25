@@ -1,0 +1,19 @@
+package:
+  name: mixed_prefix_formats
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - if: win
+      then:
+        - mkdir %PREFIX%\mixed_formats
+        - 'echo {"backslash_path": "%PREFIX%", "forward_slash_path": "%PREFIX:\=/%", "normal_data": "some normal data"} > %PREFIX%\mixed_formats\kernel.json'
+        - 'echo Configuration file > %PREFIX%\mixed_formats\config.txt'
+        - 'echo Backslash prefix: %PREFIX% >> %PREFIX%\mixed_formats\config.txt'
+        - 'echo Forward slash prefix: %PREFIX:\=/% >> %PREFIX%\mixed_formats\config.txt'
+        - 'echo End of config >> %PREFIX%\mixed_formats\config.txt'
+
+requirements:
+  host:
+    - python 3.11.*
