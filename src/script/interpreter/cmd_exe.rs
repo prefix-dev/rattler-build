@@ -43,6 +43,9 @@ impl CmdExeInterpreter {
     /// 
     /// For each command line (except the last), adds:
     /// `IF %ERRORLEVEL% NEQ 0 EXIT 1`
+    /// 
+    /// Handles line continuation properly - commands that end with ^ continue on the next line,
+    /// and exit code checks are only added after the complete command is finished.
     pub fn add_exit_code_checks(script_content: &str) -> String {
         let lines: Vec<&str> = script_content.lines().collect();
         
@@ -52,6 +55,7 @@ impl CmdExeInterpreter {
         }
         
         let mut result = Vec::new();
+        let mut in_continuation = false;
         
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
@@ -59,18 +63,39 @@ impl CmdExeInterpreter {
             // Add the original line
             result.push(line.to_string());
             
-            // Add exit code check after each command line (except the last one)
-            // We should add checks for all lines that could be commands, but skip:
-            // - empty lines and whitespace-only lines
-            // - comment lines (@rem, rem, ::)
-            // - label lines (starting with :)
-            let should_add_check = i < lines.len() - 1 
-                && !trimmed.is_empty() 
+            // Check if this line continues to the next (ends with ^)
+            let line_continues = trimmed.ends_with('^');
+            
+            // Determine if we should add an exit code check
+            // We add checks after command lines (except the last), but we need to handle:
+            // - empty lines and whitespace-only lines (skip)
+            // - comment lines (@rem, rem, ::) (skip) 
+            // - label lines (starting with :) (skip)
+            // - line continuation (only add check after the final line of a continued command)
+            let is_command_line = !trimmed.is_empty() 
                 && !trimmed.starts_with("@rem") 
                 && !trimmed.starts_with("rem ") 
                 && !trimmed.starts_with("REM ")
                 && !trimmed.starts_with("::") 
                 && !trimmed.starts_with(':');
+            
+            // Update continuation state
+            if line_continues {
+                in_continuation = true;
+            } else if in_continuation {
+                // This line completes a continuation sequence
+                in_continuation = false;
+            }
+            
+            // Add exit code check if:
+            // - This is not the last line
+            // - This is a command line 
+            // - We're not in the middle of a line continuation
+            // - The line doesn't continue to the next line
+            let should_add_check = i < lines.len() - 1 
+                && is_command_line
+                && !in_continuation 
+                && !line_continues;
                 
             if should_add_check {
                 result.push("IF %ERRORLEVEL% NEQ 0 EXIT 1".to_string());
@@ -245,6 +270,43 @@ mod tests {
         // while the processed script would stop on first failure (the fix)
         assert!(!joined_script.contains("IF %ERRORLEVEL%"));
         assert!(processed_script.contains("IF %ERRORLEVEL% NEQ 0 EXIT 1"));
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_line_continuation() {
+        // Test handling of line continuation using ^ character
+        let script = "echo This is a command that ^\ncontinues on next line\necho Another command";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        // Should only add exit check after the completed continued command
+        let expected = "echo This is a command that ^\ncontinues on next line\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Another command";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_multiple_continuations() {
+        // Test multiple line continuations in sequence
+        let script = "python -c \"import sys; ^\nprint('line 1'); ^\nprint('line 2')\"\necho Done";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        // Should only add exit check after the final line of the continued command
+        let expected = "python -c \"import sys; ^\nprint('line 1'); ^\nprint('line 2')\"\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Done";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_continuation_at_end() {
+        // Test continuation at the end of script (no exit check should be added)
+        let script = "echo First command\necho Last command ^\ncontinues here";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo First command\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Last command ^\ncontinues here";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_mixed_continuation_and_single_lines() {
+        let script = "echo Start\npython -c \"import ^\nsys\"\necho Middle\ndir /w ^\n/p\necho End";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo Start\nIF %ERRORLEVEL% NEQ 0 EXIT 1\npython -c \"import ^\nsys\"\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Middle\nIF %ERRORLEVEL% NEQ 0 EXIT 1\ndir /w ^\n/p\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho End";
+        assert_eq!(result, expected);
     }
 
     #[test]
