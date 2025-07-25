@@ -1,5 +1,4 @@
 [workspace]
-name = "rattler-build"
 description = "Conda package builder, using the rattler rust backend"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 channels = ["conda-forge"]
