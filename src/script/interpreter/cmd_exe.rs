@@ -37,6 +37,50 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
 
 pub(crate) struct CmdExeInterpreter;
 
+impl CmdExeInterpreter {
+    /// Add exit code checks after each command in a Windows batch script.
+    /// This ensures that failing commands don't get ignored, mimicking conda-build's behavior.
+    /// 
+    /// For each command line (except the last), adds:
+    /// `IF %ERRORLEVEL% NEQ 0 EXIT 1`
+    pub fn add_exit_code_checks(script_content: &str) -> String {
+        let lines: Vec<&str> = script_content.lines().collect();
+        
+        // If there's only one line or the script is empty, no need to add checks
+        if lines.len() <= 1 {
+            return script_content.to_string();
+        }
+        
+        let mut result = Vec::new();
+        
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            
+            // Add the original line
+            result.push(line.to_string());
+            
+            // Add exit code check after each command line (except the last one)
+            // We should add checks for all lines that could be commands, but skip:
+            // - empty lines and whitespace-only lines
+            // - comment lines (@rem, rem, ::)
+            // - label lines (starting with :)
+            let should_add_check = i < lines.len() - 1 
+                && !trimmed.is_empty() 
+                && !trimmed.starts_with("@rem") 
+                && !trimmed.starts_with("rem ") 
+                && !trimmed.starts_with("REM ")
+                && !trimmed.starts_with("::") 
+                && !trimmed.starts_with(':');
+                
+            if should_add_check {
+                result.push("IF %ERRORLEVEL% NEQ 0 EXIT 1".to_string());
+            }
+        }
+        
+        result.join("\n")
+    }
+}
+
 impl Interpreter for CmdExeInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let script = self.get_script(&args, shell::CmdExe).unwrap();
@@ -46,10 +90,14 @@ impl Interpreter for CmdExeInterpreter {
 
         tokio::fs::write(&build_env_path, script).await?;
 
+        // Add exit code checking for Windows batch files to ensure failing commands 
+        // don't get ignored. This mimics conda-build's behavior.
+        let processed_script = Self::add_exit_code_checks(args.script.script());
+
         let build_script = format!(
             "{}\n{}",
             CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-            args.script.script()
+            processed_script
         );
         tokio::fs::write(
             &build_script_path,
@@ -99,5 +147,103 @@ impl Interpreter for CmdExeInterpreter {
 
         // check if cmd.exe is in PATH
         find_interpreter("cmd", build_prefix, platform)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_exit_code_checks_empty_script() {
+        let script = "";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_single_command() {
+        let script = "echo Hello";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        assert_eq!(result, "echo Hello");
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_multiple_commands() {
+        let script = "echo First command\necho Second command\necho Third command";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo First command\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Second command\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Third command";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_comments() {
+        let script = "echo Start\n@rem This is a comment\necho Middle\n:: Another comment\necho End";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo Start\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n@rem This is a comment\necho Middle\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n:: Another comment\necho End";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_empty_lines() {
+        let script = "echo First\n\necho Second\n   \necho Third";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo First\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n\necho Second\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n   \necho Third";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_labels() {
+        let script = "echo Start\n:label1\necho After label\n:end\necho Final";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo Start\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n:label1\necho After label\nIF %ERRORLEVEL% NEQ 0 EXIT 1\n:end\necho Final";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_if_statements() {
+        let script = "echo Test\nIF EXIST file.txt echo File exists\necho Done";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "echo Test\nIF %ERRORLEVEL% NEQ 0 EXIT 1\nIF EXIST file.txt echo File exists\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Done";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_with_echo_statements() {
+        let script = "dir\nECHO Listing files\ndir /w";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "dir\nIF %ERRORLEVEL% NEQ 0 EXIT 1\nECHO Listing files\nIF %ERRORLEVEL% NEQ 0 EXIT 1\ndir /w";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_exit_code_checks_realistic_test_script() {
+        let script = "python --version\npython -c \"import mypackage\"\npython -m pytest tests/";
+        let result = CmdExeInterpreter::add_exit_code_checks(script);
+        let expected = "python --version\nIF %ERRORLEVEL% NEQ 0 EXIT 1\npython -c \"import mypackage\"\nIF %ERRORLEVEL% NEQ 0 EXIT 1\npython -m pytest tests/";
+        assert_eq!(result, expected);
+    }
+
+    #[test] 
+    fn test_comprehensive_test_commands() {
+        // This test simulates the exact issue described in #1792
+        // where failing test commands were being ignored on Windows
+        let test_commands = vec![
+            "python --version".to_string(),
+            "python -c \"import nonexistent_module\"".to_string(), // This would fail
+            "echo Success".to_string(), // This should not run if the import fails
+        ];
+        
+        let joined_script = test_commands.join("\n");
+        let processed_script = CmdExeInterpreter::add_exit_code_checks(&joined_script);
+        
+        let expected = "python --version\nIF %ERRORLEVEL% NEQ 0 EXIT 1\npython -c \"import nonexistent_module\"\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Success";
+        
+        assert_eq!(processed_script, expected);
+        
+        // Verify that the original script would continue on failure (the problem)
+        // while the processed script would stop on first failure (the fix)
+        assert!(!joined_script.contains("IF %ERRORLEVEL%"));
+        assert!(processed_script.contains("IF %ERRORLEVEL% NEQ 0 EXIT 1"));
     }
 }

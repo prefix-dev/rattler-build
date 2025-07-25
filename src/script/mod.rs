@@ -552,10 +552,14 @@ impl Output {
 
             tokio::fs::write(&build_env_path, script).await?;
 
+            // Add exit code checking for Windows batch files to ensure failing commands 
+            // don't get ignored. This mimics conda-build's behavior.
+            let processed_script = CmdExeInterpreter::add_exit_code_checks(exec_args.script.script());
+
             let build_script = format!(
                 "{}\n{}",
                 CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-                exec_args.script.script()
+                processed_script
             );
             tokio::fs::write(
                 &build_script_path,
