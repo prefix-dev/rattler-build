@@ -70,6 +70,7 @@ pub fn contains_prefix_text(
     let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
     // Check for POSIX-style PREFIX placeholder first (priority order)
+    // This handles the case where files contain $PREFIX (cross-platform standard)
     if memchr::memmem::find_iter(mmap.as_ref(), b"$PREFIX")
         .next()
         .is_some()
@@ -77,7 +78,8 @@ pub fn contains_prefix_text(
         return Ok(Some("$PREFIX".to_string()));
     }
 
-    // Check for Windows-style PREFIX placeholder
+    // Check for Windows-style PREFIX placeholder  
+    // This handles the case where files contain %PREFIX% (Windows-specific)
     if memchr::memmem::find_iter(mmap.as_ref(), b"%PREFIX%")
         .next()
         .is_some()
@@ -687,6 +689,23 @@ mod test {
 
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
         assert_eq!(found, Some("%PREFIX%".to_string()));
+    }
+
+    #[test]
+    fn contains_prefix_text_priority_order() {
+        // Test that POSIX style takes priority when both patterns are present
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix_path = tmp.path().join("some_prefix");
+        let file_path = tmp.path().join("mixed.json");
+        let content = r#"{"posix": "$PREFIX/bin", "windows": "%PREFIX%\\Scripts"}"#;
+        fs::write(&file_path, content).unwrap();
+
+        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        assert_eq!(found, Some("$PREFIX".to_string()));
+        
+        // Should be the same on Windows too - POSIX takes priority
+        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Win64).unwrap();
+        assert_eq!(found, Some("$PREFIX".to_string()));
     }
 
     #[cfg(unix)]
