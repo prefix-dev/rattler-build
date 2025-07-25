@@ -1,22 +1,18 @@
 use std::{
-    borrow::Cow,
     collections::HashMap,
-    fmt::{Display, Formatter},
-    sync::Arc,
+    fmt::{Display, Formatter}, sync::Arc,
 };
 
-use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use indicatif::HumanBytes;
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
 };
-use reqwest_middleware::ClientWithMiddleware;
+use rattler_repodata_gateway::{RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
 use crate::{
@@ -27,7 +23,6 @@ use crate::{
         pin::PinArgs,
         solver::{install_packages, solve_environment},
     },
-    run_exports::{RunExportExtractor, RunExportExtractorError},
     tool_configuration,
     tool_configuration::Configuration,
 };
@@ -548,56 +543,56 @@ pub fn apply_variant(
         .collect()
 }
 
-/// Collect run exports from the package cache and add them to the package
-/// records.
-/// TODO: There are many ways that would allow us to optimize this function.
-/// 1. This currently downloads an entire package, but we only need the
-///    `run_exports.json`.
-/// 2. There are special run_exports.json files available for some channels.
-async fn amend_run_exports(
-    records: &mut [RepoDataRecord],
-    client: ClientWithMiddleware,
-    package_cache: PackageCache,
-    multi_progress: MultiProgress,
-    progress_prefix: impl Into<Cow<'static, str>>,
-    top_level_pb: Option<ProgressBar>,
-) -> Result<(), RunExportExtractorError> {
-    let max_concurrent_requests = Arc::new(Semaphore::new(50));
-    let (tx, mut rx) = mpsc::channel(50);
+// /// Collect run exports from the package cache and add them to the package
+// /// records.
+// /// TODO: There are many ways that would allow us to optimize this function.
+// /// 1. This currently downloads an entire package, but we only need the
+// ///    `run_exports.json`.
+// /// 2. There are special run_exports.json files available for some channels.
+// async fn amend_run_exports(
+//     records: &mut [RepoDataRecord],
+//     client: ClientWithMiddleware,
+//     package_cache: PackageCache,
+//     multi_progress: MultiProgress,
+//     progress_prefix: impl Into<Cow<'static, str>>,
+//     top_level_pb: Option<ProgressBar>,
+// ) -> Result<(), RunExportExtractorError> {
+//     let max_concurrent_requests = Arc::new(Semaphore::new(50));
+//     let (tx, mut rx) = mpsc::channel(50);
 
-    let progress = PackageCacheReporter::new(
-        multi_progress,
-        top_level_pb.map_or(Placement::End, Placement::After),
-    )
-    .with_prefix(progress_prefix);
+//     let progress = PackageCacheReporter::new(
+//         multi_progress,
+//         top_level_pb.map_or(Placement::End, Placement::After),
+//     )
+//     .with_prefix(progress_prefix);
 
-    for (pkg_idx, pkg) in records.iter().enumerate() {
-        if pkg.package_record.run_exports.is_some() {
-            // If the package already boasts run exports, we don't need to do anything.
-            continue;
-        }
+//     for (pkg_idx, pkg) in records.iter().enumerate() {
+//         if pkg.package_record.run_exports.is_some() {
+//             // If the package already boasts run exports, we don't need to do anything.
+//             continue;
+//         }
 
-        let extractor = RunExportExtractor::default()
-            .with_max_concurrent_requests(max_concurrent_requests.clone())
-            .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+//         let extractor = RunExportExtractor::default()
+//             .with_max_concurrent_requests(max_concurrent_requests.clone())
+//             .with_client(client.clone())
+//             .with_package_cache(package_cache.clone(), progress.clone());
 
-        let tx = tx.clone();
-        let record = pkg.clone();
-        tokio::spawn(async move {
-            let result = extractor.extract(&record).await;
-            let _ = tx.send((pkg_idx, result)).await;
-        });
-    }
+//         let tx = tx.clone();
+//         let record = pkg.clone();
+//         tokio::spawn(async move {
+//             let result = extractor.extract(&record).await;
+//             let _ = tx.send((pkg_idx, result)).await;
+//         });
+//     }
 
-    drop(tx);
+//     drop(tx);
 
-    while let Some((pkg_idx, run_exports)) = rx.recv().await {
-        records[pkg_idx].package_record.run_exports = run_exports?;
-    }
+//     while let Some((pkg_idx, run_exports)) = rx.recv().await {
+//         records[pkg_idx].package_record.run_exports = run_exports?;
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 pub async fn install_environments(
     output: &Output,
@@ -718,20 +713,23 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
+            .wrap_in_progress_async_with_progress("Collecting run exports", async |pb| {
+                let reporter: Arc<(dyn RunExportsReporter + Send)> = Arc::new(PackageCacheReporter::new(
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        Placement::After(pb),
+                    )
+                    .with_prefix(
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                    ));
+                tool_configuration.repodata_gateway.ensure_run_exports(
                     &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
+                    Some(reporter),
+                ).await
             })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
@@ -815,20 +813,23 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
+            .wrap_in_progress_async_with_progress("Collecting run exports", async |pb| {
+                let reporter: Arc<(dyn RunExportsReporter + Send)> = Arc::new(PackageCacheReporter::new(
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        Placement::After(pb),
+                    )
+                    .with_prefix(
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                    ));
+                tool_configuration.repodata_gateway.ensure_run_exports(
                     &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
+                    Some(reporter),
+                ).await
             })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
