@@ -42,8 +42,8 @@ pub use self::{
     package::{OutputPackage, Package},
     regex::SerializableRegex,
     requirements::{
-        Dependency, IgnoreRunExports, Language, PinCompatible, PinSubpackage, Requirements,
-        RunExports,
+        Dependency, GitDependency, IgnoreRunExports, Language, PathDependency, PinCompatible,
+        PinSubpackage, Requirements, RunExports,
     },
     script::{Script, ScriptContent},
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
