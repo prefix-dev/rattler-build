@@ -246,4 +246,28 @@ mod tests {
         assert!(!joined_script.contains("IF %ERRORLEVEL%"));
         assert!(processed_script.contains("IF %ERRORLEVEL% NEQ 0 EXIT 1"));
     }
+
+    #[test]
+    fn test_issue_1792_regression() {
+        // Integration test that simulates the exact problem from issue #1792
+        println!("Testing fix for issue #1792: Windows test exit codes not checked");
+        
+        let problematic_test = "python --version\npython -c \"import pytest\"\necho Test completed successfully";
+        
+        let fixed_test = CmdExeInterpreter::add_exit_code_checks(problematic_test);
+        
+        // Before the fix: if pytest import failed, "Test completed successfully" would still run
+        // After the fix: if pytest import fails, the script stops with EXIT 1
+        
+        assert_eq!(
+            fixed_test,
+            "python --version\nIF %ERRORLEVEL% NEQ 0 EXIT 1\npython -c \"import pytest\"\nIF %ERRORLEVEL% NEQ 0 EXIT 1\necho Test completed successfully"
+        );
+        
+        // Verify we have the right number of exit checks
+        let exit_check_count = fixed_test.matches("IF %ERRORLEVEL% NEQ 0 EXIT 1").count();
+        assert_eq!(exit_check_count, 2); // Two commands that could fail
+        
+        println!("✅ Issue #1792 fix verified: Windows tests will now fail properly on command failures");
+    }
 }
