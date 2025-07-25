@@ -8,11 +8,11 @@ functions and filters that can be used in the recipe.
 ### The compiler function
 
 The compiler function can be used to put together a compiler that works for the
-current platform and the compilation "`target_platform`". The syntax looks like:
+current platform and the compilation "`host_platform`". The syntax looks like:
 `${{ compiler('c') }}` where `'c'` signifies the programming language that is
 used.
 
-This function evaluates to `<compiler>_<target_platform> <compiler_version>`.
+This function evaluates to `<compiler>_<host_platform> <compiler_version>`.
 For example, when compiling _on_ `linux` and _to_ `linux-64`, this function
 evaluates to `gcc_linux-64`.
 
@@ -38,9 +38,9 @@ c_compiler_version:
 ```
 
 The variables shown above would select the `clang` compiler in version `9.0`.
-Note that the final output will still contain the `target_platform`, so that the
+Note that the final output will still contain the `host_platform`, so that the
 full compiler will read `clang_linux-64 9.0` when compiling with
-`--target-platform linux-64`.
+`--host-platform linux-64`.
 
 `rattler-build` defines some default compilers for the following languages
 (inherited from `conda-build`):
@@ -54,11 +54,11 @@ full compiler will read `clang_linux-64 9.0` when compiling with
 
 The `stdlib` function closely mirrors the compiler function. It can be used to
 put together a standard library that works for the current platform and the
-compilation "`target_platform`".
+compilation "`host_platform`".
 
 Usage: `${{ stdlib('c') }}`
 
-Results in `<stdlib>_<target_platform> <stdlib_version>`. And uses the variant
+Results in `<stdlib>_<host_platform> <stdlib_version>`. And uses the variant
 variables `<lang>_stdlib` and `<lang>_stdlib_version` to influence the output.
 
 #### Usage in a recipe:
