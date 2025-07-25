@@ -511,8 +511,13 @@ impl Output {
         fs::create_dir_all(&info_folder)?;
 
         let paths_json_path = root_dir.join(PathsJson::package_path());
+        let paths_json_data = self.paths_json(temp_files)?;
+
+        // Perform path checks and emit warnings
+        crate::post_process::path_checks::perform_path_checks(self, &paths_json_data.paths);
+
         let paths_json = File::create(&paths_json_path)?;
-        serde_json::to_writer_pretty(paths_json, &self.paths_json(temp_files)?)?;
+        serde_json::to_writer_pretty(paths_json, &paths_json_data)?;
         new_files.insert(paths_json_path);
 
         let index_json_path = root_dir.join(IndexJson::package_path());
