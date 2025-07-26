@@ -98,48 +98,47 @@ nav:
   # - Tutorials:
   #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
-    - "Python": tutorials/python.md
-    - "C++": tutorials/cpp.md
-    - "Javascript": tutorials/javascript.md
-    - "Rust": tutorials/rust.md
-    - "Go": tutorials/go.md
-    - "Perl": tutorials/perl.md
-    - "R": tutorials/r.md
-    - "Repackaging": tutorials/repackaging.md
-    - "Converting from conda-build": converting_from_conda_build.md
+      - "Python": tutorials/python.md
+      - "C++": tutorials/cpp.md
+      - "Javascript": tutorials/javascript.md
+      - "Rust": tutorials/rust.md
+      - "Go": tutorials/go.md
+      - "Perl": tutorials/perl.md
+      - "R": tutorials/r.md
+      - "Repackaging": tutorials/repackaging.md
+      - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:
+      - Advanced options: build_options.md
 
-    - Advanced options: build_options.md
+      - Selector syntax (if/then): selectors.md
+      - Build script: build_script.md
+      - Variants: variants.md
+      - Configuration: config.md
 
-    - Selector syntax (if/then): selectors.md
-    - Build script: build_script.md
-    - Variants: variants.md
-    - Configuration: config.md
+      - Compilers and cross compilation: compilers.md
 
-    - Compilers and cross compilation: compilers.md
-
-    - Experimental features: experimental_features.md
-    - Multiple output cache: multiple_output_cache.md
-    - Sandbox: sandbox.md
-    - Generating recipes: recipe_generation.md
-    - Creating patches: create_patch.md
-    - Tips and tricks: tips_and_tricks.md
+      - Experimental features: experimental_features.md
+      - Multiple output cache: multiple_output_cache.md
+      - Sandbox: sandbox.md
+      - Generating recipes: recipe_generation.md
+      - Creating patches: create_patch.md
+      - Tips and tricks: tips_and_tricks.md
 
   - Testing:
-    - Testing packages: testing.md
-    - Reproducible builds: rebuild.md
+      - Testing packages: testing.md
+      - Reproducible builds: rebuild.md
 
   - User Experience:
-    - Terminal User Interface (TUI): tui.md
-    - Authentication & upload: authentication_and_upload.md
-    - Automatic recipe linting: automatic_linting.md
+      - Terminal User Interface (TUI): tui.md
+      - Authentication & upload: authentication_and_upload.md
+      - Automatic recipe linting: automatic_linting.md
 
   - Package:
-    - Package specification: package_spec.md
-    - Package scripts: special_files.md
-    - Package Internals: internals.md
-    - System integration: system_integration.md
+      - Package specification: package_spec.md
+      - Package scripts: special_files.md
+      - Package Internals: internals.md
+      - System integration: system_integration.md
 
   - References:
       - Recipe file: reference/recipe_file.md
@@ -160,11 +159,11 @@ plugins:
             separate_signature: true
             show_source: false
   - mike:
-      # These fields are all optional; the defaults are as below...
-      # alias_type: symlink
-      # redirect_template: null
-      # deploy_prefix: ''
-      # canonical_version: null
-      # version_selector: true
-      # css_dir: css
-      # javascript_dir: js
+# These fields are all optional; the defaults are as below...
+# alias_type: symlink
+# redirect_template: null
+# deploy_prefix: ''
+# canonical_version: null
+# version_selector: true
+# css_dir: css
+# javascript_dir: js
