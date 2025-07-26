@@ -58,42 +58,46 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
 
 /// This function requires we know the file content we are matching against is
 /// UTF-8 In case the source is non utf-8 it will fail with a read error
+///
+/// Returns all variations of the expanded prefix found in the file.
 pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
     target_platform: &Platform,
-) -> Result<Option<String>, PackagingError> {
-    // Open the file
-    let file = File::open(file_path)?;
+) -> Result<Vec<String>, PackagingError> {
+    let mut found_variations = Vec::new();
 
-    // mmap the file
-    let mmap = unsafe { memmap2::Mmap::map(&file)? };
-
-    // Check if the content contains the prefix with memchr
-    let prefix_string = prefix.to_string_lossy().to_string();
-    if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
-        .next()
-        .is_some()
     {
-        return Ok(Some(prefix_string));
-    }
+        // Open the file in a new scope to ensure the memory map and file handle are dropped
+        let file = File::open(file_path)?;
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
-    if target_platform.is_windows() {
-        use crate::utils::to_forward_slash_lossy;
-        // absolute and unc paths will break but it,
-        // will break either way as C:/ can't be converted
-        // to something meaningful in unix either way
-        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
-
-        if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
+        // Check if the content contains the prefix with memchr
+        let prefix_string = prefix.to_string_lossy().to_string();
+        if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
             .next()
             .is_some()
         {
-            return Ok(Some(forward_slash.to_string()));
+            found_variations.push(prefix_string);
+        }
+
+        if target_platform.is_windows() {
+            use crate::utils::to_forward_slash_lossy;
+            // absolute and unc paths will break but it,
+            // will break either way as C:/ can't be converted
+            // to something meaningful in unix either way
+            let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+
+            if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
+                .next()
+                .is_some()
+            {
+                found_variations.push(forward_slash.to_string());
+            }
         }
     }
 
-    Ok(None)
+    Ok(found_variations)
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -148,11 +152,36 @@ pub fn create_prefix_placeholder(
     // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
-            Ok(Some(prefix)) => {
-                has_prefix = Some(prefix);
+            Ok(variations) if !variations.is_empty() => {
+                // Choose the canonical format based on platform conventions
+                let primary_format = if target_platform.is_windows() {
+                    // On Windows, prefer backslash format (native Windows style)
+                    variations
+                        .iter()
+                        .find(|v| v.contains('\\'))
+                        .unwrap_or(&variations[0])
+                } else {
+                    // On Unix-like systems, prefer forward slash format
+                    variations
+                        .iter()
+                        .find(|v| v.contains('/') && !v.contains('\\'))
+                        .unwrap_or(&variations[0])
+                };
+
+                // If multiple variations found, normalize them to the primary format
+                if variations.len() > 1 {
+                    let content = fs::read_to_string(file_path)?;
+                    let normalized = variations
+                        .iter()
+                        .filter(|&v| v != primary_format)
+                        .fold(content, |acc, variant| acc.replace(variant, primary_format));
+                    fs::write(file_path, normalized)?;
+                }
+
+                has_prefix = Some(primary_format.clone());
                 FileMode::Text
             }
-            Ok(None) => FileMode::Text,
+            Ok(_) => FileMode::Text,
             Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
                 FileMode::Binary
             }
@@ -595,7 +624,7 @@ mod test {
         fs::write(&file_path, content).unwrap();
 
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert_eq!(found, Some(prefix_path.to_string_lossy().to_string()));
+        assert_eq!(found, vec![prefix_path.to_string_lossy().to_string()]);
     }
 
     #[test]
@@ -605,7 +634,7 @@ mod test {
         let file_path = tmp.path().join("note.txt");
         fs::write(&file_path, "nothing to see here").unwrap();
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert!(found.is_none());
+        assert!(found.is_empty());
     }
 
     #[cfg(unix)]
