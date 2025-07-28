@@ -91,6 +91,17 @@ pub fn contains_prefix_text(
         {
             return Ok(Some(forward_slash.to_string()));
         }
+
+        // Check for JSON-escaped backslashes (C:\path becomes C:\\path in JSON)
+        let escaped_backslash = prefix_string.replace('\\', "\\\\");
+        if escaped_backslash != prefix_string {
+            if memchr::memmem::find_iter(mmap.as_ref(), &escaped_backslash)
+                .next()
+                .is_some()
+            {
+                return Ok(Some(escaped_backslash));
+            }
+        }
     }
 
     Ok(None)
@@ -607,6 +618,34 @@ mod test {
         fs::write(&file_path, "nothing to see here").unwrap();
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
         assert!(found.is_none());
+    }
+
+    #[test]
+    fn contains_prefix_text_windows_json_escaped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = tmp.path().join("kernel.json");
+        
+        // Simulate a Windows prefix path
+        let prefix_path = std::path::Path::new("C:\\bld\\env");
+        
+        // Create JSON content with escaped backslashes (as would appear in real JSON files)
+        let json_content = r#"{
+  "argv": [
+    "C:\\bld\\env\\python.exe",
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
+  ],
+  "display_name": "Python 3 (ipykernel)",
+  "language": "python"
+}"#;
+        
+        fs::write(&file_path, json_content).unwrap();
+        
+        let found = contains_prefix_text(&file_path, prefix_path, &Platform::Win64).unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap(), "C:\\\\bld\\\\env");
     }
 
     #[cfg(unix)]
