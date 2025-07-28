@@ -1,0 +1,43 @@
+package:
+  name: conditional
+  version: 0.1.0
+
+# build:
+#   flags:
+#     - cuda
+#     - openmp:mpi
+
+
+requirements:
+  run:
+    - rattler-build
+    - bzip2 *; if rattler-build >=0.44
+    - zstd *; if rattler-build <0.44
+
+  extras:
+    science:
+      - numpy
+      - matplotlib
+    web:
+      - flask
+    cli:
+      - click
+
+tests:
+  - script:
+    - echo "Hello, world!"
+    requirements:
+      run:
+        - rattler-build >=0.44
+
+  - script:
+    - echo "This is a test for Rattler < 0.44"
+    requirements:
+      run:
+        - rattler-build <0.44
+
+  - script:
+    - echo "This is a test for Rattler < 0.44"
+    requirements:
+      run:
+        - conditional [extras=[science, web]]
