@@ -77,7 +77,7 @@ pub(crate) fn write_test_files(
     // For each `Command` test, we need to copy the test files to the package
     for (idx, test) in tests.iter_mut().enumerate() {
         if let TestType::Command(command_test) = test {
-            let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
+            let cwd = PathBuf::from(format!("info/conda/test-files/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
             let files = command_test.write_to_folder(&folder, output)?;
             if !files.is_empty() {
