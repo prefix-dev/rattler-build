@@ -228,7 +228,3 @@ harness = false
 # rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_menuinst = { git = "https://github.com/conda/rattler", branch = "main" }
-
-[profile.dev]
-debug = 0
-strip = "debuginfo"
