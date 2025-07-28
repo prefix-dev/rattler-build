@@ -893,7 +893,7 @@ mod test {
                     purls: None,
                     run_exports: None,
                     python_site_packages_path: None,
-                    extra_depends: Default::default(),
+                    experimental_extra_depends: Default::default(),
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
