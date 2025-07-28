@@ -95,7 +95,7 @@ scroll = "0.13.0"
 pathdiff = "0.2.3"
 comfy-table = "7.1.4"
 futures = "0.3.31"
-indicatif = "0.17.11"
+indicatif = { version = "0.18.0", features = ["in_memory"] }
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 thiserror = "2.0.12"
 tempfile = "3.20.0"
@@ -148,7 +148,7 @@ rattler = { version = "0.34.2", default-features = false, features = [
   "indicatif",
 ] }
 rattler_cache = { version = "0.3.21", default-features = false }
-rattler_conda_types = { version = "0.35.1", default-features = false, features = [
+rattler_conda_types = { version = "0.37.0", default-features = false, features = [
   "rayon",
 ] }
 rattler_digest = { version = "1.1.3", default-features = false, features = [
