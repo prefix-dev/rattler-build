@@ -152,6 +152,10 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
 /// On macOS (Mach-O files), we do the same trick and set the rpath to a relative path with the special
 /// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
+    // Skip relinking for cache-based builds
+    if output.recipe.cache.is_some() {
+        return Ok(());
+    }
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let target_platform = output.build_configuration.target_platform;
     let relocation_config = dynamic_linking.binary_relocation();
