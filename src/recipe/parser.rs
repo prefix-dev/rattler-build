@@ -20,7 +20,8 @@ use crate::{
 };
 
 mod about;
-mod build;
+/// Build configuration and settings
+pub mod build;
 mod cache;
 mod glob_vec;
 mod helper;
