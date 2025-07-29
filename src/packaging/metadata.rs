@@ -83,7 +83,7 @@ pub fn contains_prefix_text(
 
         if target_platform.is_windows() {
             use crate::utils::to_forward_slash_lossy;
-            // absolute and unc paths will break but it,
+            // absolute and unc paths will break it, but
             // will break either way as C:/ can't be converted
             // to something meaningful in unix either way
             let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
