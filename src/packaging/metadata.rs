@@ -170,6 +170,12 @@ pub fn create_prefix_placeholder(
 
                 // If multiple variations found, normalize them to the primary format
                 if variations.len() > 1 {
+                    tracing::warn!(
+                        "Found multiple prefix format variations in file {:?}: {:?}. Normalizing to primary format: {:?}",
+                        file_path,
+                        variations,
+                        primary_format
+                    );
                     let content = fs::read_to_string(file_path)?;
                     let normalized = variations
                         .iter()
