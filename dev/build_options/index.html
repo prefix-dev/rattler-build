@@ -1779,10 +1779,13 @@ them. This is useful for files that might be modified inside the environment
 the environment to save space – that means that files modified in one
 environment will be modified in all environments. This is not always desirable,
 and in that case you can use the <code>always_copy_files</code> option.</p>
-<p>??? note "How <code>always_copy_files</code> works" The <code>always_copy_files</code> option works by
+<div class="admonition note">
+<p class="admonition-title">How <code>always_copy_files</code> works</p>
+<p>The <code>always_copy_files</code> option works by
 setting the <code>no_link</code> option in the <code>info/paths.json</code> to <code>true</code> for the files in
 question. This means that the files are copied instead of linked when the
 package is installed.</p>
+</div>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="c1"># include files even if they are already in the environment</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="c1"># as part of some other host dependency</span>
