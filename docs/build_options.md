@@ -81,10 +81,11 @@ the environment to save space – that means that files modified in one
 environment will be modified in all environments. This is not always desirable,
 and in that case you can use the `always_copy_files` option.
 
-??? note "How `always_copy_files` works" The `always_copy_files` option works by
-setting the `no_link` option in the `info/paths.json` to `true` for the files in
-question. This means that the files are copied instead of linked when the
-package is installed.
+!!! note "How `always_copy_files` works"
+    The `always_copy_files` option works by
+    setting the `no_link` option in the `info/paths.json` to `true` for the files in
+    question. This means that the files are copied instead of linked when the
+    package is installed.
 
 ```yaml title="recipe.yaml"
 build:
