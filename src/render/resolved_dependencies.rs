@@ -680,7 +680,7 @@ pub(crate) async fn resolve_dependencies(
                 );
                 tool_configuration
                     .repodata_gateway
-                    .ensure_run_exports(&mut resolved, Some(reporter))
+                    .ensure_run_exports(resolved.iter_mut(), Some(reporter))
                     .await
             })
             .await
@@ -782,7 +782,7 @@ pub(crate) async fn resolve_dependencies(
                 );
                 tool_configuration
                     .repodata_gateway
-                    .ensure_run_exports(&mut resolved, Some(reporter))
+                    .ensure_run_exports(resolved.iter_mut(), Some(reporter))
                     .await
             })
             .await
