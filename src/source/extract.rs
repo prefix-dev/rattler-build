@@ -1,9 +1,12 @@
 //! Helpers to extract archives
 use std::{
+    collections::HashSet,
     ffi::OsStr,
     io::{self, BufRead, BufReader},
     path::Path,
 };
+
+use super::copy_dir::{CopyOptions, copy_file};
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -108,11 +111,20 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
         _ => src.to_path_buf(),
     };
 
-    for entry in fs::read_dir(src_dir)? {
+    let mut paths_created = HashSet::new();
+    let options = CopyOptions {
+        overwrite: true,
+        ..Default::default()
+    };
+
+    for entry in fs::read_dir(&src_dir)? {
         let entry = entry?;
         let destination = dest.join(entry.file_name());
-        fs::rename(entry.path(), destination)?;
+        copy_file(entry.path(), &destination, &mut paths_created, &options)?;
     }
+
+    // Clean up the source directory after successful copy
+    fs::remove_dir_all(&src_dir)?;
 
     Ok(())
 }
@@ -186,7 +198,10 @@ pub(crate) fn extract_zip(
         let mut file = archive
             .by_index(i)
             .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
-        let outpath = tmp_extraction_dir.path().join(file.mangled_name());
+        let enclosed_name = file.enclosed_name().ok_or_else(|| {
+            SourceError::InvalidZip(format!("unsafe file path in zip: {}", file.name()))
+        })?;
+        let outpath = tmp_extraction_dir.path().join(enclosed_name);
         if file.name().ends_with('/') {
             fs::create_dir_all(&outpath)?;
         } else {
