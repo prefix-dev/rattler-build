@@ -122,7 +122,7 @@ base64 = "0.22.1"
 flate2 = "1.1.2"
 xz2 = "0.1.7"
 zstd = "0.13.3"
-toml = "0.9.4"
+toml = "0.8.23"
 memmap2 = "0.9.7"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = "0.5.4"
