@@ -28,8 +28,8 @@ tokio = { version = "1.47.1", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.37.0"
-rattler_config = "0.2.5"
+rattler_conda_types = { git = "https://github.com/remimimimimi/rattler.git", branch = "feat/extract-run-export" }
+rattler_config = { git = "https://github.com/remimimimimi/rattler.git", branch = "feat/extract-run-export" }
 clap = "4.5.42"
 url = "2.5.4"
 chrono = "0.4.41"
