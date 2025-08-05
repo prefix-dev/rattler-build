@@ -249,7 +249,8 @@ pub async fn run<B: Backend>(
                             log_sender
                                 .send(Event::SetBuildState(i, BuildProgress::Building))
                                 .unwrap();
-                            match run_build(package.output, &package.tool_config).await {
+                            let preserve_working_directory = false;
+                            match run_build(package.output, &package.tool_config, preserve_working_directory).await {
                                 Ok((output, _archive)) => {
                                     output.record_build_end();
                                     let span = tracing::info_span!("Build summary");
