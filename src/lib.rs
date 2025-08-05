@@ -483,6 +483,7 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
+    let preserve_working_directory = false;
 
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
@@ -492,9 +493,13 @@ pub async fn run_build_from_args(
         .collect::<Vec<_>>();
 
     for (index, output) in outputs_to_build.iter().enumerate() {
-        let (output, archive) = match run_build(output.clone(), &tool_configuration)
-            .boxed_local()
-            .await
+        let (output, archive) = match run_build(
+            output.clone(),
+            &tool_configuration,
+            preserve_working_directory,
+        )
+        .boxed_local()
+        .await
         {
             Ok((output, archive)) => {
                 output.record_build_end();
@@ -796,7 +801,8 @@ pub async fn rebuild(
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(output, &tool_config).await?;
+    let preserve_working_directory = false;
+    run_build(output, &tool_config, preserve_working_directory).await?;
 
     Ok(())
 }

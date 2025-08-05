@@ -100,11 +100,12 @@ pub async fn skip_existing(
 pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
+    preserve_working_directory: bool,
 ) -> miette::Result<(Output, PathBuf)> {
     output
         .build_configuration
         .directories
-        .create_build_dir(true)
+        .create_build_dir(!preserve_working_directory)
         .into_diagnostic()?;
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
