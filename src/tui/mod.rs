@@ -20,7 +20,7 @@ use std::io::{self, Stderr};
 use std::panic;
 use std::path::PathBuf;
 
-use crate::build::run_build;
+use crate::build::{WorkingDirectoryBehavior, run_build};
 use crate::console_utils::LoggingOutputHandler;
 use crate::{BuildData, get_build_output, sort_build_outputs_topologically};
 
@@ -249,8 +249,13 @@ pub async fn run<B: Backend>(
                             log_sender
                                 .send(Event::SetBuildState(i, BuildProgress::Building))
                                 .unwrap();
-                            let preserve_working_directory = false;
-                            match run_build(package.output, &package.tool_config, preserve_working_directory).await {
+                            match run_build(
+                                package.output,
+                                &package.tool_config,
+                                WorkingDirectoryBehavior::Cleanup,
+                            )
+                            .await
+                            {
                                 Ok((output, _archive)) => {
                                     output.record_build_end();
                                     let span = tracing::info_span!("Build summary");
