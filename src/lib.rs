@@ -50,7 +50,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use build::{run_build, skip_existing};
+use build::{WorkingDirectoryBehavior, run_build, skip_existing};
 use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
@@ -483,7 +483,6 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
-
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
     let all_output_names = outputs_to_build
@@ -492,9 +491,13 @@ pub async fn run_build_from_args(
         .collect::<Vec<_>>();
 
     for (index, output) in outputs_to_build.iter().enumerate() {
-        let (output, archive) = match run_build(output.clone(), &tool_configuration)
-            .boxed_local()
-            .await
+        let (output, archive) = match run_build(
+            output.clone(),
+            &tool_configuration,
+            WorkingDirectoryBehavior::Cleanup,
+        )
+        .boxed_local()
+        .await
         {
             Ok((output, archive)) => {
                 output.record_build_end();
@@ -796,7 +799,7 @@ pub async fn rebuild(
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(output, &tool_config).await?;
+    run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     Ok(())
 }
