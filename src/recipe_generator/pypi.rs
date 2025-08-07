@@ -525,7 +525,7 @@ mod tests {
     async fn test_hyphenated_imports_are_sanitized() {
         let opts = PyPIOpts {
             package: "file-read-backwards".into(),
-            version: None,
+            version: Some("3.2.0".into()),
             write: false,
             use_mapping: true,
             tree: false,
