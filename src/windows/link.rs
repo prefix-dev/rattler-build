@@ -1,16 +1,13 @@
 #![allow(dead_code)]
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     path::{Path, PathBuf},
 };
 
 use fs_err::File;
-
-use goblin::pe::{PE, header::DOS_MAGIC};
+use goblin::pe::PE;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
-use scroll::Pread;
 
 use crate::{
     post_process::relink::{RelinkError, Relinker},
@@ -61,13 +58,16 @@ pub enum DllParseError {
 
 impl Relinker for Dll {
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
-        let mut file = File::open(path)?;
-        let mut buf: [u8; 2] = [0; 2];
-        file.read_exact(&mut buf)?;
-        let signature = buf
-            .pread_with::<u16>(0, scroll::LE)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        Ok(DOS_MAGIC == signature)
+        let file = File::open(path)?;
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+
+        match PE::parse(&mmap) {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                tracing::warn!("[relink/windows] Skipping {path:?}: {e}");
+                Ok(false)
+            }
+        }
     }
 
     fn new(path: &Path) -> Result<Self, RelinkError> {
