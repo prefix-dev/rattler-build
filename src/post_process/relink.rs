@@ -185,7 +185,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             continue;
         }
 
-        if !relocation_config.is_match(p) {
+        let rel_path = p.strip_prefix(tmp_prefix)?;
+        if !relocation_config.is_match(rel_path) {
             continue;
         }
 
