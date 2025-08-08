@@ -5,7 +5,6 @@ use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
-    ops::Deref,
     path::{Path, PathBuf},
 };
 
@@ -25,6 +24,54 @@ use url::Url;
 
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
+
+/// Compute all path variations (forward slash, backward slash) for prefix detection.
+/// Returns a Vec of potential prefix strings to search for.
+fn compute_prefix_variations(prefix: &Path, target_platform: &Platform) -> Vec<String> {
+    let mut variations = Vec::new();
+
+    // Always include the original prefix as-is
+    let original = prefix.to_string_lossy().to_string();
+    variations.push(original);
+
+    // On Windows, also include forward-slash version
+    if target_platform.is_windows() {
+        use crate::utils::to_forward_slash_lossy;
+        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+        let forward_version = forward_slash.to_string();
+
+        if !variations.contains(&forward_version) {
+            variations.push(forward_version);
+        }
+    }
+
+    variations
+}
+
+/// Search for all prefix variations in a file with a single memory mapping.
+/// Returns which variations were found in the file.
+fn find_prefix_variations_in_file(
+    file_path: &Path,
+    variations: &[String],
+) -> Result<Vec<String>, PackagingError> {
+    let mut found_variations = Vec::new();
+
+    // Open the file in a scope to ensure the memory map and file handle are dropped
+    let file = File::open(file_path)?;
+    let mmap = unsafe { memmap2::Mmap::map(&file)? };
+
+    // Search for each variation in the memory-mapped file
+    for variation in variations {
+        if memchr::memmem::find_iter(mmap.as_ref(), variation.as_bytes())
+            .next()
+            .is_some()
+        {
+            found_variations.push(variation.clone());
+        }
+    }
+
+    Ok(found_variations)
+}
 
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
@@ -65,39 +112,8 @@ pub fn contains_prefix_text(
     prefix: &Path,
     target_platform: &Platform,
 ) -> Result<Vec<String>, PackagingError> {
-    let mut found_variations = Vec::new();
-
-    {
-        // Open the file in a new scope to ensure the memory map and file handle are dropped
-        let file = File::open(file_path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-
-        // Check if the content contains the prefix with memchr
-        let prefix_string = prefix.to_string_lossy().to_string();
-        if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
-            .next()
-            .is_some()
-        {
-            found_variations.push(prefix_string);
-        }
-
-        if target_platform.is_windows() {
-            use crate::utils::to_forward_slash_lossy;
-            // absolute and unc paths will break it, but
-            // will break either way as C:/ can't be converted
-            // to something meaningful in unix either way
-            let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
-
-            if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
-                .next()
-                .is_some()
-            {
-                found_variations.push(forward_slash.to_string());
-            }
-        }
-    }
-
-    Ok(found_variations)
+    let variations = compute_prefix_variations(prefix, target_platform);
+    find_prefix_variations_in_file(file_path, &variations)
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -153,6 +169,15 @@ pub fn create_prefix_placeholder(
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
             Ok(variations) if !variations.is_empty() => {
+                if variations.len() > 1 {
+                    tracing::warn!(
+                        "MixedPrefixPathVariations in file {:?}: found {} variations: {:?}",
+                        file_path,
+                        variations.len(),
+                        variations
+                    );
+                }
+
                 // Choose the canonical format based on platform conventions
                 let primary_format = if target_platform.is_windows() {
                     // On Windows, prefer backslash format (native Windows style)
@@ -170,12 +195,6 @@ pub fn create_prefix_placeholder(
 
                 // If multiple variations found, normalize them to the primary format
                 if variations.len() > 1 {
-                    tracing::warn!(
-                        "Found multiple prefix format variations in file {:?}: {:?}. Normalizing to primary format: {:?}",
-                        file_path,
-                        variations,
-                        primary_format
-                    );
                     let content = fs::read_to_string(file_path)?;
                     let normalized = variations
                         .iter()
