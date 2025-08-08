@@ -402,10 +402,11 @@ impl Output {
                 continue;
             }
 
-            if !p.exists() {
-                if p.is_symlink() {
-                    // check if the file is in the prefix
-                    if let Ok(link_target) = p.read_link() {
+            // Handle symlinks first, regardless of whether they exist or are broken
+            if meta.is_symlink() {
+                if let Ok(link_target) = p.read_link() {
+                    // For broken symlinks, validate the target should be relative
+                    if !p.exists() {
                         if link_target.is_relative() {
                             let Some(relative_path_parent) = relative_path.parent() else {
                                 tracing::warn!("could not get parent of symlink {:?}", &p);
@@ -413,7 +414,8 @@ impl Output {
                             };
 
                             let resolved_path = temp_files
-                                .encoded_prefix
+                                .temp_dir
+                                .path()
                                 .join(relative_path_parent)
                                 .join(&link_target);
 
@@ -423,8 +425,6 @@ impl Output {
                                     &p,
                                     &link_target
                                 );
-
-                                // Think about continuing here or packaging broken symlinks
                                 continue;
                             }
                         } else {
@@ -433,14 +433,17 @@ impl Output {
                                 &p,
                                 link_target
                             );
+                            continue;
                         }
-                    } else {
-                        tracing::warn!("could not read symlink {:?}", &p);
                     }
+                    // Valid symlink, will be processed below
                 } else {
-                    tracing::warn!("file does not exist: {:?}", &p);
+                    tracing::warn!("could not read symlink {:?}", &p);
                     continue;
                 }
+            } else if !p.exists() {
+                tracing::warn!("file does not exist: {:?}", &p);
+                continue;
             }
 
             if meta.is_dir() {
@@ -457,41 +460,54 @@ impl Output {
                     };
                     paths_json.paths.push(path_entry);
                 }
-            } else if meta.is_file() {
-                let content_type =
-                    content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
-                let prefix_placeholder = create_prefix_placeholder(
-                    &self.build_configuration.target_platform,
-                    p,
-                    temp_files.temp_dir.path(),
-                    &temp_files.encoded_prefix,
-                    &content_type,
-                    self.recipe.build().prefix_detection(),
-                )?;
-
-                let digest = compute_file_digest::<sha2::Sha256>(p)?;
-                let no_link = always_copy_files.is_match(&relative_path);
-                paths_json.paths.push(PathsEntry {
-                    sha256: Some(digest),
-                    relative_path,
-                    path_type: PathType::HardLink,
-                    prefix_placeholder,
-                    no_link,
-                    size_in_bytes: Some(meta.len()),
-                });
-            } else if meta.is_symlink() {
-                let digest = if p.is_file() {
-                    compute_file_digest::<sha2::Sha256>(p)?
+            } else {
+                // non-directory file or symlink
+                let path_type = if meta.is_symlink() {
+                    PathType::SoftLink
                 } else {
-                    compute_bytes_digest::<sha2::Sha256>(&[])
+                    PathType::HardLink
                 };
 
+                // For symlinks, content_type can be None, but for regular files it's required
+                let prefix_placeholder = if path_type == PathType::SoftLink {
+                    // For symlinks, we don't need content type for prefix detection
+                    None
+                } else {
+                    // For regular files, we need content type
+                    let content_type = content_type
+                        .ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
+                    create_prefix_placeholder(
+                        &self.build_configuration.target_platform,
+                        p,
+                        temp_files.temp_dir.path(),
+                        &temp_files.encoded_prefix,
+                        &content_type,
+                        self.recipe.build().prefix_detection(),
+                    )?
+                };
+
+                // Compute digest: for file symlinks use the file content digest, for directory symlinks use empty digest
+                let digest = if path_type == PathType::SoftLink {
+                    // Follow symlink to get target metadata
+                    if fs::metadata(p)?.is_file() {
+                        // Symlink to file: digest the file content
+                        Some(compute_file_digest::<sha2::Sha256>(p)?)
+                    } else {
+                        // Symlink to directory: use empty digest
+                        Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+                    }
+                } else {
+                    // Hard links/files: digest the file content
+                    Some(compute_file_digest::<sha2::Sha256>(p)?)
+                };
+
+                let no_link = always_copy_files.is_match(&relative_path);
                 paths_json.paths.push(PathsEntry {
-                    sha256: Some(digest),
+                    sha256: digest,
                     relative_path,
-                    path_type: PathType::SoftLink,
-                    prefix_placeholder: None,
-                    no_link: false,
+                    path_type,
+                    prefix_placeholder,
+                    no_link,
                     size_in_bytes: Some(meta.len()),
                 });
             }
