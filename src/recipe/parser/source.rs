@@ -387,29 +387,29 @@ impl fmt::Display for GitUrl {
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     #[serde_as(as = "OneOrMany<_, PreferOne>")]
-    url: Vec<Url>,
+    pub url: Vec<Url>,
 
     /// Optionally a sha256 checksum to verify the downloaded file
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<SerializableHash::<rattler_digest::Sha256>>")]
-    sha256: Option<Sha256Hash>,
+    pub sha256: Option<Sha256Hash>,
 
     /// Optionally a md5 checksum to verify the downloaded file
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<SerializableHash::<rattler_digest::Md5>>")]
-    md5: Option<Md5Hash>,
+    pub md5: Option<Md5Hash>,
 
     /// Optionally a file name to rename the downloaded file (does not apply to archives)
     #[serde(skip_serializing_if = "Option::is_none")]
-    file_name: Option<String>,
+    pub file_name: Option<String>,
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    patches: Vec<PathBuf>,
+    pub patches: Vec<PathBuf>,
 
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
-    target_directory: Option<PathBuf>,
+    pub target_directory: Option<PathBuf>,
 }
 
 impl UrlSource {
