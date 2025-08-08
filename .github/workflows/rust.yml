@@ -43,7 +43,7 @@ jobs:
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.8.12
+      - uses: prefix-dev/setup-pixi@v0.8.14
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         with:
           cache: true
@@ -151,12 +151,9 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        shell: bash
-        run: |
-          # Cross has warnings and we don't want that to stop the build
-          unset RUSTFLAGS
-          # Cross hasn't made a release since 2023, so we use `main` instead
-          cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2
+        with:
+          tool: cross
 
       - name: Show version information (Rust, cargo, GCC)
         run: |

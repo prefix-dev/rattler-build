@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.44.0"
+version = "0.45.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -61,11 +61,11 @@ serde-untagged = "0.1.7"
 anyhow = "1.0.98"
 walkdir = "2.5.0"
 hex = "0.4.3"
-serde_json = "1.0.140"
-reqwest = { version = "0.12.20", default-features = false, features = [
+serde_json = "1.0.142"
+reqwest = { version = "0.12.22", default-features = false, features = [
   "multipart",
 ] }
-tokio = { version = "1.45.1", features = [
+tokio = { version = "1.47.1", features = [
   "rt",
   "macros",
   "rt-multi-thread",
@@ -73,11 +73,11 @@ tokio = { version = "1.45.1", features = [
 ] }
 itertools = "0.14.0"
 content_inspector = "0.2.4"
-serde_with = "3.13.0"
+serde_with = "3.14.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.40", features = ["derive", "env", "cargo"] }
-minijinja = { version = "2.10.2", features = [
+clap = { version = "4.5.42", features = ["derive", "env", "cargo"] }
+minijinja = { version = "2.11.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -96,34 +96,34 @@ pathdiff = "0.2.3"
 comfy-table = "7.1.4"
 futures = "0.3.31"
 indicatif = { version = "0.18.0", features = ["in_memory"] }
-console = { version = "0.15.11", features = ["windows-console-colors"] }
+console = { version = "0.16.0", features = ["windows-console-colors"] }
 thiserror = "2.0.12"
 tempfile = "3.20.0"
 chrono = "0.4.41"
 sha1 = "0.10.6"
-spdx = "0.10.8"
+spdx = "0.10.9"
 ignore = "0.4.23"
 globset = "0.4.16"
 clap-verbosity-flag = "3.0.3"
 tracing-core = "0.1.34"
 petgraph = "0.8.2"
-indexmap = "2.9.0"
+indexmap = "2.10.0"
 dunce = "1.0.5"
 fs-err = "3.1.1"
 which = "8.0.0"
-clap_complete = "4.5.54"
-clap_complete_nushell = "4.5.7"
+clap_complete = "4.5.55"
+clap_complete_nushell = "4.5.8"
 tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
 
 tar = "0.4.44"
-zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
+zip = { version = "4.3.0", default-features = false, features = ["deflate"] }
 bzip2 = "0.6.0"
 base64 = "0.22.1"
 flate2 = "1.1.2"
 xz2 = "0.1.7"
 zstd = "0.13.3"
 toml = "0.8.23"
-memmap2 = "0.9.5"
+memmap2 = "0.9.7"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.2"
@@ -132,57 +132,57 @@ ratatui = { version = "0.29.0", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
-tui-input = { version = "0.11.1", optional = true }
+tui-input = { version = "0.14.0", optional = true }
 reflink-copy = "0.1.26"
 rayon = "1.10.0"
 regex = "1.11.1"
 async-recursion = "1.1.1"
-opendal = { version = "0.53.3", default-features = false, features = [
+opendal = { version = "0.54.0", default-features = false, features = [
   "services-s3",
 ] }
 
 # Rattler crates
-rattler_upload = { version = "0.1.2", default-features = false, features = [
-  "s3",
-] }
-rattler_config = { version = "0.2.0" }
-rattler = { version = "0.34.2", default-features = false, features = [
+rattler_config = { version = "0.2.5" }
+rattler = { version = "0.34.11", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.21", default-features = false }
+rattler_cache = { version = "0.3.29", default-features = false }
 rattler_conda_types = { version = "0.37.0", default-features = false, features = [
   "rayon",
 ] }
-rattler_digest = { version = "1.1.3", default-features = false, features = [
+rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.24.1", default-features = false }
-rattler_networking = { version = "0.25.1", default-features = false, features = [
+rattler_index = { version = "0.24.7", default-features = false }
+rattler_networking = { version = "0.25.8", default-features = false, features = [
   "s3",
   "rattler_config",
 ] }
-rattler_redaction = { version = "0.1.11" }
-rattler_repodata_gateway = { version = "0.23.2", default-features = false, features = [
+rattler_upload = { version = "0.1.2", default-features = false, features = [
+  "s3",
+] }
+rattler_redaction = { version = "0.1.12" }
+rattler_repodata_gateway = { version = "0.23.10", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.9", default-features = false, features = [
+rattler_sandbox = { version = "0.1.10", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.24.1", default-features = false, features = [
+rattler_shell = { version = "0.24.7", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "2.1.1", default-features = false, features = [
+rattler_solve = { version = "2.1.8", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.14", default-features = false }
-rattler_package_streaming = { version = "0.22.40", default-features = false }
-rattler_menuinst = "0.2.11"
+rattler_virtual_packages = { version = "2.1.1", default-features = false }
+rattler_package_streaming = { version = "0.22.48", default-features = false }
+rattler_menuinst = "0.2.20"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"
-strum = "0.27.1"
+strum = "0.27.2"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
 diffy = { git = "https://github.com/prefix-dev/diffy.git", branch = "master" }
@@ -190,7 +190,7 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.16.2"
+sevenz-rust2 = "0.17.1"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { version = "0.10.9", features = ["asm"] }
@@ -200,11 +200,11 @@ sha2 = { version = "0.10.9" }
 
 [dev-dependencies]
 insta = { version = "1.43.1", features = ["yaml", "filters"] }
-rstest = "0.25.0"
+rstest = "0.26.1"
 tracing-test = "0.2.5"
-tracing-indicatif = "0.3.9"
+tracing-indicatif = "0.3.12"
 serial_test = "3.2.0"
-criterion = { version = "0.6.0", features = ["html_reports"] }
+criterion = { version = "0.7.0", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
 
 [[bench]]
