@@ -56,28 +56,53 @@ pub enum DllParseError {
     ParseFailed(#[from] goblin::error::Error),
 }
 
-impl Relinker for Dll {
-    fn test_file(path: &Path) -> Result<bool, RelinkError> {
+impl Dll {
+    /// Try to parse a PE file and create a Dll analyzer, returning None for non-PE or invalid PE files
+    pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
         let file = File::open(path)?;
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
         match PE::parse(&mmap) {
-            Ok(_) => Ok(true),
+            Ok(pe) => Ok(Some(Self {
+                path: path.to_path_buf(),
+                libraries: pe.libraries.iter().map(PathBuf::from).collect(),
+            })),
             Err(e) => {
-                tracing::warn!("[relink/windows] Skipping {path:?}: {e}");
-                Ok(false)
+                match e {
+                    goblin::error::Error::BadMagic(_) => {
+                        // Not a PE file (bad magic number), skip silently
+                        Ok(None)
+                    }
+                    goblin::error::Error::Malformed(_) => {
+                        // File looks like PE but is structurally malformed
+                        tracing::warn!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
+                        Ok(None)
+                    }
+                    _ => {
+                        // IO, buffer, scroll errors should bubble up as real system errors
+                        Err(RelinkError::ParseError(e))
+                    }
+                }
             }
+        }
+    }
+}
+
+impl Relinker for Dll {
+    fn test_file(path: &Path) -> Result<bool, RelinkError> {
+        match Self::try_new(path)? {
+            Some(_) => Ok(true),
+            None => Ok(false),
         }
     }
 
     fn new(path: &Path) -> Result<Self, RelinkError> {
-        let file = File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-        let pe = PE::parse(&mmap)?;
-        Ok(Self {
-            path: path.to_path_buf(),
-            libraries: pe.libraries.iter().map(PathBuf::from).collect(),
-        })
+        match Self::try_new(path)? {
+            Some(dll) => Ok(dll),
+            None => Err(RelinkError::ParseError(goblin::error::Error::Malformed(
+                "Not a valid PE file".to_string(),
+            ))),
+        }
     }
 
     fn libraries(&self) -> HashSet<PathBuf> {
