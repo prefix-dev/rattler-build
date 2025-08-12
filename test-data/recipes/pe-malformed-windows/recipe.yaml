@@ -1,0 +1,22 @@
+package:
+  name: pe-test
+  version: "1.0.0"
+
+source:
+  # No external source; build script will generate the malformed DLL
+  path: .
+
+build:
+  number: 0
+  script: |
+    rem Create a malformed PE file directly in the PREFIX Library\bin
+    powershell -NoProfile -Command "${env:out} = Join-Path $env:PREFIX 'Library\bin\malformed.dll'; New-Item -Force -ItemType Directory (Split-Path ${env:out}) | Out-Null; $len = 0x10000 + 4 + 100; $bytes = New-Object byte[] ($len); $bytes[0] = 0x4D; $bytes[1] = 0x5A; $bytes[60] = 0x00; $bytes[61] = 0x00; $bytes[62] = 0x01; $bytes[63] = 0x00; $bytes[0x10000] = 0x46; $bytes[0x10000 + 1] = 0x41; $bytes[0x10000 + 2] = 0x4B; $bytes[0x10000 + 3] = 0x45; [System.IO.File]::WriteAllBytes(${env:out}, $bytes)"
+
+requirements:
+  build: []
+  host: []
+  run: []
+
+about:
+  summary: Test package to validate relinker behavior with malformed PE files on Windows
+  license: MIT

@@ -104,30 +104,23 @@ pub trait Relinker {
     ) -> Result<(), RelinkError>;
 }
 
-/// Returns true if the file is valid (i.e. ELF or Mach-o or PE)
-pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkError> {
-    if platform.is_linux() {
-        SharedObject::test_file(path)
-    } else if platform.is_osx() {
-        Dylib::test_file(path)
-    } else if platform.is_windows() {
-        Dll::test_file(path)
-    } else {
-        Err(RelinkError::UnknownPlatform)
-    }
-}
-
 /// Returns the relink helper for the current platform.
 pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
-    if !is_valid_file(platform, path)? {
-        return Err(RelinkError::UnknownFileFormat);
-    }
     if platform.is_linux() {
+        if !SharedObject::test_file(path)? {
+            return Err(RelinkError::UnknownFileFormat);
+        }
         Ok(Box::new(SharedObject::new(path)?))
     } else if platform.is_osx() {
+        if !Dylib::test_file(path)? {
+            return Err(RelinkError::UnknownFileFormat);
+        }
         Ok(Box::new(Dylib::new(path)?))
     } else if platform.is_windows() {
-        Ok(Box::new(Dll::new(path)?))
+        match Dll::try_new(path)? {
+            Some(dll) => Ok(Box::new(dll)),
+            None => Err(RelinkError::UnknownFileFormat),
+        }
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -190,18 +183,21 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             continue;
         }
 
-        if is_valid_file(target_platform, p)? {
-            let relinker = get_relinker(target_platform, p)?;
-            if !target_platform.is_windows() {
-                relinker.relink(
-                    tmp_prefix,
-                    encoded_prefix,
-                    &rpaths,
-                    rpath_allowlist,
-                    &system_tools,
-                )?;
+        match get_relinker(target_platform, p) {
+            Ok(relinker) => {
+                if !target_platform.is_windows() {
+                    relinker.relink(
+                        tmp_prefix,
+                        encoded_prefix,
+                        &rpaths,
+                        rpath_allowlist,
+                        &system_tools,
+                    )?;
+                }
+                binaries.insert(p.clone());
             }
-            binaries.insert(p.clone());
+            Err(RelinkError::UnknownFileFormat) => {}
+            Err(e) => return Err(e),
         }
     }
     perform_linking_checks(output, &binaries, tmp_prefix)?;
