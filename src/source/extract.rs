@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::console_utils::LoggingOutputHandler;
+use crate::utils::remove_dir_all_force;
 
 use fs_err as fs;
 use fs_err::File;
@@ -113,6 +114,9 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
         let destination = dest.join(entry.file_name());
         fs::rename(entry.path(), destination)?;
     }
+
+    // Clean up the temporary directory
+    remove_dir_all_force(src)?;
 
     Ok(())
 }
