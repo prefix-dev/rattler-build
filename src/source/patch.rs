@@ -150,6 +150,7 @@ fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
             #[cfg(not(unix))]
             {
                 // Assume this means windows
+                #[allow(clippy::permissions_set_readonly_false)]
                 perms.set_readonly(false);
             }
             fs_err::set_permissions(path, perms).map_err(SourceError::Io)?;
