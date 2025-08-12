@@ -9,6 +9,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rattler::install::Placement;
 use rattler_cache::package_cache::CacheReporter;
 use rattler_conda_types::RepoDataRecord;
+use rattler_repodata_gateway::RunExportsReporter;
 
 /// A reporter that makes it easy to show the progress of updating the package
 /// cache.
@@ -49,7 +50,7 @@ impl PackageCacheReporter {
     /// Adds a new package to the reporter. Returns a
     /// `PackageCacheReporterEntry` which can be passed to any of the cache
     /// functions of a package cache to track progress.
-    pub fn add(&mut self, record: &RepoDataRecord) -> PackageCacheReporterEntry {
+    pub fn add(&self, record: &RepoDataRecord) -> PackageCacheReporterEntry {
         let mut inner = self.inner.lock().unwrap();
 
         let entry = ProgressEntry {
@@ -71,6 +72,12 @@ impl PackageCacheReporter {
             inner: self.inner.clone(),
             entry_idx,
         }
+    }
+}
+
+impl RunExportsReporter for PackageCacheReporter {
+    fn add(&self, record: &RepoDataRecord) -> Arc<dyn CacheReporter> {
+        Arc::new(self.add(record))
     }
 }
 
