@@ -2270,3 +2270,16 @@ def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_extracted_package(tmp_path, "nodejs-test")
 
     assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="PE header test only relevant on Windows"
+)
+def test_pe_header_signature_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Malformed PE in Library/bin should be skipped by relinker; build succeeds."""
+    recipe = recipes / "pe-malformed-windows/recipe.yaml"
+    rattler_build.build(recipe, tmp_path)
+    pkg = get_extracted_package(tmp_path, "pe-test")
+    assert (pkg / "info/index.json").exists()
