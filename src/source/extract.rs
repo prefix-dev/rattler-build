@@ -1,12 +1,9 @@
 //! Helpers to extract archives
 use std::{
-    collections::HashSet,
     ffi::OsStr,
     io::{self, BufRead, BufReader},
     path::Path,
 };
-
-use super::copy_dir::{CopyOptions, copy_file};
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -111,20 +108,11 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
         _ => src.to_path_buf(),
     };
 
-    let mut paths_created = HashSet::new();
-    let options = CopyOptions {
-        overwrite: true,
-        ..Default::default()
-    };
-
-    for entry in fs::read_dir(&src_dir)? {
+    for entry in fs::read_dir(src_dir)? {
         let entry = entry?;
         let destination = dest.join(entry.file_name());
-        copy_file(entry.path(), &destination, &mut paths_created, &options)?;
+        fs::rename(entry.path(), destination)?;
     }
-
-    // Clean up the source directory after successful copy
-    fs::remove_dir_all(&src_dir)?;
 
     Ok(())
 }
