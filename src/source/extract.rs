@@ -1,7 +1,12 @@
 //! Helpers to extract archives
-use std::{ffi::OsStr, io::BufRead, path::Path};
+use std::{
+    ffi::OsStr,
+    io::{self, BufRead, BufReader},
+    path::Path,
+};
 
 use crate::console_utils::LoggingOutputHandler;
+use crate::utils::remove_dir_all_force;
 
 use fs_err as fs;
 use fs_err::File;
@@ -13,7 +18,7 @@ enum TarCompression<'a> {
     Gzip(flate2::read::GzDecoder<Box<dyn BufRead + 'a>>),
     Bzip2(bzip2::read::BzDecoder<Box<dyn BufRead + 'a>>),
     Xz2(xz2::read::XzDecoder<Box<dyn BufRead + 'a>>),
-    Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<Box<dyn BufRead + 'a>>>),
+    Zstd(zstd::stream::read::Decoder<'a, BufReader<Box<dyn BufRead + 'a>>>),
     Compress,
     Lzip,
     Lzop,
@@ -79,8 +84,8 @@ fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> T
     }
 }
 
-impl std::io::Read for TarCompression<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+impl io::Read for TarCompression<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
             TarCompression::PlainTar(reader) => reader.read(buf),
             TarCompression::Gzip(reader) => reader.read(buf),
@@ -110,6 +115,9 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
         fs::rename(entry.path(), destination)?;
     }
 
+    // Clean up the temporary directory
+    remove_dir_all_force(src)?;
+
     Ok(())
 }
 
@@ -132,7 +140,7 @@ pub(crate) fn extract_tar(
     );
 
     let file = File::open(archive)?;
-    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let buf_reader = BufReader::with_capacity(1024 * 1024, file);
     let wrapped = progress_bar.wrap_read(buf_reader);
 
     let mut archive = tar::Archive::new(ext_to_compression(archive.file_name(), Box::new(wrapped)));
@@ -170,15 +178,32 @@ pub(crate) fn extract_zip(
     );
 
     let file = File::open(archive)?;
-    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let buf_reader = BufReader::with_capacity(1024 * 1024, file);
     let wrapped = progress_bar.wrap_read(buf_reader);
     let mut archive =
         zip::ZipArchive::new(wrapped).map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
-    archive
-        .extract(&tmp_extraction_dir)
-        .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
+
+    // Extract using iterator - handles Windows-specific issues with manual extraction
+    (0..archive.len()).try_for_each(|i| -> Result<(), SourceError> {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
+        let enclosed_name = file.enclosed_name().ok_or_else(|| {
+            SourceError::InvalidZip(format!("unsafe file path in zip: {}", file.name()))
+        })?;
+        let outpath = tmp_extraction_dir.path().join(enclosed_name);
+        if file.name().ends_with('/') {
+            fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                fs::create_dir_all(p)?;
+            }
+            io::copy(&mut file, &mut File::create(&outpath)?)?;
+        }
+        Ok(())
+    })?;
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
     progress_bar.finish_with_message("Extracted...");
@@ -204,7 +229,7 @@ pub(crate) fn extract_7z(
     );
 
     let file = File::open(archive)?;
-    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let buf_reader = BufReader::with_capacity(1024 * 1024, file);
     let wrapped = progress_bar.wrap_read(buf_reader);
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
