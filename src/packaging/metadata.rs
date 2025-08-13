@@ -5,6 +5,7 @@ use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
+    io::{BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -116,6 +117,59 @@ pub fn contains_prefix_text(
     find_prefix_variations_in_file(file_path, &variations)
 }
 
+/// Normalize prefix variations in a file using streaming I/O and read them line by line.
+fn normalize_prefix_variations_streaming(
+    file_path: &Path,
+    variations: &[String],
+    primary_format: &str,
+) -> Result<(), PackagingError> {
+    let variations_to_replace: Vec<&str> = variations
+        .iter()
+        .filter(|&v| v != primary_format)
+        .map(|s| s.as_str())
+        .collect();
+
+    if variations_to_replace.is_empty() {
+        return Ok(());
+    }
+
+    let temp_file_path = file_path.with_extension("tmp_normalize");
+    let original_metadata = fs::metadata(file_path)?;
+
+    {
+        let input_file = File::open(file_path)?;
+        let output_file = File::create(&temp_file_path)?;
+
+        let reader = BufReader::new(input_file);
+        let mut writer = BufWriter::new(output_file);
+
+        for line_result in reader.lines() {
+            let mut line = line_result?;
+
+            for &variation in &variations_to_replace {
+                if line.contains(variation) {
+                    line = line.replace(variation, primary_format);
+                }
+            }
+
+            writeln!(writer, "{}", line)?;
+        }
+
+        writer.flush()?;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let permissions = std::fs::Permissions::from_mode(original_metadata.permissions().mode());
+        fs::set_permissions(&temp_file_path, permissions)?;
+    }
+
+    fs::rename(&temp_file_path, file_path)?;
+
+    Ok(())
+}
+
 /// Create a prefix placeholder object for the given file and prefix.
 /// This function will also search in the file for the prefix and determine if
 /// the file is binary or text.
@@ -195,12 +249,7 @@ pub fn create_prefix_placeholder(
 
                 // If multiple variations found, normalize them to the primary format
                 if variations.len() > 1 {
-                    let content = fs::read_to_string(file_path)?;
-                    let normalized = variations
-                        .iter()
-                        .filter(|&v| v != primary_format)
-                        .fold(content, |acc, variant| acc.replace(variant, primary_format));
-                    fs::write(file_path, normalized)?;
+                    normalize_prefix_variations_streaming(file_path, &variations, primary_format)?;
                 }
 
                 has_prefix = Some(primary_format.clone());
