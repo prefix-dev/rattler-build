@@ -148,7 +148,7 @@ rattler = { version = "0.34.8", default-features = false, features = [
   "indicatif",
 ] }
 rattler_cache = { version = "0.3.27", default-features = false }
-rattler_conda_types = { version = "0.36.0", default-features = false, features = [
+rattler_conda_types = { version = "0.37.0", default-features = false, features = [
   "rayon",
   "experimental_extras",
 ] }
