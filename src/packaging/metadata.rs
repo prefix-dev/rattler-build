@@ -134,6 +134,7 @@ fn normalize_prefix_variations_streaming(
     }
 
     let temp_file_path = file_path.with_extension("tmp_normalize");
+    #[cfg(unix)]
     let original_metadata = fs::metadata(file_path)?;
 
     {
