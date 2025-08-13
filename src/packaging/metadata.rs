@@ -5,7 +5,7 @@ use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
-    ops::Deref,
+    io::{BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -25,6 +25,54 @@ use url::Url;
 
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
+
+/// Compute all path variations (forward slash, backward slash) for prefix detection.
+/// Returns a Vec of potential prefix strings to search for.
+fn compute_prefix_variations(prefix: &Path, target_platform: &Platform) -> Vec<String> {
+    let mut variations = Vec::new();
+
+    // Always include the original prefix as-is
+    let original = prefix.to_string_lossy().to_string();
+    variations.push(original);
+
+    // On Windows, also include forward-slash version
+    if target_platform.is_windows() {
+        use crate::utils::to_forward_slash_lossy;
+        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+        let forward_version = forward_slash.to_string();
+
+        if !variations.contains(&forward_version) {
+            variations.push(forward_version);
+        }
+    }
+
+    variations
+}
+
+/// Search for all prefix variations in a file with a single memory mapping.
+/// Returns which variations were found in the file.
+fn find_prefix_variations_in_file(
+    file_path: &Path,
+    variations: &[String],
+) -> Result<Vec<String>, PackagingError> {
+    let mut found_variations = Vec::new();
+
+    // Open the file in a scope to ensure the memory map and file handle are dropped
+    let file = File::open(file_path)?;
+    let mmap = unsafe { memmap2::Mmap::map(&file)? };
+
+    // Search for each variation in the memory-mapped file
+    for variation in variations {
+        if memchr::memmem::find_iter(mmap.as_ref(), variation.as_bytes())
+            .next()
+            .is_some()
+        {
+            found_variations.push(variation.clone());
+        }
+    }
+
+    Ok(found_variations)
+}
 
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
@@ -58,42 +106,69 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
 
 /// This function requires we know the file content we are matching against is
 /// UTF-8 In case the source is non utf-8 it will fail with a read error
+///
+/// Returns all variations of the expanded prefix found in the file.
 pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
     target_platform: &Platform,
-) -> Result<Option<String>, PackagingError> {
-    // Open the file
-    let file = File::open(file_path)?;
+) -> Result<Vec<String>, PackagingError> {
+    let variations = compute_prefix_variations(prefix, target_platform);
+    find_prefix_variations_in_file(file_path, &variations)
+}
 
-    // mmap the file
-    let mmap = unsafe { memmap2::Mmap::map(&file)? };
+/// Normalize prefix variations in a file using streaming I/O and read them line by line.
+fn normalize_prefix_variations_streaming(
+    file_path: &Path,
+    variations: &[String],
+    primary_format: &str,
+) -> Result<(), PackagingError> {
+    let variations_to_replace: Vec<&str> = variations
+        .iter()
+        .filter(|&v| v != primary_format)
+        .map(|s| s.as_str())
+        .collect();
 
-    // Check if the content contains the prefix with memchr
-    let prefix_string = prefix.to_string_lossy().to_string();
-    if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
-        .next()
-        .is_some()
+    if variations_to_replace.is_empty() {
+        return Ok(());
+    }
+
+    let temp_file_path = file_path.with_extension("tmp_normalize");
+    #[cfg(unix)]
+    let original_metadata = fs::metadata(file_path)?;
+
     {
-        return Ok(Some(prefix_string));
-    }
+        let input_file = File::open(file_path)?;
+        let output_file = File::create(&temp_file_path)?;
 
-    if target_platform.is_windows() {
-        use crate::utils::to_forward_slash_lossy;
-        // absolute and unc paths will break but it,
-        // will break either way as C:/ can't be converted
-        // to something meaningful in unix either way
-        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+        let reader = BufReader::new(input_file);
+        let mut writer = BufWriter::new(output_file);
 
-        if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
-            .next()
-            .is_some()
-        {
-            return Ok(Some(forward_slash.to_string()));
+        for line_result in reader.lines() {
+            let mut line = line_result?;
+
+            for &variation in &variations_to_replace {
+                if line.contains(variation) {
+                    line = line.replace(variation, primary_format);
+                }
+            }
+
+            writeln!(writer, "{}", line)?;
         }
+
+        writer.flush()?;
     }
 
-    Ok(None)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let permissions = std::fs::Permissions::from_mode(original_metadata.permissions().mode());
+        fs::set_permissions(&temp_file_path, permissions)?;
+    }
+
+    fs::rename(&temp_file_path, file_path)?;
+
+    Ok(())
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -148,11 +223,40 @@ pub fn create_prefix_placeholder(
     // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
-            Ok(Some(prefix)) => {
-                has_prefix = Some(prefix);
+            Ok(variations) if !variations.is_empty() => {
+                if variations.len() > 1 {
+                    tracing::warn!(
+                        "MixedPrefixPathVariations in file {:?}: found {} variations: {:?}",
+                        file_path,
+                        variations.len(),
+                        variations
+                    );
+                }
+
+                // Choose the canonical format based on platform conventions
+                let primary_format = if target_platform.is_windows() {
+                    // On Windows, prefer backslash format (native Windows style)
+                    variations
+                        .iter()
+                        .find(|v| v.contains('\\'))
+                        .unwrap_or(&variations[0])
+                } else {
+                    // On Unix-like systems, prefer forward slash format
+                    variations
+                        .iter()
+                        .find(|v| v.contains('/') && !v.contains('\\'))
+                        .unwrap_or(&variations[0])
+                };
+
+                // If multiple variations found, normalize them to the primary format
+                if variations.len() > 1 {
+                    normalize_prefix_variations_streaming(file_path, &variations, primary_format)?;
+                }
+
+                has_prefix = Some(primary_format.clone());
                 FileMode::Text
             }
-            Ok(None) => FileMode::Text,
+            Ok(_) => FileMode::Text,
             Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
                 FileMode::Binary
             }
@@ -596,7 +700,7 @@ mod test {
         fs::write(&file_path, content).unwrap();
 
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert_eq!(found, Some(prefix_path.to_string_lossy().to_string()));
+        assert_eq!(found, vec![prefix_path.to_string_lossy().to_string()]);
     }
 
     #[test]
@@ -606,7 +710,7 @@ mod test {
         let file_path = tmp.path().join("note.txt");
         fs::write(&file_path, "nothing to see here").unwrap();
         let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
-        assert!(found.is_none());
+        assert!(found.is_empty());
     }
 
     #[cfg(unix)]
