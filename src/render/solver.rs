@@ -180,7 +180,7 @@ impl GatewayReporter {
     }
 }
 
-impl rattler_repodata_gateway::Reporter for GatewayReporter {
+impl rattler_repodata_gateway::DownloadReporter for GatewayReporter {
     fn on_download_start(&self, _url: &Url) -> usize {
         let progress_bar = self
             .multi_progress
@@ -215,6 +215,16 @@ impl rattler_repodata_gateway::Reporter for GatewayReporter {
         let progress_bar = &self.progress_bars.lock().unwrap()[index];
         progress_bar.set_length(total.unwrap_or(bytes) as u64);
         progress_bar.set_position(bytes as u64);
+    }
+}
+
+impl rattler_repodata_gateway::Reporter for GatewayReporter {
+    fn jlap_reporter(&self) -> Option<&dyn rattler_repodata_gateway::JLAPReporter> {
+        None
+    }
+
+    fn download_reporter(&self) -> Option<&dyn rattler_repodata_gateway::DownloadReporter> {
+        Some(self)
     }
 }
 
