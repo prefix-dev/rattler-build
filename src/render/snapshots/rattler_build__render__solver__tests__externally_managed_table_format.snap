@@ -1,0 +1,11 @@
+---
+source: src/render/solver.rs
+expression: table_output
+snapshot_kind: text
+---
+┌─────────┬─────────┬───────────┬─────────────┬───────────┐
+│ Package ┆ Version ┆ Build     ┆ Channel     ┆      Size │
+╞═════════╪═════════╪═══════════╪═════════════╪═══════════╡
+│ cmake   ┆ 3.27.1  ┆ h123abc_0 ┆ conda-forge ┆ 12.30 MiB │
+│ ninja   ┆ 1.11.1  ┆ h456def_0 ┆ conda-forge ┆  1.14 MiB │
+└─────────┴─────────┴───────────┴─────────────┴───────────┘

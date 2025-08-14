@@ -25,7 +25,7 @@ use crate::{
     recipe::parser::{Dependency, Requirements},
     render::{
         pin::PinArgs,
-        solver::{install_packages, solve_environment},
+        solver::{install_packages, print_externally_managed_environment_info, solve_environment},
     },
     run_exports::{RunExportExtractor, RunExportExtractorError},
     tool_configuration,
@@ -634,6 +634,21 @@ pub async fn install_environments(
     Ok(())
 }
 
+/// Prints build and host environment info when externally managed.
+fn print_externally_managed_environments(dependencies: &FinalizedDependencies) {
+    if let Some(build_deps) = dependencies.build.as_ref() {
+        if !build_deps.resolved.is_empty() {
+            print_externally_managed_environment_info("build", &build_deps.resolved);
+        }
+    }
+
+    if let Some(host_deps) = dependencies.host.as_ref() {
+        if !host_deps.resolved.is_empty() {
+            print_externally_managed_environment_info("host", &host_deps.resolved);
+        }
+    }
+}
+
 /// This function renders the run exports into `RunExportsJson` format
 /// This function applies any variant information or `pin_subpackage`
 /// specifications to the run exports.
@@ -1013,14 +1028,15 @@ impl Output {
         &self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
-        if tool_configuration.environments_externally_managed {
-            return Ok(());
-        }
-
         let dependencies = self
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        if tool_configuration.environments_externally_managed {
+            print_externally_managed_environments(dependencies);
+            return Ok(());
+        }
 
         install_environments(self, dependencies, tool_configuration).await
     }
