@@ -420,11 +420,6 @@ pub fn print_externally_managed_environment_info(name: &str, required_packages: 
 
         tracing::info!("{}", table);
     }
-
-    tracing::info!(
-        "{} Successfully updated the {name} environment",
-        console::style(console::Emoji("✔", "")).green(),
-    );
 }
 
 #[cfg(test)]
