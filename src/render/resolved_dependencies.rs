@@ -19,13 +19,14 @@ use thiserror::Error;
 use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
+use crate::render::solver::create_environment_table;
 use crate::{
     metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
     recipe::parser::{Dependency, Requirements},
     render::{
         pin::PinArgs,
-        solver::{install_packages, print_externally_managed_environment_info, solve_environment},
+        solver::{install_packages, solve_environment},
     },
     run_exports::{RunExportExtractor, RunExportExtractorError},
     tool_configuration,
@@ -638,13 +639,16 @@ pub async fn install_environments(
 fn print_externally_managed_environments(dependencies: &FinalizedDependencies) {
     if let Some(build_deps) = dependencies.build.as_ref() {
         if !build_deps.resolved.is_empty() {
-            print_externally_managed_environment_info("build", &build_deps.resolved);
+            tracing::info!(
+                "{}",
+                create_environment_table("build", &build_deps.resolved)
+            );
         }
     }
 
     if let Some(host_deps) = dependencies.host.as_ref() {
         if !host_deps.resolved.is_empty() {
-            print_externally_managed_environment_info("host", &host_deps.resolved);
+            tracing::info!("{}", create_environment_table("host", &host_deps.resolved));
         }
     }
 }

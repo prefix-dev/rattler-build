@@ -374,28 +374,26 @@ pub async fn install_packages(
     Ok(())
 }
 
-/// Prints a formatted table showing packages in an externally managed environment.
-///
-/// Displays environment info similar to normal installations but with "(externally managed)" suffix.
-pub fn print_externally_managed_environment_info(name: &str, required_packages: &[RepoDataRecord]) {
+/// Extracts short channel name from URL (e.g., "conda.anaconda.org/conda-forge" → "conda-forge").
+fn short_channel(channel: Option<&str>) -> String {
+    let channel = channel.unwrap_or_default();
+    if channel.contains('/') {
+        channel
+            .rsplit('/')
+            .find(|s| !s.is_empty())
+            .unwrap_or_default()
+            .to_string()
+    } else {
+        channel.to_string()
+    }
+}
+
+/// Creates a formatted table for externally managed environment info.
+pub fn create_environment_table(name: &str, required_packages: &[RepoDataRecord]) -> String {
     use comfy_table::{Table, presets::UTF8_FULL_CONDENSED};
     use indicatif::HumanBytes;
 
-    /// Extracts short channel name from URL (e.g., "conda.anaconda.org/conda-forge" → "conda-forge").
-    fn short_channel(channel: Option<&str>) -> String {
-        let channel = channel.unwrap_or_default();
-        if channel.contains('/') {
-            channel
-                .rsplit('/')
-                .find(|s| !s.is_empty())
-                .unwrap_or_default()
-                .to_string()
-        } else {
-            channel.to_string()
-        }
-    }
-
-    tracing::info!("\n{name} environment (externally managed)\n");
+    let mut output = format!("\n{name} environment (externally managed)\n");
 
     if !required_packages.is_empty() {
         let mut table = Table::new();
@@ -418,8 +416,10 @@ pub fn print_externally_managed_environment_info(name: &str, required_packages: 
             ]);
         }
 
-        tracing::info!("{}", table);
+        output.push('\n');
+        output.push_str(&table.to_string());
     }
+    output
 }
 
 #[cfg(test)]
@@ -475,125 +475,60 @@ mod tests {
     }
 
     #[test]
-    fn test_print_externally_managed_environment_info_with_packages() {
-        // Create test packages with deterministic data for snapshot testing
-        let packages = vec![
-            create_test_record(
-                "cmake",
-                "3.27.1",
-                "h123abc_0",
-                Some(12_900_000),
-                "conda-forge",
-            ),
-            create_test_record(
-                "ninja",
-                "1.11.1",
-                "h456def_0",
-                Some(1_200_000),
-                "conda-forge",
-            ),
-        ];
-
-        // Test the function with packages - just verify it doesn't panic
-        print_externally_managed_environment_info("build", &packages);
-
-        // Basic assertion to ensure we have the expected packages
-        assert_eq!(packages.len(), 2);
-        assert_eq!(packages[0].package_record.name.as_normalized(), "cmake");
-        assert_eq!(packages[1].package_record.name.as_normalized(), "ninja");
-    }
-
-    #[test]
-    fn test_print_externally_managed_environment_info_empty() {
-        // Test with empty packages
-        let empty_packages = Vec::new();
-        print_externally_managed_environment_info("host", &empty_packages);
-
-        // The fact we get here means the function didn't panic with empty input
-        assert!(empty_packages.is_empty());
-    }
-
-    #[test]
-    fn test_short_channel_function() {
-        // Test the short_channel helper function indirectly by testing records with different channels
-        let record_with_full_url = create_test_record(
-            "test",
-            "1.0.0",
+    fn test_create_environment_table_basic() {
+        let packages = vec![create_test_record(
+            "cmake",
+            "3.27.1",
             "h123_0",
-            Some(1000),
-            "https://conda.anaconda.org/conda-forge",
-        );
-        let record_with_short_name =
-            create_test_record("test", "1.0.0", "h123_0", Some(1000), "conda-forge");
-
-        print_externally_managed_environment_info(
-            "test",
-            &vec![record_with_full_url, record_with_short_name],
-        );
-
-        // Just verify the function completes without panic
-        assert!(true);
+            Some(1_000_000),
+            "conda-forge",
+        )];
+        let result = create_environment_table("build", &packages);
+        assert!(result.contains("build environment (externally managed)"));
+        assert!(result.contains("cmake"));
+        assert!(result.contains("3.27.1"));
+        assert!(result.contains("conda-forge"));
+    }
+    #[test]
+    fn test_create_environment_table_empty() {
+        let result = create_environment_table("host", &[]);
+        assert_eq!(result, "\nhost environment (externally managed)\n");
     }
 
     #[test]
-    fn test_externally_managed_table_format() {
-        use comfy_table::{Table, presets::UTF8_FULL_CONDENSED};
-        use indicatif::HumanBytes;
+    fn test_create_environment_table_no_size() {
+        let packages = vec![create_test_record(
+            "python",
+            "3.9.18",
+            "h123_0",
+            None,
+            "conda-forge",
+        )];
+        let result = create_environment_table("test", &packages);
+        assert!(result.contains("python"));
+        assert!(result.contains("3.9.18"));
+        // Should handle missing size gracefully (empty cell)
+        assert!(result.contains("conda-forge"));
+    }
 
-        // Test that we can generate the table format that the function would produce
+    #[test]
+    fn test_short_channel_extraction() {
         let packages = vec![
             create_test_record(
-                "cmake",
-                "3.27.1",
-                "h123abc_0",
-                Some(12_900_000),
-                "conda-forge",
+                "pkg",
+                "1.0.2a1",
+                "h1",
+                Some(100000),
+                "https://conda.anaconda.org/conda-forge",
             ),
-            create_test_record(
-                "ninja",
-                "1.11.1",
-                "h456def_0",
-                Some(1_200_000),
-                "conda-forge",
-            ),
+            create_test_record("pkg2", "2.0", "h2", Some(200), "pytorch/linux-64"),
+            create_test_record("pkg3", "3.0", "h3", Some(300), "simple"),
         ];
+        let result = create_environment_table("test", &packages);
+        assert!(!result.contains("anaconda")); // extracted from URL
+        assert!(result.contains("linux-64")); // extracted from path
+        assert!(result.contains("simple")); // simple channel name
 
-        if !packages.is_empty() {
-            let mut table = Table::new();
-            table.load_preset(UTF8_FULL_CONDENSED);
-            table.set_header(vec!["Package", "Version", "Build", "Channel", "Size"]);
-            let column = table.column_mut(4).expect("Size column should exist");
-            column.set_cell_alignment(comfy_table::CellAlignment::Right);
-
-            for record in &packages {
-                let channel = record.channel.as_deref().unwrap_or_default();
-                let short_channel = if channel.contains('/') {
-                    channel
-                        .rsplit('/')
-                        .find(|s| !s.is_empty())
-                        .unwrap_or_default()
-                        .to_string()
-                } else {
-                    channel.to_string()
-                };
-
-                table.add_row([
-                    record.package_record.name.as_normalized().to_string(),
-                    record.package_record.version.to_string(),
-                    record.package_record.build.to_string(),
-                    short_channel,
-                    record
-                        .package_record
-                        .size
-                        .map(|s| HumanBytes(s).to_string())
-                        .unwrap_or_default(),
-                ]);
-            }
-
-            let table_output = table.to_string();
-
-            // Use insta for snapshot testing of the table output
-            insta::assert_snapshot!(table_output);
-        }
+        insta::assert_snapshot!(result);
     }
 }
