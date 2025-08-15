@@ -7,7 +7,7 @@ preview = ['pixi-build']
 
 [package]
 name = "rattler-build"
-version = "0.0.0dev" # NOTE: how to set this automatically?
+version = "0.0.0dev"   # NOTE: how to set this automatically?
 
 [tasks]
 build-release = "cargo build --release"
