@@ -19,6 +19,7 @@ use thiserror::Error;
 use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
+use crate::render::solver::create_environment_table;
 use crate::{
     metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
@@ -634,6 +635,24 @@ pub async fn install_environments(
     Ok(())
 }
 
+/// Prints build and host environment info when externally managed.
+fn print_externally_managed_environments(dependencies: &FinalizedDependencies) {
+    if let Some(build_deps) = dependencies.build.as_ref() {
+        if !build_deps.resolved.is_empty() {
+            tracing::info!(
+                "{}",
+                create_environment_table("build", &build_deps.resolved)
+            );
+        }
+    }
+
+    if let Some(host_deps) = dependencies.host.as_ref() {
+        if !host_deps.resolved.is_empty() {
+            tracing::info!("{}", create_environment_table("host", &host_deps.resolved));
+        }
+    }
+}
+
 /// This function renders the run exports into `RunExportsJson` format
 /// This function applies any variant information or `pin_subpackage`
 /// specifications to the run exports.
@@ -1013,14 +1032,15 @@ impl Output {
         &self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
-        if tool_configuration.environments_externally_managed {
-            return Ok(());
-        }
-
         let dependencies = self
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        if tool_configuration.environments_externally_managed {
+            print_externally_managed_environments(dependencies);
+            return Ok(());
+        }
 
         install_environments(self, dependencies, tool_configuration).await
     }
