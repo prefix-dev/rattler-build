@@ -187,6 +187,12 @@ pub struct Configuration {
     /// Whether to use bzip2
     pub use_bz2: bool,
 
+    /// Whether to use sharded repodata
+    pub use_sharded: bool,
+
+    /// Whether to use JLAP (JSON Lines Append Protocol)
+    pub use_jlap: bool,
+
     /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
 
@@ -275,6 +281,8 @@ pub struct ConfigurationBuilder {
     test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
+    use_sharded: bool,
+    use_jlap: bool,
     skip_existing: SkipExisting,
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
@@ -307,6 +315,8 @@ impl ConfigurationBuilder {
             test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: true,
+            use_sharded: true,
+            use_jlap: false,
             skip_existing: SkipExisting::None,
             noarch_build_platform: None,
             channel_config: None,
@@ -451,6 +461,22 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Whether downloading sharded repodata is enabled.
+    pub fn with_sharded_repodata_enabled(self, sharded_repodata_enabled: bool) -> Self {
+        Self {
+            use_sharded: sharded_repodata_enabled,
+            ..self
+        }
+    }
+
+    /// Whether using JLAP (JSON Lines Append Protocol) is enabled.
+    pub fn with_jlap_enabled(self, jlap_enabled: bool) -> Self {
+        Self {
+            use_jlap: jlap_enabled,
+            ..self
+        }
+    }
+
     /// Define the noarch platform
     pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
         Self {
@@ -506,10 +532,10 @@ impl ConfigurationBuilder {
             .with_client(client.client.clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
-                    jlap_enabled: true,
+                    jlap_enabled: self.use_jlap,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
-                    sharded_enabled: true,
+                    sharded_enabled: self.use_sharded,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),
@@ -528,6 +554,8 @@ impl ConfigurationBuilder {
             test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
+            use_sharded: self.use_sharded,
+            use_jlap: self.use_jlap,
             skip_existing: self.skip_existing,
             noarch_build_platform: self.noarch_build_platform,
             channel_config,
