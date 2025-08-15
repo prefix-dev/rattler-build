@@ -230,6 +230,7 @@ pub struct CommonData {
     pub s3_config: HashMap<String, s3_middleware::S3Config>,
     pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
+    pub disable_sharded: bool,
 }
 
 impl CommonData {
@@ -273,6 +274,14 @@ impl CommonData {
         }
 
         let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
+
+        // Extract repodata configuration from config if available
+        let disable_sharded = config
+            .repodata_config
+            .default
+            .disable_sharded
+            .unwrap_or(false);
+
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
@@ -281,6 +290,7 @@ impl CommonData {
             mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
             allow_insecure_host,
+            disable_sharded,
         }
     }
 

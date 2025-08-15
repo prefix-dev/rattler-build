@@ -1,0 +1,5 @@
+# Configuration file to test disable-sharded functionality
+default-channels = ["conda-forge"]
+
+[repodata-config]
+disable-sharded = true

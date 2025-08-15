@@ -150,7 +150,8 @@ pub fn get_tool_config(
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
-        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows);
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_repodata_config(build_data.common.disable_sharded);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -701,6 +702,7 @@ pub async fn run_test(
             .into_diagnostic()?,
         )
         .with_channel_priority(test_data.common.channel_priority)
+        .with_repodata_config(test_data.common.disable_sharded)
         .finish();
 
     let channels = test_data
@@ -791,6 +793,7 @@ pub async fn rebuild(
             .into_diagnostic()?,
         )
         .with_test_strategy(rebuild_data.test)
+        .with_repodata_config(rebuild_data.common.disable_sharded)
         .finish();
 
     output

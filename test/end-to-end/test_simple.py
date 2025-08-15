@@ -2283,3 +2283,32 @@ def test_pe_header_signature_error(
     rattler_build.build(recipe, tmp_path)
     pkg = get_extracted_package(tmp_path, "pe-test")
     assert (pkg / "info/index.json").exists()
+
+
+def test_repodata_config_disable_sharded(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that the disable-sharded repodata configuration option is properly loaded and applied."""
+    recipe_dir = recipes / "repodata-config"
+
+    # Test with disable-sharded = true configuration
+    config_disable = recipe_dir / "config-disable-sharded.toml"
+    rendered_disable = rattler_build.render(
+        recipe_dir / "recipe.yaml",
+        tmp_path,
+        with_solve=True,
+        extra_args=["--config-file", str(config_disable)],
+    )
+    assert len(rendered_disable) == 1
+    assert rendered_disable[0]["recipe"]["package"]["name"] == "test-repodata-config"
+
+    # Test with disable-sharded = false configuration (default behavior)
+    config_enable = recipe_dir / "config-enable-sharded.toml"
+    rendered_enable = rattler_build.render(
+        recipe_dir / "recipe.yaml",
+        tmp_path,
+        with_solve=True,
+        extra_args=["--config-file", str(config_enable)],
+    )
+    assert len(rendered_enable) == 1
+    assert rendered_enable[0]["recipe"]["package"]["name"] == "test-repodata-config"

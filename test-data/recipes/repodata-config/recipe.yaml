@@ -1,0 +1,21 @@
+package:
+  name: test-repodata-config
+  version: 1.0.0
+
+source:
+  path: .
+
+build:
+  script: echo "Testing repodata configuration"
+
+requirements:
+  host:
+    - python
+
+tests:
+  - script:
+      - python --version
+
+about:
+  summary: A test package to verify repodata configuration works
+  license: MIT

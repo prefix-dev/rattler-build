@@ -286,6 +286,7 @@ pub struct ConfigurationBuilder {
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
     environments_externally_managed: bool,
+    disable_sharded: bool,
 }
 
 impl Configuration {
@@ -318,6 +319,7 @@ impl ConfigurationBuilder {
             error_prefix_in_binary: false,
             allow_symlinks_on_windows: false,
             environments_externally_managed: false,
+            disable_sharded: false,
         }
     }
 
@@ -488,6 +490,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set repodata configuration options
+    pub fn with_repodata_config(self, disable_sharded: bool) -> Self {
+        Self {
+            disable_sharded,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
@@ -509,7 +519,7 @@ impl ConfigurationBuilder {
                     jlap_enabled: true,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
-                    sharded_enabled: true,
+                    sharded_enabled: !self.disable_sharded,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),
