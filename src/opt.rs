@@ -246,6 +246,7 @@ pub struct CommonData {
 
 impl CommonData {
     /// Create a new instance of `CommonData`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
