@@ -60,6 +60,10 @@ def build_recipes(
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     exclude_newer: Union[datetime, None] = None,
+    use_bz2: bool = True,
+    use_zstd: bool = True,
+    use_jlap: bool = False,
+    use_sharded: bool = True,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -93,6 +97,10 @@ def build_recipes(
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
         exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
+        use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
+        use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
+        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
+        use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
         None
@@ -127,6 +135,10 @@ def build_recipes(
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     )
 
 
@@ -139,6 +151,10 @@ def test_package(
     allow_insecure_host: Union[List[str], None] = None,
     debug: bool = False,
     test_index: Union[int, None] = None,
+    use_bz2: bool = True,
+    use_zstd: bool = True,
+    use_jlap: bool = False,
+    use_sharded: bool = True,
 ) -> None:
     """
     Run a test for a single package.
@@ -152,12 +168,27 @@ def test_package(
         allow_insecure_host: Allow insecure hosts for the build.
         debug: Enable or disable debug mode. (default: False)
         test_index: The test to run, selected by index. (default: None - run all tests)
+        use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
+        use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
+        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
+        use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
         None
     """
     test_package_py(
-        package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host, debug, test_index
+        package_file,
+        channel,
+        compression_threads,
+        auth_file,
+        channel_priority,
+        allow_insecure_host,
+        debug,
+        test_index,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     )
 
 

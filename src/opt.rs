@@ -203,6 +203,14 @@ pub struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     pub use_bz2: bool,
 
+    /// Enable support for sharded repodata
+    #[clap(long, env = "RATTLER_SHARDED", default_value = "true", hide = true)]
+    pub use_sharded: bool,
+
+    /// Enable support for JLAP (JSON Lines Append Protocol)
+    #[clap(long, env = "RATTLER_JLAP", default_value = "false", hide = true)]
+    pub use_jlap: bool,
+
     /// Enable experimental features
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
@@ -230,10 +238,15 @@ pub struct CommonData {
     pub s3_config: HashMap<String, s3_middleware::S3Config>,
     pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
+    pub use_zstd: bool,
+    pub use_bz2: bool,
+    pub use_sharded: bool,
+    pub use_jlap: bool,
 }
 
 impl CommonData {
     /// Create a new instance of `CommonData`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
@@ -241,6 +254,10 @@ impl CommonData {
         config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
+        use_zstd: bool,
+        use_bz2: bool,
+        use_sharded: bool,
+        use_jlap: bool,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
@@ -281,6 +298,10 @@ impl CommonData {
             mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
             allow_insecure_host,
+            use_zstd,
+            use_bz2,
+            use_sharded,
+            use_jlap,
         }
     }
 
@@ -292,6 +313,10 @@ impl CommonData {
             config,
             value.channel_priority.map(|c| c.value),
             value.allow_insecure_host,
+            value.use_zstd,
+            value.use_bz2,
+            value.use_sharded,
+            value.use_jlap,
         )
     }
 }
