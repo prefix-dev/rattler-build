@@ -60,10 +60,10 @@ def build_recipes(
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     exclude_newer: Union[datetime, None] = None,
-    allow_bz2: bool = True,
-    allow_zstd: bool = True,
-    allow_jlap: bool = False,
-    allow_sharded: bool = True,
+    use_bz2: bool = True,
+    use_zstd: bool = True,
+    use_jlap: bool = False,
+    use_sharded: bool = True,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -135,10 +135,10 @@ def build_recipes(
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
-        allow_bz2,
-        allow_zstd,
-        allow_jlap,
-        allow_sharded,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     )
 
 
