@@ -25,7 +25,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -56,6 +56,10 @@ fn build_recipes_py(
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    use_bz2: bool,
+    use_zstd: bool,
+    use_jlap: bool,
+    use_sharded: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -70,6 +74,10 @@ fn build_recipes_py(
         config,
         channel_priority,
         allow_insecure_host,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     );
     let build_platform = build_platform
         .map(|p| Platform::from_str(&p))
@@ -147,7 +155,7 @@ fn build_recipes_py(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
@@ -157,6 +165,10 @@ fn test_package_py(
     allow_insecure_host: Option<Vec<String>>,
     debug: bool,
     test_index: Option<usize>,
+    use_bz2: bool,
+    use_zstd: bool,
+    use_jlap: bool,
+    use_sharded: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -171,6 +183,10 @@ fn test_package_py(
         config,
         channel_priority,
         allow_insecure_host,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     );
     let channel = match channel {
         None => None,

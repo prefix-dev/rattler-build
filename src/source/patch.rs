@@ -488,6 +488,8 @@ mod tests {
             common: CommonOpts {
                 use_zstd: true,
                 use_bz2: true,
+                use_sharded: true,
+                use_jlap: false,
                 output_dir: Some(artifacts_dir_path),
                 ..Default::default()
             },
