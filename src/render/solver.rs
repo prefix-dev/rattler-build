@@ -12,6 +12,7 @@ use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
+use rattler_repodata_gateway::{DownloadReporter, JLAPReporter};
 use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
 use url::Url;
 
@@ -180,7 +181,7 @@ impl GatewayReporter {
     }
 }
 
-impl rattler_repodata_gateway::Reporter for GatewayReporter {
+impl rattler_repodata_gateway::DownloadReporter for GatewayReporter {
     fn on_download_start(&self, _url: &Url) -> usize {
         let progress_bar = self
             .multi_progress
@@ -215,6 +216,16 @@ impl rattler_repodata_gateway::Reporter for GatewayReporter {
         let progress_bar = &self.progress_bars.lock().unwrap()[index];
         progress_bar.set_length(total.unwrap_or(bytes) as u64);
         progress_bar.set_position(bytes as u64);
+    }
+}
+
+impl rattler_repodata_gateway::Reporter for GatewayReporter {
+    fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
+        Some(self)
+    }
+
+    fn jlap_reporter(&self) -> Option<&dyn JLAPReporter> {
+        None
     }
 }
 
