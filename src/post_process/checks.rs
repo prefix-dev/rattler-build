@@ -291,98 +291,83 @@ pub fn perform_linking_checks(
         .collect();
     tracing::trace!("Package files: {package_files:#?}");
 
-    // Parallel processing of linked packages
-    let linked_packages_results: Vec<Result<PackageLinkInfo, LinkingCheckError>> = package_files
-        .par_iter()
-        .map(|package| {
-            let mut link_info = PackageLinkInfo {
-                file: package.file.clone(),
-                linked_packages: Vec::new(),
-            };
-            // If the package that we are linking against does not exist in run
-            // dependencies then it is "overlinking".
-            for lib in &package.shared_libraries {
-                let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
+    let mut linked_packages = Vec::new();
+    for package in package_files.iter() {
+        let mut link_info = PackageLinkInfo {
+            file: package.file.clone(),
+            linked_packages: Vec::new(),
+        };
+        // If the package that we are linking against does not exist in run
+        // dependencies then it is "overlinking".
+        for lib in &package.shared_libraries {
+            let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
 
-                // skip @self on macOS
-                if target_platform.is_osx() && lib.to_str() == Some("self") {
-                    continue;
-                }
+            // skip @self on macOS
+            if target_platform.is_osx() && lib.to_str() == Some("self") {
+                continue;
+            }
 
-                // Check if the package has the library linked.
-                if let Some(package) = package.linked_dsos.get(lib) {
-                    link_info.linked_packages.push(LinkedPackage {
-                        name: lib.to_path_buf(),
-                        link_origin: LinkOrigin::ForeignPackage(
-                            package.as_normalized().to_string(),
-                        ),
-                    });
-                    continue;
-                }
+            // Check if the package has the library linked.
+            if let Some(package) = package.linked_dsos.get(lib) {
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.to_path_buf(),
+                    link_origin: LinkOrigin::ForeignPackage(package.as_normalized().to_string()),
+                });
+                continue;
+            }
 
-                // Check if the library is one of the system libraries (i.e. comes from sysroot).
-                if system_libs.is_match(lib) {
-                    link_info.linked_packages.push(LinkedPackage {
-                        name: lib.to_path_buf(),
-                        link_origin: LinkOrigin::System,
-                    });
-                    continue;
-                }
+            // Check if the library is one of the system libraries (i.e. comes from sysroot).
+            if system_libs.is_match(lib) {
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.to_path_buf(),
+                    link_origin: LinkOrigin::System,
+                });
+                continue;
+            }
 
-                // Check if the package itself has the shared library.
-                if new_files.iter().any(|file| file.ends_with(lib)) {
-                    link_info.linked_packages.push(LinkedPackage {
-                        name: lib.to_path_buf(),
-                        link_origin: LinkOrigin::PackageItself,
-                    });
-                    continue;
-                }
+            // Check if the package itself has the shared library.
+            if new_files.iter().any(|file| file.ends_with(lib)) {
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.to_path_buf(),
+                    link_origin: LinkOrigin::PackageItself,
+                });
+                continue;
+            }
 
-                // Check if we allow overlinking.
-                if dynamic_linking.missing_dso_allowlist().is_match(lib) {
-                    tracing::info!(
-                        "{lib:?} is missing in run dependencies for {:?}, \
+            // Check if we allow overlinking.
+            if dynamic_linking.missing_dso_allowlist().is_match(lib) {
+                tracing::info!(
+                    "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",
-                        package.file
-                    );
-                // Error on overlinking.
-                } else if dynamic_linking.error_on_overlinking() {
-                    link_info.linked_packages.push(LinkedPackage {
-                        name: lib.to_path_buf(),
-                        link_origin: LinkOrigin::NotFound,
-                    });
-                    return Err(LinkingCheckError::Overlinking {
-                        package: lib.to_path_buf(),
-                        file: package.file.clone(),
-                    });
-                } else {
-                    let warn_str = format!("Overlinking against {lib:?} for {:?}", package.file);
-                    tracing::warn!(warn_str);
-                    output.record_warning(&warn_str);
-                }
-
+                    package.file
+                );
+            // Error on overlinking.
+            } else if dynamic_linking.error_on_overlinking() {
                 link_info.linked_packages.push(LinkedPackage {
                     name: lib.to_path_buf(),
                     link_origin: LinkOrigin::NotFound,
                 });
-            }
-            Ok(link_info)
-        })
-        .collect();
-
-    // Collect results and handle errors
-    let mut linked_packages = Vec::new();
-    for result in linked_packages_results {
-        match result {
-            Ok(link_info) => linked_packages.push(link_info),
-            Err(e) => {
-                // Print all linked packages collected so far before returning error
+                linked_packages.push(link_info);
                 linked_packages.iter().for_each(|linked_package| {
                     tracing::info!("\n{linked_package}");
                 });
-                return Err(e);
+
+                return Err(LinkingCheckError::Overlinking {
+                    package: lib.to_path_buf(),
+                    file: package.file.clone(),
+                });
+            } else {
+                let warn_str = format!("Overlinking against {lib:?} for {:?}", package.file);
+                tracing::warn!(warn_str);
+                output.record_warning(&warn_str);
             }
+
+            link_info.linked_packages.push(LinkedPackage {
+                name: lib.to_path_buf(),
+                link_origin: LinkOrigin::NotFound,
+            });
         }
+        linked_packages.push(link_info);
     }
 
     linked_packages.iter().for_each(|linked_package| {
@@ -411,6 +396,5 @@ pub fn perform_linking_checks(
             output.record_warning(&format!("Overdepending against {run_dependency}"));
         }
     }
-
     Ok(())
 }
