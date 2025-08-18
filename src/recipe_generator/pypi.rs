@@ -157,7 +157,7 @@ async fn extract_build_requirements(
             entry.read_to_string(&mut contents).into_diagnostic()?;
 
             // Parse TOML
-            let toml: toml::Value = contents.parse().into_diagnostic()?;
+            let toml: toml::Table = contents.parse().into_diagnostic()?;
 
             // Try different build system specs
             return Ok(match toml.get("build-system") {
