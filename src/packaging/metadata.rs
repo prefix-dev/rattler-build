@@ -62,7 +62,6 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
 pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
-    target_platform: &Platform,
 ) -> Result<Option<String>, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
@@ -72,11 +71,12 @@ pub fn contains_prefix_text(
 
     // Check if the content contains the prefix with memchr
     let prefix_string = prefix.to_string_lossy().to_string();
+    let mut detected_prefix = None;
     if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
         .next()
         .is_some()
     {
-        return Ok(Some(prefix_string));
+        detected_prefix = Some(prefix_string);
     }
 
     // On Windows we always also need to check for forward slashes.
@@ -92,11 +92,20 @@ pub fn contains_prefix_text(
             .next()
             .is_some()
         {
+            if detected_prefix.is_some() {
+                tracing::error!(
+                    "File {file_path:?} contains the prefix with both forward- and backslashes. This is not supported and can lead to issues.\n  Prefix: {prefix:?}",
+                );
+                return Err(PackagingError::MixedPrefixPlaceholders(
+                    file_path.to_path_buf(),
+                ));
+            }
+
             return Ok(Some(forward_slash.to_string()));
         }
     }
 
-    Ok(None)
+    Ok(detected_prefix)
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -150,7 +159,7 @@ pub fn create_prefix_placeholder(
     // Even if we force the replacement mode to be text we still cannot handle it
     // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
-        match contains_prefix_text(file_path, encoded_prefix, target_platform) {
+        match contains_prefix_text(file_path, encoded_prefix) {
             Ok(Some(prefix)) => {
                 has_prefix = Some(prefix);
                 FileMode::Text
@@ -594,7 +603,7 @@ mod test {
         let content = format!("This file lives in {} directory", prefix_path.display());
         fs::write(&file_path, content).unwrap();
 
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        let found = contains_prefix_text(&file_path, &prefix_path).unwrap();
         assert_eq!(found, Some(prefix_path.to_string_lossy().to_string()));
     }
 
@@ -604,7 +613,7 @@ mod test {
         let prefix_path = tmp.path().join("absent_prefix");
         let file_path = tmp.path().join("note.txt");
         fs::write(&file_path, "nothing to see here").unwrap();
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        let found = contains_prefix_text(&file_path, &prefix_path).unwrap();
         assert!(found.is_none());
     }
 
