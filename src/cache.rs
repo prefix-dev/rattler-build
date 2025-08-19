@@ -21,7 +21,7 @@ use crate::{
         FinalizedDependencies, install_environments, resolve_dependencies,
     },
     source::{
-        copy_dir::{CopyDir, CopyOptions, copy_file},
+        copy_dir::{CopyDir, CopyOptions, copy_file_with_prefix},
         fetch_sources,
         patch::apply_patch_custom,
     },
@@ -283,7 +283,14 @@ impl Output {
                     .strip_prefix(self.prefix())
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
-                copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
+                copy_file_with_prefix(
+                    file,
+                    dest,
+                    &mut creation_cache,
+                    &copy_options,
+                    Some(self.prefix()),
+                )
+                .into_diagnostic()?;
                 copied_files.push(stripped.to_path_buf());
             }
 
