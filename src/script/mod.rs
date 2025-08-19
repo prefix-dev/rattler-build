@@ -210,11 +210,12 @@ impl Script {
             ScriptContent::Commands(commands) => {
                 if self.interpreter() == "cmd" {
                     // add in an `if %errorlevel% neq 0` check
-                    let commands = commands
-                        .iter()
-                        .map(|c| format!("{}\nif %errorlevel% neq 0 exit /b %errorlevel%", c))
-                        .collect::<Vec<_>>();
-                    return Ok(ResolvedScriptContents::Inline(commands.join("\n")));
+                    Ok(ResolvedScriptContents::Inline(
+                        commands
+                            .iter()
+                            .map(|c| format!("{}\nif %errorlevel% neq 0 exit /b %errorlevel%", c))
+                            .join("\n"),
+                    ))
                 } else {
                     Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
                 }
