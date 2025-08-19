@@ -79,7 +79,9 @@ pub fn contains_prefix_text(
         return Ok(Some(prefix_string));
     }
 
-    if target_platform.is_windows() || cfg!(windows) {
+    // On Windows we always also need to check for forward slashes.
+    // This also includes `noarch` packages that are built on Windows.
+    if cfg!(windows) {
         use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
