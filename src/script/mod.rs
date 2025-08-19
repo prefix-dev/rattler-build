@@ -18,7 +18,6 @@ use rattler_shell::shell;
 use std::{
     collections::HashMap,
     collections::HashSet,
-    ffi::OsStr,
     io,
     path::{Path, PathBuf},
     process::Stdio,
@@ -209,7 +208,17 @@ impl Script {
                 }
             }
             ScriptContent::Commands(commands) => {
-                Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
+                if self.interpreter() == "cmd" {
+                    // add in an `if %errorlevel% neq 0` check
+                    Ok(ResolvedScriptContents::Inline(
+                        commands
+                            .iter()
+                            .map(|c| format!("{}\nif %errorlevel% neq 0 exit /b %errorlevel%", c))
+                            .join("\n"),
+                    ))
+                } else {
+                    Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
+                }
             }
             ScriptContent::Command(command) => {
                 Ok(ResolvedScriptContents::Inline(command.to_owned()))
@@ -248,36 +257,12 @@ impl Script {
         sandbox_config: Option<&SandboxConfiguration>,
         debug: Debug,
     ) -> Result<(), InterpreterError> {
-        // TODO: This is a bit of an out and about way to determine whether or
-        //  not nushell is available. It would be best to run the activation
-        //  of the environment and see if nu is on the path, but hat is a
-        //  pretty expensive operation. So instead we just check if the nu
-        //  executable is in a known place.
-        let nushell_path = format!("bin/nu{}", std::env::consts::EXE_SUFFIX);
-        let has_nushell = build_prefix
-            .map(|p| p.join(&nushell_path))
-            .or_else(|| Some(run_prefix.join(&nushell_path)))
-            .map(|p| p.is_file())
-            .unwrap_or(false);
-        if has_nushell {
-            tracing::debug!("Nushell is available to run build scripts");
-        }
-
-        // Determine the user defined interpreter.
-        let mut interpreter =
-            self.interpreter()
-                .unwrap_or(if cfg!(windows) { "cmd" } else { "bash" });
-        let interpreter_is_nushell = interpreter == "nushell" || interpreter == "nu";
-
         // Determine the valid script extensions based on the available interpreters.
         let mut valid_script_extensions = Vec::new();
         if cfg!(windows) {
             valid_script_extensions.push("bat");
         } else {
             valid_script_extensions.push("sh");
-        }
-        if has_nushell || interpreter_is_nushell {
-            valid_script_extensions.push("nu");
         }
 
         let env_vars = env_vars
@@ -296,47 +281,6 @@ impl Script {
         }
 
         let contents = self.resolve_content(recipe_dir, jinja_config, &valid_script_extensions)?;
-
-        // Select a different interpreter if the script is a nushell script.
-        if contents
-            .path()
-            .and_then(|p| p.extension())
-            .and_then(OsStr::to_str)
-            == Some("nu")
-            && !(interpreter == "nushell" || interpreter == "nu")
-        {
-            tracing::info!("Using nushell interpreter for script");
-            interpreter = "nushell";
-        }
-
-        // Select interpreter based on file extension
-        if let Some(path) = contents.path() {
-            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
-                match ext {
-                    "py" if interpreter == "bash" || interpreter == "cmd" => {
-                        tracing::info!("Using python interpreter for .py script");
-                        interpreter = "python";
-                    }
-                    "pl" if interpreter == "bash" || interpreter == "cmd" => {
-                        tracing::info!("Using perl interpreter for .pl script");
-                        interpreter = "perl";
-                    }
-                    "r" if interpreter == "bash" || interpreter == "cmd" => {
-                        tracing::info!("Using rscript interpreter for .r script");
-                        interpreter = "rscript";
-                    }
-                    "rb" if interpreter == "bash" || interpreter == "cmd" => {
-                        tracing::info!("Using ruby interpreter for .rb script");
-                        interpreter = "ruby";
-                    }
-                    "js" if interpreter == "bash" || interpreter == "cmd" => {
-                        tracing::info!("Using nodejs interpreter for .js script");
-                        interpreter = "nodejs";
-                    }
-                    _ => {}
-                }
-            }
-        }
 
         let secrets = self
             .secrets()
@@ -373,16 +317,8 @@ impl Script {
             debug,
         };
 
-        match interpreter {
-            "nushell" | "nu" => {
-                if !has_nushell {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Nushell is not installed, did you add `nushell` to the build dependencies?".to_string(),
-                    ).into());
-                }
-                NuShellInterpreter.run(exec_args).await?
-            }
+        match self.interpreter() {
+            "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
             "bash" => BashInterpreter.run(exec_args).await?,
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
             "python" => PythonInterpreter.run(exec_args).await?,
@@ -393,7 +329,7 @@ impl Script {
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    format!("Unsupported interpreter: {}", interpreter),
+                    format!("Unsupported interpreter: {}", self.interpreter()),
                 )
                 .into());
             }
@@ -733,6 +669,41 @@ async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use tokio_util::bytes::BytesMut;
+
+    #[test]
+    fn test_cmd_errorlevel_injected() {
+        use crate::recipe::parser::{Script, ScriptContent};
+        let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
+        let script = Script {
+            content: ScriptContent::Commands(commands.clone()),
+            interpreter: None,
+            env: IndexMap::new(),
+            secrets: Vec::new(),
+            cwd: None,
+        };
+
+        // Use dummy paths for recipe_dir and extensions
+        let recipe_dir = std::path::Path::new(".");
+        let extensions = &["bat"];
+
+        let resolved = script
+            .resolve_content(recipe_dir, None, extensions)
+            .unwrap();
+
+        if cfg!(windows) {
+            let expected = "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\necho World\nif %errorlevel% neq 0 exit /b %errorlevel%";
+            match resolved {
+                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
+                _ => panic!("Expected Inline variant"),
+            }
+        } else {
+            let expected = "echo Hello\necho World";
+            match resolved {
+                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
+                _ => panic!("Expected Inline variant"),
+            }
+        }
+    }
 
     #[test]
     fn test_crlf_normalizer_no_crlf() {
