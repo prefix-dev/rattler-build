@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -234,55 +235,60 @@ pub fn perform_linking_checks(
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
     let host_prefix = output.prefix();
-    let mut package_files = Vec::new();
-    for file in new_files.iter() {
-        // Parse the DSO to get the list of libraries it links to
-        match relink::get_relinker(output.build_configuration.target_platform, file) {
-            Ok(relinker) => {
-                let mut file_dsos = Vec::new();
 
-                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix);
-                for (lib, resolved) in &resolved_libraries {
-                    // filter out @self on macOS
-                    if target_platform.is_osx() && lib.to_str() == Some("self") {
-                        continue;
-                    }
+    // Parallel processing of DSO files
+    let package_files: Vec<PackageFile> = new_files
+        .par_iter()
+        .filter_map(|file| {
+            // Parse the DSO to get the list of libraries it links to
+            match relink::get_relinker(output.build_configuration.target_platform, file) {
+                Ok(relinker) => {
+                    let mut file_dsos = Vec::new();
 
-                    let lib = resolved.as_ref().unwrap_or(lib);
-                    if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                        if let Some(package) = prefix_info
-                            .path_to_package
-                            .get(&libpath.to_path_buf().into())
-                        {
-                            if let Some(nature) = prefix_info.package_to_nature.get(package) {
-                                // Only take shared libraries into account.
-                                if nature == &PackageNature::DSOLibrary {
-                                    file_dsos.push((libpath.to_path_buf(), package.clone()));
+                    let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix);
+                    for (lib, resolved) in &resolved_libraries {
+                        // filter out @self on macOS
+                        if target_platform.is_osx() && lib.to_str() == Some("self") {
+                            continue;
+                        }
+
+                        let lib = resolved.as_ref().unwrap_or(lib);
+                        if let Ok(libpath) = lib.strip_prefix(host_prefix) {
+                            if let Some(package) = prefix_info
+                                .path_to_package
+                                .get(&libpath.to_path_buf().into())
+                            {
+                                if let Some(nature) = prefix_info.package_to_nature.get(package) {
+                                    // Only take shared libraries into account.
+                                    if nature == &PackageNature::DSOLibrary {
+                                        file_dsos.push((libpath.to_path_buf(), package.clone()));
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                package_files.push(PackageFile {
-                    file: file
-                        .clone()
-                        .strip_prefix(tmp_prefix)
-                        .unwrap_or(file)
-                        .to_path_buf(),
-                    linked_dsos: file_dsos.into_iter().collect(),
-                    shared_libraries: resolved_libraries
-                        .into_iter()
-                        .map(|(v, res)| res.unwrap_or(v.to_path_buf()))
-                        .collect(),
-                });
+                    Some(PackageFile {
+                        file: file
+                            .clone()
+                            .strip_prefix(tmp_prefix)
+                            .unwrap_or(file)
+                            .to_path_buf(),
+                        linked_dsos: file_dsos.into_iter().collect(),
+                        shared_libraries: resolved_libraries
+                            .into_iter()
+                            .map(|(v, res)| res.unwrap_or(v.to_path_buf()))
+                            .collect(),
+                    })
+                }
+                Err(RelinkError::UnknownFileFormat) => None,
+                Err(e) => {
+                    tracing::error!("Failed to get relinker for file {}: {}", file.display(), e);
+                    None
+                }
             }
-            Err(RelinkError::UnknownFileFormat) => {
-                continue;
-            }
-            Err(e) => return Err(LinkingCheckError::SharedObject(e.to_string())),
-        }
-    }
+        })
+        .collect();
     tracing::trace!("Package files: {package_files:#?}");
 
     let mut linked_packages = Vec::new();
@@ -390,6 +396,5 @@ pub fn perform_linking_checks(
             output.record_warning(&format!("Overdepending against {run_dependency}"));
         }
     }
-
     Ok(())
 }

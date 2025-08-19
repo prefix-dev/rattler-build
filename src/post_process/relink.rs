@@ -167,36 +167,51 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     // allow to use tools from build prefix such as patchelf, install_name_tool, ...
     let system_tools = output.system_tools.with_build_prefix(output.build_prefix());
 
-    for (p, content_type) in temp_files.content_type_map() {
-        let metadata = fs::symlink_metadata(p)?;
-        if metadata.is_symlink() || metadata.is_dir() {
-            tracing::debug!("Relink skipping symlink or directory: {}", p.display());
-            continue;
-        }
-
-        if content_type != &Some(content_inspector::ContentType::BINARY) {
-            continue;
-        }
-
-        let rel_path = p.strip_prefix(tmp_prefix)?;
-        if !relocation_config.is_match(rel_path) {
-            continue;
-        }
-
-        match get_relinker(target_platform, p) {
-            Ok(relinker) => {
-                if !target_platform.is_windows() {
-                    relinker.relink(
-                        tmp_prefix,
-                        encoded_prefix,
-                        &rpaths,
-                        rpath_allowlist,
-                        &system_tools,
-                    )?;
-                }
-                binaries.insert(p.clone());
+    use rayon::prelude::*;
+    let results: Vec<Result<Option<PathBuf>, RelinkError>> = temp_files
+        .content_type_map()
+        .par_iter()
+        .map(|(p, content_type)| {
+            let metadata = fs::symlink_metadata(p)?;
+            if metadata.is_symlink() || metadata.is_dir() {
+                tracing::debug!("Relink skipping symlink or directory: {}", p.display());
+                return Ok(None);
             }
-            Err(RelinkError::UnknownFileFormat) => {}
+
+            if content_type != &Some(content_inspector::ContentType::BINARY) {
+                return Ok(None);
+            }
+
+            let rel_path = p.strip_prefix(tmp_prefix)?;
+            if !relocation_config.is_match(rel_path) {
+                return Ok(None);
+            }
+
+            match get_relinker(target_platform, p) {
+                Ok(relinker) => {
+                    if !target_platform.is_windows() {
+                        relinker.relink(
+                            tmp_prefix,
+                            encoded_prefix,
+                            &rpaths,
+                            rpath_allowlist,
+                            &system_tools,
+                        )?;
+                    }
+                    Ok(Some(p.clone()))
+                }
+                Err(RelinkError::UnknownFileFormat) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+        .collect();
+
+    for result in results {
+        match result {
+            Ok(Some(path)) => {
+                binaries.insert(path);
+            }
+            Ok(None) => {}
             Err(e) => return Err(e),
         }
     }
