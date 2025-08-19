@@ -232,6 +232,7 @@ fn determine_interpreter_from_path(path: &Path) -> Option<String> {
         .and_then(|ext_lower| match ext_lower.as_str() {
             "py" => Some("python".to_string()),
             "rb" => Some("ruby".to_string()),
+            "js" => Some("nodejs".to_string()),
             "pl" => Some("perl".to_string()),
             "r" => Some("rscript".to_string()),
             "sh" | "bash" => Some("bash".to_string()),
