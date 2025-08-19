@@ -670,6 +670,41 @@ mod tests {
     use tokio_util::bytes::BytesMut;
 
     #[test]
+    fn test_cmd_errorlevel_injected() {
+        use crate::recipe::parser::{Script, ScriptContent};
+        let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
+        let script = Script {
+            content: ScriptContent::Commands(commands.clone()),
+            interpreter: None,
+            env: IndexMap::new(),
+            secrets: Vec::new(),
+            cwd: None,
+        };
+
+        // Use dummy paths for recipe_dir and extensions
+        let recipe_dir = std::path::Path::new(".");
+        let extensions = &["bat"];
+
+        let resolved = script
+            .resolve_content(recipe_dir, None, extensions)
+            .unwrap();
+
+        if cfg!(windows) {
+            let expected = "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\necho World\nif %errorlevel% neq 0 exit /b %errorlevel%";
+            match resolved {
+                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
+                _ => panic!("Expected Inline variant"),
+            }
+        } else {
+            let expected = "echo Hello\necho World";
+            match resolved {
+                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
+                _ => panic!("Expected Inline variant"),
+            }
+        }
+    }
+
+    #[test]
     fn test_crlf_normalizer_no_crlf() {
         let mut normalizer = CrLfNormalizer::default();
         let mut buffer = BytesMut::from("test string with no CR or LF");
@@ -779,6 +814,4 @@ mod tests {
         let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
         assert!(eof_result.is_none());
     }
-
-    
 }
