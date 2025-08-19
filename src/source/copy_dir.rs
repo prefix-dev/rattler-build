@@ -8,7 +8,7 @@ use std::{
 use fs_err::create_dir_all;
 
 use globset::Glob;
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::recipe::parser::{GlobVec, GlobWithSource};
@@ -215,6 +215,11 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
+        // Create override pattern to exclude .git directories
+        let mut override_builder = OverrideBuilder::new(self.from_path);
+        override_builder.add("!.git/").unwrap();
+        let overrides = override_builder.build().unwrap();
+
         let mut walk_builder = WalkBuilder::new(self.from_path);
         walk_builder
             // disregard global gitignore
@@ -224,7 +229,9 @@ impl<'a> CopyDir<'a> {
             .git_ignore(self.use_gitignore)
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
-            .hidden(self.hidden);
+            .hidden(self.hidden)
+            // Apply override to exclude .git directories
+            .overrides(overrides);
         if self.use_condapackageignore {
             walk_builder.add_custom_ignore_filename(".condapackageignore");
         }
@@ -736,6 +743,39 @@ mod test {
                 .join("target_dir")
                 .join("file_in_target.txt")
                 .exists()
+        );
+    }
+
+    #[test]
+    fn test_git_directory_exclusion() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src = tmp_dir.path().join("src");
+        fs_err::create_dir_all(&src).unwrap();
+
+        // Create regular files and .git structure
+        fs::write(src.join("main.rs"), "fn main() {}").unwrap();
+        let git_obj = src.join(".git/objects/ab/1234567890abcdef");
+        fs_err::create_dir_all(git_obj.parent().unwrap()).unwrap();
+        fs::write(&git_obj, "fake git object").unwrap();
+
+        #[cfg(unix)]
+        if git_obj.metadata().is_ok() {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs_err::set_permissions(&git_obj, std::fs::Permissions::from_mode(0o444));
+        }
+
+        let dest = tmp_dir.path().join("dest");
+        let result = super::CopyDir::new(&src, &dest)
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        assert!(dest.join("main.rs").exists() && !dest.join(".git").exists());
+        assert!(
+            !result
+                .copied_paths()
+                .iter()
+                .any(|p| p.components().any(|c| c.as_os_str() == ".git"))
         );
     }
 }
