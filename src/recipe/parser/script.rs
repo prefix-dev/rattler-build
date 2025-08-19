@@ -156,8 +156,10 @@ impl<'de> Deserialize<'de> for Script {
 
 impl Script {
     /// Returns the interpreter to use to execute the script
-    pub fn interpreter(&self) -> Option<&str> {
-        self.interpreter.as_deref()
+    pub fn interpreter(&self) -> &str {
+        self.interpreter
+            .as_deref()
+            .unwrap_or(if cfg!(windows) { "cmd" } else { "bash" })
     }
 
     /// Returns the script contents
