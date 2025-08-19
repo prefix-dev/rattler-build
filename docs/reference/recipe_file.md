@@ -391,7 +391,8 @@ build:
       then:
         - echo "unix"
 ```
-There are many other configurable settings, such as environmental values.
+
+There are many other configurable settings, such as environment variables and secrets.
 Please see [Build script](../build_script.md) for more information.
 
 ### Skipping builds
