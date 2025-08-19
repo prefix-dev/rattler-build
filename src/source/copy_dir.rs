@@ -142,6 +142,7 @@ pub(crate) struct CopyDir<'a> {
     use_git_global: bool,
     use_condapackageignore: bool,
     hidden: bool,
+    exclude_git_dirs: bool,
     copy_options: CopyOptions,
 }
 
@@ -159,6 +160,8 @@ impl<'a> CopyDir<'a> {
             use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
+            // exclude .git directories by default for path sources
+            exclude_git_dirs: false,
             copy_options: CopyOptions::default(),
         }
     }
@@ -205,6 +208,11 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    pub fn exclude_git_dirs(mut self, b: bool) -> Self {
+        self.exclude_git_dirs = b;
+        self
+    }
+
     pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
         create_dir_all(self.to_path)?;
@@ -215,11 +223,6 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        // Create override pattern to exclude .git directories
-        let mut override_builder = OverrideBuilder::new(self.from_path);
-        override_builder.add("!.git/").unwrap();
-        let overrides = override_builder.build().unwrap();
-
         let mut walk_builder = WalkBuilder::new(self.from_path);
         walk_builder
             // disregard global gitignore
@@ -229,9 +232,15 @@ impl<'a> CopyDir<'a> {
             .git_ignore(self.use_gitignore)
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
-            .hidden(self.hidden)
-            // Apply override to exclude .git directories
-            .overrides(overrides);
+            .hidden(self.hidden);
+
+        // Conditionally exclude .git directories for path sources only
+        if self.exclude_git_dirs {
+            let mut override_builder = OverrideBuilder::new(self.from_path);
+            override_builder.add("!.git/").unwrap();
+            let overrides = override_builder.build().unwrap();
+            walk_builder.overrides(overrides);
+        }
         if self.use_condapackageignore {
             walk_builder.add_custom_ignore_filename(".condapackageignore");
         }
@@ -767,6 +776,7 @@ mod test {
         let dest = tmp_dir.path().join("dest");
         let result = super::CopyDir::new(&src, &dest)
             .use_gitignore(false)
+            .exclude_git_dirs(true)
             .run()
             .unwrap();
 
