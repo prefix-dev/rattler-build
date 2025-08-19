@@ -79,7 +79,7 @@ pub fn contains_prefix_text(
         return Ok(Some(prefix_string));
     }
 
-    if target_platform.is_windows() {
+    if target_platform.is_windows() || cfg!(windows) {
         use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
