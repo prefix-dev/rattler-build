@@ -354,6 +354,15 @@ impl ResolvedDependencies {
         result
     }
 }
+impl Display for ResolvedDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        write!(f, "{}", self.to_table(table, false))
+    }
+}
 
 impl FinalizedRunDependencies {
     pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
@@ -633,24 +642,6 @@ pub async fn install_environments(
     .await?;
 
     Ok(())
-}
-
-/// Prints build and host environment info when externally managed.
-fn print_externally_managed_environments(dependencies: &FinalizedDependencies) {
-    if let Some(build_deps) = dependencies.build.as_ref() {
-        if !build_deps.resolved.is_empty() {
-            tracing::info!(
-                "{}",
-                create_environment_table("build", &build_deps.resolved)
-            );
-        }
-    }
-
-    if let Some(host_deps) = dependencies.host.as_ref() {
-        if !host_deps.resolved.is_empty() {
-            tracing::info!("{}", create_environment_table("host", &host_deps.resolved));
-        }
-    }
 }
 
 /// This function renders the run exports into `RunExportsJson` format
@@ -1038,7 +1029,26 @@ impl Output {
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
         if tool_configuration.environments_externally_managed {
-            print_externally_managed_environments(dependencies);
+            if let Some(finalized_dependencies) = &self.finalized_dependencies {
+                let span = tracing::info_span!("Externally resolved dependencies", recipe = self.identifier());
+                let _enter = span.enter();
+                if let Some(build) = &finalized_dependencies.build {
+                    tracing::info!(
+                        "\nResolved build dependencies({}):\n{}",
+                        self.identifier(),
+                        build
+                    );
+                }
+                if let Some(host) = &finalized_dependencies.host {
+                    tracing::info!(
+                        "Resolved host dependencies({}):\n{}",
+                        self.identifier(),
+                        host
+                    );
+                }
+            } else {
+                tracing::info!("No finalized dependencies found for this output.");
+            }
             return Ok(());
         }
 
