@@ -1028,29 +1028,30 @@ impl Output {
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
         if tool_configuration.environments_externally_managed {
-            if let Some(finalized_dependencies) = &self.finalized_dependencies {
-                let span = tracing::info_span!(
-                    "Externally resolved dependencies",
-                    recipe = self.identifier()
+            let span = tracing::info_span!(
+                "Externally resolved dependencies",
+                recipe = self.identifier()
+            );
+            let _enter = span.enter();
+            if let Some(build) = &dependencies.build {
+                tracing::info!(
+                    "\nResolved build dependencies({}):\n{}",
+                    self.identifier(),
+                    build
                 );
-                let _enter = span.enter();
-                if let Some(build) = &finalized_dependencies.build {
-                    tracing::info!(
-                        "\nResolved build dependencies({}):\n{}",
-                        self.identifier(),
-                        build
-                    );
-                }
-                if let Some(host) = &finalized_dependencies.host {
-                    tracing::info!(
-                        "Resolved host dependencies({}):\n{}",
-                        self.identifier(),
-                        host
-                    );
-                }
-            } else {
-                tracing::info!("No finalized dependencies found for this output.");
             }
+            if let Some(host) = &dependencies.host {
+                tracing::info!(
+                    "Resolved host dependencies({}):\n{}",
+                    self.identifier(),
+                    host
+                );
+            }
+            tracing::info!(
+                "Resolved run dependencies({}):\n{}",
+                self.identifier(),
+                dependencies.run
+            );
             return Ok(());
         }
 
