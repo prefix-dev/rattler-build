@@ -353,6 +353,15 @@ impl ResolvedDependencies {
         result
     }
 }
+impl Display for ResolvedDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        write!(f, "{}", self.to_table(table, false))
+    }
+}
 
 impl FinalizedRunDependencies {
     pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
@@ -1013,14 +1022,38 @@ impl Output {
         &self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
-        if tool_configuration.environments_externally_managed {
-            return Ok(());
-        }
-
         let dependencies = self
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        if tool_configuration.environments_externally_managed {
+            let span = tracing::info_span!(
+                "Externally resolved dependencies",
+                recipe = self.identifier()
+            );
+            let _enter = span.enter();
+            if let Some(build) = &dependencies.build {
+                tracing::info!(
+                    "\nResolved build dependencies({}):\n{}",
+                    self.identifier(),
+                    build
+                );
+            }
+            if let Some(host) = &dependencies.host {
+                tracing::info!(
+                    "Resolved host dependencies({}):\n{}",
+                    self.identifier(),
+                    host
+                );
+            }
+            tracing::info!(
+                "Resolved run dependencies({}):\n{}",
+                self.identifier(),
+                dependencies.run
+            );
+            return Ok(());
+        }
 
         install_environments(self, dependencies, tool_configuration).await
     }

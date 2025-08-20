@@ -117,11 +117,16 @@ default = { features = [
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
 
-[package]
-name = "rattler-build"
-version = "0.0.0dev"   # NOTE: how to set this automatically?
 
 # pixi build
 [package.build.backend]
 name = "pixi-build-rust"
-version = "*"
+version = "0.3.*"
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+[package]
+name = "rattler-build"
+version = "0.0.0dev"   # NOTE: how to set this automatically?
+
