@@ -392,6 +392,9 @@ build:
         - echo "unix"
 ```
 
+There are many other configurable settings, such as environment variables and secrets.
+Please see [Build script](../build_script.md) for more information.
+
 ### Skipping builds
 
 Lists conditions under which `rattler-build` should skip the build of this recipe.
