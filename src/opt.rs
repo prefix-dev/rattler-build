@@ -387,6 +387,11 @@ pub struct BuildOpts {
     #[arg(short = 'm', long)]
     pub variant_config: Option<Vec<PathBuf>>,
 
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11).
+    /// Multiple values separated by commas will create multiple build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
+
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]
     pub ignore_recipe_variants: bool,
@@ -501,6 +506,7 @@ pub struct BuildData {
     pub host_platform: Platform,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
+    pub variant_overrides: Vec<(String, Vec<String>)>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
     pub with_solve: bool,
@@ -535,6 +541,7 @@ impl BuildData {
         host_platform: Option<Platform>,
         channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
+        variant_overrides: Vec<(String, Vec<String>)>,
         ignore_recipe_variants: bool,
         render_only: bool,
         with_solve: bool,
@@ -568,6 +575,7 @@ impl BuildData {
                 .unwrap_or(Platform::current()),
             channels,
             variant_config: variant_config.unwrap_or_default(),
+            variant_overrides,
             ignore_recipe_variants,
             render_only,
             with_solve,
@@ -612,6 +620,7 @@ impl BuildData {
                     .and_then(|config| config.default_channels.clone())
             }),
             opts.variant_config,
+            opts.variant_overrides,
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
@@ -662,6 +671,18 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse variant override (e.g., "python=3.12" or "python=3.12,3.11")
+fn parse_variant_override(
+    s: &str,
+) -> Result<(String, Vec<String>), Box<dyn Error + Send + Sync + 'static>> {
+    let (key, value) = s
+        .split_once('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+
+    let values: Vec<String> = value.split(',').map(|v| v.trim().to_string()).collect();
+    Ok((key.to_string(), values))
 }
 
 /// Parse a datetime string in RFC3339 format
