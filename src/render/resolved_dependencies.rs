@@ -1030,7 +1030,10 @@ impl Output {
 
         if tool_configuration.environments_externally_managed {
             if let Some(finalized_dependencies) = &self.finalized_dependencies {
-                let span = tracing::info_span!("Externally resolved dependencies", recipe = self.identifier());
+                let span = tracing::info_span!(
+                    "Externally resolved dependencies",
+                    recipe = self.identifier()
+                );
                 let _enter = span.enter();
                 if let Some(build) = &finalized_dependencies.build {
                     tracing::info!(
