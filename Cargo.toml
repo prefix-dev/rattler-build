@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.45.0"
+version = "0.46.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -97,8 +97,8 @@ comfy-table = "7.1.4"
 futures = "0.3.31"
 indicatif = { version = "0.18.0", features = ["in_memory"] }
 console = { version = "0.16.0", features = ["windows-console-colors"] }
-thiserror = "2.0.15"
-tempfile = "3.20.0"
+thiserror = "2.0.16"
+tempfile = "3.21.0"
 chrono = "0.4.41"
 sha1 = "0.10.6"
 spdx = "0.11.1"
