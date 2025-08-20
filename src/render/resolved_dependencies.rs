@@ -19,7 +19,6 @@ use thiserror::Error;
 use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
-use crate::render::solver::create_environment_table;
 use crate::{
     metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
