@@ -6,12 +6,14 @@ on:
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
   pull_request:
     paths:
       - "src/**"
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
 
 name: End-to-End testing
 
