@@ -417,7 +417,7 @@ mod tests {
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
     }
-    
+
     #[test]
     fn test_apply_patches_with_orig() {
         let (tempdir, _) = setup_patch_test_dir();
