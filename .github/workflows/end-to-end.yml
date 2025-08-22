@@ -6,12 +6,14 @@ on:
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
   pull_request:
     paths:
       - "src/**"
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
 
 name: End-to-End testing
 
@@ -45,7 +47,7 @@ jobs:
       # build in release mode so that it's reasonably fast to run the tests
       - run: pixi run build-release
       - run: pixi run test-ci
-      - run: pixi run test-end-to-end -s -v
+      - run: pixi run test-end-to-end -v
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
