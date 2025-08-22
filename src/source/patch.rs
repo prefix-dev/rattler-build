@@ -77,11 +77,14 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         .unwrap_or(0);
 
     for strip_level in 0..max_components {
-        let all_paths_exist = patched_files.iter().all(|p| {
+        // We check for _any_ path existing here. Sometimes patches reference
+        // files that are deleted (e.g. `foobar.orig`) and thus it's more robust to look for
+        // the first match in the affected files.
+        let any_paths_exist = patched_files.iter().any(|p| {
             let path: PathBuf = p.components().skip(strip_level).collect();
             work_dir.join(path).exists()
         });
-        if all_paths_exist {
+        if any_paths_exist {
             return Ok(strip_level);
         }
     }
@@ -100,34 +103,41 @@ fn custom_patch_stripped_paths(
     strip_level: usize,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let original = (diff.original(), diff.modified());
+
+    let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
+        std::str::from_utf8(path_bytes).ok().and_then(|p| {
+            (p.trim() != "/dev/null").then(|| {
+                PathBuf::from(p)
+                    .components()
+                    .skip(strip_level)
+                    .collect::<PathBuf>()
+            })
+        })
+    };
+
     let stripped = (
-        // XXX: Probably absolute paths should be checked as well. But
-        // it is highly unlikely to meet them in patches, so we ignore
-        // that for now.
-        original
-            .0
-            .and_then(|p| std::str::from_utf8(p).ok())
-            .and_then(|p| {
-                (p.trim() != "/dev/null").then(|| {
-                    PathBuf::from(p)
-                        .components()
-                        .skip(strip_level)
-                        .collect::<PathBuf>()
-                })
-            }),
-        original
-            .1
-            .and_then(|p| std::str::from_utf8(p).ok())
-            .and_then(|p| {
-                (p.trim() != "/dev/null").then(|| {
-                    PathBuf::from(p)
-                        .components()
-                        .skip(strip_level)
-                        .collect::<PathBuf>()
-                })
-            }),
+        original.0.and_then(strip_path),
+        original.1.and_then(strip_path),
     );
-    stripped
+
+    // Handle backup file cases
+    match &stripped {
+        (Some(orig), Some(modified)) => {
+            // Check if original is a backup file (.orig, .bak) of the modified file
+            if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
+                if let Some(mod_name) = modified.file_name() {
+                    if (orig_ext == "orig" || orig_ext == "bak") && orig_stem == mod_name {
+                        // Original is backup, modified is actual file
+                        // Treat this as modifying the actual file in place
+                        return (Some(modified.clone()), Some(modified.clone()));
+                    }
+                }
+            }
+
+            stripped
+        }
+        _ => stripped,
+    }
 }
 
 fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
@@ -397,6 +407,24 @@ mod tests {
         // Test with normal patch
         apply_patches(
             &[PathBuf::from("test.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+    
+    #[test]
+    fn test_apply_patches_with_orig() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with normal patch
+        apply_patches(
+            &[PathBuf::from("test_with_orig.patch")],
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
