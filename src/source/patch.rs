@@ -437,6 +437,143 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_patches_with_bak() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with .bak extension patch
+        apply_patches(
+            &[PathBuf::from("test_with_bak.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("This was patched using .bak extension!"));
+    }
+
+    #[test]
+    fn test_apply_patches_mixed_existing_files() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that references both existing and non-existing files
+        apply_patches(
+            &[PathBuf::from("test_simple_mixed.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let existing_file = tempdir.path().join("workdir/existing_file.txt");
+        let existing_file = fs_err::read_to_string(&existing_file).unwrap();
+        assert!(existing_file.contains("Mixed files patch applied!"));
+
+        let new_file = tempdir.path().join("workdir/new_file.txt");
+        let new_file = fs_err::read_to_string(&new_file).unwrap();
+        assert!(new_file.contains("This is a new file."));
+        assert!(new_file.contains("Created by patch application."));
+    }
+
+    #[test]
+    fn test_strip_level_detection_edge_case() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that has deep paths but only some files exist
+        apply_patches(
+            &[PathBuf::from("test_strip_level_edge_case.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let deep_file = tempdir.path().join("workdir/deep/nested/directory/deep_file.txt");
+        let deep_file = fs_err::read_to_string(&deep_file).unwrap();
+        assert!(deep_file.contains("Strip level test applied!"));
+    }
+
+    #[test]
+    fn test_strip_level_algorithm_comparison() {
+        // Test to demonstrate the difference between 'any' and 'all' logic
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patch_file = manifest_dir.join("test-data/patch_application/patches/test_strip_level_edge_case.patch");
+        let patch_content = fs_err::read(&patch_file).unwrap();
+        let patch = patch_from_bytes(&patch_content).unwrap();
+        
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        
+        // The current implementation should find strip level 4 based on existing deep file
+        let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
+        assert_eq!(strip_level, 4, "Current 'any' logic should find strip level 4");
+        
+        // Let's also test what the old 'all' logic would have found
+        // (This is what the function used to do before the PR)
+        let patched_files = parse_patch(&patch);
+        let max_components = patched_files
+            .iter()
+            .map(|p| p.components().count())
+            .max()
+            .unwrap_or(0);
+        
+        let mut old_algorithm_result = None;
+        for strip_level in 0..max_components {
+            let all_paths_exist = patched_files.iter().all(|p| {
+                let path: PathBuf = p.components().skip(strip_level).collect();
+                work_dir.join(path).exists()
+            });
+            if all_paths_exist {
+                old_algorithm_result = Some(strip_level);
+                break;
+            }
+        }
+        
+        // The old algorithm would not have found any strip level where ALL files exist
+        // because nonexistent_deep.txt.orig doesn't exist
+        assert_eq!(old_algorithm_result, None, "Old 'all' logic should not find a valid strip level");
+    }
+
+    #[test]
+    fn test_backup_file_logic_edge_cases() {
+        // Test edge cases in the backup file handling logic
+        let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+        
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+        
+        // Test the backup file logic
+        let paths = custom_patch_stripped_paths(&diff, 1);
+        
+        // Should treat this as modifying file.txt in place
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+        
+        // Test .bak extension
+        let patch_content = b"--- a/file.txt.bak\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+        
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+        
+        let paths = custom_patch_stripped_paths(&diff, 1);
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+        
+        // Test case where backup file logic should NOT apply
+        let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+        
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+        
+        let paths = custom_patch_stripped_paths(&diff, 1);
+        // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
+        assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+    }
+
+    #[test]
     fn test_apply_patches_with_crlf() {
         let (tempdir, _) = setup_patch_test_dir();
 
