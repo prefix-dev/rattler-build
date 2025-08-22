@@ -1045,6 +1045,36 @@ impl TryConvertNode<u64> for RenderedScalarNode {
     }
 }
 
+impl TryConvertNode<usize> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<usize, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<usize> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<usize, Vec<PartialParsingError>> {
+        self.as_str()
+            .parse()
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::from(err),
+                    label = format!("failed to parse `{}` as unsigned integer", self.as_str())
+                )
+            })
+            .map_err(|e| vec![e])
+    }
+}
+
 impl TryConvertNode<i32> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<i32, Vec<PartialParsingError>> {
         self.as_str()
