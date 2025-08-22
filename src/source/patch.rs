@@ -14,6 +14,11 @@ use diffy::{Diff, Patch};
 use fs_err::File;
 use itertools::Itertools;
 
+fn is_dev_null(path: &str) -> bool {
+    let trimmed = path.trim();
+    return trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null";
+}
+
 fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
@@ -21,7 +26,7 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
         if let Some(p) = diff
             .original()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| p.trim() != "/dev/null")
+            .filter(|p| !is_dev_null(p))
             .map(PathBuf::from)
         {
             affected_files.insert(p);
@@ -29,7 +34,7 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
         if let Some(p) = diff
             .modified()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| p.trim() != "/dev/null")
+            .filter(|p| !is_dev_null(p))
             .map(PathBuf::from)
         {
             affected_files.insert(p);
@@ -249,17 +254,19 @@ pub(crate) fn apply_patch_custom(
 
     for diff in patch {
         let file_paths = custom_patch_stripped_paths(&diff, strip_level);
+        println!("File paths: {:?}", file_paths);
         let absolute_file_paths = (
             file_paths.0.map(|o| work_dir.join(&o)),
             file_paths.1.map(|m| work_dir.join(&m)),
         );
 
-        tracing::debug!(
+        println!(
             "Patch will be applied:\n\tFrom: {:#?}\n\tTo:{:#?}",
             absolute_file_paths.0,
             absolute_file_paths.1
         );
 
+        println!("Writing: {}", absolute_file_paths.1.as_ref().unwrap().display());
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
