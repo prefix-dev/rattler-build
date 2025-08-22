@@ -8,7 +8,7 @@ use ::rattler_build::{
         CondaForgeData, PrefixData, QuetzData, TestData,
     },
     run_test,
-    tool_configuration::{self, SkipExisting, TestStrategy},
+    tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
     upload,
 };
 use clap::ValueEnum;
@@ -121,6 +121,7 @@ fn build_recipes_py(
         host_platform,
         channel,
         variant_config,
+        Vec::new(), // variant_overrides - empty for now
         ignore_recipe_variants,
         render_only,
         with_solve,
@@ -135,10 +136,10 @@ fn build_recipes_py(
         false, // TUI disabled
         skip_existing,
         noarch_build_platform,
-        None,
-        None,
+        None,  // extra meta
+        None,  // sandbox configuration
         Debug::new(debug),
-        continue_on_failure.into(),
+        ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
