@@ -6,7 +6,7 @@
 +Mixed files patch applied!
  By the patching tool in rattler-build.
  Thank you!
---- a/dev/null	2021-12-27 12:22:09.000000000 -0800
+--- /dev/null	2021-12-27 12:22:09.000000000 -0800
 +++ b/new_file.txt	2021-12-27 12:22:14.000000000 -0800
 @@ -0,0 +1,2 @@
 +This is a new file.

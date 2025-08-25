@@ -111,7 +111,7 @@ fn custom_patch_stripped_paths(
 
     let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
         std::str::from_utf8(path_bytes).ok().and_then(|p| {
-            (p.trim() != "/dev/null").then(|| {
+            (!is_dev_null(p)).then(|| {
                 PathBuf::from(p)
                     .components()
                     .skip(strip_level)
@@ -262,11 +262,13 @@ pub(crate) fn apply_patch_custom(
 
         println!(
             "Patch will be applied:\n\tFrom: {:#?}\n\tTo:{:#?}",
-            absolute_file_paths.0,
-            absolute_file_paths.1
+            absolute_file_paths.0, absolute_file_paths.1
         );
 
-        println!("Writing: {}", absolute_file_paths.1.as_ref().unwrap().display());
+        println!(
+            "Writing: {}",
+            absolute_file_paths.1.as_ref().unwrap().display()
+        );
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
@@ -277,16 +279,24 @@ pub(crate) fn apply_patch_custom(
                 fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
             }
             (Some(o), Some(m)) => {
-                let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
+                // Check if the original file exists
+                // If it doesn't, treat this as creating a new file
+                if !o.exists() {
+                    let new_file_content =
+                        apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                    write_patch_content(&new_file_content, &m)?;
+                } else {
+                    let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
-                let new_file_content =
-                    apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
+                    let new_file_content =
+                        apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
 
-                if o != m {
-                    fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    if o != m {
+                        fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    }
+
+                    write_patch_content(&new_file_content, &m)?;
                 }
-
-                write_patch_content(&new_file_content, &m)?;
             }
         }
     }
@@ -497,7 +507,9 @@ mod tests {
         )
         .unwrap();
 
-        let deep_file = tempdir.path().join("workdir/deep/nested/directory/deep_file.txt");
+        let deep_file = tempdir
+            .path()
+            .join("workdir/deep/nested/directory/deep_file.txt");
         let deep_file = fs_err::read_to_string(&deep_file).unwrap();
         assert!(deep_file.contains("Strip level test applied!"));
     }
@@ -506,17 +518,21 @@ mod tests {
     fn test_strip_level_algorithm_comparison() {
         // Test to demonstrate the difference between 'any' and 'all' logic
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let patch_file = manifest_dir.join("test-data/patch_application/patches/test_strip_level_edge_case.patch");
+        let patch_file = manifest_dir
+            .join("test-data/patch_application/patches/test_strip_level_edge_case.patch");
         let patch_content = fs_err::read(&patch_file).unwrap();
         let patch = patch_from_bytes(&patch_content).unwrap();
-        
+
         let (tempdir, _) = setup_patch_test_dir();
         let work_dir = tempdir.path().join("workdir");
-        
+
         // The current implementation should find strip level 4 based on existing deep file
         let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
-        assert_eq!(strip_level, 4, "Current 'any' logic should find strip level 4");
-        
+        assert_eq!(
+            strip_level, 4,
+            "Current 'any' logic should find strip level 4"
+        );
+
         // Let's also test what the old 'all' logic would have found
         // (This is what the function used to do before the PR)
         let patched_files = parse_patch(&patch);
@@ -525,7 +541,7 @@ mod tests {
             .map(|p| p.components().count())
             .max()
             .unwrap_or(0);
-        
+
         let mut old_algorithm_result = None;
         for strip_level in 0..max_components {
             let all_paths_exist = patched_files.iter().all(|p| {
@@ -537,43 +553,46 @@ mod tests {
                 break;
             }
         }
-        
+
         // The old algorithm would not have found any strip level where ALL files exist
         // because nonexistent_deep.txt.orig doesn't exist
-        assert_eq!(old_algorithm_result, None, "Old 'all' logic should not find a valid strip level");
+        assert_eq!(
+            old_algorithm_result, None,
+            "Old 'all' logic should not find a valid strip level"
+        );
     }
 
     #[test]
     fn test_backup_file_logic_edge_cases() {
         // Test edge cases in the backup file handling logic
         let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
-        
+
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
-        
+
         // Test the backup file logic
         let paths = custom_patch_stripped_paths(&diff, 1);
-        
+
         // Should treat this as modifying file.txt in place
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
-        
+
         // Test .bak extension
         let patch_content = b"--- a/file.txt.bak\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
-        
+
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
-        
+
         let paths = custom_patch_stripped_paths(&diff, 1);
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
-        
+
         // Test case where backup file logic should NOT apply
         let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
-        
+
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
-        
+
         let paths = custom_patch_stripped_paths(&diff, 1);
         // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
         assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
