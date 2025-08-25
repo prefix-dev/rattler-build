@@ -428,7 +428,7 @@ impl Output {
                                         &p,
                                         &link_target
                                     );
-                                    return Ok(None);
+                                    // Continue processing the symlink instead of skipping it
                                 }
                             } else {
                                 tracing::warn!(
