@@ -293,7 +293,7 @@ fn build_build_section(
 /// Build the requirements section
 fn build_requirements_section(
     project: &serde_json::Map<String, Value>,
-    _toml_data: &HashMap<String, Value>,
+    toml_data: &HashMap<String, Value>,
 ) -> miette::Result<serialize::Requirements> {
     let mut requirements = serialize::Requirements::default();
 
@@ -306,6 +306,17 @@ fn build_requirements_section(
     // Add Python version constraint if specified in requires-python
     if let Some(requires_python) = project.get("requires-python").and_then(|r| r.as_str()) {
         host_deps[0] = format_python_constraint(requires_python);
+    }
+
+    // Add build system requirements
+    if let Some(build_system) = toml_data.get("build-system").and_then(|b| b.as_object()) {
+        if let Some(requires) = build_system.get("requires").and_then(|r| r.as_array()) {
+            for req in requires {
+                if let Some(req_str) = req.as_str() {
+                    host_deps.push(req_str.to_string());
+                }
+            }
+        }
     }
 
     requirements.host = host_deps;
@@ -455,14 +466,33 @@ fn convert_python_to_conda_dependency(dep: &str) -> String {
     };
     
     // Convert Python version operators to conda format
-    let conda_dep = base_dep
-        .replace("==", " =")  // Python == becomes conda =
-        .replace("~=", " ~=") // Compatible release stays the same
-        .replace(">=", " >=") // Greater than or equal stays the same
-        .replace("<=", " <=") // Less than or equal stays the same
-        .replace(">", " >")   // Greater than stays the same  
-        .replace("<", " <")   // Less than stays the same
-        .replace("!=", " !="); // Not equal stays the same
+    // Process in order from longest to shortest to avoid conflicts
+    let mut conda_dep = base_dep.to_string();
+    
+    // Handle multi-character operators first
+    conda_dep = conda_dep.replace("==", " =");   // Python == becomes conda =
+    conda_dep = conda_dep.replace("~=", " ~=");  // Compatible release stays the same
+    conda_dep = conda_dep.replace(">=", " >=");  // Greater than or equal
+    conda_dep = conda_dep.replace("<=", " <=");  // Less than or equal
+    conda_dep = conda_dep.replace("!=", " !=");  // Not equal
+    
+    // Handle single character operators, but only if not already processed
+    // and not immediately after a comma
+    let chars: Vec<char> = conda_dep.chars().collect();
+    let mut result = String::new();
+    
+    for (i, &ch) in chars.iter().enumerate() {
+        if (ch == '>' || ch == '<') && i > 0 {
+            let prev_char = chars[i - 1];
+            // Add space only if previous char is not space and not comma
+            if prev_char != ' ' && prev_char != ',' {
+                result.push(' ');
+            }
+        }
+        result.push(ch);
+    }
+    
+    let conda_dep = result;
     
     // Handle common Python package to conda package name mappings
     // This is a subset - in a full implementation this would be more comprehensive
@@ -493,6 +523,220 @@ fn apply_package_name_mapping(dep: &str) -> String {
     }
     
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_convert_python_to_conda_dependency() {
+        // Test basic version constraints
+        assert_eq!(
+            convert_python_to_conda_dependency("numpy>=1.21.0"),
+            "numpy >=1.21.0"
+        );
+        assert_eq!(
+            convert_python_to_conda_dependency("pandas==1.3.0"),
+            "pandas =1.3.0"
+        );
+        assert_eq!(
+            convert_python_to_conda_dependency("requests~=2.25.0"),
+            "requests ~=2.25.0"
+        );
+
+        // Test environment markers
+        assert_eq!(
+            convert_python_to_conda_dependency("typing-extensions>=3.7; python_version<'3.8'"),
+            "typing-extensions >=3.7"
+        );
+
+        // Test multiple constraints
+        assert_eq!(
+            convert_python_to_conda_dependency("click>=7.0,<9.0"),
+            "click >=7.0,<9.0"
+        );
+    }
+
+    #[test]
+    fn test_format_python_constraint() {
+        assert_eq!(
+            format_python_constraint(">=3.9"),
+            "python >=3.9"
+        );
+        assert_eq!(
+            format_python_constraint(">=3.9,<4.0"),
+            "python >=3.9,<4.0"
+        );
+    }
+
+    #[test]
+    fn test_apply_package_name_mapping() {
+        assert_eq!(
+            apply_package_name_mapping("pillow >=8.0.0"),
+            "pillow >=8.0.0"
+        );
+        assert_eq!(
+            apply_package_name_mapping("pyyaml >=5.4.0"),
+            "pyyaml >=5.4.0"
+        );
+    }
+
+    #[test]
+    fn test_build_schema_version() {
+        // Test default schema version
+        let toml_data = HashMap::new();
+        assert_eq!(build_schema_version(&toml_data), Some(1));
+
+        // Test custom schema version
+        let mut toml_data = HashMap::new();
+        let tool_data = json!({
+            "conda": {
+                "recipe": {
+                    "schema_version": 2
+                }
+            }
+        });
+        toml_data.insert("tool".to_string(), tool_data);
+        assert_eq!(build_schema_version(&toml_data), Some(2));
+
+        // Test missing schema version in tool.conda.recipe
+        let mut toml_data = HashMap::new();
+        let tool_data = json!({
+            "conda": {
+                "recipe": {}
+            }
+        });
+        toml_data.insert("tool".to_string(), tool_data);
+        assert_eq!(build_schema_version(&toml_data), Some(1));
+    }
+
+    #[test]
+    fn test_format_yaml_with_schema() {
+        let yaml_content = "schema_version: 1\npackage:\n  name: test";
+        let result = format_yaml_with_schema(yaml_content);
+        assert!(result.starts_with("# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json"));
+        assert!(result.contains("schema_version: 1"));
+    }
+
+    #[test]
+    fn test_build_context_section() {
+        let mut project = serde_json::Map::new();
+        project.insert("name".to_string(), json!("test-package"));
+        project.insert("version".to_string(), json!("1.0.0"));
+
+        let toml_data = HashMap::new();
+        let context = build_context_section(&project, &toml_data).unwrap();
+
+        assert_eq!(context.get("name"), Some(&"test-package".to_string()));
+        assert_eq!(context.get("version"), Some(&"1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_build_context_section_dynamic_version() {
+        let mut project = serde_json::Map::new();
+        project.insert("name".to_string(), json!("test-package"));
+        project.insert("dynamic".to_string(), json!(["version"]));
+
+        let mut toml_data = HashMap::new();
+        let build_system = json!({
+            "build-backend": "hatchling.build"
+        });
+        toml_data.insert("build-system".to_string(), build_system);
+
+        let context = build_context_section(&project, &toml_data).unwrap();
+        assert_eq!(context.get("name"), Some(&"test-package".to_string()));
+        assert_eq!(context.get("version"), Some(&"${{ environ.get('HATCH_BUILD_VERSION', '0.1.0') }}".to_string()));
+    }
+
+    #[test]
+    fn test_build_package_section() {
+        let mut project = serde_json::Map::new();
+        project.insert("name".to_string(), json!("test-package"));
+        project.insert("version".to_string(), json!("1.0.0"));
+
+        let package = build_package_section(&project).unwrap();
+        assert_eq!(package.name, "${{ name }}");
+        assert_eq!(package.version, "${{ version }}");
+    }
+
+    #[test]
+    fn test_build_requirements_section() {
+        let mut project = serde_json::Map::new();
+        project.insert("name".to_string(), json!("test-package"));
+        project.insert("dependencies".to_string(), json!([
+            "numpy>=1.21.0",
+            "pandas>=1.3.0",
+            "click>=8.0.0"
+        ]));
+        project.insert("requires-python".to_string(), json!(">=3.9"));
+
+        let mut toml_data = HashMap::new();
+        let build_system = json!({
+            "requires": ["setuptools", "wheel"]
+        });
+        toml_data.insert("build-system".to_string(), build_system);
+
+        let requirements = build_requirements_section(&project, &toml_data).unwrap();
+
+        // Check host dependencies include build system requirements
+        assert!(requirements.host.contains(&"setuptools".to_string()));
+        assert!(requirements.host.contains(&"wheel".to_string()));
+
+        // Check run dependencies include project dependencies
+        assert!(requirements.run.contains(&"numpy >=1.21.0".to_string()));
+        assert!(requirements.run.contains(&"pandas >=1.3.0".to_string()));
+        assert!(requirements.run.contains(&"click >=8.0.0".to_string()));
+
+        // Check python constraint is included
+        assert!(requirements.run.contains(&"python >=3.9".to_string()));
+    }
+
+    #[test]
+    fn test_build_about_section() {
+        let mut project = serde_json::Map::new();
+        project.insert("description".to_string(), json!("A test package"));
+        project.insert("license".to_string(), json!({"text": "MIT"}));
+        
+        let urls = json!({
+            "Homepage": "https://example.com",
+            "Source": "https://github.com/example/test",
+            "Documentation": "https://docs.example.com"
+        });
+        project.insert("urls".to_string(), urls);
+
+        let about = build_about_section(&project).unwrap();
+        assert_eq!(about.summary, Some("A test package".to_string()));
+        assert_eq!(about.license, Some("MIT".to_string()));
+        assert_eq!(about.homepage, Some("https://example.com".to_string()));
+        assert_eq!(about.repository, Some("https://github.com/example/test".to_string()));
+        assert_eq!(about.documentation, Some("https://docs.example.com".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_dynamic_version() {
+        // Test setuptools_scm
+        let mut toml_data = HashMap::new();
+        let build_system = json!({
+            "build-backend": "setuptools_scm.build_meta"
+        });
+        toml_data.insert("build-system".to_string(), build_system);
+
+        let version = resolve_dynamic_version(&toml_data).unwrap();
+        assert_eq!(version, "${{ environ.get('SETUPTOOLS_SCM_PRETEND_VERSION', '0.1.0') }}");
+
+        // Test hatchling
+        let mut toml_data = HashMap::new();
+        let build_system = json!({
+            "build-backend": "hatchling.build"
+        });
+        toml_data.insert("build-system".to_string(), build_system);
+
+        let version = resolve_dynamic_version(&toml_data).unwrap();
+        assert_eq!(version, "${{ environ.get('HATCH_BUILD_VERSION', '0.1.0') }}");
+    }
 }
 
 /// Apply conda-specific overrides from tool.conda.recipe.* sections
