@@ -1027,7 +1027,7 @@ pub async fn debug_recipe(
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: Vec::new(),
-        variant_overrides: Vec::new(),
+        variant_overrides: HashMap::new(),
         ignore_recipe_variants: false,
         render_only: false,
         with_solve: true,
