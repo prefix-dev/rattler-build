@@ -137,8 +137,8 @@ fn build_recipes_py(
         false, // TUI disabled
         skip_existing,
         noarch_build_platform,
-        None,  // extra meta
-        None,  // sandbox configuration
+        None, // extra meta
+        None, // sandbox configuration
         Debug::new(debug),
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
