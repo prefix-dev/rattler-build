@@ -13,3 +13,8 @@ site
 .pixi
 target-pixi
 *.conda
+
+# Test files generated during pyproject recipe development
+*example*.toml
+*recipe*.yaml
+/recipe/
