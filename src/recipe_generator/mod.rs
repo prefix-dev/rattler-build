@@ -1,16 +1,18 @@
-//! Module for generating recipes for Python (PyPI), R (CRAN), Perl (CPAN), or Lua (LuaRocks) packages
+//! Module for generating recipes for Python (PyPI), R (CRAN), Perl (CPAN), Lua (LuaRocks) packages, or local Python projects
 use clap::Parser;
 
 mod cpan;
 mod cran;
 mod luarocks;
 mod pypi;
+mod pyproject;
 mod serialize;
 
 use cpan::{CpanOpts, generate_cpan_recipe};
 use cran::{CranOpts, generate_r_recipe};
 use luarocks::{LuarocksOpts, generate_luarocks_recipe};
 use pypi::PyPIOpts;
+use pyproject::{PyprojectOpts, generate_pyproject_recipe};
 pub use serialize::write_recipe;
 
 use self::pypi::generate_pypi_recipe;
@@ -29,6 +31,9 @@ pub enum Source {
 
     /// Generate a recipe for a Lua package from LuaRocks
     Luarocks(LuarocksOpts),
+
+    /// Generate a recipe from a local pyproject.toml file
+    Pyproject(PyprojectOpts),
 }
 
 /// Options for generating a recipe
@@ -46,6 +51,7 @@ pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
         Source::Cran(opts) => generate_r_recipe(&opts).await?,
         Source::Cpan(opts) => generate_cpan_recipe(&opts).await?,
         Source::Luarocks(opts) => generate_luarocks_recipe(&opts).await?,
+        Source::Pyproject(opts) => generate_pyproject_recipe(&opts).await?,
     }
 
     Ok(())

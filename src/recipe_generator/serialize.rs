@@ -47,6 +47,8 @@ pub struct GitSourceElement {
 #[derive(Default, Debug, Serialize)]
 pub struct Build {
     pub script: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number: Option<u32>,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -114,6 +116,8 @@ pub enum Test {
 
 #[derive(Default, Debug, Serialize)]
 pub struct Recipe {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u32>,
     pub context: IndexMap<String, String>,
     pub package: Package,
     pub source: Vec<SourceElement>,
