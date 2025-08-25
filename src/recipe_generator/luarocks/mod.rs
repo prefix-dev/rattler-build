@@ -380,6 +380,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
     };
 
     let mut recipe = Recipe {
+        schema_version: Some(1),
         context,
         package: crate::recipe_generator::serialize::Package {
             name: package_name.as_normalized().to_string(),
@@ -388,6 +389,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         source: vec![source_element],
         build: Build {
             script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
+            number: Some(0),
             python: Python::default(),
             noarch: None,
         },
