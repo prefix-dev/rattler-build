@@ -270,7 +270,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::SpdxParsing(err) => {
                 writeln!(
                     f,
-                    "failed to parse SPDX license: {} with: {}",
+                    "failed to parse SPDX license: '{}' with: {}",
                     err.original, err.reason
                 )?;
                 writeln!(
