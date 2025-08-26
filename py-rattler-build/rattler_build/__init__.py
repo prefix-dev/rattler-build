@@ -11,7 +11,7 @@ from .rattler_build import (
 
 
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Union
 from datetime import datetime
 
 __all__ = [
@@ -39,7 +39,7 @@ def build_recipes(
     host_platform: Union[str, None] = None,
     channel: Union[List[str], None] = None,
     variant_config: Union[List[str], None] = None,
-    variant_overrides: Union[dict, None] = None,
+    variant_overrides: Union[Dict[str, List[str]], None] = None,
     ignore_recipe_variants: bool = False,
     render_only: bool = False,
     with_solve: bool = False,
