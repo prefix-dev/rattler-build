@@ -91,6 +91,18 @@ Since version 0.35.0, rattler-build supports conda_build_config.yaml files,
 parsing a subset of conda-build's configuration syntax. The filename must match
 exactly to be recognized as a conda-build config file.
 
+## Overriding the variant configuration from the command line
+
+You can override the chosen variant configuration by passing in the variant you want from the CLI:
+
+```bash
+rattler-build build --recipe ./my-recipe --variant python=3.12 --variant numpy="2.*"
+```
+
+To build against multiple Python versions you can separate the variant strings by `,`, eg. `--variant python=3.12,3.13`.
+
+This will follow the same logic as using multiple variant files: the CLI will overwrite any variant keys set by files that were loaded.
+
 ## Package hash from variant
 
 You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.

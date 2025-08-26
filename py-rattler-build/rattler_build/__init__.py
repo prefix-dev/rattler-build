@@ -11,7 +11,7 @@ from .rattler_build import (
 
 
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Union
 from datetime import datetime
 
 __all__ = [
@@ -39,6 +39,7 @@ def build_recipes(
     host_platform: Union[str, None] = None,
     channel: Union[List[str], None] = None,
     variant_config: Union[List[str], None] = None,
+    variant_overrides: Union[Dict[str, List[str]], None] = None,
     ignore_recipe_variants: bool = False,
     render_only: bool = False,
     with_solve: bool = False,
@@ -76,6 +77,7 @@ def build_recipes(
         host_platform: The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch).
         channel: Add a channel to search for dependencies in.
         variant_config: Variant configuration files for the build.
+        variant_overrides: A dictionary of variant key-value pairs to override. Keys are strings, values are lists of strings.
         ignore_recipe_variants: Do not read the `variants.yaml` file next to a recipe.
         render_only: Render the recipe files without executing the build.
         with_solve: Render the recipe files with solving dependencies.
@@ -114,6 +116,7 @@ def build_recipes(
         host_platform,
         channel,
         variant_config,
+        variant_overrides,
         ignore_recipe_variants,
         render_only,
         with_solve,

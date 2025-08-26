@@ -389,7 +389,7 @@ pub struct BuildOpts {
 
     /// Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11).
     /// Multiple values separated by commas will create multiple build variants.
-    #[arg(long = "variant", value_parser = parse_variant_override)]
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
     pub variant_overrides: Vec<(String, Vec<String>)>,
 
     /// Do not read the `variants.yaml` file next to a recipe.
@@ -506,7 +506,7 @@ pub struct BuildData {
     pub host_platform: Platform,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
-    pub variant_overrides: Vec<(String, Vec<String>)>,
+    pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
     pub with_solve: bool,
@@ -541,7 +541,7 @@ impl BuildData {
         host_platform: Option<Platform>,
         channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
-        variant_overrides: Vec<(String, Vec<String>)>,
+        variant_overrides: HashMap<String, Vec<String>>,
         ignore_recipe_variants: bool,
         render_only: bool,
         with_solve: bool,
@@ -620,7 +620,7 @@ impl BuildData {
                     .and_then(|config| config.default_channels.clone())
             }),
             opts.variant_config,
-            opts.variant_overrides,
+            opts.variant_overrides.into_iter().collect(),
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
