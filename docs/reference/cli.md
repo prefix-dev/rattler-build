@@ -122,6 +122,11 @@ Build a package from a recipe
 	Variant configuration files for the build
 
 
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+
+
 - `--ignore-recipe-variants`
 
 	Do not read the `variants.yaml` file next to a recipe
