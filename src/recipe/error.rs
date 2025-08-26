@@ -268,7 +268,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
             ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
-                writeln!(f, "failed to parse SPDX license: {}", err.reason)?;
+                writeln!(f, "failed to parse SPDX license: {} with: {}", err.original, err.reason)?;
                 writeln!(
                     f,
                     "See <https://spdx.org/licenses> for the list of valid licenses."
