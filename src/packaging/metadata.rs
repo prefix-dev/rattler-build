@@ -468,17 +468,24 @@ impl Output {
                         &content_type,
                         self.recipe.build().prefix_detection(),
                     )?;
-                    let digest = compute_file_digest::<sha2::Sha256>(p)?;
+                    let file_size = meta.len();
+                    // Compute SHA256 for files - empty files get empty hash
+                    let digest = if file_size > 0 {
+                        Some(compute_file_digest::<sha2::Sha256>(p)?)
+                    } else {
+                        Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+                    };
                     let no_link = always_copy_files.is_match(&relative_path);
                     return Ok(Some(PathsEntry {
-                        sha256: Some(digest),
+                        sha256: digest,
                         relative_path,
                         path_type: PathType::HardLink,
                         prefix_placeholder,
                         no_link,
-                        size_in_bytes: Some(meta.len()),
+                        size_in_bytes: Some(file_size),
                     }));
                 } else if meta.is_symlink() {
+                    // For symlinks, compute hash of the target file content if it exists and is within package, otherwise empty digest
                     let digest = if p.is_file() {
                         compute_file_digest::<sha2::Sha256>(p)?
                     } else {
