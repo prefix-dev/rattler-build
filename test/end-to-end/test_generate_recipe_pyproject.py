@@ -254,24 +254,25 @@ def test_pyproject_stdout_output(rattler_build: RattlerBuild, tmp_path: Path):
 
     pyproject_file = tmp_path / "pyproject.toml"
     pyproject_file.write_text(pyproject_content)
-    
+
     result = rattler_build(
         "generate-recipe",
         "pyproject",
         "--input",
         str(pyproject_file),
         capture_output=True,
-        text=True
+        text=True,
     )
-    
+
     assert result.returncode == 0
-    
+
     # Check that output was written to stdout
     assert "schema_version: 1" in result.stdout
     assert "stdout-test" in result.stdout
-    
+
     # Parse the YAML output from stdout
     import yaml
+
     recipe = yaml.safe_load(result.stdout)
     assert recipe["context"]["name"] == "stdout-test"
     assert recipe["context"]["version"] == "1.0.0"
