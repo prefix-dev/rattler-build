@@ -114,7 +114,6 @@ mod tests {
                 input_str.as_str(),
                 "-o",
                 output_str.as_str(),
-                "--write",
             ];
             self.with_args(args)
         }
