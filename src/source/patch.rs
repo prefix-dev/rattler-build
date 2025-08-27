@@ -16,7 +16,7 @@ use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
-    return trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null";
+    trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
 }
 
 /// Normalizes backup file paths (.orig/.bak) to their actual file paths
