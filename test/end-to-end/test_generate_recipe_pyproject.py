@@ -55,7 +55,6 @@ def test_basic_pyproject_generation(rattler_build: RattlerBuild, tmp_path: Path)
         str(pyproject_file),
         "--output",
         str(output_dir / "recipe.yaml"),
-        "--write",
         capture_output=True,
         text=True,
     )
@@ -120,7 +119,6 @@ def test_pyproject_missing_file_error(rattler_build: RattlerBuild, tmp_path: Pat
         str(nonexistent_file),
         "--output",
         str(tmp_path / "output.yaml"),
-        "--write",
         capture_output=True,
         text=True,
     )
@@ -153,7 +151,6 @@ def test_pyproject_overwrite_protection(rattler_build: RattlerBuild, tmp_path: P
         str(pyproject_file),
         "--output",
         str(recipe_file),
-        "--write",
         capture_output=True,
         text=True,
     )
@@ -189,7 +186,6 @@ def test_pyproject_overwrite_flag(rattler_build: RattlerBuild, tmp_path: Path):
         str(pyproject_file),
         "--output",
         str(recipe_file),
-        "--write",
         "--overwrite",
         capture_output=True,
         text=True,
@@ -227,7 +223,6 @@ def test_pyproject_schema_version_in_output(
         str(pyproject_file),
         "--output",
         str(output_dir / "recipe.yaml"),
-        "--write",
         capture_output=True,
         text=True,
     )
@@ -246,3 +241,37 @@ def test_pyproject_schema_version_in_output(
     with open(recipe_file) as f:
         recipe = yaml.safe_load(f)
     assert recipe["schema_version"] == 1
+
+
+def test_pyproject_stdout_output(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that output goes to stdout when no --output is provided."""
+    pyproject_content = dedent("""
+        [project]
+        name = "stdout-test"
+        version = "1.0.0"
+        description = "Test stdout output"
+    """).strip()
+
+    pyproject_file = tmp_path / "pyproject.toml"
+    pyproject_file.write_text(pyproject_content)
+    
+    result = rattler_build(
+        "generate-recipe",
+        "pyproject",
+        "--input",
+        str(pyproject_file),
+        capture_output=True,
+        text=True
+    )
+    
+    assert result.returncode == 0
+    
+    # Check that output was written to stdout
+    assert "schema_version: 1" in result.stdout
+    assert "stdout-test" in result.stdout
+    
+    # Parse the YAML output from stdout
+    import yaml
+    recipe = yaml.safe_load(result.stdout)
+    assert recipe["context"]["name"] == "stdout-test"
+    assert recipe["context"]["version"] == "1.0.0"

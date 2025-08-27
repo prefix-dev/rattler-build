@@ -15,9 +15,9 @@ pub struct PyprojectOpts {
     #[arg(short, long, default_value = "pyproject.toml")]
     pub input: PathBuf,
 
-    /// Path to write the recipe.yaml file (defaults to recipe/recipe.yaml in current directory)
-    #[arg(short, long, default_value = "recipe/recipe.yaml")]
-    pub output: PathBuf,
+    /// Path to write the recipe.yaml file. If not provided, output will be printed to stdout
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 
     /// Whether to overwrite existing recipe file
     #[arg(long)]
@@ -26,10 +26,6 @@ pub struct PyprojectOpts {
     /// Output format: yaml or json
     #[arg(long, default_value = "yaml")]
     pub format: String,
-
-    /// Whether to write the recipe to a file
-    #[arg(short, long)]
-    pub write: bool,
 
     /// Sort keys in output
     #[arg(long)]
@@ -85,23 +81,23 @@ pub async fn generate_pyproject_recipe(opts: &PyprojectOpts) -> miette::Result<(
     };
 
     // Write or print the recipe
-    if opts.write {
+    if let Some(output_path) = &opts.output {
         // Check if output file exists and we're not overwriting
-        if opts.output.exists() && !opts.overwrite {
+        if output_path.exists() && !opts.overwrite {
             return Err(miette::miette!(
                 "Output file {} already exists. Use --overwrite to replace it.",
-                opts.output.display()
+                output_path.display()
             ));
         }
 
         // Create parent directory if it doesn't exist
-        if let Some(parent) = opts.output.parent() {
+        if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).into_diagnostic()?;
         }
 
         // Write to the specified output file
-        fs::write(&opts.output, &recipe_content).into_diagnostic()?;
-        tracing::info!("Recipe written to {}", opts.output.display());
+        fs::write(output_path, &recipe_content).into_diagnostic()?;
+        tracing::info!("Recipe written to {}", output_path.display());
     } else {
         print!("{}", recipe_content);
     }
