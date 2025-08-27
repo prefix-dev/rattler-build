@@ -841,9 +841,8 @@ Generate a recipe from a local pyproject.toml file
 
 - `-o`, `--output <OUTPUT>`
 
-	Path to write the recipe.yaml file (defaults to recipe/recipe.yaml in current directory)
+	Path to write the recipe.yaml file. If not provided, output will be printed to stdout
 
-	- Default value: `recipe/recipe.yaml`
 
 - `--overwrite`
 
@@ -855,11 +854,6 @@ Generate a recipe from a local pyproject.toml file
 	Output format: yaml or json
 
 	- Default value: `yaml`
-
-- `-w`, `--write`
-
-	Whether to write the recipe to a file
-
 
 - `--sort-keys`
 
