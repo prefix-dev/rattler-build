@@ -741,7 +741,7 @@ requirements:
         let tmp = tmp("test_generate_recipe_pyproject_basic");
         // Create the temp directory
         fs::create_dir_all(tmp.as_dir()).unwrap();
-        
+
         // Create a basic pyproject.toml
         let pyproject_content = r#"
 [project]
@@ -769,30 +769,33 @@ build-backend = "setuptools.build_meta"
         // Run rattler-build generate-recipe pyproject
         let rattler_build = rattler().generate_recipe_pyproject(&pyproject_path, &recipe_path);
 
-        assert!(rattler_build.status.success(), 
-               "Command failed: {}", String::from_utf8_lossy(&rattler_build.stdout));
+        assert!(
+            rattler_build.status.success(),
+            "Command failed: {}",
+            String::from_utf8_lossy(&rattler_build.stdout)
+        );
 
         // Check that recipe.yaml was created
         assert!(recipe_path.exists(), "recipe.yaml was not created");
 
         // Check recipe content
         let recipe_content = fs::read_to_string(&recipe_path).unwrap();
-        
+
         // Should have schema header
         assert!(recipe_content.contains("# yaml-language-server: $schema="));
         assert!(recipe_content.contains("schema_version: 1"));
-        
+
         // Should have correct package info
         assert!(recipe_content.contains("name: test-package"));
         assert!(recipe_content.contains("version: 1.0.0"));
-        
+
         // Should have dependencies converted
         assert!(recipe_content.contains("requests >=2.25.0"));
         assert!(recipe_content.contains("click >=8.0.0"));
-        
+
         // Should have entry points
         assert!(recipe_content.contains("test-tool = test_package.cli:main"));
-        
+
         // Should have build system requirements
         assert!(recipe_content.contains("setuptools"));
         assert!(recipe_content.contains("wheel"));
@@ -803,7 +806,7 @@ build-backend = "setuptools.build_meta"
         let tmp = tmp("test_generate_recipe_pyproject_conda_overrides");
         // Create the temp directory
         fs::create_dir_all(tmp.as_dir()).unwrap();
-        
+
         // Create a pyproject.toml with conda recipe overrides
         let pyproject_content = r#"
 [project]
@@ -837,20 +840,23 @@ build-backend = "hatchling.build"
         // Run rattler-build generate-recipe pyproject
         let rattler_build = rattler().generate_recipe_pyproject(&pyproject_path, &recipe_path);
 
-        assert!(rattler_build.status.success(), 
-               "Command failed: {}", String::from_utf8_lossy(&rattler_build.stdout));
+        assert!(
+            rattler_build.status.success(),
+            "Command failed: {}",
+            String::from_utf8_lossy(&rattler_build.stdout)
+        );
 
         // Check recipe content
         let recipe_content = fs::read_to_string(&recipe_path).unwrap();
-        
+
         // Should have custom schema version
         assert!(recipe_content.contains("schema_version: 2"));
-        
+
         // Should have conda overrides applied
         assert!(recipe_content.contains("custom_var: custom_value"));
         assert!(recipe_content.contains("license: MIT"));
         assert!(recipe_content.contains("homepage: https://example.com"));
-        
+
         // Should have hatchling build system
         assert!(recipe_content.contains("hatchling"));
     }
