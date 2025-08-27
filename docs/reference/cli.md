@@ -122,6 +122,11 @@ Build a package from a recipe
 	Variant configuration files for the build
 
 
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+
+
 - `--ignore-recipe-variants`
 
 	Do not read the `variants.yaml` file next to a recipe
@@ -684,6 +689,7 @@ Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `cran` — Generate a recipe for an R package from CRAN
 * `cpan` — Generate a recipe for a Perl package from CPAN
 * `luarocks` — Generate a recipe for a Lua package from LuaRocks
+* `pyproject` — Generate a recipe from a local pyproject.toml file
 
 
 
@@ -815,6 +821,65 @@ Generate a recipe for a Lua package from LuaRocks
 	Where to write the recipe to
 
 	- Default value: `.`
+
+
+
+
+#### `pyproject`
+
+Generate a recipe from a local pyproject.toml file
+
+**Usage:** `rattler-build generate-recipe pyproject [OPTIONS]`
+
+##### **Options:**
+
+- `-i`, `--input <INPUT>`
+
+	Path to the pyproject.toml file (defaults to pyproject.toml in current directory)
+
+	- Default value: `pyproject.toml`
+
+- `-o`, `--output <OUTPUT>`
+
+	Path to write the recipe.yaml file (defaults to recipe/recipe.yaml in current directory)
+
+	- Default value: `recipe/recipe.yaml`
+
+- `--overwrite`
+
+	Whether to overwrite existing recipe file
+
+
+- `--format <FORMAT>`
+
+	Output format: yaml or json
+
+	- Default value: `yaml`
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a file
+
+
+- `--sort-keys`
+
+	Sort keys in output
+
+
+- `--include-comments`
+
+	Include helpful comments in the output
+
+
+- `--exclude-sections <EXCLUDE_SECTIONS>`
+
+	Exclude specific sections from the output (comma-separated)
+
+
+- `--validate`
+
+	Validate the generated recipe
+
 
 
 
