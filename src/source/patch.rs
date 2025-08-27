@@ -19,25 +19,58 @@ fn is_dev_null(path: &str) -> bool {
     return trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null";
 }
 
+/// Normalizes backup file paths (.orig/.bak) to their actual file paths
+/// Returns (original_path, modified_path) with backup files resolved
+fn normalize_backup_paths(
+    original_path: Option<PathBuf>,
+    modified_path: Option<PathBuf>,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    let (Some(orig), Some(modified)) = (&original_path, &modified_path) else {
+        return (original_path, modified_path);
+    };
+
+    // If paths are the same, no backup normalization needed
+    if orig == modified {
+        return (original_path, modified_path);
+    }
+
+    // Check if original file is a backup of the modified file
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
+        if let Some(mod_filename) = modified.file_name() {
+            if matches!(orig_ext.to_str(), Some("orig" | "bak")) && orig_stem == mod_filename {
+                // Original is a backup of modified file, treat as modifying the actual file
+                return (Some(modified.clone()), Some(modified.clone()));
+            }
+        }
+    }
+
+    (original_path, modified_path)
+}
+
 fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
     for diff in patch {
-        if let Some(p) = diff
+        let original_path = diff
             .original()
             .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| !is_dev_null(p))
-            .map(PathBuf::from)
-        {
-            affected_files.insert(p);
-        }
-        if let Some(p) = diff
+            .map(PathBuf::from);
+
+        let modified_path = diff
             .modified()
             .and_then(|p| std::str::from_utf8(p).ok())
             .filter(|p| !is_dev_null(p))
-            .map(PathBuf::from)
-        {
-            affected_files.insert(p);
+            .map(PathBuf::from);
+
+        let (normalized_orig, normalized_mod) =
+            normalize_backup_paths(original_path, modified_path);
+
+        if let Some(path) = normalized_orig {
+            affected_files.insert(path);
+        }
+        if let Some(path) = normalized_mod {
+            affected_files.insert(path);
         }
     }
 
@@ -107,42 +140,16 @@ fn custom_patch_stripped_paths(
     diff: &Diff<'_, [u8]>,
     strip_level: usize,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
-    let original = (diff.original(), diff.modified());
-
     let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
         std::str::from_utf8(path_bytes).ok().and_then(|p| {
-            (!is_dev_null(p)).then(|| {
-                PathBuf::from(p)
-                    .components()
-                    .skip(strip_level)
-                    .collect::<PathBuf>()
-            })
+            (!is_dev_null(p)).then(|| PathBuf::from(p).components().skip(strip_level).collect())
         })
     };
 
-    let stripped = (
-        original.0.and_then(strip_path),
-        original.1.and_then(strip_path),
-    );
+    let original_path = diff.original().and_then(strip_path);
+    let modified_path = diff.modified().and_then(strip_path);
 
-    // Handle backup file cases
-    match &stripped {
-        (Some(orig), Some(modified)) => {
-            // Check if original is a backup file (.orig, .bak) of the modified file
-            if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
-                if let Some(mod_name) = modified.file_name() {
-                    if (orig_ext == "orig" || orig_ext == "bak") && orig_stem == mod_name {
-                        // Original is backup, modified is actual file
-                        // Treat this as modifying the actual file in place
-                        return (Some(modified.clone()), Some(modified.clone()));
-                    }
-                }
-            }
-
-            stripped
-        }
-        _ => stripped,
-    }
+    normalize_backup_paths(original_path, modified_path)
 }
 
 fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
