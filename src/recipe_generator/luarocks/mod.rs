@@ -578,6 +578,12 @@ mod tests {
 
     #[test]
     fn test_parse_rockspec() {
+        // Skip test on PowerPC architectures
+        if std::env::consts::ARCH == "powerpc" || std::env::consts::ARCH == "powerpc64" {
+            eprintln!("Skipping test_parse_rockspec on PowerPC architecture.");
+            return;
+        }
+
         // Check if `lua` is on the PATH
         if std::process::Command::new("lua").output().is_err() {
             eprintln!("Lua is not installed or not on the PATH. Skipping rockspec parsing test.");

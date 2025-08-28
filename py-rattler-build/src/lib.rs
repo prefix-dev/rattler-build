@@ -3,10 +3,7 @@ use std::{collections::HashMap, future::Future, path::PathBuf, str::FromStr};
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
-    opt::{
-        AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
-        CondaForgeData, PrefixData, QuetzData, TestData,
-    },
+    opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
     upload,
@@ -20,6 +17,10 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
+use rattler_upload::upload;
+use rattler_upload::upload::opt::{
+    AnacondaData, ArtifactoryData, CondaForgeData, PrefixData, QuetzData,
+};
 use url::Url;
 
 /// Execute async tasks in Python bindings with proper error handling
