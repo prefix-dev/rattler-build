@@ -236,6 +236,7 @@ pub(crate) async fn fetch_source(
                         copy_dir::CopyDir::new(&src_path, &dest_dir)
                             .use_gitignore(src.use_gitignore())
                             .with_globvec(&src.filter)
+                            .exclude_git_dirs(true)
                             .run()
                     },
                 )?;
