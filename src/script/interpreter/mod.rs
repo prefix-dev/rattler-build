@@ -110,12 +110,11 @@ pub trait Interpreter {
         if let Some(build_prefix) = &args.build_prefix {
             let build_prefix_activator =
                 Activator::from_path(build_prefix, shell_type, args.execution_platform)?;
-            let current_env = std::env::vars().collect::<HashMap<_, _>>();
             let activation_vars = ActivationVariables {
                 conda_prefix: None,
                 path: None,
                 path_modification_behavior: PathModificationBehavior::Prepend,
-                current_env,
+                current_env: current_env.clone(),
             };
 
             let build_activation = build_prefix_activator.activation(activation_vars)?;
