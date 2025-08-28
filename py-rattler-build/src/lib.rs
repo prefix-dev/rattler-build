@@ -4,12 +4,12 @@ use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
+    recipe_generator::{
+        CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
+        generate_pypi_recipe_string, generate_r_recipe_string,
+    },
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
-    recipe_generator::{
-        generate_cpan_recipe_string, generate_luarocks_recipe_string, generate_pypi_recipe_string, generate_r_recipe_string,
-        CpanOpts, PyPIOpts,
-    },
 };
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
@@ -29,9 +29,11 @@ where
 {
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to create async runtime: {}", e)))?;
-    
+
     rt.block_on(async {
-        future.await.map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        future
+            .await
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     })
 }
 
@@ -63,20 +65,14 @@ fn generate_pypi_recipe_string_py(
 /// Generate a CRAN (R) recipe and return the YAML as a string.
 #[pyfunction]
 #[pyo3(signature = (package, universe=None))]
-fn generate_r_recipe_string_py(
-    package: String,
-    universe: Option<String>,
-) -> PyResult<String> {
+fn generate_r_recipe_string_py(package: String, universe: Option<String>) -> PyResult<String> {
     run_async_task(generate_r_recipe_string(&package, universe.as_deref()))
 }
 
 /// Generate a CPAN (Perl) recipe and return the YAML as a string.
 #[pyfunction]
 #[pyo3(signature = (package, version=None))]
-fn generate_cpan_recipe_string_py(
-    package: String,
-    version: Option<String>,
-) -> PyResult<String> {
+fn generate_cpan_recipe_string_py(package: String, version: Option<String>) -> PyResult<String> {
     let opts = CpanOpts {
         package,
         version,
@@ -411,7 +407,8 @@ fn upload_packages_to_conda_forge_py(
     );
 
     run_async_task(async {
-        upload::conda_forge::upload_packages_to_conda_forge(&package_files, conda_forge_data).await?;
+        upload::conda_forge::upload_packages_to_conda_forge(&package_files, conda_forge_data)
+            .await?;
         Ok(())
     })
 }
