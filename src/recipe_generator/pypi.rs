@@ -157,7 +157,7 @@ async fn extract_build_requirements(
             entry.read_to_string(&mut contents).into_diagnostic()?;
 
             // Parse TOML
-            let toml: toml::Value = contents.parse().into_diagnostic()?;
+            let toml: toml::Table = contents.parse().into_diagnostic()?;
 
             // Try different build system specs
             return Ok(match toml.get("build-system") {
@@ -430,7 +430,7 @@ pub async fn create_recipe(
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
-            imports: vec![metadata.info.name.clone()],
+            imports: vec![metadata.info.name.replace('-', "_")],
             pip_check: true,
         },
     }));
@@ -519,5 +519,33 @@ mod tests {
         let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
 
         assert_yaml_snapshot!(recipe);
+    }
+
+    #[tokio::test]
+    async fn test_hyphenated_imports_are_sanitized() {
+        let opts = PyPIOpts {
+            package: "file-read-backwards".into(),
+            version: Some("3.2.0".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+        };
+
+        let client = reqwest::Client::new();
+        let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
+        let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
+
+        let python_test = recipe
+            .tests
+            .iter()
+            .find_map(|t| {
+                if let Test::Python(pt) = t {
+                    Some(pt)
+                } else {
+                    None
+                }
+            })
+            .expect("expected a Python test");
+        assert_eq!(python_test.python.imports, vec!["file_read_backwards"]);
     }
 }

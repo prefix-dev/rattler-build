@@ -199,6 +199,14 @@ pub struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     pub use_bz2: bool,
 
+    /// Enable support for sharded repodata
+    #[clap(long, env = "RATTLER_SHARDED", default_value = "true", hide = true)]
+    pub use_sharded: bool,
+
+    /// Enable support for JLAP (JSON Lines Append Protocol)
+    #[clap(long, env = "RATTLER_JLAP", default_value = "false", hide = true)]
+    pub use_jlap: bool,
+
     /// Enable experimental features
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
@@ -226,10 +234,15 @@ pub struct CommonData {
     pub s3_config: HashMap<String, s3_middleware::S3Config>,
     pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
+    pub use_zstd: bool,
+    pub use_bz2: bool,
+    pub use_sharded: bool,
+    pub use_jlap: bool,
 }
 
 impl CommonData {
     /// Create a new instance of `CommonData`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
@@ -237,6 +250,10 @@ impl CommonData {
         config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
+        use_zstd: bool,
+        use_bz2: bool,
+        use_sharded: bool,
+        use_jlap: bool,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
@@ -277,6 +294,10 @@ impl CommonData {
             mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
             allow_insecure_host,
+            use_zstd,
+            use_bz2,
+            use_sharded,
+            use_jlap,
         }
     }
 
@@ -288,6 +309,10 @@ impl CommonData {
             config,
             value.channel_priority.map(|c| c.value),
             value.allow_insecure_host,
+            value.use_zstd,
+            value.use_bz2,
+            value.use_sharded,
+            value.use_jlap,
         )
     }
 }
@@ -357,6 +382,11 @@ pub struct BuildOpts {
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     pub variant_config: Option<Vec<PathBuf>>,
+
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11).
+    /// Multiple values separated by commas will create multiple build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
 
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]
@@ -472,6 +502,7 @@ pub struct BuildData {
     pub host_platform: Platform,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
+    pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
     pub with_solve: bool,
@@ -506,6 +537,7 @@ impl BuildData {
         host_platform: Option<Platform>,
         channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
+        variant_overrides: HashMap<String, Vec<String>>,
         ignore_recipe_variants: bool,
         render_only: bool,
         with_solve: bool,
@@ -539,6 +571,7 @@ impl BuildData {
                 .unwrap_or(Platform::current()),
             channels,
             variant_config: variant_config.unwrap_or_default(),
+            variant_overrides,
             ignore_recipe_variants,
             render_only,
             with_solve,
@@ -583,6 +616,7 @@ impl BuildData {
                     .and_then(|config| config.default_channels.clone())
             }),
             opts.variant_config,
+            opts.variant_overrides.into_iter().collect(),
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
@@ -633,6 +667,18 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse variant override (e.g., "python=3.12" or "python=3.12,3.11")
+fn parse_variant_override(
+    s: &str,
+) -> Result<(String, Vec<String>), Box<dyn Error + Send + Sync + 'static>> {
+    let (key, value) = s
+        .split_once('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+
+    let values: Vec<String> = value.split(',').map(|v| v.trim().to_string()).collect();
+    Ok((key.to_string(), values))
 }
 
 /// Parse a datetime string in RFC3339 format

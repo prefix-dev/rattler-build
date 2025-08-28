@@ -1037,11 +1037,11 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
-def test_nushell_implicit_recipe(
+def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     rattler_build.build(
-        recipes / "nushell-implicit/recipe.yaml",
+        recipes / "nushell-script-detection/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "nushell")
@@ -1131,9 +1131,12 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches
+    # check that the snapshot matches (different on windows vs. unix)
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    assert test_yaml == snapshot
+    if os.name == "nt":
+        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
+    else:
+        assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -2269,4 +2272,17 @@ def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     )
     pkg = get_extracted_package(tmp_path, "nodejs-test")
 
+    assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="PE header test only relevant on Windows"
+)
+def test_pe_header_signature_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Malformed PE in Library/bin should be skipped by relinker; build succeeds."""
+    recipe = recipes / "pe-malformed-windows/recipe.yaml"
+    rattler_build.build(recipe, tmp_path)
+    pkg = get_extracted_package(tmp_path, "pe-test")
     assert (pkg / "info/index.json").exists()

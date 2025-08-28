@@ -30,10 +30,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # master
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: "1.86.0"
           components: clippy,rustfmt
@@ -43,7 +43,7 @@ jobs:
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.8.14
+      - uses: prefix-dev/setup-pixi@v0.9.0
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         with:
           cache: true
@@ -63,6 +63,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'ci:full-build')
     strategy:
       fail-fast: false
       matrix:
@@ -113,7 +114,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           submodules: recursive
 
@@ -136,7 +137,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@ab6845274e2ff01cd4462007e1a9d9df1ab49f42 # v1
         with:
           toolchain: "1.86.0"
           target: ${{ matrix.target }}
@@ -151,7 +152,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2
+        uses: taiki-e/install-action@f63c33fd96cc1e69a29bafd06541cf28588b43a4 # v2
         with:
           tool: cross
 
@@ -262,9 +263,10 @@ jobs:
   build-post:
     name: Post-process
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           submodules: recursive
       - name: Set as latest release

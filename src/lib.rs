@@ -71,6 +71,7 @@ use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::variable::Variable;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
 use source_code::Source;
@@ -149,7 +150,11 @@ pub fn get_tool_config(
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
-        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows);
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_zstd_repodata_enabled(build_data.common.use_zstd)
+        .with_bz2_repodata_enabled(build_data.common.use_bz2)
+        .with_sharded_repodata_enabled(build_data.common.use_sharded)
+        .with_jlap_enabled(build_data.common.use_jlap);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -252,7 +257,14 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+    let mut variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+
+    // Apply variant overrides from command line
+    for (key, values) in &build_data.variant_overrides {
+        let normalized_key = NormalizedKey::from(key.as_str());
+        let variables: Vec<Variable> = values.iter().map(|v| Variable::from_string(v)).collect();
+        variant_config.variants.insert(normalized_key, variables);
+    }
 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, named_source, &selector_config)?;
@@ -953,6 +965,7 @@ pub async fn debug_recipe(
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: Vec::new(),
+        variant_overrides: HashMap::new(),
         ignore_recipe_variants: false,
         render_only: false,
         with_solve: true,
