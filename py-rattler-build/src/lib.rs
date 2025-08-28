@@ -6,7 +6,6 @@ use ::rattler_build::{
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
-    upload,
 };
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;

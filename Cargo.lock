@@ -4731,9 +4731,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_upload"
-version = "0.1.3"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55cf767b90b93691f558c7c936d8b6e3892c91bfa4b8942d4f6693baa5306631"
+checksum = "79dbb53d61ff957bd2b619265700cb0d00716a9e0eb76fce7f2574a4b40acc98"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -4741,7 +4741,7 @@ dependencies = [
  "futures",
  "indicatif",
  "miette",
- "opendal 0.53.3",
+ "opendal",
  "rattler_conda_types",
  "rattler_config",
  "rattler_digest",
@@ -4757,7 +4757,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "tempfile",
- "thiserror 2.0.12",
+ "thiserror 2.0.16",
  "tokio",
  "tokio-util",
  "tracing",
