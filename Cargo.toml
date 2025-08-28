@@ -159,6 +159,9 @@ rattler_networking = { version = "0.25.10", default-features = false, features =
   "s3",
   "rattler_config",
 ] }
+rattler_upload = { version = "0.2.0", default-features = false, features = [
+  "s3",
+] }
 rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.0", default-features = false, features = [
   "gateway",

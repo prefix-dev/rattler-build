@@ -33,6 +33,7 @@ rattler_config = "0.2.5"
 clap = "4.5.42"
 url = "2.5.4"
 chrono = "0.4.41"
+rattler_upload = "0.2.0"
 
 [build-dependencies]
 pyo3-build-config = "0.25.1"
