@@ -34,24 +34,24 @@ jobs:
     name: Python Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build sdist"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           command: sdist
           args: --out dist
-    #   - name: "Test sdist"
-    #     run: |
-    #       rustup default $(cat rust-toolchain)
-    #       cd py-rattler-build
-    #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-    #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
+      #   - name: "Test sdist"
+      #     run: |
+      #       rustup default $(cat rust-toolchain)
+      #       cd py-rattler-build
+      #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+      #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload sdist"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -69,20 +69,20 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
-#         There are a number of issues with cross compiling ring to windows on aarch64.
-#         For now, we just won't build a wheel, we will revisit this in the future.
-#          - target: aarch64-pc-windows-msvc
-#            arch: x64
+    #         There are a number of issues with cross compiling ring to windows on aarch64.
+    #         For now, we just won't build a wheel, we will revisit this in the future.
+    #          - target: aarch64-pc-windows-msvc
+    #            arch: x64
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
@@ -109,15 +109,15 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -147,18 +147,18 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
-          manylinux: '2_28'
+          manylinux: "2_28"
           args: --release --out dist  --no-default-features --features rustls-tls
       - uses: uraimo/run-on-arch-action@1c358dc49363439f8c563ce8f93005f7fe76b849 # v3
         if: matrix.platform.arch != 'ppc64'
@@ -180,7 +180,6 @@ jobs:
           name: linux-wheels-${{ matrix.platform.target }}
           path: py-rattler-build/dist
 
-
   musllinux:
     runs-on: ubuntu-latest
     name: Python Build ${{ matrix.target }}
@@ -191,16 +190,16 @@ jobs:
           - x86_64-unknown-linux-musl
         #   - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels (rustls-tls)"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -208,7 +207,7 @@ jobs:
           args: --release --out dist --no-default-features --features rustls-tls
       - name: "Build wheels (native-tls)"
         if: matrix.target != 'x86_64-unknown-linux-musl'
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -243,14 +242,14 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
@@ -274,18 +273,18 @@ jobs:
           path: py-rattler-build/dist
 
   macos-x86_64:
-    runs-on: macos-13   # x86_64 runner
+    runs-on: macos-13 # x86_64 runner
     name: Python Build x86_64-macos
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           working-directory: py-rattler-build
           target: x86_64
@@ -304,15 +303,15 @@ jobs:
     runs-on: macos-latest
     name: Python Build universal2-apple-macos
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels - universal2"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           args: --release --target universal2-apple-darwin --out dist --no-default-features --features rustls-tls
           working-directory: py-rattler-build
@@ -332,7 +331,7 @@ jobs:
     # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: main # We checkout the main branch to check for the commit
       - name: Check main branch
@@ -368,7 +367,7 @@ jobs:
       - windows
       - linux
       - linux-cross
-    #   - linux-cross-native-tls
+      #   - linux-cross-native-tls
       - musllinux
       - musllinux-cross
       - validate-tag
@@ -380,7 +379,7 @@ jobs:
       # For pypi trusted publishing
       id-token: write
     steps:
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
         with:
           merge-multiple: true
           path: wheels
@@ -401,7 +400,7 @@ jobs:
       # For git tag
       contents: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           ref: ${{ inputs.sha }}
       - name: git tag

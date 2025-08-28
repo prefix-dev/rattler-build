@@ -3,7 +3,7 @@
 use std::{
     io::IsTerminal,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
 };
 
 use crate::system_tools::{SystemTools, Tool};
@@ -133,6 +133,32 @@ fn git_command(system_tools: &SystemTools, sub_cmd: &str) -> Result<Command, Too
     Ok(command)
 }
 
+/// Run a git command and log precisely what went wrong.
+fn run_git_command(command: &mut Command) -> Result<Output, SourceError> {
+    let output = command
+        .output()
+        .map_err(|_err| SourceError::GitErrorStr("could not execute git"))?;
+
+    if !output.status.success() {
+        tracing::error!("Command failed: {:?}", command);
+        tracing::error!(
+            "Command output: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        tracing::error!(
+            "Command stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        return Err(SourceError::GitError(format!(
+            "failed to run command: {:?}",
+            command
+        )));
+    }
+
+    Ok(output)
+}
+
 /// Fetch the git repository specified by the given source and place it in the cache directory.
 pub fn git_src(
     system_tools: &SystemTools,
@@ -152,7 +178,7 @@ pub fn git_src(
             Some(
                 url.path_segments()?
                     .filter(|x| !x.is_empty())
-                    .last()?
+                    .next_back()?
                     .to_string(),
             )
         })()
@@ -162,7 +188,7 @@ pub fn git_src(
                 url.trim_end_matches(".git")
                     .split('/')
                     .filter(|x| !x.is_empty())
-                    .last()?
+                    .next_back()?
                     .to_string(),
             )
         })()
@@ -200,22 +226,12 @@ pub fn git_src(
                     .args([
                         // Avoid overhead of fetching unused tags.
                         "--no-tags",
-                        "--progress",
                         "-n",
                         source.url().to_string().as_str(),
                     ])
                     .arg(cache_path.as_os_str());
 
-                let output = command
-                    .output()
-                    .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
-
-                if !output.status.success() {
-                    return Err(SourceError::GitError(format!(
-                        "Git clone failed for source: {}",
-                        String::from_utf8_lossy(&output.stderr)
-                    )));
-                }
+                let _ = run_git_command(&mut command)?;
             }
 
             assert!(cache_path.exists());
@@ -247,31 +263,17 @@ pub fn git_src(
                 command.args(["--depth", depth.to_string().as_str()]);
             }
 
-            let output = command
-                .output()
-                .map_err(|_| SourceError::ValidationFailed)?;
-
-            if !output.status.success() {
-                tracing::error!("Command failed: {:?}", command);
-                return Err(SourceError::GitErrorStr(
-                    "failed to execute clone from file",
-                ));
-            }
+            let _ = run_git_command(&mut command)?;
         }
     }
 
     // Resolve the reference and set the head to the specified revision.
-    let output = Command::new("git")
-        .current_dir(&cache_path)
-        // make sure that we get the commit, not the annotated tag
-        .args(["rev-parse", &format!("{}^{{commit}}", rev)])
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
-
-    if !output.status.success() {
-        tracing::error!("Command failed: `git rev-parse \"{}\"`", &rev);
-        return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
-    }
+    let output = run_git_command(
+        Command::new("git")
+            .current_dir(&cache_path)
+            // make sure that we get the commit, not the annotated tag
+            .args(["rev-parse", &format!("{}^0", rev)]),
+    )?;
 
     let ref_git = String::from_utf8(output.stdout)
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
@@ -294,11 +296,11 @@ pub fn git_src(
 
 fn git_lfs_pull(git_ref: &str) -> Result<(), SourceError> {
     // verify git-lfs is installed
-    let mut command = Command::new("git");
-    command.args(["lfs", "ls-files"]);
-    let output = command
+    let output = Command::new("git")
+        .args(["lfs", "ls-files"])
         .output()
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
+
     if !output.status.success() {
         return Err(SourceError::GitErrorStr(
             "git-lfs not installed, but required",
@@ -306,24 +308,10 @@ fn git_lfs_pull(git_ref: &str) -> Result<(), SourceError> {
     }
 
     // git lfs fetch
-    let mut command = Command::new("git");
-    command.args(["lfs", "fetch", "origin", git_ref]);
-    let output = command
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
-    if !output.status.success() {
-        return Err(SourceError::GitErrorStr("`git lfs fetch` failed!"));
-    }
+    run_git_command(Command::new("git").args(["lfs", "fetch", "origin", git_ref]))?;
 
     // git lfs checkout
-    let mut command = Command::new("git");
-    command.args(["lfs", "checkout"]);
-    let output = command
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
-    if !output.status.success() {
-        return Err(SourceError::GitErrorStr("`git lfs checkout` failed!"));
-    }
+    run_git_command(Command::new("git").args(["lfs", "checkout"]))?;
 
     Ok(())
 }
@@ -344,6 +332,9 @@ mod tests {
     fn test_host_git_source() {
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
         let cases = vec![
             (
                 GitSource::create(
@@ -390,30 +381,11 @@ mod tests {
                 ),
                 "rattler-build",
             ),
-            (
-                GitSource::create(
-                    GitUrl::Path("../rattler-build".parse().unwrap()),
-                    GitRev::default(),
-                    None,
-                    vec![],
-                    None,
-                    false,
-                ),
-                "rattler-build",
-            ),
         ];
         let system_tools = crate::system_tools::SystemTools::new();
 
         for (source, repo_name) in cases {
-            let res = git_src(
-                &system_tools,
-                &source,
-                cache_dir.as_ref(),
-                // TODO: this test assumes current dir is the root folder of the project which may
-                // not be necessary for local runs.
-                std::env::current_dir().unwrap().as_ref(),
-            )
-            .unwrap();
+            let res = git_src(&system_tools, &source, cache_dir.as_ref(), &recipe_dir).unwrap();
             assert_eq!(
                 res.0.to_string_lossy(),
                 cache_dir.join(repo_name).to_string_lossy()

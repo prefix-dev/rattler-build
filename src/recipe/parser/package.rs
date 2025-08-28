@@ -60,7 +60,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
                             *key.span(),
                             ErrorKind::InvalidField(invalid.to_string().into()),
                             help = format!("valid fields for `{name}` are `name` and `version`")
-                        )])
+                        )]);
                     }
                 }
                 Ok(())
@@ -138,7 +138,7 @@ impl TryConvertNode<OutputPackage> for RenderedMappingNode {
                             *key.span(),
                             ErrorKind::InvalidField(invalid.to_string().into()),
                             help = format!("valid fields for `{name}` are `name` and `version`")
-                        )])
+                        )]);
                     }
                 }
                 Ok(())
@@ -167,8 +167,18 @@ impl TryConvertNode<PackageName> for RenderedNode {
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
-        PackageName::from_str(self.as_str())
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])
+        let name = PackageName::from_str(self.as_str())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])?;
+
+        if name.as_normalized() != name.as_source() {
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::PackageNameNormalization(name.as_source().to_string()),
+                help = "package names are case insensitive, but the name is not normalized"
+            )]);
+        }
+
+        Ok(name)
     }
 }
 
@@ -176,7 +186,7 @@ impl TryConvertNode<PackageName> for RenderedScalarNode {
 mod tests {
     use crate::{
         assert_miette_snapshot,
-        recipe::{jinja::SelectorConfig, Recipe},
+        recipe::{Recipe, jinja::SelectorConfig},
         variant_config::ParseErrors,
     };
 

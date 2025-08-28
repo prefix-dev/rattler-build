@@ -5,9 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{upload::get_default_client, CondaForgeData};
+use crate::{CondaForgeData, upload::get_default_client};
 use fs_err::tokio as fs;
-use miette::{miette, IntoDiagnostic};
+use miette::{IntoDiagnostic, miette};
 use tracing::{debug, info};
 
 use super::{

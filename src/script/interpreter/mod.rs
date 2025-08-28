@@ -1,34 +1,51 @@
 mod bash;
 mod cmd_exe;
+mod nodejs;
 mod nushell;
 mod perl;
 mod python;
+mod r;
+mod ruby;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub(crate) use bash::BashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
+pub(crate) use nodejs::NodeJsInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
 pub(crate) use perl::PerlInterpreter;
 pub(crate) use python::PythonInterpreter;
-
+pub(crate) use r::RInterpreter;
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{
-        prefix_path_entries, ActivationError, ActivationVariables, Activator,
-        PathModificationBehavior,
+        ActivationError, ActivationVariables, Activator, PathModificationBehavior,
+        prefix_path_entries,
     },
     shell::{self, Shell},
 };
+pub(crate) use ruby::RubyInterpreter;
 
 use super::ExecutionArgs;
 
-pub(crate) const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+/// The error type for the interpreter
+#[derive(Debug, thiserror::Error)]
+pub enum InterpreterError {
+    /// This error is returned when running in debug mode
+    #[error("Debugging information: {0}")]
+    Debug(String),
+
+    /// This error is returned when the script execution fails or the
+    /// interpreter is not found
+    #[error("IO Error: {0}")]
+    ExecutionFailed(#[from] std::io::Error),
+}
 
 pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
+    source "((script_path))"
 fi
 ## End of preamble
 "#;
@@ -38,7 +55,7 @@ pub const CMDEXE_PREAMBLE: &str = r#"
 @echo on
 IF "%CONDA_BUILD%" == "" (
     @rem special behavior from conda-build for Windows
-    call ((script_path))
+    call "((script_path))"
 )
 @rem re-enable echo because the activation scripts might have messed with it
 @echo on
@@ -79,11 +96,13 @@ pub trait Interpreter {
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 
         let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
+        let current_env = std::env::vars().collect::<HashMap<_, _>>();
 
         let activation_vars = ActivationVariables {
             conda_prefix,
             path: None,
             path_modification_behavior: PathModificationBehavior::Prepend,
+            current_env: current_env.clone(),
         };
 
         let host_activation = host_prefix_activator.activation(activation_vars)?;
@@ -96,6 +115,7 @@ pub trait Interpreter {
                 conda_prefix: None,
                 path: None,
                 path_modification_behavior: PathModificationBehavior::Prepend,
+                current_env,
             };
 
             let build_activation = build_prefix_activator.activation(activation_vars)?;
@@ -108,7 +128,7 @@ pub trait Interpreter {
         Ok(shell_script.contents()?)
     }
 
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError>;
 
     #[allow(dead_code)]
     async fn find_interpreter(

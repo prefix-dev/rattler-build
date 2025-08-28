@@ -15,15 +15,15 @@ use thiserror::Error;
 
 use crate::{
     _partialerror,
-    conda_build_config::{load_conda_build_config, ParseConfigBuildConfigError},
+    conda_build_config::{ParseConfigBuildConfigError, load_conda_build_config},
     consts::CONDA_BUILD_CONFIG_FILE,
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
+        Jinja, Recipe, Render,
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         variable::Variable,
-        Jinja, Recipe, Render,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -108,7 +108,7 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
                         *key.span(),
                         ErrorKind::InvalidField(key_str.to_string().into()),
                         help = format!("Valid fields for {name} are: max_pin, min_pin")
-                    )])
+                    )]);
                 }
             }
         }
@@ -391,7 +391,7 @@ impl VariantConfig {
                 for key in zip {
                     let value = match self.variants.get(key) {
                         None => {
-                            return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()))
+                            return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
                         }
                         Some(value) => value,
                     };
@@ -535,6 +535,11 @@ impl VariantConfig {
                         .requirements
                         .ignore_run_exports
                         .from_package
+                        .insert("python".parse().unwrap());
+                    recipe
+                        .requirements
+                        .ignore_run_exports
+                        .by_name
                         .insert("python".parse().unwrap());
                 }
 

@@ -55,7 +55,7 @@ The recipe spec has the following parts:
   build the recipe
 - [x] `build`: defines how to build the recipe and what build number to use
 - [x] `requirements`: defines requirements of the top-level package
-- [x] `test`: defines tests for the top-level package
+- [x] `tests`: defines tests for the top-level package
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
 
@@ -392,6 +392,9 @@ build:
         - echo "unix"
 ```
 
+There are many other configurable settings, such as environment variables and secrets.
+Please see [Build script](../build_script.md) for more information.
+
 ### Skipping builds
 
 Lists conditions under which `rattler-build` should skip the build of this recipe.
@@ -698,7 +701,6 @@ Using a runtime dependency name:
 !!! note
     `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
-
 ## Tests section
 
 `rattler-build` supports four different types of tests. The "script test" installs
@@ -742,6 +744,19 @@ tests:
       - echo "hello world"
       - bsdiff4 -h
       - bspatch4 -h
+```
+
+#### External scripts
+
+You can also easily run a script from your recipe directory.
+Note that your package should either depend on the interpreter (e.g. Python or R)
+or you need to add a `requirements` section to the test that installs the interpreter.
+
+```yaml
+tests:
+  - script: tests/run_test.py
+  - script: tests/run_test.R
+  - script: tests/run_test.sh
 ```
 
 #### Extra test files
@@ -805,6 +820,7 @@ tests:
         - bsdiff4
         - bspatch4
       pip_check: true  # can be left out because this is the default
+      python_version: 3.12.*  # optional: use list for multiple versions, default resolves to environment
 ```
 
 Internally this will write a small Python script that imports the modules:
@@ -812,6 +828,41 @@ Internally this will write a small Python script that imports the modules:
 ```python
 import bsdiff4
 import bspatch4
+```
+
+### Perl tests
+
+For this test type you can list a set of Perl modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+tests:
+  - perl:
+      uses:
+        - Call::Context
+```
+
+Internally this will write a small Perl script that imports the modules:
+
+```perl
+use Call::Context;
+```
+
+### R tests
+
+For this test type you can list a set of R modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+- r:
+    libraries:
+      - knitr
+```
+
+Internally this will write a small R script that imports the modules:
+
+```r
+library(knitr)
 ```
 
 ### Check for package contents
@@ -830,6 +881,15 @@ tests:
         - etc/libmamba
         - etc/libmamba/*.mamba.txt
 
+      # For more advanced cases, you can use the expanded form with exists and not_exists:
+      # files:
+      #   exists:
+      #     - etc/libmamba/test.txt
+      #     - etc/libmamba
+      #     - etc/libmamba/*.mamba.txt
+      #   not_exists:
+      #     - etc/libmamba/unwanted.txt
+
       # checks for the existence of `mamba/api/__init__.py` inside of the
       # Python site-packages directory (note: also see Python import checks)
       site_packages:
@@ -841,6 +901,10 @@ tests:
       # sure things work fine
       bin:
         - mamba
+
+      # enable strict mode: error if any file in the package is not matched by one of the globs
+      # (default: false)
+      strict: true
 
       # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
       # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin

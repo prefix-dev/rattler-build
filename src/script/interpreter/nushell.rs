@@ -7,9 +7,9 @@ use rattler_shell::{
     shell::{self, Shell, ShellEnum},
 };
 
-use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
+use crate::script::{ExecutionArgs, run_process_with_replacements};
 
-use super::{find_interpreter, Interpreter};
+use super::{Interpreter, InterpreterError, find_interpreter};
 
 pub(crate) struct NuShellInterpreter;
 
@@ -23,7 +23,7 @@ if not ("CONDA_BUILD" in $env) {
 "#;
 
 impl Interpreter for NuShellInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
+    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let host_shell_type = ShellEnum::default();
         let nushell = ShellEnum::NuShell(Default::default());
 
@@ -36,11 +36,14 @@ impl Interpreter for NuShellInterpreter {
             .ok();
         let current_conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
 
+        let mut current_env = std::env::vars().collect::<HashMap<_, _>>();
+
         // Run the activation script for the host environment.
         let activation_vars = ActivationVariables {
             conda_prefix: current_conda_prefix,
             path: current_path,
             path_modification_behavior: PathModificationBehavior::default(),
+            current_env: current_env.clone(),
         };
 
         let host_prefix_activator = Activator::from_path(
@@ -55,7 +58,8 @@ impl Interpreter for NuShellInterpreter {
             .unwrap();
 
         // Overwrite the current environment variables with the one from the activated host environment.
-        activation_variables.extend(host_activation_variables);
+        activation_variables.extend(host_activation_variables.clone());
+        current_env.extend(host_activation_variables);
 
         // If there is a build environment run the activation script for that environment and extend
         // the activation variables with the new environment variables.
@@ -70,6 +74,7 @@ impl Interpreter for NuShellInterpreter {
                     .get(nushell.path_var(&args.execution_platform))
                     .map(|path| std::env::split_paths(&path).collect()),
                 path_modification_behavior: PathModificationBehavior::default(),
+                current_env,
             };
 
             let build_activation = build_prefix_activator
@@ -104,10 +109,10 @@ impl Interpreter for NuShellInterpreter {
             match find_interpreter("nu", args.build_prefix.as_ref(), &args.execution_platform) {
                 Ok(Some(path)) => path,
                 _ => {
-                    return Err(std::io::Error::new(
+                    return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
                         std::io::ErrorKind::NotFound,
                         "NuShell executable not found in PATH",
-                    ));
+                    )));
                 }
             }
             .to_string_lossy()
@@ -127,11 +132,10 @@ impl Interpreter for NuShellInterpreter {
             let status_code = output.status.code().unwrap_or(1);
             tracing::error!("Script failed with status {}", status_code);
             tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
-            return Err(std::io::Error::new(
+            return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Script failed".to_string(),
-            ));
+            )));
         }
 
         Ok(())

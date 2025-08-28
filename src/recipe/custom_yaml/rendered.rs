@@ -5,21 +5,21 @@
 use std::{fmt, hash::Hash, ops};
 
 use indexmap::IndexMap;
-use marked_yaml::{types::MarkedScalarNode, Span};
+use marked_yaml::{Span, types::MarkedScalarNode};
 use serde::{Serialize, Serializer};
 
 use crate::{
     _partialerror,
     recipe::{
-        error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
-        jinja::Jinja,
         Render,
+        error::{ErrorKind, ParsingError, PartialParsingError, jinja_error_to_label},
+        jinja::Jinja,
     },
     source_code::SourceCode,
 };
 
 use super::{
-    parse_yaml, HasSpan, MappingNode, Node, ScalarNode, SequenceNode, SequenceNodeInternal,
+    HasSpan, MappingNode, Node, ScalarNode, SequenceNode, SequenceNodeInternal, parse_yaml,
 };
 
 /// A span-marked new Conda Recipe YAML node
@@ -403,11 +403,7 @@ impl From<&MarkedScalarNode> for RenderedScalarNode {
 impl From<bool> for RenderedScalarNode {
     /// Convert from a boolean into a node
     fn from(value: bool) -> Self {
-        if value {
-            "true".into()
-        } else {
-            "false".into()
-        }
+        if value { "true".into() } else { "false".into() }
     }
 }
 

@@ -1,0 +1,17 @@
+package:
+  name: test-strict-pass
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "test" > $PREFIX/test.txt
+      else:
+        - echo "test" > %PREFIX%\test.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - test.txt

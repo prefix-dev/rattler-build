@@ -10,10 +10,10 @@ use std::fmt::Debug;
 use crate::{
     _partialerror,
     recipe::{
+        Render,
         custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
-        Render,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -37,7 +37,7 @@ pub use self::{
     about::About,
     build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
-    glob_vec::{GlobVec, GlobWithSource},
+    glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
     regex::SerializableRegex,
@@ -49,7 +49,7 @@ pub use self::{
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PerlTest, PythonTest, PythonVersion, TestType,
+        PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest, TestType,
     },
 };
 
@@ -89,19 +89,12 @@ pub struct Recipe {
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
     fn collect_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.push(x);
                 acc
             });
-        if err.is_empty() {
-            Ok(())
-        } else {
-            Err(err)
-        }
+        if err.is_empty() { Ok(()) } else { Err(err) }
     }
 }
 
@@ -110,19 +103,12 @@ impl<T, K, V> CollectErrors<K, V> for T where T: Iterator<Item = Result<K, V>> +
 pub(crate) trait FlattenErrors<K, V>: Iterator<Item = Result<K, Vec<V>>> + Sized {
     fn flatten_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.extend(x);
                 acc
             });
-        if err.is_empty() {
-            Ok(())
-        } else {
-            Err(err)
-        }
+        if err.is_empty() { Ok(()) } else { Err(err) }
     }
 }
 
@@ -224,7 +210,10 @@ impl Recipe {
                                 {
                                     return Err(vec![_partialerror!(
                                         *item.span(),
-                                        ErrorKind::SequenceMixedTypes((variable.as_ref().kind(), rendered_sequence[0].as_ref().kind())),
+                                        ErrorKind::SequenceMixedTypes((
+                                            variable.as_ref().kind(),
+                                            rendered_sequence[0].as_ref().kind()
+                                        )),
                                         help = "sequence `context` must have all members of the same scalar type"
                                     )]);
                                 }
@@ -320,8 +309,11 @@ impl Recipe {
         build.skip = build.skip.with_eval(&jinja)?;
 
         if schema_version != 1 {
-            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
-                schema_version, env!("CARGO_PKG_VERSION"));
+            tracing::warn!(
+                "Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
+                schema_version,
+                env!("CARGO_PKG_VERSION")
+            );
         }
 
         let recipe = Recipe {
@@ -399,7 +391,11 @@ mod tests {
 
         let unix_recipe = Recipe::from_yaml(recipe, selector_config_unix);
         assert!(unix_recipe.is_ok());
-        insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"character: \d+", "character: [FILTERED]");
+        settings.bind(|| {
+            insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+        });
     }
 
     #[test]
@@ -414,7 +410,11 @@ mod tests {
 
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
         assert!(win_recipe.is_ok());
-        insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"character: \d+", "character: [FILTERED]");
+        settings.bind(|| {
+            insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
+        });
     }
 
     #[test]

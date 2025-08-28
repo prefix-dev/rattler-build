@@ -1,0 +1,15 @@
+package:
+  name: ruby-extension-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script: build.rb # Should auto-detect Ruby interpreter
+
+requirements:
+  build:
+    - ruby
+
+about:
+  summary: Test auto-detection of Ruby interpreter from .rb extension
+  license: MIT

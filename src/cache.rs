@@ -11,18 +11,19 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     env_vars,
-    metadata::{build_reindexed_channels, Output},
+    metadata::{Output, build_reindexed_channels},
     packaging::Files,
     recipe::{
-        parser::{Dependency, Requirements, Source},
         Jinja,
+        parser::{Dependency, Requirements, Source},
     },
     render::resolved_dependencies::{
-        install_environments, resolve_dependencies, FinalizedDependencies,
+        FinalizedDependencies, install_environments, resolve_dependencies,
     },
     source::{
-        copy_dir::{copy_file, CopyDir, CopyOptions},
+        copy_dir::{CopyDir, CopyOptions, copy_file},
         fetch_sources,
+        patch::apply_patch_custom,
     },
 };
 
@@ -179,7 +180,7 @@ impl Output {
                     Ok(cache) => {
                         tracing::info!("Restoring cache from {:?}", cache_dir);
                         self = self
-                            .fetch_sources(tool_configuration)
+                            .fetch_sources(tool_configuration, apply_patch_custom)
                             .await
                             .into_diagnostic()?;
                         return self.restore_cache(cache, cache_dir).await;
@@ -204,6 +205,7 @@ impl Output {
                 &self.build_configuration.directories,
                 &self.system_tools,
                 tool_configuration,
+                apply_patch_custom,
             )
             .await
             .into_diagnostic()?;

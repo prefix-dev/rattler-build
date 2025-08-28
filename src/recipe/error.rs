@@ -152,6 +152,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::package_name_parsing))]
     PackageNameParsing(#[from] rattler_conda_types::InvalidPackageNameError),
 
+    /// Error when parsing a [`PackageName`](rattler_conda_types::PackageName).
+    #[diagnostic(code(error::package_name_normalization))]
+    PackageNameNormalization(String),
+
     /// Error when parsing a [`EntryPoint`](rattler_conda_types::package::EntryPoint).
     #[diagnostic(code(error::entry_point_parsing))]
     EntryPointParsing(String),
@@ -280,6 +284,9 @@ impl fmt::Display for ErrorKind {
             ErrorKind::PackageNameParsing(err) => {
                 write!(f, "failed to parse package name: {}", err)
             }
+            ErrorKind::PackageNameNormalization(s) => {
+                write!(f, "input package name not normalized: {}", s)
+            }
             ErrorKind::EntryPointParsing(err) => {
                 write!(f, "failed to parse entry point: {}", err)
             }
@@ -333,12 +340,8 @@ macro_rules! _error {
             kind: $kind,
         }
     }};
-    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
-    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
+    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
+    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
     ($src:expr, $span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
             src: $src,
@@ -378,12 +381,8 @@ macro_rules! _partialerror {
             kind: $kind,
         }
     }};
-    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
-    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
+    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
+    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
             span: $span,
@@ -434,17 +433,16 @@ pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
             .span()
             .start()
             .cloned()
-            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
-        _ => marked_yaml::Marker::new(0, 0, 0),
+            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0, 0)),
+        _ => marked_yaml::Marker::new(0, 0, 0, 0),
     }
 }
 
 /// Convert a [`marked_yaml::Span`] to a [`SourceSpan`].
 pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceSpan {
-    let marked_start = span
-        .start()
-        .copied()
-        .unwrap_or_else(|| marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX));
+    let marked_start = span.start().copied().unwrap_or_else(|| {
+        marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX)
+    });
     let marked_end = span.end().copied();
 
     let start = SourceOffset::from_location(src, marked_start.line(), marked_start.column());
@@ -470,11 +468,7 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
         }
         None => {
             let l = find_length(src, start);
-            if l == 0 {
-                1
-            } else {
-                l
-            }
+            if l == 0 { 1 } else { l }
         }
     };
 

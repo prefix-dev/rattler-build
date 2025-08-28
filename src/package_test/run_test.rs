@@ -15,26 +15,26 @@ use std::{
     str::FromStr,
 };
 
-use dunce::canonicalize;
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, IndexJson, PackageFile},
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    package::{ArchiveIdentifier, IndexJson, PackageFile},
 };
-use rattler_index::index_fs;
+use rattler_index::{IndexFsConfig, index_fs};
 use rattler_shell::{
     activation::ActivationError,
     shell::{Shell, ShellEnum},
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use tempfile::TempDir;
 
 use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
-        TestType,
+        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest, Script,
+        ScriptContent, TestType,
     },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
@@ -143,7 +143,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(true),
+                        Debug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -164,7 +164,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(true),
+                        Debug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -220,6 +220,8 @@ pub struct TestConfiguration {
     pub current_platform: PlatformWithVirtualPackages,
     /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
+    /// The index of the test to execute. If not set, all tests will be executed.
+    pub test_index: Option<usize>,
     /// The channels to use for the test – do not forget to add the local build
     /// outputs channel if desired
     pub channels: Vec<ChannelUrl>,
@@ -229,6 +231,12 @@ pub struct TestConfiguration {
     pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+    /// The output directory to create the test prefixes in (will be `output_dir/test`)
+    pub output_dir: PathBuf,
+    /// Debug mode yes, or no
+    pub debug: Debug,
+    /// Exclude packages newer than this date from the solver
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -326,16 +334,19 @@ pub async fn run_test(
     // if there is a downstream package, that's the one we actually want to test
     let package_file = downstream_package.as_deref().unwrap_or(package_file);
 
+    let index_config = IndexFsConfig {
+        channel: tmp_repo.path().to_path_buf(),
+        target_platform: Some(target_platform),
+        repodata_patch: None,
+        write_zst: false,
+        write_shards: false,
+        force: false,
+        max_parallel: num_cpus::get_physical(),
+        multi_progress: None,
+    };
+
     // index the temporary channel
-    index_fs(
-        tmp_repo.path(),
-        Some(target_platform),
-        None,
-        false,
-        num_cpus::get_physical(),
-        None,
-    )
-    .await?;
+    index_fs(index_config).await?;
 
     let cache_dir = rattler::default_cache_dir()?;
 
@@ -354,10 +365,6 @@ pub async fn run_test(
         );
         fs::remove_dir_all(&package_folder)?;
     }
-
-    let prefix = canonicalize(&config.test_prefix)?;
-
-    tracing::info!("Creating test environment in '{}'", prefix.display());
 
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
@@ -391,6 +398,11 @@ pub async fn run_test(
     let env = env_vars_from_package(&index_json);
     // extract package in place
     if package_folder.join("info/test").exists() {
+        let prefix =
+            TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.output_dir)?.keep();
+
+        tracing::info!("Creating test environment in '{}'", prefix.display());
+
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
         let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
             serde_json::from_str(&fs::read_to_string(package_folder.join(&test_dep_json))?)?
@@ -420,6 +432,7 @@ pub async fn run_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -435,30 +448,60 @@ pub async fn run_test(
             "{} all tests passed!",
             console::style(console::Emoji("✔", "")).green()
         );
+
+        if prefix.exists() {
+            fs::remove_dir_all(prefix)?;
+        }
     }
 
     if package_folder.join("info/tests/tests.yaml").exists() {
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
+        if let Some(test_index) = config.test_index {
+            if test_index >= tests.len() {
+                return Err(TestError::TestFailed(format!(
+                    "Test index {} out of range (0..{})",
+                    test_index,
+                    tests.len()
+                )));
+            }
+        }
+
+        let tests = if let Some(test_index) = config.test_index {
+            vec![tests[test_index].clone()]
+        } else {
+            tests
+        };
+
         for test in tests {
+            let test_prefix =
+                TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.keep();
             match test {
                 TestType::Command(c) => {
-                    c.run_test(&pkg, &package_folder, &prefix, &config, &env)
+                    c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)
                         .await?
                 }
                 TestType::Python { python } => {
                     python
-                        .run_test(&pkg, &package_folder, &prefix, &config)
+                        .run_test(&pkg, &package_folder, &test_prefix, &config)
                         .await?
                 }
                 TestType::Perl { perl } => {
-                    perl.run_test(&pkg, &package_folder, &prefix, &config)
+                    perl.run_test(&pkg, &package_folder, &test_prefix, &config)
+                        .await?
+                }
+                TestType::R { r } => {
+                    r.run_test(&pkg, &package_folder, &test_prefix, &config)
+                        .await?
+                }
+                TestType::Ruby { ruby } => {
+                    ruby.run_test(&pkg, &package_folder, &test_prefix, &config)
                         .await?
                 }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
-                        .run_test(&pkg, package_file, &prefix, &config)
+                        .run_test(&pkg, package_file, &test_prefix, &config)
                         .await?
                 }
                 TestType::Downstream(_) => {
@@ -469,16 +512,16 @@ pub async fn run_test(
                 // This test already runs during the build process and we don't need to run it again
                 TestType::PackageContents { .. } => {}
             }
+
+            if !config.keep_test_prefix {
+                fs::remove_dir_all(test_prefix)?;
+            }
         }
 
         tracing::info!(
             "{} all tests passed!",
             console::style(console::Emoji("✔", "")).green()
         );
-    }
-
-    if prefix.exists() {
-        fs::remove_dir_all(prefix)?;
     }
 
     Ok(())
@@ -565,6 +608,7 @@ impl PythonTest {
         let span = tracing::info_span!("", message = %span_message);
         let _guard = span.enter();
 
+        let test_prefix = prefix.join("test_env");
         create_environment(
             "test",
             &dependencies,
@@ -572,11 +616,12 @@ impl PythonTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            prefix,
+            &test_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -592,17 +637,18 @@ impl PythonTest {
             ..Script::default()
         };
 
-        let tmp_dir = tempfile::tempdir()?;
+        let test_dir = prefix.join("test");
+        fs::create_dir_all(&test_dir)?;
         script
             .run_script(
                 Default::default(),
-                tmp_dir.path(),
+                &test_dir,
                 path,
-                prefix,
+                &test_prefix,
                 None,
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -622,11 +668,11 @@ impl PythonTest {
                     Default::default(),
                     path,
                     path,
-                    prefix,
+                    &test_prefix,
                     None,
                     None,
                     None,
-                    Debug::new(true),
+                    config.debug,
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -659,6 +705,7 @@ impl PerlTest {
 
         let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
+        let test_prefix = prefix.join("test_env");
         create_environment(
             "test",
             &dependencies,
@@ -666,11 +713,12 @@ impl PerlTest {
                 .host_platform
                 .as_ref()
                 .unwrap_or(&config.current_platform),
-            prefix,
+            &test_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -690,17 +738,18 @@ impl PerlTest {
             ..Script::default()
         };
 
-        let tmp_dir = tempfile::tempdir()?;
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
         script
             .run_script(
                 Default::default(),
-                tmp_dir.path(),
+                &test_folder,
                 path,
-                prefix,
+                &test_prefix,
                 None,
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -726,7 +775,7 @@ impl CommandsTest {
 
         let build_prefix = if !deps.build.is_empty() {
             tracing::info!("Installing build dependencies");
-            let build_prefix = test_directory.join("bld");
+            let build_prefix = test_directory.join("test_build_env");
             let build_dependencies = deps
                 .build
                 .iter()
@@ -742,6 +791,7 @@ impl CommandsTest {
                 &config.tool_configuration,
                 config.channel_priority,
                 config.solve_strategy,
+                config.exclude_newer,
             )
             .await
             .map_err(TestError::TestEnvironmentSetup)?;
@@ -767,7 +817,7 @@ impl CommandsTest {
             .as_ref()
             .unwrap_or(&config.current_platform);
 
-        let run_prefix = test_directory.join("run");
+        let run_prefix = test_directory.join("test_run_env");
         create_environment(
             "test",
             &dependencies,
@@ -777,6 +827,7 @@ impl CommandsTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -792,8 +843,8 @@ impl CommandsTest {
 
         // copy all test files to a temporary directory and set it as the working
         // directory
-        let tmp_dir = tempfile::tempdir()?;
-        CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
+        let test_dir = test_directory.join("test");
+        CopyDir::new(path, &test_dir).run().map_err(|e| {
             TestError::IoError(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to copy test files: {}", e),
@@ -824,13 +875,13 @@ impl CommandsTest {
             script
                 .run_script(
                     env_vars,
-                    tmp_dir.path(),
+                    &test_dir,
                     path,
                     &run_prefix,
                     build_prefix.as_ref(),
                     None,
                     None,
-                    Debug::new(true),
+                    config.debug,
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -877,6 +928,7 @@ impl DownstreamTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            config.exclude_newer,
         )
         .await;
 
@@ -926,6 +978,149 @@ impl DownstreamTest {
                 );
             }
         }
+
+        Ok(())
+    }
+}
+
+impl RTest {
+    /// Execute the R test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running R test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["r-base".parse().unwrap(), match_spec];
+        let test_prefix = prefix.join("test_env");
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            &test_prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+            config.exclude_newer,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut libraries = String::new();
+        tracing::info!("Testing R libraries:\n");
+
+        for library in &self.libraries {
+            writeln!(libraries, "library({})", library)?;
+            tracing::info!("  library({})", library);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(libraries.clone()),
+            interpreter: Some("rscript".into()),
+            ..Script::default()
+        };
+
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
+        script
+            .run_script(
+                Default::default(),
+                &test_folder,
+                path,
+                &test_prefix,
+                None,
+                None,
+                None,
+                config.debug,
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+impl RubyTest {
+    /// Execute the Ruby test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running Ruby test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["ruby".parse().unwrap(), match_spec];
+
+        let test_prefix = prefix.join("test_env");
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            &test_prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+            config.exclude_newer,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut requires = String::new();
+        tracing::info!("Testing Ruby requires:\n");
+
+        for module in &self.requires {
+            writeln!(requires, "require '{}'", module)?;
+            tracing::info!("  require '{}'", module);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(requires.clone()),
+            interpreter: Some("ruby".into()),
+            ..Script::default()
+        };
+
+        let test_folder = prefix.join("test_files");
+        fs::create_dir_all(&test_folder)?;
+        script
+            .run_script(
+                Default::default(),
+                &test_folder,
+                path,
+                &test_prefix,
+                None,
+                None,
+                None,
+                config.debug,
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
         Ok(())
     }

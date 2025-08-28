@@ -155,3 +155,20 @@ Some notable options are:
 ```
 
 [minijinja]: https://github.com/mitsuhiko/minijinja
+
+### Alternatives for scalar fields
+
+Some fields accept scalars rather than lists, and selectors cannot be used. Alternatives include:
+
+```yaml
+string: ${{ "foobar" if USE_OPENMP else "bla" }}
+```
+
+```yaml
+string: |
+  {% if USE_OPENMP %}
+     blablabla
+  {% else %}
+     blabla
+  {% endif %}
+```

@@ -16,7 +16,10 @@ use crate::{
     validate_keys,
 };
 
-use super::{glob_vec::GlobVec, FlattenErrors, Script};
+use super::{
+    FlattenErrors, Script,
+    glob_vec::{GlobCheckerVec, GlobVec},
+};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The platform condition to evaluate at runtime
@@ -230,6 +233,20 @@ pub struct DownstreamTest {
     pub downstream: String,
 }
 
+/// A test that checks if R libraries can be loaded
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RTest {
+    /// List of R libraries to test with library()
+    pub libraries: Vec<String>,
+}
+
+/// A test that checks if Ruby gems/modules can be required
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RubyTest {
+    /// List of Ruby modules to test with require
+    pub requires: Vec<String>,
+}
+
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -243,6 +260,16 @@ pub enum TestType {
     Perl {
         /// The modules to test
         perl: PerlTest,
+    },
+    /// An R test that will test if the R libraries can be loaded
+    R {
+        /// The R libraries to load and test
+        r: RTest,
+    },
+    /// A Ruby test that will test if the modules can be required
+    Ruby {
+        /// The modules to test
+        ruby: RubyTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(Box<CommandsTest>),
@@ -259,22 +286,32 @@ pub enum TestType {
 /// Package content test that compares the contents of the package with the expected contents.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageContentsTest {
-    /// file paths, direct and/or globs
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub files: GlobVec,
+    /// File paths using glob patterns to check for existence or non-existence.
+    /// Uses `exists` field for files that must be present and `not_exists` for files that must not be present.
+    /// If any glob in `exists` doesn't match at least one file, the test fails.
+    /// If any glob in `not_exists` matches any file, the test fails.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub files: GlobCheckerVec,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub site_packages: GlobVec,
+    /// Uses `exists` field for packages that must be present and `not_exists` for packages that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub site_packages: GlobCheckerVec,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub bin: GlobVec,
+    /// Uses `exists` field for binaries that must be present and `not_exists` for binaries that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub bin: GlobCheckerVec,
     /// check for dynamic or static library file path
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub lib: GlobVec,
+    /// Uses `exists` field for libraries that must be present and `not_exists` for libraries that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub lib: GlobCheckerVec,
     /// check if include path contains the file, direct or glob?
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub include: GlobVec,
+    /// Uses `exists` field for headers that must be present and `not_exists` for headers that must not be present.
+    #[serde(default, skip_serializing_if = "GlobCheckerVec::is_empty")]
+    pub include: GlobCheckerVec,
+    /// whether to enable strict mode (error on non-matched files or missing files)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub strict: bool,
 }
 
 impl TryConvertNode<Vec<TestType>> for RenderedNode {
@@ -438,10 +475,18 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::Perl { perl };
                 }
+                "r" => {
+                    let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::R { r: rscript };
+                }
+                "ruby" => {
+                    let ruby = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Ruby { ruby };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `requirements`, `files`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `ruby`, `script`, `requirements`, `files`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -588,6 +633,42 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
 }
 
 ///////////////////////////
+/// R Test              ///
+///////////////////////////
+impl TryConvertNode<RTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RTest, Vec<PartialParsingError>> {
+        let mut rtest = RTest::default();
+        validate_keys!(rtest, self.iter(), libraries);
+        if rtest.libraries.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("libraries".into()),
+                help = "expected field `libraries` in R test to be a list of strings."
+            )])?;
+        }
+        Ok(rtest)
+    }
+}
+
+///////////////////////////
+/// Ruby Test           ///
+///////////////////////////
+impl TryConvertNode<RubyTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RubyTest, Vec<PartialParsingError>> {
+        let mut ruby_test = RubyTest::default();
+        validate_keys!(ruby_test, self.iter(), requires);
+        if ruby_test.requires.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("requires".into()),
+                help = "expected field `requires` in ruby test to be a list of strings."
+            )])?;
+        }
+        Ok(ruby_test)
+    }
+}
+
+///////////////////////////
 /// Package Contents    ///
 ///////////////////////////
 impl TryConvertNode<PackageContentsTest> for RenderedNode {
@@ -613,7 +694,8 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
             site_packages,
             lib,
             bin,
-            include
+            include,
+            strict
         );
         Ok(package_contents)
     }
@@ -767,6 +849,85 @@ mod test {
                 );
             }
             _ => panic!("expected python test"),
+        }
+    }
+
+    #[test]
+    fn test_package_contents_parsing() {
+        let test_section = r#"
+        tests:
+          - package_contents:
+              files:
+                exists:
+                  - foo.hpp
+                not_exists:
+                  - baz.hpp
+        "#;
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
+        let parsed: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
+        match &parsed[0] {
+            TestType::PackageContents { package_contents } => {
+                let inc: Vec<&str> = package_contents
+                    .files
+                    .exists_globs()
+                    .iter()
+                    .map(|g| g.source())
+                    .collect();
+                let exc: Vec<&str> = package_contents
+                    .files
+                    .not_exists_globs()
+                    .iter()
+                    .map(|g| g.source())
+                    .collect();
+                assert_eq!(inc, vec!["foo.hpp"]);
+                assert_eq!(exc, vec!["baz.hpp"]);
+            }
+            _ => panic!("expected a package_contents test"),
+        }
+    }
+
+    #[test]
+    fn test_package_contents_strict_mode() {
+        let test_section = r#"
+        tests:
+          - package_contents:
+              strict: true
+              files:
+                - "**/*.txt"
+              bin:
+                - rust
+          - package_contents:
+              files:
+                - "**/*.txt"
+        "#;
+
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        match &tests[0] {
+            TestType::PackageContents { package_contents } => {
+                assert!(package_contents.strict);
+                assert_eq!(package_contents.files.exists_globs().len(), 1);
+                assert_eq!(package_contents.bin.exists_globs().len(), 1);
+            }
+            _ => panic!("expected package contents test"),
+        }
+
+        match &tests[1] {
+            TestType::PackageContents { package_contents } => {
+                assert!(!package_contents.strict);
+                assert_eq!(package_contents.files.exists_globs().len(), 1);
+            }
+            _ => panic!("expected package contents test"),
         }
     }
 }

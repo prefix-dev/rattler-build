@@ -5,6 +5,7 @@ on:
       - "v*.*.*"
   pull_request:
     paths:
+      - ".github/workflows/rust.yml"
       - "src/**"
       - "Cargo.*"
   workflow_dispatch:
@@ -29,20 +30,40 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
-          toolchain: "1.83.0"
+          toolchain: "1.86.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
+      # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
+      - name: Set up GNU patch on Windows
+        # Needed to use GNU patch instead of Strawberry Perl patch
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
+        run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
+      - uses: prefix-dev/setup-pixi@v0.9.0
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
+        with:
+          cache: true
+      - name: Set up GNU patch on MacOS
+        # Needed to use GNU patch instead of whatever is builtin on macos (1 test fails)
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
+        run: pixi global install patch=2.7.6
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
+      - name: Run patch apply tests
+        # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
+        run: |
+          patch --version
+          cargo test --features=tui,recipe-generation,patch-test-extra --verbose -- --nocapture --ignored
 
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'ci:full-build')
     strategy:
       fail-fast: false
       matrix:
@@ -66,6 +87,8 @@ jobs:
             os: windows-2022
           - target: x86_64-pc-windows-msvc
             os: windows-2022
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
     env:
       # These are some environment variables that configure the build so that the binary size is reduced.
       # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
@@ -91,16 +114,18 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        with:
+          submodules: recursive
 
       - name: Extract version
         shell: bash
         id: metadata
         run:
           | # also call this step outside of $(...) to make sure the status code is propagated
-          ${{ startsWith(matrix.os, 'windows') && 'choco install yq' || '' }}
-          yq '.package.version' Cargo.toml
-          echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
+            ${{ startsWith(matrix.os, 'windows') && 'choco install yq' || '' }}
+            yq '.package.version' Cargo.toml
+            echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
 
       - name: Assert version in release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -112,10 +137,10 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
+        uses: actions-rust-lang/setup-rust-toolchain@ab6845274e2ff01cd4462007e1a9d9df1ab49f42 # v1
         with:
-          toolchain: "1.83.0"
-          targets: ${{ matrix.target }}
+          toolchain: "1.86.0"
+          target: ${{ matrix.target }}
 
       - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -125,11 +150,9 @@ jobs:
         if: matrix.target == 'powerpc64le-unknown-linux-gnu'
         run: sudo apt install libssl-dev
 
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@f63c33fd96cc1e69a29bafd06541cf28588b43a4 # v2
         with:
           tool: cross
 
@@ -217,7 +240,7 @@ jobs:
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
@@ -240,9 +263,12 @@ jobs:
   build-post:
     name: Post-process
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        with:
+          submodules: recursive
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |

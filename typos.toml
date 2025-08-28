@@ -1,3 +1,16 @@
+[files]
+extend-exclude = [
+  ".git/",
+  ".pixi/",
+  "**/*.snap",
+  "**/*.patch",
+  "tests/data/mapping_files/*",
+  "test-data/conda_forge/**/*",
+  "test-data/patch_application/**/*",
+]
+ignore-hidden = false
+
 [default.extend-identifiers]
 ratatui = "ratatui"
 ND = "ND"
+FreeTakServer = "FreeTakServer"

@@ -1,25 +1,26 @@
 //! This module contains the functions to package a conda package from a given
 //! output.
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     io::Write,
     path::{Component, Path, PathBuf},
 };
 
 use fs_err as fs;
 use fs_err::File;
+use metadata::clean_url;
 use rattler_conda_types::{
+    ChannelUrl, Platform,
+    compression_level::CompressionLevel,
     package::{ArchiveType, PackageFile, PathsJson},
-    Platform,
 };
-use rattler_package_streaming::write::{
-    write_conda_package, write_tar_bz2_package, CompressionLevel,
-};
+use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_package};
+use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{content_type, Files, TempFiles};
+pub use file_finder::{Files, TempFiles, content_type};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -52,6 +53,9 @@ pub enum PackagingError {
 
     #[error("Could not strip a prefix from a Path")]
     StripPrefixError(#[from] std::path::StripPrefixError),
+
+    #[error("Found mixed Prefix placeholders in file (forward- vs backslashes)")]
+    MixedPrefixPlaceholders(PathBuf),
 
     #[error("Could not serialize JSON: {0}")]
     SerializationError(#[from] serde_json::Error),
@@ -103,7 +107,7 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let copy_dir_work = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -111,10 +115,9 @@ fn copy_license_files(
         .use_gitignore(false)
         .run()?;
 
-        let copied_files_work_dir = copy_dir.copied_paths();
-        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
+        let copied_files_work_dir = copy_dir_work.copied_paths();
 
-        let copy_dir = copy_dir::CopyDir::new(
+        let copy_dir_recipe = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
@@ -123,14 +126,16 @@ fn copy_license_files(
         .overwrite(true)
         .run()?;
 
-        let copied_files_recipe_dir = copy_dir.copied_paths();
-        let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
+        let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
 
         // if a file was copied from the recipe dir, and the work dir, we should
         // issue a warning
         for file in copied_files_recipe_dir {
             if copied_files_work_dir.contains(file) {
-                let warn_str = format!("License file from source directory was overwritten by license file from recipe folder ({})", file.display());
+                let warn_str = format!(
+                    "License file from source directory was overwritten by license file from recipe folder ({})",
+                    file.display()
+                );
                 tracing::warn!(warn_str);
                 output.record_warning(&warn_str);
             }
@@ -142,10 +147,30 @@ fn copy_license_files(
             .map(PathBuf::from)
             .collect::<HashSet<PathBuf>>();
 
-        if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            let warn_str = "No include glob matched for copying license files";
-            tracing::warn!(warn_str);
-            output.record_warning(warn_str);
+        // Check which globs didn't match any files
+        let mut missing_globs = Vec::new();
+
+        // Check globs from both work and recipe dir results
+        for (glob_str, match_obj) in copy_dir_work.include_globs() {
+            if !match_obj.get_matched() {
+                // Check if it matched in the recipe dir
+                if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
+                    if !recipe_match.get_matched() {
+                        missing_globs.push(glob_str.clone());
+                    }
+                } else {
+                    missing_globs.push(glob_str.clone());
+                }
+            }
+        }
+
+        if !missing_globs.is_empty() {
+            let error_str = format!(
+                "The following license files were not found: {}",
+                missing_globs.join(", ")
+            );
+            tracing::error!(error_str);
+            return Err(PackagingError::LicensesNotFound);
         }
 
         if copied_files.is_empty() {
@@ -203,11 +228,21 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
+    let mut output_clean = output.clone();
+    // clean URLs of any secrets or tokens
+    output_clean.build_configuration.channels = output_clean
+        .build_configuration
+        .channels
+        .iter()
+        .map(clean_url)
+        .map(|url| ChannelUrl::from(url.parse::<url::Url>().expect("url is valid")))
+        .collect();
+
     // Write out the "rendered" recipe as well (the recipe with all the variables
     // replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
-    rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
+    rendered_recipe.write_all(serde_yaml::to_string(&output_clean)?.as_bytes())?;
     files.push(rendered_recipe_file);
 
     Ok(files)
@@ -226,6 +261,120 @@ impl rattler_package_streaming::write::ProgressBar for ProgressBar {
     fn set_total(&mut self, total: u64) {
         self.progress_bar.set_length(total);
     }
+}
+
+/// Error type for path normalization operations
+#[derive(Debug, thiserror::Error)]
+pub enum PathNormalizationError {
+    /// Error when a path component contains invalid Unicode
+    #[error("Path component contains invalid Unicode: {0}")]
+    InvalidUnicode(String),
+}
+
+/// Normalizes a component string for comparison.
+///
+/// This helper function applies Unicode normalization (NFKC) and optional case folding to a path component.
+/// When case folding is applied, it's done in a way that properly handles special Unicode cases.
+fn normalize_component(component_str: &str, to_lowercase: bool) -> String {
+    if to_lowercase {
+        let normalized = component_str.nfkc().collect::<String>();
+        normalized.to_uppercase().to_lowercase()
+    } else {
+        component_str.nfkc().collect::<String>()
+    }
+}
+
+/// Normalizes a path for case-insensitive comparison.
+///
+/// This function:
+/// 1. Applies Unicode normalization (NFKC) to each path component
+/// 2. Handles path separators consistently across platforms
+/// 3. Optionally converts to lowercase for case-insensitive comparison
+///
+/// Returns a normalized string representation of the path.
+fn normalize_path_for_comparison(
+    path: &Path,
+    to_lowercase: bool,
+) -> Result<String, PathNormalizationError> {
+    let estimated_capacity = path.as_os_str().len() * 6 / 5 + path.components().count();
+    let mut normalized = String::with_capacity(estimated_capacity);
+
+    let separator = '/';
+
+    for c in path.components() {
+        match c {
+            Component::CurDir => continue,
+            Component::RootDir => {
+                normalized.push(separator);
+            }
+            Component::Prefix(_) | Component::ParentDir | Component::Normal(_) => {
+                if !normalized.is_empty() && !normalized.ends_with(separator) {
+                    normalized.push(separator);
+                }
+
+                let os_str = match c {
+                    Component::Prefix(p) => p.as_os_str(),
+                    _ => c.as_os_str(),
+                };
+
+                let component_str = os_str.to_str().ok_or_else(|| {
+                    PathNormalizationError::InvalidUnicode(format!(
+                        "Path component contains invalid Unicode: {}",
+                        os_str.to_string_lossy()
+                    ))
+                })?;
+
+                normalized.push_str(&normalize_component(component_str, to_lowercase));
+            }
+        }
+    }
+
+    Ok(normalized)
+}
+
+/// Finds paths that would collide on case-insensitive filesystems.
+///
+/// Returns groups of paths that differ only by case.
+pub fn find_case_insensitive_collisions<I, P>(paths: I) -> Vec<Vec<PathBuf>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut lc_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
+
+    for path_ref in paths {
+        let path = path_ref.as_ref();
+        let case_folded = normalize_path_for_comparison(path, true).unwrap_or_else(|err| {
+            tracing::warn!(
+                "Failed to normalize path for comparison: {}: {}",
+                path.display(),
+                err
+            );
+            path.display().to_string().to_lowercase()
+        });
+
+        lc_map
+            .entry(case_folded)
+            .or_default()
+            .push(path.to_path_buf());
+    }
+
+    let mut result: Vec<Vec<PathBuf>> = lc_map
+        .into_values()
+        .filter(|group| group.len() > 1)
+        .map(|group| {
+            let mut unique_paths: Vec<PathBuf> = group
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            unique_paths.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
+            unique_paths
+        })
+        .collect();
+
+    result.sort_by(|a, b| a[0].as_os_str().cmp(b[0].as_os_str()));
+    result
 }
 
 /// Given an output and a set of new files, create a conda package.
@@ -305,6 +454,20 @@ pub fn package_conda(
             (false, true) => std::cmp::Ordering::Less,
         }
     });
+
+    for group in find_case_insensitive_collisions(&files) {
+        let list = group
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join("\n  - ");
+        let warn_str = format!(
+            "Mixed-case filenames detected, case-insensitive filesystems may break:\n  - {}",
+            list
+        );
+        tracing::error!(warn_str);
+        output.record_warning(&warn_str);
+    }
 
     let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
 
@@ -416,5 +579,241 @@ impl Output {
         )?;
 
         package_conda(self, tool_configuration, &files_after)
+    }
+}
+
+#[cfg(test)]
+mod packaging_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[cfg(unix)]
+    use std::ffi::OsStr;
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+    #[cfg(windows)]
+    use std::os::windows::ffi::OsStringExt;
+
+    #[test]
+    fn test_find_case_insensitive_collisions_detects() {
+        let files = vec![
+            Path::new("foo/BAR"),
+            Path::new("foo/bar"),
+            Path::new("foo/Baz"),
+            Path::new("foo/qux"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 1);
+
+        let paths_in_group: Vec<String> =
+            groups[0].iter().map(|p| p.display().to_string()).collect();
+
+        assert!(paths_in_group.contains(&"foo/BAR".to_string()));
+        assert!(paths_in_group.contains(&"foo/bar".to_string()));
+    }
+
+    #[test]
+    fn test_find_case_insensitive_collisions_empty() {
+        let files = vec![Path::new("foo/bar"), Path::new("foo/baz")];
+        let groups = find_case_insensitive_collisions(&files);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn test_find_case_insensitive_collisions_unicode() {
+        let files = vec![
+            Path::new("foo/straße"),
+            Path::new("foo/STRASSE"),
+            Path::new("foo/other"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 1);
+    }
+
+    #[test]
+    fn test_slash_collision() {
+        let files = vec![
+            Path::new("path/to/text/file.py"),
+            Path::new("path/to/textfile.py"),
+        ];
+        let groups = find_case_insensitive_collisions(&files);
+        assert_eq!(groups.len(), 0);
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_basic() {
+        let path = Path::new("foo/bar/baz.txt");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar/baz.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_lowercase() {
+        let path = Path::new("Foo/BAR/Baz.TXT");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        assert_eq!(normalized, "foo/bar/baz.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_unicode() {
+        let path = Path::new("straße/café");
+        let normalized_case_sensitive = normalize_path_for_comparison(path, false).unwrap();
+        let normalized_case_insensitive = normalize_path_for_comparison(path, true).unwrap();
+
+        assert_eq!(normalized_case_sensitive, "straße/café");
+        assert_eq!(normalized_case_insensitive, "strasse/café");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_unicode_equivalence() {
+        // Test that different Unicode representations normalize to the same result
+        let path1 = Path::new("café"); // é as single character
+        let path2 = Path::new("cafe\u{0301}"); // e + combining acute accent
+
+        let norm1 = normalize_path_for_comparison(path1, false).unwrap();
+        let norm2 = normalize_path_for_comparison(path2, false).unwrap();
+
+        assert_eq!(norm1, norm2);
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_empty_path() {
+        let path = Path::new("");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_single_component() {
+        let path = Path::new("file.txt");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "file.txt");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_current_dir() {
+        let path = Path::new("./foo/bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // Current directory components should be skipped
+        assert_eq!(normalized, "foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_parent_dir() {
+        let path = Path::new("../foo/bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "../foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_absolute_path() {
+        let path = Path::new("/foo/bar/baz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "/foo/bar/baz");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_with_separators() {
+        let path = Path::new("foo//bar///baz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // Multiple separators should be normalized to single separators
+        assert_eq!(normalized, "foo/bar/baz");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_trailing_separator() {
+        let path = Path::new("foo/bar/");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_case_folding_special_chars() {
+        // Test German ß -> SS conversion in case folding
+        let path = Path::new("straße");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        assert_eq!(normalized, "strasse");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_complex_path() {
+        let path = Path::new("./Foo/../Bar/./Baz.TXT");
+        let normalized_case_sensitive = normalize_path_for_comparison(path, false).unwrap();
+        let normalized_case_insensitive = normalize_path_for_comparison(path, true).unwrap();
+
+        // Current dir components (.) are skipped, but parent dir (..) and other components are preserved
+        assert_eq!(normalized_case_sensitive, "Foo/../Bar/Baz.TXT");
+        assert_eq!(normalized_case_insensitive, "foo/../bar/baz.txt");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_windows_prefix() {
+        let path = Path::new("C:\\foo\\bar");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        // On Windows, backslashes should be normalized to forward slashes
+        assert_eq!(normalized, "C:/foo/bar");
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_preserves_path_structure() {
+        // Ensure that the original failing test case works correctly
+        let path1 = Path::new("path/to/text/file.py");
+        let path2 = Path::new("path/to/textfile.py");
+
+        let norm1 = normalize_path_for_comparison(path1, true).unwrap();
+        let norm2 = normalize_path_for_comparison(path2, true).unwrap();
+
+        assert_ne!(norm1, norm2);
+        assert_eq!(norm1, "path/to/text/file.py");
+        assert_eq!(norm2, "path/to/textfile.py");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_invalid_unicode_windows() {
+        // Invalid UTF-16 sequence
+        let invalid_utf16: &[u16] = &[0x0043, 0x003A, 0xD800, 0x005C];
+        let os_string = std::ffi::OsString::from_wide(invalid_utf16);
+        let path = Path::new(&os_string);
+
+        let result = normalize_path_for_comparison(path, false);
+        assert!(matches!(
+            result,
+            Err(PathNormalizationError::InvalidUnicode(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_normalize_path_for_comparison_invalid_unicode_unix() {
+        // Invalid UTF-8 sequence
+        let invalid_utf8: &[u8] = &[0x66, 0x6f, 0x80, 0x6f];
+        let path = Path::new(OsStr::from_bytes(invalid_utf8));
+
+        let result = normalize_path_for_comparison(path, false);
+        assert!(matches!(
+            result,
+            Err(PathNormalizationError::InvalidUnicode(_))
+        ));
+    }
+
+    #[test]
+    fn test_normalize_path_for_comparison_turkish_i() {
+        // Test Turkish 'İ' (I with dot) case folding
+        let path = Path::new("İstanbul");
+        let normalized = normalize_path_for_comparison(path, true).unwrap();
+        // Note: According to Unicode case-folding rules, `İ` (U+0130) maps to
+        // `i` followed by COMBINING DOT ABOVE (U+0307). Therefore the
+        // normalized representation contains this combining mark.
+        assert_eq!(normalized, "i\u{0307}stanbul");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_path_for_comparison_mixed_separators() {
+        let path = Path::new(r"foo/bar\baz");
+        let normalized = normalize_path_for_comparison(path, false).unwrap();
+        assert_eq!(normalized, "foo/bar/baz");
     }
 }

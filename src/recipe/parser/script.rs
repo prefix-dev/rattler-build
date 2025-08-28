@@ -8,6 +8,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::path::Path;
 use std::{borrow::Cow, path::PathBuf};
 
 /// Defines the script to run to build the package.
@@ -155,8 +156,10 @@ impl<'de> Deserialize<'de> for Script {
 
 impl Script {
     /// Returns the interpreter to use to execute the script
-    pub fn interpreter(&self) -> Option<&str> {
-        self.interpreter.as_deref()
+    pub fn interpreter(&self) -> &str {
+        self.interpreter
+            .as_deref()
+            .unwrap_or(if cfg!(windows) { "cmd" } else { "bash" })
     }
 
     /// Returns the script contents
@@ -202,6 +205,44 @@ impl From<ScriptContent> for Script {
     }
 }
 
+/// Helper function to validate a path for invalid UTF-8 characters
+fn validate_path_utf8(
+    path: &Path,
+    span: &impl HasSpan,
+    field_name: &str,
+) -> Result<(), Vec<PartialParsingError>> {
+    if path.to_str().is_none() {
+        return Err(vec![_partialerror!(
+            *span.span(),
+            ErrorKind::InvalidValue((
+                field_name.to_string(),
+                "path contains invalid UTF-8 characters".into()
+            )),
+            help = "Ensure the path contains only valid UTF-8 characters"
+        )]);
+    }
+    Ok(())
+}
+
+/// Helper function to determine interpreter based on file extension
+fn determine_interpreter_from_path(path: &Path) -> Option<String> {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|ext| ext.to_lowercase())
+        .and_then(|ext_lower| match ext_lower.as_str() {
+            "py" => Some("python".to_string()),
+            "rb" => Some("ruby".to_string()),
+            "js" => Some("nodejs".to_string()),
+            "pl" => Some("perl".to_string()),
+            "r" => Some("rscript".to_string()),
+            "sh" | "bash" => Some("bash".to_string()),
+            "bat" | "cmd" => Some("cmd".to_string()),
+            "ps1" => Some("powershell".to_string()),
+            "nu" => Some("nushell".to_string()),
+            _ => None,
+        })
+}
+
 impl TryConvertNode<Script> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
         match self {
@@ -217,8 +258,16 @@ impl TryConvertNode<Script> for RenderedNode {
 }
 
 impl TryConvertNode<Script> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<Script, Vec<PartialParsingError>> {
-        Ok(ScriptContent::CommandOrPath(self.source().to_owned()).into())
+    fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
+        let path_str = self.source();
+        let path = PathBuf::from(path_str);
+
+        validate_path_utf8(&path, self, name)?;
+
+        let mut script: Script = ScriptContent::CommandOrPath(path_str.to_owned()).into();
+        script.interpreter = determine_interpreter_from_path(&path);
+
+        Ok(script)
     }
 }
 
@@ -232,7 +281,9 @@ impl TryConvertNode<Script> for RenderedSequenceNode {
             }
         }
 
-        if strings.len() == 1 {
+        if strings.is_empty() {
+            Ok(ScriptContent::Commands(strings).into())
+        } else if strings.len() == 1 {
             Ok(ScriptContent::CommandOrPath(strings[0].clone()).into())
         } else {
             Ok(ScriptContent::Commands(strings).into())
@@ -253,7 +304,9 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             return Err(vec![_partialerror!(
                 *invalid.span(),
                 ErrorKind::InvalidField(invalid.to_string().into()),
-                help = format!("valid keys for {name} are `env`, `secrets`, `interpreter`, `content` or `file`")
+                help = format!(
+                    "valid keys for {name} are `env`, `secrets`, `interpreter`, `content` or `file`"
+                )
             )]);
         }
 
@@ -320,13 +373,21 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             (None, None) => ScriptContent::Default,
         };
 
-        Ok(Script {
+        let mut script = Script {
             env,
             secrets,
             interpreter,
             content,
             cwd: None,
-        })
+        };
+
+        if script.interpreter.is_none() {
+            if let ScriptContent::Path(path) = &script.content {
+                script.interpreter = determine_interpreter_from_path(path);
+            }
+        }
+
+        Ok(script)
     }
 }
 

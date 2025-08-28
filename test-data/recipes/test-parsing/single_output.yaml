@@ -159,6 +159,22 @@ tests:
         - src_file.txt
   - package_contents:
       lib:
+        not_exists:
+          - test.so
+          - test.so.*
+        exists:
+          - footest.so
+          - footest.so.*
+      files:
+        exists:
+          - test.txt
+          - license.txt
+        not_exists:
+          - test2.txt
+          - license2.txt
+
+  - package_contents:
+      lib:
         - test
         - test.so.*
       include:
@@ -168,7 +184,7 @@ tests:
         - test
         - test.exe
         - foo*
-      site_packages: 
+      site_packages:
         - numpy
         - numpy/foo/__init__.py
       files:

@@ -1,0 +1,3 @@
+[submodule "test-data/conda_forge"]
+	path = test-data/conda_forge
+	url = https://github.com/remimimimimi/patch-apply-test-data.git

@@ -1,0 +1,21 @@
+package:
+  name: test-cr
+  version: 0.0.0
+
+build:
+  number: 0
+  script:
+    content:
+      - if: win
+        then: |
+          powershell -Command "$count=1; while($count -le 10) { Write-Host -NoNewline ([char]13); Write-Host -NoNewline ('line ' + $count); Start-Sleep -Milliseconds 100; $count++ }; Write-Host ([char]10 + 'done')"
+      - if: unix
+        then: |
+          #!/usr/bin/env bash
+          set +x
+          set -eu
+          for i in {1..10}; do
+            echo -ne "\rline ${i}"
+            sleep 0.1
+          done
+          echo -e "\ndone"

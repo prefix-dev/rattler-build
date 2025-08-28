@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,14 @@ import boto3
 import pytest
 import requests
 import yaml
-from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
+import subprocess
+import shutil
+from helpers import (
+    RattlerBuild,
+    check_build_output,
+    get_extracted_package,
+    get_package,
+)
 
 
 def test_functionality(rattler_build: RattlerBuild):
@@ -34,6 +42,63 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     # Check that the total number of files under the license folder is correct
     # 5 files + 3 folders = 8
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
+
+
+def test_missing_license_file(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a specified license file is missing."""
+    try:
+        rattler_build.build(recipes / "missing_license_file", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
+
+
+def test_missing_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a license glob pattern matches no files."""
+    try:
+        rattler_build.build(recipes / "missing_license_glob", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
+
+
+def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that building a package with spaces in output paths works correctly."""
+    output_dir = tmp_path / "Output Space Dir"
+    output_dir.mkdir(exist_ok=True)
+
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe.yaml",
+        output_dir,
+    )
+    pkg = get_extracted_package(output_dir, "spaces-in-paths")
+    assert (pkg / "test.txt").exists()
+    assert (pkg / "dir with spaces").exists()
+    assert (pkg / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
+
+    # Build the recipe with quoted paths on all platforms
+    rattler_build.build(
+        recipes / "spaces-in-paths" / "recipe-with-quotes.yaml",
+        output_dir,
+    )
+    pkg_quoted = get_extracted_package(output_dir, "spaces-in-paths-quotes")
+    assert (pkg_quoted / "test.txt").exists()
+
+    # Check directories with spaces on all platforms
+    assert (pkg_quoted / "dir with spaces").exists()
+    assert (pkg_quoted / "dir with spaces" / "file.txt").exists()
+    assert (
+        pkg_quoted / "dir with spaces" / "file.txt"
+    ).read_text().strip() == "This file is in a directory with spaces"
 
 
 def check_info(folder: Path, expected: Path):
@@ -134,6 +199,67 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
+
+
+def test_strict_mode_fail(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode fails when unmatched files exist"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipe_dir / "recipe-fail.yaml", output_dir)
+
+
+def test_strict_mode_pass(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that strict mode passes when all files are matched"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    rattler_build.build(recipe_dir / "recipe-pass.yaml", output_dir)
+
+
+def test_strict_mode_many_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that strict mode shows all unmatched files, not just the first few"""
+    recipe_dir = recipes / "strict-mode"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    build_args = rattler_build.build_args(
+        recipe_dir / "recipe-many-files.yaml",
+        output_dir,
+        extra_args=["--log-style=json"],
+    )
+    result = subprocess.run(
+        [str(rattler_build.path), *build_args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert result.returncode != 0
+
+    logs = []
+    stderr = result.stderr if result.stderr else ""
+    for line in stderr.splitlines():
+        if line.strip() and line.strip().startswith("{"):
+            try:
+                logs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    stdout = result.stdout if result.stdout else ""
+    error_output = stderr + stdout
+    assert "unmatched1.txt" in error_output
+    assert "unmatched2.txt" in error_output
+    assert "unmatched3.txt" in error_output
+    assert "unmatched4.txt" in error_output
+    assert "unmatched5.txt" in error_output
+    assert "unmatched6.txt" in error_output
+    assert "unmatched7.txt" in error_output
 
 
 @pytest.mark.skipif(
@@ -557,23 +683,26 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/index.json").exists()
     assert (pkg / "info/paths.json").exists()
 
-    index_json = json.loads((pkg / "info/index.json").read_text())
-    subdir = index_json["subdir"]
-    is_win = subdir.startswith("win")
-
     def check_path(p, t):
-        if t == "binary" and is_win or t is None:
+        if t is None:
             assert "file_mode" not in p
             assert "prefix_placeholder" not in p
         else:
             assert p["file_mode"] == t
             assert len(p["prefix_placeholder"]) > 10
 
+    win = os.name == "nt"
+
     paths = json.loads((pkg / "info/paths.json").read_text())
     for p in paths["paths"]:
         path = p["_path"]
         if path == "is_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
         elif path == "is_binary/file_without_prefix":
@@ -581,14 +710,22 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
         elif path == "is_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
-            if not is_win:
+            if not win:
                 check_path(p, "text")
             else:
+                # On Windows, we do not look into binary files (even if forced to text)
+                # and thus we also don't do any prefix replacement
                 check_path(p, None)
         elif path == "force_text/file_without_prefix":
             check_path(p, None)
         elif path == "force_binary/file_with_prefix":
-            check_path(p, "binary")
+            if not win:
+                check_path(p, "binary")
+            else:
+                # On Windows, we do not look into binary files
+                # and we also don't do any prefix replacement
+                check_path(p, None)
+
         elif path == "force_binary/file_without_prefix":
             check_path(p, None)
         elif path == "ignore/file_with_prefix":
@@ -917,11 +1054,11 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
-def test_nushell_implicit_recipe(
+def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     rattler_build.build(
-        recipes / "nushell-implicit/recipe.yaml",
+        recipes / "nushell-script-detection/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "nushell")
@@ -1011,9 +1148,12 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches
+    # check that the snapshot matches (different on windows vs. unix)
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    assert test_yaml == snapshot
+    if os.name == "nt":
+        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
+    else:
+        assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -1396,6 +1536,71 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["platform"] == host_subdir().split("-")[0]
 
 
+@pytest.mark.skipif(
+    os.name == "nt" or platform.system() == "Darwin",
+    reason="Filesystem case-insensitivity prevents testing collision warning trigger",
+)
+def test_case_insensitive_collision_warning(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe_content = """
+context:
+  name: test-case-collision
+  version: 0.1.0
+
+package:
+  name: test-case-collision
+  version: 0.1.0
+
+build:
+  script:
+    # Create directories with case difference
+    - mkdir -p case_test
+    - echo "UPPER CASE FILE" > case_test/CASE-FILE.txt
+    - echo "lower case file" > case_test/case-file.txt
+    # Install the directory into the prefix to trigger packaging
+    - cp -r case_test $PREFIX/
+    # Add another test file to ensure packaging works
+    - echo "test content" > regular-file.txt
+    - cp regular-file.txt $PREFIX/
+
+about:
+  summary: A test package for case-insensitive file collisions
+"""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(recipe_content)
+
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+        extra_args=["-vvv"],
+    )
+
+    output = rattler_build(*args, stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path / "output", "test-case-collision")
+    extracted_files_list = [str(f.relative_to(pkg)) for f in pkg.glob("**/*")]
+
+    assert (
+        "case_test/CASE-FILE.txt" in extracted_files_list
+    ), "CASE-FILE.txt not found in package"
+    assert (
+        "case_test/case-file.txt" in extracted_files_list
+    ), "case-file.txt not found in package"
+    assert (
+        "regular-file.txt" in extracted_files_list
+    ), "regular-file.txt not found in package"
+
+    collision_warning_pattern = (
+        r"Mixed-case filenames detected, case-insensitive filesystems may break:"
+        r"\n  - case_test/CASE-FILE.txt"
+        r"\n  - case_test/case-file.txt"
+    )
+
+    assert re.search(
+        collision_warning_pattern, output, flags=re.IGNORECASE
+    ), f"Case collision warning not found in build output. Output contains:\n{output}"
+
+
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
 def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
@@ -1569,3 +1774,612 @@ def test_hatch_vcs_versions(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert (pkg / "info/index.json").exists()
     index = json.loads((pkg / "info/index.json").read_text())
     assert index["version"] == "0.1.0.dev12+ga47bad07"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows PowerShell behavior")
+def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "line-breaks"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = check_output(
+        [str(rattler_build.path), *args], stderr=STDOUT, text=True, encoding="utf-8"
+    )
+    output_lines = output.splitlines()
+    found_lines = {i: False for i in range(1, 11)}
+    for line in output_lines:
+        for i in range(1, 11):
+            if f"line {i}" in line:
+                found_lines[i] = True
+
+    for i in range(1, 11):
+        assert found_lines[i], f"Expected to find 'line {i}' in the output"
+
+    assert any("done" in line for line in output_lines)
+
+
+def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "r-test", tmp_path)
+    pkg = get_extracted_package(tmp_path, "r-test")
+
+    assert (pkg / "r-test-output.txt").exists()
+
+    output_content = (pkg / "r-test-output.txt").read_text()
+    assert (
+        "This file was created by the R interpreter in rattler-build" in output_content
+    )
+    assert "R version:" in output_content
+    assert "PREFIX:" in output_content
+    assert (pkg / "info/recipe/recipe.yaml").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # Verify index.json exists before running test
+    assert (pkg / "info/index.json").exists(), "index.json file missing from package"
+
+    pkg_file = get_package(tmp_path, "r-test")
+    test_result = rattler_build.test(pkg_file)
+    assert "Running R test" in test_result
+    assert "all tests passed!" in test_result
+
+
+def test_channel_sources(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    with pytest.raises(CalledProcessError):
+        # channel_sources and channels cannot both be set at the same time
+        rattler_build.build(
+            recipes / "channel_sources",
+            tmp_path,
+            custom_channels=["conda-forge"],
+        )
+
+    output = rattler_build.build(
+        recipes / "channel_sources",
+        tmp_path,
+        extra_args=["--render-only"],
+    )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]
+
+
+def test_relative_file_loading(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # build the package with experimental flag to enable the feature
+    rattler_build.build(
+        recipes / "relative_file_loading",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg = get_extracted_package(tmp_path, "relative-file-loading")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "relative-file-loading"
+    assert index_json["version"] == "1.0.0"
+
+    assert (pkg / "info/about.json").exists()
+    about_json = json.loads((pkg / "info/about.json").read_text())
+    assert "Loaded from relative file" in about_json["description"]
+    assert (pkg / "info/recipe/data/package_data.yaml").exists()
+    recipe_data = yaml.safe_load(
+        (pkg / "info/recipe/data/package_data.yaml").read_text()
+    )
+    assert recipe_data["name"] == "test-relative-loading"
+    assert recipe_data["version"] == "1.0.0"
+    assert recipe_data["description"] == "Loaded from relative file"
+
+    # Check the rendered recipe
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    rendered_recipe = yaml.safe_load(
+        (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    )
+    print("\nRendered recipe structure:")
+    print(yaml.dump(rendered_recipe, default_flow_style=False))
+
+    assert "recipe" in rendered_recipe
+    assert "context" in rendered_recipe["recipe"]
+
+    context = rendered_recipe["recipe"]["context"]
+    assert "loaded_data" in context
+    assert "loaded_name" in context
+    assert "loaded_version" in context
+    assert "loaded_description" in context
+    assert context["loaded_name"] == "test-relative-loading"
+    assert context["loaded_version"] == "1.0.0"
+    assert context["loaded_description"] == "Loaded from relative file"
+    assert "about" in rendered_recipe["recipe"]
+    assert "description" in rendered_recipe["recipe"]["about"]
+    assert (
+        rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
+    )
+
+
+@pytest.mark.parametrize(
+    "interpreter",
+    [
+        pytest.param(
+            "bash",
+            marks=pytest.mark.skipif(os.name == "nt", reason="bash only on unix"),
+        ),
+        pytest.param(
+            "bat",
+            marks=pytest.mark.skipif(os.name != "nt", reason="bat only on windows"),
+        ),
+        "py",
+        "pl",
+        "nu",
+        "r",
+    ],
+)
+def test_interpreter_detection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, interpreter: str
+):
+    """
+    Tests that rattler-build automatically detects the required interpreter
+    for build and test scripts based on their file extension, without explicit
+    interpreter specification in the recipe.
+    """
+    recipe_dir = recipes / "interpreter-detection" / interpreter
+    pkg_name = f"test-interpreter-{interpreter}"
+
+    try:
+        rattler_build.build(recipe_dir, tmp_path)
+    except CalledProcessError as e:
+        print(f"Build failed for interpreter: {interpreter}")
+        print(f"STDOUT:\n{e.stdout.decode() if e.stdout else ''}")
+        print(f"STDERR:\n{e.stderr.decode() if e.stderr else ''}")
+        raise
+
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    if interpreter == "bat":
+        expected_output = "Hello from Cmd!"
+    elif interpreter == "py":
+        expected_output = "Hello from Python!"
+    elif interpreter == "pl":
+        expected_output = "Hello from Perl!"
+    elif interpreter == "nu":
+        expected_output = "Hello from Nushell!"
+    elif interpreter == "r":
+        expected_output = "Hello from R!"
+    else:
+        expected_output = f"Hello from {interpreter.upper()}!"
+
+    assert expected_output in test_output
+    assert "all tests passed!" in test_output
+
+
+def test_interpreter_detection_all_tests(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests that rattler-build can run multiple test scripts requiring
+    different interpreters within the same test phase.
+    """
+    recipe_dir = recipes / "interpreter-detection"
+    pkg_name = "test-interpreter-all"
+
+    rattler_build.build(recipe_dir, tmp_path)
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    assert "Hello from Python!" in test_output
+    assert "Hello from Perl!" in test_output
+    assert "Hello from R!" in test_output
+    assert "Hello from Nushell!" in test_output
+    assert "all tests passed!" in test_output
+
+
+def test_relative_git_path_py(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests building a recipe with a relative Git source path.
+    """
+    repo_dir = tmp_path / "repo"
+    recipe_dir = tmp_path / "recipe_dir" / "subdir"
+    recipe_dir.mkdir(parents=True, exist_ok=True)
+    repo_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        subprocess.run(
+            ["git", "init", "--initial-branch=main"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("Git executable not found, skipping test")
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    readme_path = repo_dir / "README.md"
+    readme_path.write_text("test content")
+    try:
+        subprocess.run(
+            ["git", "add", "README.md"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # get the original commit hash
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        original_commit = result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    # We are gonna create the recipe file here, because we are gonna use git with commit history too.
+    recipe_path = recipe_dir / "recipe.yaml"
+    recipe_content = """
+package:
+  name: test-relative-git
+  version: 1.0.0
+source:
+  git: ../../repo
+build:
+  script:
+    - if: unix
+      then:
+        - cp README.md $PREFIX/README_from_build.md
+      else:
+        - copy README.md %PREFIX%\\README_from_build.md
+"""
+    recipe_path.write_text(recipe_content)
+
+    build_output_path = tmp_path / "build_output"
+    rattler_build.build(recipe_path, build_output_path)
+
+    pkg = get_extracted_package(build_output_path, "test-relative-git")
+
+    cloned_readme = pkg / "README_from_build.md"
+    assert (
+        cloned_readme.exists()
+    ), "README_from_build.md should exist in the built package"
+    assert cloned_readme.read_text() == "test content", "Cloned README content mismatch"
+
+    rendered_recipe_path = pkg / "info/recipe/rendered_recipe.yaml"
+    assert (
+        rendered_recipe_path.exists()
+    ), "rendered_recipe.yaml not found in package info"
+    rendered_recipe = yaml.safe_load(rendered_recipe_path.read_text())
+
+    assert (
+        "finalized_sources" in rendered_recipe
+    ), "'finalized_sources' missing in rendered recipe"
+    assert (
+        len(rendered_recipe["finalized_sources"]) == 1
+    ), "Expected exactly one finalized source"
+    final_source = rendered_recipe["finalized_sources"][0]
+    assert "rev" in final_source, "'rev' missing in finalized source"
+    resolved_commit = final_source["rev"]
+    assert (
+        resolved_commit == original_commit
+    ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="Test requires Unix-like environment for shell commands"
+)
+def test_merge_build_and_host(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # simply run the recipe "merge_build_and_host/recipe.yaml"
+    rattler_build.build(
+        recipes / "merge_build_and_host/recipe.yaml",
+        tmp_path,
+    )
+
+
+def test_error_on_binary_prefix(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --error-prefix-in-binary flag correctly detects prefix in binaries"""
+    recipe_path = recipes / "binary_prefix_test"
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    rattler_build(*args)
+
+    shutil.rmtree(tmp_path)
+    tmp_path.mkdir()
+    args = rattler_build.build_args(recipe_path, tmp_path)
+    args = list(args) + ["--error-prefix-in-binary"]
+
+    if os.name == "nt":
+        # On Windows, we don't deal with binary prefixes in the same way,
+        # so this test is not applicable
+        rattler_build(*args, stderr=STDOUT)
+        return
+
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with binary prefix error")
+    except CalledProcessError as e:
+        output = e.output.decode("utf-8") if e.output else ""
+        assert "Binary file" in output and "contains host prefix" in output
+
+
+@pytest.mark.skipif(
+    platform.system() != "Linux", reason="Symlink test only runs on Linux"
+)
+def test_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that symlinks work correctly on Linux"""
+    recipe_path = recipes / "symlink_test"
+    args = rattler_build.build_args(recipe_path, tmp_path)
+
+    rattler_build(*args)
+    pkg = get_extracted_package(tmp_path, "symlink-test")
+
+    # Verify the symlinks exist and are correct
+    assert (pkg / "bin/symlink_script").exists()
+    assert (pkg / "bin/another_symlink").exists()
+    assert (pkg / "bin/real_script").exists()
+
+    # Verify they are actually symlinks
+    assert (pkg / "bin/symlink_script").is_symlink()
+    assert (pkg / "bin/another_symlink").is_symlink()
+
+    # Verify they point to the right target
+    assert os.readlink(pkg / "bin/symlink_script") == "real_script"
+    assert os.readlink(pkg / "bin/another_symlink") == "real_script"
+
+
+def test_secret_leaking(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # build the package with experimental flag to enable the feature
+    rattler_build.build(
+        recipes / "empty_folder",
+        tmp_path,
+        extra_args=[
+            "-c",
+            "https://iamasecretusername:123412341234@foobar.com/some-channel",
+            "-c",
+            "https://bizbar.com/t/token1234567/channel-name",
+        ],
+    )
+    pkg = get_extracted_package(tmp_path, "empty_folder")
+    # scan all files to make sure that the secret is not present
+    for file in pkg.rglob("**/*"):
+        if file.is_file():
+            print("Checking file:", file)
+            content = file.read_text()
+            assert "iamasecretusername" not in content, f"Secret found in {file}"
+            assert "123412341234" not in content, f"Secret found in {file}"
+
+            assert "token1234567" not in content, f"Token found in {file}"
+
+
+def test_extracted_timestamps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # simply run the recipe "merge_build_and_host/recipe.yaml"
+    rattler_build.build(
+        recipes / "timestamps/recipe.yaml",
+        tmp_path,
+    )
+
+
+def test_url_source_ignore_files(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that .ignore files don't affect URL sources."""
+    recipe_path = Path("test-data/recipes/url-source-with-ignore/recipe.yaml")
+
+    # This should succeed since we don't respect .ignore files anymore
+    rattler_build.build(
+        recipe_path,
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "test-url-source-ignore")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "test-url-source-ignore"
+    assert index_json["version"] == "1.0.0"
+
+
+def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that .condapackageignore files are respected during source copying."""
+    test_dir = tmp_path / "rattlerbuildignore-src"
+    test_dir.mkdir()
+    shutil.copy(
+        recipes / "rattlerbuildignore" / "recipe.yaml", test_dir / "recipe.yaml"
+    )
+
+    # Create .condapackageignore
+    (test_dir / ".condapackageignore").write_text("ignored.txt\n*.pyc\n")
+
+    # Create test files
+    (test_dir / "included.txt").write_text("This should be included")
+    (test_dir / "ignored.txt").write_text("This should be ignored")
+    (test_dir / "test.pyc").write_text("This should also be ignored")
+
+    output_dir = tmp_path / "output"
+    rattler_build.build(test_dir, output_dir)
+
+    pkg = get_extracted_package(output_dir, "test-rattlerbuildignore")
+    files_dir = pkg / "files"
+
+    assert (files_dir / "included.txt").exists()
+    assert (files_dir / "recipe.yaml").exists()
+    assert not (files_dir / "ignored.txt").exists()
+    assert not (files_dir / "test.pyc").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows for symlink testing")
+def test_windows_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that Windows symlinks are created correctly during package building"""
+    rattler_build.build(
+        recipes / "win-symlink-test",
+        tmp_path,
+        extra_args=["--allow-symlinks-on-windows"],
+    )
+    pkg = get_extracted_package(tmp_path, "win-symlink-test")
+
+    # Debug: Print all files in the package
+    print("\nFiles in package:")
+    for f in pkg.rglob("*"):
+        print(f"  {f.relative_to(pkg)}")
+
+    # Verify the target file and executable exist
+    assert (pkg / "lib" / "target.txt").exists()
+    assert (pkg / "bin" / "real_exe.bat").exists()
+
+    # Check if the symlink file exists in the package directory listing
+    bin_dir = pkg / "bin"
+    assert any(f.name == "symlink_to_target.txt" for f in bin_dir.iterdir())
+
+
+def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test that case-insensitive file systems handle files correctly."""
+    # Build the package with a recipe that has mixed-case filenames
+    rattler_build.build(
+        recipes / "case-insensitive/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "c2")
+
+    # check if the current filesystem is case-insensitive by creating a temporary file with a mixed case name
+    test_file = tmp_path / "MixedCaseFile.txt"
+    mixed_case_file = tmp_path / "mixedcasefile.txt"
+
+    # create the mixed-case files
+    test_file.write_text("This is a test.")
+    case_insensitive = mixed_case_file.exists()
+
+    paths_json = (pkg / "info/paths.json").read_text()
+    paths = json.loads(paths_json)
+    paths = [p["_path"] for p in paths["paths"]]
+
+    if case_insensitive:
+        # we don't package `cmake/test_file.txt` again, because our dependency already contains `CMake/test_file.txt`
+        assert len(paths) == 1
+        assert "TEST.txt" in paths or "test.txt" in paths
+    else:
+        assert len(paths) == 3
+        assert "cmake/test_file.txt" in paths
+        assert "TEST.txt" in paths
+        assert "test.txt" in paths
+
+
+def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+
+def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_extension_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "ruby-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-imports-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-imports-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-nodejs-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="PE header test only relevant on Windows"
+)
+def test_pe_header_signature_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Malformed PE in Library/bin should be skipped by relinker; build succeeds."""
+    recipe = recipes / "pe-malformed-windows/recipe.yaml"
+    rattler_build.build(recipe, tmp_path)
+    pkg = get_extracted_package(tmp_path, "pe-test")
+    assert (pkg / "info/index.json").exists()

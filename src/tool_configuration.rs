@@ -1,19 +1,20 @@
 //! Configuration for the rattler-build tool
 //! This is useful when using rattler-build as a library
 
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
-    authentication_storage::{self, AuthenticationStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
+    authentication_storage::{self, AuthenticationStorageError},
+    mirror_middleware, s3_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;
@@ -46,8 +47,30 @@ pub enum TestStrategy {
     NativeAndEmulated,
 }
 
+/// Whether we want to continue building on failure of a package or stop the build
+/// entirely
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContinueOnFailure {
+    /// Continue building on failure of a package
+    Yes,
+    /// Stop the build entirely on failure of a package
+    #[default]
+    No,
+}
+
+// This is the key part - implement From<bool> for your type
+impl From<bool> for ContinueOnFailure {
+    fn from(value: bool) -> Self {
+        if value {
+            ContinueOnFailure::Yes
+        } else {
+            ContinueOnFailure::No
+        }
+    }
+}
+
 /// A client that can handle both secure and insecure connections
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BaseClient {
     /// The standard client with SSL verification enabled
     client: ClientWithMiddleware,
@@ -62,9 +85,16 @@ impl BaseClient {
     pub fn new(
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
+        s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+        mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     ) -> Result<Self, AuthenticationStorageError> {
         let auth_storage = get_auth_store(auth_file)?;
         let timeout = 5 * 60;
+
+        let s3_middleware =
+            s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
+        let mirror_middleware =
+            mirror_middleware::MirrorMiddleware::from_map(mirror_middleware_config);
 
         let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
             builder
@@ -85,6 +115,8 @@ impl BaseClient {
         .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
             auth_storage.clone(),
         )))
+        .with(mirror_middleware)
+        .with(s3_middleware)
         .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
@@ -155,6 +187,12 @@ pub struct Configuration {
     /// Whether to use bzip2
     pub use_bz2: bool,
 
+    /// Whether to use sharded repodata
+    pub use_sharded: bool,
+
+    /// Whether to use JLAP (JSON Lines Append Protocol)
+    pub use_jlap: bool,
+
     /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
 
@@ -183,6 +221,20 @@ pub struct Configuration {
 
     /// List of hosts for which SSL certificate verification should be skipped
     pub allow_insecure_host: Option<Vec<String>>,
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub continue_on_failure: ContinueOnFailure,
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub error_prefix_in_binary: bool,
+
+    /// Whether to allow symlinks in packages on Windows (defaults to false)
+    pub allow_symlinks_on_windows: bool,
+
+    /// Whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler-build
+    /// to execute scripts / bundle up files.
+    pub environments_externally_managed: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -207,9 +259,16 @@ pub fn get_auth_store(
 /// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
+    s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<BaseClient, AuthenticationStorageError> {
-    BaseClient::new(auth_file, allow_insecure_host)
+    BaseClient::new(
+        auth_file,
+        allow_insecure_host,
+        s3_middleware_config,
+        mirror_middleware_config,
+    )
 }
 
 /// A builder for a [`Configuration`].
@@ -222,6 +281,8 @@ pub struct ConfigurationBuilder {
     test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
+    use_sharded: bool,
+    use_jlap: bool,
     skip_existing: SkipExisting,
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
@@ -229,6 +290,10 @@ pub struct ConfigurationBuilder {
     io_concurrency_limit: Option<usize>,
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: ContinueOnFailure,
+    error_prefix_in_binary: bool,
+    allow_symlinks_on_windows: bool,
+    environments_externally_managed: bool,
 }
 
 impl Configuration {
@@ -250,6 +315,8 @@ impl ConfigurationBuilder {
             test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: true,
+            use_sharded: true,
+            use_jlap: false,
             skip_existing: SkipExisting::None,
             noarch_build_platform: None,
             channel_config: None,
@@ -257,6 +324,10 @@ impl ConfigurationBuilder {
             io_concurrency_limit: None,
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
+            continue_on_failure: ContinueOnFailure::No,
+            error_prefix_in_binary: false,
+            allow_symlinks_on_windows: false,
+            environments_externally_managed: false,
         }
     }
 
@@ -265,6 +336,30 @@ impl ConfigurationBuilder {
     pub fn with_cache_dir(self, cache_dir: PathBuf) -> Self {
         Self {
             cache_dir: Some(cache_dir),
+            ..self
+        }
+    }
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
+        Self {
+            continue_on_failure,
+            ..self
+        }
+    }
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub fn with_error_prefix_in_binary(self, error_prefix_in_binary: bool) -> Self {
+        Self {
+            error_prefix_in_binary,
+            ..self
+        }
+    }
+
+    /// Whether to allow symlinks in packages on Windows
+    pub fn with_allow_symlinks_on_windows(self, allow_symlinks_on_windows: bool) -> Self {
+        Self {
+            allow_symlinks_on_windows,
             ..self
         }
     }
@@ -366,6 +461,22 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Whether downloading sharded repodata is enabled.
+    pub fn with_sharded_repodata_enabled(self, sharded_repodata_enabled: bool) -> Self {
+        Self {
+            use_sharded: sharded_repodata_enabled,
+            ..self
+        }
+    }
+
+    /// Whether using JLAP (JSON Lines Append Protocol) is enabled.
+    pub fn with_jlap_enabled(self, jlap_enabled: bool) -> Self {
+        Self {
+            use_jlap: jlap_enabled,
+            ..self
+        }
+    }
+
     /// Define the noarch platform
     pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
         Self {
@@ -390,15 +501,25 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler
+    /// to execute scripts / bundle up files.
+    pub fn with_environments_externally_managed(
+        self,
+        environments_externally_managed: bool,
+    ) -> Self {
+        Self {
+            environments_externally_managed,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
-        let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None, self.allow_insecure_host.clone())
-                .expect("failed to create client")
-        });
+        let client = self.client.unwrap_or_default();
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
@@ -411,10 +532,10 @@ impl ConfigurationBuilder {
             .with_client(client.client.clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
-                    jlap_enabled: true,
+                    jlap_enabled: self.use_jlap,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
-                    sharded_enabled: true,
+                    sharded_enabled: self.use_sharded,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),
@@ -433,6 +554,8 @@ impl ConfigurationBuilder {
             test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
+            use_sharded: self.use_sharded,
+            use_jlap: self.use_jlap,
             skip_existing: self.skip_existing,
             noarch_build_platform: self.noarch_build_platform,
             channel_config,
@@ -442,6 +565,10 @@ impl ConfigurationBuilder {
             repodata_gateway,
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
+            continue_on_failure: self.continue_on_failure,
+            error_prefix_in_binary: self.error_prefix_in_binary,
+            allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            environments_externally_managed: self.environments_externally_managed,
         }
     }
 }

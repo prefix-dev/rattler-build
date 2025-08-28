@@ -98,6 +98,7 @@ Recipe {
                         start: Some(
                             Marker {
                                 source: 0,
+                                character: [FILTERED],
                                 line: 16,
                                 column: 9,
                             },
@@ -388,6 +389,7 @@ Recipe {
                 include: [
                     "xtensor/xarray.hpp{,/**}",
                 ],
+                strict: false,
             },
         },
         Command(
@@ -484,7 +486,6 @@ Recipe {
         license_file: [
             "LICENSE{,/**}",
         ],
-        license_url: None,
         summary: Some(
             "The C++ tensor algebra library",
         ),

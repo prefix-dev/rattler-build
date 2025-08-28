@@ -1,65 +1,184 @@
 //! This module contains the implementation of the fetching for a `UrlSource` struct.
 
+use crate::{
+    console_utils::LoggingOutputHandler,
+    recipe::parser::UrlSource,
+    source::extract::{extract_7z, extract_tar, extract_zip, is_archive},
+    tool_configuration::{self, APP_USER_AGENT},
+};
+use chrono;
 use fs_err as fs;
+use reqwest_middleware::Error as MiddlewareError;
+use serde::{Deserialize, Serialize};
+use std::hash::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::{
     ffi::OsStr,
     io::{Read as _, Write as _},
     path::{Path, PathBuf},
 };
-
-use crate::{
-    console_utils::LoggingOutputHandler,
-    recipe::parser::UrlSource,
-    source::extract::{extract_tar, extract_zip},
-    tool_configuration::{self, APP_USER_AGENT},
-};
-use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
 
-use super::{checksum::Checksum, extract::is_tarball, SourceError};
+use super::{SourceError, checksum::Checksum, extract::is_tarball};
 
-/// Splits a path into stem and extension, handling special cases like .tar.gz
-fn split_path(path: &Path) -> std::io::Result<(String, String)> {
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid path stem"))?;
-
-    let (stem_no_tar, is_tar) = if let Some(s) = stem.strip_suffix(".tar") {
-        (s, true)
-    } else {
-        (stem, false)
-    };
-
-    let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-
-    let full_extension = if is_tar {
-        format!(".tar.{}", extension)
-    } else if !extension.is_empty() {
-        format!(".{}", extension)
-    } else {
-        String::new()
-    };
-
-    Ok((stem_no_tar.replace('.', "_"), full_extension))
+/// Metadata about a downloaded file
+#[derive(Debug, Serialize, Deserialize)]
+struct DownloadMetadata {
+    /// The original URL that was downloaded
+    url: String,
+    /// The actual filename from Content-Disposition header or URL
+    actual_filename: Option<String>,
+    /// The checksum of the downloaded file
+    checksum: String,
+    /// The checksum type (sha256, md5, etc.)
+    checksum_type: String,
+    /// Timestamp of when the file was downloaded
+    download_time: chrono::DateTime<chrono::Utc>,
+    /// Whether the filename came from Content-Disposition header
+    filename_from_header: bool,
 }
 
-/// Generates a cache name from URL and checksum
-fn cache_name_from_url(
+/// Splits a path into stem and extension, handling special cases like .tar.gz
+/// Only splits known archive extensions, otherwise uses .archive as fallback
+pub(crate) fn split_path(path: &Path) -> std::io::Result<(String, String)> {
+    let filename = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid filename"))?;
+
+    // Check if this is a known archive format
+    if is_archive(filename) {
+        // Handle compound extensions like .tar.gz, .tar.bz2, etc.
+        let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid path stem")
+        })?;
+
+        let (stem_no_tar, is_tar) = if let Some(s) = stem.strip_suffix(".tar") {
+            (s, true)
+        } else {
+            (stem, false)
+        };
+
+        let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+        let full_extension = if is_tar {
+            format!(".tar.{}", extension)
+        } else if !extension.is_empty() {
+            format!(".{}", extension)
+        } else {
+            String::new()
+        };
+
+        Ok((stem_no_tar.replace('.', "_"), full_extension))
+    } else {
+        let clean_filename = filename.replace('.', "_");
+        Ok((clean_filename, "".to_string()))
+    }
+}
+
+/// Generates a cache name using actual filename (from Content-Disposition or URL)
+fn cache_name_from_actual_filename(
     url: &url::Url,
-    checksum: &Checksum,
+    checksum: Option<&Checksum>,
+    actual_filename: Option<&String>,
     with_extension: bool,
 ) -> Option<String> {
-    let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
+    let filename = if let Some(actual) = actual_filename {
+        actual.as_str()
+    } else {
+        url.path_segments()?.filter(|x| !x.is_empty()).next_back()?
+    };
 
-    let (stem, extension) = split_path(Path::new(filename)).ok()?;
-    let checksum_hex = checksum.to_hex();
+    // Generate a simple hash from the URL if no checksum is provided
+    let cache_suffix = if let Some(checksum) = checksum {
+        checksum.to_hex()[..8].to_string()
+    } else {
+        // Use a simple hash of the URL for cache differentiation
+        let mut hasher = DefaultHasher::new();
+        url.to_string().hash(&mut hasher);
+        format!("{:x}", hasher.finish())[..8].to_string()
+    };
+
+    // Special handling for GitHub tarball URLs when no actual filename is provided
+    let (final_stem, final_extension) = split_path(Path::new(filename)).ok()?;
 
     Some(if with_extension {
-        format!("{}_{}{}", stem, &checksum_hex[..8], extension)
+        format!("{}_{}{}", final_stem, cache_suffix, final_extension)
     } else {
-        format!("{}_{}", stem, &checksum_hex[..8])
+        format!("{}_{}", final_stem, cache_suffix)
     })
+}
+
+/// Extracts filename from Content-Disposition header
+fn extract_filename_from_content_disposition(header_value: &str) -> Option<String> {
+    // Parse Content-Disposition header like: attachment; filename="file.tar.gz"
+    for part in header_value.split(';') {
+        let part = part.trim();
+        if part.starts_with("filename=") {
+            let filename = part.strip_prefix("filename=")?;
+            // Remove quotes if present
+            let filename = filename.trim_matches('"').trim_matches('\'');
+            if filename.is_empty() {
+                return None;
+            }
+            return Some(filename.to_string());
+        }
+    }
+    None
+}
+
+/// Gets the actual filename by sending a HEAD request to check Content-Disposition
+async fn get_actual_filename(
+    url: &url::Url,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<Option<String>, SourceError> {
+    let client = tool_configuration.client.for_host(url);
+
+    let response = client
+        .head(url.clone())
+        .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::debug!("HEAD request failed for {}: {}", url, e);
+            // Don't fail the whole operation if HEAD fails, just return None
+            SourceError::UnknownError(format!("HEAD request failed: {}", e))
+        })?;
+
+    if let Some(content_disposition) = response.headers().get("content-disposition") {
+        if let Ok(header_str) = content_disposition.to_str() {
+            if let Some(filename) = extract_filename_from_content_disposition(header_str) {
+                tracing::info!("Found filename from Content-Disposition: {}", filename);
+                return Ok(Some(filename));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Saves download metadata as JSON file
+async fn save_download_metadata(
+    cache_file: &Path,
+    metadata: &DownloadMetadata,
+) -> Result<(), SourceError> {
+    let metadata_path = cache_file.with_extension(format!(
+        "{}.json",
+        cache_file
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("metadata")
+    ));
+
+    let json_content = serde_json::to_string_pretty(metadata)
+        .map_err(|e| SourceError::UnknownError(format!("Failed to serialize metadata: {}", e)))?;
+
+    tokio::fs::write(&metadata_path, json_content)
+        .await
+        .map_err(SourceError::Io)?;
+
+    tracing::debug!("Saved download metadata to: {}", metadata_path.display());
+    Ok(())
 }
 
 async fn fetch_remote(
@@ -71,7 +190,7 @@ async fn fetch_remote(
 
     let (mut response, download_size) = {
         let resp = client
-            .get(url.as_str())
+            .get(url.clone())
             .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
             .send()
             .await
@@ -137,7 +256,7 @@ async fn fetch_remote(
 
     progress_bar.set_message(
         url.path_segments()
-            .and_then(|segs| segs.last())
+            .and_then(|mut segs| segs.next_back())
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
@@ -163,6 +282,7 @@ fn extracted_folder(path: &Path) -> PathBuf {
 
 fn extract_to_cache(
     path: &Path,
+    actual_file_name: Option<&String>,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<PathBuf, SourceError> {
     let target = extracted_folder(path);
@@ -172,18 +292,32 @@ fn extract_to_cache(
         return Ok(target);
     }
 
-    if is_tarball(
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .as_ref(),
-    ) {
+    let is_zip = actual_file_name
+        .map(|name| name.ends_with(".zip"))
+        .unwrap_or_else(|| path.extension() == Some(OsStr::new("zip")));
+
+    let is_7z = actual_file_name
+        .map(|name| name.ends_with(".7z"))
+        .unwrap_or_else(|| path.extension() == Some(OsStr::new("7z")));
+
+    let is_tarball = actual_file_name
+        .map(|name| is_tarball(name))
+        .unwrap_or_else(|| {
+            path.extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(is_tarball)
+        });
+    if is_tarball {
         tracing::info!("Extracting tar file to cache: {}", path.display());
         extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
-    } else if path.extension() == Some(OsStr::new("zip")) {
+    } else if is_zip {
         tracing::info!("Extracting zip file to cache: {}", path.display());
         extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    } else if is_7z {
+        tracing::info!("Extracting 7z file to cache: {}", path.display());
+        extract_7z(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
     }
 
@@ -226,18 +360,46 @@ pub(crate) async fn url_src(
     cache_dir: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<PathBuf, SourceError> {
-    // convert sha256 or md5 to Checksum
-    let checksum = Checksum::from_url_source(source).ok_or_else(|| {
-        SourceError::NoChecksum(format!("No checksum found for url(s): {:?}", source.urls()))
-    })?;
+    // convert sha256 or md5 to Checksum - now optional
+    let checksum = Checksum::from_url_source(source);
 
     let mut last_error = None;
     for url in source.urls() {
-        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum, true).ok_or(
-            SourceError::UnknownErrorStr("Failed to build cache name from url"),
-        )?);
+        // First, try to get the actual filename from Content-Disposition
+        let actual_filename = if url.scheme() == "file" {
+            // For file URLs, use the path directly
+            url.path_segments()
+                .and_then(|mut segs| segs.next_back())
+                .map(str::to_string)
+        } else {
+            // For remote URLs, try to get the real filename from Content-Disposition
+            match get_actual_filename(url, tool_configuration).await {
+                Ok(filename) => filename.or_else(|| {
+                    // Fallback to URL path if no Content-Disposition
+                    url.path_segments()
+                        .and_then(|mut segs| segs.next_back())
+                        .map(str::to_string)
+                }),
+                Err(_) => {
+                    // If HEAD request fails, fallback to URL path
+                    url.path_segments()
+                        .and_then(|mut segs| segs.next_back())
+                        .map(str::to_string)
+                }
+            }
+        };
+
+        // Generate cache name using actual filename (for proper extension handling)
+        let cache_name = PathBuf::from(
+            cache_name_from_actual_filename(url, checksum.as_ref(), actual_filename.as_ref(), true)
+                .ok_or(SourceError::UnknownErrorStr(
+                    "Failed to build cache name from url",
+                ))?,
+        );
 
         let cache_name = cache_dir.join(cache_name);
+
+        let filename_from_header = actual_filename.is_some() && url.scheme() != "file";
 
         if url.scheme() == "file" {
             let local_path = url.to_file_path().map_err(|_| {
@@ -251,8 +413,10 @@ pub(crate) async fn url_src(
                 return Err(SourceError::FileNotFound(local_path));
             }
 
-            if !checksum.validate(&local_path) {
-                return Err(SourceError::ValidationFailed);
+            if let Some(checksum) = &checksum {
+                if !checksum.validate(&local_path) {
+                    return Err(SourceError::ValidationFailed);
+                }
             }
 
             // copy file to cache
@@ -265,17 +429,47 @@ pub(crate) async fn url_src(
             tracing::info!("Using local source file.");
         } else {
             let metadata = fs::metadata(&cache_name);
-            if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
+            let is_valid_cache = metadata.is_ok()
+                && metadata?.is_file()
+                && checksum.as_ref().is_none_or(|c| c.validate(&cache_name));
+
+            if is_valid_cache {
                 tracing::info!("Found valid source cache file.");
             } else {
                 match fetch_remote(url, &cache_name, tool_configuration).await {
                     Ok(_) => {
                         tracing::info!("Downloaded file from {}", url);
 
-                        if !checksum.validate(&cache_name) {
-                            tracing::error!("Checksum validation failed!");
-                            fs::remove_file(&cache_name)?;
-                            return Err(SourceError::ValidationFailed);
+                        if let Some(checksum) = &checksum {
+                            if !checksum.validate(&cache_name) {
+                                tracing::error!("Checksum validation failed!");
+                                fs::remove_file(&cache_name)?;
+                                return Err(SourceError::ValidationFailed);
+                            }
+                        }
+
+                        // Save download metadata
+                        let metadata = DownloadMetadata {
+                            url: url.to_string(),
+                            actual_filename: actual_filename.clone(),
+                            checksum: checksum
+                                .as_ref()
+                                .map(|c| c.to_hex())
+                                .unwrap_or_else(|| "none".to_string()),
+                            checksum_type: checksum
+                                .as_ref()
+                                .map(|c| match c {
+                                    Checksum::Sha256(_) => "sha256".to_string(),
+                                    Checksum::Md5(_) => "md5".to_string(),
+                                })
+                                .unwrap_or_else(|| "none".to_string()),
+                            download_time: chrono::Utc::now(),
+                            filename_from_header,
+                        };
+
+                        if let Err(e) = save_download_metadata(&cache_name, &metadata).await {
+                            tracing::warn!("Failed to save download metadata: {}", e);
+                            // Don't fail the whole operation if metadata saving fails
                         }
                     }
                     Err(e) => {
@@ -290,7 +484,20 @@ pub(crate) async fn url_src(
         if source.file_name().is_some() {
             return Ok(cache_name);
         } else {
-            return extract_to_cache(&cache_name, tool_configuration);
+            // Use actual filename to determine if we should extract
+            let should_extract = actual_filename
+                .as_ref()
+                .map(|name| is_archive(name))
+                .unwrap_or_else(|| {
+                    // Fallback to checking the cache file extension if no filename available
+                    is_archive(&cache_name.file_name().unwrap_or_default().to_string_lossy())
+                });
+
+            if should_extract {
+                return extract_to_cache(&cache_name, actual_filename.as_ref(), tool_configuration);
+            } else {
+                return Ok(cache_name);
+            }
         }
     }
 
@@ -313,12 +520,17 @@ mod tests {
     #[test]
     fn test_split_filename() {
         let test_cases = vec![
+            // Known archive formats - should split normally
             ("example.tar.gz", ("example", ".tar.gz")),
             ("example.tar.bz2", ("example", ".tar.bz2")),
             ("example.zip", ("example", ".zip")),
             ("example.tar", ("example", ".tar")),
-            ("example", ("example", "")),
             (".hidden.tar.gz", ("_hidden", ".tar.gz")),
+            // Version-like names - should use .archive extension
+            ("2.1.2", ("2_1_2", "")),
+            ("example.1", ("example_1", "")),
+            ("example", ("example", "")),
+            ("1.0.0-beta.1", ("1_0_0-beta_1", "")),
         ];
 
         for (filename, expected) in test_cases {
@@ -333,36 +545,150 @@ mod tests {
     }
 
     #[test]
+    fn test_content_disposition_parsing() {
+        let test_cases = vec![
+            ("attachment; filename=\"file.tar.gz\"", Some("file.tar.gz")),
+            ("attachment; filename=file.tar.gz", Some("file.tar.gz")),
+            ("attachment; filename='file.tar.gz'", Some("file.tar.gz")),
+            ("inline; filename=\"data.zip\"", Some("data.zip")),
+            ("attachment", None),
+            ("attachment; filename=", None),
+        ];
+
+        for (header, expected) in test_cases {
+            let result = extract_filename_from_content_disposition(header);
+            assert_eq!(result.as_deref(), expected, "Failed for header: {}", header);
+        }
+    }
+
+    #[test]
+    fn test_is_archive() {
+        let test_cases = vec![
+            ("file.7z", true),
+            ("file.tar.gz", true),
+            ("file.tar.bz2", true),
+            ("file.tar.xz", true),
+            ("file.zip", true),
+            ("file.tar", true),
+            ("file.txt", false),
+            ("file.exe", false),
+            ("file", false),
+        ];
+
+        for (filename, expected) in test_cases {
+            assert_eq!(
+                is_archive(filename),
+                expected,
+                "Failed for filename: {}",
+                filename
+            );
+        }
+    }
+
+    #[test]
     fn test_cache_name() {
-        let cases =
-            vec![
+        let cases = vec![
             (
                 "https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
+                    )
+                    .unwrap(),
+                ),
                 "snowflake-3_13_27_6a15e95e.zip",
             ),
             (
                 "https://example.com/example.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                    )
+                    .unwrap(),
+                ),
                 "example_12345678.tar.gz",
             ),
             (
                 "https://github.com/mamba-org/mamba/archive/refs/tags/micromamba-12.23.12.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
+                    )
+                    .unwrap(),
+                ),
                 "micromamba-12_23_12_63fd8a1d.tar.gz",
             ),
         ];
 
         for (url, checksum, expected) in cases {
             let url = Url::parse(url).unwrap();
-            let name = cache_name_from_url(&url, &checksum, true).unwrap();
+            let name = cache_name_from_actual_filename(&url, Some(&checksum), None, true).unwrap();
             assert_eq!(name, expected);
         }
+    }
+
+    #[test]
+    fn test_cache_name_with_actual_filename() {
+        let cases = vec![
+            // With actual filename from Content-Disposition
+            (
+                "https://api.github.com/repos/FreeTAKTeam/FreeTakServer/tarball/v2.2.1",
+                Some("FreeTakServer-2.2.1.tar.gz".to_string()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                    )
+                    .unwrap(),
+                ),
+                "FreeTakServer-2_2_1_12345678.tar.gz",
+            ),
+            // Regular URL with extension
+            (
+                "https://example.com/file.zip",
+                None,
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+                    )
+                    .unwrap(),
+                ),
+                "file_abcdef12.zip",
+            ),
+        ];
+
+        for (url, actual_filename, checksum, expected) in cases {
+            let url = Url::parse(url).unwrap();
+            let name = cache_name_from_actual_filename(
+                &url,
+                Some(&checksum),
+                actual_filename.as_ref(),
+                true,
+            )
+            .unwrap();
+            assert_eq!(name, expected);
+        }
+    }
+
+    #[test]
+    fn test_cache_name_without_checksum() {
+        let url =
+            Url::parse("https://api.github.com/repos/FreeTAKTeam/FreeTakServer/tarball/v2.2.1")
+                .unwrap();
+
+        // Test without checksum - should generate URL-based hash
+        let name_no_checksum = cache_name_from_actual_filename(&url, None, None, true).unwrap();
+        assert_eq!(name_no_checksum, "v2_2_1_c5054c75");
+
+        // Test with actual filename
+        let name_with_filename = cache_name_from_actual_filename(
+            &url,
+            None,
+            Some(&"FreeTakServer-2.2.1.tar.gz".to_string()),
+            true,
+        )
+        .unwrap();
+
+        assert!(name_with_filename.starts_with("FreeTakServer-2_2_1_"));
+        assert!(name_with_filename.ends_with(".tar.gz"));
     }
 }

@@ -3,13 +3,13 @@ use std::{collections::HashMap, collections::HashSet, path::PathBuf};
 
 use itertools::Itertools;
 use miette::IntoDiagnostic;
-use rattler_digest::{compute_bytes_digest, Sha256Hash};
+use rattler_digest::{Sha256Hash, compute_bytes_digest};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
 
 use crate::recipe_generator::{
-    serialize::{self, ScriptTest, SourceElement, Test},
+    serialize::{self, ScriptTest, Test, UrlSourceElement},
     write_recipe,
 };
 #[allow(non_snake_case)]
@@ -42,11 +42,11 @@ pub struct PackageInfo {
     pub _distro: String,
     pub _host: String,
     pub _status: String,
-    pub _pkgdocs: String,
+    pub _pkgdocs: Option<String>,
     pub _srconly: Option<String>,
-    pub _winbinary: String,
-    pub _macbinary: String,
-    pub _wasmbinary: String,
+    pub _winbinary: Option<String>,
+    pub _macbinary: Option<String>,
+    pub _wasmbinary: Option<String>,
     pub _buildurl: String,
     pub _registered: bool,
     pub _dependencies: Vec<Dependency>,
@@ -204,7 +204,7 @@ const R_BUILTINS: &[&str] = &[
 #[async_recursion::async_recursion]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let package = &opts.package;
-    eprintln!("Generating R recipe for {}", package);
+    tracing::info!("Generating R recipe for {}", package);
     let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
         "https://{universe}.r-universe.dev/api/packages/{}",
@@ -229,14 +229,22 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     ))
     .expect("Failed to parse URL");
 
+    // It looks like CRAN moves the package to the archive for old versions
+    // so let's add that as a fallback mirror
+    let url_archive = Url::parse(&format!(
+        "https://cran.r-project.org/src/contrib/Archive/{}",
+        package_info._file
+    ))
+    .expect("Failed to parse URL");
+
     let sha256 = fetch_package_sha256sum(&url).await?;
 
-    let source = SourceElement {
-        url: url.to_string(),
+    let source = UrlSourceElement {
+        url: vec![url.to_string(), url_archive.to_string()],
         md5: None,
         sha256: Some(format!("{:x}", sha256)),
     };
-    recipe.source.push(source);
+    recipe.source.push(source.into());
 
     recipe.build.script = "R CMD INSTALL --build .".to_string();
 
@@ -303,8 +311,10 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     recipe.about.description = Some(package_info.Description.clone());
     (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
     recipe.about.repository = Some(package_info._upstream.clone());
-    if url::Url::parse(&package_info._pkgdocs).is_ok() {
-        recipe.about.documentation = Some(package_info._pkgdocs.clone());
+    if let Some(pkgdocs) = &package_info._pkgdocs {
+        if url::Url::parse(pkgdocs).is_ok() {
+            recipe.about.documentation = Some(pkgdocs.clone());
+        }
     }
 
     recipe.tests.push(Test::Script(ScriptTest {

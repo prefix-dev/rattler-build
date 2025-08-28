@@ -3,14 +3,25 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec};
+use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    metadata::{build_reindexed_channels, Output},
+    apply_patch_custom,
+    metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
     render::solver::load_repodatas,
+    script::InterpreterError,
     tool_configuration,
 };
+
+/// Behavior for handling the working directory during the build process
+#[derive(Debug, Clone, Copy)]
+pub enum WorkingDirectoryBehavior {
+    /// Preserve the working directory (don't clean up)
+    Preserve,
+    /// Clean up the working directory after build
+    Cleanup,
+}
 
 /// Check if the build should be skipped because it already exists in any of the
 /// channels
@@ -98,11 +109,16 @@ pub async fn skip_existing(
 pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
+    working_directory_behavior: WorkingDirectoryBehavior,
 ) -> miette::Result<(Output, PathBuf)> {
+    let cleanup = matches!(
+        working_directory_behavior,
+        WorkingDirectoryBehavior::Cleanup
+    );
     output
         .build_configuration
         .directories
-        .create_build_dir(true)
+        .create_build_dir(cleanup)
         .into_diagnostic()?;
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
@@ -115,7 +131,7 @@ pub async fn run_build(
         output.build_or_fetch_cache(tool_configuration).await?
     } else {
         output
-            .fetch_sources(tool_configuration)
+            .fetch_sources(tool_configuration, apply_patch_custom)
             .await
             .into_diagnostic()?
     };
@@ -130,13 +146,39 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-    output.run_build_script().await.into_diagnostic()?;
+    match output.run_build_script().await {
+        Ok(_) => {}
+        Err(InterpreterError::Debug(info)) => {
+            tracing::info!("{}", info);
+            return Err(miette::miette!(
+                "Script not executed because debug mode is enabled"
+            ));
+        }
+        Err(InterpreterError::ExecutionFailed(_)) => {
+            return Err(miette::miette!("Script failed to execute"));
+        }
+    }
 
     // Package all the new files
     let (result, paths_json) = output
         .create_package(tool_configuration)
         .await
         .into_diagnostic()?;
+
+    // Check for binary prefix if configured
+    if tool_configuration.error_prefix_in_binary {
+        tracing::info!("Checking for embedded prefix in binary files...");
+        check_for_binary_prefix(&output, &paths_json)?;
+    }
+
+    // Check for symlinks on Windows if not allowed
+    if (output.build_configuration.target_platform.is_windows()
+        || output.build_configuration.target_platform == Platform::NoArch)
+        && !tool_configuration.allow_symlinks_on_windows
+    {
+        tracing::info!("Checking for symlinks ...");
+        check_for_symlinks_on_windows(&output, &paths_json)?;
+    }
 
     output.record_artifact(&result, &paths_json);
 
@@ -163,4 +205,52 @@ pub async fn run_build(
     }
 
     Ok((output, result))
+}
+
+/// Check if any binary files contain the host prefix
+fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::FileMode;
+
+    for paths_entry in &paths_json.paths {
+        if let Some(prefix_placeholder) = &paths_entry.prefix_placeholder {
+            if prefix_placeholder.file_mode == FileMode::Binary {
+                return Err(miette::miette!(
+                    "Package {} contains Binary file {} which contains host prefix placeholder, which may cause issues when the package is installed to a different location. \
+                    Consider fixing the build process to avoid embedding the host prefix in binaries. \
+                    To allow this, remove the --error-prefix-in-binary flag.",
+                    output.name().as_normalized(),
+                    paths_entry.relative_path.display()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if any files are symlinks on Windows
+fn check_for_symlinks_on_windows(
+    output: &Output,
+    paths_json: &PathsJson,
+) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::PathType;
+
+    let mut symlinks = Vec::new();
+
+    for paths_entry in &paths_json.paths {
+        if paths_entry.path_type == PathType::SoftLink {
+            symlinks.push(paths_entry.relative_path.display().to_string());
+        }
+    }
+
+    if !symlinks.is_empty() {
+        return Err(miette::miette!(
+            "Package {} contains symlinks which are not supported on most Windows systems:\n  - {}\n\
+            To allow symlinks, use the --allow-symlinks-on-windows flag.",
+            output.name().as_normalized(),
+            symlinks.join("\n  - ")
+        ));
+    }
+
+    Ok(())
 }

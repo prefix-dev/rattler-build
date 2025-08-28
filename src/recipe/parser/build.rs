@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::str::FromStr;
 
-use rattler_conda_types::{package::EntryPoint, NoArchType};
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};

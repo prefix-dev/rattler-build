@@ -1,12 +1,15 @@
 //! Relink a dylib to use relative paths for rpaths
 use fs_err::File;
 use goblin::mach::Mach;
+use goblin::mach::header::{
+    Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE, SIZEOF_HEADER_32, SIZEOF_HEADER_64,
+};
 use indexmap::IndexSet;
 use memmap2::MmapMut;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
@@ -29,11 +32,13 @@ pub struct Dylib {
 }
 
 impl Relinker for Dylib {
-    /// only parse the magic number of a file and check if it
-    /// is a Mach-O file
+    /// Parse the magic number of a file and check if it
+    /// is a Mach-O file that should be relinked.
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
         let mut buf: [u8; 4] = [0; 4];
+
+        // First, quick magic number check
         match file.read_exact(&mut buf) {
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
@@ -42,7 +47,37 @@ impl Relinker for Dylib {
 
         let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
         match ctx_res {
-            Ok((_, Some(_))) => Ok(true),
+            Ok((_, Some(ctx))) => {
+                // It's a valid Mach-O file, now read just enough for the header
+                // Mach-O header is 28 bytes for 32-bit, 32 bytes for 64-bit
+                let header_size = if ctx.container.is_big() {
+                    SIZEOF_HEADER_64 // 64-bit header
+                } else {
+                    SIZEOF_HEADER_32 // 32-bit header
+                };
+
+                // Read the full header from the beginning
+                file.rewind()?;
+                let mut header_buf = vec![0u8; header_size];
+                file.read_exact(&mut header_buf)?;
+
+                // Parse just the header to get the filetype
+                let header: Header = header_buf.pread_with(0, ctx)?;
+
+                // Only process dynamic libraries, bundles, and executables
+                // Skip object files (MH_OBJECT = 0x1) and other types
+                let should_relink = matches!(header.filetype, MH_DYLIB | MH_BUNDLE | MH_EXECUTE);
+
+                if !should_relink {
+                    tracing::debug!(
+                        "Skipping Mach-O file with type 0x{:x}: {}",
+                        header.filetype,
+                        path.display()
+                    );
+                }
+
+                Ok(should_relink)
+            }
             Ok((_, None)) => Ok(false),
             Err(_) => Ok(false),
         }
@@ -280,7 +315,7 @@ impl Relinker for Dylib {
             // run builtin relink. If it fails, try install_name_tool
             if let Err(e) = relink(&self.path, &changes) {
                 assert!(self.path.exists());
-                tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
+                tracing::debug!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
             codesign(&self.path, system_tools)?;
@@ -583,7 +618,7 @@ mod tests {
     };
     use tempfile::tempdir_in;
 
-    use super::{install_name_tool, RelinkError};
+    use super::{RelinkError, install_name_tool};
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,
@@ -591,6 +626,34 @@ mod tests {
     use crate::{post_process::relink::Relinker, recipe::parser::GlobVec};
 
     const EXPECTED_PATH: &str = "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib";
+
+    #[test]
+    fn test_file_type_detection() -> Result<(), RelinkError> {
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+
+        // Test that object files are not recognized as valid for relinking
+        let object_file = test_data.join("simple-macho.o");
+        assert!(
+            !Dylib::test_file(&object_file)?,
+            "Object files should not be valid for relinking"
+        );
+
+        // Test that dynamic libraries are recognized as valid
+        let dylib_file = test_data.join("simple.dylib");
+        assert!(
+            Dylib::test_file(&dylib_file)?,
+            "Dynamic libraries should be valid for relinking"
+        );
+
+        // Test existing binary that we know is valid
+        let binary_file = test_data.join("zlink-macos");
+        assert!(
+            Dylib::test_file(&binary_file)?,
+            "Executables should be valid for relinking"
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {

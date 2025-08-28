@@ -53,6 +53,11 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
+/// Checks whether file has a known archive extension (including zip)
+pub fn is_archive(file_name: &str) -> bool {
+    is_tarball(file_name) || file_name.ends_with(".zip") || file_name.ends_with(".7z")
+}
+
 fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
     match ext
         .and_then(OsStr::to_str)
@@ -181,6 +186,37 @@ pub(crate) fn extract_zip(
     Ok(())
 }
 
+/// Extracts a 7z archive to the specified target directory.
+pub(crate) fn extract_7z(
+    archive: impl AsRef<Path>,
+    target_directory: impl AsRef<Path>,
+    log_handler: &LoggingOutputHandler,
+) -> Result<(), SourceError> {
+    let archive = archive.as_ref();
+    let target_directory = target_directory.as_ref();
+    fs::create_dir_all(target_directory)?;
+
+    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
+    let progress_bar = log_handler.add_progress_bar(
+        indicatif::ProgressBar::new(len)
+            .with_prefix("Extracting 7z")
+            .with_style(log_handler.default_bytes_style()),
+    );
+
+    let file = File::open(archive)?;
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let wrapped = progress_bar.wrap_read(buf_reader);
+
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
+    sevenz_rust2::decompress(wrapped, &tmp_extraction_dir)
+        .map_err(|e| SourceError::SevenZipExtractionError(e.to_string()))?;
+
+    move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
+
+    progress_bar.finish_with_message("Extracted...");
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use fs_err::{self as fs, File};
@@ -221,9 +257,11 @@ mod test {
         ));
         assert!(res.err().is_none());
         assert!(tempdir.path().join("text.txt").exists());
-        assert!(fs::read_to_string(tempdir.path().join("text.txt"))
-            .unwrap()
-            .contains("Hello, World"));
+        assert!(
+            fs::read_to_string(tempdir.path().join("text.txt"))
+                .unwrap()
+                .contains("Hello, World")
+        );
     }
 
     #[test]

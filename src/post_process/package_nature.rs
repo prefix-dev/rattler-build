@@ -15,6 +15,7 @@
 use rattler_conda_types::{PackageName, PrefixRecord};
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     ops::Sub,
     path::{Path, PathBuf},
 };
@@ -29,6 +30,8 @@ pub enum PackageNature {
     /// Interpreters
     InterpreterR,
     InterpreterPython,
+    InterpreterRuby,
+    InterpreterNodeJs,
     /// R or Python library with DSOs
     PluginLibraryR,
     PluginLibraryPython,
@@ -52,22 +55,20 @@ pub fn is_dso(file: &Path) -> bool {
 
 impl PackageNature {
     pub fn from_prefix_record(prefix_record: &PrefixRecord) -> Self {
-        if prefix_record
+        let package_name = prefix_record
             .repodata_record
             .package_record
             .name
-            .as_normalized()
-            == "python"
-        {
+            .as_normalized();
+
+        if package_name == "python" {
             return PackageNature::InterpreterPython;
-        } else if prefix_record
-            .repodata_record
-            .package_record
-            .name
-            .as_normalized()
-            == "r-base"
-        {
+        } else if package_name == "r-base" {
             return PackageNature::InterpreterR;
+        } else if package_name == "ruby" {
+            return PackageNature::InterpreterRuby;
+        } else if package_name == "nodejs" {
+            return PackageNature::InterpreterNodeJs;
         }
         let run_exports_json = PathBuf::from("info/run_exports.json");
         if prefix_record.files.contains(&run_exports_json) {
@@ -126,10 +127,43 @@ impl PackageNature {
     }
 }
 
+pub struct CaseInsensitivePathBuf {
+    path: PathBuf,
+}
+
+impl CaseInsensitivePathBuf {
+    fn normalize_path(&self) -> String {
+        self.path
+            .to_string_lossy()
+            .to_lowercase()
+            .replace('\\', "/")
+    }
+}
+
+impl Hash for CaseInsensitivePathBuf {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.normalize_path().hash(state);
+    }
+}
+
+impl From<PathBuf> for CaseInsensitivePathBuf {
+    fn from(path: PathBuf) -> Self {
+        CaseInsensitivePathBuf { path }
+    }
+}
+
+impl PartialEq for CaseInsensitivePathBuf {
+    fn eq(&self, other: &Self) -> bool {
+        self.normalize_path() == other.normalize_path()
+    }
+}
+
+impl Eq for CaseInsensitivePathBuf {}
+
 #[derive(Default)]
 pub(crate) struct PrefixInfo {
     pub package_to_nature: HashMap<PackageName, PackageNature>,
-    pub path_to_package: HashMap<PathBuf, PackageName>,
+    pub path_to_package: HashMap<CaseInsensitivePathBuf, PackageName>,
 }
 
 impl PrefixInfo {
@@ -149,10 +183,12 @@ impl PrefixInfo {
                         record.repodata_record.package_record.name.clone(),
                         package_nature,
                     );
+
                     for file in record.files {
-                        prefix_info
-                            .path_to_package
-                            .insert(file, record.repodata_record.package_record.name.clone());
+                        prefix_info.path_to_package.insert(
+                            file.into(),
+                            record.repodata_record.package_record.name.clone(),
+                        );
                     }
                 }
             }

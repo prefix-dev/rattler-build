@@ -13,19 +13,18 @@ use console::style;
 use indicatif::{
     HumanBytes, HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle,
 };
-use tracing::{field, Level};
-use tracing_core::{span::Id, Event, Field, Subscriber};
+use tracing::{Level, field};
+use tracing_core::{Event, Field, Subscriber, span::Id};
 use tracing_subscriber::{
+    EnvFilter, Layer,
     filter::{Directive, ParseError},
     fmt::{
-        self,
+        self, FmtContext, FormatEvent, FormatFields, MakeWriter,
         format::{self, Format},
-        FmtContext, FormatEvent, FormatFields, MakeWriter,
     },
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    EnvFilter, Layer,
 };
 
 use crate::consts;

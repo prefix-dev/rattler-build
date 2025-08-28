@@ -198,10 +198,6 @@ in the build recipe:
 
 : The URL of the documentation of the package.
 
-`license_url: url`
-
-: The URL of the license of the package.
-
 `license: string (from about.license)`
 
 : The SPDX license identifier of the package.

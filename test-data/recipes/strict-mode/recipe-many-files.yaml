@@ -1,0 +1,31 @@
+package:
+  name: test-strict-many
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "matched" > $PREFIX/matched.txt
+        - echo "unmatched1" > $PREFIX/unmatched1.txt
+        - echo "unmatched2" > $PREFIX/unmatched2.txt
+        - echo "unmatched3" > $PREFIX/unmatched3.txt
+        - echo "unmatched4" > $PREFIX/unmatched4.txt
+        - echo "unmatched5" > $PREFIX/unmatched5.txt
+        - echo "unmatched6" > $PREFIX/unmatched6.txt
+        - echo "unmatched7" > $PREFIX/unmatched7.txt
+      else:
+        - echo "matched" > %PREFIX%\matched.txt
+        - echo "unmatched1" > %PREFIX%\unmatched1.txt
+        - echo "unmatched2" > %PREFIX%\unmatched2.txt
+        - echo "unmatched3" > %PREFIX%\unmatched3.txt
+        - echo "unmatched4" > %PREFIX%\unmatched4.txt
+        - echo "unmatched5" > %PREFIX%\unmatched5.txt
+        - echo "unmatched6" > %PREFIX%\unmatched6.txt
+        - echo "unmatched7" > %PREFIX%\unmatched7.txt
+
+tests:
+  - package_contents:
+      strict: true
+      files:
+        - matched.txt

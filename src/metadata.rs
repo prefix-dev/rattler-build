@@ -15,12 +15,12 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
-    package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
+    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
     VersionWithSource,
+    compression_level::CompressionLevel,
+    package::{ArchiveType, PathType, PathsEntry, PathsJson},
 };
-use rattler_index::index_fs;
-use rattler_package_streaming::write::CompressionLevel;
+use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use rattler_virtual_packages::{
@@ -120,6 +120,7 @@ impl Directories {
         output_dir: &Path,
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
+        merge_build_and_host: bool,
     ) -> Result<Directories, std::io::Error> {
         if !output_dir.exists() {
             fs::create_dir_all(output_dir)?;
@@ -157,7 +158,11 @@ impl Directories {
 
         let directories = Directories {
             build_dir: build_dir.clone(),
-            build_prefix: build_dir.join("build_env"),
+            build_prefix: if merge_build_and_host {
+                host_prefix.clone()
+            } else {
+                build_dir.join("build_env")
+            },
             cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
@@ -238,7 +243,7 @@ impl PackagingSettings {
     /// and the selected archive type.
     pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
-            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
+            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
@@ -372,6 +377,9 @@ pub struct BuildConfiguration {
     /// Whether to enable debug output in build scripts
     #[serde(skip_serializing, default)]
     pub debug: Debug,
+    /// Exclude packages newer than this date from the solver
+    #[serde(skip_serializing, default)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildConfiguration {
@@ -395,6 +403,7 @@ impl BuildConfiguration {
             hash: Some(self.hash.clone()),
             experimental: false,
             allow_undefined: false,
+            recipe_path: None,
         }
     }
 }
@@ -405,7 +414,7 @@ pub struct PackageIdentifier {
     /// The name of the package
     pub name: PackageName,
     /// The version of the package
-    pub version: Version,
+    pub version: VersionWithSource,
     /// The build string of the package
     pub build_string: String,
 }
@@ -461,7 +470,7 @@ pub struct Output {
     /// Some extra metadata that should be recorded additionally in about.json
     /// Usually it is used during the CI build to record link to the CI job
     /// that created this artifact
-    #[serde(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_meta: Option<BTreeMap<String, Value>>,
 }
 
@@ -765,17 +774,21 @@ pub async fn build_reindexed_channels(
         ),
     );
 
+    let index_config = IndexFsConfig {
+        channel: output_dir.clone(),
+        target_platform: Some(build_configuration.target_platform),
+        repodata_patch: None,
+        write_zst: false,
+        write_shards: false,
+        force: false,
+        max_parallel: num_cpus::get_physical(),
+        multi_progress: None,
+    };
+
     // Reindex the output channel from the files on disk
-    index_fs(
-        output_dir,
-        Some(build_configuration.target_platform),
-        None,
-        false,
-        num_cpus::get_physical(),
-        None,
-    )
-    .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    index_fs(index_config)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(iter::once(output_channel.base_url)
         .chain(build_configuration.channels.iter().cloned())
@@ -812,7 +825,7 @@ mod test {
         MatchSpec, NoArchType, PackageName, PackageRecord, ParseStrictness, RepoDataRecord,
         VersionWithSource,
     };
-    use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
     use std::str::FromStr;
     use url::Url;
@@ -830,6 +843,7 @@ mod test {
             &tempdir.path().join("output"),
             false,
             &chrono::Utc::now(),
+            false,
         )
         .unwrap();
         directories.create_build_dir(false).unwrap();
@@ -845,10 +859,13 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![SourceDependency {
-                spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }
-            .into()],
+            specs: vec![
+                SourceDependency {
+                    spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict)
+                        .unwrap(),
+                }
+                .into(),
+            ],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),
@@ -876,7 +893,7 @@ mod test {
                     purls: None,
                     run_exports: None,
                     python_site_packages_path: None,
-                    extra_depends: Default::default(),
+                    experimental_extra_depends: Default::default(),
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

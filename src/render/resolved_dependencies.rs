@@ -9,18 +9,18 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
-    Platform, RepoDataRecord,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
+    package::RunExportsJson,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
 use crate::{
-    metadata::{build_reindexed_channels, BuildConfiguration, Output},
+    metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
     recipe::parser::{Dependency, Requirements},
     render::{
@@ -351,6 +351,15 @@ impl ResolvedDependencies {
             result.insert(record.package_record.name.clone(), run_exports.clone());
         }
         result
+    }
+}
+impl Display for ResolvedDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        write!(f, "{}", self.to_table(table, false))
     }
 }
 
@@ -710,6 +719,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -806,6 +816,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -1015,6 +1026,34 @@ impl Output {
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        if tool_configuration.environments_externally_managed {
+            let span = tracing::info_span!(
+                "Externally resolved dependencies",
+                recipe = self.identifier()
+            );
+            let _enter = span.enter();
+            if let Some(build) = &dependencies.build {
+                tracing::info!(
+                    "\nResolved build dependencies({}):\n{}",
+                    self.identifier(),
+                    build
+                );
+            }
+            if let Some(host) = &dependencies.host {
+                tracing::info!(
+                    "Resolved host dependencies({}):\n{}",
+                    self.identifier(),
+                    host
+                );
+            }
+            tracing::info!(
+                "Resolved run dependencies({}):\n{}",
+                self.identifier(),
+                dependencies.run
+            );
+            return Ok(());
+        }
 
         install_environments(self, dependencies, tool_configuration).await
     }

@@ -1,0 +1,15 @@
+package:
+  name: nodejs-extension-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script: build.js # Should auto-detect NodeJS interpreter
+
+requirements:
+  build:
+    - nodejs
+
+about:
+  summary: Test auto-detection of NodeJS interpreter from .js extension
+  license: MIT

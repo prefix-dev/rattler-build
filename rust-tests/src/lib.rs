@@ -508,6 +508,14 @@ mod tests {
     }
 
     #[test]
+    fn test_7z_source() {
+        let tmp = tmp("test_7z_source");
+        let rattler_build = rattler().build(recipes().join("7z-source"), tmp.as_dir(), None, None);
+
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
     fn test_dry_run_cf_upload() {
         let tmp = tmp("test_polarify");
         let variant = recipes().join("polarify").join("linux_64_.yaml");
@@ -674,5 +682,37 @@ requirements:
     - python
 "#;
         run_build_from_yaml_string(recipe_content.to_string());
+    }
+
+    #[test]
+    fn test_missing_license_file() {
+        let tmp = tmp("test_missing_license_file");
+        let rattler_build = rattler().build(
+            recipes().join("missing_license_file"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert!(output.contains("No license files were copied"));
+        assert!(output.contains("The following license files were not found: does-not-exist.txt"));
+    }
+
+    #[test]
+    fn test_missing_license_glob() {
+        let tmp = tmp("test_missing_license_glob");
+        let rattler_build = rattler().build(
+            recipes().join("missing_license_glob"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert!(output.contains("No license files were copied"));
+        assert!(output.contains("The following license files were not found: *.license"));
     }
 }

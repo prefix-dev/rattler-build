@@ -1,0 +1,16 @@
+package:
+  name: test-interpreter-nu
+  version: 0.1.0
+
+build:
+  script: build.nu
+
+requirements:
+  build:
+    - nushell
+
+tests:
+  - script: build.nu
+    requirements:
+      build:
+        - nushell

@@ -13,16 +13,16 @@ use state::*;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use miette::IntoDiagnostic;
+use ratatui::Terminal;
 use ratatui::backend::Backend;
 use ratatui::prelude::*;
-use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
 use std::path::PathBuf;
 
-use crate::build::run_build;
+use crate::build::{WorkingDirectoryBehavior, run_build};
 use crate::console_utils::LoggingOutputHandler;
-use crate::{get_build_output, sort_build_outputs_topologically, BuildData};
+use crate::{BuildData, get_build_output, sort_build_outputs_topologically};
 
 use self::utils::run_editor;
 
@@ -249,7 +249,13 @@ pub async fn run<B: Backend>(
                             log_sender
                                 .send(Event::SetBuildState(i, BuildProgress::Building))
                                 .unwrap();
-                            match run_build(package.output, &package.tool_config).await {
+                            match run_build(
+                                package.output,
+                                &package.tool_config,
+                                WorkingDirectoryBehavior::Cleanup,
+                            )
+                            .await
+                            {
                                 Ok((output, _archive)) => {
                                     output.record_build_end();
                                     let span = tracing::info_span!("Build summary");

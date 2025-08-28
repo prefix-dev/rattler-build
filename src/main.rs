@@ -3,6 +3,7 @@
 use std::{
     fs::File,
     io::{self, IsTerminal},
+    path::PathBuf,
 };
 
 use clap::{CommandFactory, Parser};
@@ -11,10 +12,12 @@ use rattler_build::{
     build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
-    opt::{App, BuildData, DebugData, ShellCompletion, SubCommands},
-    rebuild, run_test, upload_from_args,
+    opt::{App, BuildData, Config, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
+    rebuild, run_test,
+    source::create_patch,
+    upload_from_args,
 };
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -76,12 +79,21 @@ async fn async_main() -> miette::Result<()> {
         None
     };
 
+    let config = if let Some(config_path) = app.config_file {
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
+    } else {
+        None
+    };
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
-            fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
+            fn print_completions<G: clap_complete::Generator>(
+                generator: G,
+                cmd: &mut clap::Command,
+            ) {
                 clap_complete::generate(
-                    gen,
+                    generator,
                     cmd,
                     cmd.get_name().to_string(),
                     &mut std::io::stdout(),
@@ -94,13 +106,18 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Build(build_args)) => {
             let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
-            let build_data = BuildData::from(build_args);
+            let build_data = BuildData::from_opts_and_config(build_args, config);
 
             // Get all recipe paths and keep tempdir alive until end of the function
-            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir)?;
+            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
 
             if recipe_paths.is_empty() {
-                miette::bail!("Couldn't detect any recipes.")
+                if recipe_dir.is_some() {
+                    tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
+                    return Ok(());
+                } else {
+                    miette::bail!("Couldn't find recipe.")
+                }
             }
 
             if build_data.tui {
@@ -122,10 +139,16 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
-        Some(SubCommands::Test(test_args)) => run_test(test_args.into(), log_handler).await,
+        Some(SubCommands::Test(test_args)) => {
+            run_test(
+                TestData::from_opts_and_config(test_args, config),
+                log_handler,
+            )
+            .await
+        }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild(
-                rebuild_args.into(),
+                RebuildData::from_opts_and_config(rebuild_args, config),
                 log_handler.expect("logger is not initialized"),
             )
             .await
@@ -137,9 +160,28 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(opts)) => {
-            let debug_data = DebugData::from(opts);
+            let debug_data = DebugData::from_opts_and_config(opts, config);
             debug_recipe(debug_data, &log_handler).await?;
             Ok(())
+        }
+        Some(SubCommands::CreatePatch(opts)) => {
+            let exclude_vec = opts.exclude.clone().unwrap_or_default();
+            match create_patch::create_patch(
+                opts.directory,
+                &opts.name,
+                opts.overwrite,
+                opts.patch_dir.as_deref(),
+                &exclude_vec,
+                opts.dry_run,
+            ) {
+                Ok(()) => Ok(()),
+                Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
+                    tracing::warn!("Not writing patch file, already exists: {}", path.display());
+                    tracing::warn!("Use --overwrite to replace the existing patch file.");
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
+            }
         }
         None => {
             _ = App::command().print_long_help();
@@ -149,9 +191,9 @@ async fn async_main() -> miette::Result<()> {
 }
 
 fn recipe_paths(
-    recipes: Vec<std::path::PathBuf>,
-    recipe_dir: Option<std::path::PathBuf>,
-) -> Result<(Vec<std::path::PathBuf>, Option<TempDir>), miette::Error> {
+    recipes: Vec<PathBuf>,
+    recipe_dir: Option<&PathBuf>,
+) -> Result<(Vec<PathBuf>, Option<TempDir>), miette::Error> {
     let mut recipe_paths = Vec::new();
     let mut temp_dir_opt = None;
     if !std::io::stdin().is_terminal()

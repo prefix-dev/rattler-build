@@ -7,3 +7,11 @@
   
   '''
 # ---
+# name: test_r_tests
+  '''
+  - r:
+      libraries:
+      - ggplot2
+  
+  '''
+# ---
