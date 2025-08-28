@@ -10,6 +10,10 @@ use ::rattler_build::{
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
     upload,
+    recipe_generator::{
+        generate_cpan_recipe_string, generate_luarocks_recipe_string, generate_pypi_recipe_string, generate_r_recipe_string,
+        CpanOpts, PyPIOpts,
+    },
 };
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
@@ -22,6 +26,83 @@ use url::Url;
 #[pyfunction]
 fn get_rattler_build_version_py() -> PyResult<String> {
     Ok(get_rattler_build_version().to_string())
+}
+
+/// Generate a PyPI recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, version=None, use_mapping=true))]
+fn generate_pypi_recipe_string_py(
+    package: String,
+    version: Option<String>,
+    use_mapping: bool,
+) -> PyResult<String> {
+    let opts = PyPIOpts {
+        package,
+        version,
+        write: false,
+        use_mapping,
+        tree: false,
+    };
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        match generate_pypi_recipe_string(&opts).await {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+        }
+    })
+}
+
+/// Generate a CRAN (R) recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, universe=None))]
+fn generate_r_recipe_string_py(
+    package: String,
+    universe: Option<String>,
+) -> PyResult<String> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        match generate_r_recipe_string(&package, universe.as_deref()).await {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+        }
+    })
+}
+
+/// Generate a CPAN (Perl) recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, version=None))]
+fn generate_cpan_recipe_string_py(
+    package: String,
+    version: Option<String>,
+) -> PyResult<String> {
+    let opts = CpanOpts {
+        package,
+        version,
+        write: false,
+        tree: false,
+    };
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        match generate_cpan_recipe_string(&opts).await {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+        }
+    })
+}
+
+/// Generate a LuaRocks recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (rock))]
+fn generate_luarocks_recipe_string_py(rock: String) -> PyResult<String> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        match generate_luarocks_recipe_string(&rock).await {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+        }
+    })
 }
 
 #[pyfunction]
@@ -378,6 +459,10 @@ fn upload_packages_to_conda_forge_py(
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_pypi_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_r_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_cpan_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_luarocks_recipe_string_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_package_to_quetz_py, &m).unwrap())?;

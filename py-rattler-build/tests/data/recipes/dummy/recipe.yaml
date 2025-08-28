@@ -9,13 +9,18 @@ outputs:
 
     build:
       script:
-        - mkdir -p $PREFIX/bin
         - if: win
           then:
-            - echo "echo dummy-x on windows" > $PREFIX/bin/dummy-x.bat
+            - if not exist "%PREFIX%\bin" mkdir "%PREFIX%\bin"
+            - echo @echo dummy-x on windows > %PREFIX%\bin\dummy-x.bat
           else:
+            - mkdir -p $PREFIX/bin
             - echo "echo dummy-x on unix" > $PREFIX/bin/dummy-x
             - chmod +x $PREFIX/bin/dummy-x
     tests:
       - script:
-          - dummy-x
+          - if: win
+            then:
+              - dummy-x.bat
+            else:
+              - dummy-x
