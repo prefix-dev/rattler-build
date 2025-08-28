@@ -234,14 +234,14 @@ pub struct DownstreamTest {
 }
 
 /// A test that checks if R libraries can be loaded
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RTest {
     /// List of R libraries to test with library()
     pub libraries: Vec<String>,
 }
 
 /// A test that checks if Ruby gems/modules can be required
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RubyTest {
     /// List of Ruby modules to test with require
     pub requires: Vec<String>,
