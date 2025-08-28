@@ -129,11 +129,11 @@ Tests are serialized to `info/tests/tests.yaml` in the created package and read 
 When adding extra files to your tests:
 
 1. **During package creation**
-     - Files are copied to `$PREFIX/etc/conda/test-files/{pkg_name}/{idx}`
+     - Files are copied to `$PREFIX/info/conda/test-files/{pkg_name}/{idx}`
      - `{idx}` is a sequential number assigned to each test
      - Files can come from both `source` (work directory) and `recipe` locations
 2. **During test execution**
-     - Files are copied from `$PREFIX/etc/conda/test-files/{pkg_name}/{idx}` to a temporary directory
+     - Files are copied from `$PREFIX/info/conda/test-files/{pkg_name}/{idx}` to a temporary directory
      - Tests run within this temporary directory
      - Use relative paths to access these files in your test commands
 
