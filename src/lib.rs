@@ -762,13 +762,75 @@ pub async fn rebuild(
     rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    tracing::info!("Rebuilding {}", rebuild_data.package_file.to_string_lossy());
+    use crate::opt::PackageSource;
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    use std::process::Command;
+
+    // Check if the input is a URL or local path
+    let (_temp_dir_guard, package_path) = match rebuild_data.package_file {
+        PackageSource::Url(ref url) => {
+            // Download the package to a temporary location
+            tracing::info!("Downloading package from {}", url);
+
+            let client = reqwest::Client::new();
+            let response = client.get(url.as_str()).send().await.into_diagnostic()?;
+
+            if !response.status().is_success() {
+                return Err(miette::miette!(
+                    "Failed to download package: HTTP {}",
+                    response.status()
+                ));
+            }
+
+            // Extract filename from URL or use a default
+            let filename = url
+                .path_segments()
+                .and_then(|segments| segments.last())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("package.tar.bz2");
+
+            let temp_dir = tempfile::tempdir().into_diagnostic()?;
+            let package_path = temp_dir.path().join(filename);
+
+            let bytes = response.bytes().await.into_diagnostic()?;
+            fs::write(&package_path, &bytes).into_diagnostic()?;
+
+            tracing::info!("Downloaded package to: {:?}", package_path);
+
+            // Keep the temp directory alive for the duration
+            (Some(temp_dir), package_path)
+        }
+        PackageSource::Path(ref path) => {
+            // Use the local path directly
+            (None, path.clone())
+        }
+    };
+
+    // Calculate SHA256 of the original package
+    let original_sha = {
+        let mut file = fs::File::open(&package_path).into_diagnostic()?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 8192];
+        loop {
+            let n = file.read(&mut buffer).into_diagnostic()?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buffer[..n]);
+        }
+        format!("{:x}", hasher.finalize())
+    };
+
+    tracing::info!("Original package SHA256: {}", original_sha);
+    tracing::info!("Rebuilding {}", package_path.display());
+
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
     // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
+    rebuild::extract_recipe(&package_path, temp_folder.path()).into_diagnostic()?;
 
     let temp_dir = temp_folder.keep();
 
@@ -782,12 +844,12 @@ pub async fn rebuild(
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
 
-    // create output dir and set it in the config
-    let output_dir = rebuild_data.common.output_dir;
+    // Use a temporary directory for the build output to avoid overwriting the original
+    let temp_output_dir = tempfile::tempdir().into_diagnostic()?;
+    let temp_output_path = temp_output_dir.path().to_path_buf();
 
-    fs::create_dir_all(&output_dir).into_diagnostic()?;
-    output.build_configuration.directories.output_dir =
-        canonicalize(output_dir).into_diagnostic()?;
+    fs::create_dir_all(&temp_output_path).into_diagnostic()?;
+    output.build_configuration.directories.output_dir = temp_output_path.clone();
 
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
@@ -811,7 +873,103 @@ pub async fn rebuild(
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+    let (_rebuilt_output, temp_rebuilt_path) =
+        run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+
+    // Generate timestamp for the rebuilt package
+    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+
+    // Create final output directory
+    let final_output_dir = rebuild_data.common.output_dir.clone();
+    fs::create_dir_all(&final_output_dir).into_diagnostic()?;
+
+    // Generate new filename with rebuild timestamp
+    let original_filename = temp_rebuilt_path
+        .file_name()
+        .ok_or_else(|| miette::miette!("Failed to get filename from rebuilt package"))?;
+    let original_name = original_filename.to_string_lossy();
+
+    // Insert timestamp before the extension
+    let new_filename = if let Some(pos) = original_name.rfind('.') {
+        format!(
+            "{}-rebuild-{}{}",
+            &original_name[..pos],
+            timestamp,
+            &original_name[pos..]
+        )
+    } else {
+        format!("{}-rebuild-{}", original_name, timestamp)
+    };
+
+    let rebuilt_path = final_output_dir.join(&new_filename);
+
+    // Move the rebuilt package to final location with new name
+    fs::rename(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+
+    // Now we can drop the temp directory
+    drop(temp_output_dir);
+
+    // Calculate SHA256 of the rebuilt package
+    let rebuilt_sha = {
+        let mut file = fs::File::open(&rebuilt_path).into_diagnostic()?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 8192];
+        loop {
+            let n = file.read(&mut buffer).into_diagnostic()?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buffer[..n]);
+        }
+        format!("{:x}", hasher.finalize())
+    };
+
+    tracing::info!("Rebuilt package SHA256: {}", rebuilt_sha);
+    tracing::info!("Rebuilt package saved to: {:?}", rebuilt_path);
+
+    // Compare the SHA hashes
+    if original_sha == rebuilt_sha {
+        tracing::info!("✅ Rebuild successful! SHA256 hashes match.");
+        println!("✅ Rebuild successful! The rebuilt package is identical to the original.");
+        println!("  Rebuilt package: {}", rebuilt_path.display());
+    } else {
+        tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
+        println!("❌ Rebuild produced different output!");
+        println!("  Original SHA256: {}", original_sha);
+        println!("  Rebuilt SHA256:  {}", rebuilt_sha);
+        println!("  Rebuilt package: {}", rebuilt_path.display());
+
+        // Check if diffoscope is available
+        let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
+
+        if diffoscope_available {
+            println!("\nWould you like to run diffoscope to see the differences? [y/N]");
+
+            use std::io::{self, BufRead};
+            let stdin = io::stdin();
+            let mut input = String::new();
+            stdin.lock().read_line(&mut input).into_diagnostic()?;
+
+            if input.trim().to_lowercase() == "y" {
+                println!("Running diffoscope...");
+                let output = Command::new("diffoscope")
+                    .arg(&package_path)
+                    .arg(&rebuilt_path)
+                    .arg("--text-color")
+                    .arg("auto")
+                    .output()
+                    .into_diagnostic()?;
+
+                println!("{}", String::from_utf8_lossy(&output.stdout));
+                if !output.stderr.is_empty() {
+                    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                }
+            }
+        } else {
+            println!("\nHint: Install diffoscope to see detailed differences:");
+            println!("  pixi global install diffoscope");
+        }
+    }
 
     Ok(())
 }
