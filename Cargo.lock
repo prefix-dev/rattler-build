@@ -4307,6 +4307,7 @@ dependencies = [
  "rattler_sandbox",
  "rattler_shell",
  "rattler_solve",
+ "rattler_upload",
  "rattler_virtual_packages",
  "rayon",
  "reflink-copy",
@@ -4726,6 +4727,41 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.16",
  "tracing",
+]
+
+[[package]]
+name = "rattler_upload"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79dbb53d61ff957bd2b619265700cb0d00716a9e0eb76fce7f2574a4b40acc98"
+dependencies = [
+ "base64 0.22.1",
+ "clap",
+ "fs-err",
+ "futures",
+ "indicatif",
+ "miette",
+ "opendal",
+ "rattler_conda_types",
+ "rattler_config",
+ "rattler_digest",
+ "rattler_networking",
+ "rattler_package_streaming",
+ "rattler_redaction",
+ "rattler_solve",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.16",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
 ]
 
 [[package]]
