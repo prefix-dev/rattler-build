@@ -1,5 +1,9 @@
 [workspace]
-members = ["rust-tests"]
+members = [
+  "rust-tests",
+  "crates/rattler_git",
+  "crates/rattler_build_source_cache",
+]
 
 [package]
 name = "rattler-build"
@@ -176,6 +180,10 @@ rattler_solve = { version = "3.0.1", default-features = false, features = [
 rattler_virtual_packages = { version = "2.1.3", default-features = false }
 rattler_package_streaming = { version = "0.23.1", default-features = false }
 rattler_menuinst = "0.2.21"
+
+# Local rattler-build crates
+rattler_git = { path = "crates/rattler_git" }
+rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"
