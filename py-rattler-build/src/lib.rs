@@ -6,7 +6,6 @@ use ::rattler_build::{
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
-    upload,
     recipe_generator::{
         generate_cpan_recipe_string, generate_luarocks_recipe_string, generate_pypi_recipe_string, generate_r_recipe_string,
         CpanOpts, PyPIOpts,
