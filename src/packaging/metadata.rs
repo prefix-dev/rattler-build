@@ -27,6 +27,16 @@ use url::Url;
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
 
+/// Safely check if a symlink resolves to a regular file, with basic loop protection
+fn is_symlink_to_file(path: &Path) -> bool {
+    // Simple approach: try to canonicalize the path, which handles cycles gracefully
+    // If canonicalization fails (due to cycles or missing targets), assume it's not a file
+    match path.canonicalize() {
+        Ok(canonical_path) => canonical_path.is_file(),
+        Err(_) => false, // Could be cycle, missing target, or permission issue
+    }
+}
+
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
 pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
@@ -486,7 +496,7 @@ impl Output {
                     }));
                 } else if meta.is_symlink() {
                     // For symlinks, compute hash of the target file content if it exists and is within package, otherwise empty digest
-                    let digest = if p.is_file() {
+                    let digest = if is_symlink_to_file(p) {
                         compute_file_digest::<sha2::Sha256>(p)?
                     } else {
                         compute_bytes_digest::<sha2::Sha256>(&[])
