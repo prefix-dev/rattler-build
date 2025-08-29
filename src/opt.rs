@@ -766,12 +766,38 @@ impl TestData {
     }
 }
 
+/// Represents a package source that can be either a local path or a URL
+#[derive(Debug, Clone)]
+pub enum PackageSource {
+    /// Local file path
+    Path(PathBuf),
+    /// Remote URL
+    Url(Url),
+}
+
+impl FromStr for PackageSource {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Try to parse as URL first
+        if s.starts_with("http://") || s.starts_with("https://") {
+            match Url::parse(s) {
+                Ok(url) => Ok(PackageSource::Url(url)),
+                Err(e) => Err(format!("Invalid URL: {}", e)),
+            }
+        } else {
+            // Treat as local path
+            Ok(PackageSource::Path(PathBuf::from(s)))
+        }
+    }
+}
+
 /// Rebuild options.
 #[derive(Parser)]
 pub struct RebuildOpts {
-    /// The package file to rebuild
+    /// The package file to rebuild (can be a local path or URL)
     #[arg(short, long)]
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
     #[arg(long, hide = true)]
@@ -797,7 +823,7 @@ pub struct RebuildOpts {
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct RebuildData {
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
     pub test: TestStrategy,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
@@ -821,7 +847,7 @@ impl RebuildData {
 
     /// Create a new instance of `RebuildData`
     pub fn new(
-        package_file: PathBuf,
+        package_file: PackageSource,
         test: TestStrategy,
         compression_threads: Option<u32>,
         common: CommonData,
