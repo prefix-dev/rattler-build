@@ -786,9 +786,9 @@ pub async fn rebuild(
             // Extract filename from URL or use a default
             let filename = url
                 .path_segments()
-                .and_then(|segments| segments.next_back())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("package.tar.bz2");
+                .and_then(|segments| segments.last())
+                .map(|s| s.to_string())
+                .unwrap_or("package.tar.bz2".into());
 
             let temp_dir = tempfile::tempdir().into_diagnostic()?;
             let package_path = temp_dir.path().join(filename);
