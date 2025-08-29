@@ -9,6 +9,8 @@ from .rattler_build import (
     upload_packages_to_conda_forge_py,
 )
 
+from . import recipe_generation
+
 
 from pathlib import Path
 from typing import Dict, List, Union
@@ -23,6 +25,7 @@ __all__ = [
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
+    "recipe_generation",
 ]
 
 
