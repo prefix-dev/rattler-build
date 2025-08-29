@@ -1,0 +1,145 @@
+//! Source definitions for the cache
+
+use rattler_git::{git::GitReference as RattlerGitReference, GitUrl as RattlerGitUrl};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// Checksum types supported by the cache
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Checksum {
+    Sha256(Vec<u8>),
+    Md5(Vec<u8>),
+}
+
+impl Checksum {
+    /// Convert checksum to hex string
+    pub fn to_hex(&self) -> String {
+        match self {
+            Checksum::Sha256(bytes) => hex::encode(bytes),
+            Checksum::Md5(bytes) => hex::encode(bytes),
+        }
+    }
+
+    /// Validate a file against this checksum
+    pub fn validate(&self, path: &std::path::Path) -> bool {
+        use md5::{Digest as Md5Digest, Md5};
+        use sha2::{Digest as Sha2Digest, Sha256};
+        use std::io::Read;
+
+        let mut file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            Err(_) => return false,
+        };
+
+        let mut buffer = Vec::new();
+        if file.read_to_end(&mut buffer).is_err() {
+            return false;
+        }
+
+        match self {
+            Checksum::Sha256(expected) => {
+                let mut hasher = Sha256::new();
+                hasher.update(&buffer);
+                let result = hasher.finalize();
+                result.as_slice() == expected.as_slice()
+            }
+            Checksum::Md5(expected) => {
+                let mut hasher = Md5::new();
+                hasher.update(&buffer);
+                let result = hasher.finalize();
+                result.as_slice() == expected.as_slice()
+            }
+        }
+    }
+
+    /// Create from hex string
+    pub fn from_hex_str(value: &str, kind: ChecksumKind) -> Result<Self, hex::FromHexError> {
+        let bytes = hex::decode(value)?;
+        Ok(match kind {
+            ChecksumKind::Sha256 => Checksum::Sha256(bytes),
+            ChecksumKind::Md5 => Checksum::Md5(bytes),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ChecksumKind {
+    Sha256,
+    Md5,
+}
+
+/// Git source specification that wraps rattler_git functionality
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitSource {
+    pub url: url::Url,
+    pub reference: RattlerGitReference,
+    pub depth: Option<i32>,
+    pub lfs: bool,
+}
+
+impl GitSource {
+    /// Convert to rattler_git::GitUrl
+    pub fn to_git_url(&self) -> RattlerGitUrl {
+        RattlerGitUrl::from_reference(self.url.clone(), self.reference.clone())
+    }
+
+    /// Create a new GitSource
+    pub fn new(
+        url: url::Url,
+        reference: RattlerGitReference,
+        depth: Option<i32>,
+        lfs: bool,
+    ) -> Self {
+        Self {
+            url,
+            reference,
+            depth,
+            lfs,
+        }
+    }
+}
+
+/// URL source specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UrlSource {
+    pub urls: Vec<url::Url>,
+    pub checksum: Option<Checksum>,
+    pub file_name: Option<String>,
+}
+
+/// Source types that can be cached
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Source {
+    Git(GitSource),
+    Url(UrlSource),
+    Path(PathBuf), // Path sources are passed through without caching
+}
+
+// Add hex crate to dependencies
+pub(crate) mod hex {
+    pub fn encode(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    }
+
+    pub fn decode(s: &str) -> Result<Vec<u8>, FromHexError> {
+        if s.len() % 2 != 0 {
+            return Err(FromHexError);
+        }
+
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| FromHexError))
+            .collect()
+    }
+
+    #[derive(Debug)]
+    pub struct FromHexError;
+
+    impl std::fmt::Display for FromHexError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "invalid hex string")
+        }
+    }
+
+    impl std::error::Error for FromHexError {}
+}

@@ -396,8 +396,7 @@ fn find_url_cache_dir(
     cache_dir: &Path,
     url_src: &crate::recipe::parser::UrlSource,
 ) -> Result<PathBuf, SourceError> {
-    // This should match the logic in url_source::extracted_folder
-    // You might need to recreate the cache name logic here
+    // Recreate the cache name logic (previously in url_source::extracted_folder)
     use crate::source::checksum::Checksum;
 
     let checksum = Checksum::from_url_source(url_src)
@@ -414,8 +413,11 @@ fn find_url_cache_dir(
         .and_then(|segments| segments.filter(|x| !x.is_empty()).next_back())
         .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
-    let (stem, _) = super::url_source::split_path(Path::new(filename))
-        .map_err(|e| SourceError::UnknownError(format!("Failed to split path: {}", e)))?;
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .to_string();
 
     let checksum_hex = checksum.to_hex();
     let cache_name = format!("{}_{}", stem, &checksum_hex[..8]);
