@@ -7,13 +7,11 @@ mod luarocks;
 mod pypi;
 mod serialize;
 
-use cpan::{CpanOpts, generate_cpan_recipe};
-use cran::{CranOpts, generate_r_recipe};
-use luarocks::{LuarocksOpts, generate_luarocks_recipe};
-use pypi::PyPIOpts;
+pub use self::cpan::{CpanOpts, generate_cpan_recipe, generate_cpan_recipe_string};
+pub use self::cran::{CranOpts, generate_r_recipe, generate_r_recipe_string};
+pub use self::luarocks::{LuarocksOpts, generate_luarocks_recipe, generate_luarocks_recipe_string};
+pub use self::pypi::{PyPIOpts, generate_pypi_recipe, generate_pypi_recipe_string};
 pub use serialize::write_recipe;
-
-use self::pypi::generate_pypi_recipe;
 
 /// The source of the package to generate a recipe for
 #[derive(Debug, Clone, Parser)]

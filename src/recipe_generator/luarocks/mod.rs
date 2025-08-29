@@ -15,6 +15,7 @@ use crate::recipe_generator::serialize::{
     UrlSourceElement, write_recipe,
 };
 
+/// Options to control LuaRocks recipe generation.
 #[derive(Debug, Clone, Parser)]
 pub struct LuarocksOpts {
     /// Luarocks package to generate recipe for.
@@ -72,29 +73,27 @@ pub struct RockspecBuild {
     pub install: Option<BTreeMap<String, serde_json::Value>>,
 }
 
-pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()> {
-    let rockspec_url = if opts.rock.contains("http://") || opts.rock.contains("https://") {
-        // Direct rockspec URL provided
-        opts.rock.clone()
+/// Build a LuaRocks recipe (as a `Recipe`) from a rockspec identifier or URL.
+///
+/// The `rock` parameter accepts any format supported by `LuarocksOpts.rock`:
+/// - module
+/// - module/version
+/// - author/module/version
+/// - direct rockspec URL
+async fn build_luarocks_recipe(rock: &str) -> miette::Result<Recipe> {
+    // Determine rockspec URL or resolve via module search
+    let rockspec_url = if rock.contains("http://") || rock.contains("https://") {
+        rock.to_string()
     } else {
         // Parse package specification
-        let parts: Vec<&str> = opts.rock.split('/').collect();
+        let parts: Vec<&str> = rock.split('/').collect();
         match parts.as_slice() {
-            [module] => {
-                // Just module name, fetch latest version
-                return fetch_and_generate_from_module(module, None, opts).await;
-            }
-            [module, version] => {
-                // Module and version
-                return fetch_and_generate_from_module(module, Some(version), opts).await;
-            }
-            [author, module, version] => {
-                // Construct direct rockspec URL
-                format!(
-                    "https://luarocks.org/manifests/{}/{}-{}.rockspec",
-                    author, module, version
-                )
-            }
+            [module] => resolve_rockspec_url_from_module(module, None).await?,
+            [module, version] => resolve_rockspec_url_from_module(module, Some(version)).await?,
+            [author, module, version] => format!(
+                "https://luarocks.org/manifests/{}/{}-{}.rockspec",
+                author, module, version
+            ),
             _ => {
                 return Err(miette::miette!(
                     "Invalid rock specification. Use 'module', 'module/version', or 'author/module/version'"
@@ -103,30 +102,18 @@ pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()>
         }
     };
 
-    // Fetch and parse rockspec
+    // Fetch and parse rockspec, then construct recipe
     let rockspec_content = fetch_rockspec(&rockspec_url).await?;
     let rockspec = parse_rockspec(&rockspec_content)?;
-
-    // Generate recipe
     let recipe = rockspec_to_recipe(&rockspec)?;
-
-    // Write recipe
-    let recipe_str = recipe.to_string();
-    if opts.write_to == PathBuf::from(".") {
-        println!("{}", recipe_str);
-    } else {
-        let package_name = recipe.package.name.clone();
-        write_recipe(&package_name, &recipe_str).into_diagnostic()?;
-    }
-
-    Ok(())
+    Ok(recipe)
 }
 
-async fn fetch_and_generate_from_module(
+/// Resolve a rockspec URL for a module and optional version by scraping LuaRocks.
+async fn resolve_rockspec_url_from_module(
     module: &str,
     version: Option<&str>,
-    opts: &LuarocksOpts,
-) -> miette::Result<()> {
+) -> miette::Result<String> {
     // Search for module on LuaRocks by scraping HTML
     let search_url = format!("https://luarocks.org/search?q={}", module);
     let response = reqwest::get(&search_url)
@@ -203,14 +190,41 @@ async fn fetch_and_generate_from_module(
         author, module, target_version
     );
 
-    // Fetch and parse rockspec
-    let rockspec_content = fetch_rockspec(&rockspec_url).await?;
+    Ok(rockspec_url)
+}
+
+/// Generate a LuaRocks recipe and return the YAML as a string.
+pub async fn generate_luarocks_recipe_string(rock: &str) -> miette::Result<String> {
+    let recipe = build_luarocks_recipe(rock).await?;
+    Ok(recipe.to_string())
+}
+
+/// Generate a LuaRocks recipe from `LuarocksOpts` and either print it or write it to disk.
+pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()> {
+    // Build recipe once and reuse for printing/writing
+    let recipe = build_luarocks_recipe(&opts.rock).await?;
+    let recipe_str = recipe.to_string();
+    if opts.write_to == PathBuf::from(".") {
+        println!("{}", recipe_str);
+    } else {
+        let package_name = recipe.package.name.clone();
+        write_recipe(&package_name, &recipe_str).into_diagnostic()?;
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+async fn fetch_and_generate_from_module(
+    module: &str,
+    version: Option<&str>,
+    opts: &LuarocksOpts,
+) -> miette::Result<()> {
+    // Use the shared helpers to avoid duplication
+    let url = resolve_rockspec_url_from_module(module, version).await?;
+    let rockspec_content = fetch_rockspec(&url).await?;
     let rockspec = parse_rockspec(&rockspec_content)?;
-
-    // Generate recipe
     let recipe = rockspec_to_recipe(&rockspec)?;
-
-    // Write recipe
     let recipe_str = recipe.to_string();
     if opts.write_to == PathBuf::from(".") {
         println!("{}", recipe_str);
