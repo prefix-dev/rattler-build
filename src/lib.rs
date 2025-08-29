@@ -777,18 +777,17 @@ pub async fn rebuild(
             let response = client.get(url.as_str()).send().await.into_diagnostic()?;
 
             if !response.status().is_success() {
-                return Err(miette::miette!(
-                    "Failed to download package: HTTP {}",
-                    response.status()
-                ));
+                miette::bail!("Failed to download package: HTTP {}", response.status());
             }
 
             // Extract filename from URL or use a default
-            let filename = url
+            let Some(filename) = url
                 .path_segments()
-                .and_then(|segments| segments.last())
+                .and_then(|mut segments| segments.next_back())
                 .map(|s| s.to_string())
-                .unwrap_or("package.tar.bz2".into());
+            else {
+                miette::bail!("Failed to extract filename from URL: {}", url);
+            };
 
             let temp_dir = tempfile::tempdir().into_diagnostic()?;
             let package_path = temp_dir.path().join(filename);
