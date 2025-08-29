@@ -786,7 +786,7 @@ pub async fn rebuild(
             // Extract filename from URL or use a default
             let filename = url
                 .path_segments()
-                .and_then(|segments| segments.last())
+                .and_then(|segments| segments.next_back())
                 .filter(|s| !s.is_empty())
                 .unwrap_or("package.tar.bz2");
 
