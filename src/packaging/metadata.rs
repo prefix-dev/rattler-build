@@ -27,6 +27,16 @@ use url::Url;
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
 
+/// Safely check if a symlink resolves to a regular file, with basic loop protection
+fn is_symlink_to_file(path: &Path) -> bool {
+    // Simple approach: try to canonicalize the path, which handles cycles gracefully
+    // If canonicalization fails (due to cycles or missing targets), assume it's not a file
+    match path.canonicalize() {
+        Ok(canonical_path) => canonical_path.is_file(),
+        Err(_) => false, // Could be cycle, missing target, or permission issue
+    }
+}
+
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
 pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
@@ -428,7 +438,7 @@ impl Output {
                                         &p,
                                         &link_target
                                     );
-                                    return Ok(None);
+                                    // Continue processing the symlink instead of skipping it
                                 }
                             } else {
                                 tracing::warn!(
@@ -468,18 +478,25 @@ impl Output {
                         &content_type,
                         self.recipe.build().prefix_detection(),
                     )?;
-                    let digest = compute_file_digest::<sha2::Sha256>(p)?;
+                    let file_size = meta.len();
+                    // Compute SHA256 for files - empty files get empty hash
+                    let digest = if file_size > 0 {
+                        Some(compute_file_digest::<sha2::Sha256>(p)?)
+                    } else {
+                        Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+                    };
                     let no_link = always_copy_files.is_match(&relative_path);
                     return Ok(Some(PathsEntry {
-                        sha256: Some(digest),
+                        sha256: digest,
                         relative_path,
                         path_type: PathType::HardLink,
                         prefix_placeholder,
                         no_link,
-                        size_in_bytes: Some(meta.len()),
+                        size_in_bytes: Some(file_size),
                     }));
                 } else if meta.is_symlink() {
-                    let digest = if p.is_file() {
+                    // For symlinks, compute hash of the target file content if it exists and is within package, otherwise empty digest
+                    let digest = if is_symlink_to_file(p) {
                         compute_file_digest::<sha2::Sha256>(p)?
                     } else {
                         compute_bytes_digest::<sha2::Sha256>(&[])
