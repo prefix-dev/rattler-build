@@ -689,6 +689,7 @@ Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `cran` — Generate a recipe for an R package from CRAN
 * `cpan` — Generate a recipe for a Perl package from CPAN
 * `luarocks` — Generate a recipe for a Lua package from LuaRocks
+* `pyproject` — Generate a recipe from a local pyproject.toml file
 
 
 
@@ -820,6 +821,59 @@ Generate a recipe for a Lua package from LuaRocks
 	Where to write the recipe to
 
 	- Default value: `.`
+
+
+
+
+#### `pyproject`
+
+Generate a recipe from a local pyproject.toml file
+
+**Usage:** `rattler-build generate-recipe pyproject [OPTIONS]`
+
+##### **Options:**
+
+- `-i`, `--input <INPUT>`
+
+	Path to the pyproject.toml file (defaults to pyproject.toml in current directory)
+
+	- Default value: `pyproject.toml`
+
+- `-o`, `--output <OUTPUT>`
+
+	Path to write the recipe.yaml file. If not provided, output will be printed to stdout
+
+
+- `--overwrite`
+
+	Whether to overwrite existing recipe file
+
+
+- `--format <FORMAT>`
+
+	Output format: yaml or json
+
+	- Default value: `yaml`
+
+- `--sort-keys`
+
+	Sort keys in output
+
+
+- `--include-comments`
+
+	Include helpful comments in the output
+
+
+- `--exclude-sections <EXCLUDE_SECTIONS>`
+
+	Exclude specific sections from the output (comma-separated)
+
+
+- `--validate`
+
+	Validate the generated recipe
+
 
 
 
