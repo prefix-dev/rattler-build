@@ -609,7 +609,7 @@ Options for uploading to S3
 
 - `-c`, `--channel <CHANNEL>`
 
-	The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
+	The channel URL in the S3 bucket to upload the package to, e.g., `s3://my-bucket/my-channel`
 
 
 - `--endpoint-url <ENDPOINT_URL>`
