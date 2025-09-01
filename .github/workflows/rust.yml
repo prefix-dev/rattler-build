@@ -290,7 +290,7 @@ jobs:
           submodules: recursive
 
       - name: Download rattler-build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
         with:
           name: rattler-build-x86_64-unknown-linux-musl.tar.gz
           path: ./
@@ -312,8 +312,8 @@ jobs:
 
       - name: Rebuild rich package
         run: |
-          # Find the built package (should be something like rich-*.tar.bz2)
-          PACKAGE=$(find ./output/noarch/rich-*.tar.bz2 | head -n1)
+          # Find the built package (should be something like rich-*.conda)
+          PACKAGE=$(find ./output/noarch/rich-*.conda | head -n1)
           echo "Rebuilding package: $PACKAGE"
           ./rattler-build rebuild "$PACKAGE"
           echo "Rebuild completed successfully"
