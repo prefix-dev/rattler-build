@@ -46,6 +46,7 @@ pub mod source_code;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
+    process::Command,
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -762,10 +763,13 @@ pub async fn rebuild(
     rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    use crate::opt::PackageSource;
-    use sha2::{Digest, Sha256};
-    use std::io::Read;
-    use std::process::Command;
+    let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
+        rebuild_data.common.auth_file,
+        rebuild_data.common.s3_config.clone(),
+        rebuild_data.common.mirror_config.clone(),
+        rebuild_data.common.allow_insecure_host.clone(),
+    )
+    .into_diagnostic()?;
 
     // Check if the input is a URL or local path
     let (_temp_dir_guard, package_path) = match rebuild_data.package_file {
@@ -773,8 +777,12 @@ pub async fn rebuild(
             // Download the package to a temporary location
             tracing::info!("Downloading package from {}", url);
 
-            let client = reqwest::Client::new();
-            let response = client.get(url.as_str()).send().await.into_diagnostic()?;
+            let response = reqwest_client
+                .get_client()
+                .get(url.as_str())
+                .send()
+                .await
+                .into_diagnostic()?;
 
             if !response.status().is_success() {
                 miette::bail!("Failed to download package: HTTP {}", response.status());
@@ -807,22 +815,11 @@ pub async fn rebuild(
     };
 
     // Calculate SHA256 of the original package
-    let original_sha = {
-        let mut file = fs::File::open(&package_path).into_diagnostic()?;
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; 8192];
-        loop {
-            let n = file.read(&mut buffer).into_diagnostic()?;
-            if n == 0 {
-                break;
-            }
-            hasher.update(&buffer[..n]);
-        }
-        format!("{:x}", hasher.finalize())
-    };
+    let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
+        .into_diagnostic()?;
 
-    tracing::info!("Original package SHA256: {}", original_sha);
-    tracing::info!("Rebuilding {}", package_path.display());
+    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Rebuilding \"{}\"", package_path.display());
 
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
@@ -854,15 +851,7 @@ pub async fn rebuild(
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
         .with_compression_threads(rebuild_data.compression_threads)
-        .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(
-                rebuild_data.common.auth_file,
-                rebuild_data.common.s3_config.clone(),
-                rebuild_data.common.mirror_config.clone(),
-                rebuild_data.common.allow_insecure_host.clone(),
-            )
-            .into_diagnostic()?,
-        )
+        .with_reqwest_client(reqwest_client)
         .with_test_strategy(rebuild_data.test)
         .finish();
 
@@ -872,7 +861,7 @@ pub async fn rebuild(
         .recreate_directories()
         .into_diagnostic()?;
 
-    let (_rebuilt_output, temp_rebuilt_path) =
+    let (rebuilt_output, temp_rebuilt_path) =
         run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     // Generate timestamp for the rebuilt package
@@ -882,23 +871,18 @@ pub async fn rebuild(
     let final_output_dir = rebuild_data.common.output_dir.clone();
     fs::create_dir_all(&final_output_dir).into_diagnostic()?;
 
-    // Generate new filename with rebuild timestamp
-    let original_filename = temp_rebuilt_path
-        .file_name()
-        .ok_or_else(|| miette::miette!("Failed to get filename from rebuilt package"))?;
-    let original_name = original_filename.to_string_lossy();
-
     // Insert timestamp before the extension
-    let new_filename = if let Some(pos) = original_name.rfind('.') {
-        format!(
-            "{}-rebuild-{}{}",
-            &original_name[..pos],
-            timestamp,
-            &original_name[pos..]
-        )
-    } else {
-        format!("{}-rebuild-{}", original_name, timestamp)
-    };
+    let new_filename = format!(
+        "{}-{}-{}-rebuilt-{timestamp}{}",
+        rebuilt_output.name().as_normalized(),
+        rebuilt_output.version(),
+        rebuilt_output.build_string(),
+        rebuilt_output
+            .build_configuration
+            .packaging_settings
+            .archive_type
+            .extension()
+    );
 
     let rebuilt_path = final_output_dir.join(&new_filename);
 
@@ -909,22 +893,11 @@ pub async fn rebuild(
     drop(temp_output_dir);
 
     // Calculate SHA256 of the rebuilt package
-    let rebuilt_sha = {
-        let mut file = fs::File::open(&rebuilt_path).into_diagnostic()?;
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; 8192];
-        loop {
-            let n = file.read(&mut buffer).into_diagnostic()?;
-            if n == 0 {
-                break;
-            }
-            hasher.update(&buffer[..n]);
-        }
-        format!("{:x}", hasher.finalize())
-    };
+    let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
+        .into_diagnostic()?;
 
-    tracing::info!("Rebuilt package SHA256: {}", rebuilt_sha);
-    tracing::info!("Rebuilt package saved to: {:?}", rebuilt_path);
+    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
     // Compare the SHA hashes
     if original_sha == rebuilt_sha {
@@ -934,8 +907,8 @@ pub async fn rebuild(
     } else {
         tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
         println!("❌ Rebuild produced different output!");
-        println!("  Original SHA256: {}", original_sha);
-        println!("  Rebuilt SHA256:  {}", rebuilt_sha);
+        println!("  Original SHA256: {:x}", original_sha);
+        println!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
         println!("  Rebuilt package: {}", rebuilt_path.display());
 
         // Check if diffoscope is available
