@@ -12,6 +12,7 @@ use crate::recipe_generator::{
     serialize::{self, ScriptTest, Test, UrlSourceElement},
     write_recipe,
 };
+/// Package metadata returned by the R-universe/CRAN API.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PackageInfo {
@@ -52,6 +53,7 @@ pub struct PackageInfo {
     pub _dependencies: Vec<Dependency>,
 }
 
+/// Packaging time and user information.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Packaged {
@@ -59,6 +61,7 @@ pub struct Packaged {
     pub User: String,
 }
 
+/// Options to control CRAN/R recipe generation.
 #[derive(Debug, Clone, Parser)]
 pub struct CranOpts {
     /// The R Universe to fetch the package from (defaults to `cran`)
@@ -77,6 +80,7 @@ pub struct CranOpts {
     pub write: bool,
 }
 
+/// Commit information from the R-universe/CRAN API.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Commit {
@@ -87,6 +91,7 @@ pub struct Commit {
     pub time: i64,
 }
 
+/// Maintainer information from the R-universe/CRAN API.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Maintainer {
@@ -95,6 +100,7 @@ pub struct Maintainer {
     pub login: Option<String>,
 }
 
+/// Dependency specification for a CRAN package, including role and version.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Dependency {
@@ -175,6 +181,7 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
     res
 }
 
+/// Download the package at `url` and compute its SHA256 checksum.
 pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Error> {
     let client = reqwest::Client::new();
     let response = client.get(url.clone()).send().await.into_diagnostic()?;
@@ -201,11 +208,28 @@ const R_BUILTINS: &[&str] = &[
     "utils",
 ];
 
-#[async_recursion::async_recursion]
-pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
-    let package = &opts.package;
+fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
+    let recipe_str = format!("{}", recipe);
+    let mut final_recipe = String::new();
+    for line in recipe_str.lines() {
+        if line.contains("SUGGEST") {
+            final_recipe.push_str(&format!(
+                "{}  # suggested\n",
+                line.replace(" - SUGGEST", " # - ")
+            ));
+        } else {
+            final_recipe.push_str(&format!("{}\n", line));
+        }
+    }
+    final_recipe
+}
+
+async fn build_cran_recipe_and_deps(
+    package: &str,
+    universe: Option<&str>,
+) -> miette::Result<(serialize::Recipe, HashSet<String>)> {
+    let universe = universe.unwrap_or("cran");
     tracing::info!("Generating R recipe for {}", package);
-    let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
         "https://{universe}.r-universe.dev/api/packages/{}",
         package
@@ -324,19 +348,29 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         )],
     }));
 
-    let recipe_str = format!("{}", recipe);
+    Ok((recipe, remaining_deps))
+}
 
-    let mut final_recipe = String::new();
-    for line in recipe_str.lines() {
-        if line.contains("SUGGEST") {
-            final_recipe.push_str(&format!(
-                "{}  # suggested\n",
-                line.replace(" - SUGGEST", " # - ")
-            ));
-        } else {
-            final_recipe.push_str(&format!("{}\n", line));
-        }
-    }
+/// Generate a CRAN recipe for `package` and return the YAML as a string.
+pub async fn generate_r_recipe_string(
+    package: &str,
+    universe: Option<&str>,
+) -> miette::Result<String> {
+    let (recipe, _remaining_deps) = build_cran_recipe_and_deps(package, universe).await?;
+    Ok(format_cran_recipe_with_suggests(&recipe))
+}
+
+#[async_recursion::async_recursion]
+/// Generate a CRAN recipe using `CranOpts` and either print it or write it to disk.
+///
+/// If `opts.write` is true, the recipe is written to a folder named after the
+/// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
+/// dependencies are recursively generated if they don't already exist locally.
+pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
+    let (recipe, remaining_deps) =
+        build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
+
+    let final_recipe = format_cran_recipe_with_suggests(&recipe);
 
     if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;

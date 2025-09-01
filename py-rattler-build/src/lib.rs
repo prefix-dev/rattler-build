@@ -1,9 +1,13 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, future::Future, path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
+    recipe_generator::{
+        CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
+        generate_pypi_recipe_string, generate_r_recipe_string,
+    },
     run_test,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
 };
@@ -18,10 +22,72 @@ use rattler_upload::upload::opt::{
 };
 use url::Url;
 
+/// Execute async tasks in Python bindings with proper error handling
+fn run_async_task<F, R>(future: F) -> PyResult<R>
+where
+    F: Future<Output = miette::Result<R>>,
+{
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| PyRuntimeError::new_err(format!("Failed to create async runtime: {}", e)))?;
+
+    rt.block_on(async {
+        future
+            .await
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    })
+}
+
 // Bind the get version function to the Python module
 #[pyfunction]
 fn get_rattler_build_version_py() -> PyResult<String> {
     Ok(get_rattler_build_version().to_string())
+}
+
+/// Generate a PyPI recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, version=None, use_mapping=true))]
+fn generate_pypi_recipe_string_py(
+    package: String,
+    version: Option<String>,
+    use_mapping: bool,
+) -> PyResult<String> {
+    let opts = PyPIOpts {
+        package,
+        version,
+        write: false,
+        use_mapping,
+        tree: false,
+    };
+
+    run_async_task(generate_pypi_recipe_string(&opts))
+}
+
+/// Generate a CRAN (R) recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, universe=None))]
+fn generate_r_recipe_string_py(package: String, universe: Option<String>) -> PyResult<String> {
+    run_async_task(generate_r_recipe_string(&package, universe.as_deref()))
+}
+
+/// Generate a CPAN (Perl) recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (package, version=None))]
+fn generate_cpan_recipe_string_py(package: String, version: Option<String>) -> PyResult<String> {
+    let opts = CpanOpts {
+        package,
+        version,
+        write: false,
+        tree: false,
+    };
+
+    run_async_task(generate_cpan_recipe_string(&opts))
+}
+
+/// Generate a LuaRocks recipe and return the YAML as a string.
+#[pyfunction]
+#[pyo3(signature = (rock))]
+fn generate_luarocks_recipe_string_py(rock: String) -> PyResult<String> {
+    run_async_task(generate_luarocks_recipe_string(&rock))
 }
 
 #[pyfunction]
@@ -146,11 +212,8 @@ fn build_recipes_py(
         exclude_newer,
     );
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) = build_recipes(recipes, build_data, &None).await {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        build_recipes(recipes, build_data, &None).await?;
         Ok(())
     })
 }
@@ -211,11 +274,8 @@ fn test_package_py(
         common,
     );
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) = run_test(test_data, None).await {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        run_test(test_data, None).await?;
         Ok(())
     })
 }
@@ -235,14 +295,8 @@ fn upload_package_to_quetz_py(
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let quetz_data = QuetzData::new(url, channels, api_key);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) =
-            rattler_upload::upload::upload_package_to_quetz(&store, &package_files, quetz_data)
-                .await
-        {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        upload::upload_package_to_quetz(&store, &package_files, quetz_data).await?;
         Ok(())
     })
 }
@@ -262,13 +316,8 @@ fn upload_package_to_artifactory_py(
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let artifactory_data = ArtifactoryData::new(url, channels, token);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) =
-            upload::upload_package_to_artifactory(&store, &package_files, artifactory_data).await
-        {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        upload::upload_package_to_artifactory(&store, &package_files, artifactory_data).await?;
         Ok(())
     })
 }
@@ -290,12 +339,8 @@ fn upload_package_to_prefix_py(
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, skip_existing);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) = upload::upload_package_to_prefix(&store, &package_files, prefix_data).await
-        {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        upload::upload_package_to_prefix(&store, &package_files, prefix_data).await?;
         Ok(())
     })
 }
@@ -320,13 +365,8 @@ fn upload_package_to_anaconda_py(
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let anaconda_data = AnacondaData::new(owner, channel, api_key, url, force);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) =
-            upload::upload_package_to_anaconda(&store, &package_files, anaconda_data).await
-        {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        upload::upload_package_to_anaconda(&store, &package_files, anaconda_data).await?;
         Ok(())
     })
 }
@@ -366,14 +406,9 @@ fn upload_packages_to_conda_forge_py(
         dry_run,
     );
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        if let Err(e) =
-            upload::conda_forge::upload_packages_to_conda_forge(&package_files, conda_forge_data)
-                .await
-        {
-            return Err(PyRuntimeError::new_err(e.to_string()));
-        }
+    run_async_task(async {
+        upload::conda_forge::upload_packages_to_conda_forge(&package_files, conda_forge_data)
+            .await?;
         Ok(())
     })
 }
@@ -381,6 +416,10 @@ fn upload_packages_to_conda_forge_py(
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_pypi_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_r_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_cpan_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(generate_luarocks_recipe_string_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_package_to_quetz_py, &m).unwrap())?;
