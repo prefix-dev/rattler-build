@@ -836,6 +836,8 @@ mod tests {
 
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
+            use crate::source::fetch_source;
+
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
 
             // If you rename these, don't forget to change names in `show_dir_difference`.
