@@ -261,21 +261,17 @@ pub(crate) fn apply_patch_custom(
 
     for diff in patch {
         let file_paths = custom_patch_stripped_paths(&diff, strip_level);
-        println!("File paths: {:?}", file_paths);
         let absolute_file_paths = (
             file_paths.0.map(|o| work_dir.join(&o)),
             file_paths.1.map(|m| work_dir.join(&m)),
         );
 
-        println!(
+        tracing::debug!(
             "Patch will be applied:\n\tFrom: {:#?}\n\tTo:{:#?}",
-            absolute_file_paths.0, absolute_file_paths.1
+            absolute_file_paths.0,
+            absolute_file_paths.1
         );
 
-        println!(
-            "Writing: {}",
-            absolute_file_paths.1.as_ref().unwrap().display()
-        );
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
@@ -344,11 +340,10 @@ mod tests {
 
     #[cfg(feature = "patch-test-extra")]
     use crate::{
-        SystemTools, get_build_output, get_tool_config,
+        get_build_output, get_tool_config,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
         script::SandboxArguments,
-        source::fetch_source,
         tool_configuration::Configuration,
     };
 
