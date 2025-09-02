@@ -53,6 +53,7 @@ use std::{
 
 use build::{WorkingDirectoryBehavior, run_build, skip_existing};
 use console_utils::LoggingOutputHandler;
+use dialoguer::Confirm;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
@@ -901,45 +902,45 @@ pub async fn rebuild(
 
     // Compare the SHA hashes
     if original_sha == rebuilt_sha {
-        tracing::info!("✅ Rebuild successful! SHA256 hashes match.");
-        println!("✅ Rebuild successful! The rebuilt package is identical to the original.");
-        println!("  Rebuilt package: {}", rebuilt_path.display());
+        tracing::info!(
+            "✅ Rebuild successful! SHA256 hashes match. Packages are bit-for-bit identical!"
+        );
     } else {
         tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
-        println!("❌ Rebuild produced different output!");
-        println!("  Original SHA256: {:x}", original_sha);
-        println!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
-        println!("  Rebuilt package: {}", rebuilt_path.display());
+        tracing::info!("❌ Rebuild produced different output!");
+        tracing::info!("  Original SHA256: {:x}", original_sha);
+        tracing::info!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
+        tracing::info!("  Rebuilt package: {}", rebuilt_path.display());
 
         // Check if diffoscope is available
         let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
 
         if diffoscope_available {
-            println!("\nWould you like to run diffoscope to see the differences? [y/N]");
+            let confirmation = Confirm::new()
+                .with_prompt("Do you want to run diffoscope?")
+                .interact()
+                .unwrap();
 
-            use std::io::{self, BufRead};
-            let stdin = io::stdin();
-            let mut input = String::new();
-            stdin.lock().read_line(&mut input).into_diagnostic()?;
-
-            if input.trim().to_lowercase() == "y" {
-                println!("Running diffoscope...");
-                let output = Command::new("diffoscope")
+            if confirmation {
+                let mut command = Command::new("diffoscope");
+                command
                     .arg(&package_path)
                     .arg(&rebuilt_path)
                     .arg("--text-color")
-                    .arg("auto")
-                    .output()
-                    .into_diagnostic()?;
+                    .arg("always");
 
-                println!("{}", String::from_utf8_lossy(&output.stdout));
+                tracing::info!("Running diffoscope: {:?}", command);
+
+                let output = command.output().into_diagnostic()?;
+
+                tracing::info!("{}", String::from_utf8_lossy(&output.stdout));
                 if !output.stderr.is_empty() {
-                    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                    tracing::info!("{}", String::from_utf8_lossy(&output.stderr));
                 }
             }
         } else {
-            println!("\nHint: Install diffoscope to see detailed differences:");
-            println!("  pixi global install diffoscope");
+            tracing::info!("\nHint: Install diffoscope to see detailed differences:");
+            tracing::info!("  pixi global install diffoscope");
         }
     }
 
