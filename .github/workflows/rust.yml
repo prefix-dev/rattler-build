@@ -315,7 +315,7 @@ jobs:
           # Find the built package (should be something like rich-*.conda)
           PACKAGE=$(find ./output/noarch/rich-*.conda | head -n1)
           echo "Rebuilding package: $PACKAGE"
-          ./rattler-build rebuild "$PACKAGE"
+          ./rattler-build rebuild --package-file "$PACKAGE"
           echo "Rebuild completed successfully"
 
       - name: Compare original and rebuilt packages
