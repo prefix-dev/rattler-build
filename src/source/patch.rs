@@ -813,6 +813,7 @@ mod tests {
     #[tokio::test]
     async fn test_package_from_conda_forge(
         #[base_dir = "test-data/conda_forge/recipes"]
+        #[dirs]
         #[files("*")]
         // Slow tests
         #[exclude("(root)|(tiledbsoma)|(libmodplug)")]
