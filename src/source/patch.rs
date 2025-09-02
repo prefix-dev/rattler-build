@@ -827,7 +827,7 @@ mod tests {
                     (Some(o), None) => {
                         patch_results.push((patch, PatchResult::Deleted(!o.exists())))
                     }
-                    (Some(o), Some(m)) => {
+                    (Some(_), Some(m)) => {
                         let modified_file_contents = fs_err::read(m).into_diagnostic()?;
                         let modified_file_debug_representation =
                             String::from_utf8(modified_file_contents)
