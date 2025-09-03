@@ -102,7 +102,7 @@ fn parse_recipe_py(
     build_platform: Option<String>,
     experimental: Option<bool>,
     allow_undefined: Option<bool>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let target_platform = target_platform
         .map(|p| Platform::from_str(&p))
         .transpose()
@@ -136,7 +136,7 @@ fn parse_recipe_py(
                 PyRuntimeError::new_err(format!("Failed to serialize recipe: {}", e))
             })?;
 
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 pythonize::pythonize(py, &json_value)
                     .map(|obj| obj.into())
                     .map_err(|e| {
