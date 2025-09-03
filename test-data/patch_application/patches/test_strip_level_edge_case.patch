@@ -1,0 +1,12 @@
+--- a/b/c/d/deep/nested/directory/deep_file.txt.orig	2021-12-27 12:22:09.000000000 -0800
++++ a/b/c/d/deep/nested/directory/deep_file.txt	2021-12-27 12:22:14.000000000 -0800
+@@ -1,3 +1,4 @@
+ This is a deep nested file.
+ It should be patchable with various strip levels.
++Strip level test applied!
+ Original content here.
+--- a/b/c/d/nonexistent_deep.txt.orig	2021-12-27 12:22:09.000000000 -0800
++++ a/b/c/d/nonexistent_deep.txt	2021-12-27 12:22:14.000000000 -0800
+@@ -0,0 +1,2 @@
++This file doesn't exist.
++Should not affect strip level detection.

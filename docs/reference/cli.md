@@ -374,7 +374,7 @@ Rebuild a package from a package file instead of a recipe
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
-	The package file to rebuild
+	The package file to rebuild (can be a local path or URL)
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
