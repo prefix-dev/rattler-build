@@ -8,7 +8,7 @@ here](https://reproducible-builds.org/).
 ## Usage
 
 ```bash
-rattler-build rebuild ./mypkg-0.1.0-h60d57d3_0.tar.bz2
+rattler-build rebuild --package-file ./mypkg-0.1.0-h60d57d3_0.tar.bz2
 ```
 
 ### How it works
