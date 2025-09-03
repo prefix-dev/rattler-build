@@ -4,11 +4,13 @@ use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
+    recipe::parser::Recipe,
     recipe_generator::{
         CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
         generate_pypi_recipe_string, generate_r_recipe_string,
     },
     run_test,
+    selectors::SelectorConfig,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
 };
 use clap::ValueEnum;
@@ -88,6 +90,65 @@ fn generate_cpan_recipe_string_py(package: String, version: Option<String>) -> P
 #[pyo3(signature = (rock))]
 fn generate_luarocks_recipe_string_py(rock: String) -> PyResult<String> {
     run_async_task(generate_luarocks_recipe_string(&rock))
+}
+
+/// Parse a recipe YAML string and return the parsed recipe as a Python dictionary.
+#[pyfunction]
+#[pyo3(signature = (yaml_content, target_platform=None, host_platform=None, build_platform=None, experimental=None, allow_undefined=None))]
+fn parse_recipe_py(
+    yaml_content: String,
+    target_platform: Option<String>,
+    host_platform: Option<String>,
+    build_platform: Option<String>,
+    experimental: Option<bool>,
+    allow_undefined: Option<bool>,
+) -> PyResult<PyObject> {
+    let target_platform = target_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        .unwrap_or_else(Platform::current);
+
+    let host_platform = host_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        .unwrap_or_else(Platform::current);
+
+    let build_platform = build_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        .unwrap_or_else(Platform::current);
+
+    let selector_config = SelectorConfig {
+        target_platform,
+        host_platform,
+        build_platform,
+        experimental: experimental.unwrap_or(false),
+        allow_undefined: allow_undefined.unwrap_or(false),
+        ..Default::default()
+    };
+
+    match Recipe::from_yaml(yaml_content.as_str(), selector_config) {
+        Ok(recipe) => {
+            let json_value = serde_json::to_value(recipe).map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to serialize recipe: {}", e))
+            })?;
+
+            Python::with_gil(|py| {
+                pythonize::pythonize(py, &json_value)
+                    .map(|obj| obj.into())
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!("Failed to convert to Python: {}", e))
+                    })
+            })
+        }
+        Err(errors) => Err(PyRuntimeError::new_err(format!(
+            "Recipe parsing failed: {:?}",
+            errors
+        ))),
+    }
 }
 
 #[pyfunction]
@@ -420,6 +481,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(generate_r_recipe_string_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(generate_cpan_recipe_string_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(generate_luarocks_recipe_string_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(parse_recipe_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_package_to_quetz_py, &m).unwrap())?;

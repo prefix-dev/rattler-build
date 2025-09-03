@@ -35,6 +35,8 @@ url = "2.5.4"
 chrono = "0.4.41"
 rattler_upload = "0.2.0"
 miette = "7.6.0"
+serde_json = "1.0.143"
+pythonize = "0.25.0"
 
 [build-dependencies]
 pyo3-build-config = "0.25.1"
