@@ -116,6 +116,10 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     variables.insert("cdt_arch".into());
                 } else if function == "match" {
                     extract_variable_from_expression(arg, variables);
+                    // We also need to extract the second argument if it is a variable
+                    if let Some(second_arg) = get_pos_expr(&call.args, 1) {
+                        extract_variable_from_expression(second_arg, variables);
+                    }
                 }
             }
         }
@@ -342,6 +346,7 @@ mod test {
             - if: match(xpython, ">=3.7")
               then: numpy 100
             - ${{ testexprvar is string }}
+            - ${{ match(match_a_var, match_b_var) }}
         "#;
 
         let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
@@ -360,6 +365,8 @@ mod test {
         assert!(used_vars.contains("def"));
         assert!(used_vars.contains("xpython"));
         assert!(used_vars.contains("testexprvar"));
+        assert!(used_vars.contains("match_a_var"));
+        assert!(used_vars.contains("match_b_var"));
     }
 
     #[test]
