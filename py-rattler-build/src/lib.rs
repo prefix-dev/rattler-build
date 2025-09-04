@@ -1,10 +1,16 @@
-use std::{collections::HashMap, future::Future, path::PathBuf, str::FromStr};
+use serde_json::Value as JsonValue;
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::Future,
+    path::PathBuf,
+    str::FromStr,
+};
 
 use ::rattler_build::{
-    build_recipes, get_rattler_build_version,
+    NormalizedKey, build_recipes, get_rattler_build_version,
     metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
-    recipe::parser::Recipe,
+    recipe::{parser::Recipe, variable::Variable},
     recipe_generator::{
         CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
         generate_pypi_recipe_string, generate_r_recipe_string,
@@ -37,6 +43,174 @@ where
             .await
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     })
+}
+
+/// Python wrapper for SelectorConfig
+#[pyclass]
+#[derive(Clone)]
+pub struct PySelectorConfig {
+    inner: SelectorConfig,
+}
+
+#[pymethods]
+impl PySelectorConfig {
+    #[new]
+    #[pyo3(signature = (target_platform=None, host_platform=None, build_platform=None, variant=None, experimental=None, allow_undefined=None, recipe_path=None))]
+    fn new(
+        target_platform: Option<String>,
+        host_platform: Option<String>,
+        build_platform: Option<String>,
+        variant: Option<HashMap<String, Py<PyAny>>>,
+        experimental: Option<bool>,
+        allow_undefined: Option<bool>,
+        recipe_path: Option<PathBuf>,
+    ) -> PyResult<Self> {
+        let target_platform = target_platform
+            .map(|p| Platform::from_str(&p))
+            .transpose()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+            .unwrap_or_else(Platform::current);
+
+        let host_platform = host_platform
+            .map(|p| Platform::from_str(&p))
+            .transpose()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+            .unwrap_or_else(Platform::current);
+
+        let build_platform = build_platform
+            .map(|p| Platform::from_str(&p))
+            .transpose()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+            .unwrap_or_else(Platform::current);
+
+        // Convert variant from Python dict to BTreeMap<NormalizedKey, Variable>
+        let variant_map = if let Some(variant_dict) = variant {
+            Python::attach(|py| {
+                let mut map = BTreeMap::new();
+                for (key, value) in variant_dict {
+                    let normalized_key = NormalizedKey::from(key);
+                    // Convert Python object to JSON Value then to Variable
+                    let json_val: serde_json::Value = pythonize::depythonize(value.bind(py))
+                        .map_err(|e| {
+                            PyRuntimeError::new_err(format!(
+                                "Failed to convert variant value: {}",
+                                e
+                            ))
+                        })?;
+                    let variable = match &json_val {
+                        JsonValue::String(s) => Variable::from_string(s),
+                        JsonValue::Bool(b) => Variable::from(*b),
+                        JsonValue::Number(n) => {
+                            if let Some(i) = n.as_i64() {
+                                Variable::from(i)
+                            } else {
+                                Variable::from_string(&n.to_string())
+                            }
+                        }
+                        JsonValue::Array(arr) => {
+                            let vars: Result<Vec<Variable>, PyErr> = arr
+                                .iter()
+                                .map(|v| match v {
+                                    JsonValue::String(s) => Ok(Variable::from_string(s)),
+                                    JsonValue::Bool(b) => Ok(Variable::from(*b)),
+                                    JsonValue::Number(n) => Ok(if let Some(i) = n.as_i64() {
+                                        Variable::from(i)
+                                    } else {
+                                        Variable::from_string(&n.to_string())
+                                    }),
+                                    _ => Err(PyRuntimeError::new_err(
+                                        "Complex array elements not supported",
+                                    )),
+                                })
+                                .collect();
+                            Variable::from(vars?)
+                        }
+                        JsonValue::Object(_) => {
+                            return Err(PyRuntimeError::new_err("Object variants not supported"));
+                        }
+                        JsonValue::Null => {
+                            return Err(PyRuntimeError::new_err("Null variants not supported"));
+                        }
+                    };
+                    map.insert(normalized_key, variable);
+                }
+                Ok::<BTreeMap<NormalizedKey, Variable>, PyErr>(map)
+            })?
+        } else {
+            BTreeMap::new()
+        };
+
+        let selector_config = SelectorConfig {
+            target_platform,
+            host_platform,
+            build_platform,
+            hash: None,
+            variant: variant_map,
+            experimental: experimental.unwrap_or(false),
+            allow_undefined: allow_undefined.unwrap_or(false),
+            recipe_path,
+        };
+
+        Ok(PySelectorConfig {
+            inner: selector_config,
+        })
+    }
+
+    #[getter]
+    fn target_platform(&self) -> String {
+        self.inner.target_platform.to_string()
+    }
+
+    #[getter]
+    fn host_platform(&self) -> String {
+        self.inner.host_platform.to_string()
+    }
+
+    #[getter]
+    fn build_platform(&self) -> String {
+        self.inner.build_platform.to_string()
+    }
+
+    #[getter]
+    fn experimental(&self) -> bool {
+        self.inner.experimental
+    }
+
+    #[getter]
+    fn allow_undefined(&self) -> bool {
+        self.inner.allow_undefined
+    }
+
+    #[getter]
+    fn recipe_path(&self) -> Option<PathBuf> {
+        self.inner.recipe_path.clone()
+    }
+
+    #[getter]
+    fn variant(&self) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
+            let mut dict = HashMap::new();
+            for (key, value) in &self.inner.variant {
+                let json_value = serde_json::to_value(value).map_err(|e| {
+                    PyRuntimeError::new_err(format!("Failed to serialize variant: {}", e))
+                })?;
+                dict.insert(key.normalize(), json_value);
+            }
+            pythonize::pythonize(py, &dict)
+                .map(|obj| obj.into())
+                .map_err(|e| {
+                    PyRuntimeError::new_err(format!("Failed to convert variant to Python: {}", e))
+                })
+        })
+    }
+}
+
+impl PySelectorConfig {
+    /// Internal method to get the underlying SelectorConfig
+    /// This is used internally when passing the config to Rust functions
+    pub(crate) fn inner(&self) -> &SelectorConfig {
+        &self.inner
+    }
 }
 
 // Bind the get version function to the Python module
@@ -94,43 +268,12 @@ fn generate_luarocks_recipe_string_py(rock: String) -> PyResult<String> {
 
 /// Parse a recipe YAML string and return the parsed recipe as a Python dictionary.
 #[pyfunction]
-#[pyo3(signature = (yaml_content, target_platform=None, host_platform=None, build_platform=None, experimental=None, allow_undefined=None))]
+#[pyo3(signature = (yaml_content, selector_config))]
 fn parse_recipe_py(
     yaml_content: String,
-    target_platform: Option<String>,
-    host_platform: Option<String>,
-    build_platform: Option<String>,
-    experimental: Option<bool>,
-    allow_undefined: Option<bool>,
+    selector_config: &PySelectorConfig,
 ) -> PyResult<Py<PyAny>> {
-    let target_platform = target_platform
-        .map(|p| Platform::from_str(&p))
-        .transpose()
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
-        .unwrap_or_else(Platform::current);
-
-    let host_platform = host_platform
-        .map(|p| Platform::from_str(&p))
-        .transpose()
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
-        .unwrap_or_else(Platform::current);
-
-    let build_platform = build_platform
-        .map(|p| Platform::from_str(&p))
-        .transpose()
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
-        .unwrap_or_else(Platform::current);
-
-    let selector_config = SelectorConfig {
-        target_platform,
-        host_platform,
-        build_platform,
-        experimental: experimental.unwrap_or(false),
-        allow_undefined: allow_undefined.unwrap_or(false),
-        ..Default::default()
-    };
-
-    match Recipe::from_yaml(yaml_content.as_str(), selector_config) {
+    match Recipe::from_yaml(yaml_content.as_str(), selector_config.inner().clone()) {
         Ok(recipe) => {
             let json_value = serde_json::to_value(recipe).map_err(|e| {
                 PyRuntimeError::new_err(format!("Failed to serialize recipe: {}", e))
@@ -489,6 +632,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload_package_to_prefix_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_package_to_anaconda_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_packages_to_conda_forge_py, &m).unwrap())?;
+    m.add_class::<PySelectorConfig>()?;
 
     Ok(())
 }

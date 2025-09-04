@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from rattler_build import Recipe
+from rattler_build import Recipe, PySelectorConfig, parse_recipe_py
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "test-package"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"
@@ -82,6 +82,48 @@ def test_recipe_representations() -> None:
     assert "Requirements(" in repr(recipe.requirements)
     assert "About(" in repr(recipe.about)
     assert "Source(" in repr(recipe.source[0])
+
+
+def test_selector_config_with_variants() -> None:
+    """Test SelectorConfig with variant configuration"""
+    config = PySelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+    assert config.target_platform == "linux-64"
+    assert config.variant["python"] == "3.11"
+    assert config.variant["build_number"] == 1
+
+
+def test_parse_recipe_with_selectors() -> None:
+    """Test parsing recipe with platform selectors using existing test data"""
+    linux_config = PySelectorConfig(target_platform="linux-64")
+    windows_config = PySelectorConfig(target_platform="win-64")
+
+    recipe_linux = parse_recipe_py(TEST_RECIPE_FILE.read_text(), linux_config)
+    recipe_windows = parse_recipe_py(TEST_RECIPE_FILE.read_text(), windows_config)
+
+    # Both should parse the same package
+    assert recipe_linux["package"]["name"] == "test-package"
+    assert recipe_windows["package"]["name"] == "test-package"
+
+    # Check that we can parse both successfully - the main point is that SelectorConfig works
+    # However, as @wolf noted, the "intermediate recipe" in pixi-build will be migrating to rattler-build at some point.
+    # This would improve SelectorConfig to parse and validate while resolving selectors for different operating systems.
+    # For example, linux: selectors could potentially be validated on Windows.
+    # But for now, this is all we can do.
+    assert "requirements" in recipe_linux
+    assert "requirements" in recipe_windows
+    assert len(recipe_linux["requirements"]["host"]) > 0
+    assert len(recipe_windows["requirements"]["host"]) > 0
+
+
+def test_recipe_with_variants() -> None:
+    """Test recipe parsing with variant substitution using existing test data"""
+    config = PySelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+
+    recipe = parse_recipe_py(TEST_RECIPE_FILE.read_text(), config)
+
+    assert recipe["package"]["name"] == "test-package"
+    assert recipe["package"]["version"] == "1.0.0"
+    assert recipe["build"]["number"] == 0
 
 
 if __name__ == "__main__":

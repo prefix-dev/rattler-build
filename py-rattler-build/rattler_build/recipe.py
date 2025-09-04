@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from .rattler_build import parse_recipe_py
+from .rattler_build import parse_recipe_py, PySelectorConfig
 
 
 class Build:
@@ -310,6 +310,7 @@ class Recipe:
         build_platform: Optional[str] = None,
         experimental: Optional[bool] = None,
         allow_undefined: Optional[bool] = None,
+        variant: Optional[Dict[str, Any]] = None,
     ) -> "Recipe":
         """Create a Recipe from a YAML string.
 
@@ -320,15 +321,17 @@ class Recipe:
             build_platform: The build platform. Defaults to current platform.
             experimental: Enable experimental features. Defaults to False.
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
+            variant: Variant configuration as a dictionary. Defaults to empty.
         """
-        data = parse_recipe_py(
-            yaml_content,
+        selector_config = PySelectorConfig(
             target_platform=target_platform,
             host_platform=host_platform,
             build_platform=build_platform,
             experimental=experimental,
             allow_undefined=allow_undefined,
+            variant=variant,
         )
+        data = parse_recipe_py(yaml_content, selector_config)
         return cls(data)
 
     @classmethod
@@ -340,6 +343,7 @@ class Recipe:
         build_platform: Optional[str] = None,
         experimental: Optional[bool] = None,
         allow_undefined: Optional[bool] = None,
+        variant: Optional[Dict[str, Any]] = None,
     ) -> "Recipe":
         """Create a Recipe from a YAML file path.
 
@@ -350,6 +354,7 @@ class Recipe:
             build_platform: The build platform. Defaults to current platform.
             experimental: Enable experimental features. Defaults to False.
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
+            variant: Variant configuration as a dictionary. Defaults to empty.
         """
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -360,6 +365,7 @@ class Recipe:
             build_platform=build_platform,
             experimental=experimental,
             allow_undefined=allow_undefined,
+            variant=variant,
         )
 
     @property
