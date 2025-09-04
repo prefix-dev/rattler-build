@@ -847,7 +847,7 @@ Store authentication information for a given host
 
 - `<HOST>`
 
-	The host to authenticate with (e.g. repo.prefix.dev)
+	The host to authenticate with (e.g. prefix.dev)
 
 
 

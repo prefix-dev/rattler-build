@@ -153,7 +153,7 @@ options.
 
 A variant package has the same version number, but different "hash" and
 potentially different dependencies or build options. Variant keys are extracted
-from the `variant_config.yaml` file and usually any used Jinja variables or
+from the `variants.yaml` file and usually any used Jinja variables or
 dependencies without version specifier are used as variant keys.
 
 Variant keys can also be forcibly set or ignored with the `use_keys` and
