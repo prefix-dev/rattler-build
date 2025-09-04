@@ -821,13 +821,13 @@ compiler:
 
         let result: Result<VariantConfig, Vec<PartialParsingError>> =
             rendered_node.try_convert("test");
-        
+
         assert!(result.is_ok());
         let config = result.unwrap();
-        
+
         let validation_result = config.validate_zip_keys();
         assert!(validation_result.is_err());
-        
+
         match validation_result.unwrap_err() {
             VariantExpandError::InvalidZipKeyStructure => {}
             other => panic!("Expected InvalidZipKeyStructure error, got: {:?}", other),
