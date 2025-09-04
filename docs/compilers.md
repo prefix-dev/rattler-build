@@ -4,7 +4,7 @@ To use a compiler in your project, it's best to use the `${{ compiler('lang')
 }}` template function. The compiler function works by taking a language,
 determining the configured compiler for that language, and adding some
 information about the target platform to the selected compiler. To configure a
-compiler for a specific language, the `variant_config.yaml` file can be used.
+compiler for a specific language, the `variants.yaml` file can be used.
 
 For example, in a recipe that uses a C-compiler, you can use the following code:
 
