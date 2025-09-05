@@ -72,7 +72,7 @@ ruff-format = "ruff format --force-exclude"
 ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
 toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
 toml-lint = "taplo lint --verbose **/pixi.toml"
-typos = "typos --write-changes --force-exclude"
+typos = "typos --force-exclude"
 
 [feature.dev.dependencies]
 tbump = "*"
