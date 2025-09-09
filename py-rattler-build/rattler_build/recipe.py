@@ -295,6 +295,66 @@ class TestType:
         return f"TestType(type='{self.test_type}')"
 
 
+class SelectorConfig:
+    """Python wrapper for PySelectorConfig to provide a cleaner interface."""
+
+    def __init__(
+        self,
+        target_platform: Optional[str] = None,
+        host_platform: Optional[str] = None,
+        build_platform: Optional[str] = None,
+        experimental: Optional[bool] = None,
+        allow_undefined: Optional[bool] = None,
+        variant: Optional[Dict[str, Any]] = None,
+    ):
+        self._config = PySelectorConfig(
+            target_platform=target_platform,
+            host_platform=host_platform,
+            build_platform=build_platform,
+            experimental=experimental,
+            allow_undefined=allow_undefined,
+            variant=variant,
+        )
+
+    @property
+    def target_platform(self) -> Optional[str]:
+        """Get the target platform."""
+        return self._config.target_platform
+
+    @property
+    def host_platform(self) -> Optional[str]:
+        """Get the host platform."""
+        return self._config.host_platform
+
+    @property
+    def build_platform(self) -> Optional[str]:
+        """Get the build platform."""
+        return self._config.build_platform
+
+    @property
+    def experimental(self) -> Optional[bool]:
+        """Get whether experimental features are enabled."""
+        return self._config.experimental
+
+    @property
+    def allow_undefined(self) -> Optional[bool]:
+        """Get whether undefined variables are allowed."""
+        return self._config.allow_undefined
+
+    @property
+    def variant(self) -> Dict[str, Any]:
+        """Get the variant configuration."""
+        return self._config.variant
+
+    def __repr__(self) -> str:
+        return f"SelectorConfig(target_platform={self.target_platform!r}, variant={self.variant!r})"
+
+    @property
+    def config(self) -> PySelectorConfig:
+        """Get the underlying PySelectorConfig object."""
+        return self._config
+
+
 class Recipe:
     """A parsed conda recipe with object-oriented access to all fields."""
 
@@ -323,7 +383,7 @@ class Recipe:
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
             variant: Variant configuration as a dictionary. Defaults to empty.
         """
-        selector_config = PySelectorConfig(
+        selector_config = SelectorConfig(
             target_platform=target_platform,
             host_platform=host_platform,
             build_platform=build_platform,
@@ -331,7 +391,7 @@ class Recipe:
             allow_undefined=allow_undefined,
             variant=variant,
         )
-        data = parse_recipe_py(yaml_content, selector_config)
+        data = parse_recipe_py(yaml_content, selector_config.config)
         return cls(data)
 
     @classmethod

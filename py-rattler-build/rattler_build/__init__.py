@@ -19,6 +19,7 @@ from .recipe import (
     About,
     Source,
     TestType,
+    SelectorConfig,
 )
 
 from . import recipe_generation
@@ -46,6 +47,7 @@ __all__ = [
     "Source",
     "TestType",
     "parse_recipe_py",
+    "SelectorConfig",
     "PySelectorConfig",
 ]
 

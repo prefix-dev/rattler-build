@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from rattler_build import Recipe, PySelectorConfig, parse_recipe_py
+from rattler_build import Recipe, SelectorConfig, parse_recipe_py
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "test-package"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"
@@ -86,7 +86,7 @@ def test_recipe_representations() -> None:
 
 def test_selector_config_with_variants() -> None:
     """Test SelectorConfig with variant configuration"""
-    config = PySelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+    config = SelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
     assert config.target_platform == "linux-64"
     assert config.variant["python"] == "3.11"
     assert config.variant["build_number"] == 1
@@ -94,8 +94,8 @@ def test_selector_config_with_variants() -> None:
 
 def test_parse_recipe_with_selectors() -> None:
     """Test parsing recipe with platform selectors using existing test data"""
-    linux_config = PySelectorConfig(target_platform="linux-64")
-    windows_config = PySelectorConfig(target_platform="win-64")
+    linux_config = SelectorConfig(target_platform="linux-64")
+    windows_config = SelectorConfig(target_platform="win-64")
 
     recipe_linux = parse_recipe_py(TEST_RECIPE_FILE.read_text(), linux_config)
     recipe_windows = parse_recipe_py(TEST_RECIPE_FILE.read_text(), windows_config)
@@ -117,7 +117,7 @@ def test_parse_recipe_with_selectors() -> None:
 
 def test_recipe_with_variants() -> None:
     """Test recipe parsing with variant substitution using existing test data"""
-    config = PySelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+    config = SelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
 
     recipe = parse_recipe_py(TEST_RECIPE_FILE.read_text(), config)
 
