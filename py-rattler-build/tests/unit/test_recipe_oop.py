@@ -97,8 +97,8 @@ def test_parse_recipe_with_selectors() -> None:
     linux_config = SelectorConfig(target_platform="linux-64")
     windows_config = SelectorConfig(target_platform="win-64")
 
-    recipe_linux = parse_recipe_py(TEST_RECIPE_FILE.read_text(), linux_config)
-    recipe_windows = parse_recipe_py(TEST_RECIPE_FILE.read_text(), windows_config)
+    recipe_linux = parse_recipe_py(TEST_RECIPE_FILE.read_text(), linux_config.config)
+    recipe_windows = parse_recipe_py(TEST_RECIPE_FILE.read_text(), windows_config.config)
 
     # Both should parse the same package
     assert recipe_linux["package"]["name"] == "test-package"
@@ -119,7 +119,7 @@ def test_recipe_with_variants() -> None:
     """Test recipe parsing with variant substitution using existing test data"""
     config = SelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
 
-    recipe = parse_recipe_py(TEST_RECIPE_FILE.read_text(), config)
+    recipe = parse_recipe_py(TEST_RECIPE_FILE.read_text(), config.config)
 
     assert recipe["package"]["name"] == "test-package"
     assert recipe["package"]["version"] == "1.0.0"
