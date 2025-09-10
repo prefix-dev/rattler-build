@@ -98,6 +98,7 @@ class RattlerBuild:
         custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
         extra_meta: dict[str, Any] = None,
+        raw: bool = False,
         **kwargs: Any,
     ) -> Any:
         args = self.build_args(
@@ -110,9 +111,19 @@ class RattlerBuild:
         )
         if with_solve:
             args += ["--with-solve"]
-        output = self(*args, "--render-only", **kwargs)
-        print(output)
-        return json.loads(output)
+        if raw:
+            return self(
+                *args,
+                "--render-only",
+                need_result_object=True,
+                text=True,
+                capture_output=True,
+                **kwargs,
+            )
+        else:
+            output = self(*args, "--render-only", **kwargs)
+            print(output)
+            return json.loads(output)
 
 
 def get_package(folder: Path, glob="*.tar.bz2"):
