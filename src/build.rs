@@ -137,7 +137,7 @@ pub async fn run_build(
     };
 
     let output = output
-        .resolve_dependencies(tool_configuration)
+        .resolve_dependencies(tool_configuration, true)
         .await
         .into_diagnostic()?;
 

@@ -1052,7 +1052,7 @@ pub async fn build_recipes(
             for output in outputs {
                 updated_outputs.push(
                     output
-                        .resolve_dependencies(&tool_config)
+                        .resolve_dependencies(&tool_config, false)
                         .await
                         .into_diagnostic()?,
                 );
@@ -1161,7 +1161,7 @@ pub async fn debug_recipe(
             .await
             .into_diagnostic()?;
         let output = output
-            .resolve_dependencies(&tool_config)
+            .resolve_dependencies(&tool_config, true)
             .await
             .into_diagnostic()?;
         output

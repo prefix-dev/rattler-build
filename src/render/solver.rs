@@ -186,7 +186,7 @@ impl rattler_repodata_gateway::DownloadReporter for GatewayReporter {
             .multi_progress
             .add(ProgressBar::new(1))
             .with_finish(indicatif::ProgressFinish::AndLeave)
-            .with_prefix("Downloading");
+            .with_prefix("Fetching repodata");
 
         // use the configured style
         if let Some(template) = &self.progress_template {

@@ -220,10 +220,15 @@ impl Output {
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
 
-            let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
-                    .await
-                    .unwrap();
+            let finalized_dependencies = resolve_dependencies(
+                &cache.requirements,
+                &self,
+                &channels,
+                tool_configuration,
+                true,
+            )
+            .await
+            .unwrap();
 
             install_environments(&self, &finalized_dependencies, tool_configuration)
                 .await
