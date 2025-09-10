@@ -158,7 +158,19 @@ def test_render_only_with_solve_does_not_download_packages(
     assert "Collecting run exports" not in combined
     assert "Installing host environment" not in combined
     assert "Installing build environment" not in combined
-    assert "Resolving host environment" in combined
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
+    deps = outputs[0].get("finalized_dependencies", {})
+    resolved_len = 0
+    host = deps.get("host")
+    if isinstance(host, dict):
+        resolved_len = len(host.get("resolved", []))
+    if resolved_len == 0:
+        build = deps.get("build")
+        if isinstance(build, dict):
+            resolved_len = len(build.get("resolved", []))
+    assert resolved_len >= 1
 
 
 def test_run_exports(
