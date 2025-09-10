@@ -42,6 +42,7 @@ mod windows;
 mod package_cache_reporter;
 pub mod source_code;
 
+use crate::render::resolved_dependencies::RunExportsDownload;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
@@ -1052,7 +1053,7 @@ pub async fn build_recipes(
             for output in outputs {
                 updated_outputs.push(
                     output
-                        .resolve_dependencies(&tool_config, false)
+                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
                         .await
                         .into_diagnostic()?,
                 );
@@ -1161,7 +1162,7 @@ pub async fn debug_recipe(
             .await
             .into_diagnostic()?;
         let output = output
-            .resolve_dependencies(&tool_config, true)
+            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
             .await
             .into_diagnostic()?;
         output

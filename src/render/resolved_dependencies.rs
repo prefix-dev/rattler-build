@@ -478,6 +478,15 @@ pub enum ResolveError {
     RefreshChannelError(std::io::Error),
 }
 
+/// Controls whether to download missing run exports during dependency resolution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunExportsDownload {
+    /// Download packages to extract run exports when they are missing
+    DownloadMissing,
+    /// Skip downloading packages for run exports extraction
+    SkipDownload,
+}
+
 /// Apply a variant to a dependency list and resolve all pin_subpackage and
 /// compiler dependencies
 pub fn apply_variant(
@@ -693,7 +702,7 @@ pub(crate) async fn resolve_dependencies(
     output: &Output,
     channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
-    download_missing_run_exports: bool,
+    download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();
 
@@ -727,7 +736,7 @@ pub(crate) async fn resolve_dependencies(
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
-        if download_missing_run_exports {
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
             tool_configuration
                 .fancy_log_handler
                 .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
@@ -827,7 +836,7 @@ pub(crate) async fn resolve_dependencies(
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
-        if download_missing_run_exports {
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
             tool_configuration
                 .fancy_log_handler
                 .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
@@ -996,7 +1005,7 @@ impl Output {
     pub async fn resolve_dependencies(
         self,
         tool_configuration: &tool_configuration::Configuration,
-        download_missing_run_exports: bool,
+        download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
         let span = tracing::info_span!("Resolving environments");
         let _enter = span.enter();

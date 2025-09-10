@@ -18,7 +18,7 @@ use crate::{
         parser::{Dependency, Requirements, Source},
     },
     render::resolved_dependencies::{
-        FinalizedDependencies, install_environments, resolve_dependencies,
+        FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{
         copy_dir::{CopyDir, CopyOptions, copy_file},
@@ -225,7 +225,7 @@ impl Output {
                 &self,
                 &channels,
                 tool_configuration,
-                true,
+                RunExportsDownload::DownloadMissing,
             )
             .await
             .unwrap();

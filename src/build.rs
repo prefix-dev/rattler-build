@@ -9,6 +9,7 @@ use crate::{
     apply_patch_custom,
     metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
+    render::resolved_dependencies::RunExportsDownload,
     render::solver::load_repodatas,
     script::InterpreterError,
     tool_configuration,
@@ -137,7 +138,7 @@ pub async fn run_build(
     };
 
     let output = output
-        .resolve_dependencies(tool_configuration, true)
+        .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
         .await
         .into_diagnostic()?;
 
