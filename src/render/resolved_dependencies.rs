@@ -478,6 +478,15 @@ pub enum ResolveError {
     RefreshChannelError(std::io::Error),
 }
 
+/// Controls whether to download missing run exports during dependency resolution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunExportsDownload {
+    /// Download packages to extract run exports when they are missing
+    DownloadMissing,
+    /// Skip downloading packages for run exports extraction
+    SkipDownload,
+}
+
 /// Apply a variant to a dependency list and resolve all pin_subpackage and
 /// compiler dependencies
 pub fn apply_variant(
@@ -693,6 +702,7 @@ pub(crate) async fn resolve_dependencies(
     output: &Output,
     channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
+    download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();
 
@@ -724,26 +734,29 @@ pub(crate) async fn resolve_dependencies(
         .await
         .map_err(ResolveError::from)?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    amend_run_exports(
+                        &mut resolved,
+                        tool_configuration.client.get_client().clone(),
+                        tool_configuration.package_cache.clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -821,26 +834,29 @@ pub(crate) async fn resolve_dependencies(
         .await
         .map_err(ResolveError::from)?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    amend_run_exports(
+                        &mut resolved,
+                        tool_configuration.client.get_client().clone(),
+                        tool_configuration.package_cache.clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -989,6 +1005,7 @@ impl Output {
     pub async fn resolve_dependencies(
         self,
         tool_configuration: &tool_configuration::Configuration,
+        download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
         let span = tracing::info_span!("Resolving environments");
         let _enter = span.enter();
@@ -1006,6 +1023,7 @@ impl Output {
             &self,
             &channels,
             tool_configuration,
+            download_missing_run_exports,
         )
         .await?;
 

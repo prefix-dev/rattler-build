@@ -140,6 +140,39 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     check_info(pkg, expected=recipes / "toml" / "expected")
 
 
+def test_render_only_with_solve_does_not_download_packages(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    result = rattler_build.render(
+        recipes / "toml",
+        tmp_path,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        raw=True,
+    )
+
+    assert result.returncode == 0
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+
+    # Verify we did not trigger steps that download packages
+    assert "Collecting run exports" not in combined
+    assert "Installing host environment" not in combined
+    assert "Installing build environment" not in combined
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
+    deps = outputs[0].get("finalized_dependencies", {})
+    resolved_len = 0
+    host = deps.get("host")
+    if isinstance(host, dict):
+        resolved_len = len(host.get("resolved", []))
+    if resolved_len == 0:
+        build = deps.get("build")
+        if isinstance(build, dict):
+            resolved_len = len(build.get("resolved", []))
+    assert resolved_len >= 1
+
+
 def test_run_exports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
