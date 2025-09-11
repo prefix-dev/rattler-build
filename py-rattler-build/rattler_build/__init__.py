@@ -7,8 +7,6 @@ from .rattler_build import (
     upload_package_to_prefix_py,
     upload_package_to_anaconda_py,
     upload_packages_to_conda_forge_py,
-    parse_recipe_py,
-    PySelectorConfig,
 )
 
 from .recipe import (
@@ -19,6 +17,7 @@ from .recipe import (
     About,
     Source,
     TestType,
+    TestTypeEnum,
     SelectorConfig,
 )
 
@@ -46,9 +45,8 @@ __all__ = [
     "About",
     "Source",
     "TestType",
-    "parse_recipe_py",
+    "TestTypeEnum",
     "SelectorConfig",
-    "PySelectorConfig",
 ]
 
 

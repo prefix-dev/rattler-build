@@ -1,12 +1,28 @@
 """Object-oriented interface for Recipe parsing and manipulation."""
 
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from .rattler_build import parse_recipe_py, PySelectorConfig
 
 
+class TestTypeEnum(Enum):
+    """Enumeration of test types."""
+
+    COMMAND = "command"
+    PYTHON = "python"
+    PACKAGE_CONTENTS = "package_contents"
+    DOWNSTREAM = "downstream"
+    PERL = "perl"
+    R = "r"
+    RUBY = "ruby"
+    UNKNOWN = "unknown"
+
+
 class Build:
     """Build configuration for a recipe."""
+
+    _data: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]):
         self._data = data
@@ -46,20 +62,24 @@ class Build:
         """Get the noarch type if any (alias for noarch property)."""
         return self.noarch
 
+    @property
     def is_noarch(self) -> bool:
         """Check if this is a noarch build."""
         return self.noarch is not None
 
+    @property
     def has_script(self) -> bool:
         """Check if this build has a script defined."""
         return self.script is not None
 
     def __repr__(self) -> str:
-        return f"Build(number={self.number}, noarch={self.is_noarch()})"
+        return f"Build(number={self.number}, noarch={self.is_noarch})"
 
 
 class Package:
     """Package information for a recipe."""
+
+    _data: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]):
         self._data = data
@@ -83,6 +103,8 @@ class Package:
 
 class Requirements:
     """Requirements for a recipe."""
+
+    _data: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]):
         self._data = data
@@ -129,6 +151,8 @@ class Requirements:
 class About:
     """About information for a recipe."""
 
+    _data: Dict[str, Any]
+
     def __init__(self, data: Dict[str, Any]):
         self._data = data or {}
 
@@ -173,6 +197,8 @@ class About:
 
 class Source:
     """Source information for a recipe."""
+
+    _data: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]):
         self._data = data
@@ -239,27 +265,29 @@ class Source:
 class TestType:
     """Test type for a recipe."""
 
+    _data: Dict[str, Any]
+
     def __init__(self, data: Dict[str, Any]):
         self._data = data
 
     @property
-    def test_type(self) -> str:
+    def test_type(self) -> TestTypeEnum:
         """Get the test type name."""
         if "Command" in self._data:
-            return "command"
+            return TestTypeEnum.COMMAND
         elif "Python" in self._data:
-            return "python"
+            return TestTypeEnum.PYTHON
         elif "PackageContents" in self._data:
-            return "package_contents"
+            return TestTypeEnum.PACKAGE_CONTENTS
         elif "Downstream" in self._data:
-            return "downstream"
+            return TestTypeEnum.DOWNSTREAM
         elif "Perl" in self._data:
-            return "perl"
+            return TestTypeEnum.PERL
         elif "R" in self._data:
-            return "r"
+            return TestTypeEnum.R
         elif "Ruby" in self._data:
-            return "ruby"
-        return "unknown"
+            return TestTypeEnum.RUBY
+        return TestTypeEnum.UNKNOWN
 
     @property
     def commands(self) -> Optional[List[str]]:
@@ -298,6 +326,8 @@ class TestType:
 class SelectorConfig:
     """Python wrapper for PySelectorConfig to provide a cleaner interface."""
 
+    _config: PySelectorConfig
+
     def __init__(
         self,
         target_platform: Optional[str] = None,
@@ -321,30 +351,60 @@ class SelectorConfig:
         """Get the target platform."""
         return self._config.target_platform
 
+    @target_platform.setter
+    def target_platform(self, value: Optional[str]) -> None:
+        """Set the target platform."""
+        self._config.target_platform = value
+
     @property
     def host_platform(self) -> Optional[str]:
         """Get the host platform."""
         return self._config.host_platform
+
+    @host_platform.setter
+    def host_platform(self, value: Optional[str]) -> None:
+        """Set the host platform."""
+        self._config.host_platform = value
 
     @property
     def build_platform(self) -> Optional[str]:
         """Get the build platform."""
         return self._config.build_platform
 
+    @build_platform.setter
+    def build_platform(self, value: Optional[str]) -> None:
+        """Set the build platform."""
+        self._config.build_platform = value
+
     @property
     def experimental(self) -> Optional[bool]:
         """Get whether experimental features are enabled."""
         return self._config.experimental
+
+    @experimental.setter
+    def experimental(self, value: Optional[bool]) -> None:
+        """Set whether experimental features are enabled."""
+        self._config.experimental = value
 
     @property
     def allow_undefined(self) -> Optional[bool]:
         """Get whether undefined variables are allowed."""
         return self._config.allow_undefined
 
+    @allow_undefined.setter
+    def allow_undefined(self, value: Optional[bool]) -> None:
+        """Set whether undefined variables are allowed."""
+        self._config.allow_undefined = value
+
     @property
     def variant(self) -> Dict[str, Any]:
         """Get the variant configuration."""
         return self._config.variant
+
+    @variant.setter
+    def variant(self, value: Dict[str, Any]) -> None:
+        """Set the variant configuration."""
+        self._config.variant = value
 
     def __repr__(self) -> str:
         return f"SelectorConfig(target_platform={self.target_platform!r}, variant={self.variant!r})"
@@ -357,6 +417,8 @@ class SelectorConfig:
 
 class Recipe:
     """A parsed conda recipe with object-oriented access to all fields."""
+
+    _data: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]):
         self._data = data
@@ -477,13 +539,15 @@ class Recipe:
         """Get extra information as a Python dictionary."""
         return self._data.get("extra", {})
 
+    @property
     def has_tests(self) -> bool:
         """Check if this recipe has any tests defined."""
         return len(self.tests) > 0
 
+    @property
     def is_noarch(self) -> bool:
         """Check if this recipe builds a noarch package."""
-        return self.build.is_noarch()
+        return self.build.is_noarch
 
     def __repr__(self) -> str:
         return f"Recipe(package={self.package.name}, schema_version={self.schema_version})"

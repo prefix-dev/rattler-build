@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
-from rattler_build import Recipe, SelectorConfig, parse_recipe_py
+from rattler_build import Recipe, SelectorConfig
+from rattler_build.rattler_build import parse_recipe_py
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "test-package"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"
@@ -55,10 +56,10 @@ def test_recipe_all_sections() -> None:
     assert len(recipe.extra) == 0
 
     # Test convenience methods
-    assert not recipe.has_tests()
-    assert not recipe.is_noarch()
-    assert recipe.build.has_script()
-    assert not recipe.build.is_noarch()
+    assert not recipe.has_tests
+    assert not recipe.is_noarch
+    assert recipe.build.has_script
+    assert not recipe.build.is_noarch
 
 
 def test_recipe_representations() -> None:
@@ -90,6 +91,49 @@ def test_selector_config_with_variants() -> None:
     assert config.target_platform == "linux-64"
     assert config.variant["python"] == "3.11"
     assert config.variant["build_number"] == 1
+
+
+def test_selector_config_setters() -> None:
+    """Test SelectorConfig property setters"""
+    config = SelectorConfig()
+
+    initial_target = config.target_platform  # Store initial value (may have default)
+    config.target_platform = "win-64"
+    assert config.target_platform == "win-64"
+    assert config.target_platform != initial_target
+
+    # Test host_platform setter
+    initial_host = config.host_platform
+    config.host_platform = "win-64"
+    assert config.host_platform == "win-64"
+    assert config.host_platform != initial_host
+
+    # Test build_platform setter
+    initial_build = config.build_platform
+    config.build_platform = "win-64"
+    assert config.build_platform == "win-64"
+    assert config.build_platform != initial_build
+
+    # Test experimental setter
+    config.experimental = True
+    assert config.experimental is True
+    config.experimental = False
+    assert config.experimental is False
+
+    # Test allow_undefined setter
+    config.allow_undefined = True
+    assert config.allow_undefined is True
+    config.allow_undefined = False
+    assert config.allow_undefined is False
+
+    # Test variant setter
+    initial_variant = config.variant
+    new_variant = {"python": "3.9", "numpy": "1.21"}
+    config.variant = new_variant
+    assert config.variant == new_variant
+    assert config.variant["python"] == "3.9"
+    assert config.variant["numpy"] == "1.21"
+    assert config.variant != initial_variant
 
 
 def test_parse_recipe_with_selectors() -> None:
