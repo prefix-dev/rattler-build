@@ -1699,13 +1699,15 @@ It can be very useful as a "sanity check" to ensure that the package contains th
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/python*/site-packages/mypackage/*.py</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">not_exists</span><span class="p">:</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/python*/site-packages/mypackage/deprecated_module.py</span>
-</span></code></pre></div>
-- <strong><code>lib</code></strong>: matches libraries in the package (<code>.so</code>, <code>.dll</code>, <code>.dylib</code> files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. <code>foo</code> will match <code>libfoo.so</code>, <code>libfoo.dylib</code>, and <code>foo.dll</code>).
-- <strong><code>include</code></strong>: matches files under the <code>include</code> directory in the package. You can specify the file name like <code>foo.h</code>.
-- <strong><code>bin</code></strong>: matches files under the <code>bin</code> directory in the package. You can specify executable names like <code>foo</code> which will match <code>foo.exe</code> on Windows and <code>foo</code> on Linux and macOS.
-- <strong><code>site_packages</code></strong>: matches files under the <code>site-packages</code> directory in the package. You can specify the import path like <code>foobar.api</code> which will match <code>foobar/api.py</code> and <code>foobar/api/__init__.py</code>.
-- <strong><code>strict</code></strong>: when set to <code>true</code>, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: <code>false</code>).</p>
+</span></code></pre></div></p>
 </blockquote>
+<ul>
+<li><strong><code>lib</code></strong>: matches libraries in the package (<code>.so</code>, <code>.dll</code>, <code>.dylib</code> files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. <code>foo</code> will match <code>libfoo.so</code>, <code>libfoo.dylib</code>, and <code>foo.dll</code>).</li>
+<li><strong><code>include</code></strong>: matches files under the <code>include</code> directory in the package. You can specify the file name like <code>foo.h</code>.</li>
+<li><strong><code>bin</code></strong>: matches files under the <code>bin</code> directory in the package. You can specify executable names like <code>foo</code> which will match <code>foo.exe</code> on Windows and <code>foo</code> on Linux and macOS.</li>
+<li><strong><code>site_packages</code></strong>: matches files under the <code>site-packages</code> directory in the package. You can specify the import path like <code>foobar.api</code> which will match <code>foobar/api.py</code> and <code>foobar/api/__init__.py</code>.</li>
+<li><strong><code>strict</code></strong>: when set to <code>true</code>, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: <code>false</code>).</li>
+</ul>
 <h2 id="testing-existing-packages">Testing existing packages<a class="headerlink" href="#testing-existing-packages" title="Permanent link">#</a></h2>
 <p>The tests from the test section are actually added <em>into</em> your package and
 can also be executed straight from the existing package.</p>
