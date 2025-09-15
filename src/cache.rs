@@ -21,7 +21,7 @@ use crate::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{
-        copy_dir::{CopyDir, CopyOptions, copy_file},
+        copy_dir::{CopyDir, CopyOptions, copy_file, copy_metadata},
         fetch_sources,
         patch::apply_patch_custom,
     },
@@ -289,6 +289,7 @@ impl Output {
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
+                let _ = copy_metadata(file, dest);
                 copied_files.push(stripped.to_path_buf());
             }
 
