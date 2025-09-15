@@ -137,7 +137,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@ac90e63697ac2784f4ecfe2964e1a285c304003a # v1
+        uses: actions-rust-lang/setup-rust-toolchain@2fcdc490d667999e01ddbbf0f2823181beef6b39 # v1
         with:
           toolchain: "1.86.0"
           target: ${{ matrix.target }}
@@ -152,7 +152,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@57511bcdf8cdb0eab6448cb7fa632952d9f25742 # v2
+        uses: taiki-e/install-action@849bd009f730a24e9db18262f4e9f062591dee39 # v2
         with:
           tool: cross
 
