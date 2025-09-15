@@ -1314,15 +1314,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "convert_case"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
-dependencies = [
- "unicode-segmentation",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1469,6 +1460,7 @@ checksum = "829d955a0bb380ef178a640b91779e3987da38c9aea133b20614cfed8cdea9c6"
 dependencies = [
  "bitflags 2.9.4",
  "crossterm_winapi",
+ "futures-core",
  "mio",
  "parking_lot 0.12.4",
  "rustix 0.38.44",
@@ -1485,14 +1477,9 @@ checksum = "d8b9f2e4c67f833b660cdb0a3523065869fb35570177239812ed4c905aeff87b"
 dependencies = [
  "bitflags 2.9.4",
  "crossterm_winapi",
- "derive_more",
  "document-features",
- "futures-core",
- "mio",
  "parking_lot 0.12.4",
  "rustix 1.0.8",
- "signal-hook",
- "signal-hook-mio",
  "winapi",
 ]
 
@@ -1647,27 +1634,6 @@ version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "derive_more"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
-dependencies = [
- "derive_more-impl",
-]
-
-[[package]]
-name = "derive_more-impl"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
-dependencies = [
- "convert_case",
  "proc-macro2",
  "quote",
  "syn",
@@ -4302,7 +4268,7 @@ dependencies = [
  "console 0.16.0",
  "content_inspector",
  "criterion",
- "crossterm 0.29.0",
+ "crossterm 0.28.1",
  "dialoguer",
  "diffy",
  "dunce",
