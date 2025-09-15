@@ -28,12 +28,12 @@ tokio = { version = "1.47.1", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.39.1"
-rattler_config = "0.2.8"
+rattler_conda_types = "0.39.2"
+rattler_config = "0.2.9"
 clap = "4.5.47"
 url = "2.5.4"
 chrono = "0.4.41"
-rattler_upload = "0.2.1"
+rattler_upload = "0.3.1"
 miette = "7.6.0"
 
 [build-dependencies]
