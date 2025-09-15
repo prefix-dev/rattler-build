@@ -31,7 +31,7 @@ use rattler_upload::upload::opt::{
 use url::Url;
 
 mod error;
-use error::{PyRattlerBuildError, RattlerBuildError};
+use error::RattlerBuildError;
 
 /// Execute async tasks in Python bindings with proper error handling
 fn run_async_task<F, R>(future: F) -> PyResult<R>
@@ -70,19 +70,19 @@ impl PySelectorConfig {
         let target_platform = target_platform
             .map(|p| Platform::from_str(&p))
             .transpose()
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         let host_platform = host_platform
             .map(|p| Platform::from_str(&p))
             .transpose()
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         let build_platform = build_platform
             .map(|p| Platform::from_str(&p))
             .transpose()
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         // Convert variant from Python dict to BTreeMap<NormalizedKey, Variable>
@@ -93,7 +93,10 @@ impl PySelectorConfig {
                 // Convert Python object to JSON Value then to Variable
                 let json_val: serde_json::Value =
                     pythonize::depythonize(value.bind(py)).map_err(|e| {
-                        RattlerBuildError::Json(format!("Failed to convert variant value: {}", e))
+                        RattlerBuildError::Variant(format!(
+                            "Failed to convert variant value: {}",
+                            e
+                        ))
                     })?;
                 let variable = match &json_val {
                     JsonValue::String(s) => Variable::from_string(s),
@@ -163,8 +166,7 @@ impl PySelectorConfig {
 
     #[setter]
     fn set_target_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value)
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
         self.inner.target_platform = platform;
         Ok(())
     }
@@ -176,8 +178,7 @@ impl PySelectorConfig {
 
     #[setter]
     fn set_host_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value)
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
         self.inner.host_platform = platform;
         Ok(())
     }
@@ -189,8 +190,7 @@ impl PySelectorConfig {
 
     #[setter]
     fn set_build_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value)
-            .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
         self.inner.build_platform = platform;
         Ok(())
     }
@@ -242,15 +242,13 @@ impl PySelectorConfig {
     fn variant(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut dict = HashMap::new();
         for (key, value) in &self.inner.variant {
-            let json_value = serde_json::to_value(value).map_err(|e| {
-                RattlerBuildError::Json(format!("Failed to serialize variant: {}", e))
-            })?;
+            let json_value = serde_json::to_value(value).map_err(RattlerBuildError::from)?;
             dict.insert(key.normalize(), json_value);
         }
         Ok(pythonize::pythonize(py, &dict)
-            .map(|obj| obj.unbind())
+            .map(|obj| obj.into())
             .map_err(|e| {
-                RattlerBuildError::Json(format!("Failed to convert variant to Python: {}", e))
+                RattlerBuildError::Variant(format!("Failed to convert variant to Python: {}", e))
             })?)
     }
 
@@ -261,7 +259,7 @@ impl PySelectorConfig {
             let normalized_key = NormalizedKey::from(key);
             let json_val: serde_json::Value =
                 pythonize::depythonize(py_value.bind(py)).map_err(|e| {
-                    RattlerBuildError::Json(format!("Failed to convert variant value: {}", e))
+                    RattlerBuildError::Variant(format!("Failed to convert variant value: {}", e))
                 })?;
             let variable = match &json_val {
                 JsonValue::String(s) => Variable::from_string(s),
@@ -367,16 +365,17 @@ fn parse_recipe_py(
 ) -> PyResult<Py<PyAny>> {
     match Recipe::from_yaml(yaml_content.as_str(), selector_config.inner.clone()) {
         Ok(recipe) => {
-            let json_value = serde_json::to_value(recipe).map_err(|e| {
-                RattlerBuildError::Json(format!("Failed to serialize recipe: {}", e))
-            })?;
+            let json_value = serde_json::to_value(recipe).map_err(RattlerBuildError::from)?;
 
             Python::attach(|py| {
                 pythonize::pythonize(py, &json_value)
                     .map(|obj| obj.into())
                     .map_err(|e| {
-                        RattlerBuildError::Json(format!("Failed to convert to Python: {}", e))
-                            .into()
+                        RattlerBuildError::RecipeParse(format!(
+                            "Failed to convert to Python: {}",
+                            e
+                        ))
+                        .into()
                     })
             })
         }
@@ -447,15 +446,15 @@ fn build_recipes_py(
     let build_platform = build_platform
         .map(|p| Platform::from_str(&p))
         .transpose()
-        .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        .map_err(RattlerBuildError::from)?;
     let target_platform = target_platform
         .map(|p| Platform::from_str(&p))
         .transpose()
-        .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        .map_err(RattlerBuildError::from)?;
     let host_platform = host_platform
         .map(|p| Platform::from_str(&p))
         .transpose()
-        .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        .map_err(RattlerBuildError::from)?;
     let package_format = package_format
         .map(|p| PackageFormatAndCompression::from_str(&p))
         .transpose()
@@ -465,7 +464,7 @@ fn build_recipes_py(
     let noarch_build_platform = noarch_build_platform
         .map(|p| Platform::from_str(&p))
         .transpose()
-        .map_err(|e| RattlerBuildError::PlatformParse(e.to_string()))?;
+        .map_err(RattlerBuildError::from)?;
     let channel = match channel {
         None => None,
         Some(channel) => Some(
@@ -592,7 +591,7 @@ fn upload_package_to_quetz_py(
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
 
-    let url = Url::parse(&url).map_err(|e| RattlerBuildError::UrlParse(e.to_string()))?;
+    let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let quetz_data = QuetzData::new(url, channels, api_key);
 
     run_async_task(async {
@@ -613,7 +612,7 @@ fn upload_package_to_artifactory_py(
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
 
-    let url = Url::parse(&url).map_err(|e| RattlerBuildError::UrlParse(e.to_string()))?;
+    let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let artifactory_data = ArtifactoryData::new(url, channels, token);
 
     run_async_task(async {
@@ -636,7 +635,7 @@ fn upload_package_to_prefix_py(
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
 
-    let url = Url::parse(&url).map_err(|e| RattlerBuildError::UrlParse(e.to_string()))?;
+    let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, skip_existing);
 
     run_async_task(async {
@@ -662,7 +661,7 @@ fn upload_package_to_anaconda_py(
     let url = url
         .map(|u| Url::parse(&u))
         .transpose()
-        .map_err(|e| RattlerBuildError::UrlParse(e.to_string()))?;
+        .map_err(RattlerBuildError::from)?;
     let anaconda_data = AnacondaData::new(owner, channel, api_key, url, force);
 
     run_async_task(async {
@@ -688,13 +687,13 @@ fn upload_packages_to_conda_forge_py(
     let anaconda_url = anaconda_url
         .map(|u| Url::parse(&u))
         .transpose()
-        .map_err(|e| RattlerBuildError::UrlParse(format!("Error parsing anaconda_url: {e}")))?;
+        .map_err(|e| RattlerBuildError::Other(format!("Error parsing anaconda_url: {e}")))?;
 
     let validation_endpoint = validation_endpoint
         .map(|u| Url::parse(&u))
         .transpose()
         .map_err(|e| {
-            RattlerBuildError::UrlParse(format!("Error parsing validation_endpoint: {e}",))
+            RattlerBuildError::Other(format!("Error parsing validation_endpoint: {e}",))
         })?;
 
     let conda_forge_data = CondaForgeData::new(
@@ -717,7 +716,7 @@ fn upload_packages_to_conda_forge_py(
 
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
-    m.add("RattlerBuildError", _py.get_type::<PyRattlerBuildError>())?;
+    error::register_exceptions(_py, &m)?;
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(generate_pypi_recipe_string_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(generate_r_recipe_string_py, &m).unwrap())?;

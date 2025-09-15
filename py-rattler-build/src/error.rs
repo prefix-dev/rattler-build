@@ -1,65 +1,71 @@
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use std::fmt;
+use thiserror::Error;
 
-pyo3::create_exception!(rattler_build, PyRattlerBuildError, PyRuntimeError);
+create_exception!(rattler_build, PyRattlerBuildError, PyException);
+create_exception!(rattler_build, PyPlatformParseError, PyRattlerBuildError);
+create_exception!(rattler_build, PyChannelPriorityError, PyRattlerBuildError);
+create_exception!(rattler_build, PyPackageFormatError, PyRattlerBuildError);
+create_exception!(rattler_build, PyUrlParseError, PyRattlerBuildError);
+create_exception!(rattler_build, PyAuthError, PyRattlerBuildError);
+create_exception!(rattler_build, PyUploadError, PyRattlerBuildError);
+create_exception!(rattler_build, PyRecipeParseError, PyRattlerBuildError);
+create_exception!(rattler_build, PyVariantError, PyRattlerBuildError);
+create_exception!(rattler_build, PyJsonError, PyRattlerBuildError);
+create_exception!(rattler_build, PyIoError, PyRattlerBuildError);
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum RattlerBuildError {
-    PlatformParse(String),
+    #[error("Platform parse error: {0}")]
+    PlatformParse(#[from] rattler_conda_types::ParsePlatformError),
+
+    #[error("Channel priority error: {0}")]
     ChannelPriority(String),
+
+    #[error("Package format error: {0}")]
     PackageFormat(String),
-    UrlParse(String),
+
+    #[error("URL parse error")]
+    UrlParse(#[from] url::ParseError),
+
+    #[error("Authentication error: {0}")]
     Auth(String),
+
+    #[error("Upload error: {0}")]
     Upload(String),
+
+    #[error("Recipe parse error: {0}")]
     RecipeParse(String),
+
+    #[error("Variant error: {0}")]
     Variant(String),
-    Json(String),
-    Io(String),
+
+    #[error("JSON error")]
+    Json(#[from] serde_json::Error),
+
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+
+    #[error("Error: {0}")]
     Other(String),
 }
 
-impl fmt::Display for RattlerBuildError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RattlerBuildError::PlatformParse(msg) => write!(f, "Platform parse error: {}", msg),
-            RattlerBuildError::ChannelPriority(msg) => write!(f, "Channel priority error: {}", msg),
-            RattlerBuildError::PackageFormat(msg) => write!(f, "Package format error: {}", msg),
-            RattlerBuildError::UrlParse(msg) => write!(f, "URL parse error: {}", msg),
-            RattlerBuildError::Auth(msg) => write!(f, "Authentication error: {}", msg),
-            RattlerBuildError::Upload(msg) => write!(f, "Upload error: {}", msg),
-            RattlerBuildError::RecipeParse(msg) => write!(f, "Recipe parse error: {}", msg),
-            RattlerBuildError::Variant(msg) => write!(f, "Variant error: {}", msg),
-            RattlerBuildError::Json(msg) => write!(f, "JSON error: {}", msg),
-            RattlerBuildError::Io(msg) => write!(f, "IO error: {}", msg),
-            RattlerBuildError::Other(msg) => write!(f, "Error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RattlerBuildError {}
-
 impl From<RattlerBuildError> for PyErr {
     fn from(error: RattlerBuildError) -> Self {
-        PyRattlerBuildError::new_err(error.to_string())
-    }
-}
-
-impl From<url::ParseError> for RattlerBuildError {
-    fn from(error: url::ParseError) -> Self {
-        RattlerBuildError::UrlParse(error.to_string())
-    }
-}
-
-impl From<serde_json::Error> for RattlerBuildError {
-    fn from(error: serde_json::Error) -> Self {
-        RattlerBuildError::Json(error.to_string())
-    }
-}
-
-impl From<std::io::Error> for RattlerBuildError {
-    fn from(error: std::io::Error) -> Self {
-        RattlerBuildError::Io(error.to_string())
+        match error {
+            RattlerBuildError::PlatformParse(e) => PyPlatformParseError::new_err(e.to_string()),
+            RattlerBuildError::ChannelPriority(msg) => PyChannelPriorityError::new_err(msg),
+            RattlerBuildError::PackageFormat(msg) => PyPackageFormatError::new_err(msg),
+            RattlerBuildError::UrlParse(e) => PyUrlParseError::new_err(e.to_string()),
+            RattlerBuildError::Auth(msg) => PyAuthError::new_err(msg),
+            RattlerBuildError::Upload(msg) => PyUploadError::new_err(msg),
+            RattlerBuildError::RecipeParse(msg) => PyRecipeParseError::new_err(msg),
+            RattlerBuildError::Variant(msg) => PyVariantError::new_err(msg),
+            RattlerBuildError::Json(e) => PyJsonError::new_err(e.to_string()),
+            RattlerBuildError::Io(e) => PyIoError::new_err(e.to_string()),
+            RattlerBuildError::Other(e) => PyRattlerBuildError::new_err(e.to_string()),
+        }
     }
 }
 
@@ -67,4 +73,22 @@ impl From<miette::Report> for RattlerBuildError {
     fn from(error: miette::Report) -> Self {
         RattlerBuildError::Other(error.to_string())
     }
+}
+
+pub(crate) fn register_exceptions(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("RattlerBuildError", py.get_type::<PyRattlerBuildError>())?;
+    m.add("PlatformParseError", py.get_type::<PyPlatformParseError>())?;
+    m.add(
+        "ChannelPriorityError",
+        py.get_type::<PyChannelPriorityError>(),
+    )?;
+    m.add("PackageFormatError", py.get_type::<PyPackageFormatError>())?;
+    m.add("UrlParseError", py.get_type::<PyUrlParseError>())?;
+    m.add("AuthError", py.get_type::<PyAuthError>())?;
+    m.add("UploadError", py.get_type::<PyUploadError>())?;
+    m.add("RecipeParseError", py.get_type::<PyRecipeParseError>())?;
+    m.add("VariantError", py.get_type::<PyVariantError>())?;
+    m.add("JsonError", py.get_type::<PyJsonError>())?;
+    m.add("IoError", py.get_type::<PyIoError>())?;
+    Ok(())
 }

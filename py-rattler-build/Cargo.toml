@@ -37,6 +37,7 @@ rattler_upload = "0.2.1"
 miette = "7.6.0"
 serde_json = "1.0.143"
 pythonize = "0.26.0"
+thiserror = "2.0.16"
 
 [build-dependencies]
 pyo3-build-config = "0.26.0"

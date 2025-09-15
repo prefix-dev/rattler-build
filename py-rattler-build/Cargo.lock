@@ -3802,6 +3802,7 @@ dependencies = [
  "rattler_config",
  "rattler_upload",
  "serde_json",
+ "thiserror 2.0.16",
  "tokio",
  "url",
 ]
