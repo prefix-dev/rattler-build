@@ -7,6 +7,19 @@ from .rattler_build import (
     upload_package_to_prefix_py,
     upload_package_to_anaconda_py,
     upload_packages_to_conda_forge_py,
+    RattlerBuildError,
+)
+
+from .recipe import (
+    Recipe,
+    Package,
+    Build,
+    Requirements,
+    About,
+    Source,
+    TestType,
+    TestTypeEnum,
+    SelectorConfig,
 )
 
 from . import recipe_generation
@@ -26,6 +39,16 @@ __all__ = [
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
     "recipe_generation",
+    "Recipe",
+    "Package",
+    "Build",
+    "Requirements",
+    "RattlerBuildError",
+    "About",
+    "Source",
+    "TestType",
+    "TestTypeEnum",
+    "SelectorConfig",
 ]
 
 
