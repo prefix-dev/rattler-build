@@ -43,6 +43,13 @@ tests:
       recipe:
         - tests/
 
+  # run test scripts with environment variables. Note that the interpreter is
+  # inferred automatically and the test file is copied from recipe or source directory
+  - script:
+      env:
+        HELLO: "Hello World!"
+      file: run_my_test_script.py
+
   # python specific tests
   - python:
       # this test section tries to import the python modules and errors if it can't
