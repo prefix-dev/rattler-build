@@ -1302,6 +1302,23 @@ def test_cache_install(
     assert (pkg2 / "info/index.json").exists()
 
 
+@pytest.mark.skipif(
+    not host_subdir().startswith("linux"),
+    reason="recipe does not support execution on non-Linux platforms",
+)
+def test_cache_metadata(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "cache/recipe-metadata.yaml", tmp_path, extra_args=["--experimental"]
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "foo1")
+    pkg2 = get_extracted_package(tmp_path, "foo2")
+    assert (pkg1 / "info/index.json").exists()
+    assert (pkg2 / "info/index.json").exists()
+
+
 def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "env_vars",
