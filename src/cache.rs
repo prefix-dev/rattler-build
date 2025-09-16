@@ -289,7 +289,7 @@ impl Output {
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
-                let _ = copy_metadata(file, dest);
+                copy_metadata(file, dest).into_diagnostic()?;
                 copied_files.push(stripped.to_path_buf());
             }
 
