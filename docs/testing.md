@@ -30,16 +30,6 @@ tests:
         import mypkg
         assert mypkg.__version__ == "0.1.0"
 
-  # run test scripts with environment variables
-  - script:
-      interpreter: python
-      env:
-        HELLO: "Hello World!"
-      file: run_my_test_script.py
-    files:
-      recipe:
-        - run_my_test_script.py
-
   # execute `pytest` with the tests from the `tests` folder
   - script:
       - pytest ./tests
@@ -52,6 +42,13 @@ tests:
     files:
       recipe:
         - tests/
+
+  # run test scripts with environment variables. Note that the interpreter is
+  # inferred automatically and the test file is copied from recipe or source directory
+  - script:
+      env:
+        HELLO: "Hello World!"
+      file: run_my_test_script.py
 
   # python specific tests
   - python:
