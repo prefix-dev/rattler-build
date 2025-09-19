@@ -201,8 +201,11 @@ impl TryConvertNode<BuildString> for RenderedScalarNode {
 /// Post process operations for regex based replacements
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcess {
+    /// Files to apply the regex replacement to
     pub files: GlobVec,
+    /// The regex pattern to match
     pub regex: SerializableRegex,
+    /// The replacement string
     pub replacement: String,
 }
 
@@ -388,8 +391,10 @@ impl DynamicLinking {
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkingCheckBehavior {
+    /// Ignore linking issues
     #[default]
     Ignore,
+    /// Treat linking issues as errors
     Error,
 }
 
