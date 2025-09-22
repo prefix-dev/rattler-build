@@ -168,7 +168,3 @@ def test_recipe_with_variants() -> None:
     assert recipe["package"]["name"] == "test-package"
     assert recipe["package"]["version"] == "1.0.0"
     assert recipe["build"]["number"] == 0
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
