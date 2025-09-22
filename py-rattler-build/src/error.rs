@@ -30,7 +30,7 @@ pub enum RattlerBuildError {
     UrlParse(#[from] url::ParseError),
 
     #[error("Authentication error: {0}")]
-    Auth(String),
+    Auth(#[from] rattler_networking::authentication_storage::AuthenticationStorageError),
 
     #[error("Upload error: {0}")]
     Upload(String),
@@ -58,7 +58,7 @@ impl From<RattlerBuildError> for PyErr {
             RattlerBuildError::ChannelPriority(msg) => PyChannelPriorityError::new_err(msg),
             RattlerBuildError::PackageFormat(msg) => PyPackageFormatError::new_err(msg),
             RattlerBuildError::UrlParse(e) => PyUrlParseError::new_err(e.to_string()),
-            RattlerBuildError::Auth(msg) => PyAuthError::new_err(msg),
+            RattlerBuildError::Auth(e) => PyAuthError::new_err(e.to_string()),
             RattlerBuildError::Upload(msg) => PyUploadError::new_err(msg),
             RattlerBuildError::RecipeParse(msg) => PyRecipeParseError::new_err(msg),
             RattlerBuildError::Variant(msg) => PyVariantError::new_err(msg),

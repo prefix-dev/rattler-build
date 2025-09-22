@@ -3800,6 +3800,7 @@ dependencies = [
  "rattler-build",
  "rattler_conda_types",
  "rattler_config",
+ "rattler_networking",
  "rattler_upload",
  "serde_json",
  "thiserror 2.0.16",

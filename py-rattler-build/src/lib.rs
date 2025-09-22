@@ -588,8 +588,7 @@ fn upload_package_to_quetz_py(
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
 ) -> PyResult<()> {
-    let store = tool_configuration::get_auth_store(auth_file)
-        .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
+    let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let quetz_data = QuetzData::new(url, channels, api_key);
@@ -609,9 +608,7 @@ fn upload_package_to_artifactory_py(
     token: Option<String>,
     auth_file: Option<PathBuf>,
 ) -> PyResult<()> {
-    let store = tool_configuration::get_auth_store(auth_file)
-        .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
-
+    let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let artifactory_data = ArtifactoryData::new(url, channels, token);
 
@@ -632,8 +629,7 @@ fn upload_package_to_prefix_py(
     skip_existing: bool,
     attestation_file: Option<PathBuf>,
 ) -> PyResult<()> {
-    let store = tool_configuration::get_auth_store(auth_file)
-        .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
+    let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
     let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, skip_existing);
@@ -655,8 +651,7 @@ fn upload_package_to_anaconda_py(
     force: bool,
     auth_file: Option<PathBuf>,
 ) -> PyResult<()> {
-    let store = tool_configuration::get_auth_store(auth_file)
-        .map_err(|e| RattlerBuildError::Auth(e.to_string()))?;
+    let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = url
         .map(|u| Url::parse(&u))
