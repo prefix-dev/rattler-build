@@ -145,7 +145,7 @@ numpy: ["1.12", "1.14"]
 However, if we use the `zip_keys` and specify:
 
 ```yaml
-zip_keys: ["python", "numpy"]
+zip_keys: [["python", "numpy"]]
 python: ["3.8", "3.9"]
 numpy: ["1.12", "1.14"]
 ```
