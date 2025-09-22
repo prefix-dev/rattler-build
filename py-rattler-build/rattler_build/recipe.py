@@ -37,13 +37,6 @@ class Build:
         """Get the build string."""
         return self._data.get("string")
 
-    @property
-    def script(self) -> Optional[str]:
-        """Get the build script."""
-        script_data = self._data.get("script")
-        if script_data:
-            return str(script_data)
-        return None
 
     @property
     def noarch(self) -> Optional[str]:
