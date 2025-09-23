@@ -5,18 +5,16 @@ use std::{
     sync::Arc,
 };
 
-use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
 };
-use reqwest_middleware::ClientWithMiddleware;
+use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
 use crate::{
@@ -27,10 +25,11 @@ use crate::{
         pin::PinArgs,
         solver::{install_packages, solve_environment},
     },
-    run_exports::{RunExportExtractor, RunExportExtractorError},
     tool_configuration,
     tool_configuration::Configuration,
 };
+
+use super::reporters::GatewayReporter;
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -566,55 +565,76 @@ pub fn apply_variant(
         .collect()
 }
 
+use rattler::package_cache::CacheReporter;
+use rattler_repodata_gateway::DownloadReporter;
+
+struct RunExportsProgressReporter {
+    repodata_reporter: GatewayReporter,
+    package_cache_reporter: PackageCacheReporter,
+}
+
+impl RunExportsProgressReporter {
+    fn new(
+        repodata_reporter: GatewayReporter,
+        package_cache_reporter: PackageCacheReporter,
+    ) -> Self {
+        Self {
+            repodata_reporter,
+            package_cache_reporter,
+        }
+    }
+}
+
+impl RunExportsReporter for RunExportsProgressReporter {
+    fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
+        Some(&self.repodata_reporter)
+    }
+
+    fn create_package_download_reporter(
+        &self,
+        repo_data_record: &RepoDataRecord,
+    ) -> Option<Box<dyn CacheReporter>> {
+        let mut reporter = self.package_cache_reporter.clone();
+        let entry = reporter.add(repo_data_record);
+        Some(Box::new(entry) as Box<dyn CacheReporter>)
+    }
+}
+
 /// Collect run exports from the package cache and add them to the package
 /// records.
-/// TODO: There are many ways that would allow us to optimize this function.
-/// 1. This currently downloads an entire package, but we only need the
-///    `run_exports.json`.
-/// 2. There are special run_exports.json files available for some channels.
-async fn amend_run_exports(
+async fn ensure_run_exports(
     records: &mut [RepoDataRecord],
-    client: ClientWithMiddleware,
-    package_cache: PackageCache,
+    gateway: &Gateway,
     multi_progress: MultiProgress,
     progress_prefix: impl Into<Cow<'static, str>>,
     top_level_pb: Option<ProgressBar>,
+    progress_style: ProgressStyle,
+    finish_style: ProgressStyle,
 ) -> Result<(), RunExportExtractorError> {
-    let max_concurrent_requests = Arc::new(Semaphore::new(50));
-    let (tx, mut rx) = mpsc::channel(50);
+    let progress_prefix: Cow<'static, str> = progress_prefix.into();
+    let placement = top_level_pb
+        .as_ref()
+        .map(|pb| Placement::After(pb.clone()))
+        .unwrap_or(Placement::End);
 
-    let progress = PackageCacheReporter::new(
-        multi_progress,
-        top_level_pb.map_or(Placement::End, Placement::After),
-    )
-    .with_prefix(progress_prefix);
+    let repodata_reporter = GatewayReporter::builder()
+        .with_multi_progress(multi_progress.clone())
+        .with_progress_template(progress_style.clone())
+        .with_finish_template(finish_style.clone())
+        .with_placement(placement.clone())
+        .finish();
 
-    for (pkg_idx, pkg) in records.iter().enumerate() {
-        if pkg.package_record.run_exports.is_some() {
-            // If the package already boasts run exports, we don't need to do anything.
-            continue;
-        }
+    let package_cache_reporter =
+        PackageCacheReporter::new(multi_progress, placement).with_prefix(progress_prefix);
 
-        let extractor = RunExportExtractor::default()
-            .with_max_concurrent_requests(max_concurrent_requests.clone())
-            .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+    let reporter: Arc<dyn RunExportsReporter> = Arc::new(RunExportsProgressReporter::new(
+        repodata_reporter,
+        package_cache_reporter,
+    ));
 
-        let tx = tx.clone();
-        let record = pkg.clone();
-        tokio::spawn(async move {
-            let result = extractor.extract(&record).await;
-            let _ = tx.send((pkg_idx, result)).await;
-        });
-    }
-
-    drop(tx);
-
-    while let Some((pkg_idx, run_exports)) = rx.recv().await {
-        records[pkg_idx].package_record.run_exports = run_exports?;
-    }
-
-    Ok(())
+    gateway
+        .ensure_run_exports(records.iter_mut(), Some(reporter))
+        .await
 }
 
 pub async fn install_environments(
@@ -708,6 +728,20 @@ pub(crate) async fn resolve_dependencies(
 
     let mut compatibility_specs = HashMap::new();
 
+    let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+        let client = tool_configuration.client.get_client().clone();
+        let package_cache = tool_configuration.package_cache.clone();
+        Some(
+            Gateway::builder()
+                .with_max_concurrent_requests(50)
+                .with_client(client)
+                .with_package_cache(package_cache)
+                .finish(),
+        )
+    } else {
+        None
+    };
+
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let build_env_specs = apply_variant(
             requirements.build(),
@@ -740,10 +774,13 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration
                 .fancy_log_handler
                 .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                    amend_run_exports(
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
+                        .fancy_log_handler
+                        .finished_progress_style();
+                    ensure_run_exports(
                         &mut resolved,
-                        tool_configuration.client.get_client().clone(),
-                        tool_configuration.package_cache.clone(),
+                        gateway.as_ref().unwrap(),
                         tool_configuration
                             .fancy_log_handler
                             .multi_progress()
@@ -752,6 +789,8 @@ pub(crate) async fn resolve_dependencies(
                             .fancy_log_handler
                             .with_indent_levels("  "),
                         Some(pb),
+                        progress_style,
+                        finish_style,
                     )
                 })
                 .await
@@ -840,10 +879,13 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration
                 .fancy_log_handler
                 .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                    amend_run_exports(
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
+                        .fancy_log_handler
+                        .finished_progress_style();
+                    ensure_run_exports(
                         &mut resolved,
-                        tool_configuration.client.get_client().clone(),
-                        tool_configuration.package_cache.clone(),
+                        gateway.as_ref().unwrap(),
                         tool_configuration
                             .fancy_log_handler
                             .multi_progress()
@@ -852,6 +894,8 @@ pub(crate) async fn resolve_dependencies(
                             .fancy_log_handler
                             .with_indent_levels("  "),
                         Some(pb),
+                        progress_style,
+                        finish_style,
                     )
                 })
                 .await
