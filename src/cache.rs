@@ -21,7 +21,7 @@ use crate::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{
-        copy_dir::{CopyDir, CopyOptions, copy_file, copy_metadata},
+        copy_dir::{CopyDir, CopyOptions, copy_file},
         fetch_sources,
         patch::apply_patch_custom,
     },
