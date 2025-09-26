@@ -1,4 +1,3 @@
-import pytest
 from pathlib import Path
 from rattler_build import Recipe, SelectorConfig
 from rattler_build.rattler_build import parse_recipe_py
