@@ -37,7 +37,6 @@ class Build:
         """Get the build string."""
         return self._data.get("string")
 
-
     @property
     def noarch(self) -> Optional[str]:
         """Get the noarch type if any."""
@@ -59,6 +58,11 @@ class Build:
     def is_noarch(self) -> bool:
         """Check if this is a noarch build."""
         return self.noarch is not None
+
+    @property
+    def script(self) -> Optional[str]:
+        """Get the build script if defined."""
+        return self._data.get("script")
 
     @property
     def has_script(self) -> bool:
