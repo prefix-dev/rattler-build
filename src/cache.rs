@@ -282,6 +282,7 @@ impl Output {
                 // skip directories (if they are not a symlink)
                 // directories are implicitly created by the files
                 if file.is_dir() && !file.is_symlink() {
+                    // let _ = copy_metadata(file, &prefix_cache_dir.join(file.strip_prefix(self.prefix()).unwrap()));
                     continue;
                 }
                 let stripped = file
@@ -289,7 +290,7 @@ impl Output {
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
-                let _ = copy_metadata(file, dest);
+                // let _ = copy_metadata(file, dest);
                 copied_files.push(stripped.to_path_buf());
             }
 

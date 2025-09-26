@@ -35,9 +35,9 @@ impl Default for CopyOptions {
     }
 }
 
-/// Copy metadata from source to destination
-/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
-/// We need to deal with permissions and timestamps ourselves
+/// Copy metadata from source to destination.
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked.
+/// We need to deal with permissions and timestamps ourselves.
 pub(crate) fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
     let metadata = fs_err::metadata(from)?;
 
@@ -427,11 +427,13 @@ where
             // File has been reflinked
             #[cfg(target_os = "linux")]
             {
+                tracing::info!("Copying metadata for reflinked file {:?} -> {:?}", from, to.as_ref());
                 copy_metadata(from, to.as_ref())?;
             }
         }
         Ok(Some(_)) => {
             // File has been copied
+            tracing::info!("Copied file {:?} -> {:?}", from, to.as_ref());
             match copy_metadata(from, to.as_ref()) {
                 Ok(()) => {}
                 Err(e) => {
