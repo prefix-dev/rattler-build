@@ -35,7 +35,6 @@ mod post_process;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
-mod run_exports;
 mod unix;
 mod windows;
 

@@ -1,21 +1,17 @@
-use std::{
-    future::IntoFuture,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{future::IntoFuture, path::Path};
 
+use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
 use anyhow::Context;
 use comfy_table::Table;
 use console::style;
 use futures::FutureExt;
-use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use indicatif::HumanBytes;
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
 use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
-use url::Url;
 
-use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
+use super::reporters::GatewayReporter;
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
@@ -158,106 +154,6 @@ pub async fn create_environment(
     .await?;
 
     Ok(required_packages)
-}
-
-struct GatewayReporter {
-    progress_bars: Arc<Mutex<Vec<ProgressBar>>>,
-    multi_progress: indicatif::MultiProgress,
-    progress_template: Option<ProgressStyle>,
-    finish_template: Option<ProgressStyle>,
-}
-
-#[derive(Default)]
-struct GatewayReporterBuilder {
-    multi_progress: Option<indicatif::MultiProgress>,
-    progress_template: Option<ProgressStyle>,
-    finish_template: Option<ProgressStyle>,
-}
-
-impl GatewayReporter {
-    pub fn builder() -> GatewayReporterBuilder {
-        GatewayReporterBuilder::default()
-    }
-}
-
-impl rattler_repodata_gateway::DownloadReporter for GatewayReporter {
-    fn on_download_start(&self, _url: &Url) -> usize {
-        let progress_bar = self
-            .multi_progress
-            .add(ProgressBar::new(1))
-            .with_finish(indicatif::ProgressFinish::AndLeave)
-            .with_prefix("Downloading repodata");
-
-        // use the configured style
-        if let Some(template) = &self.progress_template {
-            progress_bar.set_style(template.clone());
-        }
-
-        // progress_bar.enable_steady_tick(Duration::from_millis(100));
-
-        let mut progress_bars = self.progress_bars.lock().unwrap();
-        progress_bars.push(progress_bar);
-        progress_bars.len() - 1
-    }
-
-    fn on_download_complete(&self, _url: &Url, index: usize) {
-        // Remove the progress bar from the multi progress
-        let pb = &self.progress_bars.lock().unwrap()[index];
-        if let Some(template) = &self.finish_template {
-            pb.set_style(template.clone());
-            pb.finish_with_message("Done".to_string());
-        } else {
-            pb.finish();
-        }
-    }
-
-    fn on_download_progress(&self, _url: &Url, index: usize, bytes: usize, total: Option<usize>) {
-        let progress_bar = &self.progress_bars.lock().unwrap()[index];
-        progress_bar.set_length(total.unwrap_or(bytes) as u64);
-        progress_bar.set_position(bytes as u64);
-    }
-}
-
-impl GatewayReporterBuilder {
-    #[must_use]
-    pub fn with_multi_progress(
-        mut self,
-        multi_progress: indicatif::MultiProgress,
-    ) -> GatewayReporterBuilder {
-        self.multi_progress = Some(multi_progress);
-        self
-    }
-
-    #[must_use]
-    pub fn with_progress_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
-        self.progress_template = Some(template);
-        self
-    }
-
-    #[must_use]
-    pub fn with_finish_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
-        self.finish_template = Some(template);
-        self
-    }
-
-    pub fn finish(self) -> GatewayReporter {
-        GatewayReporter {
-            progress_bars: Arc::new(Mutex::new(Vec::new())),
-            multi_progress: self.multi_progress.expect("multi progress is required"),
-            progress_template: self.progress_template,
-            finish_template: self.finish_template,
-        }
-    }
-}
-
-impl rattler_repodata_gateway::Reporter for GatewayReporter {
-    fn jlap_reporter(&self) -> Option<&dyn rattler_repodata_gateway::JLAPReporter> {
-        None
-    }
-
-    fn download_reporter(&self) -> Option<&dyn rattler_repodata_gateway::DownloadReporter> {
-        Some(self)
-    }
 }
 
 /// Load repodata from channels. Only includes necessary records for platform &
