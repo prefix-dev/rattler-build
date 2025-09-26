@@ -28,7 +28,8 @@ def test_recipe_all_sections() -> None:
     build = recipe.build
     assert build.number == 0
     assert not build.noarch
-    assert build.script is not None
+    
+    assert build.script.strip() == "pip install . --no-deps -vv"
 
     # Requirements (including selectors)
     reqs = recipe.requirements
