@@ -612,21 +612,21 @@ Options for uploading to S3
 	The channel URL in the S3 bucket to upload the package to, e.g., `s3://my-bucket/my-channel`
 
 
+- `--force`
+
+	Replace files if it already exists
+
+
+###### **S3 Credentials**
+
 - `--endpoint-url <ENDPOINT_URL>`
 
 	The endpoint URL of the S3 backend
 
-	- Default value: `https://s3.amazonaws.com`
 
 - `--region <REGION>`
 
 	The region of the S3 backend
-
-	- Default value: `eu-central-1`
-
-- `--force-path-style`
-
-	Whether to use path-style S3 URLs
 
 
 - `--access-key-id <ACCESS_KEY_ID>`
@@ -642,6 +642,14 @@ Options for uploading to S3
 - `--session-token <SESSION_TOKEN>`
 
 	The session token for the S3 bucket
+
+
+- `--addressing-style <ADDRESSING_STYLE>`
+
+	How to address the bucket
+
+	- Default value: `virtual-host`
+	- Possible values: `virtual-host`, `path`
 
 
 
