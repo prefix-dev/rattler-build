@@ -2,7 +2,7 @@
 
 !!!note
 
-    The "multi-output" cache is a little bit different from a compilation cache. If you look for tips and tricks on how to use `sccache` or `ccache` with `rattler-build`, please refer to the [tips and tricks section](tips_and_tricks.md#using-sccache-or-ccache).
+    The "multi-output" cache is a little bit different from a compilation cache. If you look for tips and tricks on how to use `sccache` or `ccache` with `rattler-build`, please refer to the [tips and tricks section](tips_and_tricks.md#using-sccache-or-ccache-with-rattler-build).
 
 Sometimes you build a package and want to split the contents into multiple sub-packages.
 For example, when building a C/C++ package, you might want to create multiple packages for the

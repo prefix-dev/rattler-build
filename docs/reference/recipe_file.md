@@ -1361,5 +1361,5 @@ tests:
 
 ### Jinja functions
 
-- [`load_from_file`](../experimental_features.md#load-from-files)
+- [`load_from_file`](../experimental_features.md#load_from_filefile_path)
 - [`git.*` functions](../experimental_features.md#git-functions)
