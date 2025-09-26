@@ -427,7 +427,11 @@ where
             // File has been reflinked
             #[cfg(target_os = "linux")]
             {
-                tracing::info!("Copying metadata for reflinked file {:?} -> {:?}", from, to.as_ref());
+                tracing::info!(
+                    "Copying metadata for reflinked file {:?} -> {:?}",
+                    from,
+                    to.as_ref()
+                );
                 copy_metadata(from, to.as_ref())?;
             }
         }
