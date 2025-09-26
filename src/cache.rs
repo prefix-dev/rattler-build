@@ -228,7 +228,7 @@ impl Output {
                 RunExportsDownload::DownloadMissing,
             )
             .await
-            .unwrap();
+            .into_diagnostic()?;
 
             install_environments(&self, &finalized_dependencies, tool_configuration)
                 .await
