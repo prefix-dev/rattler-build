@@ -248,7 +248,7 @@ impl VariantConfig {
         selector_config: &SelectorConfig,
     ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
         if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
-            Ok(Self::load_conda_build_config(path, selector_config)?)
+            Ok(load_conda_build_config(path, selector_config)?)
         } else {
             Self::load_variant_config(path, selector_config)
         }
@@ -274,15 +274,6 @@ impl VariantConfig {
                 parse_errors
             })?;
         Ok(config)
-    }
-
-    /// This function loads an old-style variant configuration file and returns
-    /// the configuration.
-    fn load_conda_build_config(
-        path: &Path,
-        selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, ParseConfigBuildConfigError> {
-        load_conda_build_config(path, selector_config)
     }
 
     /// This function loads multiple variant configuration files and merges them
