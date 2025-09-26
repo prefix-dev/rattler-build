@@ -468,8 +468,11 @@ pub enum ResolveError {
     #[error("Could not apply pin: {0}")]
     PinApplyError(#[from] PinError),
 
-    #[error("Could not apply pin. The following subpackage is not available: {0:?}")]
-    SubpackageNotFound(PackageName),
+    #[error("Could not apply pin_subpackage. The following subpackage is not available: {}", .0.as_normalized())]
+    PinSubpackageNotFound(PackageName),
+
+    #[error("Could not apply pin_compatible. The following package is not part of the solution: {}", .0.as_normalized())]
+    PinCompatibleNotFound(PackageName),
 
     #[error("Compiler configuration error: {0}")]
     CompilerError(String),
@@ -534,7 +537,7 @@ pub fn apply_variant(
                     let name = &pin.pin_value().name;
                     let subpackage = subpackages
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinSubpackageNotFound(name.clone()))?;
                     let pinned = pin
                         .pin_value()
                         .apply(&subpackage.version, &subpackage.build_string)?;
@@ -549,7 +552,7 @@ pub fn apply_variant(
                     let name = &pin.pin_value().name;
                     let pin_package = compatibility_specs
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinCompatibleNotFound(name.clone()))?;
 
                     let pinned = pin
                         .pin_value()
