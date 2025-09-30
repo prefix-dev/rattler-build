@@ -297,15 +297,13 @@ impl VariantConfig {
         }
 
         let normalized = key.normalize();
-        self.variants
-            .iter()
-            .find_map(|(existing_key, values)| {
-                if existing_key.normalize() == normalized {
-                    Some((existing_key.clone(), values.clone()))
-                } else {
-                    None
-                }
-            })
+        self.variants.iter().find_map(|(existing_key, values)| {
+            if existing_key.normalize() == normalized {
+                Some((existing_key.clone(), values.clone()))
+            } else {
+                None
+            }
+        })
     }
 
     fn validate_zip_keys(&self) -> Result<(), VariantExpandError> {
@@ -350,10 +348,8 @@ impl VariantConfig {
     ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, VariantExpandError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
-        let used_vars_by_normalized: HashMap<String, &NormalizedKey> = used_vars
-            .iter()
-            .map(|key| (key.normalize(), key))
-            .collect();
+        let used_vars_by_normalized: HashMap<String, &NormalizedKey> =
+            used_vars.iter().map(|key| (key.normalize(), key)).collect();
         let zip_key_normalized: HashSet<String> = zip_keys
             .iter()
             .flat_map(|zip| zip.iter().map(|key| key.normalize()))
@@ -419,18 +415,17 @@ impl VariantConfig {
                         true
                     } else {
                         already_used_vars.iter().all(|(key, value)| {
-                            combination
-                                .get(key)
-                                .or_else(|| {
-                                    combination.iter().find_map(|(existing_key, existing_value)| {
+                            combination.get(key).or_else(|| {
+                                combination
+                                    .iter()
+                                    .find_map(|(existing_key, existing_value)| {
                                         if existing_key.normalize() == key.normalize() {
                                             Some(existing_value)
                                         } else {
                                             None
                                         }
                                     })
-                                })
-                                == Some(value)
+                            }) == Some(value)
                         })
                     }
                 })
