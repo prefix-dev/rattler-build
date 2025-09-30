@@ -51,7 +51,7 @@ pub use self::{
     package::{OutputPackage, Package},
     parsing_utils::{
         StandardTryConvert, invalid_field_error, missing_field_error, parse_bool,
-        parse_optional_string, parse_required_string, validate_mapping_keys,
+        parse_required_string, validate_mapping_keys,
         validate_multi_output_root_keys,
     },
     regex::SerializableRegex,

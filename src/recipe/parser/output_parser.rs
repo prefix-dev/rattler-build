@@ -167,9 +167,6 @@ impl Output {
 
     /// Apply inheritance from a cache output
     pub fn apply_cache_inheritance(&mut self, cache: &CacheOutput) {
-        let script_backup = self.build.script.clone();
-        self.build.script = script_backup;
-
         if let Some(inherit_spec) = &self.inherit {
             if inherit_spec.inherit_run_exports() {
                 if let Some(cache_ignore) = &cache.ignore_run_exports {

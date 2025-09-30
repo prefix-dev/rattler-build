@@ -24,7 +24,10 @@ fn convert_errors<S: SourceCode>(errors: Vec<PartialParsingError>, src: S) -> Pa
         .into_iter()
         .map(|e| ParsingError::from_partial(src.clone(), e))
         .collect::<Vec<_>>();
-    converted_errors.into_iter().next().unwrap()
+    converted_errors
+        .into_iter()
+        .next()
+        .expect("convert_errors requires at least one PartialParsingError")
 }
 
 /// Validates root keys for multi-output recipes (RenderedMappingNode version)

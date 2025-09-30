@@ -52,15 +52,6 @@ pub fn parse_required_string(
         .to_string())
 }
 
-/// Helper to parse an optional string field
-pub fn parse_optional_string(
-    value: &RenderedNode,
-    field_name: &str,
-    context: &str,
-) -> Result<Option<String>, Vec<PartialParsingError>> {
-    Ok(Some(parse_required_string(value, field_name, context)?))
-}
-
 /// Helper to parse a boolean field
 pub fn parse_bool(
     value: &RenderedNode,
