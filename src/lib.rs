@@ -4,10 +4,8 @@
 
 pub mod build;
 pub mod cache;
-pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
-mod normalized_key;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
@@ -61,7 +59,6 @@ use metadata::{
     build_reindexed_channels,
 };
 use miette::{Context, IntoDiagnostic};
-pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
@@ -71,6 +68,7 @@ use rattler_conda_types::{
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
+use rattler_variants::NormalizedKey;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
@@ -265,7 +263,9 @@ pub async fn get_build_output(
     for (key, values) in &build_data.variant_overrides {
         let normalized_key = NormalizedKey::from(key.as_str());
         let variables: Vec<Variable> = values.iter().map(|v| Variable::from_string(v)).collect();
-        variant_config.variants.insert(normalized_key, variables);
+        variant_config
+            .variants_mut()
+            .insert(normalized_key, variables);
     }
 
     let outputs_and_variants =

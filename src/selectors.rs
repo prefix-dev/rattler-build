@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 use crate::{
     hash::HashInfo,
-    normalized_key::NormalizedKey,
     recipe::{
         jinja::{Env, Git},
         variable::Variable,
@@ -14,6 +13,7 @@ use crate::{
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
+use rattler_variants::NormalizedKey;
 use strum::IntoEnumIterator as _;
 
 /// The selector config is used to render the recipe.

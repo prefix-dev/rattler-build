@@ -143,7 +143,7 @@ opendal = { version = "0.54.0", default-features = false, features = [
 
 # Rattler crates
 rattler_config = { version = "0.2.9" }
-rattler = { version = "0.37.3", default-features = false, features = [
+rattler = { version = "=0.37.4", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
@@ -154,7 +154,7 @@ rattler_conda_types = { version = "0.39.2", default-features = false, features =
 rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.25.1", default-features = false }
+rattler_index = { version = "=0.25.2", default-features = false }
 rattler_networking = { version = "0.25.11", default-features = false, features = [
   "s3",
   "rattler_config",
@@ -166,7 +166,7 @@ rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.2", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.10", default-features = false, features = [
+rattler_sandbox = { version = "=0.1.11", default-features = false, features = [
   "tokio",
 ] }
 rattler_shell = { version = "0.25.0", default-features = false, features = [
@@ -178,7 +178,8 @@ rattler_solve = { version = "3.0.2", default-features = false, features = [
 ] }
 rattler_virtual_packages = { version = "2.1.4", default-features = false }
 rattler_package_streaming = { version = "0.23.2", default-features = false }
-rattler_menuinst = "0.2.24"
+rattler_menuinst = "=0.2.27"
+rattler_variants = "=0.1.0"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"
@@ -217,17 +218,19 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-# rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_menuinst = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_sandbox = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_cache = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_conda_types = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_digest = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_index = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_networking = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_repodata_gateway = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_shell = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_solve = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_redaction = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_virtual_packages = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_package_streaming = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_menuinst = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_config = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }
+rattler_variants = { git = "https://github.com/Hofer-Julian/rattler", branch = "feat/move-variant" }

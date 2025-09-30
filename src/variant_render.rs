@@ -5,11 +5,11 @@ use std::{
 
 use petgraph::graph::DiGraph;
 use rattler_conda_types::PackageName;
+use rattler_variants::NormalizedKey;
 
 use crate::{
     env_vars,
     hash::HashInfo,
-    normalized_key::NormalizedKey,
     recipe::{
         Jinja, ParsingError, Recipe,
         custom_yaml::Node,

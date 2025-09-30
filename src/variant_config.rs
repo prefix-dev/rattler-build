@@ -3,28 +3,24 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
 use indexmap::IndexSet;
 use miette::Diagnostic;
 use rattler_conda_types::{NoArchType, Platform};
+use rattler_variants::{
+    NormalizedKey, Pin, VariantConfig as ParsedVariantConfig,
+    VariantConfigError as ParsedVariantConfigError, VariantContext as ParsedVariantContext,
+    VariantValue,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    _partialerror,
-    conda_build_config::{ParseConfigBuildConfigError, load_conda_build_config},
-    consts::CONDA_BUILD_CONFIG_FILE,
     hash::HashInfo,
-    normalized_key::NormalizedKey,
-    recipe::{
-        Jinja, Recipe, Render,
-        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
-        error::{ErrorKind, ParsingError, PartialParsingError},
-        variable::Variable,
-    },
+    recipe::{Recipe, custom_yaml::Node, error::ParsingError, variable::Variable},
     selectors::SelectorConfig,
     source_code::SourceCode,
     variant_render::{stage_0_render, stage_1_render},
@@ -69,51 +65,6 @@ impl std::hash::Hash for DiscoveredOutput {
         self.node.hash(state);
         self.used_vars.hash(state);
         self.hash.hash(state);
-    }
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-/// Represents a pin configuration for a package.
-pub struct Pin {
-    /// The maximum pin (a string like "x.x.x").
-    pub max_pin: Option<String>,
-    /// The minimum pin (a string like "x.x.x").
-    pub min_pin: Option<String>,
-}
-
-impl TryConvertNode<Pin> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Pin, Vec<PartialParsingError>> {
-        self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
-            .map_err(|e| vec![e])
-            .and_then(|map| map.try_convert(name))
-    }
-}
-
-impl TryConvertNode<Pin> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<Pin, Vec<PartialParsingError>> {
-        let mut pin = Pin::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "max_pin" => {
-                    pin.max_pin = value.try_convert(key_str)?;
-                }
-                "min_pin" => {
-                    pin.min_pin = value.try_convert(key_str)?;
-                }
-                _ => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(key_str.to_string().into()),
-                        help = format!("Valid fields for {name} are: max_pin, min_pin")
-                    )]);
-                }
-            }
-        }
-
-        Ok(pin)
     }
 }
 
@@ -190,23 +141,85 @@ pub struct VariantConfig {
     pub variants: BTreeMap<NormalizedKey, Vec<Variable>>,
 }
 
-/// An error that can occur while parsing a variant configuration file.
 #[allow(missing_docs)]
 #[derive(Debug, Error, Diagnostic)]
 pub enum VariantConfigError<S: SourceCode> {
     #[error(transparent)]
     #[diagnostic(transparent)]
+    ParsedConfig(#[from] ParsedVariantConfigError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     RecipeParseErrors(#[from] ParseErrors<S>),
-
-    #[error("Could not parse variant config file ({0}): {1}")]
-    ParseError(PathBuf, serde_yaml::Error),
-
-    #[error("Could not open file ({0}): {1}")]
-    IOError(PathBuf, std::io::Error),
 
     #[error(transparent)]
     #[diagnostic(transparent)]
     NewParseError(#[from] ParsingError<S>),
+}
+
+fn build_variant_context(selector_config: &SelectorConfig) -> ParsedVariantContext {
+    let variant = selector_config
+        .variant
+        .iter()
+        .map(|(key, value)| {
+            (
+                NormalizedKey::from(key.normalize()),
+                variable_to_variant_value(value),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    ParsedVariantContext::new(
+        selector_config.target_platform,
+        selector_config.host_platform,
+        selector_config.build_platform,
+    )
+    .with_variant(variant)
+}
+
+fn convert_variants(parsed: &ParsedVariantConfig) -> BTreeMap<NormalizedKey, Vec<Variable>> {
+    parsed
+        .variants()
+        .iter()
+        .map(|(key, values)| {
+            let variables = values.iter().map(variant_value_to_variable).collect();
+            (NormalizedKey::from(key.normalize()), variables)
+        })
+        .collect()
+}
+
+fn variant_value_to_variable(value: &VariantValue) -> Variable {
+    match value {
+        VariantValue::Bool(b) => (*b).into(),
+        VariantValue::Integer(i) => (*i).into(),
+        VariantValue::Float(f) => Variable::from_string(&f.to_string()),
+        VariantValue::String(s) => Variable::from_string(s),
+    }
+}
+
+fn variable_to_variant_value(variable: &Variable) -> VariantValue {
+    use minijinja::value::ValueKind;
+
+    match variable.as_ref().kind() {
+        ValueKind::Bool => VariantValue::Bool(variable.as_ref().is_true()),
+        ValueKind::Number => {
+            let value = variable.to_string();
+            if let Ok(i) = value.parse::<i64>() {
+                VariantValue::Integer(i)
+            } else if let Ok(f) = value.parse::<f64>() {
+                VariantValue::Float(f)
+            } else {
+                VariantValue::String(value)
+            }
+        }
+        _ => {
+            if let Some(s) = variable.as_ref().as_str() {
+                VariantValue::String(s.to_string())
+            } else {
+                VariantValue::String(variable.to_string())
+            }
+        }
+    }
 }
 
 /// An error that indicates variant configuration is invalid.
@@ -229,156 +242,52 @@ pub enum VariantExpandError {
     CycleInRecipeOutputs(String),
 }
 
-impl<S: SourceCode> From<ParseConfigBuildConfigError> for VariantConfigError<S> {
-    fn from(e: ParseConfigBuildConfigError) -> Self {
-        match e {
-            ParseConfigBuildConfigError::ParseError(path, err) => {
-                VariantConfigError::ParseError(path, err)
-            }
-            ParseConfigBuildConfigError::IOError(path, e) => VariantConfigError::IOError(path, e),
-        }
-    }
-}
-
 impl VariantConfig {
-    /// This function loads a single variant configuration file and returns the
-    /// configuration.
-    fn load_file(
-        path: &Path,
-        selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
-        if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
-            Ok(load_conda_build_config(path, selector_config)?)
-        } else {
-            Self::load_variant_config(path, selector_config)
-        }
-    }
-
-    fn load_variant_config(
-        path: &Path,
-        selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
-        let file = fs_err::read_to_string(path)
-            .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
-        let source = Arc::<str>::from(file.as_str());
-        let yaml_node = Node::parse_yaml(0, source.clone())?;
-        let jinja = Jinja::new(selector_config.clone());
-        let rendered_node: RenderedNode = yaml_node
-            .render(&jinja, path.to_string_lossy().as_ref())
-            .map_err(|e| ParseErrors::from_partial_vec(source.clone(), e))?;
-
-        let config: VariantConfig = rendered_node
-            .try_convert(path.to_string_lossy().as_ref())
-            .map_err(|e| {
-                let parse_errors: ParseErrors<_> = ParsingError::from_partial_vec(source, e).into();
-                parse_errors
-            })?;
-        Ok(config)
-    }
-
-    /// This function loads multiple variant configuration files and merges them
-    /// into a single configuration. The configuration files are loaded in
-    /// the order they are provided in the `files` argument. The
-    /// `selector_config` argument is used to select the correct configuration
-    /// for the target platform.
-    ///
-    /// A variant configuration file is a YAML file that contains a mapping of
-    /// package names to a list of variants. For example:
-    ///
-    /// ```yaml
-    /// python:
-    /// - "3.9"
-    /// - "3.8"
-    /// ```
-    ///
-    /// The above configuration file will select the `python` package with the
-    /// variants `3.9` and `3.8`.
-    ///
-    /// The `selector_config` argument is used to select the correct
-    /// configuration for the target platform. For example, if the
-    /// `selector_config` is `unix`, the following configuration file:
-    ///
-    /// ```yaml
-    /// sel(unix):
-    ///   python:
-    ///   - "3.9"
-    ///   - "3.8"
-    /// sel(win):
-    ///   python:
-    ///   - "3.9"
-    /// ```
-    ///
-    /// will be flattened to:
-    ///
-    /// ```yaml
-    /// python:
-    /// - "3.9"
-    /// - "3.8"
-    /// ```
-    ///
-    /// The `files` argument is a list of paths to the variant configuration
-    /// files. The files are loaded in the order they are provided in the
-    /// `files` argument. The keys of a later file replace keys from an
-    /// earlier file (values are _not_ merged).
-    ///
-    /// A special key, the `zip_keys` is used to "zip" the values of two keys.
-    /// For example, if the following configuration file is loaded:
-    ///
-    /// ```yaml
-    /// compiler:
-    /// - gcc
-    /// - clang
-    /// python:
-    /// - "3.9"
-    /// - "3.8"
-    /// zip_keys:
-    /// - [compiler, python]
-    /// ```
-    ///
-    /// the variant configuration will be zipped so that the following variants
-    /// are selected:
-    ///
-    /// ```txt
-    /// [python=3.9, compiler=gcc]
-    /// and
-    /// [python=3.8, compiler=clang]
-    /// ```
+    /// Load variant configuration files and convert them into the internal representation.
     pub fn from_files(
         files: &[PathBuf],
         selector_config: &SelectorConfig,
     ) -> Result<Self, VariantConfigError<Arc<str>>> {
-        let mut variant_configs = Vec::new();
+        let context = build_variant_context(selector_config);
+        let parsed = ParsedVariantConfig::from_files(files, &context)?;
+        let variants = convert_variants(&parsed);
+        Ok(Self {
+            pin_run_as_build: parsed.pin_run_as_build().cloned(),
+            zip_keys: parsed.zip_keys().cloned(),
+            variants,
+        })
+    }
 
-        for filename in files {
-            tracing::info!("Loading variant config file: {:?}", filename);
-            let config = Self::load_file(filename, selector_config)?;
-            variant_configs.push(config);
+    #[cfg(test)]
+    fn from_parts_for_tests(
+        variants: BTreeMap<NormalizedKey, Vec<Variable>>,
+        zip_keys: Option<Vec<Vec<NormalizedKey>>>,
+    ) -> Self {
+        Self {
+            pin_run_as_build: None,
+            zip_keys,
+            variants,
         }
+    }
 
-        let mut final_config = VariantConfig::default();
-        for config in variant_configs {
-            final_config.variants.extend(config.variants);
-            if let Some(pin_run_as_build) = config.pin_run_as_build {
-                if let Some(final_pin_run_as_build) = &mut final_config.pin_run_as_build {
-                    final_pin_run_as_build.extend(pin_run_as_build);
-                } else {
-                    final_config.pin_run_as_build = Some(pin_run_as_build);
-                }
-            }
-            final_config.zip_keys = config.zip_keys;
-        }
+    /// Obtain mutable access to the internal variant map.
+    pub fn variants_mut(&mut self) -> &mut BTreeMap<NormalizedKey, Vec<Variable>> {
+        &mut self.variants
+    }
 
-        // always insert target_platform and build_platform
-        final_config.variants.insert(
-            "target_platform".into(),
-            vec![selector_config.target_platform.to_string().into()],
-        );
-        final_config.variants.insert(
-            "build_platform".into(),
-            vec![selector_config.build_platform.to_string().into()],
-        );
+    /// Return the pin configuration defined in the variant file, if any.
+    pub fn pin_run_as_build(&self) -> Option<&BTreeMap<String, Pin>> {
+        self.pin_run_as_build.as_ref()
+    }
 
-        Ok(final_config)
+    /// Return the configured zip key groups, if any.
+    pub fn zip_keys(&self) -> Option<&Vec<Vec<NormalizedKey>>> {
+        self.zip_keys.as_ref()
+    }
+
+    /// Access the normalized variant entries.
+    pub fn variants(&self) -> &BTreeMap<NormalizedKey, Vec<Variable>> {
+        &self.variants
     }
 
     fn validate_zip_keys(&self) -> Result<(), VariantExpandError> {
@@ -562,40 +471,6 @@ impl VariantConfig {
     }
 }
 
-impl TryConvertNode<VariantConfig> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
-        self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
-            .and_then(|map| map.try_convert(name))
-    }
-}
-
-impl TryConvertNode<VariantConfig> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
-        let mut config = VariantConfig::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "pin_run_as_build" => {
-                    config.pin_run_as_build = value.try_convert(key_str)?;
-                }
-                "zip_keys" => {
-                    config.zip_keys = value.try_convert(key_str)?;
-                }
-                _ => {
-                    let variants: Option<Vec<Variable>> = value.try_convert(key_str)?;
-                    if let Some(variants) = variants {
-                        config.variants.insert(key_str.into(), variants);
-                    }
-                }
-            }
-        }
-
-        Ok(config)
-    }
-}
-
 #[derive(Debug, Clone)]
 enum VariantKey {
     Key(NormalizedKey, Vec<Variable>),
@@ -643,17 +518,6 @@ pub struct ParseErrors<S: SourceCode> {
     errs: Vec<ParsingError<S>>,
 }
 
-impl<S: SourceCode> ParseErrors<S> {
-    fn from_partial_vec(source: S, errs: Vec<PartialParsingError>) -> Self
-    where
-        S: Clone + AsRef<str>,
-    {
-        Self {
-            errs: ParsingError::from_partial_vec(source, errs),
-        }
-    }
-}
-
 impl<S: SourceCode> From<Vec<ParsingError<S>>> for ParseErrors<S> {
     fn from(errs: Vec<ParsingError<S>>) -> Self {
         Self { errs }
@@ -698,43 +562,8 @@ fn find_combinations(
 mod tests {
     use fs_err as fs;
     use rattler_conda_types::Platform;
-    use rstest::rstest;
 
-    use crate::{normalized_key::NormalizedKey, selectors::SelectorConfig};
-
-    #[rstest]
-    #[case("selectors/config_1.yaml")]
-    fn test_flatten_selectors(#[case] filename: &str) {
-        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = fs::read_to_string(test_data_dir.join(filename)).unwrap();
-        let yaml = Node::parse_yaml(0, yaml_file.as_str()).unwrap();
-
-        let selector_config = SelectorConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            variant: Default::default(),
-            hash: None,
-            ..Default::default()
-        };
-        let jinja = Jinja::new(selector_config);
-
-        let res: RenderedNode = yaml.render(&jinja, "test1").unwrap();
-        let res: VariantConfig = res.try_convert("test1").unwrap();
-        insta::assert_yaml_snapshot!(res);
-
-        let selector_config = SelectorConfig {
-            target_platform: Platform::Win64,
-            host_platform: Platform::Win64,
-            build_platform: Platform::Win64,
-            ..Default::default()
-        };
-        let jinja = Jinja::new(selector_config);
-
-        let res: RenderedNode = yaml.render(&jinja, "test2").unwrap();
-        let res: VariantConfig = res.try_convert("test2").unwrap();
-        insta::assert_yaml_snapshot!(res);
-    }
+    use crate::selectors::SelectorConfig;
 
     #[test]
     fn test_load_config() {
@@ -749,7 +578,7 @@ mod tests {
 
         let variant = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         assert_eq!(
-            variant.variants.get(&"noboolean".into()).unwrap(),
+            variant.variants().get(&"noboolean".into()).unwrap(),
             &vec![Variable::from_string("true")]
         );
         insta::assert_yaml_snapshot!(variant);
@@ -788,111 +617,56 @@ mod tests {
 
     #[test]
     fn test_zip_keys_validation() {
-        let selector_config = SelectorConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            ..Default::default()
-        };
+        let mut variants = BTreeMap::<NormalizedKey, Vec<Variable>>::new();
+        variants.insert("python".into(), vec!["3.9".into(), "3.10".into()]);
+        variants.insert("compiler".into(), vec!["gcc".into(), "clang".into()]);
 
-        // Test that invalid zip_keys (flat list) fails
-        let invalid_yaml = r#"
-zip_keys: [python, compiler]
-python:
-  - "3.9"
-  - "3.10"
-compiler:
-  - gcc
-  - clang
-"#;
-        let source = Arc::<str>::from(invalid_yaml);
-        let yaml_node = Node::parse_yaml(0, source.clone()).unwrap();
-        let jinja = Jinja::new(selector_config.clone());
-        let rendered_node: RenderedNode = yaml_node.render(&jinja, "test").unwrap();
+        let used_vars = vec!["python".into()].into_iter().collect();
 
-        let result: Result<VariantConfig, Vec<PartialParsingError>> =
-            rendered_node.try_convert("test");
-
-        assert!(result.is_ok());
-        let config = result.unwrap();
-
-        let validation_result = config.validate_zip_keys();
-        assert!(validation_result.is_err());
-
-        match validation_result.unwrap_err() {
-            VariantExpandError::InvalidZipKeyStructure => {}
-            other => panic!("Expected InvalidZipKeyStructure error, got: {:?}", other),
-        }
-
-        // Test that valid zip_keys (list of lists) succeeds
-        let valid_yaml = r#"
-zip_keys:
-  - [python, compiler]
-python:
-  - "3.9"
-  - "3.10"
-compiler:
-  - gcc
-  - clang
-"#;
-        let source = Arc::<str>::from(valid_yaml);
-        let yaml_node = Node::parse_yaml(0, source.clone()).unwrap();
-        let rendered_node: RenderedNode = yaml_node.render(&jinja, "test").unwrap();
-
-        let result: Result<VariantConfig, Vec<PartialParsingError>> =
-            rendered_node.try_convert("test");
-        assert!(
-            result.is_ok(),
-            "Expected zip_keys validation to succeed for list of lists"
+        let valid = VariantConfig::from_parts_for_tests(
+            variants,
+            Some(vec![vec!["python".into(), "compiler".into()]]),
         );
+        assert!(valid.combinations(&used_vars, None).is_ok());
     }
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = BTreeMap::<NormalizedKey, Vec<Variable>>::new();
-        variants.insert("a".into(), vec!["1".into(), "2".into()]);
-        variants.insert("b".into(), vec!["3".into(), "4".into()]);
-        let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
+        let mut base_variants = BTreeMap::<NormalizedKey, Vec<Variable>>::new();
+        base_variants.insert("a".into(), vec!["1".into(), "2".into()]);
+        base_variants.insert("b".into(), vec!["3".into(), "4".into()]);
+        let zip_keys = Some(vec![vec!["a".into(), "b".into()]]);
 
-        let used_vars = vec!["a".into()].into_iter().collect();
-        let mut config = VariantConfig {
-            variants,
-            zip_keys: Some(zip_keys),
-            pin_run_as_build: None,
-        };
+        let config = VariantConfig::from_parts_for_tests(base_variants.clone(), zip_keys.clone());
+        let used_a = vec!["a".into()].into_iter().collect();
+        assert_eq!(config.combinations(&used_a, None).unwrap().len(), 2);
 
-        let combinations = config.combinations(&used_vars, None).unwrap();
-        assert_eq!(combinations.len(), 2);
+        let used_ab = vec!["a".into(), "b".into()].into_iter().collect();
+        assert_eq!(config.combinations(&used_ab, None).unwrap().len(), 2);
 
-        let used_vars = vec!["a".into(), "b".into()].into_iter().collect();
-        let combinations = config.combinations(&used_vars, None).unwrap();
-        assert_eq!(combinations.len(), 2);
-
-        config
-            .variants
-            .insert("c".into(), vec!["5".into(), "6".into(), "7".into()]);
-        let used_vars = vec!["a".into(), "b".into(), "c".into()]
+        let mut extended_variants = base_variants.clone();
+        extended_variants.insert("c".into(), vec!["5".into(), "6".into(), "7".into()]);
+        let config_zip =
+            VariantConfig::from_parts_for_tests(extended_variants.clone(), zip_keys.clone());
+        let used_abc = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
-        let combinations = config.combinations(&used_vars, None).unwrap();
-        assert_eq!(combinations.len(), 2 * 3);
+        assert_eq!(
+            config_zip.combinations(&used_abc, None).unwrap().len(),
+            2 * 3
+        );
 
-        let used_vars = vec!["a".into(), "b".into(), "c".into()]
-            .into_iter()
-            .collect();
-        config.zip_keys = None;
-        let combinations = config.combinations(&used_vars, None).unwrap();
-        assert_eq!(combinations.len(), 2 * 2 * 3);
+        let config_no_zip = VariantConfig::from_parts_for_tests(extended_variants.clone(), None);
+        assert_eq!(
+            config_no_zip.combinations(&used_abc, None).unwrap().len(),
+            2 * 2 * 3
+        );
 
-        let already_used_vars = BTreeMap::from_iter(vec![("a".into(), "1".into())]);
-        let c2 = config
-            .combinations(&used_vars, Some(&already_used_vars))
+        let already_used = BTreeMap::from_iter(vec![("a".into(), "1".into())]);
+        let filtered = config_no_zip
+            .combinations(&used_abc, Some(&already_used))
             .unwrap();
-        println!("{:?}", c2);
-        // for c in &c2 {
-        //     assert!(c.get(&"a".into()).unwrap() == "1");
-        // }
-        assert!(c2.len() == 2 * 3);
+        assert_eq!(filtered.len(), 2 * 3);
     }
 
     #[test]
