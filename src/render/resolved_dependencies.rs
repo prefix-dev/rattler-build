@@ -12,6 +12,7 @@ use rattler_conda_types::{
     package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
+use rattler_variants::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
@@ -508,7 +509,13 @@ pub fn apply_variant(
                     let m = m.clone();
                     if build_time && m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
+                            let normalized_key: NormalizedKey = name.as_normalized().into();
+                            let variant_value = variant.get(&normalized_key).or_else(|| {
+                                let fallback_key = NormalizedKey::from(normalized_key.normalize());
+                                variant.get(&fallback_key)
+                            });
+
+                            if let Some(version) = variant_value {
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
                                 let mut spec = version.to_string();
