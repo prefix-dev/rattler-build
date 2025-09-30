@@ -290,6 +290,24 @@ impl VariantConfig {
         &self.variants
     }
 
+    /// Look up variant values allowing hyphen/underscore spelling differences.
+    fn resolve_variant_entry(&self, key: &NormalizedKey) -> Option<(NormalizedKey, Vec<Variable>)> {
+        if let Some(values) = self.variants.get(key) {
+            return Some((key.clone(), values.clone()));
+        }
+
+        let normalized = key.normalize();
+        self.variants
+            .iter()
+            .find_map(|(existing_key, values)| {
+                if existing_key.normalize() == normalized {
+                    Some((existing_key.clone(), values.clone()))
+                } else {
+                    None
+                }
+            })
+    }
+
     fn validate_zip_keys(&self) -> Result<(), VariantExpandError> {
         if let Some(zip_keys) = &self.zip_keys {
             for zip in zip_keys {
@@ -332,13 +350,25 @@ impl VariantConfig {
     ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, VariantExpandError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
+        let used_vars_by_normalized: HashMap<String, &NormalizedKey> = used_vars
+            .iter()
+            .map(|key| (key.normalize(), key))
+            .collect();
+        let zip_key_normalized: HashSet<String> = zip_keys
+            .iter()
+            .flat_map(|zip| zip.iter().map(|key| key.normalize()))
+            .collect();
+
         let used_zip_keys = zip_keys
             .iter()
-            .filter(|zip| zip.iter().any(|key| used_vars.contains(key)))
+            .filter(|zip| {
+                zip.iter()
+                    .any(|key| used_vars_by_normalized.contains_key(&key.normalize()))
+            })
             .map(|zip| {
                 let mut map = HashMap::new();
                 for key in zip {
-                    if !used_vars.contains(key) {
+                    if !used_vars_by_normalized.contains_key(&key.normalize()) {
                         continue;
                     }
                     if let Some(values) = self.variants.get(key) {
@@ -352,12 +382,11 @@ impl VariantConfig {
         let variant_keys = used_vars
             .iter()
             .filter_map(|key| {
-                if let Some(values) = self.variants.get(key) {
-                    if !zip_keys.iter().any(|zip| zip.contains(key)) {
-                        return Some(VariantKey::Key(key.clone(), values.clone()));
-                    }
+                let (variant_key, values) = self.resolve_variant_entry(key)?;
+                if zip_key_normalized.contains(&variant_key.normalize()) {
+                    return None;
                 }
-                None
+                Some(VariantKey::Key(variant_key, values))
             })
             .collect::<Vec<_>>();
 
@@ -389,9 +418,20 @@ impl VariantConfig {
                     if already_used_vars.is_empty() {
                         true
                     } else {
-                        already_used_vars
-                            .iter()
-                            .all(|(key, value)| combination.get(key) == Some(value))
+                        already_used_vars.iter().all(|(key, value)| {
+                            combination
+                                .get(key)
+                                .or_else(|| {
+                                    combination.iter().find_map(|(existing_key, existing_value)| {
+                                        if existing_key.normalize() == key.normalize() {
+                                            Some(existing_value)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                })
+                                == Some(value)
+                        })
                     }
                 })
                 .collect();

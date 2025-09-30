@@ -142,6 +142,24 @@ pub struct Stage1Render<S: SourceCode> {
 }
 
 impl<S: SourceCode> Stage1Render<S> {
+    fn lookup_variable<'a>(
+        variables: &'a BTreeMap<NormalizedKey, Variable>,
+        key: &NormalizedKey,
+    ) -> Option<(&'a NormalizedKey, &'a Variable)> {
+        if let Some((existing_key, value)) = variables.get_key_value(key) {
+            return Some((existing_key, value));
+        }
+
+        let normalized = key.normalize();
+        variables.iter().find_map(|(existing_key, value)| {
+            if existing_key.normalize() == normalized {
+                Some((existing_key, value))
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
         self.inner
             .iter()
@@ -164,8 +182,8 @@ impl<S: SourceCode> Stage1Render<S> {
         // extract variant
         let mut variant = BTreeMap::new();
         for var in all_vars {
-            if let Some(val) = self.variables.get(&var) {
-                variant.insert(var, val.clone());
+            if let Some((resolved_key, val)) = Self::lookup_variable(&self.variables, &var) {
+                variant.insert(resolved_key.clone(), val.clone());
             }
         }
 
