@@ -11,11 +11,11 @@ use marked_yaml::{
     types::MarkedScalarNode,
 };
 use rattler_conda_types::VersionWithSource;
+use rattler_variants::NormalizedKey;
 use url::Url;
 
 use crate::{
     _partialerror,
-    normalized_key::NormalizedKey,
     recipe::{
         error::{ErrorKind, ParsingError, PartialParsingError, jinja_error_to_label},
         jinja::Jinja,

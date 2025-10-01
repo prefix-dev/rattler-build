@@ -23,6 +23,7 @@ use rattler_conda_types::{
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_variants::NormalizedKey;
 use rattler_virtual_packages::{
     DetectVirtualPackageError, VirtualPackage, VirtualPackageOverrides,
 };
@@ -32,7 +33,6 @@ use serde_json::Value;
 use crate::{
     console_utils::github_integration_enabled,
     hash::HashInfo,
-    normalized_key::NormalizedKey,
     recipe::{
         jinja::SelectorConfig,
         parser::{Recipe, Source},
