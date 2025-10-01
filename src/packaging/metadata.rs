@@ -21,10 +21,21 @@ use rattler_conda_types::{
     },
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
+use rayon::prelude::*;
 use url::Url;
 
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
+
+/// Safely check if a symlink resolves to a regular file, with basic loop protection
+fn is_symlink_to_file(path: &Path) -> bool {
+    // Simple approach: try to canonicalize the path, which handles cycles gracefully
+    // If canonicalization fails (due to cycles or missing targets), assume it's not a file
+    match path.canonicalize() {
+        Ok(canonical_path) => canonical_path.is_file(),
+        Err(_) => false, // Could be cycle, missing target, or permission issue
+    }
+}
 
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
@@ -61,7 +72,6 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
 pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
-    target_platform: &Platform,
 ) -> Result<Option<String>, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
@@ -71,14 +81,17 @@ pub fn contains_prefix_text(
 
     // Check if the content contains the prefix with memchr
     let prefix_string = prefix.to_string_lossy().to_string();
+    let mut detected_prefix = None;
     if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
         .next()
         .is_some()
     {
-        return Ok(Some(prefix_string));
+        detected_prefix = Some(prefix_string);
     }
 
-    if target_platform.is_windows() {
+    // On Windows we always also need to check for forward slashes.
+    // This also includes `noarch` packages that are built on Windows.
+    if cfg!(windows) {
         use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
@@ -89,11 +102,20 @@ pub fn contains_prefix_text(
             .next()
             .is_some()
         {
+            if detected_prefix.is_some() {
+                tracing::error!(
+                    "File {file_path:?} contains the prefix with both forward- and backslashes. This is not supported and can lead to issues.\n  Prefix: {prefix:?}",
+                );
+                return Err(PackagingError::MixedPrefixPlaceholders(
+                    file_path.to_path_buf(),
+                ));
+            }
+
             return Ok(Some(forward_slash.to_string()));
         }
     }
 
-    Ok(None)
+    Ok(detected_prefix)
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -147,7 +169,7 @@ pub fn create_prefix_placeholder(
     // Even if we force the replacement mode to be text we still cannot handle it
     // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
-        match contains_prefix_text(file_path, encoded_prefix, target_platform) {
+        match contains_prefix_text(file_path, encoded_prefix) {
             Ok(Some(prefix)) => {
                 has_prefix = Some(prefix);
                 FileMode::Text
@@ -387,113 +409,116 @@ impl Output {
             paths_version: 1,
         };
 
-        let sorted = temp_files
+        let entries: Vec<Result<Option<PathsEntry>, PackagingError>> = temp_files
             .content_type_map()
-            .iter()
-            .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2));
+            .par_iter()
+            .map(|(p, content_type)| {
+                let meta = fs::symlink_metadata(p)?;
+                let relative_path = p.strip_prefix(temp_files.temp_dir.path())?.to_path_buf();
 
-        for (p, content_type) in sorted {
-            let meta = fs::symlink_metadata(p)?;
+                if relative_path.starts_with("info") {
+                    return Ok(None);
+                }
 
-            let relative_path = p.strip_prefix(temp_files.temp_dir.path())?.to_path_buf();
-
-            // skip any info files as they are not part of the paths.json
-            if relative_path.starts_with("info") {
-                continue;
-            }
-
-            if !p.exists() {
-                if p.is_symlink() {
-                    // check if the file is in the prefix
-                    if let Ok(link_target) = p.read_link() {
-                        if link_target.is_relative() {
-                            let Some(relative_path_parent) = relative_path.parent() else {
-                                tracing::warn!("could not get parent of symlink {:?}", &p);
-                                continue;
-                            };
-
-                            let resolved_path = temp_files
-                                .encoded_prefix
-                                .join(relative_path_parent)
-                                .join(&link_target);
-
-                            if !resolved_path.exists() {
+                if !p.exists() {
+                    if p.is_symlink() {
+                        if let Ok(link_target) = p.read_link() {
+                            if link_target.is_relative() {
+                                let Some(relative_path_parent) = relative_path.parent() else {
+                                    tracing::warn!("could not get parent of symlink {:?}", &p);
+                                    return Ok(None);
+                                };
+                                let resolved_path = temp_files
+                                    .encoded_prefix
+                                    .join(relative_path_parent)
+                                    .join(&link_target);
+                                if !resolved_path.exists() {
+                                    tracing::warn!(
+                                        "symlink target not part of this package: {:?} -> {:?}",
+                                        &p,
+                                        &link_target
+                                    );
+                                    // Continue processing the symlink instead of skipping it
+                                }
+                            } else {
                                 tracing::warn!(
-                                    "symlink target not part of this package: {:?} -> {:?}",
+                                    "packaging an absolute symlink to outside the prefix {:?} -> {:?}",
                                     &p,
-                                    &link_target
+                                    link_target
                                 );
-
-                                // Think about continuing here or packaging broken symlinks
-                                continue;
                             }
                         } else {
-                            tracing::warn!(
-                                "packaging an absolute symlink to outside the prefix {:?} -> {:?}",
-                                &p,
-                                link_target
-                            );
+                            tracing::warn!("could not read symlink {:?}", &p);
                         }
                     } else {
-                        tracing::warn!("could not read symlink {:?}", &p);
+                        tracing::warn!("file does not exist: {:?}", &p);
+                        return Ok(None);
                     }
-                } else {
-                    tracing::warn!("file does not exist: {:?}", &p);
-                    continue;
                 }
-            }
 
-            if meta.is_dir() {
-                // check if dir is empty, and only then add it to paths.json
-                let mut entries = fs::read_dir(p)?;
-                if entries.next().is_none() {
-                    let path_entry = PathsEntry {
-                        sha256: None,
+                if meta.is_dir() {
+                    let mut entries = fs::read_dir(p)?;
+                    if entries.next().is_none() {
+                        return Ok(Some(PathsEntry {
+                            sha256: None,
+                            relative_path,
+                            path_type: PathType::Directory,
+                            prefix_placeholder: None,
+                            no_link: false,
+                            size_in_bytes: None,
+                        }));
+                    }
+                } else if meta.is_file() {
+                    let content_type = content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
+                    let prefix_placeholder = create_prefix_placeholder(
+                        &self.build_configuration.target_platform,
+                        p,
+                        temp_files.temp_dir.path(),
+                        &temp_files.encoded_prefix,
+                        &content_type,
+                        self.recipe.build().prefix_detection(),
+                    )?;
+                    let file_size = meta.len();
+                    // Compute SHA256 for files - empty files get empty hash
+                    let digest = if file_size > 0 {
+                        Some(compute_file_digest::<sha2::Sha256>(p)?)
+                    } else {
+                        Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+                    };
+                    let no_link = always_copy_files.is_match(&relative_path);
+                    return Ok(Some(PathsEntry {
+                        sha256: digest,
                         relative_path,
-                        path_type: PathType::Directory,
+                        path_type: PathType::HardLink,
+                        prefix_placeholder,
+                        no_link,
+                        size_in_bytes: Some(file_size),
+                    }));
+                } else if meta.is_symlink() {
+                    // For symlinks, compute hash of the target file content if it exists and is within package, otherwise empty digest
+                    let digest = if is_symlink_to_file(p) {
+                        compute_file_digest::<sha2::Sha256>(p)?
+                    } else {
+                        compute_bytes_digest::<sha2::Sha256>(&[])
+                    };
+                    return Ok(Some(PathsEntry {
+                        sha256: Some(digest),
+                        relative_path,
+                        path_type: PathType::SoftLink,
                         prefix_placeholder: None,
                         no_link: false,
-                        size_in_bytes: None,
-                    };
-                    paths_json.paths.push(path_entry);
+                        size_in_bytes: Some(meta.len()),
+                    }));
                 }
-            } else if meta.is_file() {
-                let content_type =
-                    content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
-                let prefix_placeholder = create_prefix_placeholder(
-                    &self.build_configuration.target_platform,
-                    p,
-                    temp_files.temp_dir.path(),
-                    &temp_files.encoded_prefix,
-                    &content_type,
-                    self.recipe.build().prefix_detection(),
-                )?;
+                Ok(None)
+            })
+            .collect();
 
-                let digest = compute_file_digest::<sha2::Sha256>(p)?;
-                let no_link = always_copy_files.is_match(&relative_path);
-                paths_json.paths.push(PathsEntry {
-                    sha256: Some(digest),
-                    relative_path,
-                    path_type: PathType::HardLink,
-                    prefix_placeholder,
-                    no_link,
-                    size_in_bytes: Some(meta.len()),
-                });
-            } else if meta.is_symlink() {
-                let digest = if p.is_file() {
-                    compute_file_digest::<sha2::Sha256>(p)?
-                } else {
-                    compute_bytes_digest::<sha2::Sha256>(&[])
-                };
-
-                paths_json.paths.push(PathsEntry {
-                    sha256: Some(digest),
-                    relative_path,
-                    path_type: PathType::SoftLink,
-                    prefix_placeholder: None,
-                    no_link: false,
-                    size_in_bytes: Some(meta.len()),
-                });
+        for entry in entries {
+            match entry {
+                Ok(Some(path_entry)) => paths_json.paths.push(path_entry),
+                Ok(None) => {}
+                Err(e) => return Err(e),
             }
         }
 
@@ -595,7 +620,7 @@ mod test {
         let content = format!("This file lives in {} directory", prefix_path.display());
         fs::write(&file_path, content).unwrap();
 
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        let found = contains_prefix_text(&file_path, &prefix_path).unwrap();
         assert_eq!(found, Some(prefix_path.to_string_lossy().to_string()));
     }
 
@@ -605,7 +630,7 @@ mod test {
         let prefix_path = tmp.path().join("absent_prefix");
         let file_path = tmp.path().join("note.txt");
         fs::write(&file_path, "nothing to see here").unwrap();
-        let found = contains_prefix_text(&file_path, &prefix_path, &Platform::Linux64).unwrap();
+        let found = contains_prefix_text(&file_path, &prefix_path).unwrap();
         assert!(found.is_none());
     }
 

@@ -18,6 +18,7 @@ struct CondaPyPiNameMapping {
     pypi_name: String,
 }
 
+/// Options for generating a Python (PyPI) recipe.
 #[derive(Debug, Clone, Parser)]
 pub struct PyPIOpts {
     /// Name of the package to generate
@@ -126,6 +127,7 @@ struct PyPrReleaseResponse {
     urls: Vec<PyPiRelease>,
 }
 
+/// Metadata about a PyPI release used to construct the recipe.
 #[derive(Debug, Clone)]
 pub struct PyPiMetadata {
     info: PyPiInfo,
@@ -157,7 +159,7 @@ async fn extract_build_requirements(
             entry.read_to_string(&mut contents).into_diagnostic()?;
 
             // Parse TOML
-            let toml: toml::Value = contents.parse().into_diagnostic()?;
+            let toml: toml::Table = contents.parse().into_diagnostic()?;
 
             // Try different build system specs
             return Ok(match toml.get("build-system") {
@@ -182,6 +184,7 @@ async fn extract_build_requirements(
     Ok(Vec::new())
 }
 
+/// Fetch and cache the conda-forge mapping from conda package names to PyPI names.
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
     static MAPPING: OnceCell<HashMap<String, String>> = OnceCell::new();
     MAPPING.get_or_try_init(async {
@@ -323,6 +326,7 @@ async fn map_requirement(
     req.to_string()
 }
 
+/// Create a `serialize::Recipe` from the provided options and PyPI metadata.
 pub async fn create_recipe(
     opts: &PyPIOpts,
     metadata: &PyPiMetadata,
@@ -449,6 +453,18 @@ pub async fn create_recipe(
     Ok(recipe)
 }
 
+/// Generate a recipe YAML string for a PyPI package.
+pub async fn generate_pypi_recipe_string(opts: &PyPIOpts) -> miette::Result<String> {
+    let client = reqwest::Client::new();
+    let metadata = fetch_pypi_metadata(opts, &client).await?;
+    let recipe = create_recipe(opts, &metadata, &client).await?;
+    let string = format!("{}", recipe);
+    Ok(post_process_markers(string))
+}
+
+/// Generate a recipe for a PyPI package and either write it to disk or print it.
+///
+/// If `opts.tree` is set, recursively generates recipes for runtime dependencies.
 #[async_recursion::async_recursion]
 pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     tracing::info!("Generating recipe for {}", opts.package);

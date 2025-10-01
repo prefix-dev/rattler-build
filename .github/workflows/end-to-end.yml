@@ -6,12 +6,14 @@ on:
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
   pull_request:
     paths:
       - "src/**"
       - "Cargo.*"
       - "rust-tests/**"
       - "test/end-to-end/**"
+      - ".github/workflows/end-to-end.yml"
 
 name: End-to-End testing
 
@@ -36,16 +38,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
         with:
           workspaces: ". -> target-pixi"
           key: ${{ hashFiles('pixi.lock') }}
-      - uses: prefix-dev/setup-pixi@v0.8.14
+      - uses: prefix-dev/setup-pixi@v0.9.1
       # build in release mode so that it's reasonably fast to run the tests
       - run: pixi run build-release
       - run: pixi run test-ci
-      - run: pixi run test-end-to-end -s -v
+      - run: pixi run test-end-to-end -v
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}

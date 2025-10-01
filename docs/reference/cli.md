@@ -122,6 +122,11 @@ Build a package from a recipe
 	Variant configuration files for the build
 
 
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+
+
 - `--ignore-recipe-variants`
 
 	Do not read the `variants.yaml` file next to a recipe
@@ -369,7 +374,7 @@ Rebuild a package from a package file instead of a recipe
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
-	The package file to rebuild
+	The package file to rebuild (can be a local path or URL)
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
@@ -604,24 +609,24 @@ Options for uploading to S3
 
 - `-c`, `--channel <CHANNEL>`
 
-	The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
+	The channel URL in the S3 bucket to upload the package to, e.g., `s3://my-bucket/my-channel`
 
+
+- `--force`
+
+	Replace files if it already exists
+
+
+###### **S3 Credentials**
 
 - `--endpoint-url <ENDPOINT_URL>`
 
 	The endpoint URL of the S3 backend
 
-	- Default value: `https://s3.amazonaws.com`
 
 - `--region <REGION>`
 
 	The region of the S3 backend
-
-	- Default value: `eu-central-1`
-
-- `--force-path-style`
-
-	Whether to use path-style S3 URLs
 
 
 - `--access-key-id <ACCESS_KEY_ID>`
@@ -637,6 +642,14 @@ Options for uploading to S3
 - `--session-token <SESSION_TOKEN>`
 
 	The session token for the S3 bucket
+
+
+- `--addressing-style <ADDRESSING_STYLE>`
+
+	How to address the bucket
+
+	- Default value: `virtual-host`
+	- Possible values: `virtual-host`, `path`
 
 
 
@@ -842,7 +855,7 @@ Store authentication information for a given host
 
 - `<HOST>`
 
-	The host to authenticate with (e.g. repo.prefix.dev)
+	The host to authenticate with (e.g. prefix.dev)
 
 
 

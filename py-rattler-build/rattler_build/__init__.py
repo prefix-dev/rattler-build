@@ -7,11 +7,26 @@ from .rattler_build import (
     upload_package_to_prefix_py,
     upload_package_to_anaconda_py,
     upload_packages_to_conda_forge_py,
+    RattlerBuildError,
 )
+
+from .recipe import (
+    Recipe,
+    Package,
+    Build,
+    Requirements,
+    About,
+    Source,
+    TestType,
+    TestTypeEnum,
+    SelectorConfig,
+)
+
+from . import recipe_generation
 
 
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Union
 from datetime import datetime
 
 __all__ = [
@@ -23,6 +38,17 @@ __all__ = [
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
+    "recipe_generation",
+    "Recipe",
+    "Package",
+    "Build",
+    "Requirements",
+    "RattlerBuildError",
+    "About",
+    "Source",
+    "TestType",
+    "TestTypeEnum",
+    "SelectorConfig",
 ]
 
 
@@ -39,6 +65,7 @@ def build_recipes(
     host_platform: Union[str, None] = None,
     channel: Union[List[str], None] = None,
     variant_config: Union[List[str], None] = None,
+    variant_overrides: Union[Dict[str, List[str]], None] = None,
     ignore_recipe_variants: bool = False,
     render_only: bool = False,
     with_solve: bool = False,
@@ -60,6 +87,10 @@ def build_recipes(
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     exclude_newer: Union[datetime, None] = None,
+    use_bz2: bool = True,
+    use_zstd: bool = True,
+    use_jlap: bool = False,
+    use_sharded: bool = True,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -72,6 +103,7 @@ def build_recipes(
         host_platform: The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch).
         channel: Add a channel to search for dependencies in.
         variant_config: Variant configuration files for the build.
+        variant_overrides: A dictionary of variant key-value pairs to override. Keys are strings, values are lists of strings.
         ignore_recipe_variants: Do not read the `variants.yaml` file next to a recipe.
         render_only: Render the recipe files without executing the build.
         with_solve: Render the recipe files with solving dependencies.
@@ -93,6 +125,10 @@ def build_recipes(
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
         exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
+        use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
+        use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
+        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
+        use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
         None
@@ -106,6 +142,7 @@ def build_recipes(
         host_platform,
         channel,
         variant_config,
+        variant_overrides,
         ignore_recipe_variants,
         render_only,
         with_solve,
@@ -127,6 +164,10 @@ def build_recipes(
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     )
 
 
@@ -139,6 +180,10 @@ def test_package(
     allow_insecure_host: Union[List[str], None] = None,
     debug: bool = False,
     test_index: Union[int, None] = None,
+    use_bz2: bool = True,
+    use_zstd: bool = True,
+    use_jlap: bool = False,
+    use_sharded: bool = True,
 ) -> None:
     """
     Run a test for a single package.
@@ -152,12 +197,27 @@ def test_package(
         allow_insecure_host: Allow insecure hosts for the build.
         debug: Enable or disable debug mode. (default: False)
         test_index: The test to run, selected by index. (default: None - run all tests)
+        use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
+        use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
+        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
+        use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
         None
     """
     test_package_py(
-        package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host, debug, test_index
+        package_file,
+        channel,
+        compression_threads,
+        auth_file,
+        channel_priority,
+        allow_insecure_host,
+        debug,
+        test_index,
+        use_bz2,
+        use_zstd,
+        use_jlap,
+        use_sharded,
     )
 
 

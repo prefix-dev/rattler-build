@@ -54,6 +54,9 @@ pub enum PackagingError {
     #[error("Could not strip a prefix from a Path")]
     StripPrefixError(#[from] std::path::StripPrefixError),
 
+    #[error("Found mixed Prefix placeholders in file (forward- vs backslashes)")]
+    MixedPrefixPlaceholders(PathBuf),
+
     #[error("Could not serialize JSON: {0}")]
     SerializationError(#[from] serde_json::Error),
 

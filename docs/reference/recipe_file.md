@@ -392,6 +392,9 @@ build:
         - echo "unix"
 ```
 
+There are many other configurable settings, such as environment variables and secrets.
+Please see [Build script](../build_script.md) for more information.
+
 ### Skipping builds
 
 Lists conditions under which `rattler-build` should skip the build of this recipe.
@@ -1358,5 +1361,5 @@ tests:
 
 ### Jinja functions
 
-- [`load_from_file`](../experimental_features.md#load-from-files)
+- [`load_from_file`](../experimental_features.md#load_from_filefile_path)
 - [`git.*` functions](../experimental_features.md#git-functions)

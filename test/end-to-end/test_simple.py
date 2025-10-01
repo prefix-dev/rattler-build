@@ -140,6 +140,39 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     check_info(pkg, expected=recipes / "toml" / "expected")
 
 
+def test_render_only_with_solve_does_not_download_packages(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    result = rattler_build.render(
+        recipes / "toml",
+        tmp_path,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        raw=True,
+    )
+
+    assert result.returncode == 0
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+
+    # Verify we did not trigger steps that download packages
+    assert "Collecting run exports" not in combined
+    assert "Installing host environment" not in combined
+    assert "Installing build environment" not in combined
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
+    deps = outputs[0].get("finalized_dependencies", {})
+    resolved_len = 0
+    host = deps.get("host")
+    if isinstance(host, dict):
+        resolved_len = len(host.get("resolved", []))
+    if resolved_len == 0:
+        build = deps.get("build")
+        if isinstance(build, dict):
+            resolved_len = len(build.get("resolved", []))
+    assert resolved_len >= 1
+
+
 def test_run_exports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1037,11 +1070,11 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
-def test_nushell_implicit_recipe(
+def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     rattler_build.build(
-        recipes / "nushell-implicit/recipe.yaml",
+        recipes / "nushell-script-detection/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "nushell")
@@ -1131,9 +1164,12 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches
+    # check that the snapshot matches (different on windows vs. unix)
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    assert test_yaml == snapshot
+    if os.name == "nt":
+        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
+    else:
+        assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()

@@ -12,27 +12,66 @@ use std::{
 
 use diffy::{Diff, Patch};
 use fs_err::File;
+use fs_err::read;
 use itertools::Itertools;
+
+fn is_dev_null(path: &str) -> bool {
+    let trimmed = path.trim();
+    trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
+}
+
+/// Normalizes backup file paths (.orig/.bak) to their actual file paths
+/// Returns (original_path, modified_path) with backup files resolved
+fn normalize_backup_paths(
+    original_path: Option<PathBuf>,
+    modified_path: Option<PathBuf>,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    let (Some(orig), Some(modified)) = (&original_path, &modified_path) else {
+        return (original_path, modified_path);
+    };
+
+    // If paths are the same, no backup normalization needed
+    if orig == modified {
+        return (original_path, modified_path);
+    }
+
+    // Check if original file is a backup of the modified file
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
+        if let Some(mod_filename) = modified.file_name() {
+            if matches!(orig_ext.to_str(), Some("orig" | "bak")) && orig_stem == mod_filename {
+                // Original is a backup of modified file, treat as modifying the actual file
+                return (Some(modified.clone()), Some(modified.clone()));
+            }
+        }
+    }
+
+    (original_path, modified_path)
+}
 
 fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
     for diff in patch {
-        if let Some(p) = diff
+        let original_path = diff
             .original()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| p.trim() != "/dev/null")
-            .map(PathBuf::from)
-        {
-            affected_files.insert(p);
-        }
-        if let Some(p) = diff
+            .filter(|p| !is_dev_null(p))
+            .map(PathBuf::from);
+
+        let modified_path = diff
             .modified()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| p.trim() != "/dev/null")
-            .map(PathBuf::from)
-        {
-            affected_files.insert(p);
+            .filter(|p| !is_dev_null(p))
+            .map(PathBuf::from);
+
+        let (normalized_orig, normalized_mod) =
+            normalize_backup_paths(original_path, modified_path);
+
+        if let Some(path) = normalized_orig {
+            affected_files.insert(path);
+        }
+        if let Some(path) = normalized_mod {
+            affected_files.insert(path);
         }
     }
 
@@ -77,11 +116,14 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         .unwrap_or(0);
 
     for strip_level in 0..max_components {
-        let all_paths_exist = patched_files.iter().all(|p| {
+        // We check for _any_ path existing here. Sometimes patches reference
+        // files that are deleted (e.g. `foobar.orig`) and thus it's more robust to look for
+        // the first match in the affected files.
+        let any_paths_exist = patched_files.iter().any(|p| {
             let path: PathBuf = p.components().skip(strip_level).collect();
             work_dir.join(path).exists()
         });
-        if all_paths_exist {
+        if any_paths_exist {
             return Ok(strip_level);
         }
     }
@@ -99,35 +141,16 @@ fn custom_patch_stripped_paths(
     diff: &Diff<'_, [u8]>,
     strip_level: usize,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
-    let original = (diff.original(), diff.modified());
-    let stripped = (
-        // XXX: Probably absolute paths should be checked as well. But
-        // it is highly unlikely to meet them in patches, so we ignore
-        // that for now.
-        original
-            .0
-            .and_then(|p| std::str::from_utf8(p).ok())
-            .and_then(|p| {
-                (p.trim() != "/dev/null").then(|| {
-                    PathBuf::from(p)
-                        .components()
-                        .skip(strip_level)
-                        .collect::<PathBuf>()
-                })
-            }),
-        original
-            .1
-            .and_then(|p| std::str::from_utf8(p).ok())
-            .and_then(|p| {
-                (p.trim() != "/dev/null").then(|| {
-                    PathBuf::from(p)
-                        .components()
-                        .skip(strip_level)
-                        .collect::<PathBuf>()
-                })
-            }),
-    );
-    stripped
+    let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
+        std::str::from_utf8(path_bytes).ok().and_then(|p| {
+            (!is_dev_null(p)).then(|| PathBuf::from(p).components().skip(strip_level).collect())
+        })
+    };
+
+    let original_path = diff.original().and_then(strip_path);
+    let modified_path = diff.modified().and_then(strip_path);
+
+    normalize_backup_paths(original_path, modified_path)
 }
 
 fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
@@ -260,16 +283,24 @@ pub(crate) fn apply_patch_custom(
                 fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
             }
             (Some(o), Some(m)) => {
-                let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
+                // Check if the original file exists
+                // If it doesn't, treat this as creating a new file
+                if !o.exists() {
+                    let new_file_content =
+                        apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                    write_patch_content(&new_file_content, &m)?;
+                } else {
+                    let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
-                let new_file_content =
-                    apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
+                    let new_file_content =
+                        apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
 
-                if o != m {
-                    fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    if o != m {
+                        fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    }
+
+                    write_patch_content(&new_file_content, &m)?;
                 }
-
-                write_patch_content(&new_file_content, &m)?;
             }
         }
     }
@@ -304,17 +335,66 @@ pub(crate) fn apply_patches(
     Ok(())
 }
 
+/// Summarized statistics of patch operations.
+#[derive(Debug, Default)]
+pub struct PatchStats {
+    /// Files that have been modified (both original and modified exist).
+    pub changed: Vec<PathBuf>,
+    /// Files that have been added (original is /dev/null).
+    pub added: Vec<PathBuf>,
+    /// Files that have been removed (modified is /dev/null).
+    pub removed: Vec<PathBuf>,
+}
+
+/// Summarize a single diff into added, removed, and changed files.
+pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats, SourceError> {
+    let mut stats = PatchStats::default();
+    let strip_level = guess_strip_level(diff, work_dir)?;
+    for hunk in diff {
+        let (orig_path, mod_path) = custom_patch_stripped_paths(hunk, strip_level);
+        match (orig_path, mod_path) {
+            // Both original and modified exist: record original (prefix stripped) as changed file
+            (Some(orig), Some(_mod)) => stats.changed.push(orig),
+            // Only modified exists: new file added
+            (None, Some(modified)) => stats.added.push(modified),
+            // Only original exists: file removed
+            (Some(orig), None) => stats.removed.push(orig),
+            _ => {}
+        }
+    }
+    Ok(stats)
+}
+
+/// Summarize multiple patch files by reading and parsing each patch.
+pub fn summarize_patches(
+    patches: &[PathBuf],
+    work_dir: &Path,
+    patch_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let mut total = PatchStats::default();
+    for patch_file in patches {
+        let full_path = patch_dir.join(patch_file);
+        let data = read(&full_path)?;
+        let patch = patch_from_bytes(&data)
+            .map_err(|_| SourceError::PatchParseFailed(full_path.clone()))?;
+        let stats = summarize_patch(&patch, work_dir)?;
+        total.changed.extend(stats.changed);
+        total.added.extend(stats.added);
+        total.removed.extend(stats.removed);
+    }
+    Ok(total)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::source::copy_dir::CopyDir;
 
     #[cfg(feature = "patch-test-extra")]
     use crate::{
-        SystemTools, get_build_output, get_tool_config,
+        get_build_output, get_tool_config,
         opt::{BuildData, BuildOpts, CommonOpts},
         recipe::parser::Source,
         script::SandboxArguments,
-        source::fetch_source,
         tool_configuration::Configuration,
     };
 
@@ -409,6 +489,170 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_patches_with_orig() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with normal patch
+        apply_patches(
+            &[PathBuf::from("test_with_orig.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_patches_with_bak() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with .bak extension patch
+        apply_patches(
+            &[PathBuf::from("test_with_bak.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("This was patched using .bak extension!"));
+    }
+
+    #[test]
+    fn test_apply_patches_mixed_existing_files() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that references both existing and non-existing files
+        apply_patches(
+            &[PathBuf::from("test_simple_mixed.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let existing_file = tempdir.path().join("workdir/existing_file.txt");
+        let existing_file = fs_err::read_to_string(&existing_file).unwrap();
+        assert!(existing_file.contains("Mixed files patch applied!"));
+
+        let new_file = tempdir.path().join("workdir/new_file.txt");
+        let new_file = fs_err::read_to_string(&new_file).unwrap();
+        assert!(new_file.contains("This is a new file."));
+        assert!(new_file.contains("Created by patch application."));
+    }
+
+    #[test]
+    fn test_strip_level_detection_edge_case() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that has deep paths but only some files exist
+        apply_patches(
+            &[PathBuf::from("test_strip_level_edge_case.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let deep_file = tempdir
+            .path()
+            .join("workdir/deep/nested/directory/deep_file.txt");
+        let deep_file = fs_err::read_to_string(&deep_file).unwrap();
+        assert!(deep_file.contains("Strip level test applied!"));
+    }
+
+    #[test]
+    fn test_strip_level_algorithm_comparison() {
+        // Test to demonstrate the difference between 'any' and 'all' logic
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patch_file = manifest_dir
+            .join("test-data/patch_application/patches/test_strip_level_edge_case.patch");
+        let patch_content = fs_err::read(&patch_file).unwrap();
+        let patch = patch_from_bytes(&patch_content).unwrap();
+
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+
+        // The current implementation should find strip level 4 based on existing deep file
+        let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
+        assert_eq!(
+            strip_level, 4,
+            "Current 'any' logic should find strip level 4"
+        );
+
+        // Let's also test what the old 'all' logic would have found
+        // (This is what the function used to do before the PR)
+        let patched_files = parse_patch(&patch);
+        let max_components = patched_files
+            .iter()
+            .map(|p| p.components().count())
+            .max()
+            .unwrap_or(0);
+
+        let mut old_algorithm_result = None;
+        for strip_level in 0..max_components {
+            let all_paths_exist = patched_files.iter().all(|p| {
+                let path: PathBuf = p.components().skip(strip_level).collect();
+                work_dir.join(path).exists()
+            });
+            if all_paths_exist {
+                old_algorithm_result = Some(strip_level);
+                break;
+            }
+        }
+
+        // The old algorithm would not have found any strip level where ALL files exist
+        // because nonexistent_deep.txt.orig doesn't exist
+        assert_eq!(
+            old_algorithm_result, None,
+            "Old 'all' logic should not find a valid strip level"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_logic_edge_cases() {
+        // Test edge cases in the backup file handling logic
+        let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        // Test the backup file logic
+        let paths = custom_patch_stripped_paths(&diff, 1);
+
+        // Should treat this as modifying file.txt in place
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+
+        // Test .bak extension
+        let patch_content = b"--- a/file.txt.bak\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        let paths = custom_patch_stripped_paths(&diff, 1);
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+
+        // Test case where backup file logic should NOT apply
+        let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        let paths = custom_patch_stripped_paths(&diff, 1);
+        // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
+        assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+    }
+
+    #[test]
     fn test_apply_patches_with_crlf() {
         let (tempdir, _) = setup_patch_test_dir();
 
@@ -488,6 +732,8 @@ mod tests {
             common: CommonOpts {
                 use_zstd: true,
                 use_bz2: true,
+                use_sharded: true,
+                use_jlap: false,
                 output_dir: Some(artifacts_dir_path),
                 ..Default::default()
             },
@@ -618,6 +864,7 @@ mod tests {
     #[tokio::test]
     async fn test_package_from_conda_forge(
         #[base_dir = "test-data/conda_forge/recipes"]
+        #[dirs]
         #[files("*")]
         // Slow tests
         #[exclude("(root)|(tiledbsoma)|(libmodplug)")]
@@ -640,6 +887,8 @@ mod tests {
 
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
+            use crate::source::fetch_source;
+
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
 
             // If you rename these, don't forget to change names in `show_dir_difference`.

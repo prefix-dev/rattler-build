@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output, run
-from typing import Any, Optional
+from typing import Any, Optional, List
 from conda_package_handling.api import extract
 
 
@@ -98,6 +98,7 @@ class RattlerBuild:
         custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
         extra_meta: dict[str, Any] = None,
+        raw: bool = False,
         **kwargs: Any,
     ) -> Any:
         args = self.build_args(
@@ -110,9 +111,19 @@ class RattlerBuild:
         )
         if with_solve:
             args += ["--with-solve"]
-        output = self(*args, "--render-only", **kwargs)
-        print(output)
-        return json.loads(output)
+        if raw:
+            return self(
+                *args,
+                "--render-only",
+                need_result_object=True,
+                text=True,
+                capture_output=True,
+                **kwargs,
+            )
+        else:
+            output = self(*args, "--render-only", **kwargs)
+            print(output)
+            return json.loads(output)
 
 
 def get_package(folder: Path, glob="*.tar.bz2"):
@@ -145,6 +156,7 @@ def setup_patch_test_environment(
     recipe_content: str = "package:\n  name: dummy\n",
     source_url: str = "https://example.com/example.tar.gz",
     source_sha256: str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    patches: Optional[List[str]] = None,
 ) -> dict[str, Path]:
     cache_dir = tmp_path / test_name / "cache"
     work_dir = tmp_path / test_name / "work"
@@ -169,10 +181,14 @@ def setup_patch_test_environment(
     recipe_path = recipe_dir / "recipe.yaml"
     recipe_path.write_text(recipe_content)
 
+    # Build source info, optionally including patches
+    source_entry: dict[str, Any] = {"url": source_url, "sha256": source_sha256}
+    if patches:
+        source_entry["patches"] = patches
     source_info = {
         "recipe_path": str(recipe_path),
         "source_cache": str(cache_dir),
-        "sources": [{"url": source_url, "sha256": source_sha256}],
+        "sources": [source_entry],
     }
     (work_dir / ".source_info.json").write_text(json.dumps(source_info))
 
@@ -198,3 +214,33 @@ def check_build_output(
     _, err = capfd.readouterr()
     print(err)  # to debug in case it fails
     assert string_to_check in err
+
+
+def write_simple_text_patch(
+    recipe_dir: Path,
+    filename: str = "initial.patch",
+    *,
+    old: str = "hello",
+    new: str = "hello world",
+    target_file: str = "test.txt",
+) -> None:
+    """Write a simple unified diff patch that replaces *old* with *new* in *target_file*.
+
+    It gets written to ``recipe_dir / filename``.
+    """
+
+    import textwrap
+
+    patch_content = textwrap.dedent(
+        f"""
+        diff --git a/{target_file} b/{target_file}
+        index e69de29..4d1745a 100644
+        --- a/{target_file}
+        +++ b/{target_file}
+        @@ -1 +1 @@
+        -{old}
+        +{new}
+        """
+    ).lstrip()
+
+    (recipe_dir / filename).write_text(patch_content)
