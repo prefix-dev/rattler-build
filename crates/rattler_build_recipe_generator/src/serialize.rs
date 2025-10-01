@@ -3,7 +3,6 @@ use std::{fmt, path::PathBuf};
 use indexmap::IndexMap;
 use serde::Serialize;
 use serde_with::{OneOrMany, formats::PreferOne, serde_as};
-use tracing;
 
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
