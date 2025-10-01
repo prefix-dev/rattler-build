@@ -1,5 +1,39 @@
 [workspace]
-members = ["rust-tests"]
+members = ["rust-tests", "crates/rattler_build_recipe_generator"]
+
+[workspace.package]
+authors = ["rattler-build contributors <hi@prefix.dev>"]
+edition = "2024"
+license = "BSD-3-Clause"
+readme = "README.md"
+repository = "https://github.com/prefix-dev/rattler-build"
+
+[workspace.dependencies]
+async-once-cell = "0.5.4"
+async-recursion = "1.1.1"
+clap = { version = "4.5.45", features = ["derive"] }
+flate2 = "1.1.2"
+fs-err = "3.1.1"
+indexmap = "2.11.4"
+itertools = "0.14.0"
+miette = "7.6.0"
+rattler_conda_types = { version = "0.40.0", default-features = false }
+rattler_digest = { version = "1.1.5", default-features = false, features = [
+  "serde",
+] }
+regex = "1.11.1"
+reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.142"
+serde_with = "3.14.0"
+serde_yaml = "0.9.34"
+sha2 = "0.10.9"
+tar = "0.4.44"
+tempfile = "3.21.0"
+toml = "0.9.5"
+tracing = "0.1.41"
+url = "2.5.4"
+zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
 
 [package]
 name = "rattler-build"
@@ -39,7 +73,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-recipe-generation = []
+recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 # but in order to be able to publish to crates we remove this feature
@@ -192,6 +226,10 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
 ] }
 sevenz-rust2 = "0.18.0"
 dialoguer = "0.12.0"
+
+rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
+  "cli",
+] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { version = "0.10.9", features = ["asm"] }

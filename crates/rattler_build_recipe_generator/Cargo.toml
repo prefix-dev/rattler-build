@@ -1,0 +1,37 @@
+[package]
+name = "rattler_build_recipe_generator"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
+
+[features]
+default = []
+cli = ["dep:clap"]
+
+[dependencies]
+clap = { workspace = true, optional = true }
+async-once-cell = { workspace = true }
+async-recursion = { workspace = true }
+flate2 = { workspace = true }
+fs-err = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+miette = { workspace = true }
+rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true }
+sha2 = { workspace = true }
+tar = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+zip = { workspace = true }

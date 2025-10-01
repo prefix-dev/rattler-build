@@ -4334,6 +4334,7 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "rattler",
+ "rattler_build_recipe_generator",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4390,6 +4391,35 @@ dependencies = [
  "xz2",
  "zip 5.1.1",
  "zstd",
+]
+
+[[package]]
+name = "rattler_build_recipe_generator"
+version = "0.1.0"
+dependencies = [
+ "async-once-cell",
+ "async-recursion",
+ "clap",
+ "flate2",
+ "fs-err",
+ "indexmap 2.11.4",
+ "itertools 0.14.0",
+ "miette",
+ "rattler_conda_types",
+ "rattler_digest",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha2",
+ "tar",
+ "tempfile",
+ "toml",
+ "tracing",
+ "url",
+ "zip 5.1.1",
 ]
 
 [[package]]
