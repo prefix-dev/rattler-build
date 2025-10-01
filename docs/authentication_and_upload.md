@@ -164,8 +164,8 @@ If not using `rattler-build auth login s3://my-bucket --s3-access-key-id <access
 For instance, the following example uploads to a Cloudflare R2 S3 bucket:
 
 ```bash
-export AWS_ACCESS_KEY_ID=<your_access_key_id>
-export AWS_SECRET_ACCESS_KEY=<your_secret_access_key>
+export S3_ACCESS_KEY_ID=<your_access_key_id>
+export S3_SECRET_ACCESS_KEY=<your_secret_access_key>
 
 rattler-build upload s3 \
   --channel s3://my-bucket/my-channel \
