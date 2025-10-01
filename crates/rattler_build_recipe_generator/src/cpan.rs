@@ -1,3 +1,4 @@
+#[cfg(feature = "cli")]
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
@@ -9,24 +10,25 @@ use std::{
 };
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{self, ScriptTest, Test, UrlSourceElement};
+use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
 
 /// Options to control CPAN recipe generation.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct CpanOpts {
     /// Name of the package to generate
     pub package: String,
 
     /// Select a version of the package to generate (defaults to latest)
-    #[arg(long)]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub version: Option<String>,
 
     /// Whether to write the recipe to a folder
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
 
     /// Whether to generate recipes for all dependencies
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 }
 

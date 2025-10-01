@@ -1,6 +1,7 @@
-use clap::Parser;
 use std::{collections::HashMap, collections::HashSet, path::PathBuf};
 
+#[cfg(feature = "cli")]
+use clap::Parser;
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{Sha256Hash, compute_bytes_digest};
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
 
-use crate::recipe_generator::{
+use crate::{
     serialize::{self, ScriptTest, Test, UrlSourceElement},
     write_recipe,
 };
@@ -62,21 +63,22 @@ pub struct Packaged {
 }
 
 /// Options to control CRAN/R recipe generation.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct CranOpts {
     /// The R Universe to fetch the package from (defaults to `cran`)
-    #[arg(short, long)]
-    universe: Option<String>,
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub universe: Option<String>,
 
     /// Whether to create recipes for the whole dependency tree or not
-    #[arg(short, long)]
-    tree: bool,
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub tree: bool,
 
     /// Name of the package to generate
     pub package: String,
 
     /// Whether to write the recipe to a folder
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
 }
 

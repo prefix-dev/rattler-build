@@ -1,4 +1,5 @@
 use async_once_cell::OnceCell;
+#[cfg(feature = "cli")]
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
@@ -8,9 +9,7 @@ use std::path::PathBuf;
 use zip::ZipArchive;
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{
-    self, PythonTest, PythonTestInner, Test, UrlSourceElement,
-};
+use crate::serialize::{self, PythonTest, PythonTestInner, Test, UrlSourceElement};
 
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
@@ -19,25 +18,26 @@ struct CondaPyPiNameMapping {
 }
 
 /// Options for generating a Python (PyPI) recipe.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct PyPIOpts {
     /// Name of the package to generate
     pub package: String,
 
     /// Select a version of the package to generate (defaults to latest)
-    #[arg(long)]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub version: Option<String>,
 
     /// Whether to write the recipe to a folder
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
 
     /// Whether to use the conda-forge PyPI name mapping
-    #[arg(short, long, default_value = "true")]
+    #[cfg_attr(feature = "cli", arg(short, long, default_value = "true"))]
     pub use_mapping: bool,
 
     /// Whether to generate recipes for all dependencies
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 }
 
