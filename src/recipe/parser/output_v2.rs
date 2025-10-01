@@ -20,14 +20,11 @@ use super::output_parser::{Output, OutputType};
 
 /// Convert a vector of PartialParsingError to a single ParsingError
 fn convert_errors<S: SourceCode>(errors: Vec<PartialParsingError>, src: S) -> ParsingError<S> {
-    let converted_errors = errors
+    errors
         .into_iter()
         .map(|e| ParsingError::from_partial(src.clone(), e))
-        .collect::<Vec<_>>();
-    converted_errors
-        .into_iter()
         .next()
-        .expect("convert_errors requires at least one PartialParsingError")
+        .expect("convert_errors called with empty vector")
 }
 
 /// Validates root keys for multi-output recipes (RenderedMappingNode version)
