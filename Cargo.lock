@@ -1173,7 +1173,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 [[package]]
 name = "coalesced_map"
 version = "0.1.2"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "dashmap",
  "tokio",
@@ -1972,7 +1972,7 @@ dependencies = [
 [[package]]
 name = "file_url"
 version = "0.2.6"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -3796,7 +3796,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 [[package]]
 name = "path_resolver"
 version = "0.2.0"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "fs-err",
  "fxhash",
@@ -3821,9 +3821,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "petgraph"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54acf3a685220b533e437e264e4d932cfbdc4cc7ec0cd232ed73c08d03b8a7ca"
+checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
 dependencies = [
  "fixedbitset",
  "hashbrown 0.15.5",
@@ -4240,7 +4240,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.37.4"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "clap",
@@ -4392,7 +4392,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.3.34"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -4424,7 +4424,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.39.2"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "chrono",
  "core-foundation 0.10.1",
@@ -4465,7 +4465,7 @@ dependencies = [
 [[package]]
 name = "rattler_config"
 version = "0.2.9"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "console 0.16.1",
  "fs-err",
@@ -4482,7 +4482,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.1.5"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "blake2",
  "digest",
@@ -4499,7 +4499,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.25.2"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4533,7 +4533,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.11"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "quote",
  "syn",
@@ -4542,7 +4542,7 @@ dependencies = [
 [[package]]
 name = "rattler_menuinst"
 version = "0.2.27"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "chrono",
  "configparser",
@@ -4571,7 +4571,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.25.13"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -4601,7 +4601,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.23.4"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "bzip2",
  "chrono",
@@ -4630,7 +4630,7 @@ dependencies = [
 [[package]]
 name = "rattler_pty"
 version = "0.2.6"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "libc",
  "nix 0.30.1",
@@ -4640,7 +4640,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.12"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4650,7 +4650,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.24.4"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4725,7 +4725,7 @@ dependencies = [
 [[package]]
 name = "rattler_s3"
 version = "0.1.2"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -4740,7 +4740,7 @@ dependencies = [
 [[package]]
 name = "rattler_sandbox"
 version = "0.1.11"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "birdcage",
  "clap",
@@ -4751,7 +4751,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.25.0"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "anyhow",
  "enum_dispatch",
@@ -4771,7 +4771,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "3.0.3"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "chrono",
  "futures",
@@ -4824,7 +4824,7 @@ dependencies = [
 [[package]]
 name = "rattler_variants"
 version = "0.1.0"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "fs-err",
  "indexmap 2.11.4",
@@ -4841,7 +4841,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.1.5"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "archspec",
  "libloading",
@@ -5915,7 +5915,7 @@ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.1.0"
-source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#e21e9c8902b6eb3db575c3020ff30151b49d6ad2"
+source = "git+https://github.com/Hofer-Julian/rattler?branch=feat%2Fmove-variant#78c3e419d54aa0af5623088e138ed65789741ee4"
 dependencies = [
  "tokio",
 ]
