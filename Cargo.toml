@@ -15,6 +15,7 @@ clap = { version = "4.5.45", features = ["derive"] }
 flate2 = "1.1.2"
 fs-err = "3.1.1"
 indexmap = "2.11.4"
+insta = "1.41.1"
 itertools = "0.14.0"
 miette = "7.6.0"
 rattler_conda_types = { version = "0.40.0", default-features = false }
@@ -30,6 +31,7 @@ serde_yaml = "0.9.34"
 sha2 = "0.10.9"
 tar = "0.4.44"
 tempfile = "3.21.0"
+tokio = { version = "1.47.1", features = ["rt", "macros"] }
 toml = "0.9.5"
 tracing = "0.1.41"
 url = "2.5.4"
