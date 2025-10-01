@@ -242,6 +242,17 @@ pub enum VariantExpandError {
     CycleInRecipeOutputs(String),
 }
 
+impl From<ParsedVariantConfig> for VariantConfig {
+    fn from(parsed: ParsedVariantConfig) -> Self {
+        let variants = convert_variants(&parsed);
+        Self {
+            pin_run_as_build: parsed.pin_run_as_build().cloned(),
+            zip_keys: parsed.zip_keys().cloned(),
+            variants,
+        }
+    }
+}
+
 impl VariantConfig {
     /// Load variant configuration files and convert them into the internal representation.
     pub fn from_files(
@@ -250,12 +261,7 @@ impl VariantConfig {
     ) -> Result<Self, VariantConfigError<Arc<str>>> {
         let context = build_variant_context(selector_config);
         let parsed = ParsedVariantConfig::from_files(files, &context)?;
-        let variants = convert_variants(&parsed);
-        Ok(Self {
-            pin_run_as_build: parsed.pin_run_as_build().cloned(),
-            zip_keys: parsed.zip_keys().cloned(),
-            variants,
-        })
+        Ok(parsed.into())
     }
 
     #[cfg(test)]
