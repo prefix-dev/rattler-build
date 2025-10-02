@@ -1,0 +1,32 @@
+recipe:
+  name: bar
+  version: "0.1.0"
+
+build:
+  skip: not linux
+
+cache:
+  build:
+    script:
+      content:
+        - echo "hello" > file.txt
+        - echo "world" >> file.txt
+        - stat -c %y file.txt > time.txt
+
+outputs:
+  - package:
+      name: foo1
+    build:
+      script:
+        content:
+          - actual=$(stat -c %y file.txt)
+          - expected=$(cat time.txt)
+          - if [[ "$actual" != "$expected" ]]; then exit 1; else echo "timestamp works correctly"; fi
+  - package:
+      name: foo2
+    build:
+      script:
+        content:
+          - actual=$(stat -c %y file.txt)
+          - expected=$(cat time.txt)
+          - if [[ "$actual" != "$expected" ]]; then exit 1; else echo "timestamp works correctly"; fi
