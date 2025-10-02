@@ -2,7 +2,7 @@
 
 use fs_err as fs;
 #[cfg(windows)]
-use retry_policies::{Jitter, RetryDecision, RetryPolicy, policies::ExponentialBackoff};
+use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 #[cfg(windows)]
@@ -118,7 +118,6 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
     // Use a more gradual backoff with longer max retry time
     let retry_policy = ExponentialBackoff::builder()
         .base(2)
-        .jitter(Jitter::None)
         .retry_bounds(Duration::from_millis(100), Duration::from_secs(2))
         .build_with_max_retries(5);
 
