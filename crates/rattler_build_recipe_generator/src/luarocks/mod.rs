@@ -3,6 +3,7 @@
 
 use std::{collections::BTreeMap, io::Write, path::PathBuf};
 
+#[cfg(feature = "cli")]
 use clap::Parser;
 use indexmap::IndexMap;
 use miette::{Context, IntoDiagnostic};
@@ -10,13 +11,14 @@ use rattler_conda_types::PackageName;
 use serde::Deserialize;
 use tempfile::NamedTempFile;
 
-use crate::recipe_generator::serialize::{
+use crate::serialize::{
     About, Build, GitSourceElement, Python, Recipe, Requirements, ScriptTest, SourceElement, Test,
     UrlSourceElement, write_recipe,
 };
 
 /// Options to control LuaRocks recipe generation.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct LuarocksOpts {
     /// Luarocks package to generate recipe for.
     /// Can be specified as:
@@ -27,7 +29,7 @@ pub struct LuarocksOpts {
     pub rock: String,
 
     /// Where to write the recipe to
-    #[arg(short, long, default_value = ".")]
+    #[cfg_attr(feature = "cli", arg(short, long, default_value = "."))]
     pub write_to: PathBuf,
 }
 
@@ -395,7 +397,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
 
     let mut recipe = Recipe {
         context,
-        package: crate::recipe_generator::serialize::Package {
+        package: crate::serialize::Package {
             name: package_name.as_normalized().to_string(),
             version: "${{ version }}".to_string(),
         },
