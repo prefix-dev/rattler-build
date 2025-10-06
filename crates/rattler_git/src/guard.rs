@@ -81,6 +81,8 @@ impl Drop for WriteGuard {
     fn drop(&mut self) {
         // Clean up any marker files
         let begin_path = self.lock_path.with_extension("begin");
+        // We're disallowig fs::remove_file because we usually prefer fs_err. But here it's fine.
+        #[allow(clippy::disallowed_methods)]
         let _ = std::fs::remove_file(&begin_path);
     }
 }
