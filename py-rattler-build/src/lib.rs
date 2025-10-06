@@ -897,6 +897,28 @@ pub struct PyToolConfiguration {
     pub(crate) inner: tool_configuration::Configuration,
 }
 
+/// Helper function to create BuildData with sensible defaults for Python API
+fn create_build_data_for_parsing(
+    build_platform: Platform,
+    target_platform: Platform,
+    host_platform: Platform,
+    channels: Option<Vec<NamedChannelOrUrl>>,
+    output_dir: Option<PathBuf>,
+) -> BuildData {
+    // Use Default implementation and override specific fields
+    BuildData {
+        build_platform,
+        target_platform,
+        host_platform,
+        channels,
+        common: CommonData {
+            output_dir: output_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default()),
+            ..CommonData::default()
+        },
+        ..BuildData::default()
+    }
+}
+
 /// Parse a recipe YAML file with variants and return outputs
 #[pyfunction]
 #[pyo3(signature = (recipe_path, build_platform=None, target_platform=None, host_platform=None, channels=None, output_dir=None))]
@@ -943,50 +965,13 @@ fn parse_recipe_with_variants(
         None
     };
 
-    // Create build data
-    let config = ConfigBase::<()>::default();
-    let common = CommonData::new(
-        output_dir,
-        false,
-        None,
-        config,
-        None,
-        None,
-        true,
-        true,
-        false,
-        true,
-    );
-
-    let build_data = BuildData::new(
-        None,
-        Some(build_platform),
-        Some(target_platform),
-        Some(host_platform),
+    // Create build data with helper function
+    let build_data = create_build_data_for_parsing(
+        build_platform,
+        target_platform,
+        host_platform,
         channels,
-        Some(vec![]), // variant config files - empty for now
-        HashMap::new(),
-        false,
-        false,
-        false,
-        false,
-        false,
-        None,
-        None,
-        None,
-        false,
-        None,
-        common,
-        false,
-        None,
-        None,
-        None,
-        None,
-        Debug::new(false),
-        ContinueOnFailure::No,
-        false,
-        false,
-        None,
+        output_dir,
     );
 
     let tool_config = get_tool_config(&build_data, &None)

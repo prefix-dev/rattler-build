@@ -23,7 +23,10 @@ use crate::{
     console_utils::{Color, LogStyle},
     metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
-    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
+    tool_configuration::{
+        AllowSymlinksOnWindows, ColorBuildLog, ContinueOnFailure, ErrorOnPrefixInBinary,
+        IncludeRecipe, KeepBuildArtifacts, SkipExisting, TestStrategy, UseBuildId,
+    },
 };
 
 /// Application subcommands.
@@ -238,6 +241,15 @@ pub struct CommonData {
     pub use_bz2: bool,
     pub use_sharded: bool,
     pub use_jlap: bool,
+}
+
+impl Default for CommonData {
+    fn default() -> Self {
+        let config = Config::default();
+        Self::new(
+            None, false, None, config, None, None, true, true, true, false,
+        )
+    }
 }
 
 impl CommonData {
@@ -506,14 +518,14 @@ pub struct BuildData {
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
     pub with_solve: bool,
-    pub keep_build: bool,
-    pub no_build_id: bool,
+    pub keep_build: KeepBuildArtifacts,
+    pub use_build_id: UseBuildId,
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
     pub io_concurrency_limit: usize,
-    pub no_include_recipe: bool,
+    pub include_recipe: IncludeRecipe,
     pub test: TestStrategy,
-    pub color_build_log: bool,
+    pub color_build_log: ColorBuildLog,
     pub common: CommonData,
     pub tui: bool,
     pub skip_existing: SkipExisting,
@@ -522,9 +534,48 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
-    pub error_prefix_in_binary: bool,
-    pub allow_symlinks_on_windows: bool,
+    pub error_prefix_in_binary: ErrorOnPrefixInBinary,
+    pub allow_symlinks_on_windows: AllowSymlinksOnWindows,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl Default for BuildData {
+    fn default() -> Self {
+        Self {
+            up_to: None,
+            build_platform: Platform::current(),
+            target_platform: Platform::current(),
+            host_platform: Platform::current(),
+            channels: None,
+            variant_config: Vec::new(),
+            variant_overrides: HashMap::new(),
+            ignore_recipe_variants: false,
+            render_only: false,
+            with_solve: false,
+            keep_build: KeepBuildArtifacts::default(),
+            use_build_id: UseBuildId::default(),
+            package_format: PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Default,
+            },
+            compression_threads: None,
+            io_concurrency_limit: num_cpus::get() * 8,
+            include_recipe: IncludeRecipe::default(),
+            test: TestStrategy::default(),
+            color_build_log: ColorBuildLog::default(),
+            common: CommonData::default(),
+            tui: false,
+            skip_existing: SkipExisting::default(),
+            noarch_build_platform: None,
+            extra_meta: None,
+            sandbox_configuration: None,
+            debug: Debug::default(),
+            continue_on_failure: ContinueOnFailure::default(),
+            error_prefix_in_binary: ErrorOnPrefixInBinary::default(),
+            allow_symlinks_on_windows: AllowSymlinksOnWindows::default(),
+            exclude_newer: None,
+        }
+    }
 }
 
 impl BuildData {
@@ -575,17 +626,17 @@ impl BuildData {
             ignore_recipe_variants,
             render_only,
             with_solve,
-            keep_build,
-            no_build_id,
+            keep_build: keep_build.into(),
+            use_build_id: (!no_build_id).into(),
             package_format: package_format.unwrap_or(PackageFormatAndCompression {
                 archive_type: ArchiveType::Conda,
                 compression_level: CompressionLevel::Default,
             }),
             compression_threads,
             io_concurrency_limit: io_concurrency_limit.unwrap_or(num_cpus::get() * 8),
-            no_include_recipe,
+            include_recipe: (!no_include_recipe).into(),
             test: test.unwrap_or_default(),
-            color_build_log: true,
+            color_build_log: ColorBuildLog::Yes,
             common,
             tui,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
@@ -594,8 +645,8 @@ impl BuildData {
             sandbox_configuration,
             debug,
             continue_on_failure,
-            error_prefix_in_binary,
-            allow_symlinks_on_windows,
+            error_prefix_in_binary: error_prefix_in_binary.into(),
+            allow_symlinks_on_windows: allow_symlinks_on_windows.into(),
             exclude_newer,
         }
     }

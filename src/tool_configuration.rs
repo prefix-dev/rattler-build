@@ -23,9 +23,10 @@ use crate::console_utils::LoggingOutputHandler;
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 /// Whether to skip existing packages or not
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
 pub enum SkipExisting {
     /// Do not skip any packages
+    #[default]
     None,
     /// Skip packages that already exist locally
     Local,
@@ -56,6 +57,168 @@ pub enum ContinueOnFailure {
     /// Stop the build entirely on failure of a package
     #[default]
     No,
+}
+
+/// Whether to include the recipe in the final package
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncludeRecipe {
+    /// Include the recipe in the package
+    #[default]
+    Yes,
+    /// Do not include the recipe
+    No,
+}
+
+impl IncludeRecipe {
+    /// Returns true if the recipe should be included
+    pub fn should_include(self) -> bool {
+        matches!(self, IncludeRecipe::Yes)
+    }
+}
+
+impl From<bool> for IncludeRecipe {
+    fn from(value: bool) -> Self {
+        if value {
+            IncludeRecipe::Yes
+        } else {
+            IncludeRecipe::No
+        }
+    }
+}
+
+/// Whether to use a build ID (timestamp) in the build directory name
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UseBuildId {
+    /// Use build ID (timestamp) in directory name
+    #[default]
+    Yes,
+    /// Do not use build ID
+    No,
+}
+
+impl UseBuildId {
+    /// Returns true if build ID should be used
+    pub fn should_use(self) -> bool {
+        matches!(self, UseBuildId::Yes)
+    }
+}
+
+impl From<bool> for UseBuildId {
+    fn from(value: bool) -> Self {
+        if value {
+            UseBuildId::Yes
+        } else {
+            UseBuildId::No
+        }
+    }
+}
+
+/// Whether to keep intermediate build artifacts
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeepBuildArtifacts {
+    /// Keep build artifacts
+    Yes,
+    /// Clean up build artifacts
+    #[default]
+    No,
+}
+
+impl KeepBuildArtifacts {
+    /// Returns true if artifacts should be kept
+    pub fn should_keep(self) -> bool {
+        matches!(self, KeepBuildArtifacts::Yes)
+    }
+}
+
+impl From<bool> for KeepBuildArtifacts {
+    fn from(value: bool) -> Self {
+        if value {
+            KeepBuildArtifacts::Yes
+        } else {
+            KeepBuildArtifacts::No
+        }
+    }
+}
+
+/// Whether to use color in build logs
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorBuildLog {
+    /// Use color in build logs
+    #[default]
+    Yes,
+    /// Do not use color
+    No,
+}
+
+impl ColorBuildLog {
+    /// Returns true if color should be used
+    pub fn should_use(self) -> bool {
+        matches!(self, ColorBuildLog::Yes)
+    }
+}
+
+impl From<bool> for ColorBuildLog {
+    fn from(value: bool) -> Self {
+        if value {
+            ColorBuildLog::Yes
+        } else {
+            ColorBuildLog::No
+        }
+    }
+}
+
+/// Whether to error on prefix in binary files
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorOnPrefixInBinary {
+    /// Error if prefix found in binary
+    Yes,
+    /// Do not error
+    #[default]
+    No,
+}
+
+impl ErrorOnPrefixInBinary {
+    /// Returns true if should error on prefix
+    pub fn should_error(self) -> bool {
+        matches!(self, ErrorOnPrefixInBinary::Yes)
+    }
+}
+
+impl From<bool> for ErrorOnPrefixInBinary {
+    fn from(value: bool) -> Self {
+        if value {
+            ErrorOnPrefixInBinary::Yes
+        } else {
+            ErrorOnPrefixInBinary::No
+        }
+    }
+}
+
+/// Whether to allow symlinks on Windows
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowSymlinksOnWindows {
+    /// Allow symlinks on Windows
+    Yes,
+    /// Forbid symlinks on Windows
+    #[default]
+    No,
+}
+
+impl AllowSymlinksOnWindows {
+    /// Returns true if symlinks are allowed
+    pub fn is_allowed(self) -> bool {
+        matches!(self, AllowSymlinksOnWindows::Yes)
+    }
+}
+
+impl From<bool> for AllowSymlinksOnWindows {
+    fn from(value: bool) -> Self {
+        if value {
+            AllowSymlinksOnWindows::Yes
+        } else {
+            AllowSymlinksOnWindows::No
+        }
+    }
 }
 
 // This is the key part - implement From<bool> for your type

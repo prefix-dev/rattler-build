@@ -41,7 +41,13 @@ mod windows;
 mod package_cache_reporter;
 pub mod source_code;
 
-use crate::render::resolved_dependencies::RunExportsDownload;
+use crate::{
+    render::resolved_dependencies::RunExportsDownload,
+    tool_configuration::{
+        AllowSymlinksOnWindows, ColorBuildLog, ErrorOnPrefixInBinary, IncludeRecipe,
+        KeepBuildArtifacts, UseBuildId,
+    },
+};
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
@@ -142,7 +148,7 @@ pub fn get_tool_config(
     .into_diagnostic()?;
 
     let configuration_builder = Configuration::builder()
-        .with_keep_build(build_data.keep_build)
+        .with_keep_build(build_data.keep_build.should_keep())
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
@@ -151,8 +157,8 @@ pub fn get_tool_config(
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
-        .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
-        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_error_prefix_in_binary(build_data.error_prefix_in_binary.should_error())
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows.is_allowed())
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
         .with_sharded_repodata_enabled(build_data.common.use_sharded)
@@ -388,7 +394,7 @@ pub async fn get_build_output(
                     &build_name,
                     recipe_path,
                     &output_dir,
-                    build_data.no_build_id,
+                    !build_data.use_build_id.should_use(),
                     &timestamp,
                     recipe.build().merge_build_and_host_envs(),
                 )
@@ -402,8 +408,8 @@ pub async fn get_build_output(
                     build_data.package_format.archive_type,
                     build_data.package_format.compression_level,
                 ),
-                store_recipe: !build_data.no_include_recipe,
-                force_colors: build_data.color_build_log && console::colors_enabled(),
+                store_recipe: build_data.include_recipe.should_include(),
+                force_colors: build_data.color_build_log.should_use() && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
                 exclude_newer: build_data.exclude_newer,
@@ -1091,7 +1097,7 @@ pub async fn debug_recipe(
         host_platform: debug_data.host_platform,
         channels: debug_data.channels,
         common: debug_data.common,
-        keep_build: true,
+        keep_build: KeepBuildArtifacts::Yes,
         debug: Debug::new(true),
         test: TestStrategy::Skip,
         up_to: None,
@@ -1100,23 +1106,23 @@ pub async fn debug_recipe(
         ignore_recipe_variants: false,
         render_only: false,
         with_solve: true,
-        no_build_id: false,
+        use_build_id: UseBuildId::Yes,
         package_format: PackageFormatAndCompression {
             archive_type: ArchiveType::Conda,
             compression_level: CompressionLevel::Default,
         },
         compression_threads: None,
         io_concurrency_limit: num_cpus::get(),
-        no_include_recipe: false,
-        color_build_log: true,
+        include_recipe: IncludeRecipe::Yes,
+        color_build_log: ColorBuildLog::Yes,
         tui: false,
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
-        error_prefix_in_binary: false,
-        allow_symlinks_on_windows: false,
+        error_prefix_in_binary: ErrorOnPrefixInBinary::No,
+        allow_symlinks_on_windows: AllowSymlinksOnWindows::No,
         exclude_newer: None,
     };
 
