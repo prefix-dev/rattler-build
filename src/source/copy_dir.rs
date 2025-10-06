@@ -8,7 +8,7 @@ use std::{
 use fs_err::create_dir_all;
 
 use globset::Glob;
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::recipe::parser::{GlobVec, GlobWithSource};
@@ -142,6 +142,7 @@ pub(crate) struct CopyDir<'a> {
     use_git_global: bool,
     use_condapackageignore: bool,
     hidden: bool,
+    exclude_git_dirs: bool,
     copy_options: CopyOptions,
 }
 
@@ -159,6 +160,8 @@ impl<'a> CopyDir<'a> {
             use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
+            // exclude .git directories by default for path sources
+            exclude_git_dirs: false,
             copy_options: CopyOptions::default(),
         }
     }
@@ -205,6 +208,11 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    pub fn exclude_git_dirs(mut self, b: bool) -> Self {
+        self.exclude_git_dirs = b;
+        self
+    }
+
     pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
         create_dir_all(self.to_path)?;
@@ -225,6 +233,14 @@ impl<'a> CopyDir<'a> {
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
             .hidden(self.hidden);
+
+        // Conditionally exclude .git directories for path sources only
+        if self.exclude_git_dirs {
+            let mut override_builder = OverrideBuilder::new(self.from_path);
+            override_builder.add("!.git/").unwrap();
+            let overrides = override_builder.build().unwrap();
+            walk_builder.overrides(overrides);
+        }
         if self.use_condapackageignore {
             walk_builder.add_custom_ignore_filename(".condapackageignore");
         }
@@ -736,6 +752,40 @@ mod test {
                 .join("target_dir")
                 .join("file_in_target.txt")
                 .exists()
+        );
+    }
+
+    #[test]
+    fn test_git_directory_exclusion() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src = tmp_dir.path().join("src");
+        fs_err::create_dir_all(&src).unwrap();
+
+        // Create regular files and .git structure
+        fs::write(src.join("main.rs"), "fn main() {}").unwrap();
+        let git_obj = src.join(".git/objects/ab/1234567890abcdef");
+        fs_err::create_dir_all(git_obj.parent().unwrap()).unwrap();
+        fs::write(&git_obj, "fake git object").unwrap();
+
+        #[cfg(unix)]
+        if git_obj.metadata().is_ok() {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs_err::set_permissions(&git_obj, std::fs::Permissions::from_mode(0o444));
+        }
+
+        let dest = tmp_dir.path().join("dest");
+        let result = super::CopyDir::new(&src, &dest)
+            .use_gitignore(false)
+            .exclude_git_dirs(true)
+            .run()
+            .unwrap();
+
+        assert!(dest.join("main.rs").exists() && !dest.join(".git").exists());
+        assert!(
+            !result
+                .copied_paths()
+                .iter()
+                .any(|p| p.components().any(|c| c.as_os_str() == ".git"))
         );
     }
 }

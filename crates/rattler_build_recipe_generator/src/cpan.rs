@@ -1,3 +1,4 @@
+#[cfg(feature = "cli")]
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
@@ -9,23 +10,25 @@ use std::{
 };
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{self, ScriptTest, Test, UrlSourceElement};
+use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
 
-#[derive(Debug, Clone, Parser)]
+/// Options to control CPAN recipe generation.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct CpanOpts {
     /// Name of the package to generate
     pub package: String,
 
     /// Select a version of the package to generate (defaults to latest)
-    #[arg(long)]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub version: Option<String>,
 
     /// Whether to write the recipe to a folder
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
 
     /// Whether to generate recipes for all dependencies
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 }
 
@@ -121,6 +124,7 @@ struct MetaCpanHit<T> {
     source: T,
 }
 
+/// Aggregated metadata for a CPAN distribution and its modules fetched from MetaCPAN.
 #[derive(Debug, Clone)]
 pub struct CpanMetadata {
     release: CpanRelease,
@@ -466,6 +470,13 @@ async fn fetch_cpan_metadata(
     Ok(CpanMetadata { release, modules })
 }
 
+/// Construct a `Recipe` from resolved CPAN metadata without performing I/O.
+///
+/// This function converts MetaCPAN release information into a rattler-build
+/// `Recipe`, populating package metadata, sources, requirements, and basic
+/// tests. The provided `opts` are currently reserved for future use.
+///
+/// Returns the in-memory `Recipe` on success.
 pub async fn create_cpan_recipe(
     _opts: &CpanOpts,
     metadata: &CpanMetadata,
@@ -606,18 +617,10 @@ make install"#
     Ok(recipe)
 }
 
-#[async_recursion::async_recursion]
-pub async fn generate_cpan_recipe(opts: &CpanOpts) -> miette::Result<()> {
-    tracing::info!("Generating recipe for {}", opts.package);
-    let client = reqwest::Client::new();
-
-    let metadata = fetch_cpan_metadata(opts, &client).await?;
-    let recipe = create_cpan_recipe(opts, &metadata).await?;
-
+fn format_cpan_recipe_with_tests(recipe: &serialize::Recipe) -> String {
     let recipe_string = format!("{}", recipe);
-
-    // Post-process to handle test dependencies
-    let processed_recipe = recipe_string
+    // Post-process to handle test dependencies formatting
+    recipe_string
         .lines()
         .map(|line| {
             if line.contains("# test:") {
@@ -627,7 +630,32 @@ pub async fn generate_cpan_recipe(opts: &CpanOpts) -> miette::Result<()> {
             }
         })
         .collect::<Vec<_>>()
-        .join("\n");
+        .join("\n")
+}
+
+/// Generate a CPAN recipe and return the YAML as a string.
+pub async fn generate_cpan_recipe_string(opts: &CpanOpts) -> miette::Result<String> {
+    tracing::info!("Generating recipe for {}", opts.package);
+    let client = reqwest::Client::new();
+    let metadata = fetch_cpan_metadata(opts, &client).await?;
+    let recipe = create_cpan_recipe(opts, &metadata).await?;
+    Ok(format_cpan_recipe_with_tests(&recipe))
+}
+
+#[async_recursion::async_recursion]
+/// Generate a CPAN recipe from `CpanOpts` and either print it or write it to disk.
+///
+/// If `opts.write` is true, the recipe is written to a directory named after the
+/// package. Otherwise, the YAML is printed to stdout. The `tree` option is
+/// currently not implemented and will emit a warning.
+pub async fn generate_cpan_recipe(opts: &CpanOpts) -> miette::Result<()> {
+    tracing::info!("Generating recipe for {}", opts.package);
+    let client = reqwest::Client::new();
+
+    let metadata = fetch_cpan_metadata(opts, &client).await?;
+    let recipe = create_cpan_recipe(opts, &metadata).await?;
+
+    let processed_recipe = format_cpan_recipe_with_tests(&recipe);
 
     if opts.write {
         write_recipe(&recipe.package.name, &processed_recipe).into_diagnostic()?;

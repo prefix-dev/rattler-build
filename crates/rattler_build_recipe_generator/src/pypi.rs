@@ -1,4 +1,5 @@
 use async_once_cell::OnceCell;
+#[cfg(feature = "cli")]
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
@@ -8,9 +9,7 @@ use std::path::PathBuf;
 use zip::ZipArchive;
 
 use super::write_recipe;
-use crate::recipe_generator::serialize::{
-    self, PythonTest, PythonTestInner, Test, UrlSourceElement,
-};
+use crate::serialize::{self, PythonTest, PythonTestInner, Test, UrlSourceElement};
 
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
@@ -18,25 +17,27 @@ struct CondaPyPiNameMapping {
     pypi_name: String,
 }
 
-#[derive(Debug, Clone, Parser)]
+/// Options for generating a Python (PyPI) recipe.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(Parser))]
 pub struct PyPIOpts {
     /// Name of the package to generate
     pub package: String,
 
     /// Select a version of the package to generate (defaults to latest)
-    #[arg(long)]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub version: Option<String>,
 
     /// Whether to write the recipe to a folder
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
 
     /// Whether to use the conda-forge PyPI name mapping
-    #[arg(short, long, default_value = "true")]
+    #[cfg_attr(feature = "cli", arg(short, long, default_value = "true"))]
     pub use_mapping: bool,
 
     /// Whether to generate recipes for all dependencies
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 }
 
@@ -126,6 +127,7 @@ struct PyPrReleaseResponse {
     urls: Vec<PyPiRelease>,
 }
 
+/// Metadata about a PyPI release used to construct the recipe.
 #[derive(Debug, Clone)]
 pub struct PyPiMetadata {
     info: PyPiInfo,
@@ -182,6 +184,7 @@ async fn extract_build_requirements(
     Ok(Vec::new())
 }
 
+/// Fetch and cache the conda-forge mapping from conda package names to PyPI names.
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
     static MAPPING: OnceCell<HashMap<String, String>> = OnceCell::new();
     MAPPING.get_or_try_init(async {
@@ -323,6 +326,7 @@ async fn map_requirement(
     req.to_string()
 }
 
+/// Create a `serialize::Recipe` from the provided options and PyPI metadata.
 pub async fn create_recipe(
     opts: &PyPIOpts,
     metadata: &PyPiMetadata,
@@ -449,6 +453,18 @@ pub async fn create_recipe(
     Ok(recipe)
 }
 
+/// Generate a recipe YAML string for a PyPI package.
+pub async fn generate_pypi_recipe_string(opts: &PyPIOpts) -> miette::Result<String> {
+    let client = reqwest::Client::new();
+    let metadata = fetch_pypi_metadata(opts, &client).await?;
+    let recipe = create_recipe(opts, &metadata, &client).await?;
+    let string = format!("{}", recipe);
+    Ok(post_process_markers(string))
+}
+
+/// Generate a recipe for a PyPI package and either write it to disk or print it.
+///
+/// If `opts.tree` is set, recursively generates recipes for runtime dependencies.
 #[async_recursion::async_recursion]
 pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     tracing::info!("Generating recipe for {}", opts.package);

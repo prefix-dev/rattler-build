@@ -169,6 +169,9 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 /// [python=3.8, compiler=clang]
 /// ```
 ///
+/// **Important**: `zip_keys` must be a list of lists. A flat list like
+/// `zip_keys: [python, compiler]` will result in an error.
+///
 /// It's also possible to specify additional pins in the variant configuration.
 /// These pins are currently ignored.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -213,6 +216,9 @@ pub enum VariantExpandError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
 
+    #[error("zip_keys must be a list of lists, not a flat list")]
+    InvalidZipKeyStructure,
+
     #[error("Duplicate outputs: {0}")]
     DuplicateOutputs(String),
 
@@ -242,7 +248,7 @@ impl VariantConfig {
         selector_config: &SelectorConfig,
     ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
         if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
-            Ok(Self::load_conda_build_config(path, selector_config)?)
+            Ok(load_conda_build_config(path, selector_config)?)
         } else {
             Self::load_variant_config(path, selector_config)
         }
@@ -268,15 +274,6 @@ impl VariantConfig {
                 parse_errors
             })?;
         Ok(config)
-    }
-
-    /// This function loads an old-style variant configuration file and returns
-    /// the configuration.
-    fn load_conda_build_config(
-        path: &Path,
-        selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, ParseConfigBuildConfigError> {
-        load_conda_build_config(path, selector_config)
     }
 
     /// This function loads multiple variant configuration files and merges them
@@ -387,6 +384,10 @@ impl VariantConfig {
     fn validate_zip_keys(&self) -> Result<(), VariantExpandError> {
         if let Some(zip_keys) = &self.zip_keys {
             for zip in zip_keys {
+                if zip.len() < 2 {
+                    return Err(VariantExpandError::InvalidZipKeyStructure);
+                }
+
                 let mut prev_len = None;
                 for key in zip {
                     let value = match self.variants.get(key) {
@@ -784,6 +785,67 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn test_zip_keys_validation() {
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        // Test that invalid zip_keys (flat list) fails
+        let invalid_yaml = r#"
+zip_keys: [python, compiler]
+python:
+  - "3.9"
+  - "3.10"
+compiler:
+  - gcc
+  - clang
+"#;
+        let source = Arc::<str>::from(invalid_yaml);
+        let yaml_node = Node::parse_yaml(0, source.clone()).unwrap();
+        let jinja = Jinja::new(selector_config.clone());
+        let rendered_node: RenderedNode = yaml_node.render(&jinja, "test").unwrap();
+
+        let result: Result<VariantConfig, Vec<PartialParsingError>> =
+            rendered_node.try_convert("test");
+
+        assert!(result.is_ok());
+        let config = result.unwrap();
+
+        let validation_result = config.validate_zip_keys();
+        assert!(validation_result.is_err());
+
+        match validation_result.unwrap_err() {
+            VariantExpandError::InvalidZipKeyStructure => {}
+            other => panic!("Expected InvalidZipKeyStructure error, got: {:?}", other),
+        }
+
+        // Test that valid zip_keys (list of lists) succeeds
+        let valid_yaml = r#"
+zip_keys:
+  - [python, compiler]
+python:
+  - "3.9"
+  - "3.10"
+compiler:
+  - gcc
+  - clang
+"#;
+        let source = Arc::<str>::from(valid_yaml);
+        let yaml_node = Node::parse_yaml(0, source.clone()).unwrap();
+        let rendered_node: RenderedNode = yaml_node.render(&jinja, "test").unwrap();
+
+        let result: Result<VariantConfig, Vec<PartialParsingError>> =
+            rendered_node.try_convert("test");
+        assert!(
+            result.is_ok(),
+            "Expected zip_keys validation to succeed for list of lists"
+        );
+    }
 
     #[test]
     fn test_variant_combinations() {

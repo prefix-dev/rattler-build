@@ -88,7 +88,7 @@ rattler-build build --recipe ./ipywidgets
 We will build a package for `numpy` – which contains compiled code.
 Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly.
 
-The best way to do this is with a "variant_config.yaml" file.
+The best way to do this is with a "variants.yaml" file.
 The variant config file allows us to easily compile the package against multiple Python versions.
 
 ```yaml title="variants.yaml"

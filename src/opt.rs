@@ -13,12 +13,9 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::{mirror_middleware, s3_middleware};
 use rattler_solve::ChannelPriority;
+use rattler_upload::upload::opt::{Config, UploadOpts};
 use serde_json::{Value, json};
-use tracing::warn;
 use url::Url;
-
-/// The configuration type for rattler-build - just extends rattler / pixi config and can load the same TOML files.
-pub type Config = rattler_config::config::ConfigBase<()>;
 
 #[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
@@ -27,7 +24,6 @@ use crate::{
     metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
-    url_with_trailing_slash::UrlWithTrailingSlash,
 };
 
 /// Application subcommands.
@@ -770,12 +766,38 @@ impl TestData {
     }
 }
 
+/// Represents a package source that can be either a local path or a URL
+#[derive(Debug, Clone)]
+pub enum PackageSource {
+    /// Local file path
+    Path(PathBuf),
+    /// Remote URL
+    Url(Url),
+}
+
+impl FromStr for PackageSource {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Try to parse as URL first
+        if s.starts_with("http://") || s.starts_with("https://") {
+            match Url::parse(s) {
+                Ok(url) => Ok(PackageSource::Url(url)),
+                Err(e) => Err(format!("Invalid URL: {}", e)),
+            }
+        } else {
+            // Treat as local path
+            Ok(PackageSource::Path(PathBuf::from(s)))
+        }
+    }
+}
+
 /// Rebuild options.
 #[derive(Parser)]
 pub struct RebuildOpts {
-    /// The package file to rebuild
+    /// The package file to rebuild (can be a local path or URL)
     #[arg(short, long)]
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
     #[arg(long, hide = true)]
@@ -801,7 +823,7 @@ pub struct RebuildOpts {
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct RebuildData {
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
     pub test: TestStrategy,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
@@ -825,7 +847,7 @@ impl RebuildData {
 
     /// Create a new instance of `RebuildData`
     pub fn new(
-        package_file: PathBuf,
+        package_file: PackageSource,
         test: TestStrategy,
         compression_threads: Option<u32>,
         common: CommonData,
@@ -835,434 +857,6 @@ impl RebuildData {
             test,
             compression_threads,
             common,
-        }
-    }
-}
-
-/// Upload options.
-#[derive(Parser, Debug)]
-pub struct UploadOpts {
-    /// The package file to upload
-    #[arg(global = true, required = false)]
-    pub package_files: Vec<PathBuf>,
-
-    /// The server type
-    #[clap(subcommand)]
-    pub server_type: ServerType,
-
-    /// Common options.
-    #[clap(flatten)]
-    pub common: CommonOpts,
-}
-
-/// Server type.
-#[derive(Clone, Debug, PartialEq, Parser)]
-#[allow(missing_docs)]
-pub enum ServerType {
-    Quetz(QuetzOpts),
-    Artifactory(ArtifactoryOpts),
-    Prefix(PrefixOpts),
-    Anaconda(AnacondaOpts),
-    S3(S3Opts),
-    #[clap(hide = true)]
-    CondaForge(CondaForgeOpts),
-}
-
-/// Upload to a Quetz server.
-/// Authentication is used from the keychain / auth-file.
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct QuetzOpts {
-    /// The URL to your Quetz server
-    #[arg(short, long, env = "QUETZ_SERVER_URL")]
-    pub url: Url,
-
-    /// The URL to your channel
-    #[arg(short, long = "channel", env = "QUETZ_CHANNEL")]
-    pub channels: String,
-
-    /// The Quetz API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "QUETZ_API_KEY")]
-    pub api_key: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct QuetzData {
-    pub url: UrlWithTrailingSlash,
-    pub channels: String,
-    pub api_key: Option<String>,
-}
-
-impl From<QuetzOpts> for QuetzData {
-    fn from(value: QuetzOpts) -> Self {
-        Self::new(value.url, value.channels, value.api_key)
-    }
-}
-
-impl QuetzData {
-    /// Create a new instance of `QuetzData`
-    pub fn new(url: Url, channels: String, api_key: Option<String>) -> Self {
-        Self {
-            url: url.into(),
-            channels,
-            api_key,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Artifactory channel.
-/// Authentication is used from the keychain / auth-file.
-pub struct ArtifactoryOpts {
-    /// The URL to your Artifactory server
-    #[arg(short, long, env = "ARTIFACTORY_SERVER_URL")]
-    pub url: Url,
-
-    /// The URL to your channel
-    #[arg(short, long = "channel", env = "ARTIFACTORY_CHANNEL")]
-    pub channels: String,
-
-    /// Your Artifactory username
-    #[arg(long, env = "ARTIFACTORY_USERNAME", hide = true)]
-    pub username: Option<String>,
-
-    /// Your Artifactory password
-    #[arg(long, env = "ARTIFACTORY_PASSWORD", hide = true)]
-    pub password: Option<String>,
-
-    /// Your Artifactory token
-    #[arg(short, long, env = "ARTIFACTORY_TOKEN")]
-    pub token: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct ArtifactoryData {
-    pub url: UrlWithTrailingSlash,
-    pub channels: String,
-    pub token: Option<String>,
-}
-
-impl TryFrom<ArtifactoryOpts> for ArtifactoryData {
-    type Error = miette::Error;
-
-    fn try_from(value: ArtifactoryOpts) -> Result<Self, Self::Error> {
-        let token = match (value.username, value.password, value.token) {
-            (_, _, Some(token)) => Some(token),
-            (Some(_), Some(password), _) => {
-                warn!(
-                    "Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead."
-                );
-                Some(password)
-            }
-            (Some(_), None, _) => {
-                return Err(miette::miette!(
-                    "Artifactory username provided without a password"
-                ));
-            }
-            (None, Some(_), _) => {
-                return Err(miette::miette!(
-                    "Artifactory password provided without a username"
-                ));
-            }
-            _ => None,
-        };
-        Ok(Self::new(value.url, value.channels, token))
-    }
-}
-
-impl ArtifactoryData {
-    /// Create a new instance of `ArtifactoryData`
-    pub fn new(url: Url, channels: String, token: Option<String>) -> Self {
-        Self {
-            url: url.into(),
-            channels,
-            token,
-        }
-    }
-}
-
-/// Options for uploading to a prefix.dev server.
-/// Authentication is used from the keychain / auth-file
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct PrefixOpts {
-    /// The URL to the prefix.dev server (only necessary for self-hosted
-    /// instances)
-    #[arg(
-        short,
-        long,
-        env = "PREFIX_SERVER_URL",
-        default_value = "https://prefix.dev"
-    )]
-    pub url: Url,
-
-    /// The channel to upload the package to
-    #[arg(short, long, env = "PREFIX_CHANNEL")]
-    pub channel: String,
-
-    /// The prefix.dev API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "PREFIX_API_KEY")]
-    pub api_key: Option<String>,
-
-    /// Upload one or more attestation files alongside the package
-    /// Note: if you add an attestation, you can _only_ upload a single package.
-    #[arg(long, required = false)]
-    pub attestation: Option<PathBuf>,
-
-    /// Skip upload if package is existed.
-    #[arg(short, long)]
-    pub skip_existing: bool,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct PrefixData {
-    pub url: UrlWithTrailingSlash,
-    pub channel: String,
-    pub api_key: Option<String>,
-    pub attestation: Option<PathBuf>,
-    pub skip_existing: bool,
-}
-
-impl From<PrefixOpts> for PrefixData {
-    fn from(value: PrefixOpts) -> Self {
-        Self::new(
-            value.url,
-            value.channel,
-            value.api_key,
-            value.attestation,
-            value.skip_existing,
-        )
-    }
-}
-
-impl PrefixData {
-    /// Create a new instance of `PrefixData`
-    pub fn new(
-        url: Url,
-        channel: String,
-        api_key: Option<String>,
-        attestation: Option<PathBuf>,
-        skip_existing: bool,
-    ) -> Self {
-        Self {
-            url: url.into(),
-            channel,
-            api_key,
-            attestation,
-            skip_existing,
-        }
-    }
-}
-
-/// Options for uploading to a Anaconda.org server
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct AnacondaOpts {
-    /// The owner of the distribution (e.g. conda-forge or your username)
-    #[arg(short, long, env = "ANACONDA_OWNER")]
-    pub owner: String,
-
-    /// The channel / label to upload the package to (e.g. main / rc)
-    #[arg(short, long = "channel", env = "ANACONDA_CHANNEL")]
-    pub channels: Option<Vec<String>>,
-
-    /// The Anaconda API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "ANACONDA_API_KEY")]
-    pub api_key: Option<String>,
-
-    /// The URL to the Anaconda server
-    #[arg(short, long, env = "ANACONDA_SERVER_URL")]
-    pub url: Option<Url>,
-
-    /// Replace files on conflict
-    #[arg(long, short, env = "ANACONDA_FORCE")]
-    pub force: bool,
-}
-
-fn parse_s3_url(value: &str) -> Result<Url, String> {
-    let url: Url = Url::parse(value).map_err(|_| format!("`{}` isn't a valid URL", value))?;
-    if url.scheme() == "s3" && url.host_str().is_some() {
-        Ok(url)
-    } else {
-        Err(format!(
-            "Only S3 URLs of format s3://bucket/... can be used, not `{}`",
-            value
-        ))
-    }
-}
-
-/// Options for uploading to S3
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct S3Opts {
-    /// The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
-    #[arg(short, long, env = "S3_CHANNEL", value_parser = parse_s3_url)]
-    pub channel: Url,
-
-    /// The endpoint URL of the S3 backend
-    #[arg(
-        long,
-        env = "S3_ENDPOINT_URL",
-        default_value = "https://s3.amazonaws.com"
-    )]
-    pub endpoint_url: Url,
-
-    /// The region of the S3 backend
-    #[arg(long, env = "S3_REGION", default_value = "eu-central-1")]
-    pub region: String,
-
-    /// Whether to use path-style S3 URLs
-    #[arg(long, env = "S3_FORCE_PATH_STYLE", default_value = "false")]
-    pub force_path_style: bool,
-
-    /// The access key ID for the S3 bucket.
-    #[arg(long, env = "S3_ACCESS_KEY_ID", requires_all = ["secret_access_key"])]
-    pub access_key_id: Option<String>,
-
-    /// The secret access key for the S3 bucket.
-    #[arg(long, env = "S3_SECRET_ACCESS_KEY", requires_all = ["access_key_id"])]
-    pub secret_access_key: Option<String>,
-
-    /// The session token for the S3 bucket.
-    #[arg(long, env = "S3_SESSION_TOKEN", requires_all = ["access_key_id", "secret_access_key"])]
-    pub session_token: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct AnacondaData {
-    pub owner: String,
-    pub channels: Vec<String>,
-    pub api_key: Option<String>,
-    pub url: UrlWithTrailingSlash,
-    pub force: bool,
-}
-
-impl From<AnacondaOpts> for AnacondaData {
-    fn from(value: AnacondaOpts) -> Self {
-        Self::new(
-            value.owner,
-            value.channels,
-            value.api_key,
-            value.url,
-            value.force,
-        )
-    }
-}
-
-impl AnacondaData {
-    /// Create a new instance of `PrefixData`
-    pub fn new(
-        owner: String,
-        channel: Option<Vec<String>>,
-        api_key: Option<String>,
-        url: Option<Url>,
-        force: bool,
-    ) -> Self {
-        Self {
-            owner,
-            channels: channel.unwrap_or_else(|| vec!["main".to_string()]),
-            api_key,
-            url: url
-                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
-                .into(),
-            force,
-        }
-    }
-}
-
-/// Options for uploading to conda-forge
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct CondaForgeOpts {
-    /// The Anaconda API key
-    #[arg(long, env = "STAGING_BINSTAR_TOKEN")]
-    pub staging_token: String,
-
-    /// The feedstock name
-    #[arg(long, env = "FEEDSTOCK_NAME")]
-    pub feedstock: String,
-
-    /// The feedstock token
-    #[arg(long, env = "FEEDSTOCK_TOKEN")]
-    pub feedstock_token: String,
-
-    /// The staging channel name
-    #[arg(long, env = "STAGING_CHANNEL")]
-    pub staging_channel: Option<String>,
-
-    /// The Anaconda Server URL
-    #[arg(long, env = "ANACONDA_SERVER_URL")]
-    pub anaconda_url: Option<Url>,
-
-    /// The validation endpoint url
-    #[arg(long, env = "VALIDATION_ENDPOINT")]
-    pub validation_endpoint: Option<Url>,
-
-    /// The CI provider
-    #[arg(long, env = "CI")]
-    pub provider: Option<String>,
-
-    /// Dry run, don't actually upload anything
-    #[arg(long, env = "DRY_RUN")]
-    pub dry_run: bool,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct CondaForgeData {
-    pub staging_token: String,
-    pub feedstock: String,
-    pub feedstock_token: String,
-    pub staging_channel: String,
-    pub anaconda_url: UrlWithTrailingSlash,
-    pub validation_endpoint: Url,
-    pub provider: Option<String>,
-    pub dry_run: bool,
-}
-
-impl From<CondaForgeOpts> for CondaForgeData {
-    fn from(value: CondaForgeOpts) -> Self {
-        Self::new(
-            value.staging_token,
-            value.feedstock,
-            value.feedstock_token,
-            value.staging_channel,
-            value.anaconda_url,
-            value.validation_endpoint,
-            value.provider,
-            value.dry_run,
-        )
-    }
-}
-
-impl CondaForgeData {
-    /// Create a new instance of `PrefixData`
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        staging_token: String,
-        feedstock: String,
-        feedstock_token: String,
-        staging_channel: Option<String>,
-        anaconda_url: Option<Url>,
-        validation_endpoint: Option<Url>,
-        provider: Option<String>,
-        dry_run: bool,
-    ) -> Self {
-        Self {
-            staging_token,
-            feedstock,
-            feedstock_token,
-            staging_channel: staging_channel.unwrap_or_else(|| "cf-staging".to_string()),
-            anaconda_url: anaconda_url
-                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
-                .into(),
-            validation_endpoint: validation_endpoint.unwrap_or_else(|| {
-                Url::parse("https://conda-forge.herokuapp.com/feedstock-outputs/copy").unwrap()
-            }),
-            provider,
-            dry_run,
         }
     }
 }

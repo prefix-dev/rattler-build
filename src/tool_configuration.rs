@@ -109,14 +109,14 @@ impl BaseClient {
                 .build()
                 .expect("failed to create client"),
         )
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ))
+        .with(mirror_middleware)
+        .with(s3_middleware)
         .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
             auth_storage.clone(),
         )))
-        .with(mirror_middleware)
-        .with(s3_middleware)
+        .with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
         .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(

@@ -78,6 +78,13 @@ impl Dll {
                         tracing::warn!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
                         Ok(None)
                     }
+                    goblin::error::Error::Scroll(_) => {
+                        // A valid PE file but goblin can not reading and interpreting bytes
+                        tracing::warn!(
+                            "[relink/windows] Skipping uninterpretable PE file {path:?}: {e}"
+                        );
+                        Ok(None)
+                    }
                     _ => {
                         // IO, buffer, scroll errors should bubble up as real system errors
                         Err(RelinkError::ParseError(e))

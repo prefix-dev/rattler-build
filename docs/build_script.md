@@ -231,7 +231,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 `PY_VER`
 
 : Specifies the Python version against which the build is occurring.
-  This can be modified with a `variant_config.yaml` file.
+  This can be modified with a `variants.yaml` file.
 
 `PATH`
 

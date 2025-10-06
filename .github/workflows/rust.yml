@@ -37,13 +37,13 @@ jobs:
         with:
           toolchain: "1.86.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.9.0
+      - uses: prefix-dev/setup-pixi@v0.9.1
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         with:
           cache: true
@@ -58,12 +58,12 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
         run: |
           patch --version
-          cargo test --features=tui,recipe-generation,patch-test-extra --verbose -- --nocapture --ignored
+          cargo test --features=tui,recipe-generation,patch-test-extra -- --nocapture --ignored
 
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'ci:full-build')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'ci:full-build') || contains(github.event.pull_request.labels.*.name, 'needs-rebuild-tests')
     strategy:
       fail-fast: false
       matrix:
@@ -137,7 +137,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@ab6845274e2ff01cd4462007e1a9d9df1ab49f42 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: "1.86.0"
           target: ${{ matrix.target }}
@@ -152,7 +152,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@f63c33fd96cc1e69a29bafd06541cf28588b43a4 # v2
+        uses: taiki-e/install-action@f355b1dcaf1a1c56ccead97cc540a259faf4bd5a # v2
         with:
           tool: cross
 
@@ -240,7 +240,7 @@ jobs:
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
+        uses: softprops/action-gh-release@62c96d0c4e8a889135c1f3a25910db8dbe0e85f7 # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
@@ -276,3 +276,50 @@ jobs:
           gh release edit "${{ github.ref_name }}" --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  rebuild-test:
+    name: Rebuild Test
+    needs: build
+    if: contains(github.event.pull_request.labels.*.name, 'needs-rebuild-tests')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        with:
+          submodules: recursive
+
+      - name: Download rattler-build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
+        with:
+          name: rattler-build-x86_64-unknown-linux-musl.tar.gz
+          path: ./
+
+      - name: Extract rattler-build binary
+        run: |
+          tar -xzf rattler-build-x86_64-unknown-linux-musl.tar.gz
+          chmod +x rattler-build-x86_64-unknown-linux-musl/rattler-build
+          mv rattler-build-x86_64-unknown-linux-musl/rattler-build ./rattler-build
+
+      - name: Create output directory
+        run: mkdir -p output
+
+      - name: Build rich package
+        run: |
+          ./rattler-build build --recipe ./examples/rich
+          echo "Built packages:"
+          ls -la ./output/noarch/
+
+      - name: Rebuild rich package
+        run: |
+          # Find the built package (should be something like rich-*.conda)
+          PACKAGE=$(find ./output/noarch/rich-*.conda | head -n1)
+          echo "Rebuilding package: $PACKAGE"
+          ./rattler-build rebuild --package-file "$PACKAGE"
+          echo "Rebuild completed successfully"
+
+      - name: Compare original and rebuilt packages
+        run: |
+          echo "Contents after rebuild:"
+          ls -la ./output/noarch/
+          # The rebuild command should produce a new package with similar structure

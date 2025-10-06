@@ -41,7 +41,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - uses: prefix-dev/setup-pixi@v0.9.0
+      - uses: prefix-dev/setup-pixi@v0.9.1
 
       - name: Build docs for PR
         run: |
@@ -78,7 +78,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: prefix-dev/setup-pixi@v0.9.0
+      - uses: prefix-dev/setup-pixi@v0.9.1
 
       - name: Build docs for test
         run: |
@@ -102,7 +102,7 @@ jobs:
         run: |
           git checkout tags/${{ github.event.inputs.tag }}
 
-      - uses: prefix-dev/setup-pixi@v0.9.0
+      - uses: prefix-dev/setup-pixi@v0.9.1
 
       - name: Configure Git user
         run: |
@@ -133,7 +133,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: prefix-dev/setup-pixi@v0.9.0
+      - uses: prefix-dev/setup-pixi@v0.9.1
 
       - name: Configure Git user
         run: |

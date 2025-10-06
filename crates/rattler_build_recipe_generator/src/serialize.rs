@@ -158,10 +158,14 @@ pub fn write_recipe(package_name: &str, recipe: &str) -> std::io::Result<()> {
     if path.exists() {
         // move to backup
         let backup_path = path.with_extension("yaml.bak");
+        tracing::warn!(
+            "Existing recipe file will be backed up to {}",
+            backup_path.display()
+        );
         fs_err::rename(&path, backup_path)?;
     }
 
-    println!("Writing recipe to {}", path.display());
+    tracing::info!("Writing recipe to {}", path.display());
 
     fs_err::write(path, recipe)
 }

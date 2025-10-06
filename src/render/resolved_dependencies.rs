@@ -5,18 +5,16 @@ use std::{
     sync::Arc,
 };
 
-use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
 };
-use reqwest_middleware::ClientWithMiddleware;
+use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{Semaphore, mpsc};
 
 use super::pin::PinError;
 use crate::{
@@ -27,10 +25,11 @@ use crate::{
         pin::PinArgs,
         solver::{install_packages, solve_environment},
     },
-    run_exports::{RunExportExtractor, RunExportExtractorError},
     tool_configuration,
     tool_configuration::Configuration,
 };
+
+use super::reporters::GatewayReporter;
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -468,14 +467,26 @@ pub enum ResolveError {
     #[error("Could not apply pin: {0}")]
     PinApplyError(#[from] PinError),
 
-    #[error("Could not apply pin. The following subpackage is not available: {0:?}")]
-    SubpackageNotFound(PackageName),
+    #[error("Could not apply pin_subpackage. The following subpackage is not available: {}", .0.as_normalized())]
+    PinSubpackageNotFound(PackageName),
+
+    #[error("Could not apply pin_compatible. The following package is not part of the solution: {}", .0.as_normalized())]
+    PinCompatibleNotFound(PackageName),
 
     #[error("Compiler configuration error: {0}")]
     CompilerError(String),
 
     #[error("Could not reindex channels: {0}")]
     RefreshChannelError(std::io::Error),
+}
+
+/// Controls whether to download missing run exports during dependency resolution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunExportsDownload {
+    /// Download packages to extract run exports when they are missing
+    DownloadMissing,
+    /// Skip downloading packages for run exports extraction
+    SkipDownload,
 }
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and
@@ -525,7 +536,7 @@ pub fn apply_variant(
                     let name = &pin.pin_value().name;
                     let subpackage = subpackages
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinSubpackageNotFound(name.clone()))?;
                     let pinned = pin
                         .pin_value()
                         .apply(&subpackage.version, &subpackage.build_string)?;
@@ -540,7 +551,7 @@ pub fn apply_variant(
                     let name = &pin.pin_value().name;
                     let pin_package = compatibility_specs
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinCompatibleNotFound(name.clone()))?;
 
                     let pinned = pin
                         .pin_value()
@@ -557,55 +568,76 @@ pub fn apply_variant(
         .collect()
 }
 
+use rattler::package_cache::CacheReporter;
+use rattler_repodata_gateway::DownloadReporter;
+
+struct RunExportsProgressReporter {
+    repodata_reporter: GatewayReporter,
+    package_cache_reporter: PackageCacheReporter,
+}
+
+impl RunExportsProgressReporter {
+    fn new(
+        repodata_reporter: GatewayReporter,
+        package_cache_reporter: PackageCacheReporter,
+    ) -> Self {
+        Self {
+            repodata_reporter,
+            package_cache_reporter,
+        }
+    }
+}
+
+impl RunExportsReporter for RunExportsProgressReporter {
+    fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
+        Some(&self.repodata_reporter)
+    }
+
+    fn create_package_download_reporter(
+        &self,
+        repo_data_record: &RepoDataRecord,
+    ) -> Option<Box<dyn CacheReporter>> {
+        let mut reporter = self.package_cache_reporter.clone();
+        let entry = reporter.add(repo_data_record);
+        Some(Box::new(entry) as Box<dyn CacheReporter>)
+    }
+}
+
 /// Collect run exports from the package cache and add them to the package
 /// records.
-/// TODO: There are many ways that would allow us to optimize this function.
-/// 1. This currently downloads an entire package, but we only need the
-///    `run_exports.json`.
-/// 2. There are special run_exports.json files available for some channels.
-async fn amend_run_exports(
+async fn ensure_run_exports(
     records: &mut [RepoDataRecord],
-    client: ClientWithMiddleware,
-    package_cache: PackageCache,
+    gateway: &Gateway,
     multi_progress: MultiProgress,
     progress_prefix: impl Into<Cow<'static, str>>,
     top_level_pb: Option<ProgressBar>,
+    progress_style: ProgressStyle,
+    finish_style: ProgressStyle,
 ) -> Result<(), RunExportExtractorError> {
-    let max_concurrent_requests = Arc::new(Semaphore::new(50));
-    let (tx, mut rx) = mpsc::channel(50);
+    let progress_prefix: Cow<'static, str> = progress_prefix.into();
+    let placement = top_level_pb
+        .as_ref()
+        .map(|pb| Placement::After(pb.clone()))
+        .unwrap_or(Placement::End);
 
-    let progress = PackageCacheReporter::new(
-        multi_progress,
-        top_level_pb.map_or(Placement::End, Placement::After),
-    )
-    .with_prefix(progress_prefix);
+    let repodata_reporter = GatewayReporter::builder()
+        .with_multi_progress(multi_progress.clone())
+        .with_progress_template(progress_style.clone())
+        .with_finish_template(finish_style.clone())
+        .with_placement(placement.clone())
+        .finish();
 
-    for (pkg_idx, pkg) in records.iter().enumerate() {
-        if pkg.package_record.run_exports.is_some() {
-            // If the package already boasts run exports, we don't need to do anything.
-            continue;
-        }
+    let package_cache_reporter =
+        PackageCacheReporter::new(multi_progress, placement).with_prefix(progress_prefix);
 
-        let extractor = RunExportExtractor::default()
-            .with_max_concurrent_requests(max_concurrent_requests.clone())
-            .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+    let reporter: Arc<dyn RunExportsReporter> = Arc::new(RunExportsProgressReporter::new(
+        repodata_reporter,
+        package_cache_reporter,
+    ));
 
-        let tx = tx.clone();
-        let record = pkg.clone();
-        tokio::spawn(async move {
-            let result = extractor.extract(&record).await;
-            let _ = tx.send((pkg_idx, result)).await;
-        });
-    }
-
-    drop(tx);
-
-    while let Some((pkg_idx, run_exports)) = rx.recv().await {
-        records[pkg_idx].package_record.run_exports = run_exports?;
-    }
-
-    Ok(())
+    gateway
+        .ensure_run_exports(records.iter_mut(), Some(reporter))
+        .await
 }
 
 pub async fn install_environments(
@@ -693,10 +725,25 @@ pub(crate) async fn resolve_dependencies(
     output: &Output,
     channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
+    download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();
 
     let mut compatibility_specs = HashMap::new();
+
+    let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+        let client = tool_configuration.client.get_client().clone();
+        let package_cache = tool_configuration.package_cache.clone();
+        Some(
+            Gateway::builder()
+                .with_max_concurrent_requests(50)
+                .with_client(client)
+                .with_package_cache(package_cache)
+                .finish(),
+        )
+    } else {
+        None
+    };
 
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let build_env_specs = apply_variant(
@@ -724,26 +771,34 @@ pub(crate) async fn resolve_dependencies(
         .await
         .map_err(ResolveError::from)?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
                         .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+                        .finished_progress_style();
+                    ensure_run_exports(
+                        &mut resolved,
+                        gateway.as_ref().unwrap(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                        progress_style,
+                        finish_style,
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -821,26 +876,34 @@ pub(crate) async fn resolve_dependencies(
         .await
         .map_err(ResolveError::from)?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.get_client().clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
                         .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+                        .finished_progress_style();
+                    ensure_run_exports(
+                        &mut resolved,
+                        gateway.as_ref().unwrap(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                        progress_style,
+                        finish_style,
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -989,6 +1052,7 @@ impl Output {
     pub async fn resolve_dependencies(
         self,
         tool_configuration: &tool_configuration::Configuration,
+        download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
         let span = tracing::info_span!("Resolving environments");
         let _enter = span.enter();
@@ -1006,6 +1070,7 @@ impl Output {
             &self,
             &channels,
             tool_configuration,
+            download_missing_run_exports,
         )
         .await?;
 
