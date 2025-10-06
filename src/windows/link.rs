@@ -80,7 +80,9 @@ impl Dll {
                     }
                     goblin::error::Error::Scroll(_) => {
                         // A valid PE file but goblin can not reading and interpreting bytes
-                        tracing::warn!("[relink/windows] Skipping uninterpretable PE file {path:?}: {e}");
+                        tracing::warn!(
+                            "[relink/windows] Skipping uninterpretable PE file {path:?}: {e}"
+                        );
                         Ok(None)
                     }
                     _ => {

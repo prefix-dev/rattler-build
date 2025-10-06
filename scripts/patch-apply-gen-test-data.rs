@@ -9,13 +9,13 @@ use std::{
 use anyhow::Context;
 use http_range_client::HttpReader;
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
+use rattler_networking::LazyClient;
 use rattler_package_streaming::seek::stream_conda_info;
 use rattler_repodata_gateway::{
     Gateway, fetch,
     sparse::{PackageFormatSelection, SparseRepoData},
 };
-use reqwest::Client;
-use reqwest_middleware::ClientWithMiddleware;
+
 use tokio::task::JoinSet;
 use url::Url;
 
@@ -37,7 +37,7 @@ const OUTPUT_PATH: &str = "test-data/conda_forge/recipes/";
 #[tokio::main]
 async fn main() {
     let repodata_url = Url::parse("https://conda.anaconda.org/conda-forge/linux-64/").unwrap();
-    let client = ClientWithMiddleware::from(Client::new());
+    let client = LazyClient::default();
     let cache = PathBuf::from("./cache");
 
     let result = fetch::fetch_repo_data(
