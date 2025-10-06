@@ -7,9 +7,10 @@ use std::{
 };
 
 use ::rattler_build::{
-    NormalizedKey, build_recipes, get_rattler_build_version,
+    NormalizedKey, build_recipes, get_build_output, get_rattler_build_version, get_tool_config,
+    build::run_build,
     hash::HashInfo,
-    metadata::Debug,
+    metadata::{BuildConfiguration, Debug, Output},
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     recipe::{parser::Recipe, variable::Variable},
     recipe_generator::{
@@ -19,6 +20,7 @@ use ::rattler_build::{
     run_test,
     selectors::SelectorConfig,
     tool_configuration::{self, ContinueOnFailure, SkipExisting, TestStrategy},
+    variant_config::VariantConfig,
 };
 use clap::ValueEnum;
 use pyo3::prelude::*;
@@ -709,6 +711,296 @@ fn upload_packages_to_conda_forge_py(
     })
 }
 
+/// Python wrapper for VariantConfig
+#[pyclass]
+#[derive(Clone)]
+pub struct PyVariantConfig {
+    pub(crate) inner: VariantConfig,
+}
+
+#[pymethods]
+impl PyVariantConfig {
+    /// Load variant config from YAML files
+    #[staticmethod]
+    #[pyo3(signature = (files, selector_config))]
+    fn from_files(files: Vec<PathBuf>, selector_config: &PySelectorConfig) -> PyResult<Self> {
+        let variant_config = VariantConfig::from_files(&files, &selector_config.inner)
+            .map_err(|e| RattlerBuildError::Variant(format!("{}", e)))?;
+        Ok(PyVariantConfig {
+            inner: variant_config,
+        })
+    }
+
+    /// Get variants as a Python dictionary
+    #[getter]
+    fn variants(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.variants)
+            .map_err(RattlerBuildError::from)?;
+        Ok(pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| {
+                RattlerBuildError::Variant(format!("Failed to convert variants to Python: {}", e))
+            })?)
+    }
+
+    /// Get zip keys if defined
+    #[getter]
+    fn zip_keys(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        if let Some(ref zip_keys) = self.inner.zip_keys {
+            let json_value =
+                serde_json::to_value(zip_keys).map_err(RattlerBuildError::from)?;
+            Ok(Some(pythonize::pythonize(py, &json_value)
+                .map(|obj| obj.into())
+                .map_err(|e| {
+                    RattlerBuildError::Variant(format!(
+                        "Failed to convert zip_keys to Python: {}",
+                        e
+                    ))
+                })?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+/// Python wrapper for BuildConfiguration
+#[pyclass]
+#[derive(Clone)]
+pub struct PyBuildConfiguration {
+    pub(crate) inner: BuildConfiguration,
+}
+
+#[pymethods]
+impl PyBuildConfiguration {
+    #[getter]
+    fn target_platform(&self) -> String {
+        self.inner.target_platform.to_string()
+    }
+
+    #[getter]
+    fn host_platform(&self) -> String {
+        self.inner.host_platform.platform.to_string()
+    }
+
+    #[getter]
+    fn build_platform(&self) -> String {
+        self.inner.build_platform.platform.to_string()
+    }
+
+    #[getter]
+    fn variant(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.variant)
+            .map_err(RattlerBuildError::from)?;
+        Ok(pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| {
+                RattlerBuildError::Variant(format!("Failed to convert variant to Python: {}", e))
+            })?)
+    }
+
+    #[getter]
+    fn channels(&self) -> Vec<String> {
+        self.inner
+            .channels
+            .iter()
+            .map(|c| c.to_string())
+            .collect()
+    }
+
+    #[getter]
+    fn hash(&self) -> String {
+        self.inner.hash.hash.clone()
+    }
+}
+
+/// Python wrapper for Output
+#[pyclass]
+#[derive(Clone)]
+pub struct PyOutput {
+    pub(crate) inner: Output,
+}
+
+#[pymethods]
+impl PyOutput {
+    #[getter]
+    fn name(&self) -> String {
+        self.inner.name().as_normalized().to_string()
+    }
+
+    #[getter]
+    fn version(&self) -> String {
+        self.inner.version().to_string()
+    }
+
+    #[getter]
+    fn build_string(&self) -> String {
+        self.inner.build_string().to_string()
+    }
+
+    #[getter]
+    fn identifier(&self) -> String {
+        self.inner.identifier()
+    }
+
+    #[getter]
+    fn build_configuration(&self) -> PyBuildConfiguration {
+        PyBuildConfiguration {
+            inner: self.inner.build_configuration.clone(),
+        }
+    }
+
+    #[getter]
+    fn recipe(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.recipe)
+            .map_err(RattlerBuildError::from)?;
+        Ok(pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| {
+                RattlerBuildError::RecipeParse(format!("Failed to convert recipe to Python: {}", e))
+            })?)
+    }
+
+    /// Build this output
+    #[pyo3(signature = (tool_config=None))]
+    fn build(&self, tool_config: Option<PyToolConfiguration>) -> PyResult<PathBuf> {
+        let tool_config = if let Some(tc) = tool_config {
+            tc.inner
+        } else {
+            // Create a default tool configuration
+            return Err(RattlerBuildError::Other(
+                "tool_config is required for building".to_string(),
+            )
+            .into());
+        };
+
+        run_async_task(async {
+            use ::rattler_build::build::WorkingDirectoryBehavior;
+            let (_output, artifact) = run_build(self.inner.clone(), &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+            Ok(artifact)
+        })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyOutput(name='{}', version='{}', build_string='{}')",
+            self.name(),
+            self.version(),
+            self.build_string()
+        )
+    }
+}
+
+/// Python wrapper for tool configuration
+#[pyclass]
+#[derive(Clone)]
+pub struct PyToolConfiguration {
+    pub(crate) inner: tool_configuration::Configuration,
+}
+
+/// Parse a recipe YAML file with variants and return outputs
+#[pyfunction]
+#[pyo3(signature = (recipe_path, build_platform=None, target_platform=None, host_platform=None, channels=None, output_dir=None))]
+#[allow(clippy::too_many_arguments)]
+fn parse_recipe_with_variants(
+    recipe_path: PathBuf,
+    build_platform: Option<String>,
+    target_platform: Option<String>,
+    host_platform: Option<String>,
+    channels: Option<Vec<String>>,
+    output_dir: Option<PathBuf>,
+) -> PyResult<Vec<PyOutput>> {
+    // Parse platforms
+    let build_platform = build_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?
+        .unwrap_or_else(Platform::current);
+
+    let target_platform = target_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?
+        .unwrap_or_else(Platform::current);
+
+    let host_platform = host_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?
+        .unwrap_or_else(Platform::current);
+
+    // Parse channels
+    let channels = if let Some(channel_strs) = channels {
+        Some(
+            channel_strs
+                .iter()
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+    } else {
+        None
+    };
+
+    // Create build data
+    let config = ConfigBase::<()>::default();
+    let common = CommonData::new(
+        output_dir,
+        false,
+        None,
+        config,
+        None,
+        None,
+        true,
+        true,
+        false,
+        true,
+    );
+
+    let build_data = BuildData::new(
+        None,
+        Some(build_platform),
+        Some(target_platform),
+        Some(host_platform),
+        channels,
+        Some(vec![]), // variant config files - empty for now
+        HashMap::new(),
+        false,
+        false,
+        false,
+        false,
+        false,
+        None,
+        None,
+        None,
+        false,
+        None,
+        common,
+        false,
+        None,
+        None,
+        None,
+        None,
+        Debug::new(false),
+        ContinueOnFailure::No,
+        false,
+        false,
+        None,
+    );
+
+    let tool_config = get_tool_config(&build_data, &None)
+        .map_err(|e| RattlerBuildError::Other(format!("Failed to get tool config: {}", e)))?;
+
+    run_async_task(async {
+        let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+        Ok(outputs
+            .into_iter()
+            .map(|output| PyOutput { inner: output })
+            .collect())
+    })
+}
+
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     error::register_exceptions(_py, &m)?;
@@ -725,7 +1017,12 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload_package_to_prefix_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_package_to_anaconda_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload_packages_to_conda_forge_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(parse_recipe_with_variants, &m).unwrap())?;
     m.add_class::<PySelectorConfig>()?;
+    m.add_class::<PyVariantConfig>()?;
+    m.add_class::<PyBuildConfiguration>()?;
+    m.add_class::<PyOutput>()?;
+    m.add_class::<PyToolConfiguration>()?;
 
     Ok(())
 }
