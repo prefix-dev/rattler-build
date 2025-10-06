@@ -1,4 +1,5 @@
 //! Module for fetching sources and applying patches
+#![allow(dead_code)]
 
 use std::path::{Path, PathBuf, StripPrefixError};
 

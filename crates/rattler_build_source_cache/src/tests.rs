@@ -1,7 +1,7 @@
 //! Tests for the source cache
 
 #[cfg(test)]
-mod tests {
+mod source_cache_tests {
     use super::super::*;
     use crate::lock::LockManager;
     use tempfile::TempDir;
@@ -118,13 +118,13 @@ mod tests {
         // Create a temp file with the data
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test_file");
-        std::fs::write(&file_path, data).unwrap();
+        fs_err::write(&file_path, data).unwrap();
 
         // Validate should succeed
         assert!(checksum.validate(&file_path));
 
         // Write different data
-        std::fs::write(&file_path, b"different data").unwrap();
+        fs_err::write(&file_path, b"different data").unwrap();
 
         // Validate should fail
         assert!(!checksum.validate(&file_path));

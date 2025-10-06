@@ -135,17 +135,7 @@ impl SourceCacheBuilder {
                 .build()
         });
 
-        SourceCache::new(
-            cache_dir,
-            client,
-            self.max_age,
-            self.enable_cleanup,
-            self.cleanup_interval,
-            self.enable_compression,
-            self.max_concurrent_downloads,
-            self.progress_handler,
-        )
-        .await
+        SourceCache::new(cache_dir, client, self.max_age, self.progress_handler).await
     }
 }
 

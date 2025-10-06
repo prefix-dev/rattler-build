@@ -21,7 +21,7 @@ impl Drop for CacheLockGuard {
     fn drop(&mut self) {
         // FileLock automatically releases on drop
         // Clean up the lock file
-        let _ = std::fs::remove_file(&self.lock_path);
+        let _ = fs_err::remove_file(&self.lock_path);
     }
 }
 
@@ -115,8 +115,6 @@ impl LockManager {
         while let Some(entry) = dir.next_entry().await? {
             if let Some(filename) = entry.file_name().to_str() {
                 if filename.ends_with(".lock") {
-                    let lock_path = self.locks_dir.join(filename);
-
                     // Try to acquire the lock non-blocking
                     // If we can acquire it, the lock was stale
                     if let Ok(guard) = self.try_acquire(filename.trim_end_matches(".lock")) {

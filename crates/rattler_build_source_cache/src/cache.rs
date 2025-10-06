@@ -1,7 +1,6 @@
 //! Main source cache implementation
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
@@ -21,10 +20,6 @@ pub struct SourceCache {
     client: reqwest_middleware::ClientWithMiddleware,
     git_resolver: GitResolver,
     max_age: Option<chrono::Duration>,
-    enable_cleanup: bool,
-    cleanup_interval: Duration,
-    enable_compression: bool,
-    max_concurrent_downloads: usize,
     progress_handler: Option<Box<dyn ProgressHandler>>,
 }
 
@@ -34,10 +29,6 @@ impl SourceCache {
         cache_dir: PathBuf,
         client: reqwest_middleware::ClientWithMiddleware,
         max_age: Option<chrono::Duration>,
-        enable_cleanup: bool,
-        cleanup_interval: Duration,
-        enable_compression: bool,
-        max_concurrent_downloads: usize,
         progress_handler: Option<Box<dyn ProgressHandler>>,
     ) -> Result<Self, CacheError> {
         let index = CacheIndex::new(cache_dir.clone()).await?;
@@ -50,29 +41,8 @@ impl SourceCache {
             client,
             git_resolver: GitResolver::default(),
             max_age,
-            enable_cleanup,
-            cleanup_interval,
-            enable_compression,
-            max_concurrent_downloads,
             progress_handler,
         };
-
-        // Start cleanup task if enabled
-        if enable_cleanup {
-            let cache_clone = cache.cache_dir.clone();
-            let max_age = max_age.unwrap_or(chrono::Duration::days(30));
-            let interval = cleanup_interval;
-
-            tokio::spawn(async move {
-                let mut timer = tokio::time::interval(interval);
-                loop {
-                    timer.tick().await;
-                    if let Ok(index) = CacheIndex::new(cache_clone.clone()).await {
-                        let _ = index.cleanup_old_entries(max_age).await;
-                    }
-                }
-            });
-        }
 
         Ok(cache)
     }
@@ -92,10 +62,8 @@ impl SourceCache {
     /// Get a Git source from the cache or clone it if not present
     async fn get_git_source(&self, source: &GitSource) -> Result<PathBuf, CacheError> {
         let git_url = source.to_git_url();
-        let key = CacheIndex::generate_git_cache_key(
-            &source.url.to_string(),
-            &source.reference.to_string(),
-        );
+        let key =
+            CacheIndex::generate_git_cache_key(source.url.as_ref(), &source.reference.to_string());
 
         // Acquire lock for this cache entry
         let _lock = self.lock_manager.acquire(&key).await?;
@@ -210,11 +178,7 @@ impl SourceCache {
 
         for url in &source.urls {
             match self
-                .try_url(
-                    url,
-                    source.checksum.as_ref(),
-                    source.file_name.as_ref().map(|s| s.as_str()),
-                )
+                .try_url(url, source.checksum.as_ref(), source.file_name.as_deref())
                 .await
             {
                 Ok(path) => return Ok(path),
@@ -337,7 +301,7 @@ impl SourceCache {
         // Determine filename
         let filename = url
             .path_segments()
-            .and_then(|segments| segments.last())
+            .and_then(|mut segments| segments.next_back())
             .unwrap_or("download");
 
         let cache_path = self.cache_dir.join(format!("{}_{}", key, filename));
@@ -360,9 +324,9 @@ impl SourceCache {
         let response = self.client.get(url.clone()).send().await?;
 
         if !response.status().is_success() {
-            return Err(CacheError::Download(reqwest::Error::from(
+            return Err(CacheError::Download(
                 response.error_for_status().unwrap_err(),
-            )));
+            ));
         }
 
         // Get actual filename from Content-Disposition header if present
@@ -549,7 +513,6 @@ fn is_tarball(name: &str) -> bool {
 
 fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
     use flate2::read::GzDecoder;
-    use std::io::Read;
     use tar::Archive;
 
     let file = std::fs::File::open(archive)

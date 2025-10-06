@@ -22,8 +22,8 @@ impl Checksum {
 
     /// Validate a file against this checksum
     pub fn validate(&self, path: &std::path::Path) -> bool {
-        use md5::{Digest as Md5Digest, Md5};
-        use sha2::{Digest as Sha2Digest, Sha256};
+        use md5::{Digest, Md5};
+        use sha2::Sha256;
         use std::io::Read;
 
         let mut file = match std::fs::File::open(path) {
