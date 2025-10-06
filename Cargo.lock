@@ -4334,6 +4334,7 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "rattler",
+ "rattler_build_recipe_generator",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4390,6 +4391,37 @@ dependencies = [
  "xz2",
  "zip 5.1.1",
  "zstd",
+]
+
+[[package]]
+name = "rattler_build_recipe_generator"
+version = "0.1.0"
+dependencies = [
+ "async-once-cell",
+ "async-recursion",
+ "clap",
+ "flate2",
+ "fs-err",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "miette",
+ "rattler_conda_types",
+ "rattler_digest",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha2",
+ "tar",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "url",
+ "zip 5.1.1",
 ]
 
 [[package]]
@@ -7594,9 +7626,9 @@ dependencies = [
 
 [[package]]
 name = "yaml-rust2"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce2a4ff45552406d02501cea6c18d8a7e50228e7736a872951fe2fe75c91be7"
+checksum = "2462ea039c445496d8793d052e13787f2b90e750b833afee748e601c17621ed9"
 dependencies = [
  "arraydeque",
  "encoding_rs",
