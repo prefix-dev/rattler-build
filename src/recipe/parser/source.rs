@@ -192,6 +192,12 @@ pub struct GitSource {
     /// Optionally request the lfs pull in git source
     #[serde(default, skip_serializing_if = "should_not_serialize_lfs")]
     pub lfs: bool,
+    /// Expected commit hash to validate against (similar to Wolfi's expected-commit)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_commit: Option<String>,
+    /// List of commits to cherry-pick after checkout (similar to Wolfi's cherry-pick)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cherry_pick: Vec<String>,
 }
 
 /// A helper method to skip serializing the lfs flag if it is false.
@@ -217,6 +223,8 @@ impl GitSource {
             patches,
             target_directory,
             lfs,
+            expected_commit: None,
+            cherry_pick: Vec::new(),
         }
     }
 
@@ -249,6 +257,16 @@ impl GitSource {
     pub const fn lfs(&self) -> bool {
         self.lfs
     }
+
+    /// Get the expected commit hash.
+    pub fn expected_commit(&self) -> Option<&str> {
+        self.expected_commit.as_deref()
+    }
+
+    /// Get the list of commits to cherry-pick.
+    pub fn cherry_pick(&self) -> &[String] {
+        self.cherry_pick.as_slice()
+    }
 }
 
 impl TryConvertNode<GitSource> for RenderedMappingNode {
@@ -259,6 +277,8 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut patches = Vec::new();
         let mut target_directory = None;
         let mut lfs = false;
+        let mut expected_commit = None;
+        let mut cherry_pick = Vec::new();
 
         self.iter().map(|(k, v)| {
             match k.as_str() {
@@ -317,11 +337,17 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 "lfs" => {
                     lfs = v.try_convert("lfs")?;
                 }
+                "expected_commit" | "expected-commit" => {
+                    expected_commit = Some(v.try_convert("expected_commit")?);
+                }
+                "cherry_pick" | "cherry-pick" => {
+                    cherry_pick = v.try_convert("cherry_pick")?;
+                }
                 _ => {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
+                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs`, `target_directory`, `expected_commit`, and `cherry_pick`"
                     )])
                 }
             }
@@ -354,6 +380,8 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             patches,
             target_directory,
             lfs,
+            expected_commit,
+            cherry_pick,
         })
     }
 }
@@ -652,6 +680,8 @@ mod tests {
             patches: Vec::new(),
             target_directory: None,
             lfs: false,
+            expected_commit: None,
+            cherry_pick: Vec::new(),
         };
 
         let yaml = serde_yaml::to_string(&git).unwrap();
@@ -672,6 +702,8 @@ mod tests {
             patches: Vec::new(),
             target_directory: None,
             lfs: false,
+            expected_commit: None,
+            cherry_pick: Vec::new(),
         };
 
         let yaml = serde_yaml::to_string(&git).unwrap();

@@ -132,7 +132,8 @@ pub(crate) async fn fetch_source(
             };
 
             rendered_sources.push(Source::Git(GitSource {
-                rev: GitRev::Commit(result.1),
+                rev: GitRev::Commit(result.1.clone()),
+                expected_commit: Some(result.1),
                 ..src.clone()
             }));
 

@@ -285,6 +285,48 @@ pub fn git_src(
         git_lfs_pull(&ref_git)?;
     }
 
+    // Validate expected commit if provided
+    if let Some(expected_commit) = source.expected_commit() {
+        let actual_commit = ref_git.trim();
+        let expected = expected_commit.trim();
+        if actual_commit != expected {
+            return Err(SourceError::GitError(format!(
+                "Expected commit '{}' but got '{}'. The repository may have been updated. Please verify the commit hash.",
+                expected, actual_commit
+            )));
+        }
+        tracing::info!("Validated expected commit: {}", expected);
+    }
+
+    // Apply cherry-picks if provided
+    if !source.cherry_pick().is_empty() {
+        tracing::info!("Applying {} cherry-pick(s)", source.cherry_pick().len());
+        for (idx, commit) in source.cherry_pick().iter().enumerate() {
+            tracing::info!(
+                "Cherry-picking commit {} of {}: {}",
+                idx + 1,
+                source.cherry_pick().len(),
+                commit
+            );
+            let output = git_command(system_tools, "cherry-pick")?
+                .arg(commit)
+                .current_dir(&cache_path)
+                .output()
+                .map_err(|e| {
+                    SourceError::GitError(format!("Failed to cherry-pick {}: {}", commit, e))
+                })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(SourceError::GitError(format!(
+                    "Failed to cherry-pick commit '{}': {}",
+                    commit, stderr
+                )));
+            }
+            tracing::info!("Successfully cherry-picked: {}", commit);
+        }
+    }
+
     tracing::info!(
         "Checked out revision: '{}' at '{}'",
         &rev,
