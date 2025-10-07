@@ -7,8 +7,9 @@ use std::{
 };
 
 use ::rattler_build::{
-    NormalizedKey, build_recipes, get_build_output, get_rattler_build_version, get_tool_config,
+    NormalizedKey,
     build::run_build,
+    build_recipes, get_build_output, get_rattler_build_version, get_tool_config,
     hash::HashInfo,
     metadata::{BuildConfiguration, Debug, Output},
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
@@ -734,8 +735,8 @@ impl PyVariantConfig {
     /// Get variants as a Python dictionary
     #[getter]
     fn variants(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value = serde_json::to_value(&self.inner.variants)
-            .map_err(RattlerBuildError::from)?;
+        let json_value =
+            serde_json::to_value(&self.inner.variants).map_err(RattlerBuildError::from)?;
         Ok(pythonize::pythonize(py, &json_value)
             .map(|obj| obj.into())
             .map_err(|e| {
@@ -747,16 +748,17 @@ impl PyVariantConfig {
     #[getter]
     fn zip_keys(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         if let Some(ref zip_keys) = self.inner.zip_keys {
-            let json_value =
-                serde_json::to_value(zip_keys).map_err(RattlerBuildError::from)?;
-            Ok(Some(pythonize::pythonize(py, &json_value)
-                .map(|obj| obj.into())
-                .map_err(|e| {
-                    RattlerBuildError::Variant(format!(
-                        "Failed to convert zip_keys to Python: {}",
-                        e
-                    ))
-                })?))
+            let json_value = serde_json::to_value(zip_keys).map_err(RattlerBuildError::from)?;
+            Ok(Some(
+                pythonize::pythonize(py, &json_value)
+                    .map(|obj| obj.into())
+                    .map_err(|e| {
+                        RattlerBuildError::Variant(format!(
+                            "Failed to convert zip_keys to Python: {}",
+                            e
+                        ))
+                    })?,
+            ))
         } else {
             Ok(None)
         }
@@ -789,8 +791,8 @@ impl PyBuildConfiguration {
 
     #[getter]
     fn variant(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value = serde_json::to_value(&self.inner.variant)
-            .map_err(RattlerBuildError::from)?;
+        let json_value =
+            serde_json::to_value(&self.inner.variant).map_err(RattlerBuildError::from)?;
         Ok(pythonize::pythonize(py, &json_value)
             .map(|obj| obj.into())
             .map_err(|e| {
@@ -800,11 +802,7 @@ impl PyBuildConfiguration {
 
     #[getter]
     fn channels(&self) -> Vec<String> {
-        self.inner
-            .channels
-            .iter()
-            .map(|c| c.to_string())
-            .collect()
+        self.inner.channels.iter().map(|c| c.to_string()).collect()
     }
 
     #[getter]
@@ -851,8 +849,8 @@ impl PyOutput {
 
     #[getter]
     fn recipe(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value = serde_json::to_value(&self.inner.recipe)
-            .map_err(RattlerBuildError::from)?;
+        let json_value =
+            serde_json::to_value(&self.inner.recipe).map_err(RattlerBuildError::from)?;
         Ok(pythonize::pythonize(py, &json_value)
             .map(|obj| obj.into())
             .map_err(|e| {
@@ -875,7 +873,12 @@ impl PyOutput {
 
         run_async_task(async {
             use ::rattler_build::build::WorkingDirectoryBehavior;
-            let (_output, artifact) = run_build(self.inner.clone(), &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+            let (_output, artifact) = run_build(
+                self.inner.clone(),
+                &tool_config,
+                WorkingDirectoryBehavior::Cleanup,
+            )
+            .await?;
             Ok(artifact)
         })
     }
