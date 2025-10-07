@@ -177,23 +177,23 @@ opendal = { version = "0.54.0", default-features = false, features = [
 
 # Rattler crates
 rattler_config = { version = "0.2.11" }
-rattler = { version = "0.37.6", default-features = false, features = [
+rattler = { version = "0.37.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.36", default-features = false }
+rattler_cache = { version = "0.3.37", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.25.4", default-features = false }
-rattler_networking = { version = "0.25.15", default-features = false, features = [
+rattler_index = { version = "0.25.5", default-features = false }
+rattler_networking = { version = "0.25.16", default-features = false, features = [
   "s3",
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.3", default-features = false, features = [
+rattler_upload = { version = "0.3.4", default-features = false, features = [
   "s3",
 ] }
 rattler_redaction = { version = "0.1.12" }
-rattler_repodata_gateway = { version = "0.24.6", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
 ] }
 rattler_sandbox = { version = "0.1.11", default-features = false, features = [
@@ -206,8 +206,8 @@ rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.1.7", default-features = false }
-rattler_package_streaming = { version = "0.23.6", default-features = false }
+rattler_virtual_packages = { version = "2.2.0", default-features = false }
+rattler_package_streaming = { version = "0.23.7", default-features = false }
 rattler_menuinst = "0.2.29"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"

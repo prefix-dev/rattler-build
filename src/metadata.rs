@@ -24,7 +24,7 @@ use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use rattler_virtual_packages::{
-    DetectVirtualPackageError, VirtualPackage, VirtualPackageOverrides,
+    DetectVirtualPackageError, VirtualPackageOverrides, VirtualPackages,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -265,25 +265,25 @@ pub struct PlatformWithVirtualPackages {
     pub virtual_packages: Vec<GenericVirtualPackage>,
 }
 
-impl From<Platform> for PlatformWithVirtualPackages {
-    fn from(platform: Platform) -> Self {
-        Self {
-            platform,
-            virtual_packages: vec![],
-        }
-    }
-}
-
 impl PlatformWithVirtualPackages {
     /// Returns the current platform and the virtual packages available on the
     /// current system.
     pub fn detect(overrides: &VirtualPackageOverrides) -> Result<Self, DetectVirtualPackageError> {
+        let platform = Platform::current();
+        Self::detect_for_platform(platform, overrides)
+    }
+
+    /// Detect the virtual packages for the given platform, filling in defaults where appropriate
+    pub fn detect_for_platform(
+        platform: Platform,
+        overrides: &VirtualPackageOverrides,
+    ) -> Result<Self, DetectVirtualPackageError> {
+        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides)?
+            .into_generic_virtual_packages()
+            .collect();
         Ok(Self {
-            platform: Platform::current(),
-            virtual_packages: VirtualPackage::detect(overrides)?
-                .into_iter()
-                .map(GenericVirtualPackage::from)
-                .collect(),
+            platform,
+            virtual_packages,
         })
     }
 }
