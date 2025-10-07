@@ -165,37 +165,30 @@ impl SandboxConfiguration {
         }
     }
 
-    #[cfg(any(
-        all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "aarch64"),
-        target_os = "macos"
-    ))]
-    /// Get the list of exceptions for the sandbox
-    pub fn exceptions(&self) -> Vec<rattler_sandbox::Exception> {
-        let mut exceptions = Vec::new();
+    /// Convert the sandbox configuration to command-line arguments for the rattler-sandbox executable
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = Vec::new();
+
         if self.allow_network {
-            exceptions.push(rattler_sandbox::Exception::Networking);
+            args.push("--network".to_string());
         }
 
         for path in &self.read {
-            exceptions.push(rattler_sandbox::Exception::Read(
-                path.to_string_lossy().to_string(),
-            ));
+            args.push("--fs-read".to_string());
+            args.push(path.to_string_lossy().to_string());
         }
 
         for path in &self.read_execute {
-            exceptions.push(rattler_sandbox::Exception::ExecuteAndRead(
-                path.to_string_lossy().to_string(),
-            ));
+            args.push("--fs-exec-and-read".to_string());
+            args.push(path.to_string_lossy().to_string());
         }
 
         for path in &self.read_write {
-            exceptions.push(rattler_sandbox::Exception::ReadAndWrite(
-                path.to_string_lossy().to_string(),
-            ));
+            args.push("--fs-write-and-read".to_string());
+            args.push(path.to_string_lossy().to_string());
         }
 
-        exceptions
+        args
     }
 }
 

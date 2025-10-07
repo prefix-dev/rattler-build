@@ -556,6 +556,11 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
+/// Find the rattler-sandbox executable in PATH
+fn find_rattler_sandbox() -> Option<PathBuf> {
+    which::which("rattler-sandbox").ok()
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 async fn run_process_with_replacements(
@@ -572,10 +577,30 @@ async fn run_process_with_replacements(
         ))]
         {
             tracing::info!("{}", sandbox_config);
-            rattler_sandbox::tokio::sandboxed_command(
-                args[0],
-                &sandbox_config.with_cwd(cwd).exceptions(),
-            )
+
+            // Try to find rattler-sandbox executable
+            if let Some(sandbox_exe) = find_rattler_sandbox() {
+                let mut cmd = tokio::process::Command::new(sandbox_exe);
+
+                // Add sandbox configuration arguments
+                let sandbox_args = sandbox_config.with_cwd(cwd).to_args();
+                cmd.args(&sandbox_args);
+
+                // Add the actual command to execute (as positional arguments)
+                cmd.arg(args[0]);
+                cmd.args(&args[1..]);
+
+                cmd
+            } else {
+                tracing::error!("rattler-sandbox executable not found in PATH");
+                tracing::error!(
+                    "Please install it by running: pixi global install rattler-sandbox"
+                );
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "rattler-sandbox executable not found. Please install it with: pixi global install rattler-sandbox",
+                ));
+            }
         }
 
         // If the platform is not supported, log a warning and run the command without sandboxing

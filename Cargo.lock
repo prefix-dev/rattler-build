@@ -827,19 +827,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
-name = "birdcage"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "848df95320021558dd6bb4c26de3fe66724cdcbdbbf3fa720150b52b086ae568"
-dependencies = [
- "bitflags 2.9.4",
- "libc",
- "log",
- "rustix 0.38.44",
- "seccompiler",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4256,7 +4243,6 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "rattler_repodata_gateway",
- "rattler_sandbox",
  "rattler_shell",
  "rattler_solve",
  "rattler_upload",
@@ -4680,18 +4666,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "url",
-]
-
-[[package]]
-name = "rattler_sandbox"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68292c668ef45d693895d7d6c17db5dde1ae84ff8b108cc51fda4610f44834ed"
-dependencies = [
- "birdcage",
- "clap",
- "fs-err",
- "tokio",
 ]
 
 [[package]]
@@ -5382,15 +5356,6 @@ dependencies = [
  "pkcs8",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "seccompiler"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f6575e3c2b3a0fe2ef3e53855b6a8dead7c29f783da5e123d378c8c6a89017e"
-dependencies = [
- "libc",
 ]
 
 [[package]]
