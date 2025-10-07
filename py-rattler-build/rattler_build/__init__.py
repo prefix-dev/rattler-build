@@ -19,7 +19,16 @@ from .recipe import (
     Source,
     TestType,
     TestTypeEnum,
+    SelectorConfig as RecipeSelectorConfig,
+)
+
+from .config import (
     SelectorConfig,
+    VariantConfig,
+    BuildConfiguration,
+    Output,
+    ToolConfiguration,
+    parse_recipe_with_variants,
 )
 
 from . import recipe_generation
@@ -48,7 +57,13 @@ __all__ = [
     "Source",
     "TestType",
     "TestTypeEnum",
+    "RecipeSelectorConfig",
     "SelectorConfig",
+    "VariantConfig",
+    "BuildConfiguration",
+    "Output",
+    "ToolConfiguration",
+    "parse_recipe_with_variants",
 ]
 
 

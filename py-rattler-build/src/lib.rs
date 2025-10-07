@@ -304,6 +304,17 @@ impl PySelectorConfig {
         self.inner.variant = map;
         Ok(())
     }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PySelectorConfig(target_platform='{}', host_platform='{}', build_platform='{}', experimental={}, allow_undefined={})",
+            self.inner.target_platform,
+            self.inner.host_platform,
+            self.inner.build_platform,
+            self.inner.experimental,
+            self.inner.allow_undefined
+        )
+    }
 }
 
 // Bind the get version function to the Python module
@@ -763,6 +774,15 @@ impl PyVariantConfig {
             Ok(None)
         }
     }
+
+    fn __repr__(&self) -> String {
+        let variant_count = self.inner.variants.len();
+        let has_zip_keys = self.inner.zip_keys.is_some();
+        format!(
+            "PyVariantConfig(variants={}, zip_keys={})",
+            variant_count, has_zip_keys
+        )
+    }
 }
 
 /// Python wrapper for BuildConfiguration
@@ -808,6 +828,16 @@ impl PyBuildConfiguration {
     #[getter]
     fn hash(&self) -> String {
         self.inner.hash.hash.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyBuildConfiguration(target_platform='{}', host_platform='{}', build_platform='{}', hash='{}')",
+            self.inner.target_platform,
+            self.inner.host_platform.platform,
+            self.inner.build_platform.platform,
+            self.inner.hash.hash
+        )
     }
 }
 
@@ -898,6 +928,13 @@ impl PyOutput {
 #[derive(Clone)]
 pub struct PyToolConfiguration {
     pub(crate) inner: tool_configuration::Configuration,
+}
+
+#[pymethods]
+impl PyToolConfiguration {
+    fn __repr__(&self) -> String {
+        "PyToolConfiguration()".to_string()
+    }
 }
 
 /// Helper function to create BuildData with sensible defaults for Python API
