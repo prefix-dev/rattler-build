@@ -56,7 +56,7 @@ dprint = ">=0.50.0,<0.51"
 [feature.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
 cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
-cargo-fmt = "cargo fmt"
+cargo-fmt = "cargo fmt && cd py-rattler-build && cargo fmt"
 dprint-check = { cmd = "dprint check --log-level=silent", description = "Check formatting with dprint" }
 dprint-fmt = { cmd = "dprint fmt --incremental=false", description = "Format with dprint" }
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
