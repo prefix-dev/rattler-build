@@ -39,7 +39,7 @@ zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
 
 [package]
 name = "rattler-build"
-version = "0.47.1"
+version = "0.48.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -91,28 +91,26 @@ name = "patch-apply-gen-test-data"
 path = "./scripts/patch-apply-gen-test-data.rs"
 
 [dependencies]
-serde = { version = "1.0.219", features = ["derive"] }
-serde_yaml = "0.9.34"
+serde = { workspace = true }
+serde_yaml = { workspace = true }
 serde-untagged = "0.1.8"
 anyhow = "1.0.99"
 walkdir = "2.5.0"
 hex = "0.4.3"
-serde_json = "1.0.142"
-reqwest = { version = "0.12.23", default-features = false, features = [
-  "multipart",
-] }
-tokio = { version = "1.47.1", features = [
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["multipart"] }
+tokio = { workspace = true, features = [
   "rt",
   "macros",
   "rt-multi-thread",
   "process",
 ] }
-itertools = "0.14.0"
+itertools = { workspace = true }
 content_inspector = "0.2.4"
-serde_with = "3.14.0"
-url = "2.5.4"
-tracing = "0.1.41"
-clap = { version = "4.5.45", features = ["derive", "env", "cargo"] }
+serde_with = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true, features = ["env", "cargo"] }
 minijinja = { version = "2.11.0", features = [
   "unstable_machinery",
   "custom_syntax",
@@ -124,7 +122,7 @@ tracing-subscriber = { version = "0.3.19", features = [
   "json",
 ] }
 marked-yaml = { version = "0.8.0" }
-miette = { version = "7.6.0", features = ["fancy"] }
+miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
 goblin = "0.10.1"
 scroll = "0.13.0"
@@ -132,9 +130,9 @@ pathdiff = "0.2.3"
 comfy-table = "7.1.4"
 futures = "0.3.31"
 indicatif = { version = "0.18.0", features = ["in_memory"] }
-console = { version = "0.16.0", features = ["windows-console-colors"] }
-thiserror = "2.0.16"
-tempfile = "3.21.0"
+console = { version = "0.16.1", features = ["windows-console-colors"] }
+thiserror = "2.0.17"
+tempfile = { workspace = true }
 chrono = "0.4.41"
 sha1 = "0.10.6"
 spdx = "0.12.0"
@@ -143,25 +141,25 @@ globset = "0.4.16"
 clap-verbosity-flag = "3.0.3"
 tracing-core = "0.1.34"
 petgraph = "0.8.2"
-indexmap = "2.11.0"
+indexmap = { workspace = true }
 dunce = "1.0.5"
-fs-err = "3.1.1"
+fs-err = { workspace = true }
 which = "8.0.0"
 clap_complete = "4.5.57"
 clap_complete_nushell = "4.5.8"
 tokio-util = { version = "0.7.16", features = ["codec", "compat"] }
 
-tar = "0.4.44"
-zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
+tar = { workspace = true }
+zip = { workspace = true }
 bzip2 = "0.6.0"
 base64 = "0.22.1"
-flate2 = "1.1.2"
+flate2 = { workspace = true }
 xz2 = "0.1.7"
 zstd = "0.13.3"
-toml = "0.9.5"
+toml = { workspace = true }
 memmap2 = "0.9.7"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
-async-once-cell = "0.5.4"
+async-once-cell = { workspace = true }
 terminal_size = "0.4.3"
 memchr = "2.7.5"
 ratatui = { version = "0.29.0", optional = true }
@@ -171,35 +169,31 @@ throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.14.0", optional = true }
 reflink-copy = "0.1.26"
 rayon = "1.11.0"
-regex = "1.11.1"
-async-recursion = "1.1.1"
+regex = { workspace = true }
+async-recursion = { workspace = true }
 opendal = { version = "0.54.0", default-features = false, features = [
   "services-s3",
 ] }
 
 # Rattler crates
 rattler_config = { version = "0.2.11" }
-rattler = { version = "0.37.6", default-features = false, features = [
+rattler = { version = "0.37.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.36", default-features = false }
-rattler_conda_types = { version = "0.40.0", default-features = false, features = [
-  "rayon",
-] }
-rattler_digest = { version = "1.1.5", default-features = false, features = [
-  "serde",
-] }
-rattler_index = { version = "0.25.4", default-features = false }
-rattler_networking = { version = "0.25.15", default-features = false, features = [
+rattler_cache = { version = "0.3.37", default-features = false }
+rattler_conda_types = { workspace = true, features = ["rayon"] }
+rattler_digest = { workspace = true }
+rattler_index = { version = "0.25.5", default-features = false }
+rattler_networking = { version = "0.25.16", default-features = false, features = [
   "s3",
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.3", default-features = false, features = [
+rattler_upload = { version = "0.3.4", default-features = false, features = [
   "s3",
 ] }
 rattler_redaction = { version = "0.1.12" }
-rattler_repodata_gateway = { version = "0.24.6", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
 ] }
 rattler_sandbox = { version = "0.1.11", default-features = false, features = [
@@ -212,8 +206,8 @@ rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.1.7", default-features = false }
-rattler_package_streaming = { version = "0.23.6", default-features = false }
+rattler_virtual_packages = { version = "2.2.0", default-features = false }
+rattler_package_streaming = { version = "0.23.7", default-features = false }
 rattler_menuinst = "0.2.29"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
@@ -226,7 +220,7 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.18.0"
+sevenz-rust2 = "0.19.1"
 dialoguer = "0.12.0"
 
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
@@ -234,13 +228,13 @@ rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator
 ] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-sha2 = { version = "0.10.9", features = ["asm"] }
+sha2 = { workspace = true, features = ["asm"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-sha2 = { version = "0.10.9" }
+sha2 = { workspace = true }
 
 [dev-dependencies]
-insta = { version = "1.43.1", features = ["yaml", "filters"] }
+insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = "0.26.1"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
