@@ -6,7 +6,7 @@ channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
 preview = ["pixi-build"]
-# This does not seem to work yet?
+# We are using the oldest supported python version as the build variant here
 build-variants = { python = ["3.8"] }
 
 
