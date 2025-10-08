@@ -90,30 +90,20 @@ class TestVariantConfig:
 
     def test_create_config_with_variants(self):
         """Test creating a VariantConfig with variants."""
-        config = VariantConfig(
-            variants={
-                "python": ["3.9", "3.10", "3.11"],
-                "numpy": ["1.21", "1.22"]
-            }
-        )
+        config = VariantConfig(variants={"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.22"]})
         assert len(config.variants) == 2
         assert config.variants["python"] == ["3.9", "3.10", "3.11"]
         assert config.variants["numpy"] == ["1.21", "1.22"]
 
     def test_create_config_with_zip_keys(self):
         """Test creating a VariantConfig with zip_keys."""
-        config = VariantConfig(
-            zip_keys=[["python", "numpy"], ["cuda", "cudnn"]]
-        )
+        config = VariantConfig(zip_keys=[["python", "numpy"], ["cuda", "cudnn"]])
         assert config.zip_keys == [["python", "numpy"], ["cuda", "cudnn"]]
 
     def test_create_config_with_pin_run_as_build(self):
         """Test creating a VariantConfig with pin_run_as_build."""
         config = VariantConfig(
-            pin_run_as_build={
-                "python": Pin(max_pin="x.x"),
-                "numpy": Pin(max_pin="x.x", min_pin="x.x.x.x")
-            }
+            pin_run_as_build={"python": Pin(max_pin="x.x"), "numpy": Pin(max_pin="x.x", min_pin="x.x.x.x")}
         )
         assert "python" in config.pin_run_as_build
         assert "numpy" in config.pin_run_as_build
@@ -140,28 +130,16 @@ class TestVariantConfig:
 
     def test_variant_config_equality(self):
         """Test VariantConfig equality comparison."""
-        config1 = VariantConfig(
-            variants={"python": ["3.9", "3.10"]},
-            zip_keys=[["python", "numpy"]]
-        )
-        config2 = VariantConfig(
-            variants={"python": ["3.9", "3.10"]},
-            zip_keys=[["python", "numpy"]]
-        )
-        config3 = VariantConfig(
-            variants={"python": ["3.9", "3.11"]},
-            zip_keys=[["python", "numpy"]]
-        )
+        config1 = VariantConfig(variants={"python": ["3.9", "3.10"]}, zip_keys=[["python", "numpy"]])
+        config2 = VariantConfig(variants={"python": ["3.9", "3.10"]}, zip_keys=[["python", "numpy"]])
+        config3 = VariantConfig(variants={"python": ["3.9", "3.11"]}, zip_keys=[["python", "numpy"]])
 
         assert config1 == config2
         assert config1 != config3
 
     def test_variant_config_repr(self):
         """Test VariantConfig string representation."""
-        config = VariantConfig(
-            variants={"python": ["3.9"]},
-            pin_run_as_build={"numpy": Pin(max_pin="x.x")}
-        )
+        config = VariantConfig(variants={"python": ["3.9"]}, pin_run_as_build={"numpy": Pin(max_pin="x.x")})
         repr_str = repr(config)
         assert "VariantConfig" in repr_str
 
@@ -175,11 +153,7 @@ class TestVariantConfig:
     def test_variants_with_different_types(self):
         """Test variants with different value types."""
         config = VariantConfig(
-            variants={
-                "python": ["3.9", "3.10"],
-                "cuda_enabled": [True, False],
-                "cuda_version": [11, 12]
-            }
+            variants={"python": ["3.9", "3.10"], "cuda_enabled": [True, False], "cuda_version": [11, 12]}
         )
         assert config.variants["python"] == ["3.9", "3.10"]
         assert config.variants["cuda_enabled"] == [True, False]
@@ -188,16 +162,9 @@ class TestVariantConfig:
     def test_complex_config(self):
         """Test a complex VariantConfig with all fields."""
         config = VariantConfig(
-            pin_run_as_build={
-                "python": Pin(max_pin="x.x"),
-                "numpy": Pin(max_pin="x.x", min_pin="x.x.x.x")
-            },
+            pin_run_as_build={"python": Pin(max_pin="x.x"), "numpy": Pin(max_pin="x.x", min_pin="x.x.x.x")},
             zip_keys=[["python", "numpy"]],
-            variants={
-                "python": ["3.9", "3.10", "3.11"],
-                "numpy": ["1.21", "1.22", "1.23"],
-                "cuda": ["11.8", "12.0"]
-            }
+            variants={"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.22", "1.23"], "cuda": ["11.8", "12.0"]},
         )
 
         # Verify all fields are set correctly
@@ -208,9 +175,7 @@ class TestVariantConfig:
 
     def test_clear_pin_run_as_build(self):
         """Test setting pin_run_as_build to None."""
-        config = VariantConfig(
-            pin_run_as_build={"python": Pin(max_pin="x.x")}
-        )
+        config = VariantConfig(pin_run_as_build={"python": Pin(max_pin="x.x")})
         assert config.pin_run_as_build is not None
 
         config.pin_run_as_build = None
@@ -218,9 +183,7 @@ class TestVariantConfig:
 
     def test_clear_zip_keys(self):
         """Test setting zip_keys to None."""
-        config = VariantConfig(
-            zip_keys=[["python", "numpy"]]
-        )
+        config = VariantConfig(zip_keys=[["python", "numpy"]])
         assert config.zip_keys is not None
 
         config.zip_keys = None
@@ -228,9 +191,7 @@ class TestVariantConfig:
 
     def test_replace_variants(self):
         """Test completely replacing variants."""
-        config = VariantConfig(
-            variants={"python": ["3.9", "3.10"]}
-        )
+        config = VariantConfig(variants={"python": ["3.9", "3.10"]})
         assert "python" in config.variants
 
         config.variants = {"rust": ["1.70", "1.71"]}
@@ -239,21 +200,13 @@ class TestVariantConfig:
 
     def test_empty_variants_dict(self):
         """Test setting variants to an empty dict."""
-        config = VariantConfig(
-            variants={"python": ["3.9", "3.10"]}
-        )
+        config = VariantConfig(variants={"python": ["3.9", "3.10"]})
         config.variants = {}
         assert config.variants == {}
 
     def test_multiple_zip_key_groups(self):
         """Test VariantConfig with multiple zip_key groups."""
-        config = VariantConfig(
-            zip_keys=[
-                ["python", "numpy"],
-                ["cuda", "cudnn"],
-                ["gcc", "gxx"]
-            ]
-        )
+        config = VariantConfig(zip_keys=[["python", "numpy"], ["cuda", "cudnn"], ["gcc", "gxx"]])
         assert len(config.zip_keys) == 3
         assert config.zip_keys[0] == ["python", "numpy"]
         assert config.zip_keys[1] == ["cuda", "cudnn"]
@@ -266,9 +219,7 @@ class TestIntegration:
     def test_pin_in_variant_config_round_trip(self):
         """Test that Pin objects survive round-trip through VariantConfig."""
         original_pin = Pin(max_pin="x.x", min_pin="x.x.x")
-        config = VariantConfig(
-            pin_run_as_build={"python": original_pin}
-        )
+        config = VariantConfig(pin_run_as_build={"python": original_pin})
 
         retrieved_pin = config.pin_run_as_build["python"]
         assert retrieved_pin.max_pin == original_pin.max_pin
@@ -277,9 +228,7 @@ class TestIntegration:
     def test_modify_pin_after_adding_to_config(self):
         """Test that modifying original Pin doesn't affect config."""
         pin = Pin(max_pin="x.x")
-        config = VariantConfig(
-            pin_run_as_build={"python": pin}
-        )
+        config = VariantConfig(pin_run_as_build={"python": pin})
 
         # Modify the original pin
         pin.max_pin = "x.x.x"
@@ -291,15 +240,9 @@ class TestIntegration:
     def test_realistic_python_variant_config(self):
         """Test a realistic Python package variant configuration."""
         config = VariantConfig(
-            pin_run_as_build={
-                "python": Pin(max_pin="x.x"),
-                "numpy": Pin(max_pin="x.x")
-            },
+            pin_run_as_build={"python": Pin(max_pin="x.x"), "numpy": Pin(max_pin="x.x")},
             zip_keys=[["python", "numpy"]],
-            variants={
-                "python": ["3.9", "3.10", "3.11", "3.12"],
-                "numpy": ["1.21", "1.22", "1.23", "1.24"]
-            }
+            variants={"python": ["3.9", "3.10", "3.11", "3.12"], "numpy": ["1.21", "1.22", "1.23", "1.24"]},
         )
 
         assert len(config.variants["python"]) == 4
@@ -313,8 +256,8 @@ class TestIntegration:
             variants={
                 "cuda_compiler_version": ["11.8", "12.0"],
                 "cudnn": ["8.6", "8.8"],
-                "python": ["3.9", "3.10", "3.11"]
-            }
+                "python": ["3.9", "3.10", "3.11"],
+            },
         )
 
         # 2 CUDA versions * 3 Python versions = 6 total variants
@@ -350,12 +293,8 @@ class TestMerge:
 
     def test_merge_pin_run_as_build(self):
         """Test merging pin_run_as_build."""
-        config1 = VariantConfig(
-            pin_run_as_build={"python": Pin(max_pin="x.x")}
-        )
-        config2 = VariantConfig(
-            pin_run_as_build={"numpy": Pin(max_pin="x.x")}
-        )
+        config1 = VariantConfig(pin_run_as_build={"python": Pin(max_pin="x.x")})
+        config2 = VariantConfig(pin_run_as_build={"numpy": Pin(max_pin="x.x")})
 
         config1.merge(config2)
 
@@ -436,10 +375,9 @@ class TestFileLoading:
 
     def test_load_multiple_files_merge(self, variant_configs_dir: Path):
         """Test loading and merging multiple variant config files."""
-        config = VariantConfig.from_files([
-            variant_configs_dir / "simple_variants.yaml",
-            variant_configs_dir / "override_variants.yaml"
-        ])
+        config = VariantConfig.from_files(
+            [variant_configs_dir / "simple_variants.yaml", variant_configs_dir / "override_variants.yaml"]
+        )
 
         # Python should be overridden by second file
         assert config.variants["python"] == ["3.12"]
@@ -452,17 +390,14 @@ class TestFileLoading:
         """Test loading with a specific SelectorConfig."""
         selector_config = SelectorConfig(target_platform="linux-64")
         config = VariantConfig.from_files(
-            [variant_configs_dir / "simple_variants.yaml"],
-            selector_config=selector_config
+            [variant_configs_dir / "simple_variants.yaml"], selector_config=selector_config
         )
 
         assert "python" in config.variants
 
     def test_load_with_string_paths(self, variant_configs_dir: Path):
         """Test loading with string paths instead of Path objects."""
-        config = VariantConfig.from_files([
-            str(variant_configs_dir / "simple_variants.yaml")
-        ])
+        config = VariantConfig.from_files([str(variant_configs_dir / "simple_variants.yaml")])
 
         assert "python" in config.variants
         assert config.variants["python"] == ["3.9", "3.10", "3.11"]
@@ -509,10 +444,7 @@ class TestFileLoading:
     def test_from_file_with_selector(self, variant_configs_dir: Path):
         """Test from_file with a specific SelectorConfig."""
         selector = SelectorConfig(target_platform="linux-64")
-        config = VariantConfig.from_file(
-            variant_configs_dir / "simple_variants.yaml",
-            selector_config=selector
-        )
+        config = VariantConfig.from_file(variant_configs_dir / "simple_variants.yaml", selector_config=selector)
 
         assert "python" in config.variants
         assert config.variants["target_platform"] == ["linux-64"]

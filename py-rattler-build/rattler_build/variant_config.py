@@ -369,10 +369,7 @@ class VariantConfig:
         pin_keys = list(self.pin_run_as_build.keys()) if self.pin_run_as_build else []
         variant_keys = list(self.variants.keys())
         return (
-            f"VariantConfig("
-            f"pin_run_as_build={pin_keys}, "
-            f"zip_keys={self.zip_keys}, "
-            f"variants={variant_keys})"
+            f"VariantConfig(" f"pin_run_as_build={pin_keys}, " f"zip_keys={self.zip_keys}, " f"variants={variant_keys})"
         )
 
     def __eq__(self, other: object) -> bool:
@@ -435,10 +432,7 @@ class VariantConfig:
         self._inner.merge(other._inner)
 
     @staticmethod
-    def from_file(
-        file: Union[str, Path],
-        selector_config: Optional[SelectorConfig] = None
-    ) -> "VariantConfig":
+    def from_file(file: Union[str, Path], selector_config: Optional[SelectorConfig] = None) -> "VariantConfig":
         """Load a VariantConfig from a single YAML file.
 
         This function loads a single variant configuration file. The file can be
@@ -491,10 +485,7 @@ class VariantConfig:
         return result
 
     @staticmethod
-    def from_files(
-        files: List[Union[str, Path]],
-        selector_config: Optional[SelectorConfig] = None
-    ) -> "VariantConfig":
+    def from_files(files: List[Union[str, Path]], selector_config: Optional[SelectorConfig] = None) -> "VariantConfig":
         """Load a VariantConfig from one or more YAML files.
 
         This function loads and merges multiple variant configuration files.
