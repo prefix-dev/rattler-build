@@ -3502,7 +3502,7 @@ packages:
 - conda: .
   name: py-rattler-build
   version: 0.48.0
-  build: hbf21a9e_0
+  build: py38h9af789f_0
   subdir: linux-64
   depends:
   - python >=3.8
@@ -3511,13 +3511,13 @@ packages:
   - __glibc >=2.17
   license: BSD-3-Clause
   input:
-    hash: 6790385aa458658c59b82cb35ad6a23b0cc3feb21123adeff75f5e5f01ae1a95
+    hash: e4cd2238b98dedd3e0c7267199cc70ba740b547dfe6fdd627700a1c09ffad58a
     globs:
     - pyproject.toml
 - conda: .
   name: py-rattler-build
   version: 0.48.0
-  build: hbf21a9e_0
+  build: py38h9af789f_0
   subdir: osx-64
   depends:
   - python >=3.8
@@ -3526,13 +3526,13 @@ packages:
   - __osx >=10.13
   license: BSD-3-Clause
   input:
-    hash: 6790385aa458658c59b82cb35ad6a23b0cc3feb21123adeff75f5e5f01ae1a95
+    hash: e4cd2238b98dedd3e0c7267199cc70ba740b547dfe6fdd627700a1c09ffad58a
     globs:
     - pyproject.toml
 - conda: .
   name: py-rattler-build
   version: 0.48.0
-  build: hbf21a9e_0
+  build: py38h9af789f_0
   subdir: osx-arm64
   depends:
   - python >=3.8
@@ -3541,20 +3541,20 @@ packages:
   - __osx >=11.0
   license: BSD-3-Clause
   input:
-    hash: 6790385aa458658c59b82cb35ad6a23b0cc3feb21123adeff75f5e5f01ae1a95
+    hash: e4cd2238b98dedd3e0c7267199cc70ba740b547dfe6fdd627700a1c09ffad58a
     globs:
     - pyproject.toml
 - conda: .
   name: py-rattler-build
   version: 0.48.0
-  build: hbf21a9e_0
+  build: py38h9af789f_0
   subdir: win-64
   depends:
   - python >=3.8
   - python_abi 3.8.* *_cp38
   license: BSD-3-Clause
   input:
-    hash: 6790385aa458658c59b82cb35ad6a23b0cc3feb21123adeff75f5e5f01ae1a95
+    hash: e4cd2238b98dedd3e0c7267199cc70ba740b547dfe6fdd627700a1c09ffad58a
     globs:
     - pyproject.toml
 - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda

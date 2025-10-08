@@ -7,7 +7,7 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
 preview = ["pixi-build"]
 # This does not seem to work yet?
-# build-variants = { python = ["3.8"] }
+build-variants = { python = ["3.8"] }
 
 
 [package]
@@ -21,7 +21,7 @@ backend = { name = "pixi-build-python", version = "*" }
 compilers = ["rust"]
 
 [package.host-dependencies]
-python = "3.8.*"
+python = "*"
 maturin = "~=1.2.2"
 
 [package.target.linux.build-dependencies]
