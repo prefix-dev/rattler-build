@@ -383,6 +383,16 @@ impl VariantConfig {
             final_config.merge(config);
         }
 
+        // always insert target_platform and build_platform, even if we didn't load any files
+        final_config.variants.insert(
+            "target_platform".into(),
+            vec![selector_config.target_platform.to_string().into()],
+        );
+        final_config.variants.insert(
+            "build_platform".into(),
+            vec![selector_config.build_platform.to_string().into()],
+        );
+
         Ok(final_config)
     }
 
