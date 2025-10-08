@@ -1,13 +1,13 @@
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use pyo3::prelude::*;
+use crate::PySelectorConfig;
+use crate::error::RattlerBuildError;
 use ::rattler_build::{
     NormalizedKey,
-    variant_config::{Pin as RustPin, VariantConfig as RustVariantConfig},
     recipe::variable::Variable,
+    variant_config::{Pin as RustPin, VariantConfig as RustVariantConfig},
 };
-use crate::error::RattlerBuildError;
-use crate::PySelectorConfig;
+use pyo3::prelude::*;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 /// Python wrapper for Pin struct
 #[pyclass(name = "PyPin")]
@@ -22,10 +22,7 @@ impl PyPin {
     #[pyo3(signature = (max_pin=None, min_pin=None))]
     fn new(max_pin: Option<String>, min_pin: Option<String>) -> Self {
         PyPin {
-            inner: RustPin {
-                max_pin,
-                min_pin,
-            },
+            inner: RustPin { max_pin, min_pin },
         }
     }
 
@@ -50,7 +47,10 @@ impl PyPin {
     }
 
     fn __repr__(&self) -> String {
-        format!("Pin(max_pin={:?}, min_pin={:?})", self.inner.max_pin, self.inner.min_pin)
+        format!(
+            "Pin(max_pin={:?}, min_pin={:?})",
+            self.inner.max_pin, self.inner.min_pin
+        )
     }
 }
 
@@ -72,20 +72,13 @@ impl PyVariantConfig {
         variants: Option<BTreeMap<String, Vec<Py<PyAny>>>>,
     ) -> PyResult<Self> {
         // Convert pin_run_as_build from Python wrapper to Rust
-        let pin_run_as_build = pin_run_as_build.map(|map| {
-            map.into_iter()
-                .map(|(k, v)| (k, v.inner.clone()))
-                .collect()
-        });
+        let pin_run_as_build = pin_run_as_build
+            .map(|map| map.into_iter().map(|(k, v)| (k, v.inner.clone())).collect());
 
         // Convert zip_keys from String to NormalizedKey
         let zip_keys = zip_keys.map(|keys| {
             keys.into_iter()
-                .map(|inner_vec| {
-                    inner_vec.into_iter()
-                        .map(NormalizedKey::from)
-                        .collect()
-                })
+                .map(|inner_vec| inner_vec.into_iter().map(NormalizedKey::from).collect())
                 .collect()
         });
 
@@ -97,8 +90,8 @@ impl PyVariantConfig {
                 let mut variables = Vec::new();
 
                 for py_value in value_list {
-                    let json_val: serde_json::Value =
-                        pythonize::depythonize(py_value.bind(py)).map_err(|e| {
+                    let json_val: serde_json::Value = pythonize::depythonize(py_value.bind(py))
+                        .map_err(|e| {
                             RattlerBuildError::Variant(format!(
                                 "Failed to convert variant value: {}",
                                 e
@@ -151,22 +144,15 @@ impl PyVariantConfig {
 
     #[setter]
     fn set_pin_run_as_build(&mut self, value: Option<BTreeMap<String, PyRef<PyPin>>>) {
-        self.inner.pin_run_as_build = value.map(|map| {
-            map.into_iter()
-                .map(|(k, v)| (k, v.inner.clone()))
-                .collect()
-        });
+        self.inner.pin_run_as_build =
+            value.map(|map| map.into_iter().map(|(k, v)| (k, v.inner.clone())).collect());
     }
 
     #[getter]
     fn zip_keys(&self) -> Option<Vec<Vec<String>>> {
         self.inner.zip_keys.as_ref().map(|keys| {
             keys.iter()
-                .map(|inner_vec| {
-                    inner_vec.iter()
-                        .map(|nk| nk.normalize())
-                        .collect()
-                })
+                .map(|inner_vec| inner_vec.iter().map(|nk| nk.normalize()).collect())
                 .collect()
         })
     }
@@ -175,18 +161,16 @@ impl PyVariantConfig {
     fn set_zip_keys(&mut self, value: Option<Vec<Vec<String>>>) {
         self.inner.zip_keys = value.map(|keys| {
             keys.into_iter()
-                .map(|inner_vec| {
-                    inner_vec.into_iter()
-                        .map(NormalizedKey::from)
-                        .collect()
-                })
+                .map(|inner_vec| inner_vec.into_iter().map(NormalizedKey::from).collect())
                 .collect()
         });
     }
 
     #[getter]
     fn variants(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_variants: BTreeMap<String, Vec<serde_json::Value>> = self.inner.variants
+        let json_variants: BTreeMap<String, Vec<serde_json::Value>> = self
+            .inner
+            .variants
             .iter()
             .map(|(k, v)| {
                 let values: Result<Vec<serde_json::Value>, RattlerBuildError> = v
@@ -205,15 +189,19 @@ impl PyVariantConfig {
     }
 
     #[setter]
-    fn set_variants(&mut self, py: Python<'_>, value: BTreeMap<String, Vec<Py<PyAny>>>) -> PyResult<()> {
+    fn set_variants(
+        &mut self,
+        py: Python<'_>,
+        value: BTreeMap<String, Vec<Py<PyAny>>>,
+    ) -> PyResult<()> {
         let mut map = BTreeMap::new();
         for (key, value_list) in value {
             let normalized_key = NormalizedKey::from(key);
             let mut variables = Vec::new();
 
             for py_value in value_list {
-                let json_val: serde_json::Value =
-                    pythonize::depythonize(py_value.bind(py)).map_err(|e| {
+                let json_val: serde_json::Value = pythonize::depythonize(py_value.bind(py))
+                    .map_err(|e| {
                         RattlerBuildError::Variant(format!(
                             "Failed to convert variant value: {}",
                             e
@@ -248,7 +236,10 @@ impl PyVariantConfig {
     fn __repr__(&self) -> String {
         format!(
             "VariantConfig(pin_run_as_build={:?}, zip_keys={:?}, variants_keys={:?})",
-            self.inner.pin_run_as_build.as_ref().map(|m| m.keys().collect::<Vec<_>>()),
+            self.inner
+                .pin_run_as_build
+                .as_ref()
+                .map(|m| m.keys().collect::<Vec<_>>()),
             self.inner.zip_keys,
             self.inner.variants.keys().collect::<Vec<_>>()
         )
@@ -269,8 +260,9 @@ impl PyVariantConfig {
     ///     A new PyVariantConfig with the configuration from the file
     #[staticmethod]
     fn from_file(path: PathBuf, selector_config: &PySelectorConfig) -> PyResult<Self> {
-        let config = RustVariantConfig::from_file(&path, &selector_config.inner)
-            .map_err(|e| RattlerBuildError::Variant(format!("Failed to load variant config: {:?}", e)))?;
+        let config = RustVariantConfig::from_file(&path, &selector_config.inner).map_err(|e| {
+            RattlerBuildError::Variant(format!("Failed to load variant config: {:?}", e))
+        })?;
 
         Ok(PyVariantConfig { inner: config })
     }
@@ -289,8 +281,10 @@ impl PyVariantConfig {
     ///     A new PyVariantConfig with the merged configuration
     #[staticmethod]
     fn from_files(files: Vec<PathBuf>, selector_config: &PySelectorConfig) -> PyResult<Self> {
-        let config = RustVariantConfig::from_files(&files, &selector_config.inner)
-            .map_err(|e| RattlerBuildError::Variant(format!("Failed to load variant config: {:?}", e)))?;
+        let config =
+            RustVariantConfig::from_files(&files, &selector_config.inner).map_err(|e| {
+                RattlerBuildError::Variant(format!("Failed to load variant config: {:?}", e))
+            })?;
 
         Ok(PyVariantConfig { inner: config })
     }
