@@ -1,0 +1,13 @@
+python:
+  - "3.9"
+  - "3.10"
+
+cuda_compiler_version:
+  - "11.8"
+  - "12.0"
+
+pin_run_as_build:
+  python:
+    max_pin: x.x
+  numpy:
+    max_pin: x.x

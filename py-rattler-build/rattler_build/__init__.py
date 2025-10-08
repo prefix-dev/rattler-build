@@ -22,6 +22,11 @@ from .recipe import (
     SelectorConfig,
 )
 
+from .variant_config import (
+    Pin,
+    VariantConfig,
+)
+
 from . import recipe_generation
 
 
@@ -49,6 +54,8 @@ __all__ = [
     "TestType",
     "TestTypeEnum",
     "SelectorConfig",
+    "Pin",
+    "VariantConfig",
 ]
 
 

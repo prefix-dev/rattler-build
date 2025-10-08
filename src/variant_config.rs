@@ -241,17 +241,45 @@ impl<S: SourceCode> From<ParseConfigBuildConfigError> for VariantConfigError<S> 
 }
 
 impl VariantConfig {
+    /// Merge another variant configuration into this one.
+    /// - Variants are extended (keys from `other` replace keys in `self`)
+    /// - pin_run_as_build entries are extended
+    /// - zip_keys are replaced (not merged)
+    pub fn merge(&mut self, other: VariantConfig) {
+        self.variants.extend(other.variants);
+        if let Some(other_pin_run_as_build) = other.pin_run_as_build {
+            if let Some(self_pin_run_as_build) = &mut self.pin_run_as_build {
+                self_pin_run_as_build.extend(other_pin_run_as_build);
+            } else {
+                self.pin_run_as_build = Some(other_pin_run_as_build);
+            }
+        }
+        self.zip_keys = other.zip_keys;
+    }
+
     /// This function loads a single variant configuration file and returns the
-    /// configuration.
-    fn load_file(
+    /// configuration with target_platform and build_platform already inserted.
+    pub fn from_file(
         path: &Path,
         selector_config: &SelectorConfig,
     ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
-        if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
-            Ok(load_conda_build_config(path, selector_config)?)
+        let mut config = if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
+            load_conda_build_config(path, selector_config)?
         } else {
-            Self::load_variant_config(path, selector_config)
-        }
+            Self::load_variant_config(path, selector_config)?
+        };
+
+        // always insert target_platform and build_platform
+        config.variants.insert(
+            "target_platform".into(),
+            vec![selector_config.target_platform.to_string().into()],
+        );
+        config.variants.insert(
+            "build_platform".into(),
+            vec![selector_config.build_platform.to_string().into()],
+        );
+
+        Ok(config)
     }
 
     fn load_variant_config(
@@ -347,36 +375,13 @@ impl VariantConfig {
         files: &[PathBuf],
         selector_config: &SelectorConfig,
     ) -> Result<Self, VariantConfigError<Arc<str>>> {
-        let mut variant_configs = Vec::new();
+        let mut final_config = VariantConfig::default();
 
         for filename in files {
             tracing::info!("Loading variant config file: {:?}", filename);
-            let config = Self::load_file(filename, selector_config)?;
-            variant_configs.push(config);
+            let config = Self::from_file(filename, selector_config)?;
+            final_config.merge(config);
         }
-
-        let mut final_config = VariantConfig::default();
-        for config in variant_configs {
-            final_config.variants.extend(config.variants);
-            if let Some(pin_run_as_build) = config.pin_run_as_build {
-                if let Some(final_pin_run_as_build) = &mut final_config.pin_run_as_build {
-                    final_pin_run_as_build.extend(pin_run_as_build);
-                } else {
-                    final_config.pin_run_as_build = Some(pin_run_as_build);
-                }
-            }
-            final_config.zip_keys = config.zip_keys;
-        }
-
-        // always insert target_platform and build_platform
-        final_config.variants.insert(
-            "target_platform".into(),
-            vec![selector_config.target_platform.to_string().into()],
-        );
-        final_config.variants.insert(
-            "build_platform".into(),
-            vec![selector_config.build_platform.to_string().into()],
-        );
 
         Ok(final_config)
     }
