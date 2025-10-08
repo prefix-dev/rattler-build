@@ -17,6 +17,7 @@ use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
 
+use super::custom_yaml::ScalarNode;
 use super::parser::{Dependency, PinCompatible, PinSubpackage};
 use super::variable::Variable;
 
@@ -52,6 +53,38 @@ impl InternalRepr {
 pub struct Jinja {
     env: Environment<'static>,
     context: BTreeMap<String, Value>,
+}
+
+/// If we have a template that is _only_ an expression, we want to strip the
+/// `${{` and `}}` from it so that we can evaluate it as an expression instead of
+/// rendering it as a string.
+///
+/// The function checks for:
+/// - Whitespace before/after the expression
+/// - Single expression with no nested expressions
+/// - Proper opening `${{` and closing `}}`
+fn strip_expression(template: &str) -> Option<&str> {
+    let trimmed = template.trim();
+    if !trimmed.starts_with("${{") || !trimmed.ends_with("}}") {
+        return None;
+    }
+
+    // Extract content between ${{ and }}
+    let content = &trimmed[3..trimmed.len() - 2];
+    let content_trimmed = content.trim();
+
+    // If, after stripping ${{}} and trimming, the expression is empty,
+    // it's not a valid expression to compile. Treat it as if it wasn't an expression block.
+    if content_trimmed.is_empty() {
+        return None;
+    }
+
+    // Check for nested expressions
+    if content_trimmed.contains("${{") || content_trimmed.contains("}}") {
+        return None;
+    }
+
+    Some(content_trimmed)
 }
 
 impl Jinja {
@@ -94,9 +127,54 @@ impl Jinja {
         &mut self.context
     }
 
+    /// Render the given template to a Jinja value.
+    pub fn render_to_value(
+        &self,
+        template_node: &ScalarNode,
+    ) -> Result<(Value, bool), minijinja::Error> {
+        let template_str = template_node.as_str();
+        if let Some(simple_expr) = strip_expression(template_str) {
+            let expr = self.env.compile_expression(simple_expr)?;
+            let evaled = expr.eval(self.context())?;
+            // If the expression evaluated to a String, it's considered a final string value.
+            // The associated bool (false) means it should not be further type-coerced by recipe logic.
+            if evaled.kind() == minijinja::value::ValueKind::String {
+                return Ok((evaled, false));
+            } else {
+                // For non-string results (bool, number, etc.), its further coercibility
+                // depends on the original YAML scalar's coercibility.
+                return Ok((evaled, template_node.may_coerce));
+            }
+        }
+
+        // Otherwise just render it as string
+        let rendered_as_string = self.env.render_str(template_str, &self.context)?;
+        Ok((
+            Value::from(rendered_as_string),
+            !template_str.contains("${{") && template_node.may_coerce,
+        ))
+    }
+
     /// Render a template with the current context.
-    pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
-        self.env.render_str(template, &self.context)
+    pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
+        if let Some(simple_expr) = strip_expression(template) {
+            let expr = self.env.compile_expression(simple_expr)?;
+            let evaled = expr.eval(self.context())?;
+            if evaled.kind() == minijinja::value::ValueKind::String {
+                return Ok((
+                    evaled
+                        .as_str()
+                        .expect("Value kind String implies as_str is Some")
+                        .to_string(),
+                    false,
+                ));
+            } else {
+                return Ok((evaled.to_string(), true));
+            }
+        }
+
+        let rendered_string = self.env.render_str(template, &self.context)?;
+        Ok((rendered_string, !template.contains("${{")))
     }
 
     /// Render, compile and evaluate a expr string with the current context.
@@ -743,7 +821,7 @@ impl Env {
         match std::env::var(env_var) {
             Ok(r) => Ok(Value::from(r)),
             Err(_) => match default_value {
-                Some(default_value) => Ok(Value::from(default_value)),
+                Some(default_value) => Ok(Value::from_safe_string(default_value)),
                 None => Err(minijinja::Error::new(
                     minijinja::ErrorKind::InvalidOperation,
                     format!("Environment variable {env_var} not found"),
@@ -1367,5 +1445,24 @@ mod tests {
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
         );
+    }
+
+    #[test]
+    fn test_strip_expression() {
+        // Valid cases
+        assert_eq!(strip_expression("${{ expr }}"), Some("expr"));
+        assert_eq!(strip_expression("  ${{ expr }}  "), Some("expr"));
+        assert_eq!(strip_expression("${{expr}}"), Some("expr"));
+        assert_eq!(
+            strip_expression("${{ expr with spaces }}"),
+            Some("expr with spaces")
+        );
+
+        // Invalid cases
+        assert_eq!(strip_expression("not an expression"), None);
+        assert_eq!(strip_expression("${{ nested ${{ expr }} }}"), None);
+        assert_eq!(strip_expression("${{ unmatched"), None);
+        assert_eq!(strip_expression("unmatched }}"), None);
+        assert_eq!(strip_expression("text ${{ expr }} text"), None);
     }
 }

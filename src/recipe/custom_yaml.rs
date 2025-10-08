@@ -154,7 +154,7 @@ impl Render<Node> for Node {
 
 impl Render<Node> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -165,7 +165,7 @@ impl Render<Node> for ScalarNode {
         Ok(Node::from(ScalarNode::new(
             *self.span(),
             rendered,
-            self.may_coerce,
+            self.may_coerce && may_coerce,
         )))
     }
 }
@@ -176,7 +176,7 @@ impl Render<Option<ScalarNode>> for ScalarNode {
         jinja: &Jinja,
         _name: &str,
     ) -> Result<std::option::Option<ScalarNode>, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -190,7 +190,7 @@ impl Render<Option<ScalarNode>> for ScalarNode {
             Ok(Some(ScalarNode::new(
                 *self.span(),
                 rendered,
-                self.may_coerce,
+                self.may_coerce && may_coerce,
             )))
         }
     }
@@ -387,7 +387,16 @@ impl TryFrom<&marked_yaml::Node> for Node {
 pub struct ScalarNode {
     span: marked_yaml::Span,
     value: String,
-    may_coerce: bool,
+    pub(crate) may_coerce: bool,
+}
+
+/// Convert a string to a boolean
+pub fn string_to_bool(value: &str) -> Option<bool> {
+    match value {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
+    }
 }
 
 impl ScalarNode {
@@ -426,11 +435,8 @@ impl ScalarNode {
         if !self.may_coerce {
             return None;
         }
-        match self.value.as_str() {
-            "true" | "True" | "TRUE" => Some(true),
-            "false" | "False" | "FALSE" => Some(false),
-            _ => None,
-        }
+
+        string_to_bool(&self.value)
     }
 
     /// Convert the scalar node to an integer and follow coercion rules
@@ -1376,5 +1382,36 @@ impl TryConvertNode<VersionWithSource> for RenderedScalarNode {
                 )
             })
             .map_err(|e| vec![e])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_string_to_bool_true_values() {
+        assert_eq!(string_to_bool("true"), Some(true));
+        assert_eq!(string_to_bool("True"), Some(true));
+        assert_eq!(string_to_bool("TRUE"), Some(true));
+    }
+
+    #[test]
+    fn test_string_to_bool_false_values() {
+        assert_eq!(string_to_bool("false"), Some(false));
+        assert_eq!(string_to_bool("False"), Some(false));
+        assert_eq!(string_to_bool("FALSE"), Some(false));
+    }
+
+    #[test]
+    fn test_string_to_bool_none_values() {
+        assert_eq!(string_to_bool("tRuE"), None);
+        assert_eq!(string_to_bool("fAlSe"), None);
+        assert_eq!(string_to_bool("yes"), None);
+        assert_eq!(string_to_bool("no"), None);
+        assert_eq!(string_to_bool("1"), None);
+        assert_eq!(string_to_bool("0"), None);
+        assert_eq!(string_to_bool(""), None);
+        assert_eq!(string_to_bool("  true  "), None);
     }
 }
