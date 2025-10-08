@@ -5,22 +5,30 @@ authors = ["Wolf Vollprecht <wolf@prefix.dev>"]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
+preview = ["pixi-build"]
+# This does not seem to work yet?
+# build-variants = { python = ["3.8"] }
 
-[tasks]
 
-[feature.build.dependencies]
+[package]
+name = "py-rattler-build"
+version = "0.48.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "*" }
+
+[package.build.config]
+compilers = ["rust"]
+
+[package.host-dependencies]
+python = "3.8.*"
 maturin = "~=1.2.2"
-pip = "~=23.2.1"
-rust = ">=1.86.0,<1.87"
 
-[feature.build.tasks]
-build = "PIP_REQUIRE_VIRTUALENV=false maturin develop"
-build-release = "PIP_REQUIRE_VIRTUALENV=false maturin develop --release"
-
-[feature.build.target.linux-64.dependencies]
+[package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
 
 [feature.test.dependencies]
+py-rattler-build = { path = "." }
 lua = "*"
 # Python 3.8 is the minimum supported version, so we use that for testing
 python = "3.8.*"
@@ -46,8 +54,8 @@ fmt-rust = "cargo fmt --all"
 lint = { depends-on = ["type-check", "lint-python", "lint-rust"] }
 lint-python = "ruff check ."
 lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
-test = { cmd = "pytest --doctest-modules", depends-on = ["build"] }
-type-check = { cmd = "mypy", depends-on = ["build"] }
+test = { cmd = "pytest --doctest-modules" }
+type-check = { cmd = "mypy" }
 
 # checks for the CI
 fmt-rust-check = "cargo fmt --all --check"
@@ -68,7 +76,7 @@ docs = { cmd = "mkdocs serve" }
 build-docs = { cmd = "mkdocs build" }
 
 [environments]
-test = { features = ["build", "test"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
 docs = ["docs"]
 
 [dependencies]
