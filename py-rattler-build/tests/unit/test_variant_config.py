@@ -105,6 +105,7 @@ class TestVariantConfig:
         config = VariantConfig(
             pin_run_as_build={"python": Pin(max_pin="x.x"), "numpy": Pin(max_pin="x.x", min_pin="x.x.x.x")}
         )
+        assert config.pin_run_as_build is not None
         assert "python" in config.pin_run_as_build
         assert "numpy" in config.pin_run_as_build
         assert config.pin_run_as_build["python"].max_pin == "x.x"
@@ -168,6 +169,7 @@ class TestVariantConfig:
         )
 
         # Verify all fields are set correctly
+        assert config.pin_run_as_build is not None
         assert len(config.pin_run_as_build) == 2
         assert config.zip_keys == [["python", "numpy"]]
         assert len(config.variants) == 3
@@ -207,6 +209,7 @@ class TestVariantConfig:
     def test_multiple_zip_key_groups(self) -> None:
         """Test VariantConfig with multiple zip_key groups."""
         config = VariantConfig(zip_keys=[["python", "numpy"], ["cuda", "cudnn"], ["gcc", "gxx"]])
+        assert config.zip_keys is not None
         assert len(config.zip_keys) == 3
         assert config.zip_keys[0] == ["python", "numpy"]
         assert config.zip_keys[1] == ["cuda", "cudnn"]
@@ -221,6 +224,7 @@ class TestIntegration:
         original_pin = Pin(max_pin="x.x", min_pin="x.x.x")
         config = VariantConfig(pin_run_as_build={"python": original_pin})
 
+        assert config.pin_run_as_build is not None
         retrieved_pin = config.pin_run_as_build["python"]
         assert retrieved_pin.max_pin == original_pin.max_pin
         assert retrieved_pin.min_pin == original_pin.min_pin
@@ -235,6 +239,7 @@ class TestIntegration:
 
         # Config should still have the original value
         # Note: This depends on whether we copy or reference
+        assert config.pin_run_as_build is not None
         assert config.pin_run_as_build["python"].max_pin == "x.x"
 
     def test_realistic_python_variant_config(self) -> None:
@@ -298,6 +303,7 @@ class TestMerge:
 
         config1.merge(config2)
 
+        assert config1.pin_run_as_build is not None
         assert "python" in config1.pin_run_as_build
         assert "numpy" in config1.pin_run_as_build
 
