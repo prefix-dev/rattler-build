@@ -39,7 +39,7 @@ zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
 
 [package]
 name = "rattler-build"
-version = "0.48.0"
+version = "0.48.1"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
