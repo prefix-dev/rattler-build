@@ -78,7 +78,7 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patch_from_bytes(input: &[u8]) -> Result<Patch<[u8]>, diffy::ParsePatchError> {
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchError> {
     diffy::patch_from_bytes_with_config(
         input,
         diffy::ParserConfig {

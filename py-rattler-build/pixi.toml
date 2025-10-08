@@ -9,11 +9,6 @@ preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
 build-variants = { python = ["3.8"] }
 
-
-[package]
-name = "py-rattler-build"
-version = "0.48.0"
-
 [package.build]
 backend = { name = "pixi-build-python", version = "*" }
 
