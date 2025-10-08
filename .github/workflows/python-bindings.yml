@@ -38,16 +38,16 @@ jobs:
       - name: Check formatting
         working-directory: py-rattler-build
         run: |
-          pixi run -e test fmt-check
+          pixi run fmt-check
       - name: Check Cargo.lock
         working-directory: py-rattler-build
         run: |
-          pixi run -e test check-cargo-lock
+          pixi run check-cargo-lock
       - name: Lint
         working-directory: py-rattler-build
         run: |
-          pixi run -e test lint
+          pixi run lint
       - name: Run tests
         working-directory: py-rattler-build
         run: |
-          pixi run -e test test --color=yes
+          pixi run test --color=yes
