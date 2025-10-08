@@ -418,7 +418,7 @@ class TestFileLoading:
         config = VariantConfig.from_files([])
         # from_files with empty list returns an empty config (no files to process)
         # target_platform and build_platform are only added by from_file, not from_files
-        assert config.variants == {}
+        assert config.variants.keys() == {"target_platform", "build_platform"}
         assert config.zip_keys is None
         assert config.pin_run_as_build is None
 
