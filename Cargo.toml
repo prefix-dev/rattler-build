@@ -196,9 +196,6 @@ rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.11", default-features = false, features = [
-  "tokio",
-] }
 rattler_shell = { version = "0.25.2", default-features = false, features = [
   "sysinfo",
 ] }

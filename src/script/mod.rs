@@ -556,6 +556,11 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
+/// Find the rattler-sandbox executable in PATH
+fn find_rattler_sandbox() -> Option<PathBuf> {
+    which::which("rattler-sandbox").ok()
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 async fn run_process_with_replacements(
@@ -565,30 +570,28 @@ async fn run_process_with_replacements(
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
     let mut command = if let Some(sandbox_config) = sandbox_config {
-        #[cfg(any(
-            all(target_os = "linux", target_arch = "x86_64"),
-            all(target_os = "linux", target_arch = "aarch64"),
-            target_os = "macos"
-        ))]
-        {
-            tracing::info!("{}", sandbox_config);
-            rattler_sandbox::tokio::sandboxed_command(
-                args[0],
-                &sandbox_config.with_cwd(cwd).exceptions(),
-            )
-        }
+        tracing::info!("{}", sandbox_config);
 
-        // If the platform is not supported, log a warning and run the command without sandboxing
-        #[cfg(not(any(
-            all(target_os = "linux", target_arch = "x86_64"),
-            all(target_os = "linux", target_arch = "aarch64"),
-            target_os = "macos"
-        )))]
-        {
-            tracing::warn!("Sandboxing is not supported on this platform");
-            // mark variable as used
-            let _ = sandbox_config;
-            tokio::process::Command::new(args[0])
+        // Try to find rattler-sandbox executable
+        if let Some(sandbox_exe) = find_rattler_sandbox() {
+            let mut cmd = tokio::process::Command::new(sandbox_exe);
+
+            // Add sandbox configuration arguments
+            let sandbox_args = sandbox_config.with_cwd(cwd).to_args();
+            cmd.args(&sandbox_args);
+
+            // Add the actual command to execute (as positional arguments)
+            cmd.arg(args[0]);
+            cmd.args(&args[1..]);
+
+            cmd
+        } else {
+            tracing::error!("rattler-sandbox executable not found in PATH");
+            tracing::error!("Please install it by running: pixi global install rattler-sandbox");
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "rattler-sandbox executable not found. Please install it with: pixi global install rattler-sandbox",
+            ));
         }
     } else {
         tokio::process::Command::new(args[0])
