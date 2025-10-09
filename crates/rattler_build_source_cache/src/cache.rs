@@ -568,7 +568,7 @@ fn extract_zip(archive: &Path, target: &Path) -> Result<(), CacheError> {
 }
 
 fn extract_7z(archive: &Path, target: &Path) -> Result<(), CacheError> {
-    sevenz_rust::decompress_file(archive, target)
+    sevenz_rust2::decompress_file(archive, target)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to extract 7z: {}", e)))?;
 
     Ok(())

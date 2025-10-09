@@ -33,7 +33,7 @@ tracing = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 walkdir = { workspace = true }
 zip = { workspace = true }
-sevenz-rust = { workspace = true }
+sevenz-rust2 = { workspace = true }
 tar = { workspace = true }
 flate2 = { workspace = true }
 bzip2 = { workspace = true }
