@@ -27,6 +27,31 @@ from .variant_config import (
     VariantConfig,
 )
 
+from .sandbox_config import (
+    SandboxConfig,
+)
+
+from .directories import (
+    Directories,
+)
+
+from .packaging_settings import (
+    PackagingConfig,
+    ArchiveType,
+)
+
+from .debug import (
+    Debug,
+)
+
+from .test_configuration import (
+    TestConfig,
+)
+
+from .build_configuration import (
+    BuildConfig,
+)
+
 from . import recipe_generation
 
 
@@ -56,6 +81,13 @@ __all__ = [
     "SelectorConfig",
     "Pin",
     "VariantConfig",
+    "SandboxConfig",
+    "Directories",
+    "PackagingConfig",
+    "ArchiveType",
+    "Debug",
+    "TestConfig",
+    "BuildConfig",
 ]
 
 

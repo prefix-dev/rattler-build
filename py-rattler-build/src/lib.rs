@@ -36,6 +36,24 @@ use error::RattlerBuildError;
 mod variant_config;
 use variant_config::{PyPin, PyVariantConfig};
 
+mod sandbox_config;
+use sandbox_config::PySandboxConfig;
+
+mod directories;
+use directories::PyDirectories;
+
+mod packaging_settings;
+use packaging_settings::{PyArchiveType, PyPackagingConfig};
+
+mod debug;
+use debug::PyDebug;
+
+mod test_configuration;
+use test_configuration::PyTestConfig;
+
+mod build_configuration;
+use build_configuration::PyBuildConfig;
+
 /// Execute async tasks in Python bindings with proper error handling
 fn run_async_task<F, R>(future: F) -> PyResult<R>
 where
@@ -731,6 +749,13 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_class::<PySelectorConfig>()?;
     m.add_class::<PyPin>()?;
     m.add_class::<PyVariantConfig>()?;
+    m.add_class::<PySandboxConfig>()?;
+    m.add_class::<PyDirectories>()?;
+    m.add_class::<PyArchiveType>()?;
+    m.add_class::<PyPackagingConfig>()?;
+    m.add_class::<PyDebug>()?;
+    m.add_class::<PyTestConfig>()?;
+    m.add_class::<PyBuildConfig>()?;
 
     Ok(())
 }
