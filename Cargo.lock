@@ -973,40 +973,11 @@ dependencies = [
 
 [[package]]
 name = "bzip2"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdb116a6ef3f6c3698828873ad02c3014b3c85cadb88496095628e3ef1e347f8"
-dependencies = [
- "bzip2-sys",
- "libc",
-]
-
-[[package]]
-name = "bzip2"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49ecfb22d906f800d4fe833b6282cf4dc1c298f5057ca0b5445e5c209735ca47"
-dependencies = [
- "bzip2-sys",
-]
-
-[[package]]
-name = "bzip2"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bea8dcd42434048e4f7a304411d9273a411f647446c1234a65ce0554923f4cff"
 dependencies = [
  "libbz2-rs-sys",
-]
-
-[[package]]
-name = "bzip2-sys"
-version = "0.1.13+1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225bff33b2141874fe80d71e07d6eec4f85c5c216453dd96388240f96e1acc14"
-dependencies = [
- "cc",
- "pkg-config",
 ]
 
 [[package]]
@@ -1237,7 +1208,7 @@ version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef8a506ec4b81c460798f572caead636d57d3d7e940f998160f52bd254bf2d23"
 dependencies = [
- "bzip2 0.6.0",
+ "bzip2",
  "compression-core",
  "flate2",
  "memchr",
@@ -1275,7 +1246,6 @@ dependencies = [
  "encode_unicode",
  "libc",
  "once_cell",
- "unicode-width 0.2.0",
  "windows-sys 0.59.0",
 ]
 
@@ -1317,12 +1287,6 @@ dependencies = [
  "once_cell",
  "tiny-keccak",
 ]
-
-[[package]]
-name = "constant_time_eq"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "content_inspector"
@@ -1662,12 +1626,6 @@ dependencies = [
  "sha2",
  "zeroize",
 ]
-
-[[package]]
-name = "deflate64"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26bf8fc351c5ed29b5c2f0cbbac1b209b74f60ecd62e675a998df72c49af5204"
 
 [[package]]
 name = "der"
@@ -2858,19 +2816,6 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "183b3088984b400f4cfac3620d5e076c84da5364016b4f49473de574b2586235"
-dependencies = [
- "console 0.15.11",
- "number_prefix",
- "portable-atomic",
- "unicode-width 0.2.0",
- "web-time",
-]
-
-[[package]]
-name = "indicatif"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70a646d946d06bedbbc4cac4c218acf4bbf2d87757a784857025f4d447e4e1cd"
@@ -3222,16 +3167,6 @@ name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
-
-[[package]]
-name = "lzma-rs"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "297e814c836ae64db86b36cf2a557ba54368d03f6afcd7d947c266692f71115e"
-dependencies = [
- "byteorder",
- "crc",
-]
 
 [[package]]
 name = "lzma-rust"
@@ -3591,12 +3526,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "number_prefix"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
-
-[[package]]
 name = "objc2-core-foundation"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3853,16 +3782,6 @@ name = "pathdiff"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
-
-[[package]]
-name = "pbkdf2"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
-dependencies = [
- "digest",
- "hmac",
-]
 
 [[package]]
 name = "percent-encoding"
@@ -4303,7 +4222,7 @@ dependencies = [
  "futures",
  "humantime",
  "indexmap 2.11.4",
- "indicatif 0.18.0",
+ "indicatif",
  "itertools 0.14.0",
  "memchr",
  "memmap2",
@@ -4342,7 +4261,7 @@ dependencies = [
  "async-once-cell",
  "async-recursion",
  "base64",
- "bzip2 0.6.0",
+ "bzip2",
  "chrono",
  "clap",
  "clap-verbosity-flag",
@@ -4365,7 +4284,7 @@ dependencies = [
  "http-range-client",
  "ignore",
  "indexmap 2.11.4",
- "indicatif 0.18.0",
+ "indicatif",
  "insta",
  "itertools 0.14.0",
  "lazy_static",
@@ -4437,7 +4356,7 @@ dependencies = [
  "unicode-normalization",
  "url",
  "walkdir",
- "which 8.0.0",
+ "which",
  "xz2",
  "zip 5.1.1",
  "zstd",
@@ -4479,14 +4398,14 @@ name = "rattler_build_source_cache"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "bzip2 0.4.4",
+ "bzip2",
  "chrono",
  "dunce",
  "file-lock",
  "flate2",
  "fs-err",
  "futures",
- "indicatif 0.17.11",
+ "indicatif",
  "md-5",
  "rattler_git",
  "reqwest",
@@ -4504,7 +4423,7 @@ dependencies = [
  "url",
  "walkdir",
  "xz2",
- "zip 2.4.2",
+ "zip 5.1.1",
  "zstd",
 ]
 
@@ -4636,7 +4555,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
- "which 6.0.3",
+ "which",
 ]
 
 [[package]]
@@ -4654,7 +4573,7 @@ dependencies = [
  "fs-err",
  "futures",
  "fxhash",
- "indicatif 0.18.0",
+ "indicatif",
  "opendal",
  "rattler_conda_types",
  "rattler_digest",
@@ -4709,7 +4628,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "unicode-normalization",
- "which 8.0.0",
+ "which",
  "windows 0.61.3",
  "windows-registry",
 ]
@@ -4752,7 +4671,7 @@ version = "0.23.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f9b332c3e7ee6f9ee631aab31aa725022828928a61d5cb5755f2d6df36778f1"
 dependencies = [
- "bzip2 0.6.0",
+ "bzip2",
  "chrono",
  "fs-err",
  "futures-util",
@@ -4936,7 +4855,7 @@ dependencies = [
  "clap",
  "fs-err",
  "futures",
- "indicatif 0.18.0",
+ "indicatif",
  "miette",
  "opendal",
  "rattler_conda_types",
@@ -5834,7 +5753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7048af9cb3f23ee3315bccaeeef1da33c1b2cad63b8a26ac5b5498b6ef472902"
 dependencies = [
  "aes",
- "bzip2 0.6.0",
+ "bzip2",
  "cbc",
  "crc32fast",
  "getrandom 0.3.3",
@@ -6609,7 +6528,7 @@ version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04d4e11e0e27acef25a47f27e9435355fecdc488867fa2bc90e75b0700d2823d"
 dependencies = [
- "indicatif 0.18.0",
+ "indicatif",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -7108,18 +7027,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32b130c0d2d49f8b6889abc456e795e82525204f27c42cf767cf0d7734e089b8"
 dependencies = [
  "rustls-pki-types",
-]
-
-[[package]]
-name = "which"
-version = "6.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ee928febd44d98f2f459a4a79bd4d928591333a494a10a868418ac1b39cf1f"
-dependencies = [
- "either",
- "home",
- "rustix 0.38.44",
- "winsafe",
 ]
 
 [[package]]
@@ -7880,36 +7787,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "zip"
-version = "2.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
-dependencies = [
- "aes",
- "arbitrary",
- "bzip2 0.5.2",
- "constant_time_eq",
- "crc32fast",
- "crossbeam-utils",
- "deflate64",
- "displaydoc",
- "flate2",
- "getrandom 0.3.3",
- "hmac",
- "indexmap 2.11.4",
- "lzma-rs",
- "memchr",
- "pbkdf2",
- "sha1",
- "thiserror 2.0.17",
- "time",
- "xz2",
- "zeroize",
- "zopfli",
- "zstd",
 ]
 
 [[package]]
