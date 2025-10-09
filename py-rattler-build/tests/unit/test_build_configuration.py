@@ -5,7 +5,6 @@ so these tests document the expected interface rather than test construction.
 """
 
 
-
 class TestBuildConfigInterface:
     """Test suite for BuildConfig interface.
 
@@ -21,31 +20,31 @@ class TestBuildConfigInterface:
 
         # Expected properties (all read-only):
         expected_properties = [
-            "target_platform",      # str
-            "host_platform",        # Dict[str, Any]
-            "build_platform",       # Dict[str, Any]
-            "variant",              # Dict[str, Any]
-            "hash",                 # str
-            "directories",          # Directories
-            "channels",             # List[str]
-            "channel_priority",     # str
-            "solve_strategy",       # str
-            "timestamp",            # str (ISO 8601)
-            "subpackages",          # Dict[str, Dict[str, Any]]
-            "packaging_settings",   # PackagingConfig
-            "store_recipe",         # bool
-            "force_colors",         # bool
-            "sandbox_config",       # Optional[SandboxConfig]
-            "debug",                # Debug
-            "exclude_newer",        # Optional[str]
+            "target_platform",  # str
+            "host_platform",  # Dict[str, Any]
+            "build_platform",  # Dict[str, Any]
+            "variant",  # Dict[str, Any]
+            "hash",  # str
+            "directories",  # Directories
+            "channels",  # List[str]
+            "channel_priority",  # str
+            "solve_strategy",  # str
+            "timestamp",  # str (ISO 8601)
+            "subpackages",  # Dict[str, Dict[str, Any]]
+            "packaging_settings",  # PackagingConfig
+            "store_recipe",  # bool
+            "force_colors",  # bool
+            "sandbox_config",  # Optional[SandboxConfig]
+            "debug",  # Debug
+            "exclude_newer",  # Optional[str]
         ]
 
         # Expected methods:
         expected_methods = [
-            "cross_compilation",       # () -> bool
-            "target_platform_name",    # () -> str
-            "host_platform_name",      # () -> str
-            "build_platform_name",     # () -> str
+            "cross_compilation",  # () -> bool
+            "target_platform_name",  # () -> str
+            "host_platform_name",  # () -> str
+            "build_platform_name",  # () -> str
         ]
 
         assert len(expected_properties) == 17

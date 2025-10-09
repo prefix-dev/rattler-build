@@ -58,7 +58,10 @@ impl PyTestConfig {
     ///     Host platform string, or None if not set
     #[getter]
     fn host_platform(&self) -> Option<String> {
-        self.inner.host_platform.as_ref().map(|p| p.platform.to_string())
+        self.inner
+            .host_platform
+            .as_ref()
+            .map(|p| p.platform.to_string())
     }
 
     /// Get the current platform.
@@ -75,7 +78,7 @@ impl PyTestConfig {
     /// Check if test prefix should be kept after test.
     ///
     /// Returns:
-        ///     True if test prefix is kept, False if it's deleted
+    ///     True if test prefix is kept, False if it's deleted
     #[getter]
     fn keep_test_prefix(&self) -> bool {
         self.inner.keep_test_prefix
@@ -98,11 +101,7 @@ impl PyTestConfig {
     ///     List of channel URLs as strings
     #[getter]
     fn channels(&self) -> Vec<String> {
-        self.inner
-            .channels
-            .iter()
-            .map(|c| c.to_string())
-            .collect()
+        self.inner.channels.iter().map(|c| c.to_string()).collect()
     }
 
     /// Get the channel priority.
@@ -172,7 +171,10 @@ impl PyTestConfig {
             "TestConfig:\n  Test prefix: {:?}\n  Target platform: {:?}\n  Host platform: {:?}\n  Keep prefix: {}\n  Test index: {:?}\n  Output dir: {:?}\n  Debug: {}",
             self.inner.test_prefix,
             self.inner.target_platform.map(|p| p.to_string()),
-            self.inner.host_platform.as_ref().map(|p| p.platform.to_string()),
+            self.inner
+                .host_platform
+                .as_ref()
+                .map(|p| p.platform.to_string()),
             self.inner.keep_test_prefix,
             self.inner.test_index,
             self.inner.output_dir,

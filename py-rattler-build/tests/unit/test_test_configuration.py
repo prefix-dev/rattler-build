@@ -5,7 +5,6 @@ so these tests document the expected interface rather than test construction.
 """
 
 
-
 class TestTestConfigInterface:
     """Test suite for TestConfig interface.
 
@@ -21,18 +20,18 @@ class TestTestConfigInterface:
 
         # Expected properties (all read-only):
         expected_properties = [
-            "test_prefix",          # PathBuf
-            "target_platform",      # Option<String>
-            "host_platform",        # Option<String>
-            "current_platform",     # String
-            "keep_test_prefix",     # bool
-            "test_index",           # Option<usize>
-            "channels",             # Vec<String>
-            "channel_priority",     # String
-            "solve_strategy",       # String
-            "output_dir",           # PathBuf
-            "debug",                # Debug
-            "exclude_newer",        # Option<String>
+            "test_prefix",  # PathBuf
+            "target_platform",  # Option<String>
+            "host_platform",  # Option<String>
+            "current_platform",  # String
+            "keep_test_prefix",  # bool
+            "test_index",  # Option<usize>
+            "channels",  # Vec<String>
+            "channel_priority",  # String
+            "solve_strategy",  # String
+            "output_dir",  # PathBuf
+            "debug",  # Debug
+            "exclude_newer",  # Option<String>
         ]
 
         assert len(expected_properties) == 12

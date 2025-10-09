@@ -59,8 +59,8 @@ impl PySandboxConfig {
             "read_write": read_write.unwrap_or_default(),
         });
 
-        let inner: RustSandboxConfiguration = serde_json::from_value(config)
-            .expect("Failed to create SandboxConfiguration");
+        let inner: RustSandboxConfiguration =
+            serde_json::from_value(config).expect("Failed to create SandboxConfiguration");
 
         PySandboxConfig { inner }
     }
@@ -73,7 +73,8 @@ impl PySandboxConfig {
     fn allow_network(&self) -> PyResult<bool> {
         let json = serde_json::to_value(&self.inner)
             .map_err(|e| RattlerBuildError::Other(format!("Serialization failed: {}", e)))?;
-        Ok(json.get("allow_network")
+        Ok(json
+            .get("allow_network")
             .and_then(|v| v.as_bool())
             .unwrap_or(false))
     }
@@ -101,8 +102,11 @@ impl PySandboxConfig {
         let json = serde_json::to_value(&self.inner)
             .map_err(|e| RattlerBuildError::Other(format!("Serialization failed: {}", e)))?;
         let paths: Vec<PathBuf> = serde_json::from_value(
-            json.get("read").cloned().unwrap_or(serde_json::Value::Array(vec![]))
-        ).map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
+            json.get("read")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
+        )
+        .map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
         Ok(paths)
     }
 
@@ -130,8 +134,11 @@ impl PySandboxConfig {
         let json = serde_json::to_value(&self.inner)
             .map_err(|e| RattlerBuildError::Other(format!("Serialization failed: {}", e)))?;
         let paths: Vec<PathBuf> = serde_json::from_value(
-            json.get("read_execute").cloned().unwrap_or(serde_json::Value::Array(vec![]))
-        ).map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
+            json.get("read_execute")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
+        )
+        .map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
         Ok(paths)
     }
 
@@ -159,8 +166,11 @@ impl PySandboxConfig {
         let json = serde_json::to_value(&self.inner)
             .map_err(|e| RattlerBuildError::Other(format!("Serialization failed: {}", e)))?;
         let paths: Vec<PathBuf> = serde_json::from_value(
-            json.get("read_write").cloned().unwrap_or(serde_json::Value::Array(vec![]))
-        ).map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
+            json.get("read_write")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
+        )
+        .map_err(|e| RattlerBuildError::Other(format!("Deserialization failed: {}", e)))?;
         Ok(paths)
     }
 

@@ -139,11 +139,7 @@ impl PyBuildConfig {
     ///     List of channel URLs as strings
     #[getter]
     fn channels(&self) -> Vec<String> {
-        self.inner
-            .channels
-            .iter()
-            .map(|c| c.to_string())
-            .collect()
+        self.inner.channels.iter().map(|c| c.to_string()).collect()
     }
 
     /// Get the channel priority.

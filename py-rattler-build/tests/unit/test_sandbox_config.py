@@ -184,9 +184,7 @@ class TestSandboxConfigIntegration:
 
     def test_clear_paths(self) -> None:
         """Test clearing all paths."""
-        config = SandboxConfig(
-            read=[Path("/usr")], read_execute=[Path("/bin")], read_write=[Path("/tmp")]
-        )
+        config = SandboxConfig(read=[Path("/usr")], read_execute=[Path("/bin")], read_write=[Path("/tmp")])
 
         config.read = []
         config.read_execute = []

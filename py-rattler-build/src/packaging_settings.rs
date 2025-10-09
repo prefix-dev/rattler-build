@@ -116,8 +116,8 @@ impl PyPackagingConfig {
             level
         } else {
             match rust_archive_type {
-                ArchiveType::TarBz2 => 9,   // Max compression for bzip2
-                ArchiveType::Conda => 22,   // Max compression for zstd
+                ArchiveType::TarBz2 => 9, // Max compression for bzip2
+                ArchiveType::Conda => 22, // Max compression for zstd
             }
         };
 
@@ -125,22 +125,20 @@ impl PyPackagingConfig {
         match rust_archive_type {
             ArchiveType::TarBz2 => {
                 if !(1..=9).contains(&compression_level) {
-                    return Err(RattlerBuildError::Other(
-                        format!(
-                            "Invalid compression level {} for tar.bz2. Must be 1-9.",
-                            compression_level
-                        )
-                    ).into());
+                    return Err(RattlerBuildError::Other(format!(
+                        "Invalid compression level {} for tar.bz2. Must be 1-9.",
+                        compression_level
+                    ))
+                    .into());
                 }
             }
             ArchiveType::Conda => {
                 if !(-7..=22).contains(&compression_level) {
-                    return Err(RattlerBuildError::Other(
-                        format!(
-                            "Invalid compression level {} for conda. Must be -7 to 22.",
-                            compression_level
-                        )
-                    ).into());
+                    return Err(RattlerBuildError::Other(format!(
+                        "Invalid compression level {} for conda. Must be -7 to 22.",
+                        compression_level
+                    ))
+                    .into());
                 }
             }
         }
@@ -220,22 +218,20 @@ impl PyPackagingConfig {
         match self.inner.archive_type {
             ArchiveType::TarBz2 => {
                 if !(1..=9).contains(&value) {
-                    return Err(RattlerBuildError::Other(
-                        format!(
-                            "Invalid compression level {} for tar.bz2. Must be 1-9.",
-                            value
-                        )
-                    ).into());
+                    return Err(RattlerBuildError::Other(format!(
+                        "Invalid compression level {} for tar.bz2. Must be 1-9.",
+                        value
+                    ))
+                    .into());
                 }
             }
             ArchiveType::Conda => {
                 if !(-7..=22).contains(&value) {
-                    return Err(RattlerBuildError::Other(
-                        format!(
-                            "Invalid compression level {} for conda. Must be -7 to 22.",
-                            value
-                        )
-                    ).into());
+                    return Err(RattlerBuildError::Other(format!(
+                        "Invalid compression level {} for conda. Must be -7 to 22.",
+                        value
+                    ))
+                    .into());
                 }
             }
         }

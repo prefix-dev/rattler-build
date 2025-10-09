@@ -5,7 +5,6 @@ focus on property access rather than creation.
 """
 
 
-
 class TestDirectoriesProperties:
     """Test suite for Directories property access.
 
