@@ -66,12 +66,12 @@ use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{
-    GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-    compression_level::CompressionLevel, package::ArchiveType,
+    MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
+    package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
-use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
+use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
 use selectors::SelectorConfig;
@@ -185,21 +185,6 @@ pub async fn get_build_output(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
         ));
     }
-
-    // Determine virtual packages of the system. These packages define the
-    // capabilities of the system. Some packages depend on these virtual
-    // packages to indicate compatibility with the hardware of the system.
-    let virtual_packages = tool_config
-        .fancy_log_handler
-        .wrap_in_progress("determining virtual packages", move || {
-            VirtualPackage::detect(&VirtualPackageOverrides::from_env()).map(|vpkgs| {
-                vpkgs
-                    .iter()
-                    .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
-                    .collect::<Vec<_>>()
-            })
-        })
-        .into_diagnostic()?;
 
     tracing::debug!(
         "Platforms: build: {}, host: {}, target: {}",
@@ -369,19 +354,21 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
-
+        let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = metadata::Output {
             recipe: recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: PlatformWithVirtualPackages {
-                    platform: build_data.host_platform,
-                    virtual_packages: virtual_packages.clone(),
-                },
-                build_platform: PlatformWithVirtualPackages {
-                    platform: build_data.build_platform,
-                    virtual_packages: virtual_packages.clone(),
-                },
+                host_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    build_data.host_platform,
+                    &virtual_package_override,
+                )
+                .into_diagnostic()?,
+                build_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    build_data.build_platform,
+                    &virtual_package_override,
+                )
+                .into_diagnostic()?,
                 hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
