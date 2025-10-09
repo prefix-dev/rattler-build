@@ -11,8 +11,6 @@ mod source_cache_tests {
         let temp_dir = TempDir::new().unwrap();
         let _cache = SourceCacheBuilder::new()
             .cache_dir(temp_dir.path())
-            .max_age(chrono::Duration::days(7))
-            .enable_cleanup(false)
             .build()
             .await
             .unwrap();
@@ -135,7 +133,6 @@ mod source_cache_tests {
         let temp_dir = TempDir::new().unwrap();
         let cache = SourceCacheBuilder::new()
             .cache_dir(temp_dir.path())
-            .enable_cleanup(false)
             .build()
             .await
             .unwrap();

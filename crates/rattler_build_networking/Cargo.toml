@@ -1,0 +1,18 @@
+[package]
+name = "rattler_build_networking"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Networking utilities for rattler-build"
+
+[dependencies]
+reqwest = { workspace = true, features = ["multipart"] }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+rattler_networking = "0.25.16"
+url = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

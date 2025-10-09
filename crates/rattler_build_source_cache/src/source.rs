@@ -1,6 +1,6 @@
 //! Source definitions for the cache
 
-use rattler_git::{git::GitReference as RattlerGitReference, GitUrl as RattlerGitUrl};
+use rattler_git::{GitUrl as RattlerGitUrl, git::GitReference as RattlerGitReference};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

@@ -69,9 +69,9 @@ impl From<bool> for ContinueOnFailure {
     }
 }
 
-/// A client that can handle both secure and insecure connections
+/// An authenticated client with middleware support for S3, mirrors, and authentication
 #[derive(Clone, Default)]
-pub struct BaseClient {
+pub struct AuthenticatedClient {
     /// The standard client with SSL verification enabled
     client: ClientWithMiddleware,
     /// The dangerous client with SSL verification disabled
@@ -80,8 +80,8 @@ pub struct BaseClient {
     allow_insecure_host: Option<Vec<String>>,
 }
 
-impl BaseClient {
-    /// Create a new BaseClient with both secure and insecure clients
+impl AuthenticatedClient {
+    /// Create a new AuthenticatedClient with both secure and insecure clients
     pub fn new(
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
@@ -171,8 +171,11 @@ pub struct Configuration {
     /// If set to a value, a progress bar will be shown
     pub fancy_log_handler: LoggingOutputHandler,
 
-    /// The authenticated reqwest download client to use
-    pub client: BaseClient,
+    /// The authenticated reqwest download client with S3, mirrors, and auth middleware
+    pub client: AuthenticatedClient,
+
+    /// The source cache for downloading and caching source code
+    pub source_cache: Option<Arc<rattler_build_source_cache::SourceCache>>,
 
     /// Set this to true if you want to keep the build directory after the build
     /// is done
@@ -262,8 +265,8 @@ pub fn reqwest_client_from_auth_storage(
     s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
-) -> Result<BaseClient, AuthenticationStorageError> {
-    BaseClient::new(
+) -> Result<AuthenticatedClient, AuthenticationStorageError> {
+    AuthenticatedClient::new(
         auth_file,
         allow_insecure_host,
         s3_middleware_config,
@@ -275,7 +278,7 @@ pub fn reqwest_client_from_auth_storage(
 pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
-    client: Option<BaseClient>,
+    client: Option<AuthenticatedClient>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
@@ -422,7 +425,7 @@ impl ConfigurationBuilder {
     }
 
     /// Sets the request client to use for network requests.
-    pub fn with_reqwest_client(self, client: BaseClient) -> Self {
+    pub fn with_reqwest_client(self, client: AuthenticatedClient) -> Self {
         Self {
             client: Some(client),
             ..self
@@ -550,6 +553,7 @@ impl ConfigurationBuilder {
         Configuration {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
+            source_cache: None, // Built lazily on first use
             no_clean: self.no_clean,
             test_strategy,
             use_zstd: self.use_zstd,

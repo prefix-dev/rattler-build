@@ -16,6 +16,7 @@ futures = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
+rattler_build_networking = { path = "../rattler_build_networking" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

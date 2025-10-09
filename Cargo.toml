@@ -2,6 +2,7 @@
 members = [
   "rust-tests",
   "crates/rattler_git",
+  "crates/rattler_build_networking",
   "crates/rattler_build_source_cache",
   "crates/rattler_build_recipe_generator",
 ]
@@ -235,6 +236,7 @@ rattler_menuinst = "0.2.29"
 
 # Local rattler-build crates
 rattler_git = { path = "crates/rattler_git" }
+rattler_build_networking = { path = "crates/rattler_build_networking" }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"

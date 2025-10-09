@@ -391,41 +391,72 @@ fn create_directory_diff(
     Ok(patch_content)
 }
 
-/// Find the URL cache directory for a given URL source
+/// Find the URL cache directory for a given URL source using the new cache structure
 fn find_url_cache_dir(
     cache_dir: &Path,
     url_src: &crate::recipe::parser::UrlSource,
 ) -> Result<PathBuf, SourceError> {
-    // Recreate the cache name logic (previously in url_source::extracted_folder)
-    use crate::source::checksum::Checksum;
+    use rattler_build_source_cache::{CacheIndex, Checksum as CacheChecksum, source::ChecksumKind};
 
-    let checksum = Checksum::from_url_source(url_src)
-        .ok_or_else(|| SourceError::NoChecksum("No checksum for URL source".to_string()))?;
+    // Convert checksum to cache checksum
+    let checksum = url_src
+        .sha256()
+        .map(|sha| {
+            let hex_str = hex::encode(sha);
+            CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Sha256)
+        })
+        .transpose()
+        .or_else(|_| {
+            url_src
+                .md5()
+                .map(|md5| {
+                    let hex_str = hex::encode(md5);
+                    CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Md5)
+                })
+                .transpose()
+        })
+        .map_err(|e| SourceError::UnknownError(format!("Invalid checksum: {}", e)))?;
 
     let first_url = url_src
         .urls()
         .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
-    // Recreate the cache name logic from url_source.rs
-    let filename = first_url
-        .path_segments()
-        .and_then(|segments| segments.filter(|x| !x.is_empty()).next_back())
-        .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
+    // Generate the cache key using the new cache's method
+    let key = CacheIndex::generate_cache_key(first_url, checksum.as_ref());
 
-    let stem = Path::new(filename)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown")
-        .to_string();
+    // The extracted directory is stored as {key}_extracted
+    let extracted_dir = cache_dir.join(format!("{}_extracted", key));
 
-    let checksum_hex = checksum.to_hex();
-    let cache_name = format!("{}_{}", stem, &checksum_hex[..8]);
-
-    let extracted_dir = cache_dir.join(cache_name);
     if extracted_dir.exists() {
         Ok(extracted_dir)
     } else {
+        // Try to find by scanning the cache directory for extracted directories
+        // (fallback in case the naming changed)
+        for entry in fs::read_dir(cache_dir).map_err(SourceError::Io)? {
+            let entry = entry.map_err(SourceError::Io)?;
+            let path = entry.path();
+            if path.is_dir()
+                && path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.ends_with("_extracted"))
+                    .unwrap_or(false)
+            {
+                // This is an extracted directory, check if it's the one we're looking for
+                // by checking if it was recently accessed (heuristic)
+                if let Ok(metadata) = fs::metadata(&path) {
+                    if let Ok(modified) = metadata.modified() {
+                        // Consider directories modified in the last hour as candidates
+                        if let Ok(elapsed) = modified.elapsed() {
+                            if elapsed.as_secs() < 3600 && path > extracted_dir {
+                                return Ok(path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         Err(SourceError::FileNotFound(extracted_dir))
     }
 }

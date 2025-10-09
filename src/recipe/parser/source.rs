@@ -639,6 +639,75 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
     }
 }
 
+// Conversion implementations for source cache integration
+impl TryFrom<&GitSource> for rattler_build_source_cache::GitSource {
+    type Error = String;
+
+    fn try_from(git_src: &GitSource) -> Result<Self, Self::Error> {
+        use rattler_build_source_cache::GitReference;
+
+        // Convert GitRev to GitReference
+        let reference = match &git_src.rev {
+            GitRev::Branch(b) => GitReference::Branch(b.clone()),
+            GitRev::Tag(t) => GitReference::Tag(t.clone()),
+            GitRev::Commit(c) => GitReference::from_rev(c.clone()),
+            GitRev::Head => GitReference::DefaultBranch,
+        };
+
+        // Convert GitUrl to url::Url
+        let url = match &git_src.url {
+            GitUrl::Url(url) => url.clone(),
+            GitUrl::Ssh(ssh) => {
+                url::Url::parse(ssh).map_err(|e| format!("Failed to parse SSH URL: {}", e))?
+            }
+            GitUrl::Path(path) => url::Url::from_file_path(path)
+                .map_err(|_| "Failed to convert path to URL".to_string())?,
+        };
+
+        Ok(rattler_build_source_cache::GitSource::new(
+            url,
+            reference,
+            git_src.depth,
+            git_src.lfs,
+        ))
+    }
+}
+
+impl TryFrom<&UrlSource> for rattler_build_source_cache::UrlSource {
+    type Error = String;
+
+    fn try_from(url_src: &UrlSource) -> Result<Self, Self::Error> {
+        use rattler_build_source_cache::{Checksum as CacheChecksum, source::ChecksumKind};
+
+        // Convert checksum
+        let checksum = url_src
+            .sha256
+            .as_ref()
+            .map(|sha| {
+                let hex_str = hex::encode(sha);
+                CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Sha256)
+            })
+            .transpose()
+            .or_else(|_| {
+                url_src
+                    .md5
+                    .as_ref()
+                    .map(|md5| {
+                        let hex_str = hex::encode(md5);
+                        CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Md5)
+                    })
+                    .transpose()
+            })
+            .map_err(|e| format!("Invalid checksum: {}", e))?;
+
+        Ok(rattler_build_source_cache::UrlSource {
+            urls: url_src.url.clone(),
+            checksum,
+            file_name: url_src.file_name.clone(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

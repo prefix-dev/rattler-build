@@ -8,9 +8,6 @@ use std::time::Duration;
 pub struct SourceCacheBuilder {
     cache_dir: Option<PathBuf>,
     client: Option<reqwest_middleware::ClientWithMiddleware>,
-    max_age: Option<chrono::Duration>,
-    enable_cleanup: bool,
-    cleanup_interval: Duration,
     enable_compression: bool,
     max_concurrent_downloads: usize,
     progress_handler: Option<Box<dyn ProgressHandler>>,
@@ -39,9 +36,6 @@ impl Default for SourceCacheBuilder {
         Self {
             cache_dir: None,
             client: None,
-            max_age: None,
-            enable_cleanup: true,
-            cleanup_interval: Duration::from_secs(3600), // 1 hour
             enable_compression: true,
             max_concurrent_downloads: 4,
             progress_handler: None,
@@ -64,24 +58,6 @@ impl SourceCacheBuilder {
     /// Set the HTTP client to use for downloads
     pub fn client(mut self, client: reqwest_middleware::ClientWithMiddleware) -> Self {
         self.client = Some(client);
-        self
-    }
-
-    /// Set the maximum age for cache entries before they are considered stale
-    pub fn max_age(mut self, max_age: chrono::Duration) -> Self {
-        self.max_age = Some(max_age);
-        self
-    }
-
-    /// Enable or disable automatic cleanup of old cache entries
-    pub fn enable_cleanup(mut self, enable: bool) -> Self {
-        self.enable_cleanup = enable;
-        self
-    }
-
-    /// Set the interval for automatic cleanup
-    pub fn cleanup_interval(mut self, interval: Duration) -> Self {
-        self.cleanup_interval = interval;
         self
     }
 
@@ -135,7 +111,7 @@ impl SourceCacheBuilder {
                 .build()
         });
 
-        SourceCache::new(cache_dir, client, self.max_age, self.progress_handler).await
+        SourceCache::new(cache_dir, client, self.progress_handler).await
     }
 }
 

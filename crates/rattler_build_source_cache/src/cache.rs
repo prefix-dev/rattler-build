@@ -19,7 +19,6 @@ pub struct SourceCache {
     lock_manager: LockManager,
     client: reqwest_middleware::ClientWithMiddleware,
     git_resolver: GitResolver,
-    max_age: Option<chrono::Duration>,
     progress_handler: Option<Box<dyn ProgressHandler>>,
 }
 
@@ -28,7 +27,6 @@ impl SourceCache {
     pub async fn new(
         cache_dir: PathBuf,
         client: reqwest_middleware::ClientWithMiddleware,
-        max_age: Option<chrono::Duration>,
         progress_handler: Option<Box<dyn ProgressHandler>>,
     ) -> Result<Self, CacheError> {
         let index = CacheIndex::new(cache_dir.clone()).await?;
@@ -40,7 +38,6 @@ impl SourceCache {
             lock_manager,
             client,
             git_resolver: GitResolver::default(),
-            max_age,
             progress_handler,
         };
 
@@ -396,29 +393,31 @@ impl SourceCache {
             handler.on_extraction_start(archive_path);
         }
 
-        // Create target directory
-        if !target_dir.exists() {
-            tokio::fs::create_dir_all(target_dir).await?;
-        }
+        // Create a temporary directory for extraction
+        let temp_dir = tempfile::tempdir_in(&self.cache_dir)
+            .map_err(|e| CacheError::Other(format!("Failed to create temp dir: {}", e)))?;
 
         let name = archive_path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
 
-        // Extract based on file type
+        // Extract based on file type to temp directory
         if is_tarball(name) {
-            extract_tar(archive_path, target_dir)?;
+            extract_tar(archive_path, temp_dir.path())?;
         } else if name.ends_with(".zip") {
-            extract_zip(archive_path, target_dir)?;
+            extract_zip(archive_path, temp_dir.path())?;
         } else if name.ends_with(".7z") {
-            extract_7z(archive_path, target_dir)?;
+            extract_7z(archive_path, temp_dir.path())?;
         } else {
             return Err(CacheError::ExtractionError(format!(
                 "Unsupported archive format: {}",
                 name
             )));
         }
+
+        // Strip root directory if needed and move to final location
+        strip_and_move_extracted_dir(temp_dir.path(), target_dir).await?;
 
         // Notify completion
         if let Some(handler) = &self.progress_handler {
@@ -428,12 +427,9 @@ impl SourceCache {
         Ok(())
     }
 
-    /// Clean up old cache entries
-    pub async fn cleanup(&self) -> Result<(), CacheError> {
-        if let Some(max_age) = self.max_age {
-            self.index.cleanup_old_entries(max_age).await?;
-            self.lock_manager.cleanup_stale_locks().await?;
-        }
+    /// Clean up stale locks (manual cleanup only, cache entries are kept indefinitely)
+    pub async fn cleanup_stale_locks(&self) -> Result<(), CacheError> {
+        self.lock_manager.cleanup_stale_locks().await?;
         Ok(())
     }
 
@@ -588,4 +584,39 @@ async fn calculate_dir_size(dir: &Path) -> Result<u64, CacheError> {
     }
 
     Ok(total)
+}
+
+/// Strip root directory if the extracted archive contains only a single top-level directory
+async fn strip_and_move_extracted_dir(src: &Path, dest: &Path) -> Result<(), CacheError> {
+    use fs_err as fs;
+
+    // Read entries from source directory
+    let mut entries = fs::read_dir(src)?;
+
+    // Check if there's only one entry and if it's a directory
+    let first_entry = entries.next();
+    let second_entry = entries.next();
+
+    let src_dir = match (first_entry, second_entry) {
+        (Some(Ok(entry)), None) if entry.file_type()?.is_dir() => {
+            // Single directory - we'll extract from inside it
+            entry.path()
+        }
+        _ => {
+            // Multiple entries or not a directory - use the source as-is
+            src.to_path_buf()
+        }
+    };
+
+    // Create destination directory
+    fs::create_dir_all(dest)?;
+
+    // Move all files from source directory to destination
+    for entry in fs::read_dir(&src_dir)? {
+        let entry = entry?;
+        let dest_path = dest.join(entry.file_name());
+        fs::rename(entry.path(), dest_path)?;
+    }
+
+    Ok(())
 }

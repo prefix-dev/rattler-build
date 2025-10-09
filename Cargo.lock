@@ -4256,6 +4256,7 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "rattler",
+ "rattler_build_networking",
  "rattler_build_recipe_generator",
  "rattler_build_source_cache",
  "rattler_cache",
@@ -4318,6 +4319,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_networking"
+version = "0.1.0"
+dependencies = [
+ "rattler_networking",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "rattler_build_recipe_generator"
 version = "0.1.0"
 dependencies = [
@@ -4362,6 +4375,7 @@ dependencies = [
  "futures",
  "indicatif",
  "md-5",
+ "rattler_build_networking",
  "rattler_git",
  "reqwest",
  "reqwest-middleware",

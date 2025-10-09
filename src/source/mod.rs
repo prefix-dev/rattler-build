@@ -14,11 +14,9 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
 use crate::system_tools::SystemTools;
-pub mod cache_adapter;
 pub mod checksum;
 pub mod copy_dir;
 pub mod create_patch;
-pub mod extract;
 pub mod patch;
 
 #[allow(missing_docs)]
@@ -26,9 +24,6 @@ pub mod patch;
 pub enum SourceError {
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),
-
-    #[error("Failed to download source from url: {0}")]
-    Url(#[from] reqwest::Error),
 
     #[error("Url does not point to a file: {0}")]
     UrlNotFile(url::Url),
@@ -63,27 +58,6 @@ pub enum SourceError {
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
-    #[error("Failed to extract archive: {0}")]
-    TarExtractionError(String),
-
-    #[error("Failed to extract zip archive: {0}")]
-    ZipExtractionError(String),
-
-    #[error("Failed to extract 7z archive: {0}")]
-    SevenZipExtractionError(String),
-
-    #[error("Failed to read from zip: {0}")]
-    InvalidZip(String),
-
-    #[error("Failed to read from 7z: {0}")]
-    Invalid7z(String),
-
-    #[error("Failed to run git command: {0}")]
-    GitError(String),
-
-    #[error("Failed to run git command: {0}")]
-    GitErrorStr(&'static str),
-
     #[error("{0}")]
     UnknownError(String),
 
@@ -111,6 +85,11 @@ pub async fn fetch_sources(
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
 ) -> Result<Vec<Source>, SourceError> {
+    use rattler_build_source_cache::{
+        GitSource as CacheGitSource, Source as CacheSource, SourceCacheBuilder,
+        UrlSource as CacheUrlSource,
+    };
+
     if sources.is_empty() {
         tracing::info!("No sources to fetch");
         return Ok(Vec::new());
@@ -121,9 +100,13 @@ pub async fn fetch_sources(
     let recipe_dir = &directories.recipe_dir;
     let cache_src = directories.output_dir.join("src_cache");
 
-    // Create the cache adapter
-    let cache_adapter =
-        cache_adapter::SourceCacheAdapter::new(cache_src.clone(), tool_configuration).await?;
+    // Create the source cache using the authenticated client from tool_configuration
+    let source_cache = SourceCacheBuilder::new()
+        .cache_dir(&cache_src)
+        .client(tool_configuration.client.get_client().clone())
+        .build()
+        .await
+        .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
     let mut rendered_sources = Vec::new();
 
@@ -131,7 +114,15 @@ pub async fn fetch_sources(
         match src {
             Source::Git(git_src) => {
                 tracing::info!("Fetching source from git repo: {}", git_src.url());
-                let result_path = cache_adapter.fetch_source(src).await?;
+
+                // Convert to cache git source using TryFrom
+                let cache_git_source =
+                    CacheGitSource::try_from(git_src).map_err(SourceError::UnknownError)?;
+
+                let result_path = source_cache
+                    .get_source(&CacheSource::Git(cache_git_source))
+                    .await
+                    .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
                 let dest_dir = if let Some(target_directory) = git_src.target_directory() {
                     work_dir.join(target_directory)
@@ -166,7 +157,14 @@ pub async fn fetch_sources(
                     .expect("we should have at least one URL");
                 tracing::info!("Fetching source from url: {}", first_url);
 
-                let result_path = cache_adapter.fetch_source(src).await?;
+                // Convert to cache URL source using TryFrom
+                let cache_url_source =
+                    CacheUrlSource::try_from(url_src).map_err(SourceError::UnknownError)?;
+
+                let result_path = source_cache
+                    .get_source(&CacheSource::Url(cache_url_source))
+                    .await
+                    .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
                 let dest_dir = if let Some(target_directory) = url_src.target_directory() {
                     work_dir.join(target_directory)
@@ -288,8 +286,11 @@ pub async fn fetch_sources(
     }
 
     // add a hidden JSON file with the source information (for compatibility)
-    let source_info =
-        cache_adapter.create_source_info(directories.recipe_path.clone(), rendered_sources.clone());
+    let source_info = SourceInformation {
+        recipe_path: directories.recipe_path.clone(),
+        source_cache: cache_src,
+        sources: rendered_sources.clone(),
+    };
     let source_info_path = work_dir.join(".source_info.json");
     fs::write(
         &source_info_path,
