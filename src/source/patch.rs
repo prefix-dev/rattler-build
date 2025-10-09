@@ -887,7 +887,10 @@ mod tests {
 
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
-            use crate::source::fetch_source;
+            use rattler_build_source_cache::{
+                GitSource as CacheGitSource, Source as CacheSource, SourceCacheBuilder,
+                UrlSource as CacheUrlSource,
+            };
 
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
 
@@ -899,21 +902,39 @@ mod tests {
             let cache_src = comparison_dir.path().join("cache");
             fs_err::create_dir(&cache_src).into_diagnostic()?;
 
-            let mut _rendered_sources = vec![];
+            // Create the source cache
+            let source_cache = SourceCacheBuilder::new()
+                .cache_dir(&cache_src)
+                .client(tool_config.client.get_client().clone())
+                .build()
+                .await
+                .into_diagnostic()?;
 
-            // Fetch source
-            fetch_source(
-                &source,
-                &mut _rendered_sources,
-                &original_dir,
-                &recipe_dir,
-                &cache_src,
-                &SystemTools::new(),
-                &tool_config,
-                |_, _| Ok(()),
-            )
-            .await
-            .into_diagnostic()?;
+            // Convert source and fetch from cache
+            let cache_source = match &source {
+                crate::recipe::parser::Source::Git(git_src) => {
+                    let cache_git_source = CacheGitSource::try_from(git_src).into_diagnostic()?;
+                    CacheSource::Git(cache_git_source)
+                }
+                crate::recipe::parser::Source::Url(url_src) => {
+                    let cache_url_source = CacheUrlSource::try_from(url_src).into_diagnostic()?;
+                    CacheSource::Url(cache_url_source)
+                }
+                crate::recipe::parser::Source::Path(_) => {
+                    panic!("Path sources should not have patches to test");
+                }
+            };
+
+            let result_path = source_cache
+                .get_source(&cache_source)
+                .await
+                .into_diagnostic()?;
+
+            // Copy from cache to work directory
+            CopyDir::new(&result_path, &original_dir)
+                .use_gitignore(false)
+                .run()
+                .into_diagnostic()?;
 
             // Create copy of that directory.
             CopyDir::new(&original_dir, &copy_dir)
