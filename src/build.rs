@@ -6,13 +6,9 @@ use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    apply_patch_custom,
-    metadata::{Output, build_reindexed_channels},
-    recipe::parser::TestType,
-    render::resolved_dependencies::RunExportsDownload,
-    render::solver::load_repodatas,
-    script::InterpreterError,
-    tool_configuration,
+    apply_patch_custom, metadata::Output, metadata::build_reindexed_channels,
+    recipe::parser::TestType, render::resolved_dependencies::RunExportsDownload,
+    render::solver::load_repodatas, script::InterpreterError, tool_configuration,
 };
 
 /// Behavior for handling the working directory during the build process

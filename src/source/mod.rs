@@ -6,7 +6,6 @@ use std::{
 };
 
 use crate::{
-    metadata::{Directories, Output},
     recipe::parser::{GitRev, GitSource, Source},
     source::{
         checksum::Checksum,
@@ -14,6 +13,7 @@ use crate::{
     },
     system_tools::ToolError,
     tool_configuration,
+    types::{Directories, Output},
 };
 
 use fs_err as fs;
