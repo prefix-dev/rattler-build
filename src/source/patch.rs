@@ -913,11 +913,11 @@ mod tests {
             // Convert source and fetch from cache
             let cache_source = match &source {
                 crate::recipe::parser::Source::Git(git_src) => {
-                    let cache_git_source = CacheGitSource::try_from(git_src).into_diagnostic()?;
+                    let cache_git_source = CacheGitSource::try_from(git_src).unwrap();
                     CacheSource::Git(cache_git_source)
                 }
                 crate::recipe::parser::Source::Url(url_src) => {
-                    let cache_url_source = CacheUrlSource::try_from(url_src).into_diagnostic()?;
+                    let cache_url_source = CacheUrlSource::try_from(url_src).unwrap();
                     CacheSource::Url(cache_url_source)
                 }
                 crate::recipe::parser::Source::Path(_) => {
