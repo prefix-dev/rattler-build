@@ -925,13 +925,13 @@ mod tests {
                 }
             };
 
-            let result_path = source_cache
+            let result = source_cache
                 .get_source(&cache_source)
                 .await
                 .into_diagnostic()?;
 
             // Copy from cache to work directory
-            CopyDir::new(&result_path, &original_dir)
+            CopyDir::new(&result.path, &original_dir)
                 .use_gitignore(false)
                 .run()
                 .into_diagnostic()?;
