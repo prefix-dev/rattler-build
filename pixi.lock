@@ -934,6 +934,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/c-ares-1.34.5-hb9d3cd8_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/c-compiler-1.6.0-hd590300_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2025.8.3-hbd8a1cb_0.conda
+      - conda: https://prefix.dev/conda-forge/linux-64/cargo-deny-0.18.5-hb17b654_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/certifi-2025.8.3-pyhd8ed1ab_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/cffi-1.17.1-py312h06ac9bb_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/charset-normalizer-3.4.3-pyhd8ed1ab_0.conda
@@ -1051,6 +1052,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-64/c-ares-1.34.5-hf13058a_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/c-compiler-1.6.0-h63c33a9_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2025.8.3-hbd8a1cb_0.conda
+      - conda: https://prefix.dev/conda-forge/osx-64/cargo-deny-0.18.5-h3c2ae71_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/cctools-973.0.1-hd9ad811_15.conda
       - conda: https://prefix.dev/conda-forge/osx-64/cctools_osx-64-973.0.1-habff3f6_15.conda
       - conda: https://prefix.dev/conda-forge/noarch/certifi-2025.8.3-pyhd8ed1ab_0.conda
@@ -1167,6 +1169,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/c-ares-1.34.5-h5505292_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/c-compiler-1.6.0-hd291e01_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2025.8.3-hbd8a1cb_0.conda
+      - conda: https://prefix.dev/conda-forge/osx-arm64/cargo-deny-0.18.5-h8d80559_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/cctools-973.0.1-hd1ac623_15.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/cctools_osx-arm64-973.0.1-h2a25c60_15.conda
       - conda: https://prefix.dev/conda-forge/noarch/certifi-2025.8.3-pyhd8ed1ab_0.conda
@@ -1285,6 +1288,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/win-64/bzip2-1.0.8-h2466b09_7.conda
       - conda: https://prefix.dev/conda-forge/win-64/c-compiler-1.6.0-hcfcfb64_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2025.8.3-h4c7d964_0.conda
+      - conda: https://prefix.dev/conda-forge/win-64/cargo-deny-0.18.5-h18a1a76_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/certifi-2025.8.3-pyhd8ed1ab_0.conda
       - conda: https://prefix.dev/conda-forge/win-64/cffi-1.17.1-py312h4389bb4_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/charset-normalizer-3.4.3-pyhd8ed1ab_0.conda
@@ -1870,6 +1874,50 @@ packages:
   license_family: LGPL
   size: 44459
   timestamp: 1747337159019
+- conda: https://prefix.dev/conda-forge/linux-64/cargo-deny-0.18.5-hb17b654_0.conda
+  sha256: f650dde11ba5bf43ad285eba3fefcc2410f5f5b086082ece6bfc289140e5e639
+  md5: 11bd1435ac8c7814855f705dd0a580ee
+  depends:
+  - libgcc >=14
+  - __glibc >=2.17,<3.0.a0
+  constrains:
+  - __glibc >=2.17
+  license: Apache-2.0 OR MIT
+  size: 6697240
+  timestamp: 1758612727650
+- conda: https://prefix.dev/conda-forge/osx-64/cargo-deny-0.18.5-h3c2ae71_0.conda
+  sha256: 94e4b63912b52a843a9dff67ff485232c0a6ed1b2bf560e9a069c74433c26e02
+  md5: f8a5db9c5b653fde4a05d588675a7510
+  depends:
+  - __osx >=10.13
+  constrains:
+  - __osx >=10.13
+  license: Apache-2.0 OR MIT
+  size: 6625883
+  timestamp: 1758612768273
+- conda: https://prefix.dev/conda-forge/osx-arm64/cargo-deny-0.18.5-h8d80559_0.conda
+  sha256: 73585cea393f6771732d5a53cba75d2f16e6ce1756078d038fdd872b62616037
+  md5: 40986bbb04cc7e67587e5458ffd35e74
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: Apache-2.0 OR MIT
+  size: 6289763
+  timestamp: 1758612738894
+- conda: https://prefix.dev/conda-forge/win-64/cargo-deny-0.18.5-h18a1a76_0.conda
+  sha256: 54944ba03ebe7352ae3e1b8019a5fe4482af347c710b95c94fd426d525acbd4a
+  md5: 4d8bc7e02ae8ddb47764b22cbb2286ed
+  depends:
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  license: Apache-2.0 OR MIT
+  size: 6872463
+  timestamp: 1758612753191
 - conda: https://prefix.dev/conda-forge/osx-64/cctools-973.0.1-hd9ad811_15.conda
   sha256: 6fc0e86e24687cde3476e04f001ac1edf5813c0caa15b72c913b660533428987
   md5: 00374d616829d1e4d2266e571147848a
