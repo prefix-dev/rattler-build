@@ -190,7 +190,7 @@ impl BaseClientBuilder {
         self
     }
 
-    /// Set S3 middleware configuration
+    /// Set S3 s3 configuration
     #[cfg(feature = "middleware")]
     pub fn with_s3(
         mut self,
@@ -266,33 +266,34 @@ impl BaseClientBuilder {
                 .expect("Failed to load authentication storage")
         });
 
+        // Prepare middlewares once and reuse the same instances (via Arc) for both clients.
+        let mirror_mw = self
+            .mirror_config
+            .map(|cfg| Arc::new(MirrorMiddleware::from_map(cfg)));
+        let s3_mw = self
+            .s3_config
+            .map(|cfg| Arc::new(S3Middleware::new(cfg, auth_storage.clone())));
+        let auth_mw = Arc::new(AuthenticationMiddleware::from_auth_storage(
+            auth_storage.clone(),
+        ));
+        let retry_mw = Arc::new(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ));
+
+        // Build the secure client with the exact middleware chain in a fixed order.
         let mut client_builder = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
                 .build()
                 .expect("failed to create client"),
         );
-
-        // Add mirror middleware if configured
-        if let Some(mirror_config) = self.mirror_config {
-            client_builder = client_builder.with(MirrorMiddleware::from_map(mirror_config));
+        if let Some(mw) = &mirror_mw {
+            client_builder = client_builder.with_arc(mw.clone());
         }
-
-        // Add S3 middleware if configured
-        if let Some(s3_config) = self.s3_config {
-            client_builder =
-                client_builder.with(S3Middleware::new(s3_config, auth_storage.clone()));
+        if let Some(mw) = &s3_mw {
+            client_builder = client_builder.with_arc(mw.clone());
         }
-
-        // Add authentication middleware
-        client_builder = client_builder.with_arc(Arc::new(
-            AuthenticationMiddleware::from_auth_storage(auth_storage.clone()),
-        ));
-
-        // Add retry middleware
-        client_builder = client_builder.with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ));
-
+        client_builder = client_builder.with_arc(auth_mw.clone());
+        client_builder = client_builder.with_arc(retry_mw.clone());
         let client = client_builder.build();
 
         // Build dangerous client (insecure)
@@ -303,16 +304,15 @@ impl BaseClientBuilder {
                 .expect("failed to create dangerous client"),
         );
 
-        // Add retry middleware
-        dangerous_client_builder =
-            dangerous_client_builder.with(RetryTransientMiddleware::new_with_policy(
-                ExponentialBackoff::builder().build_with_max_retries(3),
-            ));
-
-        // Add authentication middleware
-        dangerous_client_builder = dangerous_client_builder.with_arc(Arc::new(
-            AuthenticationMiddleware::from_auth_storage(auth_storage),
-        ));
+        // Apply the exact same middleware chain and order to the dangerous client.
+        if let Some(mw) = &mirror_mw {
+            dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
+        }
+        if let Some(mw) = &s3_mw {
+            dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
+        }
+        dangerous_client_builder = dangerous_client_builder.with_arc(auth_mw);
+        dangerous_client_builder = dangerous_client_builder.with_arc(retry_mw);
 
         let dangerous_client = dangerous_client_builder.build();
 
