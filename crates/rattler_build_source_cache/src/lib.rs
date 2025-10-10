@@ -11,7 +11,7 @@ pub mod lock;
 pub mod source;
 
 pub use builder::SourceCacheBuilder;
-pub use cache::SourceCache;
+pub use cache::{SourceCache, SourceResult};
 pub use error::CacheError;
 pub use index::{CacheEntry, CacheIndex, SourceType};
 pub use rattler_build_networking::{BaseClient, BaseClientBuilder};

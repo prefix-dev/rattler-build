@@ -27,6 +27,19 @@ impl BaseClient {
         Self::builder().build()
     }
 
+    /// Create a BaseClient from existing clients
+    pub fn new_from_clients(
+        client: ClientWithMiddleware,
+        dangerous_client: ClientWithMiddleware,
+        allow_insecure_host: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            client,
+            dangerous_client,
+            allow_insecure_host,
+        }
+    }
+
     /// Create a builder for configuring the BaseClient
     pub fn builder() -> BaseClientBuilder {
         BaseClientBuilder::default()
@@ -121,6 +134,15 @@ pub struct BaseClientBuilder {
     user_agent: Option<String>,
     timeout_secs: u64,
     insecure_hosts: Option<Vec<String>>,
+    #[cfg(feature = "middleware")]
+    auth_storage: Option<rattler_networking::AuthenticationStorage>,
+    #[cfg(feature = "middleware")]
+    s3_config:
+        Option<std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>>,
+    #[cfg(feature = "middleware")]
+    mirror_config: Option<
+        std::collections::HashMap<url::Url, Vec<rattler_networking::mirror_middleware::Mirror>>,
+    >,
 }
 
 impl Default for BaseClientBuilder {
@@ -129,6 +151,12 @@ impl Default for BaseClientBuilder {
             user_agent: None,
             timeout_secs: 5 * 60, // 5 minutes default
             insecure_hosts: None,
+            #[cfg(feature = "middleware")]
+            auth_storage: None,
+            #[cfg(feature = "middleware")]
+            s3_config: None,
+            #[cfg(feature = "middleware")]
+            mirror_config: None,
         }
     }
 }
@@ -152,8 +180,51 @@ impl BaseClientBuilder {
         self
     }
 
+    /// Set authentication storage for authenticated requests
+    #[cfg(feature = "middleware")]
+    pub fn with_authentication(
+        mut self,
+        auth_storage: rattler_networking::AuthenticationStorage,
+    ) -> Self {
+        self.auth_storage = Some(auth_storage);
+        self
+    }
+
+    /// Set S3 middleware configuration
+    #[cfg(feature = "middleware")]
+    pub fn with_s3(
+        mut self,
+        s3_config: std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>,
+    ) -> Self {
+        self.s3_config = Some(s3_config);
+        self
+    }
+
+    /// Set mirror middleware configuration
+    #[cfg(feature = "middleware")]
+    pub fn with_mirrors(
+        mut self,
+        mirror_config: std::collections::HashMap<
+            url::Url,
+            Vec<rattler_networking::mirror_middleware::Mirror>,
+        >,
+    ) -> Self {
+        self.mirror_config = Some(mirror_config);
+        self
+    }
+
     /// Build the BaseClient with the configured settings
     pub fn build(self) -> BaseClient {
+        #[cfg(feature = "middleware")]
+        {
+            let has_middleware = self.auth_storage.is_some()
+                || self.s3_config.is_some()
+                || self.mirror_config.is_some();
+            if has_middleware {
+                return self.build_with_middleware();
+            }
+        }
+
         let user_agent = self
             .user_agent
             .unwrap_or_else(|| DEFAULT_USER_AGENT.to_string());
@@ -165,5 +236,90 @@ impl BaseClientBuilder {
         }
 
         client
+    }
+
+    #[cfg(feature = "middleware")]
+    fn build_with_middleware(self) -> BaseClient {
+        use rattler_networking::{
+            AuthenticationMiddleware, mirror_middleware::MirrorMiddleware,
+            s3_middleware::S3Middleware,
+        };
+        use std::sync::Arc;
+
+        let user_agent = self
+            .user_agent
+            .unwrap_or_else(|| DEFAULT_USER_AGENT.to_string());
+
+        let timeout_secs = self.timeout_secs;
+        let insecure_hosts = self.insecure_hosts;
+
+        let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
+            builder
+                .no_gzip()
+                .pool_max_idle_per_host(20)
+                .user_agent(&user_agent)
+                .read_timeout(std::time::Duration::from_secs(timeout_secs))
+        };
+
+        let auth_storage = self.auth_storage.unwrap_or_else(|| {
+            rattler_networking::AuthenticationStorage::from_env_and_defaults()
+                .expect("Failed to load authentication storage")
+        });
+
+        let mut client_builder = reqwest_middleware::ClientBuilder::new(
+            common_settings(reqwest::Client::builder())
+                .build()
+                .expect("failed to create client"),
+        );
+
+        // Add mirror middleware if configured
+        if let Some(mirror_config) = self.mirror_config {
+            client_builder = client_builder.with(MirrorMiddleware::from_map(mirror_config));
+        }
+
+        // Add S3 middleware if configured
+        if let Some(s3_config) = self.s3_config {
+            client_builder =
+                client_builder.with(S3Middleware::new(s3_config, auth_storage.clone()));
+        }
+
+        // Add authentication middleware
+        client_builder = client_builder.with_arc(Arc::new(
+            AuthenticationMiddleware::from_auth_storage(auth_storage.clone()),
+        ));
+
+        // Add retry middleware
+        client_builder = client_builder.with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ));
+
+        let client = client_builder.build();
+
+        // Build dangerous client (insecure)
+        let mut dangerous_client_builder = reqwest_middleware::ClientBuilder::new(
+            common_settings(reqwest::Client::builder())
+                .danger_accept_invalid_certs(true)
+                .build()
+                .expect("failed to create dangerous client"),
+        );
+
+        // Add retry middleware
+        dangerous_client_builder =
+            dangerous_client_builder.with(RetryTransientMiddleware::new_with_policy(
+                ExponentialBackoff::builder().build_with_max_retries(3),
+            ));
+
+        // Add authentication middleware
+        dangerous_client_builder = dangerous_client_builder.with_arc(Arc::new(
+            AuthenticationMiddleware::from_auth_storage(auth_storage),
+        ));
+
+        let dangerous_client = dangerous_client_builder.build();
+
+        BaseClient {
+            client,
+            dangerous_client,
+            allow_insecure_host: insecure_hosts,
+        }
     }
 }

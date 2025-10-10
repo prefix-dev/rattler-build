@@ -1,13 +1,13 @@
 //! Builder for configuring and creating a SourceCache instance
 
 use crate::{cache::SourceCache, error::CacheError};
+use rattler_build_networking::BaseClient;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 /// Builder for creating a configured SourceCache
 pub struct SourceCacheBuilder {
     cache_dir: Option<PathBuf>,
-    client: Option<reqwest_middleware::ClientWithMiddleware>,
+    client: Option<BaseClient>,
     enable_compression: bool,
     max_concurrent_downloads: usize,
     progress_handler: Option<Box<dyn ProgressHandler>>,
@@ -56,7 +56,7 @@ impl SourceCacheBuilder {
     }
 
     /// Set the HTTP client to use for downloads
-    pub fn client(mut self, client: reqwest_middleware::ClientWithMiddleware) -> Self {
+    pub fn client(mut self, client: BaseClient) -> Self {
         self.client = Some(client);
         self
     }
@@ -95,21 +95,9 @@ impl SourceCacheBuilder {
         }
 
         // Use default client if not specified
-        let client = self.client.unwrap_or_else(|| {
-            let retry_policy =
-                reqwest_retry::policies::ExponentialBackoff::builder().build_with_max_retries(3);
-
-            let client = reqwest::Client::builder()
-                .timeout(Duration::from_secs(300))
-                .build()
-                .expect("Failed to create HTTP client");
-
-            reqwest_middleware::ClientBuilder::new(client)
-                .with(reqwest_retry::RetryTransientMiddleware::new_with_policy(
-                    retry_policy,
-                ))
-                .build()
-        });
+        let client = self
+            .client
+            .unwrap_or_else(|| BaseClient::builder().timeout(300).build());
 
         SourceCache::new(cache_dir, client, self.progress_handler).await
     }

@@ -98,10 +98,10 @@ pub async fn fetch_sources(
     let recipe_dir = &directories.recipe_dir;
     let cache_src = directories.output_dir.join("src_cache");
 
-    // Create the source cache using the authenticated client from tool_configuration
+    // Create the source cache using the client from tool_configuration
     let source_cache = SourceCacheBuilder::new()
         .cache_dir(&cache_src)
-        .client(tool_configuration.client.get_client().clone())
+        .client(tool_configuration.client.clone())
         .build()
         .await
         .map_err(|e| SourceError::UnknownError(e.to_string()))?;
@@ -117,7 +117,7 @@ pub async fn fetch_sources(
                 let cache_git_source =
                     CacheGitSource::try_from(git_src).map_err(SourceError::UnknownError)?;
 
-                let result_path = source_cache
+                let result = source_cache
                     .get_source(&CacheSource::Git(cache_git_source))
                     .await
                     .map_err(|e| SourceError::UnknownError(e.to_string()))?;
@@ -136,7 +136,7 @@ pub async fn fetch_sources(
                 tool_configuration.fancy_log_handler.wrap_in_progress(
                     "copying source into isolated environment",
                     || {
-                        copy_dir::CopyDir::new(&result_path, &dest_dir)
+                        copy_dir::CopyDir::new(&result.path, &dest_dir)
                             .use_gitignore(false)
                             .run()
                     },
@@ -146,7 +146,16 @@ pub async fn fetch_sources(
                     patch::apply_patches(git_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
                 }
 
-                rendered_sources.push(src.clone());
+                // Update the git source with the resolved commit SHA
+                let updated_src = if let Some(commit_sha) = result.git_commit {
+                    let mut updated_git_src = git_src.clone();
+                    updated_git_src.rev = crate::recipe::parser::GitRev::Commit(commit_sha);
+                    Source::Git(updated_git_src)
+                } else {
+                    src.clone()
+                };
+
+                rendered_sources.push(updated_src);
             }
             Source::Url(url_src) => {
                 let first_url = url_src
@@ -159,7 +168,7 @@ pub async fn fetch_sources(
                 let cache_url_source =
                     CacheUrlSource::try_from(url_src).map_err(SourceError::UnknownError)?;
 
-                let result_path = source_cache
+                let result = source_cache
                     .get_source(&CacheSource::Url(cache_url_source))
                     .await
                     .map_err(|e| SourceError::UnknownError(e.to_string()))?;
@@ -176,16 +185,16 @@ pub async fn fetch_sources(
                 }
 
                 // Copy source code to work dir
-                if result_path.is_dir() {
+                if result.path.is_dir() {
                     tracing::info!(
                         "Copying source from cache: {} to {}",
-                        result_path.display(),
+                        result.path.display(),
                         dest_dir.display()
                     );
                     tool_configuration.fancy_log_handler.wrap_in_progress(
                         "copying source into isolated environment",
                         || {
-                            copy_dir::CopyDir::new(&result_path, &dest_dir)
+                            copy_dir::CopyDir::new(&result.path, &dest_dir)
                                 .use_gitignore(false)
                                 .run()
                         },
@@ -200,10 +209,10 @@ pub async fn fetch_sources(
                     let target = dest_dir.join(file_name);
                     tracing::info!(
                         "Copying source from cache: {} to {}",
-                        result_path.display(),
+                        result.path.display(),
                         target.display()
                     );
-                    fs::copy(&result_path, &target)?;
+                    fs::copy(&result.path, &target)?;
                 }
 
                 if !url_src.patches().is_empty() {

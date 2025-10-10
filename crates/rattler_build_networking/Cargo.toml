@@ -7,11 +7,15 @@ license.workspace = true
 repository.workspace = true
 description = "Networking utilities for rattler-build"
 
+[features]
+default = []
+middleware = ["rattler_networking"]
+
 [dependencies]
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-rattler_networking = "0.25.16"
+rattler_networking = { version = "0.25.16", optional = true }
 url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]

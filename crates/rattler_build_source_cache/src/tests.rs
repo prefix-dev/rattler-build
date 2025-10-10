@@ -141,7 +141,8 @@ mod source_cache_tests {
         let source = Source::Path(path.clone());
 
         let result = cache.get_source(&source).await.unwrap();
-        assert_eq!(result, path);
+        assert_eq!(result.path, path);
+        assert_eq!(result.git_commit, None);
     }
 
     #[tokio::test]

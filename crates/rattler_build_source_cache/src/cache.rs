@@ -10,14 +10,24 @@ use crate::{
     lock::LockManager,
     source::{Checksum, GitSource, Source, UrlSource},
 };
+use rattler_build_networking::BaseClient;
 use rattler_git::resolver::GitResolver;
+
+/// Result of fetching a source from the cache
+#[derive(Debug, Clone)]
+pub struct SourceResult {
+    /// Path to the fetched source
+    pub path: PathBuf,
+    /// For git sources, the resolved commit SHA
+    pub git_commit: Option<String>,
+}
 
 /// The main source cache that handles Git, URL, and Path sources
 pub struct SourceCache {
     cache_dir: PathBuf,
     index: CacheIndex,
     lock_manager: LockManager,
-    client: reqwest_middleware::ClientWithMiddleware,
+    client: BaseClient,
     git_resolver: GitResolver,
     progress_handler: Option<Box<dyn ProgressHandler>>,
 }
@@ -26,7 +36,7 @@ impl SourceCache {
     /// Create a new source cache
     pub async fn new(
         cache_dir: PathBuf,
-        client: reqwest_middleware::ClientWithMiddleware,
+        client: BaseClient,
         progress_handler: Option<Box<dyn ProgressHandler>>,
     ) -> Result<Self, CacheError> {
         let index = CacheIndex::new(cache_dir.clone()).await?;
@@ -45,19 +55,22 @@ impl SourceCache {
     }
 
     /// Get a source from the cache or fetch it if not present
-    pub async fn get_source(&self, source: &Source) -> Result<PathBuf, CacheError> {
+    pub async fn get_source(&self, source: &Source) -> Result<SourceResult, CacheError> {
         match source {
             Source::Git(git_source) => self.get_git_source(git_source).await,
             Source::Url(url_source) => self.get_url_source(url_source).await,
             Source::Path(path) => {
                 // Path sources are not cached, just return the path
-                Ok(path.clone())
+                Ok(SourceResult {
+                    path: path.clone(),
+                    git_commit: None,
+                })
             }
         }
     }
 
     /// Get a Git source from the cache or clone it if not present
-    async fn get_git_source(&self, source: &GitSource) -> Result<PathBuf, CacheError> {
+    async fn get_git_source(&self, source: &GitSource) -> Result<SourceResult, CacheError> {
         let git_url = source.to_git_url();
         let key =
             CacheIndex::generate_git_cache_key(source.url.as_ref(), &source.reference.to_string());
@@ -72,7 +85,10 @@ impl SourceCache {
                 // Update access time
                 self.index.touch(&key).await?;
                 tracing::info!("Found git source in cache: {}", cache_path.display());
-                return Ok(cache_path);
+                return Ok(SourceResult {
+                    path: cache_path,
+                    git_commit: entry.git_commit.clone(),
+                });
             }
         }
 
@@ -83,7 +99,12 @@ impl SourceCache {
 
         let fetch_result = self
             .git_resolver
-            .fetch(git_url.clone(), self.client.clone(), git_cache, None)
+            .fetch(
+                git_url.clone(),
+                self.client.get_client().clone(),
+                git_cache,
+                None,
+            )
             .await
             .map_err(|e| CacheError::Git(format!("Git fetch failed: {}", e)))?;
 
@@ -102,7 +123,7 @@ impl SourceCache {
             checksum: None,
             checksum_type: None,
             actual_filename: None,
-            git_commit: Some(commit_hash),
+            git_commit: Some(commit_hash.clone()),
             git_rev: Some(source.reference.to_string()),
             cache_path: repo_path
                 .strip_prefix(&self.cache_dir)
@@ -116,7 +137,10 @@ impl SourceCache {
 
         self.index.insert(key, entry).await?;
 
-        Ok(repo_path)
+        Ok(SourceResult {
+            path: repo_path,
+            git_commit: Some(commit_hash),
+        })
     }
 
     /// Pull LFS files for a git repository
@@ -169,7 +193,7 @@ impl SourceCache {
     }
 
     /// Get a URL source from the cache or download it if not present
-    async fn get_url_source(&self, source: &UrlSource) -> Result<PathBuf, CacheError> {
+    async fn get_url_source(&self, source: &UrlSource) -> Result<SourceResult, CacheError> {
         // Try each URL until one succeeds
         let mut last_error = None;
 
@@ -178,7 +202,12 @@ impl SourceCache {
                 .try_url(url, source.checksum.as_ref(), source.file_name.as_deref())
                 .await
             {
-                Ok(path) => return Ok(path),
+                Ok(path) => {
+                    return Ok(SourceResult {
+                        path,
+                        git_commit: None,
+                    });
+                }
                 Err(e) => {
                     tracing::warn!("Failed to fetch from {}: {}", url, e);
                     last_error = Some(e);
@@ -317,8 +346,8 @@ impl SourceCache {
             return Ok((cache_path, Some(filename.to_string())));
         }
 
-        // Download from HTTP/HTTPS
-        let response = self.client.get(url.clone()).send().await?;
+        // Download from HTTP/HTTPS - use the appropriate client based on SSL settings
+        let response = self.client.for_host(url).get(url.clone()).send().await?;
 
         if !response.status().is_success() {
             return Err(CacheError::Download(

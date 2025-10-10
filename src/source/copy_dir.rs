@@ -208,11 +208,11 @@ impl<'a> CopyDir<'a> {
         self
     }
 
-    // TODO: figure out if we need this
-    // pub fn exclude_git_dirs(mut self, b: bool) -> Self {
-    //     self.exclude_git_dirs = b;
-    //     self
-    // }
+    #[allow(unused)]
+    pub fn exclude_git_dirs(mut self, b: bool) -> Self {
+        self.exclude_git_dirs = b;
+        self
+    }
 
     pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
