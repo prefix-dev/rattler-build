@@ -20,6 +20,7 @@ pub mod system_tools;
 pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
+pub mod types;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
@@ -40,7 +41,6 @@ mod windows;
 mod package_cache_reporter;
 pub mod source_code;
 
-use crate::render::resolved_dependencies::RunExportsDownload;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
@@ -56,7 +56,7 @@ use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
 use metadata::{
-    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
+    BuildConfiguration, BuildSummary, Output, PackageIdentifier, PackagingSettings,
     build_reindexed_channels,
 };
 use miette::{Context, IntoDiagnostic};
@@ -73,11 +73,13 @@ use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
+use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
+use types::Directories;
 use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
