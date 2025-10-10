@@ -905,7 +905,7 @@ mod tests {
             // Create the source cache
             let source_cache = SourceCacheBuilder::new()
                 .cache_dir(&cache_src)
-                .client(tool_config.client.get_client().clone())
+                .client(tool_config.client.clone())
                 .build()
                 .await
                 .into_diagnostic()?;
