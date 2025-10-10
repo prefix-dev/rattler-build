@@ -20,7 +20,6 @@ pub mod system_tools;
 pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
-mod url_with_trailing_slash;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
