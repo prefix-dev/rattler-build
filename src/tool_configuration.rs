@@ -430,7 +430,7 @@ impl ConfigurationBuilder {
         });
         let client = self
             .client
-            .unwrap_or_else(|| rattler_build_networking::BaseClient::new());
+            .unwrap_or_else(rattler_build_networking::BaseClient::new);
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
