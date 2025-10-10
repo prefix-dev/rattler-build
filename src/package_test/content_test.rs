@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use crate::metadata::Output;
+use crate::package_test::TestError;
 use crate::recipe::parser::PackageContentsTest;
-use crate::{metadata::Output, package_test::TestError};
 use globset::{Glob, GlobBuilder, GlobSet};
 use rattler_conda_types::{Platform, package::PathsJson};
 

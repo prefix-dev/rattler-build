@@ -18,15 +18,15 @@ use thiserror::Error;
 
 use super::pin::PinError;
 use crate::{
-    metadata::{BuildConfiguration, Output, build_reindexed_channels},
+    metadata::Output,
+    metadata::{BuildConfiguration, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
     recipe::parser::{Dependency, Requirements},
     render::{
         pin::PinArgs,
         solver::{install_packages, solve_environment},
     },
-    tool_configuration,
-    tool_configuration::Configuration,
+    tool_configuration::{self, Configuration},
 };
 
 use super::reporters::GatewayReporter;

@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     env_vars,
-    metadata::{Output, build_reindexed_channels},
+    metadata::Output,
+    metadata::build_reindexed_channels,
     packaging::Files,
     recipe::{
         Jinja,

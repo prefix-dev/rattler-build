@@ -31,7 +31,8 @@ use tokio_util::{
 
 use crate::{
     env_vars::{self},
-    metadata::{Debug, Output},
+    metadata::Debug,
+    metadata::Output,
     recipe::{
         Jinja,
         parser::{Script, ScriptContent},
