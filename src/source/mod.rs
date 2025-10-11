@@ -284,8 +284,8 @@ pub async fn fetch_sources(
                         let file_url = url::Url::from_file_path(&src_path).unwrap();
                         let temp_url_source = crate::recipe::parser::UrlSource {
                             url: vec![file_url],
-                            md5: path_src.md5.clone(),
-                            sha256: path_src.sha256.clone(),
+                            md5: path_src.md5,
+                            sha256: path_src.sha256,
                             patches: path_src.patches.clone(),
                             file_name: None, // Don't set file_name for extraction
                             target_directory: path_src.target_directory.clone(),
