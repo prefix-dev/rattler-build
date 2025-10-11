@@ -1,0 +1,11 @@
+---
+source: src/recipe/parser/glob_vec.rs
+expression: "&as_yaml"
+---
+include:
+- foo/
+- bar
+- baz/**/qux
+exclude:
+- foo/bar
+- bar/*.txt

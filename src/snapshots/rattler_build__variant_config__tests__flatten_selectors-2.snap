@@ -1,0 +1,14 @@
+---
+source: src/variant_config.rs
+expression: res
+---
+pin_run_as_build: ~
+zip_keys: ~
+c_compiler:
+  - vs2019
+cplusplus:
+  - "100"
+cxx_compiler:
+  - vs2019
+python:
+  - "3.10"
