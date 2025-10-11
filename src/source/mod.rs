@@ -79,6 +79,51 @@ pub enum SourceError {
     GitNotFound(#[from] ToolError),
 }
 
+/// Copies content from a cache result to the destination directory
+fn copy_from_cache(
+    cache_path: &Path,
+    dest_dir: &Path,
+    file_name: Option<&str>,
+    tool_config: &tool_configuration::Configuration,
+) -> Result<(), SourceError> {
+    if cache_path.is_dir() {
+        tracing::info!(
+            "Copying source from cache: {} to {}",
+            cache_path.display(),
+            dest_dir.display()
+        );
+        tool_config.fancy_log_handler.wrap_in_progress(
+            "copying source into isolated environment",
+            || {
+                copy_dir::CopyDir::new(cache_path, dest_dir)
+                    .use_gitignore(false)
+                    .run()
+            },
+        )?;
+    } else {
+        let file_name = file_name.ok_or_else(|| {
+            SourceError::UnknownError("Missing file name for file copy".to_string())
+        })?;
+        let target = dest_dir.join(file_name);
+        tracing::info!(
+            "Copying source from cache: {} to {}",
+            cache_path.display(),
+            target.display()
+        );
+        fs::copy(cache_path, &target)?;
+    }
+    Ok(())
+}
+
+/// Computes the destination directory from an optional target directory
+fn compute_dest_dir(work_dir: &Path, target_directory: Option<&PathBuf>) -> PathBuf {
+    if let Some(target_directory) = target_directory {
+        work_dir.join(target_directory)
+    } else {
+        work_dir.to_path_buf()
+    }
+}
+
 /// Fetches all sources in a list of sources and applies specified patches
 pub async fn fetch_sources(
     sources: &[Source],
@@ -126,17 +171,10 @@ pub async fn fetch_sources(
                     .await
                     .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-                let dest_dir = if let Some(target_directory) = git_src.target_directory() {
-                    work_dir.join(target_directory)
-                } else {
-                    work_dir.to_path_buf()
-                };
+                let dest_dir = compute_dest_dir(work_dir, git_src.target_directory());
+                fs::create_dir_all(&dest_dir)?;
 
-                // Copy from cache to work directory
-                if !dest_dir.exists() {
-                    fs::create_dir_all(&dest_dir)?;
-                }
-
+                // Copy from cache to work directory (Git sources are always directories)
                 tool_configuration.fancy_log_handler.wrap_in_progress(
                     "copying source into isolated environment",
                     || {
@@ -146,9 +184,7 @@ pub async fn fetch_sources(
                     },
                 )?;
 
-                if !git_src.patches().is_empty() {
-                    patch::apply_patches(git_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
-                }
+                patch::apply_patches(git_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
 
                 // Update the git source with the resolved commit SHA
                 let updated_src = if let Some(commit_sha) = result.git_commit {
@@ -177,78 +213,42 @@ pub async fn fetch_sources(
                     .await
                     .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-                let dest_dir = if let Some(target_directory) = url_src.target_directory() {
-                    work_dir.join(target_directory)
-                } else {
-                    work_dir.to_path_buf()
-                };
-
-                // Create folder if it doesn't exist
-                if !dest_dir.exists() {
-                    fs::create_dir_all(&dest_dir)?;
-                }
+                let dest_dir = compute_dest_dir(work_dir, url_src.target_directory());
+                fs::create_dir_all(&dest_dir)?;
 
                 // Copy source code to work dir
                 if result.path.is_dir() {
-                    tracing::info!(
-                        "Copying source from cache: {} to {}",
-                        result.path.display(),
-                        dest_dir.display()
-                    );
-                    tool_configuration.fancy_log_handler.wrap_in_progress(
-                        "copying source into isolated environment",
-                        || {
-                            copy_dir::CopyDir::new(&result.path, &dest_dir)
-                                .use_gitignore(false)
-                                .run()
-                        },
-                    )?;
+                    copy_from_cache(&result.path, &dest_dir, None, tool_configuration)?;
                 } else {
+                    // For non-extracted files, we need to determine the file name
                     let file_name_from_url = first_url
                         .path_segments()
                         .and_then(|mut segments| segments.next_back().map(|last| last.to_string()))
                         .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
                     let file_name = url_src.file_name().unwrap_or(&file_name_from_url);
-                    let target = dest_dir.join(file_name);
-                    tracing::info!(
-                        "Copying source from cache: {} to {}",
-                        result.path.display(),
-                        target.display()
-                    );
-                    fs::copy(&result.path, &target)?;
+                    copy_from_cache(&result.path, &dest_dir, Some(file_name), tool_configuration)?;
                 }
 
-                if !url_src.patches().is_empty() {
-                    patch::apply_patches(url_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
-                }
+                patch::apply_patches(url_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
 
                 rendered_sources.push(src.clone());
             }
             Source::Path(path_src) => {
-                // Path sources work the same way as before
                 let rel_src_path = path_src.path();
                 tracing::debug!("Processing source path '{}'", rel_src_path.display());
                 let src_path = fs::canonicalize(recipe_dir.join(rel_src_path))?;
                 tracing::info!("Fetching source from path: {}", src_path.display());
 
-                let dest_dir = if let Some(target_directory) = path_src.target_directory() {
-                    work_dir.join(target_directory)
-                } else {
-                    work_dir.to_path_buf()
-                };
-
-                // Create folder if it doesn't exist
-                if !dest_dir.exists() {
-                    fs::create_dir_all(&dest_dir)?;
-                }
-
                 if !src_path.exists() {
                     return Err(SourceError::FileNotFound(src_path));
                 }
 
-                // Copy path sources as before (they're not cached)
+                let dest_dir = compute_dest_dir(work_dir, path_src.target_directory());
+                fs::create_dir_all(&dest_dir)?;
+
                 if src_path.is_dir() {
+                    // Copy directory with gitignore and filter support
                     let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
                         "copying source into isolated environment",
                         || {
@@ -263,85 +263,68 @@ pub async fn fetch_sources(
                         copy_result.copied_paths().len()
                     );
                 } else {
-                    // Handle file copying
+                    // Handle single file
                     let file_name_from_path = src_path
                         .file_name()
                         .map(|s| s.to_string_lossy().to_string());
-                    let file_name = path_src.file_name().cloned().or(file_name_from_path);
+                    let file_name = path_src
+                        .file_name()
+                        .cloned()
+                        .or(file_name_from_path)
+                        .ok_or_else(|| SourceError::FileNotFound(src_path.clone()))?;
 
-                    if let Some(file_name) = file_name {
-                        // If file_name is explicitly set, don't auto-extract (user wants the file as-is)
-                        let should_extract = path_src.file_name().is_none()
-                            && (is_tarball(&file_name)
-                                || src_path.extension() == Some(OsStr::new("zip"))
-                                || src_path.extension() == Some(OsStr::new("7z")));
+                    // Determine if we should extract this file
+                    let should_extract = path_src.file_name().is_none()
+                        && (is_tarball(&file_name)
+                            || src_path.extension() == Some(OsStr::new("zip"))
+                            || src_path.extension() == Some(OsStr::new("7z")));
 
-                        if should_extract {
-                            // Turn this into a URL source with `file://` URL and fetch it using the cache
-                            let file_url = url::Url::from_file_path(&src_path).unwrap();
-                            let temp_url_source = crate::recipe::parser::UrlSource {
-                                url: vec![file_url],
-                                md5: path_src.md5.clone(),
-                                sha256: path_src.sha256.clone(),
-                                patches: path_src.patches.clone(),
-                                file_name: None, // Don't set file_name for extraction
-                                target_directory: path_src.target_directory.clone(),
-                            };
+                    if should_extract {
+                        // Extract archive via cache
+                        let file_url = url::Url::from_file_path(&src_path).unwrap();
+                        let temp_url_source = crate::recipe::parser::UrlSource {
+                            url: vec![file_url],
+                            md5: path_src.md5.clone(),
+                            sha256: path_src.sha256.clone(),
+                            patches: path_src.patches.clone(),
+                            file_name: None, // Don't set file_name for extraction
+                            target_directory: path_src.target_directory.clone(),
+                        };
 
-                            let cache_url_source = CacheUrlSource::try_from(&temp_url_source)
-                                .map_err(SourceError::UnknownError)?;
-                            let result = source_cache
-                                .get_source(&CacheSource::Url(cache_url_source))
-                                .await
-                                .map_err(|e| SourceError::UnknownError(e.to_string()))?;
+                        let cache_url_source = CacheUrlSource::try_from(&temp_url_source)
+                            .map_err(SourceError::UnknownError)?;
+                        let result = source_cache
+                            .get_source(&CacheSource::Url(cache_url_source))
+                            .await
+                            .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-                            // Copy the extracted content from cache to work dir
-                            if result.path.is_dir() {
-                                tracing::info!(
-                                    "Copying extracted source from cache: {} to {}",
-                                    result.path.display(),
-                                    dest_dir.display()
-                                );
-                                tool_configuration.fancy_log_handler.wrap_in_progress(
-                                    "copying source into isolated environment",
-                                    || {
-                                        copy_dir::CopyDir::new(&result.path, &dest_dir)
-                                            .use_gitignore(false)
-                                            .run()
-                                    },
-                                )?;
-                            } else {
-                                let target = dest_dir.join(&file_name);
-                                tracing::info!(
-                                    "Copying source from cache: {} to {}",
-                                    result.path.display(),
-                                    target.display()
-                                );
-                                fs::copy(&result.path, &target)?;
-                            }
-                        } else {
-                            // Non-archive file or file_name explicitly set, copy directly
-                            let dest = dest_dir.join(&file_name);
-                            tracing::info!(
-                                "Copying source from path: {} to {}",
-                                src_path.display(),
-                                dest.display()
-                            );
-                            if let Some(checksum) = checksum::Checksum::from_path_source(path_src) {
-                                if !checksum.validate(&src_path) {
-                                    return Err(SourceError::ValidationFailed);
-                                }
-                            }
-                            fs::copy(&src_path, dest)?;
-                        }
+                        copy_from_cache(
+                            &result.path,
+                            &dest_dir,
+                            Some(&file_name),
+                            tool_configuration,
+                        )?;
                     } else {
-                        return Err(SourceError::FileNotFound(src_path));
+                        // Copy file directly without extraction
+                        let dest = dest_dir.join(&file_name);
+                        tracing::info!(
+                            "Copying source from path: {} to {}",
+                            src_path.display(),
+                            dest.display()
+                        );
+
+                        // Validate checksum if provided
+                        if let Some(checksum) = checksum::Checksum::from_path_source(path_src) {
+                            if !checksum.validate(&src_path) {
+                                return Err(SourceError::ValidationFailed);
+                            }
+                        }
+
+                        fs::copy(&src_path, dest)?;
                     }
                 }
 
-                if !path_src.patches().is_empty() {
-                    patch::apply_patches(path_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
-                }
+                patch::apply_patches(path_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
 
                 rendered_sources.push(src.clone());
             }

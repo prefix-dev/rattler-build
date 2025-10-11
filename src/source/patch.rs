@@ -309,7 +309,6 @@ pub(crate) fn apply_patch_custom(
 }
 
 /// Applies all patches in a list of patches to the specified work directory
-/// Currently only supports patching with the `patch` command.
 pub(crate) fn apply_patches(
     patches: &[PathBuf],
     work_dir: &Path,
