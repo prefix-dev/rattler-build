@@ -1,5 +1,8 @@
 //! Module for fetching sources and applying patches
-use std::path::{Path, PathBuf, StripPrefixError};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf, StripPrefixError},
+};
 
 use crate::{
     metadata::{Directories, Output},
@@ -9,6 +12,7 @@ use crate::{
 };
 
 use fs_err as fs;
+use rattler_build_source_cache::cache::is_tarball;
 use serde::{Deserialize, Serialize};
 
 use crate::system_tools::SystemTools;
@@ -84,8 +88,7 @@ pub async fn fetch_sources(
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
 ) -> Result<Vec<Source>, SourceError> {
     use rattler_build_source_cache::{
-        GitSource as CacheGitSource, Source as CacheSource, SourceCacheBuilder,
-        UrlSource as CacheUrlSource,
+        Source as CacheSource, SourceCacheBuilder, UrlSource as CacheUrlSource,
     };
 
     if sources.is_empty() {
@@ -113,9 +116,10 @@ pub async fn fetch_sources(
             Source::Git(git_src) => {
                 tracing::info!("Fetching source from git repo: {}", git_src.url());
 
-                // Convert to cache git source using TryFrom
-                let cache_git_source =
-                    CacheGitSource::try_from(git_src).map_err(SourceError::UnknownError)?;
+                // Convert to cache git source, passing recipe_dir for relative path resolution
+                let cache_git_source = git_src
+                    .to_cache_source(recipe_dir)
+                    .map_err(SourceError::UnknownError)?;
 
                 let result = source_cache
                     .get_source(&CacheSource::Git(cache_git_source))
@@ -259,25 +263,77 @@ pub async fn fetch_sources(
                         copy_result.copied_paths().len()
                     );
                 } else {
-                    // Handle file copying as before
-                    let file_name = path_src
+                    // Handle file copying
+                    let file_name_from_path = src_path
                         .file_name()
-                        .cloned()
-                        .or_else(|| src_path.file_name().map(PathBuf::from));
+                        .map(|s| s.to_string_lossy().to_string());
+                    let file_name = path_src.file_name().cloned().or(file_name_from_path);
 
                     if let Some(file_name) = file_name {
-                        let dest = dest_dir.join(&file_name);
-                        tracing::info!(
-                            "Copying source from path: {} to {}",
-                            src_path.display(),
-                            dest.display()
-                        );
-                        if let Some(checksum) = checksum::Checksum::from_path_source(path_src) {
-                            if !checksum.validate(&src_path) {
-                                return Err(SourceError::ValidationFailed);
+                        // If file_name is explicitly set, don't auto-extract (user wants the file as-is)
+                        let should_extract = path_src.file_name().is_none()
+                            && (is_tarball(&file_name)
+                                || src_path.extension() == Some(OsStr::new("zip"))
+                                || src_path.extension() == Some(OsStr::new("7z")));
+
+                        if should_extract {
+                            // Turn this into a URL source with `file://` URL and fetch it using the cache
+                            let file_url = url::Url::from_file_path(&src_path).unwrap();
+                            let temp_url_source = crate::recipe::parser::UrlSource {
+                                url: vec![file_url],
+                                md5: path_src.md5.clone(),
+                                sha256: path_src.sha256.clone(),
+                                patches: path_src.patches.clone(),
+                                file_name: None, // Don't set file_name for extraction
+                                target_directory: path_src.target_directory.clone(),
+                            };
+
+                            let cache_url_source = CacheUrlSource::try_from(&temp_url_source)
+                                .map_err(SourceError::UnknownError)?;
+                            let result = source_cache
+                                .get_source(&CacheSource::Url(cache_url_source))
+                                .await
+                                .map_err(|e| SourceError::UnknownError(e.to_string()))?;
+
+                            // Copy the extracted content from cache to work dir
+                            if result.path.is_dir() {
+                                tracing::info!(
+                                    "Copying extracted source from cache: {} to {}",
+                                    result.path.display(),
+                                    dest_dir.display()
+                                );
+                                tool_configuration.fancy_log_handler.wrap_in_progress(
+                                    "copying source into isolated environment",
+                                    || {
+                                        copy_dir::CopyDir::new(&result.path, &dest_dir)
+                                            .use_gitignore(false)
+                                            .run()
+                                    },
+                                )?;
+                            } else {
+                                let target = dest_dir.join(&file_name);
+                                tracing::info!(
+                                    "Copying source from cache: {} to {}",
+                                    result.path.display(),
+                                    target.display()
+                                );
+                                fs::copy(&result.path, &target)?;
                             }
+                        } else {
+                            // Non-archive file or file_name explicitly set, copy directly
+                            let dest = dest_dir.join(&file_name);
+                            tracing::info!(
+                                "Copying source from path: {} to {}",
+                                src_path.display(),
+                                dest.display()
+                            );
+                            if let Some(checksum) = checksum::Checksum::from_path_source(path_src) {
+                                if !checksum.validate(&src_path) {
+                                    return Err(SourceError::ValidationFailed);
+                                }
+                            }
+                            fs::copy(&src_path, dest)?;
                         }
-                        fs::copy(&src_path, dest)?;
                     } else {
                         return Err(SourceError::FileNotFound(src_path));
                     }

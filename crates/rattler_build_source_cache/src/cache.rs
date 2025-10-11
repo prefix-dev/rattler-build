@@ -1,5 +1,6 @@
 //! Main source cache implementation
 
+use flate2::read::GzDecoder;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
@@ -525,38 +526,58 @@ fn is_archive(name: &str) -> bool {
     is_tarball(name) || name.ends_with(".zip") || name.ends_with(".7z")
 }
 
-fn is_tarball(name: &str) -> bool {
-    name.ends_with(".tar")
-        || name.ends_with(".tar.gz")
-        || name.ends_with(".tgz")
-        || name.ends_with(".tar.bz2")
-        || name.ends_with(".tbz2")
-        || name.ends_with(".tar.xz")
-        || name.ends_with(".txz")
-        || name.ends_with(".tar.zst")
+/// Checks whether file has known tarball extension
+pub fn is_tarball(file_name: &str) -> bool {
+    [
+        // Gzip
+        ".tar.gz",
+        ".tgz",
+        ".taz",
+        // Bzip2
+        ".tar.bz2",
+        ".tbz",
+        ".tbz2",
+        ".tz2",
+        // Xz2
+        ".tar.lzma",
+        ".tlz",
+        ".tar.xz",
+        ".txz",
+        // Zstd
+        ".tar.zst",
+        ".tzst",
+        // Compress
+        ".tar.Z",
+        ".taZ",
+        // Lzip
+        ".tar.lz",
+        // Lzop
+        ".tar.lzo",
+        // PlainTar
+        ".tar",
+    ]
+    .iter()
+    .any(|ext| file_name.ends_with(ext))
 }
 
 fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
-    use flate2::read::GzDecoder;
-    use tar::Archive;
-
-    let file = std::fs::File::open(archive)
+    let file = fs_err::File::open(archive)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to open archive: {}", e)))?;
 
     let name = archive.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
     if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
-        let mut archive = Archive::new(GzDecoder::new(file));
+        let mut archive = tar::Archive::new(GzDecoder::new(file));
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.gz: {}", e)))?;
     } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") {
-        let mut archive = Archive::new(bzip2::read::BzDecoder::new(file));
+        let mut archive = tar::Archive::new(bzip2::read::BzDecoder::new(file));
         archive.unpack(target).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
         })?;
     } else if name.ends_with(".tar.xz") || name.ends_with(".txz") {
-        let mut archive = Archive::new(xz2::read::XzDecoder::new(file));
+        let mut archive = tar::Archive::new(xz2::read::XzDecoder::new(file));
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.xz: {}", e)))?;
@@ -564,12 +585,12 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
         let decoder = zstd::stream::read::Decoder::new(file).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to create zstd decoder: {}", e))
         })?;
-        let mut archive = Archive::new(decoder);
+        let mut archive = tar::Archive::new(decoder);
         archive.unpack(target).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to extract tar.zst: {}", e))
         })?;
     } else {
-        let mut archive = Archive::new(file);
+        let mut archive = tar::Archive::new(file);
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar: {}", e)))?;
@@ -579,7 +600,7 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
 }
 
 fn extract_zip(archive: &Path, target: &Path) -> Result<(), CacheError> {
-    let file = std::fs::File::open(archive)
+    let file = fs_err::File::open(archive)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to open archive: {}", e)))?;
 
     let mut archive = zip::ZipArchive::new(file)

@@ -268,14 +268,19 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     match url_ {
                         Ok(url_) => url = Some(GitUrl::Url(url_)),
                         Err(err) => {
-                            tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
-                            if url_str.contains('@') {
-                                tracing::warn!("attempting to use as SSH url");
-                                url = Some(GitUrl::Ssh(url_str));
-                            } else {
-                                tracing::warn!("attempting to parse as path");
+                            if url_str.starts_with(".") {
                                 let path = PathBuf::from(url_str);
                                 url = Some(GitUrl::Path(path));
+                            } else {
+                                tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
+                                if url_str.contains('@') {
+                                    tracing::warn!("attempting to use as SSH url");
+                                    url = Some(GitUrl::Ssh(url_str));
+                                } else {
+                                    tracing::warn!("attempting to parse as path");
+                                    let path = PathBuf::from(url_str);
+                                    url = Some(GitUrl::Path(path));
+                                }
                             }
                         }
                     }
@@ -522,7 +527,7 @@ pub struct PathSource {
     pub target_directory: Option<PathBuf>,
     /// Optionally a file name to rename the file to
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub file_name: Option<PathBuf>,
+    pub file_name: Option<String>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
     #[serde(
         default = "default_gitignore",
@@ -560,7 +565,7 @@ impl PathSource {
     }
 
     /// Get the file name.
-    pub const fn file_name(&self) -> Option<&PathBuf> {
+    pub const fn file_name(&self) -> Option<&String> {
         self.file_name.as_ref()
     }
 
@@ -640,14 +645,16 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
 }
 
 // Conversion implementations for source cache integration
-impl TryFrom<&GitSource> for rattler_build_source_cache::GitSource {
-    type Error = String;
-
-    fn try_from(git_src: &GitSource) -> Result<Self, Self::Error> {
+impl GitSource {
+    /// Convert to cache git source with relative path resolution
+    pub fn to_cache_source(
+        &self,
+        relative_root: &std::path::Path,
+    ) -> Result<rattler_build_source_cache::GitSource, String> {
         use rattler_build_source_cache::GitReference;
 
         // Convert GitRev to GitReference
-        let reference = match &git_src.rev {
+        let reference = match &self.rev {
             GitRev::Branch(b) => GitReference::Branch(b.clone()),
             GitRev::Tag(t) => GitReference::Tag(t.clone()),
             GitRev::Commit(c) => GitReference::from_rev(c.clone()),
@@ -655,20 +662,28 @@ impl TryFrom<&GitSource> for rattler_build_source_cache::GitSource {
         };
 
         // Convert GitUrl to url::Url
-        let url = match &git_src.url {
+        let url = match &self.url {
             GitUrl::Url(url) => url.clone(),
             GitUrl::Ssh(ssh) => {
-                url::Url::parse(ssh).map_err(|e| format!("Failed to parse SSH URL: {}", e))?
+                Url::parse(ssh).map_err(|e| format!("Failed to parse SSH URL: {}", e))?
             }
-            GitUrl::Path(path) => url::Url::from_file_path(path)
-                .map_err(|_| "Failed to convert path to URL".to_string())?,
+            GitUrl::Path(path) => {
+                let abs_path = if path.is_absolute() {
+                    path.clone()
+                } else {
+                    relative_root.join(path)
+                };
+                Url::from_file_path(&abs_path).map_err(|_| {
+                    format!(
+                        "Failed to convert local path to file URL: {}",
+                        abs_path.display()
+                    )
+                })?
+            }
         };
 
         Ok(rattler_build_source_cache::GitSource::new(
-            url,
-            reference,
-            git_src.depth,
-            git_src.lfs,
+            url, reference, self.depth, self.lfs,
         ))
     }
 }
