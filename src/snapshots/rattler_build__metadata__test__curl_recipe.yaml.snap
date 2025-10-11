@@ -1,0 +1,645 @@
+---
+source: src/metadata.rs
+expression: output
+---
+recipe:
+  schema_version: 1
+  context: {}
+  package:
+    name: curl
+    version: 8.0.1
+  source:
+    - url: "http://curl.haxx.se/download/curl-8.0.1.tar.bz2"
+      sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
+  build:
+    number: 0
+    string: h60d57d3_0
+  requirements:
+    build:
+      - clang_osx-arm64
+      - make
+      - perl
+      - pkg-config
+      - libtool
+  about:
+    homepage: "http://curl.haxx.se/"
+    repository: "https://github.com/curl/curl"
+    documentation: "https://curl.haxx.se/docs/"
+    license: curl
+    license_file:
+      - COPYING
+    summary: tool and library for transferring data with URL syntax
+    description: "Curl is an open source command line tool and library for transferring data\nwith URL syntax. It is used in command lines or scripts to transfer data."
+build_configuration:
+  target_platform: osx-arm64
+  host_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  build_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  variant:
+    target_platform: osx-arm64
+  hash:
+    hash: 60d57d3
+  directories:
+    host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
+    build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/build_env
+    work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/work
+    build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293
+  channels:
+    - "https://conda.anaconda.org/conda-forge"
+  channel_priority: strict
+  solve_strategy: highest
+  timestamp: "2023-11-21T13:28:13.086796Z"
+  subpackages:
+    curl:
+      name: curl
+      version: 8.0.1
+      build_string: h60d57d3_0
+  packaging_settings:
+    archive_type: tar_bz2
+    compression_level: 3
+finalized_dependencies:
+  build:
+    specs:
+      - source: clang_osx-arm64
+      - source: make
+      - source: perl
+      - source: pkg-config
+      - source: libtool
+    resolved:
+      - build: he57ea6c_1
+        build_number: 1
+        depends: []
+        license: GPL-3.0-or-later
+        license_family: GPL
+        md5: 1939d04ef89e38fde652ee8c669e092f
+        name: make
+        sha256: a011e3e1c4caec821eb4213d0a0154d39e5f81a44d2e8bafe6f84e7840c3909e
+        size: 253227
+        subdir: osx-arm64
+        timestamp: 1602706492919
+        version: "4.3"
+        fn: make-4.3-he57ea6c_1.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/make-4.3-he57ea6c_1.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hab62308_1008
+        build_number: 1008
+        depends:
+          - "libglib >=2.70.2,<3.0a0"
+          - "libiconv >=1.16,<2.0.0a0"
+        license: GPL-2.0-or-later
+        license_family: GPL
+        md5: 8d173d52214679033079d1b0582075aa
+        name: pkg-config
+        sha256: e59e69111709d097f9938e72ba19811ec1ef36aababdbed77bd7c767f15639e0
+        size: 46049
+        subdir: osx-arm64
+        timestamp: 1650239029040
+        version: 0.29.2
+        fn: pkg-config-0.29.2-hab62308_1008.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/pkg-config-0.29.2-hab62308_1008.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: he4db4b2_0
+        build_number: 0
+        depends: []
+        license: GPL and LGPL
+        md5: 686f9c755574aa221f29fbcf36a67265
+        name: libiconv
+        sha256: 2eb33065783b802f71d52bef6f15ce0fafea0adc8506f10ebd0d490244087bec
+        size: 1407036
+        subdir: osx-arm64
+        timestamp: 1652700956112
+        version: "1.17"
+        fn: libiconv-1.17-he4db4b2_0.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libiconv-1.17-he4db4b2_0.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hb7217d7_0
+        build_number: 0
+        depends: []
+        license: GPL-2.0-or-later
+        license_family: GPL
+        md5: fe8efc3385f58f0055e8100b07225055
+        name: libtool
+        sha256: efe50471d2baea151f2a93f1f99c05553f8c88e3f0065cdc267e1aa2e8c42449
+        size: 408403
+        subdir: osx-arm64
+        timestamp: 1672362003513
+        version: 2.4.7
+        fn: libtool-2.4.7-hb7217d7_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libtool-2.4.7-hb7217d7_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: 4_hf2054a2_perl5
+        build_number: 4
+        depends: []
+        license: GPL-1.0-or-later OR Artistic-1.0-Perl
+        md5: d9389447361c7b53e3bbfc947cae0973
+        name: perl
+        run_exports:
+          weak:
+            - "perl >=5.32.1,<5.33.0a0 *_perl5"
+          noarch:
+            - "perl >=5.32.1,<6.0a0 *_perl5"
+        sha256: 3bf5e43b9c7127f6d0529393535ac69c25483b3b8b76cb71ffa454f6aa73f5a3
+        size: 14472770
+        subdir: osx-arm64
+        timestamp: 1689377922184
+        version: 5.32.1
+        fn: perl-5.32.1-4_hf2054a2_perl5.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/perl-5.32.1-4_hf2054a2_perl5.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hb438215_1
+        build_number: 1
+        constrains:
+          - glib 2.78.1 *_1
+        depends:
+          - __osx >=10.9
+          - "gettext >=0.21.1,<1.0a0"
+          - libcxx >=16.0.6
+          - "libffi >=3.4,<4.0a0"
+          - "libiconv >=1.17,<2.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - "pcre2 >=10.42,<10.43.0a0"
+        license: LGPL-2.1-or-later
+        md5: 3ce7984906f2ba4be662c219e8def77e
+        name: libglib
+        sha256: 3d94b6d8d27301f23b0d0c8b078c5e0bf6fc4f5f6260f3794cfaf7e247fe9e20
+        size: 2437667
+        subdir: osx-arm64
+        timestamp: 1700083295397
+        version: 2.78.1
+        fn: libglib-2.78.1-hb438215_1.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libglib-2.78.1-hb438215_1.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h26f9a81_0
+        build_number: 0
+        depends:
+          - "bzip2 >=1.0.8,<2.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+        license: BSD-3-Clause
+        license_family: BSD
+        md5: 3e12888ecc8ee1ebee2eef9b7856357a
+        name: pcre2
+        sha256: 0335a08349ecd8dce0b81699fcd61b58415e658fe953feb27316fbb994df0685
+        size: 619848
+        subdir: osx-arm64
+        timestamp: 1698610997157
+        version: "10.42"
+        fn: pcre2-10.42-h26f9a81_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/pcre2-10.42-h26f9a81_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h4653b0c_0
+        build_number: 0
+        depends: []
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: 9d7d724faf0413bf1dbc5a85935700c8
+        name: libcxx
+        sha256: 11d3fb51c14832d9e4f6d84080a375dec21ea8a3a381a1910e67ff9cedc20355
+        size: 1160232
+        subdir: osx-arm64
+        timestamp: 1686896993785
+        version: 16.0.6
+        fn: libcxx-16.0.6-h4653b0c_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libcxx-16.0.6-h4653b0c_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h0186832_0
+        build_number: 0
+        depends:
+          - "libiconv >=1.17,<2.0a0"
+        license: LGPL-2.1-or-later AND GPL-3.0-or-later
+        md5: 63d2ff6fddfa74e5458488fd311bf635
+        name: gettext
+        sha256: 093b2f96dc4b48e4952ab8946facec98b34b708a056251fc19c23c3aad30039e
+        size: 4021036
+        subdir: osx-arm64
+        timestamp: 1665674192347
+        version: 0.21.1
+        fn: gettext-0.21.1-h0186832_0.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/gettext-0.21.1-h0186832_0.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h53f4e23_5
+        build_number: 5
+        constrains:
+          - zlib 1.2.13 *_5
+        depends: []
+        license: Zlib
+        license_family: Other
+        md5: 1a47f5236db2e06a320ffa0392f81bd8
+        name: libzlib
+        sha256: ab1c8aefa2d54322a63aaeeefe9cf877411851738616c4068e0dccc66b9c758a
+        size: 48102
+        subdir: osx-arm64
+        timestamp: 1686575426584
+        version: 1.2.13
+        fn: libzlib-1.2.13-h53f4e23_5.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.2.13-h53f4e23_5.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h93a5062_5
+        build_number: 5
+        depends: []
+        license: bzip2-1.0.6
+        license_family: BSD
+        md5: 1bbc659ca658bfd49a481b5ef7a0f40f
+        name: bzip2
+        sha256: bfa84296a638bea78a8bb29abc493ee95f2a0218775642474a840411b950fe5f
+        size: 122325
+        subdir: osx-arm64
+        timestamp: 1699280294368
+        version: 1.0.8
+        fn: bzip2-1.0.8-h93a5062_5.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-h93a5062_5.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h3422bc3_5
+        build_number: 5
+        depends: []
+        license: MIT
+        license_family: MIT
+        md5: 086914b672be056eb70fd4285b6783b6
+        name: libffi
+        sha256: 41b3d13efb775e340e4dba549ab5c029611ea6918703096b2eaa9c015c0750ca
+        size: 39020
+        subdir: osx-arm64
+        timestamp: 1636488587153
+        version: 3.4.2
+        fn: libffi-3.4.2-h3422bc3_5.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libffi-3.4.2-h3422bc3_5.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h54d7cd3_6
+        build_number: 6
+        depends:
+          - clang_impl_osx-arm64 16.0.6 hc421ffc_6
+        license: BSD-3-Clause
+        license_family: BSD
+        md5: eff396eaf83eada374913218765eea6f
+        name: clang_osx-arm64
+        sha256: 1d60c42e2f82d2ce4532000ca4345a8b39575bc76fd3fc7a52b7e337c6df22b5
+        size: 20724
+        subdir: osx-arm64
+        timestamp: 1698100642592
+        version: 16.0.6
+        fn: clang_osx-arm64-16.0.6-h54d7cd3_6.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/clang_osx-arm64-16.0.6-h54d7cd3_6.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hc421ffc_6
+        build_number: 6
+        depends:
+          - cctools_osx-arm64
+          - clang 16.0.6.*
+          - compiler-rt 16.0.6.*
+          - ld64_osx-arm64
+          - llvm-tools 16.0.6.*
+        license: BSD-3-Clause
+        license_family: BSD
+        md5: 849c0169de6bfc88253c81b2cb4ecc76
+        name: clang_impl_osx-arm64
+        sha256: 17667b5808d591331d202a49901b55a811f2b1c1486ba6b3037119915b369e9f
+        size: 17744
+        subdir: osx-arm64
+        timestamp: 1698100629642
+        version: 16.0.6
+        fn: clang_impl_osx-arm64-16.0.6-hc421ffc_6.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/clang_impl_osx-arm64-16.0.6-hc421ffc_6.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hf8d1dfb_1
+        build_number: 1
+        depends:
+          - clang 16.0.6.*
+          - clangxx 16.0.6.*
+          - compiler-rt_osx-arm64 16.0.6.*
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: APACHE
+        md5: b3dd772c4dc658203d4b5d10464cf829
+        name: compiler-rt
+        sha256: ce6a004144c7cb9b92622d3fefc5d85b4dbbe911c9a94809914e3a5b5d944e1f
+        size: 92928
+        subdir: osx-arm64
+        timestamp: 1697086766487
+        version: 16.0.6
+        fn: compiler-rt-16.0.6-hf8d1dfb_1.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/compiler-rt-16.0.6-hf8d1dfb_1.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hf8d1dfb_1
+        build_number: 1
+        constrains:
+          - compiler-rt 16.0.6
+        depends:
+          - clang 16.0.6.*
+          - clangxx 16.0.6.*
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: APACHE
+        md5: b6f8ffc7803d16bba414fdb8518209a2
+        name: compiler-rt_osx-arm64
+        noarch: generic
+        sha256: bb2acbf670084a35d4f704f92c053b990f8473045112628ecaea9e5f32c47785
+        size: 9925990
+        subdir: noarch
+        timestamp: 1697086736249
+        version: 16.0.6
+        fn: compiler-rt_osx-arm64-16.0.6-hf8d1dfb_1.conda
+        url: "https://conda.anaconda.org/conda-forge/noarch/compiler-rt_osx-arm64-16.0.6-hf8d1dfb_1.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: he79909e_2
+        build_number: 2
+        constrains:
+          - clang-tools 16.0.6.*
+          - llvm 16.0.6.*
+          - llvm-tools 16.0.6.*
+          - llvmdev 16.0.6.*
+        depends:
+          - clang-16 16.0.6 default_h07b2d96_2
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: 93c8a691ef0718a88f9529226f576e81
+        name: clang
+        sha256: dd6054b330994ab04d5f50852973546447540aec9462efb13028323e50739f34
+        size: 21253
+        subdir: osx-arm64
+        timestamp: 1699835657826
+        version: 16.0.6
+        fn: clang-16.0.6-he79909e_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/clang-16.0.6-he79909e_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: default_h07b2d96_2
+        build_number: 2
+        constrains:
+          - llvm-tools 16.0.6
+          - clangdev 16.0.6
+          - clang-tools 16.0.6
+          - clangxx 16.0.6
+        depends:
+          - libclang-cpp16 16.0.6 default_h07b2d96_2
+          - libcxx >=15.0.7
+          - "libllvm16 >=16.0.6,<16.1.0a0"
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: f7f1f0401b164aee25fcb046ce30afcb
+        name: clang-16
+        sha256: 7d65bda0e91f4dc5506a4c874b37242fc6a7243bc9ee462caaa23ba628713a5b
+        size: 690616
+        subdir: osx-arm64
+        timestamp: 1699835521679
+        version: 16.0.6
+        fn: clang-16-16.0.6-default_h07b2d96_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/clang-16-16.0.6-default_h07b2d96_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: default_h07b2d96_2
+        build_number: 2
+        depends:
+          - libcxx >=15.0.7
+          - "libllvm16 >=16.0.6,<16.1.0a0"
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: ac7ed9f991c11684e87acbc2c16a81bb
+        name: libclang-cpp16
+        sha256: 3e1ba7510d9a8287edd9585bbdc6235307dbbd6563bcd28221f53c6789479438
+        size: 11751076
+        subdir: osx-arm64
+        timestamp: 1699835382160
+        version: 16.0.6
+        fn: libclang-cpp16-16.0.6-default_h07b2d96_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libclang-cpp16-16.0.6-default_h07b2d96_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: default_h298e243_2
+        build_number: 2
+        depends:
+          - clang 16.0.6 he79909e_2
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: d4458b347db9073517317c4e652a4409
+        name: clangxx
+        sha256: d863b5d350c285257334aab8352121399cd3052922bf4a4e0e233df125f254d0
+        size: 21389
+        subdir: osx-arm64
+        timestamp: 1699835683576
+        version: 16.0.6
+        fn: clangxx-16.0.6-default_h298e243_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/clangxx-16.0.6-default_h298e243_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: he79909e_2
+        build_number: 2
+        depends:
+          - libcxx >=15
+          - "libxml2 >=2.11.4,<2.12.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - "zstd >=1.5.2,<1.6.0a0"
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: ce01d4aa770fc6910bce0d47b4e4c538
+        name: libllvm16
+        sha256: 91f42ba27db3cc25e271146d9016eccb99c7b948d22025f39748468cee2dc05f
+        size: 23239572
+        subdir: osx-arm64
+        timestamp: 1691574275053
+        version: 16.0.6
+        fn: libllvm16-16.0.6-he79909e_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libllvm16-16.0.6-he79909e_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: he79909e_2
+        build_number: 2
+        constrains:
+          - llvmdev   16.0.6
+          - clang 16.0.6.*
+          - clang-tools 16.0.6.*
+          - llvm 16.0.6.*
+        depends:
+          - libllvm16 16.0.6 he79909e_2
+          - "libxml2 >=2.11.4,<2.12.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - "zstd >=1.5.2,<1.6.0a0"
+        license: Apache-2.0 WITH LLVM-exception
+        license_family: Apache
+        md5: 1be8e193b74101ac2bde79a27e9444c1
+        name: llvm-tools
+        sha256: 134921812fb11630c2920f2f33b49ba485acac1db9b13cac2847927a99b294f7
+        size: 20650993
+        subdir: osx-arm64
+        timestamp: 1691574442545
+        version: 16.0.6
+        fn: llvm-tools-16.0.6-he79909e_2.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-16.0.6-he79909e_2.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: ha4bd21c_15
+        build_number: 15
+        constrains:
+          - ld 609.*
+          - cctools_osx-arm64 973.0.1.*
+          - "clang >=16.0.6,<17.0a0"
+          - cctools 973.0.1.*
+        depends:
+          - libcxx
+          - "libllvm16 >=16.0.6,<16.1.0a0"
+          - sigtool
+          - "tapi >=1100.0.11,<1101.0a0"
+        license: APSL-2.0
+        license_family: Other
+        md5: f4ccf19a2d6eb1f94de77e8aa64c2147
+        name: ld64_osx-arm64
+        sha256: 9342ff5f5bccbacf6d67cacc8a81fcded6e6ffebb9bc784a3af591cc6f6067d5
+        size: 1047737
+        subdir: osx-arm64
+        timestamp: 1697075431855
+        version: "609"
+        fn: ld64_osx-arm64-609-ha4bd21c_15.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/ld64_osx-arm64-609-ha4bd21c_15.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: he4954df_0
+        build_number: 0
+        depends:
+          - libcxx >=11.0.0.a0
+        license: NCSA
+        license_family: MIT
+        md5: d83362e7d0513f35f454bc50b0ca591d
+        name: tapi
+        sha256: 1709265fbee693a9e8b4126b0a3e68a6c4718b05821c659279c1af051f2d40f3
+        size: 191416
+        subdir: osx-arm64
+        timestamp: 1602687595316
+        version: 1100.0.11
+        fn: tapi-1100.0.11-he4954df_0.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/tapi-1100.0.11-he4954df_0.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h0d0cfa8_0
+        build_number: 0
+        depends:
+          - "icu >=73.2,<74.0a0"
+          - "libiconv >=1.17,<2.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - "xz >=5.2.6,<6.0a0"
+        license: MIT
+        license_family: MIT
+        md5: 37e112ce9494adfcee6c0c7bf3b5d98d
+        name: libxml2
+        sha256: 07d2da8f3fb00fb6f84cd36b5329174b878105889f0fe21e79981f27573b47af
+        size: 588705
+        subdir: osx-arm64
+        timestamp: 1700245318212
+        version: 2.11.6
+        fn: libxml2-2.11.6-h0d0cfa8_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libxml2-2.11.6-h0d0cfa8_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h57fd34a_0
+        build_number: 0
+        depends: []
+        license: LGPL-2.1 and GPL-2.0
+        md5: 39c6b54e94014701dd157f4f576ed211
+        name: xz
+        sha256: 59d78af0c3e071021cfe82dc40134c19dab8cdf804324b62940f5c8cd71803ec
+        size: 235693
+        subdir: osx-arm64
+        timestamp: 1660346961024
+        version: 5.2.6
+        fn: xz-5.2.6-h57fd34a_0.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/xz-5.2.6-h57fd34a_0.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hc8870d7_0
+        build_number: 0
+        depends: []
+        license: MIT
+        license_family: MIT
+        md5: 8521bd47c0e11c5902535bb1a17c565f
+        name: icu
+        sha256: ff9cd0c6cd1349954c801fb443c94192b637e1b414514539f3c49c56a39f51b1
+        size: 11997841
+        subdir: osx-arm64
+        timestamp: 1692902104771
+        version: "73.2"
+        fn: icu-73.2-hc8870d7_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/icu-73.2-hc8870d7_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h44b9a77_0
+        build_number: 0
+        depends:
+          - "openssl >=3.0.0,<4.0a0"
+        license: MIT
+        license_family: MIT
+        md5: 4a2cac04f86a4540b8c9b8d8f597848f
+        name: sigtool
+        sha256: 70791ae00a3756830cb50451db55f63e2a42a2fa2a8f1bab1ebd36bbb7d55bff
+        size: 210264
+        subdir: osx-arm64
+        timestamp: 1643442231687
+        version: 0.1.3
+        fn: sigtool-0.1.3-h44b9a77_0.tar.bz2
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/sigtool-0.1.3-h44b9a77_0.tar.bz2"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h4f39d0f_0
+        build_number: 0
+        depends:
+          - "libzlib >=1.2.13,<1.3.0a0"
+        license: BSD-3-Clause
+        license_family: BSD
+        md5: 5b212cfb7f9d71d603ad891879dc7933
+        name: zstd
+        sha256: 7e1fe6057628bbb56849a6741455bbb88705bae6d6646257e57904ac5ee5a481
+        size: 400508
+        subdir: osx-arm64
+        timestamp: 1693151393180
+        version: 1.5.5
+        fn: zstd-1.5.5-h4f39d0f_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.5-h4f39d0f_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h62378fb_15
+        build_number: 15
+        constrains:
+          - clang 16.0.*
+          - cctools 973.0.1.*
+          - ld64 609.*
+        depends:
+          - "ld64_osx-arm64 >=609,<610.0a0"
+          - libcxx
+          - "libllvm16 >=16.0.6,<16.1.0a0"
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - sigtool
+        license: APSL-2.0
+        license_family: Other
+        md5: ef8fba44cc38ccb4741634eddd3e14f5
+        name: cctools_osx-arm64
+        sha256: 731de9bfd150975a54b9c6ec6c107af5a72443744454ef03084be9d691c8a7db
+        size: 1122843
+        subdir: osx-arm64
+        timestamp: 1697075636223
+        version: 973.0.1
+        fn: cctools_osx-arm64-973.0.1-h62378fb_15.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/cctools_osx-arm64-973.0.1-h62378fb_15.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h0d3ecfb_0
+        build_number: 0
+        constrains:
+          - pyopenssl >=22.1
+        depends:
+          - ca-certificates
+        license: Apache-2.0
+        license_family: Apache
+        md5: 5a89552fececf4cd99628318ccbb67a3
+        name: openssl
+        sha256: 3c715b1d4940c7ad6065935db18924b85a54048dde066f963cfc250340639457
+        size: 2147225
+        subdir: osx-arm64
+        timestamp: 1698164947105
+        version: 3.1.4
+        fn: openssl-3.1.4-h0d3ecfb_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.1.4-h0d3ecfb_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: hf0a4a13_0
+        build_number: 0
+        depends: []
+        license: ISC
+        md5: c01da7c77cfcba2107174e25c1d47384
+        name: ca-certificates
+        sha256: 75f4762a55f7e9453a603c967d549bfa0a7a9669d502d103cb6fbf8c86d993c6
+        size: 154444
+        subdir: osx-arm64
+        timestamp: 1700280972188
+        version: 2023.11.17
+        fn: ca-certificates-2023.11.17-hf0a4a13_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2023.11.17-hf0a4a13_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+  host: ~
+  run:
+    depends: []
+    constraints: []
+finalized_sources: ~
+system_tools:
+  rattler-build: 0.12.1

@@ -1,0 +1,23 @@
+---
+source: src/metadata.rs
+expression: resolved_dependencies
+---
+specs:
+  - source: python 3.12.* h12332
+resolved:
+  - arch: x86_64
+    build: h123
+    build_number: 0
+    depends: []
+    license: MIT
+    md5: 68b329da9893e34099c7d8ad5cb9c940
+    name: test
+    platform: linux
+    sha256: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+    size: 123123
+    subdir: linux-64
+    timestamp: 123123
+    version: 1.2.3
+    fn: test-1.2.3-h123.tar.bz2
+    url: "https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2"
+    channel: test

@@ -1,0 +1,205 @@
+---
+source: src/recipe/parser.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+context: {}
+package:
+  name: single_output
+  version: 0.1.0
+source:
+- url: https://github.com/test/test-package.tar.gz
+  sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+  md5: 1234567890abcdef1234567890abcdef
+  file_name: test-package.tar.gz
+  patches:
+  - file.patch
+  target_directory: test-package
+- path: ./some-file.tar.gz
+  sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+  md5: 1234567890abcdef1234567890abcdef
+  patches:
+  - file.patch
+  target_directory: test-package
+  file_name: test-package.tar.gz
+  filter:
+    include:
+    - include/*
+    - '**/foo.txt'
+    - x.txt
+    - out/**
+    exclude:
+    - foo/*
+    - bar.txt
+    - baz/
+- git: https://github.com/test/package
+  depth: 10
+  patches:
+  - file.patch
+  target_directory: test-package-git
+build:
+  number: 0
+  string: blabla
+  script:
+    env:
+      TEST: MYENV_VAR
+    secrets:
+    - SECRET_VARIABLE
+    content:
+    - test
+  noarch: generic
+  python:
+    entry_points:
+    - test = test:main
+    skip_pyc_compilation:
+    - test/bla/**/*.py
+    use_python_app_entrypoint: true
+    site_packages_path: foo/bar/lib/python4.5/site-packages
+  dynamic_linking:
+    rpaths:
+    - lib/
+    binary_relocation:
+    - lib/*
+    missing_dso_allowlist:
+    - /all/lib/**/*
+    rpath_allowlist:
+    - bla/*
+    overdepending_behavior: error
+  always_copy_files:
+  - file1
+  - file2/**/*
+  always_include_files:
+  - file1
+  - file2/**/*
+  merge_build_and_host_envs: true
+  variant:
+    use_keys:
+    - key1
+    - key2
+    ignore_keys:
+    - python
+    - numpy
+    down_prioritize_variant: -5
+  prefix_detection:
+    force_file_type:
+      text:
+      - bla/*.txt
+      binary:
+      - bla/*.so
+    ignore: true
+    ignore_binary_files: true
+  post_process:
+  - files:
+    - '*.cmake'
+    - bla/
+    regex: complicated(.*)regex
+    replacement: simple_string
+  files:
+    include:
+    - include/*
+    - '**/foo.txt'
+    - x.txt
+    - out/**
+    exclude:
+    - foo/*
+    - bar.txt
+    - baz/
+requirements:
+  build:
+  - gcc_linux-64
+  - cmake
+  host:
+  - openssl
+  run:
+  - python >=3.11
+  - perl
+  - pin_subpackage:
+      name: test
+      exact: true
+  - pin_subpackage:
+      name: test
+      lower_bound: x.x.x.x.x.x
+      upper_bound: x
+      build: foo*
+  run_constraints:
+  - python * *cpython
+  run_exports:
+    noarch:
+    - python
+    strong:
+    - python
+    strong_constraints:
+    - python
+    weak:
+    - python
+    weak_constraints:
+    - python
+  ignore_run_exports:
+    by_name:
+    - python
+    from_package:
+    - python
+tests:
+- script: |
+    echo FOO
+  requirements:
+    run:
+    - bash
+    build:
+    - bash
+  files:
+    source:
+    - include/
+    - src/*.c
+    - src_file.txt
+- package_contents:
+    files:
+      exists:
+      - test.txt
+      - license.txt
+      not_exists:
+      - test2.txt
+      - license2.txt
+    lib:
+      exists:
+      - footest.so
+      - footest.so.*
+      not_exists:
+      - test.so
+      - test.so.*
+- package_contents:
+    files:
+    - test.txt
+    - license.txt
+    site_packages:
+    - numpy
+    - numpy/foo/__init__.py
+    bin:
+    - test
+    - test.exe
+    - foo*
+    lib:
+    - test
+    - test.so.*
+    include:
+    - test.h
+    - test.h*
+- python:
+    imports:
+    - numpy
+    - pypy
+    pip_check: false
+about:
+  homepage: https://cool-website.com/
+  repository: https://github.com/some-repo/some-package
+  documentation: https://cool-docs.com/
+  license: BSD-3-Clause
+  license_file:
+  - LICENSE
+  summary: A summary
+  description: More description
+extra:
+  recipe-maintainers:
+  - some-maintainer
+  random_keys:
+    with: random_value

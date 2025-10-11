@@ -1,0 +1,8 @@
+---
+source: src/recipe/parser/test.rs
+expression: yaml_serde
+---
+- python:
+    imports:
+    - numpy.testing
+    - numpy.matrix

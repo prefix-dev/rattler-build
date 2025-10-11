@@ -1,0 +1,15 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × failed to parse YAML: duplicate key.
+   ╭─[8:1]
+ 7 │ 
+ 8 │ build:
+   · ──┬──
+   ·   ╰── duplicate key here
+ 9 │   string: "1234"
+   ╰────

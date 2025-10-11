@@ -1,0 +1,10 @@
+---
+source: src/system_tools.rs
+expression: json
+---
+{
+  "git": "3.0.0",
+  "install_name_tool": "2.0.0",
+  "patchelf": "1.0.0",
+  "rattler-build": "0.0.0"
+}

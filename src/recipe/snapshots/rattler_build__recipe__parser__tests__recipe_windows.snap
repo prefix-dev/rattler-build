@@ -1,0 +1,474 @@
+---
+source: src/recipe/parser.rs
+expression: win_recipe.unwrap()
+---
+Recipe {
+    schema_version: 1,
+    context: {
+        "name": "xtensor",
+        "version": "0.24.6",
+    },
+    package: Package {
+        name: PackageName {
+            normalized: None,
+            source: "xtensor",
+        },
+        version: VersionWithSource {
+            version: Version {
+                version: [[0], [0], [24], [6]],
+                local: [],
+            },
+            source: Some(
+                "0.24.6",
+            ),
+        },
+    },
+    cache: None,
+    source: [
+        Url(
+            UrlSource {
+                url: [
+                    Url {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "github.com",
+                            ),
+                        ),
+                        port: None,
+                        path: "/xtensor-stack/xtensor/archive/0.24.6.tar.gz",
+                        query: None,
+                        fragment: None,
+                    },
+                ],
+                sha256: Some(
+                    [
+                        248,
+                        114,
+                        89,
+                        181,
+                        26,
+                        171,
+                        175,
+                        221,
+                        17,
+                        131,
+                        148,
+                        119,
+                        71,
+                        237,
+                        255,
+                        244,
+                        207,
+                        247,
+                        93,
+                        85,
+                        55,
+                        83,
+                        52,
+                        242,
+                        232,
+                        28,
+                        238,
+                        109,
+                        198,
+                        142,
+                        246,
+                        85,
+                    ],
+                ),
+                md5: None,
+                file_name: None,
+                patches: [],
+                target_directory: None,
+            },
+        ),
+    ],
+    build: Build {
+        number: 0,
+        string: Derived,
+        skip: Skip(
+            [
+                (
+                    "win and vc14",
+                    Span {
+                        start: Some(
+                            Marker {
+                                source: 0,
+                                character: [FILTERED],
+                                line: 16,
+                                column: 9,
+                            },
+                        ),
+                        end: None,
+                    },
+                ),
+            ],
+            Some(
+                false,
+            ),
+        ),
+        script: Script {
+            interpreter: None,
+            env: {},
+            secrets: [],
+            content: CommandOrPath(
+                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
+            ),
+            cwd: None,
+        },
+        noarch: NoArchType(
+            None,
+        ),
+        python: Python {
+            entry_points: [],
+            skip_pyc_compilation: [],
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        dynamic_linking: DynamicLinking {
+            rpaths: [],
+            binary_relocation: All(
+                true,
+            ),
+            missing_dso_allowlist: [],
+            rpath_allowlist: [
+                "/usr/lib/**{,/**}",
+            ],
+            overdepending_behavior: Ignore,
+            overlinking_behavior: Ignore,
+        },
+        always_copy_files: [],
+        always_include_files: [],
+        merge_build_and_host_envs: false,
+        variant: VariantKeyUsage {
+            use_keys: [],
+            ignore_keys: [],
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: [],
+                binary: [],
+            },
+            ignore: All(
+                false,
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+        files: [],
+    },
+    requirements: Requirements {
+        build: [
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "vs2017_win-64",
+                        },
+                    ),
+                    version: None,
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    extras: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
+                    license: None,
+                },
+            ),
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "cmake",
+                        },
+                    ),
+                    version: None,
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    extras: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
+                    license: None,
+                },
+            ),
+        ],
+        host: [
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "xtl",
+                        },
+                    ),
+                    version: Some(
+                        Group(
+                            And,
+                            [
+                                Range(
+                                    GreaterEquals,
+                                    Version {
+                                        version: [[0], [0], [7]],
+                                        local: [],
+                                    },
+                                ),
+                                Range(
+                                    Less,
+                                    Version {
+                                        version: [[0], [0], [8]],
+                                        local: [],
+                                    },
+                                ),
+                            ],
+                        ),
+                    ),
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    extras: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
+                    license: None,
+                },
+            ),
+        ],
+        run: [
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "xtl",
+                        },
+                    ),
+                    version: Some(
+                        Group(
+                            And,
+                            [
+                                Range(
+                                    GreaterEquals,
+                                    Version {
+                                        version: [[0], [0], [7]],
+                                        local: [],
+                                    },
+                                ),
+                                Range(
+                                    Less,
+                                    Version {
+                                        version: [[0], [0], [8]],
+                                        local: [],
+                                    },
+                                ),
+                            ],
+                        ),
+                    ),
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    extras: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
+                    license: None,
+                },
+            ),
+        ],
+        run_constraints: [
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "xsimd",
+                        },
+                    ),
+                    version: Some(
+                        Group(
+                            And,
+                            [
+                                Range(
+                                    GreaterEquals,
+                                    Version {
+                                        version: [[0], [8], [0], [3]],
+                                        local: [],
+                                    },
+                                ),
+                                Range(
+                                    Less,
+                                    Version {
+                                        version: [[0], [10]],
+                                        local: [],
+                                    },
+                                ),
+                            ],
+                        ),
+                    ),
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    extras: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
+                    license: None,
+                },
+            ),
+        ],
+        run_exports: RunExports {
+            noarch: [],
+            strong: [],
+            strong_constraints: [],
+            weak: [],
+            weak_constraints: [],
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: {},
+            from_package: {},
+        },
+    },
+    tests: [
+        PackageContents {
+            package_contents: PackageContentsTest {
+                files: [
+                    "share/cmake/xtensor/xtensorConfig.cmake{,/**}",
+                    "share/cmake/xtensor/xtensorConfigVersion.cmake{,/**}",
+                ],
+                site_packages: [],
+                bin: [],
+                lib: [],
+                include: [
+                    "xtensor/xarray.hpp{,/**}",
+                ],
+                strict: false,
+            },
+        },
+        Command(
+            CommandsTest {
+                script: Script {
+                    interpreter: None,
+                    env: {},
+                    secrets: [],
+                    content: Commands(
+                        [
+                            "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                        ],
+                    ),
+                    cwd: None,
+                },
+                requirements: CommandsTestRequirements {
+                    run: [],
+                    build: [],
+                },
+                files: CommandsTestFiles {
+                    source: [],
+                    recipe: [],
+                },
+            },
+        ),
+    ],
+    about: About {
+        homepage: Some(
+            Url {
+                scheme: "https",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: Some(
+                    Domain(
+                        "github.com",
+                    ),
+                ),
+                port: None,
+                path: "/xtensor-stack/xtensor",
+                query: None,
+                fragment: None,
+            },
+        ),
+        repository: Some(
+            Url {
+                scheme: "https",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: Some(
+                    Domain(
+                        "github.com",
+                    ),
+                ),
+                port: None,
+                path: "/xtensor-stack/xtensor",
+                query: None,
+                fragment: None,
+            },
+        ),
+        documentation: Some(
+            Url {
+                scheme: "https",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: Some(
+                    Domain(
+                        "xtensor.readthedocs.io",
+                    ),
+                ),
+                port: None,
+                path: "/",
+                query: None,
+                fragment: None,
+            },
+        ),
+        license: Some(
+            License {
+                original: "BSD-3-Clause",
+                expr: BSD-3-Clause,
+            },
+        ),
+        license_family: None,
+        license_file: [
+            "LICENSE{,/**}",
+        ],
+        summary: Some(
+            "The C++ tensor algebra library",
+        ),
+        description: Some(
+            "Multi dimensional arrays with broadcasting and lazy computing",
+        ),
+        prelink_message: None,
+    },
+    extra: {
+        "recipe-maintainers": Sequence [
+            String("some-maintainer"),
+        ],
+    },
+}

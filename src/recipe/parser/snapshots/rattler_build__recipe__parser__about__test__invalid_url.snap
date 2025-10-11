@@ -1,0 +1,15 @@
+---
+source: src/recipe/parser/about.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × failed to parse URL: relative URL without a base
+   ╭─[7:23]
+ 6 │         about:
+ 7 │             homepage: license_urla.asda:://sdskd
+   ·                       ─────────────┬────────────
+   ·                                    ╰── failed to parse URL
+ 8 │         
+   ╰────

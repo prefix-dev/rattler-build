@@ -1,0 +1,18 @@
+---
+source: src/recipe/parser/about.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × failed to parse SPDX license: 'MIT/X derivate', because: invalid
+  │ character(s)
+  │ See <https://spdx.org/licenses> for the list of valid licenses.
+  │ Use 'LicenseRef-<MyLicense>' if you are using a custom license.
+   ╭─[7:22]
+ 6 │         about:
+ 7 │             license: MIT/X derivate
+   ·                      ───────┬──────
+   ·                             ╰── here
+ 8 │         
+   ╰────

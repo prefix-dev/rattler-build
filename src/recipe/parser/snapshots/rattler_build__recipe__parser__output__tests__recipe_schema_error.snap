@@ -1,0 +1,14 @@
+---
+source: src/recipe/parser/output.rs
+expression: find_outputs_from_src(src.as_str()).unwrap_err()
+---
+  × invalid field `package`.
+   ╭─[3:1]
+ 2 │ 
+ 3 │ package:
+   · ───┬───
+   ·    ╰── here
+ 4 │   name: blib
+   ╰────
+  help: recipe cannot have both `outputs` and `package` fields. Rename
+        `package` to `recipe` or remove `outputs`

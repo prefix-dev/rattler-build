@@ -1,0 +1,17 @@
+---
+source: src/render/resolved_dependencies.rs
+expression: yaml_str
+---
+- source: xyz
+- variant: bar
+  spec: foo
+- pin_subpackage: baz
+  lower_bound: x.x.x
+  upper_bound: x.x
+  exact: true
+  spec: baz
+- pin_compatible: bat
+  lower_bound: x.x.x
+  upper_bound: x.x
+  exact: true
+  spec: bat

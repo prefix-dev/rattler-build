@@ -1,0 +1,17 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × invalid context variable name.
+   ╭─[3:11]
+ 2 │         context:
+ 3 │           foo-bar: baz
+   ·           ───┬───
+   ·              ╰── here
+ 4 │ 
+   ╰────
+  help: `context` variable names cannot contain hyphens (-) as they are not
+        valid in jinja expressions

@@ -1,0 +1,18 @@
+---
+source: src/recipe/parser/requirements.rs
+expression: "serde_yaml::to_string(&requirements).unwrap()"
+---
+build:
+- foo >=3.1
+- pin_subpackage:
+    name: foo
+    lower_bound: x.x.x.x
+    upper_bound: x.x
+- pin_compatible:
+    name: bar
+    lower_bound: x.x
+    upper_bound: x.x.x
+- pin_compatible:
+    name: bar
+    lower_bound: x.x
+    exact: true
