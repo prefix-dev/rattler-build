@@ -1,0 +1,15 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: vars
+---
+[
+    "compiler",
+    "homepage",
+    "license",
+    "maintainer",
+    "name",
+    "pin_subpackage",
+    "platform",
+    "python",
+    "version",
+]

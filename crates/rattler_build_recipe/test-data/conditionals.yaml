@@ -1,0 +1,41 @@
+package:
+  name: conditional-package
+  version: 1.5.0
+
+about:
+  homepage: https://example.com
+  license: Apache-2.0
+  summary: Package with conditional dependencies
+
+requirements:
+  build:
+    - gcc
+    - if: win
+      then: vs2019
+      else: clang
+    - if: unix
+      then: make
+  host:
+    - python
+    - if: linux
+      then: patchelf
+  run:
+    - python
+    - if: linux
+      then: libgcc
+    - if: osx
+      then: libc++
+    - if: win
+      then: msvc-runtime
+  run_exports:
+    strong:
+      - conditional-package
+      - if: cuda
+        then: cuda-toolkit
+    weak:
+      - if: openmp
+        then: libgomp
+
+extra:
+  recipe-maintainers:
+    - maintainer1

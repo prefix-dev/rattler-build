@@ -1,0 +1,16 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: format_miette_report(error_with_source)
+---
+  × missing field: missing required field: package
+   ╭─[missing_package.yaml:1:6]
+ 1 │ ╭─▶ about:
+ 2 │ │     homepage: https://example.com
+ 3 │ │     license: MIT
+ 4 │ │     summary: A package without a package section
+ 5 │ │   
+ 6 │ │   requirements:
+ 7 │ │     build:
+ 8 │ ├─▶     - gcc
+   · ╰──── missing required field: package
+   ╰────

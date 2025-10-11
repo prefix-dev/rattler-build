@@ -1,0 +1,122 @@
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 5
+  string: ${{ build_string }}
+
+  script:
+    - cmake ..
+    - make -j${{ n_jobs }}
+    - make install
+
+  # Python configuration
+  python:
+    entry_points:
+      - mytool = mypackage.cli:main
+      - myapp = mypackage.app:run
+    skip_pyc_compilation:
+      - "**/__pycache__/*"
+      - "*.pyc"
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: lib/python3.11/site-packages
+
+  # File management with validated glob patterns
+  always_copy_files:
+    - bin/critical_tool
+    - lib/important.so
+
+  always_include_files:
+    - share/docs/**/*
+    - share/man/**/*.1
+
+  files:
+    - bin/*
+    - lib/*.so*
+    - lib/**/*.a
+    - include/**/*.h
+    - include/**/*.hpp
+
+  merge_build_and_host_envs: true
+
+  # Dynamic linking configuration
+  dynamic_linking:
+    rpaths:
+      - lib/
+      - lib64/
+    # Can be true/false or list of patterns
+    binary_relocation: true
+    # Or: binary_relocation: [bin/*, lib/*.so]
+
+    missing_dso_allowlist:
+      - libsystem*.so
+      - libdl.so.*
+
+    rpath_allowlist:
+      - /usr/lib/*
+      - /lib/*
+
+    overdepending_behavior: error
+    overlinking_behavior: ignore
+
+  # Variant configuration
+  variant:
+    use_keys:
+      - python
+      - numpy
+    ignore_keys:
+      - perl
+    down_prioritize_variant: -1
+
+  # Prefix detection
+  prefix_detection:
+    force_file_type:
+      text:
+        - "*.txt"
+        - "*.sh"
+        - "*.py"
+      binary:
+        - "*.so"
+        - "*.dylib"
+    # Can be true/false or list of patterns
+    ignore: false
+    # Or: ignore: [tmp/*, .git/*]
+    ignore_binary_files: false
+
+  # Post-processing with regex replacements
+  post_process:
+    - files: [share/**/*.txt, docs/**/*.md]
+      regex: "/old/path"
+      replacement: "/new/path"
+
+    - files: [bin/*.sh]
+      regex: "#!/usr/bin/env bash"
+      replacement: "#!/bin/bash"
+
+about:
+  homepage: https://example.com/${{ name }}
+  repository: https://github.com/org/${{ name }}
+  license: MIT
+  summary: ${{ summary }}
+  description: |
+    This is a comprehensive example demonstrating all advanced build features
+    including glob validation, variant control, prefix detection, and post-processing.
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - make
+  host:
+    - python
+    - numpy
+  run:
+    - python
+    - numpy
+
+extra:
+  recipe-maintainers:
+    - ${{ maintainer }}

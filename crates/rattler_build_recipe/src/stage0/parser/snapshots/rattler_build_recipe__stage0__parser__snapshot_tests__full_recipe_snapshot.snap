@@ -1,0 +1,244 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+Stage0Recipe {
+    package: Package {
+        name: Concrete(
+            PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "full-package",
+                },
+            ),
+        ),
+        version: Concrete(
+            VersionWithSource {
+                version: Version {
+                    version: [[0], [2], [5], [1]],
+                    local: [],
+                },
+                source: Some(
+                    "2.5.1",
+                ),
+            },
+        ),
+    },
+    build: Build {
+        number: 0,
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: None,
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: ConditionalList(
+            [],
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete(
+                    true,
+                ),
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete(
+                    false,
+                ),
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [
+                Value(Concrete("gcc")),
+                Value(Concrete("make")),
+                Value(Concrete("cmake")),
+            ],
+        ),
+        host: ConditionalList(
+            [
+                Value(Concrete("python >=3.8")),
+                Value(Concrete("setuptools")),
+            ],
+        ),
+        run: ConditionalList(
+            [
+                Value(Concrete("python >=3.8")),
+                Value(Concrete("numpy >=1.19")),
+            ],
+        ),
+        run_constraints: ConditionalList(
+            [
+                Value(Concrete("scipy <2.0")),
+            ],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: Some(
+            Concrete(
+                Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "example.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+            ),
+        ),
+        license: Some(
+            Concrete(
+                License(
+                    MIT,
+                ),
+            ),
+        ),
+        license_file: Some(
+            Concrete(
+                "LICENSE",
+            ),
+        ),
+        summary: Some(
+            Concrete(
+                "A comprehensive test package",
+            ),
+        ),
+        description: Some(
+            Concrete(
+                "This package demonstrates all available fields in a recipe",
+            ),
+        ),
+        documentation: Some(
+            Concrete(
+                Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "docs.example.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+            ),
+        ),
+        repository: Some(
+            Concrete(
+                Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/example/full-package",
+                    query: None,
+                    fragment: None,
+                },
+            ),
+        ),
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [
+                Value(Concrete("alice")),
+                Value(Concrete("bob")),
+                Value(Concrete("charlie")),
+            ],
+        ),
+    },
+    source: [],
+    tests: [],
+}

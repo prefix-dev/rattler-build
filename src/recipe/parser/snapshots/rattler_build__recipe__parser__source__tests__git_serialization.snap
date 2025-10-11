@@ -4,4 +4,3 @@ expression: yaml
 ---
 git: https://test.com/test.git
 rev: refs/heads/master
-

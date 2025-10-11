@@ -1,0 +1,8 @@
+about:
+  homepage: https://example.com
+  license: MIT
+  summary: A package without a package section
+
+requirements:
+  build:
+    - gcc

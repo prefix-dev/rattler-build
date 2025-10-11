@@ -1,0 +1,62 @@
+package:
+  name: "${{ name | lower }}"
+  version: "${{ version }}"
+
+about:
+  homepage: https://github.com/${{ org }}/${{ name }}
+  license: "${{ license }}"
+  license_file: LICENSE.txt
+  summary: "${{ summary }}"
+  description: |
+    ${{ description }}
+
+    This is a multi-line description that can contain
+    templates and other formatting.
+  documentation: https://${{ name }}.readthedocs.io
+  repository: https://github.com/${{ org }}/${{ name }}
+
+requirements:
+  build:
+    - '${{ compiler("c") }}'
+    - '${{ compiler("cxx") }}'
+    - if: unix
+      then: make
+    - if: win
+      then: cmake
+  host:
+    - python ${{ python }}
+    - setuptools >=45
+    - wheel
+    - if: build_type == "cuda"
+      then: cuda-toolkit ${{ cuda_version }}
+  run:
+    - python ${{ python }}
+    - numpy >=1.19,<2.0a0
+    - '${{ pin_compatible("numpy") }}'
+    - if: linux
+      then: libgcc-ng >=9.3.0
+    - if: osx
+      then: libcxx >=10.0.0
+    - if: build_type == "cuda"
+      then: cuda-toolkit ${{ cuda_version }}
+  run_constraints:
+    - scipy >=1.5,<2.0a0
+    - if: extra_deps
+      then: pandas >=1.0
+  run_exports:
+    strong:
+      - '${{ pin_subpackage(name, max_pin="x.x") }}'
+    weak:
+      - if: has_cpp_lib
+        then: libstdcxx-ng >=9.3.0
+  ignore_run_exports:
+    by_name:
+      - qt
+      - tk
+    from_package:
+      - python
+
+extra:
+  recipe-maintainers:
+    - "${{ maintainer1 }}"
+    - "${{ maintainer2 }}"
