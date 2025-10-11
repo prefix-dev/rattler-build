@@ -1,0 +1,23 @@
+package:
+  name: "${{ name }}"
+  version: "${{ version }}"
+
+about:
+  homepage: "${{ homepage }}"
+  license: "${{ license }}"
+  summary: "${{ name }} - version ${{ version }}"
+  description: A templated package for ${{ platform }}
+
+requirements:
+  build:
+    - '${{ compiler("c") }}'
+    - '${{ compiler("cxx") }}'
+  host:
+    - python ${{ python }}
+  run:
+    - python ${{ python }}
+    - '${{ pin_subpackage("mylib", max_pin="x.x") }}'
+
+extra:
+  recipe-maintainers:
+    - "${{ maintainer }}"

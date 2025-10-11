@@ -1,0 +1,13 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: format_miette_report(error_with_source)
+---
+  × invalid value: invalid value for recipe: unknown top-level field 'build'
+   ╭─[unknown_top_level_field.yaml:5:1]
+ 4 │ 
+ 5 │ build:
+   · ──┬──
+   ·   ╰── invalid value for recipe: unknown top-level field 'build'
+ 6 │   script: build.sh
+   ╰────
+  help: valid top-level fields are: package, about, requirements, extra

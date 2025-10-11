@@ -1,0 +1,203 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+Stage0Recipe {
+    package: Package {
+        name: Concrete(
+            PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "conditional-package",
+                },
+            ),
+        ),
+        version: Concrete(
+            VersionWithSource {
+                version: Version {
+                    version: [[0], [1], [5], [0]],
+                    local: [],
+                },
+                source: Some(
+                    "1.5.0",
+                ),
+            },
+        ),
+    },
+    build: Build {
+        number: 0,
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: None,
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: ConditionalList(
+            [],
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete(
+                    true,
+                ),
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete(
+                    false,
+                ),
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [
+                Value(Concrete("gcc")),
+                Conditional(Conditional { condition: win, then: ListOrItem("vs2019"), else: ListOrItem("clang") }),
+                Conditional(Conditional { condition: unix, then: ListOrItem("make"), else: ListOrItem([]) }),
+            ],
+        ),
+        host: ConditionalList(
+            [
+                Value(Concrete("python")),
+                Conditional(Conditional { condition: linux, then: ListOrItem("patchelf"), else: ListOrItem([]) }),
+            ],
+        ),
+        run: ConditionalList(
+            [
+                Value(Concrete("python")),
+                Conditional(Conditional { condition: linux, then: ListOrItem("libgcc"), else: ListOrItem([]) }),
+                Conditional(Conditional { condition: osx, then: ListOrItem("libc++"), else: ListOrItem([]) }),
+                Conditional(Conditional { condition: win, then: ListOrItem("msvc-runtime"), else: ListOrItem([]) }),
+            ],
+        ),
+        run_constraints: ConditionalList(
+            [],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [
+                    Value(Concrete("conditional-package")),
+                    Conditional(Conditional { condition: cuda, then: ListOrItem("cuda-toolkit"), else: ListOrItem([]) }),
+                ],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [
+                    Conditional(Conditional { condition: openmp, then: ListOrItem("libgomp"), else: ListOrItem([]) }),
+                ],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: Some(
+            Concrete(
+                Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "example.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+            ),
+        ),
+        license: Some(
+            Concrete(
+                License(
+                    Apache-2.0,
+                ),
+            ),
+        ),
+        license_file: None,
+        summary: Some(
+            Concrete(
+                "Package with conditional dependencies",
+            ),
+        ),
+        description: None,
+        documentation: None,
+        repository: None,
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [
+                Value(Concrete("maintainer1")),
+            ],
+        ),
+    },
+    source: [],
+    tests: [],
+}

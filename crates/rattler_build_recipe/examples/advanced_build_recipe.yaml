@@ -1,0 +1,55 @@
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 3
+  script:
+    - cmake ..
+    - make install
+
+  # File management
+  always_copy_files:
+    - bin/special_tool
+    - lib/critical.so
+
+  always_include_files:
+    - share/docs/*
+
+  files:
+    - bin/*
+    - lib/*.so*
+    - include/**/*.h
+
+  # Environment merging
+  merge_build_and_host_envs: true
+
+  # Dynamic linking configuration
+  dynamic_linking:
+    rpaths:
+      - lib/
+      - lib64/
+    binary_relocation: true
+    missing_dso_allowlist:
+      - libsystem.so
+    rpath_allowlist:
+      - /usr/lib/*
+
+about:
+  homepage: https://example.com/${{ name }}
+  license: BSD-3-Clause
+  summary: Advanced build configuration example
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+  host:
+    - zlib
+  run:
+    - zlib
+
+extra:
+  recipe-maintainers:
+    - ${{ maintainer }}

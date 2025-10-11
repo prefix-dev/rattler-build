@@ -1,0 +1,156 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+Stage0Recipe {
+    package: Package {
+        name: Concrete(
+            PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "minimal-package",
+                },
+            ),
+        ),
+        version: Concrete(
+            VersionWithSource {
+                version: Version {
+                    version: [[0], [1], [0], [0]],
+                    local: [],
+                },
+                source: Some(
+                    "1.0.0",
+                ),
+            },
+        ),
+    },
+    build: Build {
+        number: 0,
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: None,
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: ConditionalList(
+            [],
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete(
+                    true,
+                ),
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete(
+                    false,
+                ),
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [],
+        ),
+        host: ConditionalList(
+            [],
+        ),
+        run: ConditionalList(
+            [],
+        ),
+        run_constraints: ConditionalList(
+            [],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: None,
+        license: None,
+        license_file: None,
+        summary: None,
+        description: None,
+        documentation: None,
+        repository: None,
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [],
+        ),
+    },
+    source: [],
+    tests: [],
+}

@@ -1,5 +1,9 @@
 [workspace]
-members = ["rust-tests", "crates/rattler_build_recipe_generator"]
+members = [
+  "rust-tests",
+  "crates/rattler_build_recipe_generator",
+  "crates/rattler_build_recipe",
+]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]
@@ -36,6 +40,11 @@ toml = "0.9.5"
 tracing = "0.1.41"
 url = "2.5.4"
 zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
+spdx = "0.12.0"
+thiserror = "2.0.17"
+pathdiff = "0.2.3"
+marked-yaml = "0.8.0"
+minijinja = { version = "2.11.0", features = ["unstable_machinery"] }
 
 [package]
 name = "rattler-build"
