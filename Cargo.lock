@@ -4291,6 +4291,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_recipe"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "pathdiff",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "spdx",
+ "thiserror 2.0.17",
+ "url",
+]
+
+[[package]]
 name = "rattler_build_recipe_generator"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,245 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+Stage0Recipe {
+    package: Package {
+        name: Template(
+            JinjaTemplate {
+                source: "${{ name | lower }}",
+                variables: [
+                    "name",
+                ],
+            },
+        ),
+        version: Template(
+            JinjaTemplate {
+                source: "${{ version }}",
+                variables: [
+                    "version",
+                ],
+            },
+        ),
+    },
+    build: Build {
+        number: 0,
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: None,
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: ConditionalList(
+            [],
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete(
+                    true,
+                ),
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete(
+                    false,
+                ),
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [
+                Value(Template(JinjaTemplate { source: "${{ compiler(\"c\") }}", variables: ["compiler"] })),
+                Value(Template(JinjaTemplate { source: "${{ compiler(\"cxx\") }}", variables: ["compiler"] })),
+                Conditional(Conditional { condition: unix, then: ListOrItem("make"), else: ListOrItem([]) }),
+                Conditional(Conditional { condition: win, then: ListOrItem("cmake"), else: ListOrItem([]) }),
+            ],
+        ),
+        host: ConditionalList(
+            [
+                Value(Template(JinjaTemplate { source: "python ${{ python }}", variables: ["python"] })),
+                Value(Concrete("setuptools >=45")),
+                Value(Concrete("wheel")),
+                Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem("cuda-toolkit ${{ cuda_version }}"), else: ListOrItem([]) }),
+            ],
+        ),
+        run: ConditionalList(
+            [
+                Value(Template(JinjaTemplate { source: "python ${{ python }}", variables: ["python"] })),
+                Value(Concrete("numpy >=1.19,<2.0a0")),
+                Value(Template(JinjaTemplate { source: "${{ pin_compatible(\"numpy\") }}", variables: ["pin_compatible"] })),
+                Conditional(Conditional { condition: linux, then: ListOrItem("libgcc-ng >=9.3.0"), else: ListOrItem([]) }),
+                Conditional(Conditional { condition: osx, then: ListOrItem("libcxx >=10.0.0"), else: ListOrItem([]) }),
+                Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem("cuda-toolkit ${{ cuda_version }}"), else: ListOrItem([]) }),
+            ],
+        ),
+        run_constraints: ConditionalList(
+            [
+                Value(Concrete("scipy >=1.5,<2.0a0")),
+                Conditional(Conditional { condition: extra_deps, then: ListOrItem("pandas >=1.0"), else: ListOrItem([]) }),
+            ],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [
+                    Value(Template(JinjaTemplate { source: "${{ pin_subpackage(name, max_pin=\"x.x\") }}", variables: ["name", "pin_subpackage"] })),
+                ],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [
+                    Conditional(Conditional { condition: has_cpp_lib, then: ListOrItem("libstdcxx-ng >=9.3.0"), else: ListOrItem([]) }),
+                ],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [
+                    Value(Concrete("qt")),
+                    Value(Concrete("tk")),
+                ],
+            ),
+            from_package: ConditionalList(
+                [
+                    Value(Concrete("python")),
+                ],
+            ),
+        },
+    },
+    about: About {
+        homepage: Some(
+            Template(
+                JinjaTemplate {
+                    source: "https://github.com/${{ org }}/${{ name }}",
+                    variables: [
+                        "name",
+                        "org",
+                    ],
+                },
+            ),
+        ),
+        license: Some(
+            Template(
+                JinjaTemplate {
+                    source: "${{ license }}",
+                    variables: [
+                        "license",
+                    ],
+                },
+            ),
+        ),
+        license_file: Some(
+            Concrete(
+                "LICENSE.txt",
+            ),
+        ),
+        summary: Some(
+            Template(
+                JinjaTemplate {
+                    source: "${{ summary }}",
+                    variables: [
+                        "summary",
+                    ],
+                },
+            ),
+        ),
+        description: Some(
+            Template(
+                JinjaTemplate {
+                    source: "${{ description }}\n\nThis is a multi-line description that can contain\ntemplates and other formatting.\n",
+                    variables: [
+                        "description",
+                    ],
+                },
+            ),
+        ),
+        documentation: Some(
+            Template(
+                JinjaTemplate {
+                    source: "https://${{ name }}.readthedocs.io",
+                    variables: [
+                        "name",
+                    ],
+                },
+            ),
+        ),
+        repository: Some(
+            Template(
+                JinjaTemplate {
+                    source: "https://github.com/${{ org }}/${{ name }}",
+                    variables: [
+                        "name",
+                        "org",
+                    ],
+                },
+            ),
+        ),
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [
+                Value(Template(JinjaTemplate { source: "${{ maintainer1 }}", variables: ["maintainer1"] })),
+                Value(Template(JinjaTemplate { source: "${{ maintainer2 }}", variables: ["maintainer2"] })),
+            ],
+        ),
+    },
+    source: [],
+    tests: [],
+}

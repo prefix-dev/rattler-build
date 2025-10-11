@@ -1,0 +1,6 @@
+package:
+  name: "${{ name | invalid_filter(unclosed }}"
+  version: 1.0.0
+
+about:
+  summary: "${{ summary with no closing }}"

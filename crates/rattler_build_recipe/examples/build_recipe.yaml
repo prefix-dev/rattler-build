@@ -1,0 +1,27 @@
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 5
+  string: ${{ build_string }}
+  script:
+    - cmake ..
+    - make install
+  noarch: ${{ noarch_type }}
+
+about:
+  homepage: https://example.com/${{ name }}
+  license: MIT
+  summary: A package with build configuration
+
+requirements:
+  build:
+    - cmake
+    - make
+  run:
+    - libstdc++
+
+extra:
+  recipe-maintainers:
+    - ${{ maintainer }}

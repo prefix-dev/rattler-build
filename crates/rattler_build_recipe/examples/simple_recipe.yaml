@@ -1,0 +1,31 @@
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+about:
+  homepage: https://github.com/${{ org }}/${{ name }}
+  license: MIT
+  summary: A ${{ adjective }} package for ${{ name }}
+  description: This is a longer description for ${{ name }}
+
+requirements:
+  build:
+    - cmake
+    - if: unix
+      then:
+        - gcc
+      else:
+        - msvc
+  host:
+    - python >=${{ python_version }}
+  run:
+    - python >=${{ python_version }}
+    - if: unix
+      then:
+        - libgcc
+      else:
+        - msvc-runtime
+
+extra:
+  recipe-maintainers:
+    - ${{ maintainer }}

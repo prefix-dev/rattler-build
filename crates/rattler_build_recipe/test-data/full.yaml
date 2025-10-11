@@ -1,0 +1,32 @@
+package:
+  name: full-package
+  version: 2.5.1
+
+about:
+  homepage: https://example.com
+  license: MIT
+  license_file: LICENSE
+  summary: A comprehensive test package
+  description: This package demonstrates all available fields in a recipe
+  documentation: https://docs.example.com
+  repository: https://github.com/example/full-package
+
+requirements:
+  build:
+    - gcc
+    - make
+    - cmake
+  host:
+    - python >=3.8
+    - setuptools
+  run:
+    - python >=3.8
+    - numpy >=1.19
+  run_constraints:
+    - scipy <2.0
+
+extra:
+  recipe-maintainers:
+    - alice
+    - bob
+    - charlie

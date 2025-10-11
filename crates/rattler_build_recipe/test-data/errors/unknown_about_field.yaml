@@ -1,0 +1,9 @@
+package:
+  name: test-package
+  version: 1.0.0
+
+about:
+  homepage: https://example.com
+  license: MIT
+  maintainer: John Doe
+  contact_email: john@example.com

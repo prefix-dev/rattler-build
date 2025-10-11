@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: format_miette_report(error_with_source)
+---
+  × invalid value: invalid value for name: 'Invalid Package Name With Spaces!' is not a valid package name. Package names can only contain 0-9, a-z, A-Z, -, _, or .
+   ╭─[invalid_package_name.yaml:2:9]
+ 1 │ package:
+ 2 │   name: Invalid Package Name With Spaces!
+   ·         ───┬───
+   ·            ╰── invalid value for name: 'Invalid Package Name With Spaces!' is not a valid package name. Package names can only contain 0-9, a-z, A-Z, -, _, or .
+ 3 │   version: 1.0.0
+   ╰────

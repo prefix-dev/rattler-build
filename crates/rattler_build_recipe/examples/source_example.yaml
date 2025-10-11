@@ -1,0 +1,26 @@
+package:
+  name: example
+  version: 1.0.0
+
+source:
+  - git: https://github.com/example/repo.git
+    tag: v1.0.0
+    patches:
+      - fix.patch
+  - url: https://example.com/archive.tar.gz
+    sha256: abc123
+    file_name: archive.tar.gz
+  - path: ./local/source
+    use_gitignore: true
+    filter:
+      - "*.txt"
+      - "src/"
+
+build:
+  number: 0
+  script:
+    - echo "Building example"
+
+about:
+  summary: Example package with source
+  license: MIT
