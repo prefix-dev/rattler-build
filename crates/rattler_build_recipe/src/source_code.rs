@@ -70,7 +70,7 @@ impl Source {
             .unwrap_or_default()
             .into_owned();
 
-        let contents = std::fs::read_to_string(&path)?;
+        let contents = fs_err::read_to_string(&path)?;
         Ok(Self {
             name,
             code: Arc::from(contents.as_str()),

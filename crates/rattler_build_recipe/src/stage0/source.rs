@@ -174,10 +174,8 @@ impl GitSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(target_dir) = &self.target_directory {
-            if let Value::Template(t) = target_dir {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(Value::Template(t)) = &self.target_directory {
+            vars.extend(t.used_variables().iter().cloned());
         }
         if let Some(lfs) = &self.lfs {
             vars.extend(lfs.used_variables());
@@ -210,10 +208,8 @@ impl UrlSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(target_dir) = &self.target_directory {
-            if let Value::Template(t) = target_dir {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(Value::Template(t)) = &self.target_directory {
+            vars.extend(t.used_variables().iter().cloned());
         }
         vars.sort();
         vars.dedup();
@@ -235,15 +231,11 @@ impl PathSource {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(target_dir) = &self.target_directory {
-            if let Value::Template(t) = target_dir {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(Value::Template(t)) = &self.target_directory {
+            vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(file_name) = &self.file_name {
-            if let Value::Template(t) = file_name {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(Value::Template(t)) = &self.file_name {
+            vars.extend(t.used_variables().iter().cloned());
         }
         for item in &self.filter {
             if let crate::stage0::types::Item::Value(v) = item {

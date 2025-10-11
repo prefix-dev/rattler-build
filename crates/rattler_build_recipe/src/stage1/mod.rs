@@ -34,21 +34,12 @@ pub use source::Source;
 pub use tests::TestType;
 
 /// Evaluation context containing variables for template rendering and conditional evaluation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct EvaluationContext {
     /// Variables available during evaluation (e.g., "name", "version", "py", "target_platform")
     variables: HashMap<String, String>,
     /// Configuration for Jinja functions (compiler, cdt, etc.)
     jinja_config: JinjaConfig,
-}
-
-impl Default for EvaluationContext {
-    fn default() -> Self {
-        Self {
-            variables: HashMap::new(),
-            jinja_config: JinjaConfig::default(),
-        }
-    }
 }
 
 impl EvaluationContext {

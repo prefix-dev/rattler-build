@@ -1,4 +1,4 @@
-///! AllOrGlobVec - A type that can be either "all" (boolean) or specific glob patterns
+//! AllOrGlobVec - A type that can be either "all" (boolean) or specific glob patterns
 use std::path::Path;
 
 use super::glob_vec::GlobVec;
