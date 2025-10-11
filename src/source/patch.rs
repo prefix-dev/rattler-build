@@ -887,8 +887,7 @@ mod tests {
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
             use rattler_build_source_cache::{
-                GitSource as CacheGitSource, Source as CacheSource, SourceCacheBuilder,
-                UrlSource as CacheUrlSource,
+                Source as CacheSource, SourceCacheBuilder, UrlSource as CacheUrlSource,
             };
 
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
