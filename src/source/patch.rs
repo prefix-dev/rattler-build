@@ -309,7 +309,6 @@ pub(crate) fn apply_patch_custom(
 }
 
 /// Applies all patches in a list of patches to the specified work directory
-/// Currently only supports patching with the `patch` command.
 pub(crate) fn apply_patches(
     patches: &[PathBuf],
     work_dir: &Path,
@@ -887,7 +886,9 @@ mod tests {
 
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
-            use crate::source::fetch_source;
+            use rattler_build_source_cache::{
+                Source as CacheSource, SourceCacheBuilder, UrlSource as CacheUrlSource,
+            };
 
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
 
@@ -899,21 +900,41 @@ mod tests {
             let cache_src = comparison_dir.path().join("cache");
             fs_err::create_dir(&cache_src).into_diagnostic()?;
 
-            let mut _rendered_sources = vec![];
+            // Create the source cache
+            let source_cache = SourceCacheBuilder::new()
+                .cache_dir(&cache_src)
+                .client(tool_config.client.clone())
+                .build()
+                .await
+                .into_diagnostic()?;
 
-            // Fetch source
-            fetch_source(
-                &source,
-                &mut _rendered_sources,
-                &original_dir,
-                &recipe_dir,
-                &cache_src,
-                &SystemTools::new(),
-                &tool_config,
-                |_, _| Ok(()),
-            )
-            .await
-            .into_diagnostic()?;
+            // Convert source and fetch from cache
+            let cache_source = match &source {
+                crate::recipe::parser::Source::Git(git_src) => {
+                    let cache_git_source = git_src
+                        .to_cache_source(&recipe_dir)
+                        .expect("Failed to convert git source to cache source");
+                    CacheSource::Git(cache_git_source)
+                }
+                crate::recipe::parser::Source::Url(url_src) => {
+                    let cache_url_source = CacheUrlSource::try_from(url_src).unwrap();
+                    CacheSource::Url(cache_url_source)
+                }
+                crate::recipe::parser::Source::Path(_) => {
+                    panic!("Path sources should not have patches to test");
+                }
+            };
+
+            let result = source_cache
+                .get_source(&cache_source)
+                .await
+                .into_diagnostic()?;
+
+            // Copy from cache to work directory
+            CopyDir::new(&result.path, &original_dir)
+                .use_gitignore(false)
+                .run()
+                .into_diagnostic()?;
 
             // Create copy of that directory.
             CopyDir::new(&original_dir, &copy_dir)

@@ -208,6 +208,7 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn exclude_git_dirs(mut self, b: bool) -> Self {
         self.exclude_git_dirs = b;
         self
