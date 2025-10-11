@@ -4294,6 +4294,7 @@ dependencies = [
 name = "rattler_build_recipe"
 version = "0.1.0"
 dependencies = [
+ "fs-err",
  "globset",
  "indexmap 2.11.4",
  "insta",

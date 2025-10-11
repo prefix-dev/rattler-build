@@ -1,4 +1,4 @@
-///! Stage 1 Build - evaluated build configuration with concrete values
+//! Stage 1 Build - evaluated build configuration with concrete values
 use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
 
 /// Variant key usage configuration (evaluated)

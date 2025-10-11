@@ -8,7 +8,7 @@ const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data");
 
 fn load_test_recipe(filename: &str) -> String {
     let path = format!("{}/{}", TEST_DATA_DIR, filename);
-    std::fs::read_to_string(&path)
+    fs_err::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read test file {}: {}", path, e))
 }
 

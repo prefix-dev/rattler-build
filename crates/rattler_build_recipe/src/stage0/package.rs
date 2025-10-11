@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use rattler_conda_types::VersionWithSource;
 use serde::Serialize;
 
@@ -7,9 +9,9 @@ use crate::stage0::types::Value;
 #[serde(transparent)]
 pub struct PackageName(pub rattler_conda_types::PackageName);
 
-impl ToString for PackageName {
-    fn to_string(&self) -> String {
-        self.0.as_source().to_string()
+impl Display for PackageName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.as_source())
     }
 }
 

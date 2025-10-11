@@ -1,4 +1,4 @@
-///! Validated glob patterns for file matching
+//! Validated glob patterns for file matching
 use std::path::Path;
 
 use globset::{Glob, GlobBuilder, GlobSet};

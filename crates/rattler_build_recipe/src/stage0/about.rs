@@ -14,7 +14,7 @@ impl Serialize for License {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.0.as_ref())
+        serializer.serialize_str(self.0.as_ref())
     }
 }
 

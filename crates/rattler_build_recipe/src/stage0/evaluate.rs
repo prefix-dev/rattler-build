@@ -97,7 +97,7 @@ fn render_template(
         Ok(result) => Ok(result),
         Err(e) => Err(ParseError {
             kind: ErrorKind::JinjaError,
-            span: span.clone(),
+            span: *span,
             message: Some(format!("Jinja error: {}", e)),
             suggestion: None,
         }),
