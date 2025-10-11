@@ -1,0 +1,13 @@
+---
+source: src/recipe/parser/glob_vec.rs
+expression: err
+---
+  × failed to parse glob: error parsing glob 'foo/{bla': unclosed alternate
+  │ group; missing '}' (maybe escape '{' with '[{]'?)
+   ╭─[2:11]
+ 1 │ globs:
+ 2 │         - foo/{bla
+   ·           ────┬───
+   ·               ╰── here
+ 3 │         
+   ╰────

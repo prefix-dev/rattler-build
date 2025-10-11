@@ -1,0 +1,7 @@
+---
+source: src/variant_config.rs
+expression: used_variables_all
+---
+- libblas: 3.9 *netlib
+  r_base: "4.2"
+  target_platform: linux-64

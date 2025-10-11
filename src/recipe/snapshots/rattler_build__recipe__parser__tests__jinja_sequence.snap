@@ -1,0 +1,13 @@
+---
+source: src/recipe/parser.rs
+expression: recipe
+---
+schema_version: 1
+context: {}
+package:
+  name: blib
+  version: 0.1.0
+build:
+  number: 0
+  script: "${{ \"test succeeded\" if true }}"
+requirements: {}

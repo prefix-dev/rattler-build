@@ -1,0 +1,78 @@
+---
+source: src/metadata.rs
+expression: git_source_output
+---
+recipe:
+  schema_version: 1
+  context: {}
+  package:
+    name: git_source
+    version: "1"
+  source:
+    - git: "https://github.com/prefix-dev/rattler-build"
+      rev: refs/tags/v0.1.0
+    - git: "https://github.com/wolfv/rattler-build"
+      rev: refs/heads/main
+      target_directory: main
+    - git: "https://github.com/prefix-dev/rattler-build"
+      target_directory: HEAD
+    - git: "https://github.com/prefix-dev/rattler-build"
+      rev: df83c1edf287a756b8fc995e03e9632af0344777
+      target_directory: initial_version
+  build:
+    number: 0
+    string: h60d57d3_0
+    script:
+      - test -f README.md
+      - cat ./initial_version/build.sh
+  requirements: {}
+build_configuration:
+  target_platform: osx-arm64
+  host_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  build_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  variant:
+    target_platform: osx-arm64
+  hash:
+    hash: 60d57d3
+  directories:
+    host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla
+    build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826/build_env
+    work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826/work
+    build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826
+  channels:
+    - "https://conda.anaconda.org/conda-forge"
+  channel_priority: strict
+  solve_strategy: highest
+  timestamp: "2024-01-04T14:50:26.411202Z"
+  subpackages:
+    git_source:
+      name: git_source
+      version: "1"
+      build_string: h60d57d3_0
+  packaging_settings:
+    archive_type: tar_bz2
+    compression_level: 9
+finalized_dependencies:
+  build: ~
+  host: ~
+  run:
+    depends: []
+    constraints: []
+finalized_sources:
+  - git: "https://github.com/prefix-dev/rattler-build"
+    rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
+  - git: "https://github.com/wolfv/rattler-build"
+    rev: f38cc776f5193a3773b68bde03eeee8aac05366d
+    target_directory: main
+  - git: "https://github.com/prefix-dev/rattler-build"
+    rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
+    target_directory: HEAD
+  - git: "https://github.com/prefix-dev/rattler-build"
+    rev: df83c1edf287a756b8fc995e03e9632af0344777
+    target_directory: initial_version
+system_tools:
+  rattler-build: 0.12.1

@@ -1,0 +1,88 @@
+---
+source: src/variant_config.rs
+expression: variant
+---
+pin_run_as_build:
+  boost:
+    max_pin: x.x.x
+    min_pin: ~
+  boost-cpp:
+    max_pin: x.x.x
+    min_pin: ~
+  flann:
+    max_pin: x.x.x
+    min_pin: ~
+  graphviz:
+    max_pin: x
+    min_pin: ~
+  libsvm:
+    max_pin: x
+    min_pin: ~
+  netcdf-cxx4:
+    max_pin: x.x
+    min_pin: ~
+  occt:
+    max_pin: x.x
+    min_pin: ~
+  poppler:
+    max_pin: x.x
+    min_pin: ~
+  r-base:
+    max_pin: x.x
+    min_pin: x.x
+  vlfeat:
+    max_pin: x.x.x
+    min_pin: ~
+zip_keys:
+  - - c_compiler_version
+    - cxx_compiler_version
+    - fortran_compiler_version
+    - docker_image
+  - - cudnn
+    - cuda_compiler_version
+  - - python
+    - numpy
+    - python_impl
+  - - arrow_cpp
+    - libarrow
+abseil_cpp:
+  - "20220623.0"
+alsa_lib:
+  - 1.2.8
+arb:
+  - "2.23"
+arpack:
+  - "3.7"
+arrow_cpp:
+  - 11.0.0
+  - 10.0.1
+  - 9.0.0
+  - 8.0.1
+assimp:
+  - 5.2.5
+aws_sdk_cpp:
+  - "4.5"
+blas_impl:
+  - openblas
+  - mkl
+  - blis
+boolean:
+  - true
+build_platform:
+  - linux-64
+integer:
+  - 5
+libblas:
+  - 3.9 *netlib
+libcblas:
+  - 3.9 *netlib
+liblapack:
+  - 3.9 *netlib
+liblapacke:
+  - 3.9 *netlib
+noboolean:
+  - "true"
+nointeger:
+  - "5"
+target_platform:
+  - linux-64

@@ -1,0 +1,5 @@
+---
+source: src/recipe/parser/source.rs
+expression: yaml
+---
+git: git@github.com:prefix-dev/rattler-build.git

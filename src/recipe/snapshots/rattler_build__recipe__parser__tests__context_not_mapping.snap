@@ -1,0 +1,16 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × expected a mapping.
+   ╭─[2:18]
+ 1 │ 
+ 2 │         context: "not-mapping"
+   ·                  ──────┬──────
+   ·                        ╰── here
+ 3 │ 
+   ╰────
+  help: `context` must always be a mapping

@@ -1,0 +1,54 @@
+---
+source: src/conda_build_config.rs
+expression: config
+---
+pin_run_as_build:
+  libblst:
+    max_pin: x.x
+    min_pin: ~
+  netcdf-cxx4:
+    max_pin: x.x
+    min_pin: ~
+  vlfeat:
+    max_pin: x.x.x
+    min_pin: ~
+zip_keys:
+  - - c_compiler_version
+    - cxx_compiler_version
+    - fortran_compiler_version
+  - - python
+    - numpy
+    - python_impl
+    - is_python_min
+  - - libarrow
+    - libarrow_all
+blas_impl:
+  - openblas
+c_compiler:
+  - clang
+c_compiler_version:
+  - "18"
+c_stdlib:
+  - macosx_deployment_target
+c_stdlib_version:
+  - "11.0"
+cxx_compiler:
+  - clangxx
+cxx_compiler_version:
+  - "18"
+environment_var:
+  - CF_CUDA_DISABLED
+fortran_compiler_version:
+  - "13"
+libblas:
+  - 3.9.* *netlib
+libcblas:
+  - 3.9.* *netlib
+liblapack:
+  - 3.9.* *netlib
+liblapacke:
+  - 3.9.* *netlib
+llvm_openmp:
+  - "18"
+startswith:
+  - truey

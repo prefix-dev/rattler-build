@@ -1,0 +1,19 @@
+---
+source: src/recipe/parser.rs
+expression: recipe
+---
+schema_version: 1
+context: {}
+package:
+  name: zlib
+  version: 0.1.0
+build:
+  number: 0
+  script: "${{ \"echo 'world'\" if true }}"
+  prefix_detection:
+    force_file_type:
+      binary:
+        - zlib
+requirements:
+  run:
+    - zlib

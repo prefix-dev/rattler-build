@@ -1,0 +1,16 @@
+---
+source: src/recipe/error.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × expected a mapping.
+   ╭─[3:17]
+ 2 │                 context:
+ 3 │ ╭─▶                 - a
+ 4 │ ├─▶                 - b
+   · ╰──── here
+ 5 │                 package:
+   ╰────
+  help: `context` must always be a mapping

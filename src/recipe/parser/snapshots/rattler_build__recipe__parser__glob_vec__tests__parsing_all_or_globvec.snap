@@ -1,0 +1,8 @@
+---
+source: src/recipe/parser/glob_vec.rs
+expression: "&as_yaml"
+---
+globs:
+- foo
+- bar
+- baz/**/qux

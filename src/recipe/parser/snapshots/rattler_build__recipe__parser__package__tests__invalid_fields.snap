@@ -1,0 +1,16 @@
+---
+source: src/recipe/parser/package.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × invalid field `invalid`.
+   ╭─[5:13]
+ 4 │             version: 0.1.0
+ 5 │             invalid: "field"
+   ·             ───┬───
+   ·                ╰── here
+ 6 │         
+   ╰────
+  help: valid fields for `package` are `name` and `version`

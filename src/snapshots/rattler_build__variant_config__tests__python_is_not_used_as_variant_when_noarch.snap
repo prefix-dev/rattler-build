@@ -1,0 +1,5 @@
+---
+source: src/variant_config.rs
+expression: used_variables_all
+---
+- target_platform: noarch
