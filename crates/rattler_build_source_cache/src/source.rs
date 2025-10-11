@@ -114,32 +114,3 @@ pub enum Source {
     Url(UrlSource),
     Path(PathBuf), // Path sources are passed through without caching
 }
-
-// Add hex crate to dependencies
-pub(crate) mod hex {
-    pub fn encode(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{:02x}", b)).collect()
-    }
-
-    pub fn decode(s: &str) -> Result<Vec<u8>, FromHexError> {
-        if s.len() % 2 != 0 {
-            return Err(FromHexError);
-        }
-
-        (0..s.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| FromHexError))
-            .collect()
-    }
-
-    #[derive(Debug)]
-    pub struct FromHexError;
-
-    impl std::fmt::Display for FromHexError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "invalid hex string")
-        }
-    }
-
-    impl std::error::Error for FromHexError {}
-}

@@ -31,6 +31,7 @@ indexmap = "2.11.4"
 indicatif = "0.18.0"
 insta = "1.41.1"
 itertools = "0.14.0"
+hex = "0.4.3"
 md-5 = "0.10"
 miette = "7.6.0"
 rattler_conda_types = { version = "0.40.0", default-features = false }
