@@ -10,7 +10,6 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::fs;
 use std::process;
 
 use miette::{IntoDiagnostic, NamedSource, Result};
