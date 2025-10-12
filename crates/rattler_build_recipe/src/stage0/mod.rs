@@ -22,7 +22,8 @@ pub use requirements::Requirements;
 pub use source::Source;
 pub use tests::TestType;
 pub use types::{
-    Conditional, ConditionalList, Item, JinjaExpression, JinjaTemplate, ListOrItem, Value,
+    Conditional, ConditionalList, IncludeExclude, Item, JinjaExpression, JinjaTemplate, ListOrItem,
+    Value,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]

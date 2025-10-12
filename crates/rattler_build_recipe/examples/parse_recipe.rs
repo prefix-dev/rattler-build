@@ -55,7 +55,7 @@ fn main() -> Result<()> {
     }
 
     // Read the recipe file
-    let yaml_content = fs::read_to_string(recipe_path).into_diagnostic()?;
+    let yaml_content = fs_err::read_to_string(recipe_path).into_diagnostic()?;
 
     println!("=== Parsing recipe: {} ===\n", recipe_path);
 
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
     }
 
     // Check for missing variables (excluding known Jinja function names)
-    let known_functions = vec![
+    let known_functions = [
         "compiler",
         "cdt",
         "match",

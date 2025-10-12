@@ -1,4 +1,4 @@
-use rattler_build_recipe::stage0::{Source, Value, parse_recipe_from_source};
+use rattler_build_recipe::stage0::{IncludeExclude, Source, Value, parse_recipe_from_source};
 
 #[test]
 fn test_parse_recipe_with_git_source() {
@@ -108,7 +108,14 @@ build:
             }
 
             assert!(path_src.use_gitignore);
-            assert_eq!(path_src.filter.len(), 2);
+
+            // Check filter - it should be a List variant with 2 items
+            match &path_src.filter {
+                IncludeExclude::List(list) => {
+                    assert_eq!(list.len(), 2);
+                }
+                _ => panic!("Expected List variant for filter"),
+            }
         }
         _ => panic!("Expected Path source"),
     }
