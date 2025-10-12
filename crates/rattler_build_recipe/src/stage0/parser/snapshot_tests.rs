@@ -77,3 +77,17 @@ fn test_complex_extract_variables() {
     let vars = recipe.used_variables();
     insta::assert_debug_snapshot!(vars);
 }
+
+#[test]
+fn test_script_parsing_snapshot() {
+    let source = load_test_recipe("script.yaml");
+    let recipe = parse_recipe_from_source(&source).expect("Failed to parse script recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_license_files_snapshot() {
+    let source = load_test_recipe("license_files.yaml");
+    let recipe = parse_recipe_from_source(&source).expect("Failed to parse license_files recipe");
+    insta::assert_debug_snapshot!(recipe);
+}

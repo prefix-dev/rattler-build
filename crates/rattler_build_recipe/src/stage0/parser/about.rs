@@ -4,11 +4,46 @@ use marked_yaml::Node as MarkedNode;
 
 use crate::{
     error::{ParseError, ParseResult},
+    span::SpannedString,
     stage0::{
         about::About,
-        parser::{helpers::get_span, value::parse_value},
+        parser::{helpers::get_span, list::parse_conditional_list, value::parse_value},
+        types::{ConditionalList, Item, JinjaTemplate, Value},
     },
 };
+
+/// Parse license_file field which can be either a single string or a list of strings
+fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>> {
+    // Try parsing as a sequence first
+    if yaml.as_sequence().is_some() {
+        return parse_conditional_list(yaml);
+    }
+
+    // Try parsing as a single scalar string
+    if let Some(scalar) = yaml.as_scalar() {
+        let spanned = SpannedString::from(scalar);
+        let s = spanned.as_str();
+
+        // Check if it's a template
+        if s.contains("${{") && s.contains("}}") {
+            let template = JinjaTemplate::new(s.to_string())
+                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+            let items = vec![Item::Value(Value::Template(template))];
+            return Ok(ConditionalList::new(items));
+        }
+
+        // Plain string
+        let items = vec![Item::Value(Value::Concrete(s.to_string()))];
+        return Ok(ConditionalList::new(items));
+    }
+
+    // Get proper span for better error message
+    let span = get_span(yaml);
+    Err(
+        ParseError::expected_type("string or list of strings", "other", span)
+            .with_message("license_file must be a string or a list of strings"),
+    )
+}
 
 /// Parse an About section from YAML
 ///
@@ -43,7 +78,7 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
     }
 
     if let Some(license_file) = mapping.get("license_file") {
-        about.license_file = Some(parse_value(license_file)?);
+        about.license_file = parse_license_file(license_file)?;
     }
 
     if let Some(license_family) = mapping.get("license_family") {
@@ -185,7 +220,7 @@ mod tests {
 
         assert!(about.homepage.is_some());
         assert!(about.license.is_some());
-        assert!(about.license_file.is_some());
+        assert!(!about.license_file.is_empty());
         assert!(about.summary.is_some());
         assert!(about.description.is_some());
         assert!(about.documentation.is_some());

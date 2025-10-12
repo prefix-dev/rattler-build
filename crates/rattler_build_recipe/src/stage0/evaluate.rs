@@ -39,7 +39,7 @@ use crate::{
             PythonTest as Stage0PythonTest, PythonVersion as Stage0PythonVersion,
             RTest as Stage0RTest, RubyTest as Stage0RubyTest,
         },
-        types::{ConditionalList, Item, JinjaExpression, Value},
+        types::{ConditionalList, Item, JinjaExpression, ScriptContent, Value},
     },
     stage1::{
         About as Stage1About, AllOrGlobVec, Evaluate, EvaluationContext, Extra as Stage1Extra,
@@ -297,6 +297,82 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
+/// Evaluate a ScriptContent into a string
+fn evaluate_script_content(
+    content: &ScriptContent,
+    context: &EvaluationContext,
+) -> Result<String, ParseError> {
+    match content {
+        ScriptContent::Command(cmd) => Ok(cmd.clone()),
+        ScriptContent::Inline(inline) => {
+            // For inline scripts, we need to evaluate the content or file
+            if let Some(content_list) = &inline.content {
+                // Evaluate the conditional list to get a Vec<String> of commands
+                let commands = evaluate_string_list(content_list, context)?;
+                // Join the commands with newlines to create a single script
+                Ok(commands.join("\n"))
+            } else if let Some(file_val) = &inline.file {
+                evaluate_string_value(file_val, context)
+            } else {
+                Ok(String::new())
+            }
+        }
+    }
+}
+
+/// Evaluate a ConditionalList<ScriptContent> into Vec<String>
+pub fn evaluate_script_list(
+    list: &ConditionalList<ScriptContent>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    let mut results = Vec::new();
+
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                // ScriptContent doesn't use Value wrapper, so we match on it directly
+                // Actually wait, Item<ScriptContent> means Item can be Value(Value<ScriptContent>) or Conditional(Conditional<ScriptContent>)
+                // But ScriptContent is not wrapped in Value...
+                // Let me check the type more carefully
+                match value {
+                    Value::Concrete(script_content) => {
+                        let s = evaluate_script_content(script_content, context)?;
+                        results.push(s);
+                    }
+                    Value::Template(_) => {
+                        // ScriptContent can't be a template itself
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: Span::unknown(),
+                            message: Some("Script content cannot be a template".to_string()),
+                            suggestion: None,
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+
+                if condition_met {
+                    // Evaluate the "then" items
+                    for script_content in cond.then.iter() {
+                        let s = evaluate_script_content(script_content, context)?;
+                        results.push(s);
+                    }
+                } else {
+                    // Evaluate the "else" items
+                    for script_content in cond.else_value.iter() {
+                        let s = evaluate_script_content(script_content, context)?;
+                        results.push(s);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
@@ -480,7 +556,7 @@ impl Evaluate for Stage0About {
             repository,
             documentation,
             license,
-            license_file: evaluate_optional_string_value(&self.license_file, context)?,
+            license_file: evaluate_string_list(&self.license_file, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
         })
@@ -737,7 +813,7 @@ impl Evaluate for Stage0Build {
         let string = evaluate_optional_string_value(&self.string, context)?;
 
         // Evaluate script
-        let script = evaluate_string_list(&self.script, context)?;
+        let script = evaluate_script_list(&self.script, context)?;
 
         // Evaluate noarch
         let noarch = match &self.noarch {
@@ -790,8 +866,25 @@ impl Evaluate for Stage0Build {
             post_process.push(pp.evaluate(context)?);
         }
 
+        // Evaluate build number
+        let number = match &self.number {
+            Value::Concrete(n) => *n,
+            Value::Template(template) => {
+                let s = render_template(template.source(), context, &Span::unknown())?;
+                s.parse::<u64>().map_err(|_| ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: Span::unknown(),
+                    message: Some(format!(
+                        "Invalid build number: '{}' is not a valid positive integer",
+                        s
+                    )),
+                    suggestion: None,
+                })?
+            }
+        };
+
         Ok(Stage1Build {
-            number: self.number,
+            number,
             string,
             script,
             noarch,
@@ -1102,7 +1195,7 @@ impl Evaluate for Stage0CommandsTest {
     type Output = Stage1CommandsTest;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let script = evaluate_string_list(&self.script, context)?;
+        let script = evaluate_script_list(&self.script, context)?;
         let requirements = evaluate_optional_with_default(&self.requirements, context)?;
         let files = evaluate_optional_with_default(&self.files, context)?;
 

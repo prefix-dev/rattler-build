@@ -880,6 +880,108 @@ impl<T: ToString> Value<T> {
     }
 }
 
+/// Script content - either a simple command string or an inline script with options
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ScriptContent {
+    /// Simple command string or file path
+    Command(String),
+    /// Inline script with optional interpreter, env vars, and content/file
+    Inline(InlineScript),
+}
+
+impl Display for ScriptContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptContent::Command(s) => write!(f, "{}", s),
+            ScriptContent::Inline(inline) => {
+                if inline.content.is_some() {
+                    write!(f, "InlineScript(content: [...])")
+                } else if let Some(file) = &inline.file {
+                    write!(f, "InlineScript(file: {})", file)
+                } else {
+                    write!(f, "InlineScript(empty)")
+                }
+            }
+        }
+    }
+}
+
+impl FromStr for ScriptContent {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ScriptContent::Command(s.to_string()))
+    }
+}
+
+impl Default for ScriptContent {
+    fn default() -> Self {
+        ScriptContent::Command(String::new())
+    }
+}
+
+impl ScriptContent {
+    /// Collect all variables used in this script content
+    pub fn used_variables(&self) -> Vec<String> {
+        match self {
+            ScriptContent::Command(_) => Vec::new(),
+            ScriptContent::Inline(inline) => inline.used_variables(),
+        }
+    }
+}
+
+/// Inline script specification with content or file reference
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InlineScript {
+    /// Optional interpreter (e.g., "bash", "python")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interpreter: Option<Value<String>>,
+
+    /// Environment variables for the script
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub env: indexmap::IndexMap<String, Value<String>>,
+
+    /// Secrets to expose to the script
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<String>,
+
+    /// Inline script content - can be a string or array of commands with conditionals
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ConditionalList<String>>,
+
+    /// File path to script
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<Value<String>>,
+}
+
+impl InlineScript {
+    /// Collect all variables used in this inline script
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+
+        if let Some(interpreter) = &self.interpreter {
+            vars.extend(interpreter.used_variables());
+        }
+
+        for value in self.env.values() {
+            vars.extend(value.used_variables());
+        }
+
+        if let Some(content) = &self.content {
+            vars.extend(content.used_variables());
+        }
+
+        if let Some(file) = &self.file {
+            vars.extend(file.used_variables());
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

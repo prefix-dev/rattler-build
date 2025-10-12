@@ -18,8 +18,8 @@ pub struct About {
     /// License expression (validated SPDX)
     pub license: Option<Expression>,
 
-    /// License file path
-    pub license_file: Option<String>,
+    /// License file paths
+    pub license_file: Vec<String>,
 
     /// Package summary/description
     pub summary: Option<String>,
@@ -34,13 +34,13 @@ impl About {
         Self::default()
     }
 
-    /// Check if the About section is empty (all fields are None)
+    /// Check if the About section is empty (all fields are None/empty)
     pub fn is_empty(&self) -> bool {
         self.homepage.is_none()
             && self.repository.is_none()
             && self.documentation.is_none()
             && self.license.is_none()
-            && self.license_file.is_none()
+            && self.license_file.is_empty()
             && self.summary.is_none()
             && self.description.is_none()
     }

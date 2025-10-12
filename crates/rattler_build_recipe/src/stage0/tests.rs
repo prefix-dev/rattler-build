@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, Value};
+use crate::stage0::types::{ConditionalList, ScriptContent, Value};
 
 /// Python version specification for tests
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -79,9 +79,9 @@ pub struct CommandsTestFiles {
 /// A test that executes a script in a freshly created environment
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
-    /// The script to run (list of commands)
+    /// The script to run (list of commands or script objects)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub script: ConditionalList<String>,
+    pub script: ConditionalList<ScriptContent>,
 
     /// The (extra) requirements for the test.
     #[serde(default, skip_serializing_if = "Option::is_none")]

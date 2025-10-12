@@ -1,6 +1,5 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-assertion_line: 33
 expression: recipe
 ---
 Stage0Recipe {
@@ -25,7 +24,9 @@ Stage0Recipe {
         ),
     },
     build: Build {
-        number: 0,
+        number: Concrete(
+            0,
+        ),
         string: None,
         script: ConditionalList(
             [],
@@ -166,7 +167,9 @@ Stage0Recipe {
                 },
             ),
         ),
-        license_file: None,
+        license_file: ConditionalList(
+            [],
+        ),
         license_family: None,
         summary: Some(
             Template(
