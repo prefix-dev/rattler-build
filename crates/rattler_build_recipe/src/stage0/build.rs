@@ -3,7 +3,7 @@ use std::fmt::Display;
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, ScriptContent, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, ScriptContent, Value};
 
 /// Default build number is 0
 fn default_build_number() -> Value<u64> {
@@ -47,8 +47,9 @@ pub struct Build {
     #[serde(default)]
     pub python: PythonBuild,
 
-    /// Skip build on certain conditions
-    pub skip: Option<Value<String>>,
+    /// Skip build on certain conditions (can be a boolean expression or list of platforms)
+    #[serde(default)]
+    pub skip: ConditionalList<String>,
 
     /// Always copy these files (even if they're already in the host prefix)
     #[serde(default)]
@@ -62,9 +63,9 @@ pub struct Build {
     #[serde(default)]
     pub merge_build_and_host_envs: bool,
 
-    /// Files to include in the package (glob patterns)
+    /// Files to include/exclude in the package (glob patterns or include/exclude mapping)
     #[serde(default)]
-    pub files: ConditionalList<String>,
+    pub files: IncludeExclude,
 
     /// Dynamic linking configuration
     #[serde(default)]
@@ -91,11 +92,11 @@ impl Default for Build {
             script: ConditionalList::default(),
             noarch: None,
             python: PythonBuild::default(),
-            skip: None,
+            skip: ConditionalList::default(),
             always_copy_files: ConditionalList::default(),
             always_include_files: ConditionalList::default(),
             merge_build_and_host_envs: false,
-            files: ConditionalList::default(),
+            files: IncludeExclude::default(),
             dynamic_linking: DynamicLinking::default(),
             variant: VariantKeyUsage::default(),
             prefix_detection: PrefixDetection::default(),
@@ -232,12 +233,12 @@ impl Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Build {{ number: {}, string: {}, script: [{}], noarch: {}, skip: {} }}",
+            "Build {{ number: {}, string: {}, script: [{}], noarch: {}, skip: [{}] }}",
             self.number,
             self.string.as_ref().into_iter().format(", "),
             self.script.iter().format(", "),
             self.noarch.as_ref().into_iter().format(", "),
-            self.skip.as_ref().into_iter().format(", "),
+            self.skip.iter().format(", "),
         )
     }
 }
@@ -261,8 +262,8 @@ impl Build {
             vars.extend(noarch.used_variables());
         }
 
-        if let Some(skip) = &self.skip {
-            vars.extend(skip.used_variables());
+        for item in &self.skip {
+            vars.extend(item.used_variables());
         }
 
         for item in &self.python.entry_points {
@@ -285,9 +286,7 @@ impl Build {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.files {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(self.files.used_variables());
 
         // Dynamic linking
         for item in &self.dynamic_linking.rpaths {
