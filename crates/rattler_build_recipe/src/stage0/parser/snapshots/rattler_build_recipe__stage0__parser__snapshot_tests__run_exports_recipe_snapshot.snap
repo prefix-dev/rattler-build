@@ -1,8 +1,11 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 54
 expression: recipe
 ---
 Stage0Recipe {
+    schema_version: None,
+    context: {},
     package: Package {
         name: Concrete(
             PackageName(
@@ -187,6 +190,7 @@ Stage0Recipe {
             ),
         ),
         license_file: None,
+        license_family: None,
         summary: Some(
             Concrete(
                 "Library that exports dependencies",

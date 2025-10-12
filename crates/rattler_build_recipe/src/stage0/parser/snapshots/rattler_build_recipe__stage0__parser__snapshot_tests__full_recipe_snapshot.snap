@@ -1,8 +1,11 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 26
 expression: recipe
 ---
 Stage0Recipe {
+    schema_version: None,
+    context: {},
     package: Package {
         name: Concrete(
             PackageName(
@@ -181,6 +184,7 @@ Stage0Recipe {
                 "LICENSE",
             ),
         ),
+        license_family: None,
         summary: Some(
             Concrete(
                 "A comprehensive test package",

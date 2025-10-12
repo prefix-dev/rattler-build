@@ -48,6 +48,8 @@ pub struct About {
     pub homepage: Option<Value<Url>>,
     pub license: Option<Value<License>>,
     pub license_file: Option<Value<String>>,
+    /// License family (deprecated, but still used in some recipes)
+    pub license_family: Option<Value<String>>,
     pub summary: Option<Value<String>>,
     pub description: Option<Value<String>>,
     pub documentation: Option<Value<Url>>,
@@ -81,6 +83,9 @@ impl About {
         }
         if let Some(license_file) = &self.license_file {
             vars.extend(license_file.used_variables());
+        }
+        if let Some(license_family) = &self.license_family {
+            vars.extend(license_family.used_variables());
         }
         if let Some(summary) = &self.summary {
             vars.extend(summary.used_variables());

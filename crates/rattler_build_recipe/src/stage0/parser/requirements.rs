@@ -82,10 +82,24 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
 }
 
 /// Parse a RunExports section
+///
+/// Supports two forms:
+/// 1. Direct list (defaults to weak): `run_exports: [pkg1, pkg2]`
+/// 2. Mapping with fields: `run_exports: { strong: [pkg1], weak: [pkg2] }`
 fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
+    // Check if it's a direct list (defaults to weak)
+    if yaml.as_sequence().is_some() {
+        let weak = parse_conditional_list(yaml)?;
+        return Ok(RunExports {
+            weak,
+            ..Default::default()
+        });
+    }
+
+    // Otherwise, parse as mapping
     let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("run_exports must be a mapping")
+        ParseError::expected_type("mapping or list", "other", get_span(yaml))
+            .with_message("run_exports must be either a list or a mapping")
     })?;
 
     let mut run_exports = RunExports::default();
