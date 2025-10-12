@@ -1,24 +1,165 @@
 //! Stage 1 Requirements - evaluated dependencies with concrete values
 
+use rattler_conda_types::{MatchSpec, PackageName};
 use serde::{Deserialize, Serialize};
+
+/// A pin to a specific version of a package (used in pin_subpackage and pin_compatible)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Pin {
+    /// The name of the package to pin
+    pub name: PackageName,
+
+    /// The pin arguments
+    #[serde(flatten)]
+    pub args: PinArgs,
+}
+
+/// Arguments for pinning a package
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PinArgs {
+    /// A minimum pin to a version, using `x.x.x...` as syntax or a concrete version
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lower_bound: Option<String>,
+
+    /// A maximum pin to a version, using `x.x.x...` as syntax or a concrete version
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upper_bound: Option<String>,
+
+    /// If an exact pin is given, we pin the exact version & hash
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub exact: bool,
+
+    /// Optional build string matcher
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
+}
+
+/// A pin_subpackage dependency - pins to another output of the same recipe
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PinSubpackage {
+    /// The pin value
+    #[serde(flatten)]
+    pub pin_subpackage: Pin,
+}
+
+/// A pin_compatible dependency - pins to a compatible version of a package
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PinCompatible {
+    /// The pin value
+    #[serde(flatten)]
+    pub pin_compatible: Pin,
+}
+
+/// A combination of all possible dependency types
+#[derive(Debug, Clone, PartialEq)]
+pub enum Dependency {
+    /// A regular matchspec dependency
+    Spec(MatchSpec),
+    /// A pin_subpackage dependency
+    PinSubpackage(PinSubpackage),
+    /// A pin_compatible dependency
+    PinCompatible(PinCompatible),
+}
+
+impl std::fmt::Display for Dependency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Dependency::Spec(spec) => write!(f, "{}", spec),
+            Dependency::PinSubpackage(pin) => {
+                write!(
+                    f,
+                    "pin_subpackage({})",
+                    pin.pin_subpackage.name.as_normalized()
+                )
+            }
+            Dependency::PinCompatible(pin) => {
+                write!(
+                    f,
+                    "pin_compatible({})",
+                    pin.pin_compatible.name.as_normalized()
+                )
+            }
+        }
+    }
+}
+
+impl Serialize for Dependency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum RawDependency<'a> {
+            PinSubpackage(&'a PinSubpackage),
+            PinCompatible(&'a PinCompatible),
+        }
+
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum RawSpec<'a> {
+            String(String),
+            Explicit(#[serde(with = "serde_yaml::with::singleton_map")] RawDependency<'a>),
+        }
+
+        let raw = match self {
+            Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
+            Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
+            Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
+        };
+
+        raw.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Dependency {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum RawDependency {
+            PinSubpackage(PinSubpackage),
+            PinCompatible(PinCompatible),
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        #[allow(clippy::large_enum_variant)]
+        enum RawSpec {
+            String(String),
+            Explicit(#[serde(with = "serde_yaml::with::singleton_map")] RawDependency),
+        }
+
+        let raw_spec = RawSpec::deserialize(deserializer)?;
+        Ok(match raw_spec {
+            RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
+            RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
+            RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
+        })
+    }
+}
 
 /// Run exports configuration
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports
-    pub noarch: Vec<String>,
+    pub noarch: Vec<Dependency>,
 
     /// Strong run exports (apply from build and host env to run env)
-    pub strong: Vec<String>,
+    pub strong: Vec<Dependency>,
 
     /// Strong run constraints
-    pub strong_constraints: Vec<String>,
+    pub strong_constraints: Vec<Dependency>,
 
     /// Weak run exports (apply from host env to run env)
-    pub weak: Vec<String>,
+    pub weak: Vec<Dependency>,
 
     /// Weak run constraints
-    pub weak_constraints: Vec<String>,
+    pub weak_constraints: Vec<Dependency>,
 }
 
 impl RunExports {
@@ -63,16 +204,16 @@ impl IgnoreRunExports {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Requirements {
     /// Build-time dependencies (available during build)
-    pub build: Vec<String>,
+    pub build: Vec<Dependency>,
 
     /// Host dependencies (available during build and runtime)
-    pub host: Vec<String>,
+    pub host: Vec<Dependency>,
 
     /// Runtime dependencies
-    pub run: Vec<String>,
+    pub run: Vec<Dependency>,
 
     /// Runtime constraints (optional requirements that constrain the environment)
-    pub run_constraints: Vec<String>,
+    pub run_constraints: Vec<Dependency>,
 
     /// Run exports configuration
     pub run_exports: RunExports,
@@ -111,9 +252,15 @@ mod tests {
     #[test]
     fn test_requirements_with_deps() {
         let reqs = Requirements {
-            build: vec!["gcc".to_string(), "make".to_string()],
-            host: vec!["python".to_string()],
-            run: vec!["python".to_string(), "numpy".to_string()],
+            build: vec![
+                Dependency::Spec("gcc".parse().unwrap()),
+                Dependency::Spec("make".parse().unwrap()),
+            ],
+            host: vec![Dependency::Spec("python".parse().unwrap())],
+            run: vec![
+                Dependency::Spec("python".parse().unwrap()),
+                Dependency::Spec("numpy".parse().unwrap()),
+            ],
             ..Default::default()
         };
 
@@ -129,7 +276,7 @@ mod tests {
         assert!(re.is_empty());
 
         let re = RunExports {
-            weak: vec!["foo".to_string()],
+            weak: vec![Dependency::Spec("foo".parse().unwrap())],
             ..Default::default()
         };
         assert!(!re.is_empty());

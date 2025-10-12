@@ -122,6 +122,7 @@ mod tests {
 
     #[test]
     fn test_recipe_with_all_sections() {
+        use crate::stage1::Dependency;
         use spdx::Expression;
 
         let name = PackageName::from_str("bar").unwrap();
@@ -134,7 +135,7 @@ mod tests {
             ..Default::default()
         };
         let reqs = Requirements {
-            run: vec!["python".to_string()],
+            run: vec![Dependency::Spec("python".parse().unwrap())],
             ..Default::default()
         };
         let extra = Extra {

@@ -7,7 +7,7 @@ use crate::stage0::types::{ConditionalList, IncludeExclude, ScriptContent, Value
 
 /// Default build number is 0
 fn default_build_number() -> Value<u64> {
-    Value::Concrete(0)
+    Value::new_concrete(0, crate::span::Span::unknown())
 }
 
 /// Variant key usage configuration
@@ -117,7 +117,7 @@ pub enum BinaryRelocation {
 
 impl Default for BinaryRelocation {
     fn default() -> Self {
-        Self::Boolean(Value::Concrete(true))
+        Self::Boolean(Value::new_concrete(true, crate::span::Span::unknown()))
     }
 }
 
@@ -174,7 +174,7 @@ pub enum PrefixIgnore {
 
 impl Default for PrefixIgnore {
     fn default() -> Self {
-        Self::Boolean(Value::Concrete(false))
+        Self::Boolean(Value::new_concrete(false, crate::span::Span::unknown()))
     }
 }
 

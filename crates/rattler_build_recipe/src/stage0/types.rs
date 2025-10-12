@@ -351,36 +351,62 @@ fn collect_variables_from_expr(
 }
 
 // Core enum for values that can be either concrete or templated
+// Each variant now carries span information for error reporting
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value<T> {
-    Concrete(T),
-    Template(JinjaTemplate), // Validated Jinja template
+    Concrete {
+        value: T,
+        span: crate::span::Span,
+    },
+    Template {
+        template: JinjaTemplate,
+        span: crate::span::Span,
+    },
 }
 
-impl<T: ToString> Value<T> {
+impl<T> Value<T> {
+    /// Create a new concrete value with span information
+    pub fn new_concrete(value: T, span: crate::span::Span) -> Self {
+        Value::Concrete { value, span }
+    }
+
+    /// Create a new template value with span information
+    pub fn new_template(template: JinjaTemplate, span: crate::span::Span) -> Self {
+        Value::Template { template, span }
+    }
+
+    /// Get the span information for this value
+    pub fn span(&self) -> crate::span::Span {
+        match self {
+            Value::Concrete { span, .. } => *span,
+            Value::Template { span, .. } => *span,
+        }
+    }
+
     /// Get the list of variables used in this value (cached for templates)
     pub fn used_variables(&self) -> Vec<String> {
         match self {
-            Value::Concrete(_) => Vec::new(),
-            Value::Template(template) => template.used_variables().to_vec(),
+            Value::Concrete { .. } => Vec::new(),
+            Value::Template { template, .. } => template.used_variables().to_vec(),
         }
     }
 }
 
-// Custom serialization for Value
+// Custom serialization for Value (span is not serialized)
 impl<T: Serialize> Serialize for Value<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         match self {
-            Value::Concrete(val) => val.serialize(serializer),
-            Value::Template(template) => template.serialize(serializer),
+            Value::Concrete { value, .. } => value.serialize(serializer),
+            Value::Template { template, .. } => template.serialize(serializer),
         }
     }
 }
 
 // Custom deserialization for Value
+// Note: Deserialization creates values with unknown spans since we don't have source location info
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Value<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -395,29 +421,35 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Value<T> {
             // Check if it's a template
             if s.contains("${{") {
                 let template = JinjaTemplate::new(s.to_string()).map_err(D::Error::custom)?;
-                return Ok(Value::Template(template));
+                return Ok(Value::Template {
+                    template,
+                    span: crate::span::Span::unknown(),
+                });
             }
         }
 
         // Otherwise, deserialize as T
         let concrete = T::deserialize(value).map_err(D::Error::custom)?;
-        Ok(Value::Concrete(concrete))
+        Ok(Value::Concrete {
+            value: concrete,
+            span: crate::span::Span::unknown(),
+        })
     }
 }
 
 impl<T: Display> Display for Value<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Concrete(val) => write!(f, "{val}"),
-            Value::Template(template) => write!(f, "{template}"),
+            Value::Concrete { value, .. } => write!(f, "{value}"),
+            Value::Template { template, .. } => write!(f, "{template}"),
         }
     }
 }
 
 impl<T: ToString> Value<T> {
     pub fn concrete(&self) -> Option<&T> {
-        if let Value::Concrete(val) = self {
-            Some(val)
+        if let Value::Concrete { value, .. } = self {
+            Some(value)
         } else {
             None
         }
@@ -434,11 +466,17 @@ where
         if s.contains("${{") {
             // If it contains some template syntax, validate and create template
             let template = JinjaTemplate::new(s.to_string())?;
-            return Ok(Value::Template(template));
+            return Ok(Value::Template {
+                template,
+                span: crate::span::Span::unknown(),
+            });
         }
 
         T::from_str(s)
-            .map(Value::Concrete)
+            .map(|value| Value::Concrete {
+                value,
+                span: crate::span::Span::unknown(),
+            })
             .map_err(|e| format!("Failed to parse concrete value: {}", e))
     }
 }
@@ -478,7 +516,10 @@ impl<T: Display> Display for Item<T> {
 impl<T: PartialEq> PartialEq for Item<T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Item::Value(Value::Concrete(a)), Item::Value(Value::Concrete(b))) => a == b,
+            (
+                Item::Value(Value::Concrete { value: a, .. }),
+                Item::Value(Value::Concrete { value: b, .. }),
+            ) => a == b,
             (Item::Conditional(a), Item::Conditional(b)) => {
                 a.condition == b.condition && a.then == b.then && a.else_value == b.else_value
             }
@@ -512,11 +553,17 @@ where
         if s.contains("${{") {
             // If it contains some template syntax, validate and create template
             let template = JinjaTemplate::new(s.to_string())?;
-            return Ok(Item::Value(Value::Template(template)));
+            return Ok(Item::Value(Value::Template {
+                template,
+                span: crate::span::Span::unknown(),
+            }));
         }
 
         let value = T::from_str(s).map_err(|e| format!("Failed to parse: {}", e))?;
-        Ok(Item::Value(Value::Concrete(value)))
+        Ok(Item::Value(Value::Concrete {
+            value,
+            span: crate::span::Span::unknown(),
+        }))
     }
 }
 
@@ -915,11 +962,11 @@ impl<T: ToString + Default + Debug> Conditional<T> {
 
 impl<T: ToString> Value<T> {
     pub fn is_template(&self) -> bool {
-        matches!(self, Value::Template(_))
+        matches!(self, Value::Template { .. })
     }
 
     pub fn is_concrete(&self) -> bool {
-        matches!(self, Value::Concrete(_))
+        matches!(self, Value::Concrete { .. })
     }
 }
 

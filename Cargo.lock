@@ -4306,6 +4306,7 @@ dependencies = [
  "rattler_conda_types",
  "serde",
  "serde_json",
+ "serde_yaml",
  "spdx",
  "thiserror 2.0.17",
  "url",
