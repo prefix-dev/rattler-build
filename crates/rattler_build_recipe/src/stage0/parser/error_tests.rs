@@ -106,7 +106,7 @@ impl ParseErrorWithSource {
 #[cfg(feature = "miette")]
 fn load_error_test(filename: &str) -> Source {
     let path = format!("{}/{}", TEST_DATA_DIR, filename);
-    let contents = std::fs::read_to_string(&path)
+    let contents = fs_err::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read test file {}: {}", path, e));
     Source::from_string(filename.to_string(), contents)
 }
