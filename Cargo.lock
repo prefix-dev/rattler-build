@@ -4322,6 +4322,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_conda_types",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
 name = "rattler_cache"
 version = "0.3.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"

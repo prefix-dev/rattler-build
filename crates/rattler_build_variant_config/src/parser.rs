@@ -20,7 +20,7 @@ pub fn parse_variant_file(
     path: &Path,
     context: &SelectorContext,
 ) -> Result<VariantConfig, VariantConfigError> {
-    let content = std::fs::read_to_string(path)
+    let content = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
 
     parse_variant_str(&content, context)
@@ -132,10 +132,10 @@ fn parse_variant_values(
     for item in sequence {
         // Check if this is a conditional (has 'if' and 'then' keys)
         if let Some(mapping) = item.as_mapping() {
-            if let Some(condition) = mapping.get(&serde_yaml::Value::String("if".to_string())) {
+            if let Some(condition) = mapping.get(serde_yaml::Value::String("if".to_string())) {
                 // This is an if/then conditional
                 let then_value = mapping
-                    .get(&serde_yaml::Value::String("then".to_string()))
+                    .get(serde_yaml::Value::String("then".to_string()))
                     .ok_or_else(|| {
                         VariantConfigError::InvalidConfig(
                             "Conditional must have 'then' clause".to_string(),

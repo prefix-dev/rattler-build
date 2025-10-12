@@ -1,5 +1,9 @@
 [workspace]
-members = ["rust-tests", "crates/rattler_build_recipe_generator"]
+members = [
+  "rust-tests",
+  "crates/rattler_build_recipe_generator",
+  "crates/rattler_build_variant_config",
+]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]

@@ -142,7 +142,7 @@ pub fn load_conda_build_config(
     path: &Path,
     context: &SelectorContext,
 ) -> Result<VariantConfig, VariantConfigError> {
-    let mut input = std::fs::read_to_string(path)
+    let mut input = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
 
     let selector_context = context.to_context();
@@ -258,9 +258,9 @@ mod tests {
         let context = SelectorContext::new(Platform::Linux64);
         let ctx = context.to_context();
 
-        assert_eq!(ctx.get("unix").unwrap().is_true(), true);
-        assert_eq!(ctx.get("linux").unwrap().is_true(), true);
-        assert_eq!(ctx.get("win").unwrap().is_true(), false);
-        assert_eq!(ctx.get("linux64").unwrap().is_true(), true);
+        assert!(ctx.get("unix").unwrap().is_true());
+        assert!(ctx.get("linux").unwrap().is_true());
+        assert!(!ctx.get("win").unwrap().is_true());
+        assert!(ctx.get("linux64").unwrap().is_true());
     }
 }

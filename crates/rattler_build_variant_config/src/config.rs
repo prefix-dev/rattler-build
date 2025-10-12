@@ -54,7 +54,7 @@ impl VariantConfig {
 
     /// Load variant configuration from a YAML file
     pub fn from_file(path: &Path) -> Result<Self, VariantConfigError> {
-        let content = std::fs::read_to_string(path)
+        let content = fs_err::read_to_string(path)
             .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
 
         Self::from_yaml_str(&content)
