@@ -5,7 +5,7 @@ expression: format_miette_report(error_with_source)
   × Jinja template error: Jinja error: Failed to parse Jinja template: syntax error: unexpected `}`, expected `,` (in template:1)
    ╭─[invalid_jinja.yaml:2:9]
  1 │ package:
- 2 │   name: '${{ name | invalid_filter(unclosed }}'
+ 2 │   name: "${{ name | invalid_filter(unclosed }}"
    ·         ──┬─
    ·           ╰── Jinja error: Failed to parse Jinja template: syntax error: unexpected `}`, expected `,` (in template:1)
  3 │   version: 1.0.0

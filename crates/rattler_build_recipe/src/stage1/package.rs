@@ -1,9 +1,10 @@
 //! Stage 1 Package - evaluated package information with concrete values
 
 use rattler_conda_types::{PackageName, Version};
+use serde::{Deserialize, Serialize};
 
 /// Evaluated package information with all templates and conditionals resolved
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Package {
     /// The package name (validated conda package name)
     pub name: PackageName,

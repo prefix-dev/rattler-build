@@ -7,7 +7,10 @@
 //!
 //! The transformation from stage0 to stage1 happens through the `Evaluate` trait.
 
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 use crate::{ParseError, stage0::jinja_functions::JinjaConfig};
 
@@ -34,12 +37,27 @@ pub use source::Source;
 pub use tests::TestType;
 
 /// Evaluation context containing variables for template rendering and conditional evaluation
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct EvaluationContext {
     /// Variables available during evaluation (e.g., "name", "version", "py", "target_platform")
     variables: HashMap<String, String>,
     /// Configuration for Jinja functions (compiler, cdt, etc.)
     jinja_config: JinjaConfig,
+    /// Set of variables that were actually accessed during evaluation (tracked via thread-safe interior mutability)
+    accessed_variables: Arc<Mutex<HashSet<String>>>,
+    /// Set of variables that were accessed but undefined (tracked via thread-safe interior mutability)
+    undefined_variables: Arc<Mutex<HashSet<String>>>,
+}
+
+impl Default for EvaluationContext {
+    fn default() -> Self {
+        Self {
+            variables: HashMap::new(),
+            jinja_config: JinjaConfig::default(),
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
 }
 
 impl EvaluationContext {
@@ -53,6 +71,8 @@ impl EvaluationContext {
         Self {
             variables,
             jinja_config: JinjaConfig::default(),
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -61,6 +81,8 @@ impl EvaluationContext {
         Self {
             variables,
             jinja_config,
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -92,6 +114,79 @@ impl EvaluationContext {
     /// Set the Jinja configuration
     pub fn set_jinja_config(&mut self, config: JinjaConfig) {
         self.jinja_config = config;
+    }
+
+    /// Track that a variable was accessed
+    pub(crate) fn track_access(&self, key: &str) {
+        if let Ok(mut accessed) = self.accessed_variables.lock() {
+            accessed.insert(key.to_string());
+        }
+    }
+
+    /// Track that a variable was accessed but undefined
+    pub(crate) fn track_undefined(&self, key: &str) {
+        if let Ok(mut undefined) = self.undefined_variables.lock() {
+            undefined.insert(key.to_string());
+        }
+    }
+
+    /// Get the set of variables that were accessed during evaluation
+    pub fn accessed_variables(&self) -> HashSet<String> {
+        self.accessed_variables
+            .lock()
+            .map(|accessed| accessed.clone())
+            .unwrap_or_default()
+    }
+
+    /// Get the set of variables that were accessed but undefined
+    pub fn undefined_variables(&self) -> HashSet<String> {
+        self.undefined_variables
+            .lock()
+            .map(|undefined| undefined.clone())
+            .unwrap_or_default()
+    }
+
+    /// Clear the accessed variables tracker
+    pub fn clear_accessed(&self) {
+        if let Ok(mut accessed) = self.accessed_variables.lock() {
+            accessed.clear();
+        }
+        if let Ok(mut undefined) = self.undefined_variables.lock() {
+            undefined.clear();
+        }
+    }
+
+    /// Evaluate and merge context variables into the evaluation context
+    ///
+    /// Context variables are evaluated in order, allowing later variables to reference earlier ones.
+    /// The context can contain templates that reference:
+    /// - Previously defined context variables
+    /// - Variables from the original context
+    ///
+    /// # Arguments
+    /// * `context_vars` - The context variables to evaluate (from the recipe's context section)
+    ///
+    /// # Returns
+    /// A new EvaluationContext with the evaluated context variables merged in
+    pub fn with_context(
+        &self,
+        context_vars: &indexmap::IndexMap<String, crate::stage0::Value<String>>,
+    ) -> Result<Self, ParseError> {
+        use crate::stage0::evaluate::evaluate_string_value;
+
+        // Clone the current context
+        let mut new_context = self.clone();
+
+        // Evaluate each context variable in order
+        for (key, value) in context_vars {
+            // Evaluate the value using the current context (which includes previously evaluated context vars)
+            let evaluated = evaluate_string_value(value, &new_context)?;
+
+            // Add the evaluated value to the context
+            new_context.variables.insert(key.clone(), evaluated);
+        }
+
+        Ok(new_context)
     }
 }
 
@@ -155,5 +250,122 @@ mod unit_tests {
 
         assert!(ctx.contains("name"));
         assert!(!ctx.contains("version"));
+    }
+
+    #[test]
+    fn test_context_evaluation_simple() {
+        use crate::stage0::Value;
+
+        let ctx = EvaluationContext::new();
+
+        let mut context_vars = indexmap::IndexMap::new();
+        context_vars.insert("name".to_string(), Value::Concrete("mypackage".to_string()));
+        context_vars.insert("version".to_string(), Value::Concrete("1.0.0".to_string()));
+
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+
+        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
+        assert_eq!(evaluated_ctx.get("version"), Some(&"1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_context_evaluation_with_templates() {
+        use crate::stage0::{JinjaTemplate, Value};
+
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("base".to_string(), "myorg".to_string());
+
+        let mut context_vars = indexmap::IndexMap::new();
+        context_vars.insert("name".to_string(), Value::Concrete("mypackage".to_string()));
+        context_vars.insert(
+            "full_name".to_string(),
+            Value::Template(JinjaTemplate::new("${{ base }}/${{ name }}".to_string()).unwrap()),
+        );
+
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+
+        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
+        assert_eq!(
+            evaluated_ctx.get("full_name"),
+            Some(&"myorg/mypackage".to_string())
+        );
+    }
+
+    #[test]
+    fn test_context_evaluation_forward_references() {
+        use crate::stage0::{JinjaTemplate, Value};
+
+        let ctx = EvaluationContext::new();
+
+        let mut context_vars = indexmap::IndexMap::new();
+        context_vars.insert("name".to_string(), Value::Concrete("mypackage".to_string()));
+        context_vars.insert("version".to_string(), Value::Concrete("1.0.0".to_string()));
+        context_vars.insert(
+            "package_version".to_string(),
+            Value::Template(JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap()),
+        );
+        context_vars.insert(
+            "full_id".to_string(),
+            Value::Template(JinjaTemplate::new("pkg:${{ package_version }}".to_string()).unwrap()),
+        );
+
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+
+        assert_eq!(
+            evaluated_ctx.get("package_version"),
+            Some(&"mypackage-1.0.0".to_string())
+        );
+        assert_eq!(
+            evaluated_ctx.get("full_id"),
+            Some(&"pkg:mypackage-1.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_context_evaluation_order_matters() {
+        use crate::stage0::{JinjaTemplate, Value};
+
+        let ctx = EvaluationContext::new();
+
+        // The order matters - package_version references name and version
+        let mut context_vars = indexmap::IndexMap::new();
+        context_vars.insert("name".to_string(), Value::Concrete("mypackage".to_string()));
+        context_vars.insert("version".to_string(), Value::Concrete("2.0.0".to_string()));
+        context_vars.insert(
+            "package_version".to_string(),
+            Value::Template(JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap()),
+        );
+
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+
+        assert_eq!(
+            evaluated_ctx.get("package_version"),
+            Some(&"mypackage-2.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_context_evaluation_with_existing_context() {
+        use crate::stage0::{JinjaTemplate, Value};
+
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("platform".to_string(), "linux".to_string());
+
+        let mut context_vars = indexmap::IndexMap::new();
+        context_vars.insert("name".to_string(), Value::Concrete("mypackage".to_string()));
+        context_vars.insert(
+            "full_name".to_string(),
+            Value::Template(JinjaTemplate::new("${{ name }}-${{ platform }}".to_string()).unwrap()),
+        );
+
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+
+        // Both the original context and the evaluated context should be present
+        assert_eq!(evaluated_ctx.get("platform"), Some(&"linux".to_string()));
+        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
+        assert_eq!(
+            evaluated_ctx.get("full_name"),
+            Some(&"mypackage-linux".to_string())
+        );
     }
 }
