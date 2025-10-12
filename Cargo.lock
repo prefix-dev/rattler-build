@@ -4309,6 +4309,7 @@ dependencies = [
  "spdx",
  "thiserror 2.0.17",
  "url",
+ "walkdir",
 ]
 
 [[package]]

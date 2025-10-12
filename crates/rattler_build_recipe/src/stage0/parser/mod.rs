@@ -81,6 +81,44 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
             .with_message("Recipe must be a mapping")
     })?;
 
+    // Parse optional schema_version
+    let schema_version = if let Some(schema_node) = mapping.get("schema_version") {
+        let scalar = schema_node.as_scalar().ok_or_else(|| {
+            ParseError::expected_type("scalar", "non-scalar", get_span(schema_node))
+                .with_message("schema_version must be an integer")
+        })?;
+        let version_str = scalar.as_str();
+        let version: u32 = version_str.parse().map_err(|_| {
+            ParseError::invalid_value(
+                "schema_version",
+                "not a valid integer",
+                (*scalar.span()).into(),
+            )
+        })?;
+
+        // Only version 1 is supported
+        if version != 1 {
+            return Err(ParseError::invalid_value(
+                "schema_version",
+                &format!(
+                    "unsupported schema version {} (only version 1 is supported)",
+                    version
+                ),
+                (*scalar.span()).into(),
+            ));
+        }
+        Some(version)
+    } else {
+        None
+    };
+
+    // Parse optional context
+    let context = if let Some(context_node) = mapping.get("context") {
+        parse_context(context_node)?
+    } else {
+        indexmap::IndexMap::new()
+    };
+
     // Parse required package section
     let package_node = mapping
         .get("package")
@@ -131,18 +169,28 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
         let key_str = key.as_str();
         if !matches!(
             key_str,
-            "package" | "build" | "about" | "requirements" | "extra" | "source" | "tests"
+            "package"
+                | "build"
+                | "about"
+                | "requirements"
+                | "extra"
+                | "source"
+                | "tests"
+                | "schema_version"
+                | "context"
         ) {
             return Err(ParseError::invalid_value(
                 "recipe",
                 &format!("unknown top-level field '{}'", key_str),
                 (*key.span()).into(),
             )
-            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests"));
+            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
         }
     }
 
     Ok(crate::stage0::Stage0Recipe {
+        schema_version,
+        context,
         package,
         build,
         about,
@@ -151,6 +199,29 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
         source,
         tests,
     })
+}
+
+/// Parse the context section from YAML
+///
+/// Context is an order-preserving mapping of variable names to values (can be templates or concrete).
+/// Order is important because later context values can reference earlier ones.
+fn parse_context(
+    yaml: &MarkedNode,
+) -> ParseResult<indexmap::IndexMap<String, crate::stage0::types::Value<String>>> {
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+            .with_message("context must be a mapping")
+    })?;
+
+    let mut context = indexmap::IndexMap::new();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str().to_string();
+        let value = parse_value(value_node)?;
+        context.insert(key, value);
+    }
+
+    Ok(context)
 }
 
 // All section parsers (parse_package, parse_about, parse_extra, parse_requirements)

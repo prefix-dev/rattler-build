@@ -29,6 +29,7 @@ fs-err.workspace = true
 
 [dev-dependencies]
 insta = { workspace = true }
+walkdir = "2"
 
 # Enable miette for tests to demonstrate error messages
 [dev-dependencies.miette]

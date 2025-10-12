@@ -46,6 +46,10 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
         about.license_file = Some(parse_value(license_file)?);
     }
 
+    if let Some(license_family) = mapping.get("license_family") {
+        about.license_family = Some(parse_value(license_family)?);
+    }
+
     if let Some(summary) = mapping.get("summary") {
         about.summary = Some(parse_value(summary)?);
     }
@@ -70,6 +74,7 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
             "homepage"
                 | "license"
                 | "license_file"
+                | "license_family"
                 | "summary"
                 | "description"
                 | "documentation"
@@ -81,7 +86,7 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
                 (*key.span()).into(),
             )
             .with_suggestion(
-                "valid fields are: homepage, license, license_file, summary, description, documentation, repository"
+                "valid fields are: homepage, license, license_file, license_family, summary, description, documentation, repository"
             ));
         }
     }

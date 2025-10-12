@@ -15,6 +15,58 @@ use crate::{
 
 use super::{parse_conditional_list, parse_value};
 
+/// Parse a script field from YAML
+///
+/// Script can be either:
+/// - A sequence of strings: `["echo hello", "make install"]`
+/// - A scalar multiline string: `|`
+///   `echo hello`
+///   `make install`
+///
+/// For scalar strings, we split by newlines and filter out empty lines
+fn parse_script(node: &Node) -> Result<crate::stage0::types::ConditionalList<String>, ParseError> {
+    use crate::stage0::types::{ConditionalList, Item, Value};
+
+    // Try parsing as a sequence first (the standard way)
+    if node.as_sequence().is_some() {
+        return parse_conditional_list(node);
+    }
+
+    // Try parsing as a scalar string (multiline or single line)
+    if let Some(scalar) = node.as_scalar() {
+        let spanned = SpannedString::from(scalar);
+        let script_str = spanned.as_str();
+
+        // Check if it's a template
+        if script_str.contains("${{") && script_str.contains("}}") {
+            // It's a templated script - keep as is
+            let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
+                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+            let items = vec![Item::Value(Value::Template(template))];
+            return Ok(ConditionalList::new(items));
+        }
+
+        // Split multiline string by newlines and filter empty lines
+        let lines: Vec<String> = script_str
+            .lines()
+            .map(|s| s.to_string())
+            .filter(|s| !s.trim().is_empty())
+            .collect();
+
+        let items: Vec<Item<String>> = lines
+            .into_iter()
+            .map(|line| Item::Value(Value::Concrete(line)))
+            .collect();
+
+        return Ok(ConditionalList::new(items));
+    }
+
+    Err(
+        ParseError::expected_type("sequence or scalar string", "other", get_span(node))
+            .with_message("script must be either a list of commands or a multiline string"),
+    )
+}
+
 /// Parse a Build section from YAML
 pub fn parse_build(node: &Node) -> Result<Build, ParseError> {
     let mapping = node.as_mapping().ok_or_else(|| {
@@ -52,7 +104,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 build.string = Some(parse_value(value_node)?);
             }
             "script" => {
-                build.script = parse_conditional_list(value_node)?;
+                build.script = parse_script(value_node)?;
             }
             "noarch" => {
                 build.noarch = Some(parse_value(value_node)?);

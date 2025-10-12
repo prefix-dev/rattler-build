@@ -27,6 +27,14 @@ pub use types::{
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Stage0Recipe {
+    /// Schema version (optional, defaults to None). Only version 1 is supported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u32>,
+
+    /// Context variables for Jinja template rendering (order-preserving)
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub context: indexmap::IndexMap<String, types::Value<String>>,
+
     pub package: package::Package,
     pub build: build::Build,
     pub requirements: Requirements,
@@ -50,6 +58,10 @@ impl Stage0Recipe {
         }
         for test in &self.tests {
             vars.extend(test.used_variables());
+        }
+        // Add variables from context
+        for value in self.context.values() {
+            vars.extend(value.used_variables());
         }
         vars.sort();
         vars.dedup();
