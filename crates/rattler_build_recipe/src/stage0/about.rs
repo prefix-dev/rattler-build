@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use crate::stage0::types::Value;
+use crate::stage0::types::{ConditionalList, Value};
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -47,7 +47,8 @@ impl Display for License {
 pub struct About {
     pub homepage: Option<Value<Url>>,
     pub license: Option<Value<License>>,
-    pub license_file: Option<Value<String>>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub license_file: ConditionalList<String>,
     /// License family (deprecated, but still used in some recipes)
     pub license_family: Option<Value<String>>,
     pub summary: Option<Value<String>>,
@@ -60,10 +61,10 @@ impl Display for About {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "About {{ homepage: {}, license: {}, license_file: {}, summary: {}, description: {}, documentation: {}, repository: {} }}",
+            "About {{ homepage: {}, license: {}, license_file: [{}], summary: {}, description: {}, documentation: {}, repository: {} }}",
             self.homepage.as_ref().into_iter().format(", "),
             self.license.as_ref().into_iter().format(", "),
-            self.license_file.as_ref().into_iter().format(", "),
+            self.license_file.iter().format(", "),
             self.summary.as_ref().into_iter().format(", "),
             self.description.as_ref().into_iter().format(", "),
             self.documentation.as_ref().into_iter().format(", "),
@@ -81,9 +82,7 @@ impl About {
         if let Some(license) = &self.license {
             vars.extend(license.used_variables());
         }
-        if let Some(license_file) = &self.license_file {
-            vars.extend(license_file.used_variables());
-        }
+        vars.extend(self.license_file.used_variables());
         if let Some(license_family) = &self.license_family {
             vars.extend(license_family.used_variables());
         }

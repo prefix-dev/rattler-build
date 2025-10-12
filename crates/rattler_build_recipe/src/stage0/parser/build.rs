@@ -19,15 +19,21 @@ use super::{parse_conditional_list, parse_value};
 ///
 /// Script can be either:
 /// - A sequence of strings: `["echo hello", "make install"]`
+/// - A sequence of script objects with content/file/interpreter/env
 /// - A scalar multiline string: `|`
 ///   `echo hello`
 ///   `make install`
+/// - A single script object mapping: `{env: {...}, content: [...]}`
 ///
 /// For scalar strings, we split by newlines and filter out empty lines
-fn parse_script(node: &Node) -> Result<crate::stage0::types::ConditionalList<String>, ParseError> {
-    use crate::stage0::types::{ConditionalList, Item, Value};
+fn parse_script(
+    node: &Node,
+) -> Result<crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>, ParseError>
+{
+    use crate::stage0::types::{ConditionalList, Item, ScriptContent, Value};
 
     // Try parsing as a sequence first (the standard way)
+    // parse_conditional_list will handle both strings and script objects thanks to serde(untagged)
     if node.as_sequence().is_some() {
         return parse_conditional_list(node);
     }
@@ -53,18 +59,131 @@ fn parse_script(node: &Node) -> Result<crate::stage0::types::ConditionalList<Str
             .filter(|s| !s.trim().is_empty())
             .collect();
 
-        let items: Vec<Item<String>> = lines
+        let items: Vec<Item<ScriptContent>> = lines
             .into_iter()
-            .map(|line| Item::Value(Value::Concrete(line)))
+            .map(|line| Item::Value(Value::Concrete(ScriptContent::Command(line))))
             .collect();
 
         return Ok(ConditionalList::new(items));
     }
 
-    Err(
-        ParseError::expected_type("sequence or scalar string", "other", get_span(node))
-            .with_message("script must be either a list of commands or a multiline string"),
+    // Try parsing as a single InlineScript mapping
+    if let Some(mapping) = node.as_mapping() {
+        // Parse as a single InlineScript object manually
+        let mut interpreter = None;
+        let mut env = indexmap::IndexMap::new();
+        let mut secrets = Vec::new();
+        let mut content = None;
+        let mut file = None;
+
+        for (key_node, value_node) in mapping.iter() {
+            let key = key_node.as_str();
+
+            match key {
+                "interpreter" => {
+                    interpreter = Some(parse_value(value_node)?);
+                }
+                "env" => {
+                    let env_mapping = value_node.as_mapping().ok_or_else(|| {
+                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
+                            .with_message("Expected 'env' to be a mapping")
+                    })?;
+
+                    for (env_key_node, env_value_node) in env_mapping.iter() {
+                        let env_key = env_key_node.as_str().to_string();
+                        let env_value = parse_value(env_value_node)?;
+                        env.insert(env_key, env_value);
+                    }
+                }
+                "secrets" => {
+                    let seq = value_node.as_sequence().ok_or_else(|| {
+                        ParseError::expected_type("sequence", "non-sequence", get_span(value_node))
+                            .with_message("Expected 'secrets' to be a list")
+                    })?;
+
+                    for item in seq.iter() {
+                        let scalar = item.as_scalar().ok_or_else(|| {
+                            ParseError::expected_type("string", "non-string", get_span(item))
+                                .with_message("Expected secret name to be a string")
+                        })?;
+                        secrets.push(SpannedString::from(scalar).as_str().to_string());
+                    }
+                }
+                "content" => {
+                    // Content can be either a string or a list
+                    if let Some(scalar) = value_node.as_scalar() {
+                        // Single string - convert to ConditionalList with one item
+                        let spanned = SpannedString::from(scalar);
+                        let content_str = spanned.as_str();
+
+                        // Check if it's a template
+                        if content_str.contains("${{") && content_str.contains("}}") {
+                            let template =
+                                crate::stage0::types::JinjaTemplate::new(content_str.to_string())
+                                    .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+                            content = Some(crate::stage0::types::ConditionalList::new(vec![
+                                crate::stage0::types::Item::Value(Value::Template(template)),
+                            ]));
+                        } else {
+                            // Plain string - split by newlines if multiline
+                            let lines: Vec<String> = content_str
+                                .lines()
+                                .map(|s| s.to_string())
+                                .filter(|s| !s.trim().is_empty())
+                                .collect();
+
+                            let items: Vec<crate::stage0::types::Item<String>> = lines
+                                .into_iter()
+                                .map(|line| {
+                                    crate::stage0::types::Item::Value(Value::Concrete(line))
+                                })
+                                .collect();
+
+                            content = Some(crate::stage0::types::ConditionalList::new(items));
+                        }
+                    } else {
+                        // Parse as a list (with possible conditionals)
+                        content = Some(parse_conditional_list(value_node)?);
+                    }
+                }
+                "file" => {
+                    file = Some(parse_value(value_node)?);
+                }
+                _ => {
+                    return Err(ParseError::invalid_value(
+                        "script",
+                        &format!("unknown field '{}' in script object", key),
+                        (*key_node.span()).into(),
+                    )
+                    .with_suggestion(
+                        "Valid fields are: interpreter, env, secrets, content, file",
+                    ));
+                }
+            }
+        }
+
+        let inline_script = crate::stage0::types::InlineScript {
+            interpreter,
+            env,
+            secrets,
+            content,
+            file,
+        };
+
+        let items = vec![Item::Value(Value::Concrete(ScriptContent::Inline(
+            inline_script,
+        )))];
+        return Ok(ConditionalList::new(items));
+    }
+
+    Err(ParseError::expected_type(
+        "sequence, scalar string, or script object",
+        "other",
+        get_span(node),
     )
+    .with_message(
+        "script must be either a list of commands, a multiline string, or a script object",
+    ))
 }
 
 /// Parse a Build section from YAML
@@ -85,20 +204,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
 
         match key {
             "number" => {
-                let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'number' to be a scalar value")
-                })?;
-                let spanned = SpannedString::from(scalar);
-                let num_str = spanned.as_str();
-                let num = num_str.parse::<u64>().map_err(|_| {
-                    ParseError::invalid_value(
-                        "number",
-                        "not a valid positive integer",
-                        spanned.span(),
-                    )
-                })?;
-                build.number = num;
+                build.number = parse_value(value_node)?;
             }
             "string" => {
                 build.string = Some(parse_value(value_node)?);
@@ -555,7 +661,7 @@ mod tests {
         let yaml = "{}";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert_eq!(build.number, 0);
+        assert_eq!(build.number, Value::Concrete(0));
         assert!(build.string.is_none());
         assert!(build.script.is_empty());
     }
@@ -565,7 +671,7 @@ mod tests {
         let yaml = "number: 5";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert_eq!(build.number, 5);
+        assert_eq!(build.number, Value::Concrete(5));
     }
 
     #[test]

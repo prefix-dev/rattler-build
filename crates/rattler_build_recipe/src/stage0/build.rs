@@ -3,7 +3,12 @@ use std::fmt::Display;
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, Value};
+use crate::stage0::types::{ConditionalList, ScriptContent, Value};
+
+/// Default build number is 0
+fn default_build_number() -> Value<u64> {
+    Value::Concrete(0)
+}
 
 /// Variant key usage configuration
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -21,11 +26,11 @@ pub struct VariantKeyUsage {
 }
 
 /// Stage0 Build configuration - contains templates and conditionals
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Build {
     /// Build number (increments with each rebuild)
-    #[serde(default)]
-    pub number: u64,
+    #[serde(default = "default_build_number")]
+    pub number: Value<u64>,
 
     /// Build string (usually auto-generated from variant hash)
     pub string: Option<Value<String>>,
@@ -33,7 +38,7 @@ pub struct Build {
     /// Build script - either inline commands or a file path
     /// Default is `build.sh` on Unix, `build.bat` on Windows
     #[serde(default)]
-    pub script: ConditionalList<String>,
+    pub script: ConditionalList<ScriptContent>,
 
     /// Noarch type - "python" or "generic"
     pub noarch: Option<Value<String>>,
@@ -76,6 +81,27 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default)]
     pub post_process: Vec<PostProcess>,
+}
+
+impl Default for Build {
+    fn default() -> Self {
+        Self {
+            number: default_build_number(),
+            string: None,
+            script: ConditionalList::default(),
+            noarch: None,
+            python: PythonBuild::default(),
+            skip: None,
+            always_copy_files: ConditionalList::default(),
+            always_include_files: ConditionalList::default(),
+            merge_build_and_host_envs: false,
+            files: ConditionalList::default(),
+            dynamic_linking: DynamicLinking::default(),
+            variant: VariantKeyUsage::default(),
+            prefix_detection: PrefixDetection::default(),
+            post_process: Vec::new(),
+        }
+    }
 }
 
 /// Binary relocation configuration - can be a boolean or list of glob patterns
@@ -220,6 +246,8 @@ impl Build {
     /// Collect all variables used in the build section
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
+
+        vars.extend(self.number.used_variables());
 
         if let Some(string) = &self.string {
             vars.extend(string.used_variables());

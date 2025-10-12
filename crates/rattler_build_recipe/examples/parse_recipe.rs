@@ -209,7 +209,7 @@ fn main() -> Result<()> {
     }
 
     println!("\n=== Complete Stage1 Recipe ===");
-    println!("{}", serde_json::to_string_pretty(&stage1_recipe).unwrap());
+    println!("{:#?}", stage1_recipe);
 
     Ok(())
 }
