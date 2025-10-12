@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::stage0::types::{ConditionalList, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, Value};
 
 /// Source information - can be Git, Url, or Path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -127,9 +127,9 @@ pub struct PathSource {
     #[serde(default = "default_use_gitignore", skip_serializing_if = "is_true")]
     pub use_gitignore: bool,
 
-    /// Only take certain files from the source (glob patterns)
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub filter: ConditionalList<String>,
+    /// Filter for files to include/exclude from the source
+    #[serde(default)]
+    pub filter: IncludeExclude,
 }
 
 fn default_use_gitignore() -> bool {
@@ -237,11 +237,7 @@ impl PathSource {
         if let Some(Value::Template(t)) = &self.file_name {
             vars.extend(t.used_variables().iter().cloned());
         }
-        for item in &self.filter {
-            if let crate::stage0::types::Item::Value(v) = item {
-                vars.extend(v.used_variables());
-            }
-        }
+        vars.extend(self.filter.used_variables());
         vars.sort();
         vars.dedup();
         vars

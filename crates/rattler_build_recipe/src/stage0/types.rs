@@ -848,6 +848,49 @@ impl<T: ToString + Default + Debug> ConditionalList<T> {
     }
 }
 
+/// Generic include/exclude pattern type - can be a simple list or include/exclude mapping
+/// This is commonly used for glob patterns that support filtering
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum IncludeExclude<T = String> {
+    /// Simple list of items
+    List(ConditionalList<T>),
+    /// Include/exclude mapping
+    Mapping {
+        /// Items to include
+        #[serde(default)]
+        include: ConditionalList<T>,
+        /// Items to exclude
+        #[serde(default)]
+        exclude: ConditionalList<T>,
+    },
+}
+
+impl<T> Default for IncludeExclude<T> {
+    fn default() -> Self {
+        Self::List(ConditionalList::default())
+    }
+}
+
+impl<T: ToString + Default + Debug> IncludeExclude<T> {
+    /// Collect all variables used in this include/exclude pattern
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        match self {
+            IncludeExclude::List(list) => {
+                vars.extend(list.used_variables());
+            }
+            IncludeExclude::Mapping { include, exclude } => {
+                vars.extend(include.used_variables());
+                vars.extend(exclude.used_variables());
+            }
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
 impl<T: ToString + Default + Debug> Conditional<T> {
     pub fn new(condition: String, then_value: ListOrItem<T>) -> Result<Self, String> {
         let condition = JinjaExpression::new(condition)?;

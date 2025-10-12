@@ -9,7 +9,7 @@ use crate::{
             PrefixIgnore, PythonBuild, VariantKeyUsage,
         },
         parser::helpers::get_span,
-        types::Value,
+        types::{IncludeExclude, Value},
     },
 };
 
@@ -186,6 +186,55 @@ fn parse_script(
     ))
 }
 
+/// Parse build files field - can be a list or include/exclude mapping
+fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
+    // Try parsing as a mapping with include/exclude first
+    if let Some(mapping) = node.as_mapping() {
+        let mut include = None;
+        let mut exclude = None;
+
+        for (key_node, value_node) in mapping.iter() {
+            let key = key_node.as_str();
+
+            match key {
+                "include" => {
+                    include = Some(parse_conditional_list(value_node)?);
+                }
+                "exclude" => {
+                    exclude = Some(parse_conditional_list(value_node)?);
+                }
+                _ => {
+                    return Err(ParseError::invalid_value(
+                        "files",
+                        &format!("unknown field '{}' in files mapping", key),
+                        (*key_node.span()).into(),
+                    )
+                    .with_suggestion("Valid fields are: include, exclude"));
+                }
+            }
+        }
+
+        return Ok(IncludeExclude::Mapping {
+            include: include.unwrap_or_default(),
+            exclude: exclude.unwrap_or_default(),
+        });
+    }
+
+    // Otherwise parse as a simple list
+    if node.as_sequence().is_some() {
+        return Ok(IncludeExclude::List(parse_conditional_list(node)?));
+    }
+
+    Err(ParseError::expected_type(
+        "sequence or mapping with include/exclude",
+        "other",
+        get_span(node),
+    )
+    .with_message(
+        "files must be either a list of glob patterns or a mapping with include/exclude keys",
+    ))
+}
+
 /// Parse a Build section from YAML
 pub fn parse_build(node: &Node) -> Result<Build, ParseError> {
     let mapping = node.as_mapping().ok_or_else(|| {
@@ -219,7 +268,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 build.python = parse_python_build(value_node)?;
             }
             "skip" => {
-                build.skip = Some(parse_value(value_node)?);
+                build.skip = parse_conditional_list(value_node)?;
             }
             "always_copy_files" => {
                 build.always_copy_files = parse_conditional_list(value_node)?;
@@ -247,7 +296,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 };
             }
             "files" => {
-                build.files = parse_conditional_list(value_node)?;
+                build.files = parse_build_files(value_node)?;
             }
             "dynamic_linking" => {
                 build.dynamic_linking = parse_dynamic_linking(value_node)?;

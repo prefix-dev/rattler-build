@@ -73,8 +73,9 @@ pub struct Build {
     /// Python-specific configuration
     pub python: PythonBuild,
 
-    /// Skip condition (evaluated boolean as string "true" or "false")
-    pub skip: Option<String>,
+    /// Skip conditions - can be boolean expressions or platform names
+    /// For example: ["win", "platform == 'osx-64'"]
+    pub skip: Vec<String>,
 
     /// Always copy these files (validated glob patterns)
     pub always_copy_files: GlobVec,
@@ -205,7 +206,7 @@ impl Build {
             && !self.python.use_python_app_entrypoint
             && !self.python.version_independent
             && self.python.site_packages_path.is_none()
-            && self.skip.is_none()
+            && self.skip.is_empty()
             && self.always_copy_files.is_empty()
             && self.always_include_files.is_empty()
             && !self.merge_build_and_host_envs

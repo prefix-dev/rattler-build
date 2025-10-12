@@ -6,11 +6,60 @@ use crate::{
     stage0::{
         parser::helpers::get_span,
         source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-        types::Value,
+        types::{IncludeExclude, Value},
     },
 };
 
 use super::{parse_conditional_list, parse_value};
+
+/// Parse source filter field - can be a list or include/exclude mapping
+fn parse_source_filter(node: &Node) -> Result<IncludeExclude, ParseError> {
+    // Try parsing as a mapping with include/exclude first
+    if let Some(mapping) = node.as_mapping() {
+        let mut include = None;
+        let mut exclude = None;
+
+        for (key_node, value_node) in mapping.iter() {
+            let key = key_node.as_str();
+
+            match key {
+                "include" => {
+                    include = Some(parse_conditional_list(value_node)?);
+                }
+                "exclude" => {
+                    exclude = Some(parse_conditional_list(value_node)?);
+                }
+                _ => {
+                    return Err(ParseError::invalid_value(
+                        "filter",
+                        &format!("unknown field '{}' in filter mapping", key),
+                        (*key_node.span()).into(),
+                    )
+                    .with_suggestion("Valid fields are: include, exclude"));
+                }
+            }
+        }
+
+        return Ok(IncludeExclude::Mapping {
+            include: include.unwrap_or_default(),
+            exclude: exclude.unwrap_or_default(),
+        });
+    }
+
+    // Otherwise parse as a simple list
+    if node.as_sequence().is_some() {
+        return Ok(IncludeExclude::List(parse_conditional_list(node)?));
+    }
+
+    Err(ParseError::expected_type(
+        "sequence or mapping with include/exclude",
+        "other",
+        get_span(node),
+    )
+    .with_message(
+        "filter must be either a list of glob patterns or a mapping with include/exclude keys",
+    ))
+}
 
 /// Parse source section from YAML (can be single or list)
 pub fn parse_source(node: &Node) -> Result<Vec<Source>, ParseError> {
@@ -221,7 +270,7 @@ fn parse_path_source(
     let mut target_directory = None;
     let mut file_name = None;
     let mut use_gitignore = true;
-    let mut filter = ConditionalList::default();
+    let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -264,7 +313,7 @@ fn parse_path_source(
                 };
             }
             "filter" => {
-                filter = parse_conditional_list(value_node)?;
+                filter = parse_source_filter(value_node)?;
             }
             _ => {
                 return Err(ParseError::invalid_value(

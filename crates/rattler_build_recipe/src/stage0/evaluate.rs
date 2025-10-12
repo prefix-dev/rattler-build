@@ -838,8 +838,8 @@ impl Evaluate for Stage0Build {
             }
         };
 
-        // Evaluate skip condition
-        let skip = evaluate_optional_string_value(&self.skip, context)?;
+        // Evaluate skip conditions
+        let skip = evaluate_string_list(&self.skip, context)?;
 
         // Evaluate python configuration
         let python = self.python.evaluate(context)?;
@@ -849,7 +849,21 @@ impl Evaluate for Stage0Build {
             GlobVec::from_strings(evaluate_string_list(&self.always_copy_files, context)?)?;
         let always_include_files =
             GlobVec::from_strings(evaluate_string_list(&self.always_include_files, context)?)?;
-        let files = GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?;
+
+        // Evaluate files (handle both list and include/exclude variants)
+        let files = match &self.files {
+            crate::stage0::types::IncludeExclude::List(list) => {
+                GlobVec::from_strings(evaluate_string_list(list, context)?)?
+            }
+            crate::stage0::types::IncludeExclude::Mapping {
+                include,
+                exclude: _,
+            } => {
+                // For now, just use the include list
+                // TODO: properly handle exclude patterns
+                GlobVec::from_strings(evaluate_string_list(include, context)?)?
+            }
+        };
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -1102,8 +1116,20 @@ impl Evaluate for Stage0PathSource {
             },
         };
 
-        // Evaluate filter and convert to GlobVec
-        let filter = GlobVec::from_strings(evaluate_string_list(&self.filter, context)?)?;
+        // Evaluate filter and convert to GlobVec (handle both list and include/exclude variants)
+        let filter = match &self.filter {
+            crate::stage0::types::IncludeExclude::List(list) => {
+                GlobVec::from_strings(evaluate_string_list(list, context)?)?
+            }
+            crate::stage0::types::IncludeExclude::Mapping {
+                include,
+                exclude: _,
+            } => {
+                // For now, just use the include list
+                // TODO: properly handle exclude patterns
+                GlobVec::from_strings(evaluate_string_list(include, context)?)?
+            }
+        };
 
         Ok(Stage1PathSource {
             path,
