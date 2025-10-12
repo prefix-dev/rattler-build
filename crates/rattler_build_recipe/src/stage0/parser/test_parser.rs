@@ -506,39 +506,19 @@ fn parse_package_contents_test(
         let key = key_node.as_str();
         match key {
             "files" => {
-                files = Some(parse_package_contents_check_files(
-                    value_node.as_mapping().ok_or_else(|| {
-                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                    })?,
-                )?);
+                files = Some(parse_package_contents_check_files_flexible(value_node)?);
             }
             "site_packages" => {
-                site_packages = Some(parse_package_contents_check_files(
-                    value_node.as_mapping().ok_or_else(|| {
-                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                    })?,
-                )?);
+                site_packages = Some(parse_package_contents_check_files_flexible(value_node)?);
             }
             "bin" => {
-                bin = Some(parse_package_contents_check_files(
-                    value_node.as_mapping().ok_or_else(|| {
-                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                    })?,
-                )?);
+                bin = Some(parse_package_contents_check_files_flexible(value_node)?);
             }
             "lib" => {
-                lib = Some(parse_package_contents_check_files(
-                    value_node.as_mapping().ok_or_else(|| {
-                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                    })?,
-                )?);
+                lib = Some(parse_package_contents_check_files_flexible(value_node)?);
             }
             "include" => {
-                include = Some(parse_package_contents_check_files(
-                    value_node.as_mapping().ok_or_else(|| {
-                        ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                    })?,
-                )?);
+                include = Some(parse_package_contents_check_files_flexible(value_node)?);
             }
             "strict" => {
                 let scalar = value_node.as_scalar().ok_or_else(|| {
@@ -579,6 +559,39 @@ fn parse_package_contents_test(
         include,
         strict,
     })
+}
+
+/// Parse package contents check files with flexible format support
+/// Supports two formats:
+/// 1. Shorthand (list): `- foo` means "foo must exist"
+/// 2. Explicit (mapping): `exists: [foo]` and/or `not_exists: [bar]`
+fn parse_package_contents_check_files_flexible(
+    node: &Node,
+) -> Result<PackageContentsCheckFiles, ParseError> {
+    use crate::stage0::types::ConditionalList;
+
+    // Try to parse as a mapping first (explicit format with exists/not_exists)
+    if let Some(mapping) = node.as_mapping() {
+        return parse_package_contents_check_files(mapping);
+    }
+
+    // Try to parse as a sequence (shorthand format - simple list means "exists")
+    if node.as_sequence().is_some() {
+        let exists = parse_conditional_list(node)?;
+        return Ok(PackageContentsCheckFiles {
+            exists,
+            not_exists: ConditionalList::default(),
+        });
+    }
+
+    Err(ParseError::expected_type(
+        "sequence or mapping with exists/not_exists",
+        "other",
+        get_span(node),
+    )
+    .with_message(
+        "package_contents field must be either a list of files (shorthand) or a mapping with exists/not_exists keys",
+    ))
 }
 
 fn parse_package_contents_check_files(
