@@ -1,7 +1,9 @@
 //! Stage 1 Requirements - evaluated dependencies with concrete values
 
+use serde::{Deserialize, Serialize};
+
 /// Run exports configuration
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports
     pub noarch: Vec<String>,
@@ -36,7 +38,7 @@ impl RunExports {
 }
 
 /// Ignore run exports configuration
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct IgnoreRunExports {
     /// Packages to ignore run exports from by name
     pub by_name: Vec<String>,
@@ -58,7 +60,7 @@ impl IgnoreRunExports {
 }
 
 /// Evaluated requirements with all templates and conditionals resolved
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Requirements {
     /// Build-time dependencies (available during build)
     pub build: Vec<String>,

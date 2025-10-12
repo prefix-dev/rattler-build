@@ -1,8 +1,10 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
+use serde::{Deserialize, Serialize};
+
 use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
 
 /// Variant key usage configuration (evaluated)
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
     /// Variant keys to use
     pub use_keys: Vec<String>,
@@ -13,7 +15,7 @@ pub struct VariantKeyUsage {
 }
 
 /// Prefix detection configuration
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrefixDetection {
     /// Force file type detection (text or binary)
     pub force_file_type: ForceFileType,
@@ -34,7 +36,7 @@ impl Default for PrefixDetection {
 }
 
 /// Force file type for prefix detection
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ForceFileType {
     /// Force these files to be treated as text files
     pub text: GlobVec,
@@ -43,7 +45,7 @@ pub struct ForceFileType {
 }
 
 /// Post-processing operations using regex replacements
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostProcess {
     /// Files to apply this post-processing to
     pub files: GlobVec,
@@ -54,7 +56,7 @@ pub struct PostProcess {
 }
 
 /// Evaluated build configuration with all templates and conditionals resolved
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
     pub number: u64,
@@ -100,7 +102,7 @@ pub struct Build {
 }
 
 /// Dynamic linking configuration
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DynamicLinking {
     /// RPaths to use (Linux/macOS only)
     pub rpaths: Vec<String>,
@@ -138,7 +140,7 @@ impl Default for DynamicLinking {
 }
 
 /// What to do during linking checks
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LinkingCheckBehavior {
     /// Ignore the issue (default)
     #[default]
@@ -148,7 +150,7 @@ pub enum LinkingCheckBehavior {
 }
 
 /// Python-specific build configuration
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PythonBuild {
     /// Python entry points (executable_name = module:function)
     pub entry_points: Vec<String>,
@@ -170,7 +172,7 @@ pub struct PythonBuild {
 }
 
 /// NoArch type for platform-independent packages
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NoArchType {
     /// Python noarch package (pure Python, no compiled extensions)
     Python,

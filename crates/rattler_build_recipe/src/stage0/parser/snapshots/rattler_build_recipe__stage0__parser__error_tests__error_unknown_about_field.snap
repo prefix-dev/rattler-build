@@ -10,4 +10,4 @@ expression: format_miette_report(error_with_source)
    ·        ╰── invalid value for about: unknown field 'maintainer'
  9 │   contact_email: john@example.com
    ╰────
-  help: valid fields are: homepage, license, license_file, summary, description, documentation, repository
+  help: valid fields are: homepage, license, license_file, license_family, summary, description, documentation, repository

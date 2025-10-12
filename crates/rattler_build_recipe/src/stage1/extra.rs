@@ -1,7 +1,9 @@
 //! Stage 1 Extra - evaluated extra metadata with concrete values
 
+use serde::{Deserialize, Serialize};
+
 /// Evaluated extra metadata with all templates and conditionals resolved
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Extra {
     /// List of recipe maintainers
     pub recipe_maintainers: Vec<String>,

@@ -1,11 +1,13 @@
 //! AllOrGlobVec - A type that can be either "all" (boolean) or specific glob patterns
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
 use super::glob_vec::GlobVec;
 use crate::ParseError;
 
 /// A GlobVec or a boolean to select all, none, or specific paths
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AllOrGlobVec {
     /// Select all paths (true) or no paths (false)
     All(bool),

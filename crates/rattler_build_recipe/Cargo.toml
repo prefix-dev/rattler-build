@@ -35,3 +35,8 @@ walkdir = "2"
 [dev-dependencies.miette]
 workspace = true
 features = ["fancy"]
+
+# Examples require miette feature for beautiful error messages
+[[example]]
+name = "parse_recipe"
+required-features = ["miette"]

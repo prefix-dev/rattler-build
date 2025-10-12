@@ -13,9 +13,20 @@ use std::env;
 use std::fs;
 use std::process;
 
+use miette::{IntoDiagnostic, NamedSource, Result};
 use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
 
-fn main() {
+fn main() -> Result<()> {
+    // Install miette panic handler for better error messages
+    miette::set_hook(Box::new(|_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .terminal_links(true)
+                .build(),
+        )
+    }))
+    .ok();
+
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -44,24 +55,16 @@ fn main() {
     }
 
     // Read the recipe file
-    let yaml_content = match fs::read_to_string(recipe_path) {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("Error reading file '{}': {}", recipe_path, e);
-            process::exit(1);
-        }
-    };
+    let yaml_content = fs::read_to_string(recipe_path).into_diagnostic()?;
 
     println!("=== Parsing recipe: {} ===\n", recipe_path);
 
+    // Create a named source for better error messages with miette
+    let source = NamedSource::new(recipe_path, yaml_content.clone());
+
     // Parse stage0 recipe
-    let stage0_recipe = match stage0::parse_recipe_from_source(&yaml_content) {
-        Ok(recipe) => recipe,
-        Err(e) => {
-            eprintln!("Error parsing recipe: {}", e);
-            process::exit(1);
-        }
-    };
+    let stage0_recipe = stage0::parse_recipe_from_source(&yaml_content)
+        .map_err(|e| miette::Report::new(e).with_source_code(source.clone()))?;
 
     println!("✓ Stage0 recipe parsed successfully");
     println!("\n=== Stage0 Recipe (with templates and conditionals) ===");
@@ -77,12 +80,26 @@ fn main() {
     }
 
     // Create evaluation context
-    let context = EvaluationContext::from_map(variables.clone());
+    let mut context = EvaluationContext::from_map(variables.clone());
+
+    // Evaluate and merge the recipe's context section
+    if !stage0_recipe.context.is_empty() {
+        println!("\n=== Evaluating context section ===");
+        for (key, value) in &stage0_recipe.context {
+            println!("  {} = {}", key, value);
+        }
+
+        context = context
+            .with_context(&stage0_recipe.context)
+            .map_err(|e| miette::Report::new(e).with_source_code(source.clone()))?;
+
+        println!("\n✓ Context evaluated successfully");
+    }
 
     // Show evaluation context
-    if !variables.is_empty() {
-        println!("\n=== Evaluation context ===");
-        for (key, value) in &variables {
+    if !variables.is_empty() || !stage0_recipe.context.is_empty() {
+        println!("\n=== Final evaluation context ===");
+        for (key, value) in context.variables() {
             println!("  {} = {}", key, value);
         }
     }
@@ -112,15 +129,41 @@ fn main() {
 
     // Evaluate to stage1
     println!("\n=== Evaluating recipe ===");
-    let stage1_recipe = match stage0_recipe.evaluate(&context) {
-        Ok(recipe) => recipe,
-        Err(e) => {
-            eprintln!("Error evaluating recipe: {}", e);
-            process::exit(1);
-        }
-    };
+    let stage1_recipe = stage0_recipe
+        .evaluate(&context)
+        .map_err(|e| miette::Report::new(e).with_source_code(source.clone()))?;
 
     println!("✓ Recipe evaluated successfully");
+
+    // Show which variables were actually accessed during evaluation
+    let accessed_vars = context.accessed_variables();
+    if !accessed_vars.is_empty() {
+        println!("\n=== Variables accessed during evaluation ===");
+        let mut sorted_accessed: Vec<_> = accessed_vars.iter().collect();
+        sorted_accessed.sort();
+        for var in sorted_accessed {
+            let defined = context.contains(var);
+            let status = if defined { "✓" } else { "✗ (undefined)" };
+            println!("  {} {}", status, var);
+        }
+
+        // Show which defined variables were NOT accessed (might be in conditional branches not taken)
+        let unused_vars: Vec<_> = variables
+            .keys()
+            .filter(|k| !accessed_vars.contains(k.as_str()))
+            .collect();
+
+        if !unused_vars.is_empty() {
+            println!("\n=== Defined variables NOT accessed ===");
+            println!("(These may be in conditional branches that were not taken)");
+            for var in unused_vars {
+                println!("  - {}", var);
+            }
+        }
+    } else {
+        println!("\n=== No template variables were accessed ===");
+        println!("(Recipe contains only concrete values, no templates were rendered)");
+    }
 
     println!("\n=== Stage1 Recipe (evaluated with concrete types) ===");
     println!(
@@ -165,6 +208,8 @@ fn main() {
         }
     }
 
-    println!("\n=== Complete Stage1 Recipe (Debug format) ===");
-    println!("{:#?}", stage1_recipe);
+    println!("\n=== Complete Stage1 Recipe ===");
+    println!("{}", serde_json::to_string_pretty(&stage1_recipe).unwrap());
+
+    Ok(())
 }
