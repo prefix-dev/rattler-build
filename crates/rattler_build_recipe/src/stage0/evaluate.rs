@@ -213,8 +213,8 @@ pub fn evaluate_string_value(
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
     match value {
-        Value::Concrete(s) => Ok(s.clone()),
-        Value::Template(template) => render_template(template.source(), context, &Span::unknown()),
+        Value::Concrete { value: s, .. } => Ok(s.clone()),
+        Value::Template { template, span } => render_template(template.source(), context, span),
     }
 }
 
@@ -224,8 +224,8 @@ pub fn evaluate_value_to_string<T: ToString>(
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
     match value {
-        Value::Concrete(v) => Ok(v.to_string()),
-        Value::Template(template) => render_template(template.source(), context, &Span::unknown()),
+        Value::Concrete { value: v, .. } => Ok(v.to_string()),
+        Value::Template { template, span } => render_template(template.source(), context, span),
     }
 }
 
@@ -297,6 +297,97 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
+/// Evaluate a ConditionalList<String> into Vec<Dependency>
+///
+/// This parses string dependencies into MatchSpec or handles pin_subpackage/pin_compatible.
+/// The strings can be either:
+/// - Regular match specs (e.g., "python >=3.8")
+/// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
+/// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
+pub fn evaluate_dependency_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
+    use crate::stage1::Dependency;
+
+    use rattler_conda_types::{MatchSpec, ParseStrictness};
+
+    let mut results = Vec::new();
+
+    // Iterate over the conditional list items directly to preserve span information
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                // Get the span from the Value - now we have it!
+                let span = value.span();
+
+                let s = evaluate_string_value(value, context)?;
+
+                // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+                if s.trim().starts_with('{') {
+                    // Try to deserialize as Dependency (which handles pin types)
+                    let dep: Dependency = serde_yaml::from_str(&s).map_err(|e| ParseError {
+                        kind: ErrorKind::InvalidValue,
+                        span,
+                        message: Some(format!("Failed to parse pin dependency: {}", e)),
+                        suggestion: None,
+                    })?;
+                    results.push(dep);
+                } else {
+                    // It's a regular MatchSpec string
+                    let spec = MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
+                        ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span,
+                            message: Some(format!("Invalid match spec '{}': {}", s, e)),
+                            suggestion: None,
+                        }
+                    })?;
+                    results.push(Dependency::Spec(spec));
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+
+                let items_to_process = if condition_met {
+                    &cond.then
+                } else {
+                    &cond.else_value
+                };
+
+                // Process the selected branch
+                for s in items_to_process.iter() {
+                    // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+                    if s.trim().starts_with('{') {
+                        // Try to deserialize as Dependency (which handles pin types)
+                        let dep: Dependency = serde_yaml::from_str(s).map_err(|e| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: Span::unknown(), // Conditional branches don't preserve individual spans yet
+                            message: Some(format!("Failed to parse pin dependency: {}", e)),
+                            suggestion: None,
+                        })?;
+                        results.push(dep);
+                    } else {
+                        // It's a regular MatchSpec string
+                        let spec =
+                            MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
+                                ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: Span::unknown(), // Conditional branches don't preserve individual spans yet
+                                    message: Some(format!("Invalid match spec '{}': {}", s, e)),
+                                    suggestion: None,
+                                }
+                            })?;
+                        results.push(Dependency::Spec(spec));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
 /// Evaluate a ScriptContent into a string
 fn evaluate_script_content(
     content: &ScriptContent,
@@ -335,11 +426,14 @@ pub fn evaluate_script_list(
                 // But ScriptContent is not wrapped in Value...
                 // Let me check the type more carefully
                 match value {
-                    Value::Concrete(script_content) => {
+                    Value::Concrete {
+                        value: script_content,
+                        ..
+                    } => {
                         let s = evaluate_script_content(script_content, context)?;
                         results.push(s);
                     }
-                    Value::Template(_) => {
+                    Value::Template { .. } => {
                         // ScriptContent can't be a template itself
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
@@ -397,9 +491,9 @@ pub fn evaluate_bool_value(
     field_name: &str,
 ) -> Result<bool, ParseError> {
     match value {
-        Value::Concrete(b) => Ok(*b),
-        Value::Template(template) => {
-            let s = render_template(template.source(), context, &Span::unknown())?;
+        Value::Concrete { value: b, .. } => Ok(*b),
+        Value::Template { template, span } => {
+            let s = render_template(template.source(), context, span)?;
             parse_bool_from_str(&s, field_name)
         }
     }
@@ -538,12 +632,12 @@ impl Evaluate for Stage0About {
         let license = match &self.license {
             None => None,
             Some(v) => match v {
-                Value::Concrete(license) => Some(license.0.clone()),
-                Value::Template(template) => {
-                    let s = render_template(template.source(), context, &Span::unknown())?;
+                Value::Concrete { value: license, .. } => Some(license.0.clone()),
+                Value::Template { template, span } => {
+                    let s = render_template(template.source(), context, span)?;
                     Some(s.parse::<spdx::Expression>().map_err(|e| ParseError {
                         kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
+                        span: *span,
                         message: Some(format!("Invalid SPDX license expression: {}", e)),
                         suggestion: None,
                     })?)
@@ -563,14 +657,20 @@ impl Evaluate for Stage0About {
     }
 }
 
-// Use macro for simple list field evaluations
-impl_evaluate_list_fields!(Stage0RunExports => Stage1RunExports {
-    noarch,
-    strong,
-    strong_constraints,
-    weak,
-    weak_constraints,
-});
+// Evaluate RunExports with dependency parsing
+impl Evaluate for Stage0RunExports {
+    type Output = Stage1RunExports;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1RunExports {
+            noarch: evaluate_dependency_list(&self.noarch, context)?,
+            strong: evaluate_dependency_list(&self.strong, context)?,
+            strong_constraints: evaluate_dependency_list(&self.strong_constraints, context)?,
+            weak: evaluate_dependency_list(&self.weak, context)?,
+            weak_constraints: evaluate_dependency_list(&self.weak_constraints, context)?,
+        })
+    }
+}
 
 impl_evaluate_list_fields!(Stage0IgnoreRunExports => Stage1IgnoreRunExports {
     by_name,
@@ -582,10 +682,10 @@ impl Evaluate for Stage0Requirements {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1Requirements {
-            build: evaluate_string_list(&self.build, context)?,
-            host: evaluate_string_list(&self.host, context)?,
-            run: evaluate_string_list(&self.run, context)?,
-            run_constraints: evaluate_string_list(&self.run_constraints, context)?,
+            build: evaluate_dependency_list(&self.build, context)?,
+            host: evaluate_dependency_list(&self.host, context)?,
+            run: evaluate_dependency_list(&self.run, context)?,
+            run_constraints: evaluate_dependency_list(&self.run_constraints, context)?,
             run_exports: self.run_exports.evaluate(context)?,
             ignore_run_exports: self.ignore_run_exports.evaluate(context)?,
         })
@@ -658,16 +758,16 @@ impl Evaluate for Stage0PrefixDetection {
         let ignore = match &self.ignore {
             Stage0PrefixIgnore::Boolean(val) => {
                 let bool_val = match val {
-                    Value::Concrete(b) => *b,
-                    Value::Template(template) => {
-                        let s = render_template(template.source(), context, &Span::unknown())?;
+                    Value::Concrete { value: b, .. } => *b,
+                    Value::Template { template, span } => {
+                        let s = render_template(template.source(), context, span)?;
                         match s.as_str() {
                             "true" | "True" | "yes" | "Yes" => true,
                             "false" | "False" | "no" | "No" => false,
                             _ => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
+                                    span: *span,
                                     message: Some(format!(
                                         "Invalid boolean value for prefix_detection.ignore: '{}'",
                                         s
@@ -715,16 +815,16 @@ impl Evaluate for Stage0DynamicLinking {
         let binary_relocation = match &self.binary_relocation {
             Stage0BinaryRelocation::Boolean(val) => {
                 let bool_val = match val {
-                    Value::Concrete(b) => *b,
-                    Value::Template(template) => {
-                        let s = render_template(template.source(), context, &Span::unknown())?;
+                    Value::Concrete { value: b, .. } => *b,
+                    Value::Template { template, span } => {
+                        let s = render_template(template.source(), context, span)?;
                         match s.as_str() {
                             "true" | "True" | "yes" | "Yes" => true,
                             "false" | "False" | "no" | "No" => false,
                             _ => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
+                                    span: *span,
                                     message: Some(format!(
                                         "Invalid boolean value for binary_relocation: '{}'",
                                         s
@@ -882,12 +982,12 @@ impl Evaluate for Stage0Build {
 
         // Evaluate build number
         let number = match &self.number {
-            Value::Concrete(n) => *n,
-            Value::Template(template) => {
-                let s = render_template(template.source(), context, &Span::unknown())?;
+            Value::Concrete { value: n, .. } => *n,
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span)?;
                 s.parse::<u64>().map_err(|_| ParseError {
                     kind: ErrorKind::InvalidValue,
-                    span: Span::unknown(),
+                    span: *span,
                     message: Some(format!(
                         "Invalid build number: '{}' is not a valid positive integer",
                         s
@@ -978,9 +1078,9 @@ impl Evaluate for Stage0GitSource {
         let target_directory = match &self.target_directory {
             None => None,
             Some(v) => match v {
-                Value::Concrete(p) => Some(p.clone()),
-                Value::Template(template) => {
-                    let s = render_template(template.source(), context, &Span::unknown())?;
+                Value::Concrete { value: p, .. } => Some(p.clone()),
+                Value::Template { template, span } => {
+                    let s = render_template(template.source(), context, span)?;
                     Some(PathBuf::from(s))
                 }
             },
@@ -1044,9 +1144,9 @@ impl Evaluate for Stage0UrlSource {
         let target_directory = match &self.target_directory {
             None => None,
             Some(v) => match v {
-                Value::Concrete(p) => Some(p.clone()),
-                Value::Template(template) => {
-                    let s = render_template(template.source(), context, &Span::unknown())?;
+                Value::Concrete { value: p, .. } => Some(p.clone()),
+                Value::Template { template, span } => {
+                    let s = render_template(template.source(), context, span)?;
                     Some(PathBuf::from(s))
                 }
             },
@@ -1068,9 +1168,9 @@ impl Evaluate for Stage0PathSource {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         // Evaluate path
         let path = match &self.path {
-            Value::Concrete(p) => p.clone(),
-            Value::Template(template) => {
-                let s = render_template(template.source(), context, &Span::unknown())?;
+            Value::Concrete { value: p, .. } => p.clone(),
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span)?;
                 PathBuf::from(s)
             }
         };
@@ -1096,9 +1196,9 @@ impl Evaluate for Stage0PathSource {
         let target_directory = match &self.target_directory {
             None => None,
             Some(v) => match v {
-                Value::Concrete(p) => Some(p.clone()),
-                Value::Template(template) => {
-                    let s = render_template(template.source(), context, &Span::unknown())?;
+                Value::Concrete { value: p, .. } => Some(p.clone()),
+                Value::Template { template, span } => {
+                    let s = render_template(template.source(), context, span)?;
                     Some(PathBuf::from(s))
                 }
             },
@@ -1108,9 +1208,9 @@ impl Evaluate for Stage0PathSource {
         let file_name = match &self.file_name {
             None => None,
             Some(v) => match v {
-                Value::Concrete(p) => Some(p.clone()),
-                Value::Template(template) => {
-                    let s = render_template(template.source(), context, &Span::unknown())?;
+                Value::Concrete { value: p, .. } => Some(p.clone()),
+                Value::Template { template, span } => {
+                    let s = render_template(template.source(), context, span)?;
                     Some(PathBuf::from(s))
                 }
             },
@@ -1387,7 +1487,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_string_value_concrete() {
-        let value = Value::Concrete("hello".to_string());
+        let value = Value::new_concrete("hello".to_string(), Span::unknown());
         let ctx = EvaluationContext::new();
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
@@ -1396,8 +1496,9 @@ mod tests {
 
     #[test]
     fn test_evaluate_string_value_template() {
-        let value = Value::Template(
+        let value = Value::new_template(
             JinjaTemplate::new("${{ greeting }}, ${{ name }}!".to_string()).unwrap(),
+            Span::unknown(),
         );
 
         let mut ctx = EvaluationContext::new();
@@ -1411,8 +1512,8 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_simple() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::Concrete("gcc".to_string())),
-            Item::Value(Value::Concrete("make".to_string())),
+            Item::Value(Value::new_concrete("gcc".to_string(), Span::unknown())),
+            Item::Value(Value::new_concrete("make".to_string(), Span::unknown())),
         ]);
 
         let ctx = EvaluationContext::new();
@@ -1423,7 +1524,7 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_with_conditional() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::Concrete("python".to_string())),
+            Item::Value(Value::new_concrete("python".to_string(), Span::unknown())),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
                 then: ListOrItem::new(vec!["gcc".to_string()]),
@@ -1498,12 +1599,17 @@ mod tests {
 
         // Create a list with templates that will be evaluated
         let list = ConditionalList::new(vec![
-            Item::Value(Value::Template(
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
+                Span::unknown(),
             )),
-            Item::Value(Value::Concrete("static-dep".to_string())),
-            Item::Value(Value::Template(
+            Item::Value(Value::new_concrete(
+                "static-dep".to_string(),
+                Span::unknown(),
+            )),
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ version }}".to_string()).unwrap(),
+                Span::unknown(),
             )),
         ]);
 

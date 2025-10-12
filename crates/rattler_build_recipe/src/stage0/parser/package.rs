@@ -44,12 +44,15 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
         // Template
         let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, name_spanned.span()))?;
-        crate::stage0::types::Value::Template(template)
+        crate::stage0::types::Value::new_template(template, name_spanned.span())
     } else {
         // Concrete package name
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
             .map_err(|e| ParseError::invalid_value("name", &e.to_string(), name_spanned.span()))?;
-        crate::stage0::types::Value::Concrete(crate::stage0::package::PackageName(package_name))
+        crate::stage0::types::Value::new_concrete(
+            crate::stage0::package::PackageName(package_name),
+            name_spanned.span(),
+        )
     };
 
     // Parse required 'version' field
@@ -70,14 +73,14 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
         // Template
         let template = crate::stage0::types::JinjaTemplate::new(version_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, version_spanned.span()))?;
-        crate::stage0::types::Value::Template(template)
+        crate::stage0::types::Value::new_template(template, version_spanned.span())
     } else {
         // Concrete version
         let version_with_source = rattler_conda_types::VersionWithSource::from_str(version_str)
             .map_err(|e| {
                 ParseError::invalid_value("version", &e.to_string(), version_spanned.span())
             })?;
-        crate::stage0::types::Value::Concrete(version_with_source)
+        crate::stage0::types::Value::new_concrete(version_with_source, version_spanned.span())
     };
 
     // Check for unknown fields
@@ -121,8 +124,8 @@ mod tests {
 
         // Check name
         match package.name {
-            crate::stage0::types::Value::Concrete(ref pkg_name) => {
-                assert_eq!(pkg_name.to_string(), "my-package");
+            crate::stage0::types::Value::Concrete { ref value, .. } => {
+                assert_eq!(value.to_string(), "my-package");
             }
             _ => panic!("Expected concrete name"),
         }

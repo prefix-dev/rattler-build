@@ -117,11 +117,11 @@ impl From<marked_yaml::Span> for Span {
     fn from(marked_span: marked_yaml::Span) -> Self {
         let start = marked_span
             .start()
-            .map(|m| (m.source(), m.line(), m.column()))
+            .map(|m| (m.character(), m.line(), m.column()))
             .unwrap_or((0, 0, 0));
         let end = marked_span
             .end()
-            .map(|m| (m.source(), m.line(), m.column()))
+            .map(|m| (m.character(), m.line(), m.column()))
             .unwrap_or(start);
 
         Self::new(start.0, end.0, start.1, start.2, end.1, end.2)

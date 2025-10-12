@@ -25,7 +25,10 @@ pub enum GitRev {
 
 impl Default for GitRev {
     fn default() -> Self {
-        Self::Value(Value::Concrete("HEAD".to_string()))
+        Self::Value(Value::new_concrete(
+            "HEAD".to_string(),
+            crate::span::Span::unknown(),
+        ))
     }
 }
 
@@ -174,7 +177,7 @@ impl GitSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template(t)) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
         if let Some(lfs) = &self.lfs {
@@ -208,7 +211,7 @@ impl UrlSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template(t)) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
         vars.sort();
@@ -221,7 +224,7 @@ impl PathSource {
     /// Collect all variables used in the path source
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
-        if let Value::Template(t) = &self.path {
+        if let Value::Template { template: t, .. } = &self.path {
             vars.extend(t.used_variables().iter().cloned());
         }
         if let Some(sha256) = &self.sha256 {
@@ -231,10 +234,10 @@ impl PathSource {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(Value::Template(t)) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(Value::Template(t)) = &self.file_name {
+        if let Some(Value::Template { template: t, .. }) = &self.file_name {
             vars.extend(t.used_variables().iter().cloned());
         }
         vars.extend(self.filter.used_variables());

@@ -13,7 +13,89 @@ use crate::{
     },
 };
 
-use super::{parse_conditional_list, parse_value};
+use super::{parse_conditional_list, parse_value, parse_value_with_name};
+
+/// Macro to parse a value with automatic field name inference for better error messages
+///
+/// Usage: `parse_field!("field_name", node)` or `parse_field!("parent.field", node)`
+/// This will automatically use the field name in error messages
+macro_rules! parse_field {
+    ($field:literal, $node:expr) => {{ parse_value_with_name($node, $field)? }};
+}
+
+/// Parse a boolean value from a YAML scalar node
+///
+/// Supports: true, True, yes, Yes, false, False, no, No
+fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
+    let scalar = node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(node))
+            .with_message(format!("Expected '{}' to be a boolean", field_name))
+    })?;
+    let spanned = SpannedString::from(scalar);
+    let bool_str = spanned.as_str();
+
+    match bool_str {
+        "true" | "True" | "yes" | "Yes" => Ok(true),
+        "false" | "False" | "no" | "No" => Ok(false),
+        _ => Err(ParseError::invalid_value(
+            field_name,
+            &format!("not a valid boolean value (found '{}')", bool_str),
+            spanned.span(),
+        )),
+    }
+}
+
+/// Parse a field that can be either a boolean or a list of patterns
+///
+/// This is used for fields like `binary_relocation` and `prefix_detection.ignore`
+/// that support both `true`/`false` and list of glob patterns.
+///
+/// Returns an enum with either Boolean(Value<bool>) or Patterns(ConditionalList<String>)
+fn parse_bool_or_patterns<T>(
+    node: &Node,
+    field_name: &str,
+    bool_variant: fn(Value<bool>) -> T,
+    patterns_variant: fn(crate::stage0::types::ConditionalList<String>) -> T,
+) -> Result<T, ParseError> {
+    // Try to parse as a scalar (boolean or template)
+    if let Some(scalar) = node.as_scalar() {
+        let spanned = SpannedString::from(scalar);
+        let str_val = spanned.as_str();
+
+        // Check if it's a boolean-like value
+        match str_val {
+            "true" | "True" | "yes" | "Yes" => {
+                return Ok(bool_variant(Value::new_concrete(true, spanned.span())));
+            }
+            "false" | "False" | "no" | "No" => {
+                return Ok(bool_variant(Value::new_concrete(false, spanned.span())));
+            }
+            _ => {
+                // If it contains ${{ }}, treat it as a template
+                if str_val.contains("${{") {
+                    return Ok(bool_variant(parse_value(node)?));
+                }
+                // Otherwise it's an error
+                return Err(ParseError::invalid_value(
+                    field_name,
+                    "expected 'true', 'false', or a list of glob patterns",
+                    spanned.span(),
+                ));
+            }
+        }
+    }
+
+    // Try to parse as a list of patterns
+    if node.as_sequence().is_some() {
+        return Ok(patterns_variant(parse_conditional_list(node)?));
+    }
+
+    Err(ParseError::expected_type(
+        "boolean or list",
+        "invalid type",
+        get_span(node),
+    ))
+}
 
 /// Parse a script field from YAML
 ///
@@ -48,7 +130,7 @@ fn parse_script(
             // It's a templated script - keep as is
             let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::Template(template))];
+            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
             return Ok(ConditionalList::new(items));
         }
 
@@ -61,7 +143,12 @@ fn parse_script(
 
         let items: Vec<Item<ScriptContent>> = lines
             .into_iter()
-            .map(|line| Item::Value(Value::Concrete(ScriptContent::Command(line))))
+            .map(|line| {
+                Item::Value(Value::new_concrete(
+                    ScriptContent::Command(line),
+                    spanned.span(),
+                ))
+            })
             .collect();
 
         return Ok(ConditionalList::new(items));
@@ -81,7 +168,7 @@ fn parse_script(
 
             match key {
                 "interpreter" => {
-                    interpreter = Some(parse_value(value_node)?);
+                    interpreter = Some(parse_field!("script.interpreter", value_node));
                 }
                 "env" => {
                     let env_mapping = value_node.as_mapping().ok_or_else(|| {
@@ -91,7 +178,7 @@ fn parse_script(
 
                     for (env_key_node, env_value_node) in env_mapping.iter() {
                         let env_key = env_key_node.as_str().to_string();
-                        let env_value = parse_value(env_value_node)?;
+                        let env_value = parse_field!("script.env", env_value_node);
                         env.insert(env_key, env_value);
                     }
                 }
@@ -122,7 +209,10 @@ fn parse_script(
                                 crate::stage0::types::JinjaTemplate::new(content_str.to_string())
                                     .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
                             content = Some(crate::stage0::types::ConditionalList::new(vec![
-                                crate::stage0::types::Item::Value(Value::Template(template)),
+                                crate::stage0::types::Item::Value(Value::new_template(
+                                    template,
+                                    spanned.span(),
+                                )),
                             ]));
                         } else {
                             // Plain string - split by newlines if multiline
@@ -135,7 +225,10 @@ fn parse_script(
                             let items: Vec<crate::stage0::types::Item<String>> = lines
                                 .into_iter()
                                 .map(|line| {
-                                    crate::stage0::types::Item::Value(Value::Concrete(line))
+                                    crate::stage0::types::Item::Value(Value::new_concrete(
+                                        line,
+                                        spanned.span(),
+                                    ))
                                 })
                                 .collect();
 
@@ -147,7 +240,7 @@ fn parse_script(
                     }
                 }
                 "file" => {
-                    file = Some(parse_value(value_node)?);
+                    file = Some(parse_field!("script.file", value_node));
                 }
                 _ => {
                     return Err(ParseError::invalid_value(
@@ -170,9 +263,11 @@ fn parse_script(
             file,
         };
 
-        let items = vec![Item::Value(Value::Concrete(ScriptContent::Inline(
-            inline_script,
-        )))];
+        let span = get_span(node);
+        let items = vec![Item::Value(Value::new_concrete(
+            ScriptContent::Inline(inline_script),
+            span,
+        ))];
         return Ok(ConditionalList::new(items));
     }
 
@@ -253,16 +348,16 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
 
         match key {
             "number" => {
-                build.number = parse_value(value_node)?;
+                build.number = parse_field!("build.number", value_node);
             }
             "string" => {
-                build.string = Some(parse_value(value_node)?);
+                build.string = Some(parse_field!("build.string", value_node));
             }
             "script" => {
                 build.script = parse_script(value_node)?;
             }
             "noarch" => {
-                build.noarch = Some(parse_value(value_node)?);
+                build.noarch = Some(parse_field!("build.noarch", value_node));
             }
             "python" => {
                 build.python = parse_python_build(value_node)?;
@@ -277,23 +372,8 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 build.always_include_files = parse_conditional_list(value_node)?;
             }
             "merge_build_and_host_envs" => {
-                let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'merge_build_and_host_envs' to be a boolean")
-                })?;
-                let spanned = SpannedString::from(scalar);
-                let bool_str = spanned.as_str();
-                build.merge_build_and_host_envs = match bool_str {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
-                        return Err(ParseError::invalid_value(
-                            "merge_build_and_host_envs",
-                            &format!("not a valid boolean value (found '{}')", bool_str),
-                            spanned.span(),
-                        ));
-                    }
-                };
+                build.merge_build_and_host_envs =
+                    parse_bool(value_node, "merge_build_and_host_envs")?;
             }
             "files" => {
                 build.files = parse_build_files(value_node)?;
@@ -323,44 +403,12 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
 }
 
 fn parse_binary_relocation(node: &Node) -> Result<BinaryRelocation, ParseError> {
-    // Try to parse as a boolean first
-    if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let str_val = spanned.as_str();
-
-        // Check if it's a boolean-like value
-        match str_val {
-            "true" | "True" | "yes" | "Yes" => {
-                return Ok(BinaryRelocation::Boolean(Value::Concrete(true)));
-            }
-            "false" | "False" | "no" | "No" => {
-                return Ok(BinaryRelocation::Boolean(Value::Concrete(false)));
-            }
-            _ => {
-                // If it contains ${{ }}, treat it as a template
-                if str_val.contains("${{") {
-                    return Ok(BinaryRelocation::Boolean(parse_value(node)?));
-                }
-                // Otherwise it's an error
-                return Err(ParseError::invalid_value(
-                    "binary_relocation",
-                    "expected 'true', 'false', or a list of glob patterns",
-                    spanned.span(),
-                ));
-            }
-        }
-    }
-
-    // Try to parse as a list of patterns
-    if node.as_sequence().is_some() {
-        return Ok(BinaryRelocation::Patterns(parse_conditional_list(node)?));
-    }
-
-    Err(ParseError::expected_type(
-        "boolean or list",
-        "invalid type",
-        get_span(node),
-    ))
+    parse_bool_or_patterns(
+        node,
+        "binary_relocation",
+        BinaryRelocation::Boolean,
+        BinaryRelocation::Patterns,
+    )
 }
 
 fn parse_dynamic_linking(node: &Node) -> Result<DynamicLinking, ParseError> {
@@ -388,10 +436,16 @@ fn parse_dynamic_linking(node: &Node) -> Result<DynamicLinking, ParseError> {
                 dynamic_linking.rpath_allowlist = parse_conditional_list(value_node)?;
             }
             "overdepending_behavior" => {
-                dynamic_linking.overdepending_behavior = Some(parse_value(value_node)?);
+                dynamic_linking.overdepending_behavior = Some(parse_field!(
+                    "dynamic_linking.overdepending_behavior",
+                    value_node
+                ));
             }
             "overlinking_behavior" => {
-                dynamic_linking.overlinking_behavior = Some(parse_value(value_node)?);
+                dynamic_linking.overlinking_behavior = Some(parse_field!(
+                    "dynamic_linking.overlinking_behavior",
+                    value_node
+                ));
             }
             _ => {
                 return Err(
@@ -424,45 +478,15 @@ fn parse_python_build(node: &Node) -> Result<PythonBuild, ParseError> {
                 python.skip_pyc_compilation = parse_conditional_list(value_node)?;
             }
             "use_python_app_entrypoint" => {
-                let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'use_python_app_entrypoint' to be a boolean")
-                })?;
-                let spanned = SpannedString::from(scalar);
-                let bool_str = spanned.as_str();
-                python.use_python_app_entrypoint = match bool_str {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
-                        return Err(ParseError::invalid_value(
-                            "use_python_app_entrypoint",
-                            &format!("not a valid boolean value (found '{}')", bool_str),
-                            spanned.span(),
-                        ));
-                    }
-                };
+                python.use_python_app_entrypoint =
+                    parse_bool(value_node, "use_python_app_entrypoint")?;
             }
             "version_independent" => {
-                let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'version_independent' to be a boolean")
-                })?;
-                let spanned = SpannedString::from(scalar);
-                let bool_str = spanned.as_str();
-                python.version_independent = match bool_str {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
-                        return Err(ParseError::invalid_value(
-                            "version_independent",
-                            &format!("not a valid boolean value (found '{}')", bool_str),
-                            spanned.span(),
-                        ));
-                    }
-                };
+                python.version_independent = parse_bool(value_node, "version_independent")?;
             }
             "site_packages_path" => {
-                python.site_packages_path = Some(parse_value(value_node)?);
+                python.site_packages_path =
+                    Some(parse_field!("python.site_packages_path", value_node));
             }
             _ => {
                 return Err(
@@ -495,7 +519,8 @@ fn parse_variant_key_usage(node: &Node) -> Result<VariantKeyUsage, ParseError> {
                 variant.ignore_keys = parse_conditional_list(value_node)?;
             }
             "down_prioritize_variant" => {
-                variant.down_prioritize_variant = Some(parse_value(value_node)?);
+                variant.down_prioritize_variant =
+                    Some(parse_field!("variant.down_prioritize_variant", value_node));
             }
             _ => {
                 return Err(ParseError::invalid_value(
@@ -546,44 +571,12 @@ fn parse_force_file_type(node: &Node) -> Result<ForceFileType, ParseError> {
 }
 
 fn parse_prefix_ignore(node: &Node) -> Result<PrefixIgnore, ParseError> {
-    // Try to parse as a boolean first
-    if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let str_val = spanned.as_str();
-
-        // Check if it's a boolean-like value
-        match str_val {
-            "true" | "True" | "yes" | "Yes" => {
-                return Ok(PrefixIgnore::Boolean(Value::Concrete(true)));
-            }
-            "false" | "False" | "no" | "No" => {
-                return Ok(PrefixIgnore::Boolean(Value::Concrete(false)));
-            }
-            _ => {
-                // If it contains ${{ }}, treat it as a template
-                if str_val.contains("${{") {
-                    return Ok(PrefixIgnore::Boolean(parse_value(node)?));
-                }
-                // Otherwise it's an error
-                return Err(ParseError::invalid_value(
-                    "prefix_detection.ignore",
-                    "expected 'true', 'false', or a list of glob patterns",
-                    spanned.span(),
-                ));
-            }
-        }
-    }
-
-    // Try to parse as a list of patterns
-    if node.as_sequence().is_some() {
-        return Ok(PrefixIgnore::Patterns(parse_conditional_list(node)?));
-    }
-
-    Err(ParseError::expected_type(
-        "boolean or list",
-        "invalid type",
-        get_span(node),
-    ))
+    parse_bool_or_patterns(
+        node,
+        "prefix_detection.ignore",
+        PrefixIgnore::Boolean,
+        PrefixIgnore::Patterns,
+    )
 }
 
 fn parse_prefix_detection(node: &Node) -> Result<PrefixDetection, ParseError> {
@@ -605,23 +598,8 @@ fn parse_prefix_detection(node: &Node) -> Result<PrefixDetection, ParseError> {
                 prefix_detection.ignore = parse_prefix_ignore(value_node)?;
             }
             "ignore_binary_files" => {
-                let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'ignore_binary_files' to be a boolean")
-                })?;
-                let spanned = SpannedString::from(scalar);
-                let bool_str = spanned.as_str();
-                prefix_detection.ignore_binary_files = match bool_str {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
-                        return Err(ParseError::invalid_value(
-                            "ignore_binary_files",
-                            &format!("not a valid boolean value (found '{}')", bool_str),
-                            spanned.span(),
-                        ));
-                    }
-                };
+                prefix_detection.ignore_binary_files =
+                    parse_bool(value_node, "ignore_binary_files")?;
             }
             _ => {
                 return Err(ParseError::invalid_value(
@@ -657,10 +635,10 @@ fn parse_post_process(node: &Node) -> Result<PostProcess, ParseError> {
                 files = Some(parse_conditional_list(value_node)?);
             }
             "regex" => {
-                regex = Some(parse_value(value_node)?);
+                regex = Some(parse_field!("post_process.regex", value_node));
             }
             "replacement" => {
-                replacement = Some(parse_value(value_node)?);
+                replacement = Some(parse_field!("post_process.replacement", value_node));
             }
             _ => {
                 return Err(ParseError::invalid_value(
@@ -710,7 +688,10 @@ mod tests {
         let yaml = "{}";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert_eq!(build.number, Value::Concrete(0));
+        match build.number {
+            Value::Concrete { value: n, .. } => assert_eq!(n, 0),
+            _ => panic!("Expected concrete value"),
+        }
         assert!(build.string.is_none());
         assert!(build.script.is_empty());
     }
@@ -720,7 +701,10 @@ mod tests {
         let yaml = "number: 5";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert_eq!(build.number, Value::Concrete(5));
+        match build.number {
+            Value::Concrete { value: n, .. } => assert_eq!(n, 5),
+            _ => panic!("Expected concrete value"),
+        }
     }
 
     #[test]

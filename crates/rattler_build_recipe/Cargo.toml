@@ -14,6 +14,7 @@ miette = ["dep:miette", "dep:thiserror", "dep:pathdiff"]
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 rattler_conda_types = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }

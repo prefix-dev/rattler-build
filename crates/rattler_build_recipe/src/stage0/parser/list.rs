@@ -54,14 +54,14 @@ where
             let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
             Ok(crate::stage0::types::Item::Value(
-                crate::stage0::types::Value::Template(template),
+                crate::stage0::types::Value::new_template(template, spanned.span()),
             ))
         } else {
             let value = s
                 .parse::<T>()
                 .map_err(|e| ParseError::invalid_value("item", &e.to_string(), spanned.span()))?;
             Ok(crate::stage0::types::Item::Value(
-                crate::stage0::types::Value::Concrete(value),
+                crate::stage0::types::Value::new_concrete(value, spanned.span()),
             ))
         }
     } else {

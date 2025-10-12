@@ -32,7 +32,7 @@ pub use extra::Extra;
 pub use glob_vec::GlobVec;
 pub use package::Package;
 pub use recipe::Recipe;
-pub use requirements::Requirements;
+pub use requirements::{Dependency, Pin, PinArgs, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
 pub use tests::TestType;
 

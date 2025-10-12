@@ -41,7 +41,7 @@ pub use package::parse_package;
 pub use requirements::parse_requirements;
 pub use source::parse_source;
 pub use test_parser::parse_tests;
-pub use value::parse_value;
+pub use value::{parse_value, parse_value_with_name};
 
 /// Parse a complete stage0 recipe from YAML source string
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {

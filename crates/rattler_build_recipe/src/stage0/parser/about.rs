@@ -28,12 +28,15 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
         if s.contains("${{") && s.contains("}}") {
             let template = JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::Template(template))];
+            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string
-        let items = vec![Item::Value(Value::Concrete(s.to_string()))];
+        let items = vec![Item::Value(Value::new_concrete(
+            s.to_string(),
+            spanned.span(),
+        ))];
         return Ok(ConditionalList::new(items));
     }
 
@@ -164,14 +167,14 @@ mod tests {
 
         // Verify concrete values
         match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete(url) => {
+            crate::stage0::types::Value::Concrete { value: url, .. } => {
                 assert_eq!(url.as_str(), "https://example.com/");
             }
             _ => panic!("Expected concrete value"),
         }
 
         match about.license.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete(license) => {
+            crate::stage0::types::Value::Concrete { value: license, .. } => {
                 assert_eq!(license.0.as_ref(), "MIT");
             }
             _ => panic!("Expected concrete value"),

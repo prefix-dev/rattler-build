@@ -255,7 +255,7 @@ fn parse_inline_script(
                                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
                         content = Some(crate::stage0::types::ConditionalList::new(vec![
                             crate::stage0::types::Item::Value(
-                                crate::stage0::types::Value::Template(template),
+                                crate::stage0::types::Value::new_template(template, spanned.span()),
                             ),
                         ]));
                     } else {
@@ -270,7 +270,7 @@ fn parse_inline_script(
                             .into_iter()
                             .map(|line| {
                                 crate::stage0::types::Item::Value(
-                                    crate::stage0::types::Value::Concrete(line),
+                                    crate::stage0::types::Value::new_concrete(line, spanned.span()),
                                 )
                             })
                             .collect();
@@ -325,14 +325,15 @@ fn parse_script_field(
         if script_str.contains("${{") && script_str.contains("}}") {
             let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::Template(template))];
+            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string command
-        let items = vec![Item::Value(Value::Concrete(ScriptContent::Command(
-            script_str.to_string(),
-        )))];
+        let items = vec![Item::Value(Value::new_concrete(
+            ScriptContent::Command(script_str.to_string()),
+            spanned.span(),
+        ))];
         return Ok(ConditionalList::new(items));
     }
 
@@ -340,9 +341,11 @@ fn parse_script_field(
     if let Some(mapping) = node.as_mapping() {
         // Parse the inline script from the mapping
         let inline_script = parse_inline_script(mapping)?;
-        let items = vec![Item::Value(Value::Concrete(ScriptContent::Inline(
-            inline_script,
-        )))];
+        let span = get_span(node);
+        let items = vec![Item::Value(Value::new_concrete(
+            ScriptContent::Inline(inline_script),
+            span,
+        ))];
         return Ok(ConditionalList::new(items));
     }
 
