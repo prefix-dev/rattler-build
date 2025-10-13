@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Get the span from a marked_yaml node
-pub(super) fn get_span(node: &MarkedNode) -> Span {
+pub(crate) fn get_span(node: &MarkedNode) -> Span {
     match node {
         MarkedNode::Scalar(s) => (*s.span()).into(),
         MarkedNode::Mapping(m) => (*m.span()).into(),

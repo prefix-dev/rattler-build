@@ -24,7 +24,7 @@ build:
         Source::Git(git) => {
             // Check that the git URL is correctly parsed
             match &git.url.0 {
-                Value::Concrete(url) => {
+                Value::Concrete { value: url, .. } => {
                     assert_eq!(url, "https://github.com/example/repo.git");
                 }
                 _ => panic!("Expected concrete URL"),
@@ -64,7 +64,7 @@ build:
             assert_eq!(url_src.url.len(), 1);
 
             match &url_src.url[0] {
-                Value::Concrete(url) => {
+                Value::Concrete { value: url, .. } => {
                     assert_eq!(url, "https://example.com/archive.tar.gz");
                 }
                 _ => panic!("Expected concrete URL"),
@@ -101,7 +101,7 @@ build:
     match &recipe.source[0] {
         Source::Path(path_src) => {
             match &path_src.path {
-                Value::Concrete(path) => {
+                Value::Concrete { value: path, .. } => {
                     assert_eq!(path.to_str().unwrap(), "./local/source");
                 }
                 _ => panic!("Expected concrete path"),
@@ -170,7 +170,7 @@ build:
         Source::Git(git) => {
             // Check that the URL is a template
             match &git.url.0 {
-                Value::Template(template) => {
+                Value::Template { template, .. } => {
                     assert!(template.source().contains("repo_url"));
                 }
                 _ => panic!("Expected template URL"),

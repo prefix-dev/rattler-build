@@ -146,7 +146,7 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
 }
 
 /// Parse an IgnoreRunExports section
-fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreRunExports> {
+pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreRunExports> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("ignore_run_exports must be a mapping")

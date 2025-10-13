@@ -9,6 +9,7 @@ mod build;
 mod extra;
 mod helpers;
 mod list;
+mod output_parser;
 mod package;
 mod requirements;
 mod source;
@@ -29,7 +30,6 @@ use marked_yaml::Node as MarkedNode;
 use crate::{
     error::{ErrorKind, ParseError, ParseResult},
     span::Span,
-    stage0::parser::helpers::get_span,
 };
 
 // Re-export parsing functions
@@ -37,13 +37,33 @@ pub use about::parse_about;
 pub use build::parse_build;
 pub use extra::parse_extra;
 pub use list::parse_conditional_list;
+pub use output_parser::parse_multi_output_recipe;
 pub use package::parse_package;
 pub use requirements::parse_requirements;
 pub use source::parse_source;
 pub use test_parser::parse_tests;
 pub use value::{parse_value, parse_value_with_name};
 
+// Re-export helpers within crate only
+pub(crate) use helpers::get_span;
+
+/// Parse a recipe (single or multi-output) from YAML source string
+///
+/// This function automatically detects whether the recipe is single-output or multi-output
+/// and returns the appropriate Recipe variant.
+pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
+    let yaml = marked_yaml::parse_yaml(0, source).map_err(|e| {
+        ParseError::new(ErrorKind::YamlError, Span::unknown())
+            .with_message(format!("Failed to parse YAML: {}", e))
+    })?;
+
+    parse_recipe_or_multi(&yaml)
+}
+
 /// Parse a complete stage0 recipe from YAML source string
+///
+/// Note: This function returns a SingleOutputRecipe for backwards compatibility.
+/// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = marked_yaml::parse_yaml(0, source).map_err(|e| {
         ParseError::new(ErrorKind::YamlError, Span::unknown())
@@ -53,7 +73,35 @@ pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stag
     parse_recipe(&yaml)
 }
 
+/// Parse a recipe (single or multi-output) from YAML
+///
+/// This function automatically detects whether the recipe is single-output or multi-output:
+/// - If the recipe has an "outputs" key, it's parsed as a multi-output recipe
+/// - Otherwise, it's parsed as a single-output recipe
+///
+/// Multi-output recipes use a "recipe" section instead of "package" at the top level.
+pub fn parse_recipe_or_multi(yaml: &MarkedNode) -> ParseResult<crate::stage0::Recipe> {
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
+            .with_message("Recipe must be a mapping")
+    })?;
+
+    // Detect multi-output by presence of "outputs" key
+    if mapping.get("outputs").is_some() {
+        // Multi-output recipe
+        let multi = parse_multi_output_recipe(mapping)?;
+        Ok(crate::stage0::Recipe::MultiOutput(multi))
+    } else {
+        // Single-output recipe
+        let single = parse_single_output_recipe(yaml)?;
+        Ok(crate::stage0::Recipe::SingleOutput(single))
+    }
+}
+
 /// Parse a complete stage0 recipe from YAML
+///
+/// Note: This function parses single-output recipes only.
+/// For multi-output recipe support, use `parse_recipe_or_multi()`.
 ///
 /// The recipe must be a mapping with at minimum a `package` section.
 /// Other sections (about, requirements, extra) are optional.
@@ -76,15 +124,22 @@ pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stag
 ///     - alice
 /// ```
 pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recipe> {
+    parse_single_output_recipe(yaml)
+}
+
+/// Parse a single-output recipe from YAML
+///
+/// Internal function used by both parse_recipe and parse_recipe_or_multi.
+fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::SingleOutputRecipe> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+        ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
             .with_message("Recipe must be a mapping")
     })?;
 
     // Parse optional schema_version
     let schema_version = if let Some(schema_node) = mapping.get("schema_version") {
         let scalar = schema_node.as_scalar().ok_or_else(|| {
-            ParseError::expected_type("scalar", "non-scalar", get_span(schema_node))
+            ParseError::expected_type("scalar", "non-scalar", helpers::get_span(schema_node))
                 .with_message("schema_version must be an integer")
         })?;
         let version_str = scalar.as_str();
@@ -122,7 +177,7 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
     // Parse required package section
     let package_node = mapping
         .get("package")
-        .ok_or_else(|| ParseError::missing_field("package", get_span(yaml)))?;
+        .ok_or_else(|| ParseError::missing_field("package", helpers::get_span(yaml)))?;
     let package = parse_package(package_node)?;
 
     // Parse optional sections (will use default if not present)
@@ -188,7 +243,7 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
         }
     }
 
-    Ok(crate::stage0::Stage0Recipe {
+    Ok(crate::stage0::SingleOutputRecipe {
         schema_version,
         context,
         package,
@@ -205,11 +260,11 @@ pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recip
 ///
 /// Context is an order-preserving mapping of variable names to values (can be templates or concrete).
 /// Order is important because later context values can reference earlier ones.
-fn parse_context(
+pub(crate) fn parse_context(
     yaml: &MarkedNode,
 ) -> ParseResult<indexmap::IndexMap<String, crate::stage0::types::Value<String>>> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+        ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
             .with_message("context must be a mapping")
     })?;
 

@@ -30,3 +30,26 @@ impl Package {
         vars
     }
 }
+
+/// Package metadata for multi-output recipes
+///
+/// In multi-output recipes, the version can be omitted from package outputs
+/// and will be inherited from the recipe-level version.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PackageMetadata {
+    pub name: Value<PackageName>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<Value<VersionWithSource>>,
+}
+
+impl PackageMetadata {
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = self.name.used_variables();
+        if let Some(version) = &self.version {
+            vars.extend(version.used_variables());
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}

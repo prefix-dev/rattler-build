@@ -2,31 +2,55 @@
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
 expression: recipe
 ---
-Stage0Recipe {
+SingleOutputRecipe {
     schema_version: None,
     context: {},
     package: Package {
-        name: Template(
-            JinjaTemplate {
+        name: Template {
+            template: JinjaTemplate {
                 source: "${{ name | lower }}",
                 variables: [
                     "name",
                 ],
             },
-        ),
-        version: Template(
-            JinjaTemplate {
+            span: Span {
+                start: 17,
+                end: 17,
+                start_line: 2,
+                start_column: 9,
+                end_line: 2,
+                end_column: 9,
+            },
+        },
+        version: Template {
+            template: JinjaTemplate {
                 source: "${{ version }}",
                 variables: [
                     "version",
                 ],
             },
-        ),
+            span: Span {
+                start: 50,
+                end: 50,
+                start_line: 3,
+                start_column: 12,
+                end_line: 3,
+                end_column: 12,
+            },
+        },
     },
     build: Build {
-        number: Concrete(
-            0,
-        ),
+        number: Concrete {
+            value: 0,
+            span: Span {
+                start: 0,
+                end: 0,
+                start_line: 0,
+                start_column: 0,
+                end_line: 0,
+                end_column: 0,
+            },
+        },
         string: None,
         script: ConditionalList(
             [],
@@ -63,9 +87,17 @@ Stage0Recipe {
                 [],
             ),
             binary_relocation: Boolean(
-                Concrete(
-                    true,
-                ),
+                Concrete {
+                    value: true,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
             ),
             missing_dso_allowlist: ConditionalList(
                 [],
@@ -95,9 +127,17 @@ Stage0Recipe {
                 ),
             },
             ignore: Boolean(
-                Concrete(
-                    false,
-                ),
+                Concrete {
+                    value: false,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
             ),
             ignore_binary_files: false,
         },
@@ -106,25 +146,25 @@ Stage0Recipe {
     requirements: Requirements {
         build: ConditionalList(
             [
-                Value(Template(JinjaTemplate { source: "${{ compiler(\"c\") }}", variables: ["compiler"] })),
-                Value(Template(JinjaTemplate { source: "${{ compiler(\"cxx\") }}", variables: ["compiler"] })),
+                Value(Template { template: JinjaTemplate { source: "${{ compiler(\"c\") }}", variables: ["compiler"] }, span: Span { start: 482, end: 482, start_line: 20, start_column: 7, end_line: 20, end_column: 7 } }),
+                Value(Template { template: JinjaTemplate { source: "${{ compiler(\"cxx\") }}", variables: ["compiler"] }, span: Span { start: 511, end: 511, start_line: 21, start_column: 7, end_line: 21, end_column: 7 } }),
                 Conditional(Conditional { condition: unix, then: ListOrItem("make"), else: ListOrItem([]) }),
                 Conditional(Conditional { condition: win, then: ListOrItem("cmake"), else: ListOrItem([]) }),
             ],
         ),
         host: ConditionalList(
             [
-                Value(Template(JinjaTemplate { source: "python ${{ python }}", variables: ["python"] })),
-                Value(Concrete("setuptools >=45")),
-                Value(Concrete("wheel")),
+                Value(Template { template: JinjaTemplate { source: "python ${{ python }}", variables: ["python"] }, span: Span { start: 614, end: 614, start_line: 27, start_column: 7, end_line: 27, end_column: 7 } }),
+                Value(Concrete { value: "setuptools >=45", span: Span { start: 641, end: 641, start_line: 28, start_column: 7, end_line: 28, end_column: 7 } }),
+                Value(Concrete { value: "wheel", span: Span { start: 663, end: 663, start_line: 29, start_column: 7, end_line: 29, end_column: 7 } }),
                 Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem("cuda-toolkit ${{ cuda_version }}"), else: ListOrItem([]) }),
             ],
         ),
         run: ConditionalList(
             [
-                Value(Template(JinjaTemplate { source: "python ${{ python }}", variables: ["python"] })),
-                Value(Concrete("numpy >=1.19,<2.0a0")),
-                Value(Template(JinjaTemplate { source: "${{ pin_compatible(\"numpy\") }}", variables: ["pin_compatible"] })),
+                Value(Template { template: JinjaTemplate { source: "python ${{ python }}", variables: ["python"] }, span: Span { start: 758, end: 758, start_line: 33, start_column: 7, end_line: 33, end_column: 7 } }),
+                Value(Concrete { value: "numpy >=1.19,<2.0a0", span: Span { start: 785, end: 785, start_line: 34, start_column: 7, end_line: 34, end_column: 7 } }),
+                Value(Template { template: JinjaTemplate { source: "${{ pin_compatible(\"numpy\") }}", variables: ["pin_compatible"] }, span: Span { start: 811, end: 811, start_line: 35, start_column: 7, end_line: 35, end_column: 7 } }),
                 Conditional(Conditional { condition: linux, then: ListOrItem("libgcc-ng >=9.3.0"), else: ListOrItem([]) }),
                 Conditional(Conditional { condition: osx, then: ListOrItem("libcxx >=10.0.0"), else: ListOrItem([]) }),
                 Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem("cuda-toolkit ${{ cuda_version }}"), else: ListOrItem([]) }),
@@ -132,7 +172,7 @@ Stage0Recipe {
         ),
         run_constraints: ConditionalList(
             [
-                Value(Concrete("scipy >=1.5,<2.0a0")),
+                Value(Concrete { value: "scipy >=1.5,<2.0a0", span: Span { start: 1033, end: 1033, start_line: 43, start_column: 7, end_line: 43, end_column: 7 } }),
                 Conditional(Conditional { condition: extra_deps, then: ListOrItem("pandas >=1.0"), else: ListOrItem([]) }),
             ],
         ),
@@ -142,7 +182,7 @@ Stage0Recipe {
             ),
             strong: ConditionalList(
                 [
-                    Value(Template(JinjaTemplate { source: "${{ pin_subpackage(name, max_pin=\"x.x\") }}", variables: ["name", "pin_subpackage"] })),
+                    Value(Template { template: JinjaTemplate { source: "${{ pin_subpackage(name, max_pin=\"x.x\") }}", variables: ["name", "pin_subpackage"] }, span: Span { start: 1133, end: 1133, start_line: 48, start_column: 9, end_line: 48, end_column: 9 } }),
                 ],
             ),
             strong_constraints: ConditionalList(
@@ -160,92 +200,140 @@ Stage0Recipe {
         ignore_run_exports: IgnoreRunExports {
             by_name: ConditionalList(
                 [
-                    Value(Concrete("qt")),
-                    Value(Concrete("tk")),
+                    Value(Concrete { value: "qt", span: Span { start: 1290, end: 1290, start_line: 54, start_column: 9, end_line: 54, end_column: 9 } }),
+                    Value(Concrete { value: "tk", span: Span { start: 1301, end: 1301, start_line: 55, start_column: 9, end_line: 55, end_column: 9 } }),
                 ],
             ),
             from_package: ConditionalList(
                 [
-                    Value(Concrete("python")),
+                    Value(Concrete { value: "python", span: Span { start: 1330, end: 1330, start_line: 57, start_column: 9, end_line: 57, end_column: 9 } }),
                 ],
             ),
         },
     },
     about: About {
         homepage: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "https://github.com/${{ org }}/${{ name }}",
                     variables: [
                         "name",
                         "org",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 87,
+                    end: 87,
+                    start_line: 6,
+                    start_column: 13,
+                    end_line: 6,
+                    end_column: 13,
+                },
+            },
         ),
         license: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "${{ license }}",
                     variables: [
                         "license",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 140,
+                    end: 140,
+                    start_line: 7,
+                    start_column: 12,
+                    end_line: 7,
+                    end_column: 12,
+                },
+            },
         ),
         license_file: ConditionalList(
             [
-                Value(Concrete("LICENSE.txt")),
+                Value(Concrete { value: "LICENSE.txt", span: Span { start: 173, end: 173, start_line: 8, start_column: 17, end_line: 8, end_column: 17 } }),
             ],
         ),
         license_family: None,
         summary: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "${{ summary }}",
                     variables: [
                         "summary",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 196,
+                    end: 196,
+                    start_line: 9,
+                    start_column: 12,
+                    end_line: 9,
+                    end_column: 12,
+                },
+            },
         ),
         description: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "${{ description }}\n\nThis is a multi-line description that can contain\ntemplates and other formatting.\n",
                     variables: [
                         "description",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 234,
+                    end: 234,
+                    start_line: 11,
+                    start_column: 5,
+                    end_line: 11,
+                    end_column: 5,
+                },
+            },
         ),
         documentation: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "https://${{ name }}.readthedocs.io",
                     variables: [
                         "name",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 361,
+                    end: 361,
+                    start_line: 15,
+                    start_column: 18,
+                    end_line: 15,
+                    end_column: 18,
+                },
+            },
         ),
         repository: Some(
-            Template(
-                JinjaTemplate {
+            Template {
+                template: JinjaTemplate {
                     source: "https://github.com/${{ org }}/${{ name }}",
                     variables: [
                         "name",
                         "org",
                     ],
                 },
-            ),
+                span: Span {
+                    start: 410,
+                    end: 410,
+                    start_line: 16,
+                    start_column: 15,
+                    end_line: 16,
+                    end_column: 15,
+                },
+            },
         ),
     },
     extra: Extra {
         recipe_maintainers: ConditionalList(
             [
-                Value(Template(JinjaTemplate { source: "${{ maintainer1 }}", variables: ["maintainer1"] })),
-                Value(Template(JinjaTemplate { source: "${{ maintainer2 }}", variables: ["maintainer2"] })),
+                Value(Template { template: JinjaTemplate { source: "${{ maintainer1 }}", variables: ["maintainer1"] }, span: Span { start: 1373, end: 1373, start_line: 61, start_column: 7, end_line: 61, end_column: 7 } }),
+                Value(Template { template: JinjaTemplate { source: "${{ maintainer2 }}", variables: ["maintainer2"] }, span: Span { start: 1400, end: 1400, start_line: 62, start_column: 7, end_line: 62, end_column: 7 } }),
             ],
         ),
     },

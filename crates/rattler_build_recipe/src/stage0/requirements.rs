@@ -157,9 +157,13 @@ mod tests {
     #[test]
     fn test_requirements_with_build_deps() {
         let items = vec![
-            Item::Value(Value::Concrete("gcc".to_string())),
-            Item::Value(Value::Template(
+            Item::Value(Value::new_concrete(
+                "gcc".to_string(),
+                crate::span::Span::unknown(),
+            )),
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
             )),
         ];
 
@@ -175,12 +179,14 @@ mod tests {
 
     #[test]
     fn test_requirements_collect_all_variables() {
-        let build_items = vec![Item::Value(Value::Template(
+        let build_items = vec![Item::Value(Value::new_template(
             JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
         ))];
 
-        let run_items = vec![Item::Value(Value::Template(
+        let run_items = vec![Item::Value(Value::new_template(
             JinjaTemplate::new("${{ python }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
         ))];
 
         let req = Requirements {

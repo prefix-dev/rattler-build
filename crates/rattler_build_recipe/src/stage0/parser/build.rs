@@ -108,7 +108,7 @@ fn parse_bool_or_patterns<T>(
 /// - A single script object mapping: `{env: {...}, content: [...]}`
 ///
 /// For scalar strings, we split by newlines and filter out empty lines
-fn parse_script(
+pub(crate) fn parse_script(
     node: &Node,
 ) -> Result<crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>, ParseError>
 {
