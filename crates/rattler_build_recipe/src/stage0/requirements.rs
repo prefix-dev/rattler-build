@@ -219,4 +219,75 @@ mod tests {
         assert!(ignore.is_empty());
         assert_eq!(ignore.used_variables(), Vec::<String>::new());
     }
+
+    #[test]
+    fn test_requirements_serialize_deserialize() {
+        use rattler_conda_types::MatchSpec;
+        use rattler_conda_types::ParseStrictness;
+
+        // Create requirements with parsed matchspecs and templates
+        let items = vec![
+            Item::Value(Value::new_concrete(
+                MatchSpecWrapper::Parsed(
+                    MatchSpec::from_str("python >=3.8", ParseStrictness::Strict).unwrap(),
+                ),
+                crate::span::Span::unknown(),
+            )),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("cuda-toolkit ${{ cuda_version }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
+            )),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
+            )),
+        ];
+
+        let req = Requirements {
+            build: ConditionalList::new(items),
+            ..Default::default()
+        };
+
+        // Serialize to YAML
+        let yaml = serde_yaml::to_string(&req).unwrap();
+
+        // Verify serialized format is clean and readable
+        assert!(yaml.contains("python >=3.8"));
+        assert!(yaml.contains("cuda-toolkit ${{ cuda_version }}"));
+        assert!(yaml.contains("${{ compiler('c') }}"));
+
+        // Deserialize back
+        let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
+
+        // Verify we can access the fields correctly
+        assert_eq!(deserialized.build.len(), 3);
+
+        // Verify serialized format is preserved on re-serialization
+        let yaml2 = serde_yaml::to_string(&deserialized).unwrap();
+        assert!(yaml2.contains("python >=3.8"));
+        assert!(yaml2.contains("cuda-toolkit ${{ cuda_version }}"));
+        assert!(yaml2.contains("${{ compiler('c') }}"));
+    }
+
+    #[test]
+    fn test_requirements_serialize_with_deferred() {
+        // Test that Deferred matchspecs serialize correctly (even though they deserialize as Templates)
+        let yaml = r#"
+build:
+  - python >=3.8
+  - cuda-toolkit ${{ cuda_version }}
+  - gcc
+"#;
+
+        let req: Requirements = serde_yaml::from_str(yaml).unwrap();
+
+        // Should parse successfully - templates and concrete matchspecs
+        assert_eq!(req.build.len(), 3);
+
+        // Re-serialize and verify it's clean
+        let reserialized = serde_yaml::to_string(&req).unwrap();
+        assert!(reserialized.contains("python >=3.8"));
+        assert!(reserialized.contains("cuda-toolkit ${{ cuda_version }}"));
+        assert!(reserialized.contains("gcc"));
+    }
 }

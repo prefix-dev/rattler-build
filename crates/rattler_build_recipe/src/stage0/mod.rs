@@ -37,3 +37,22 @@ pub use types::{
 /// Backwards compatibility alias for Stage0Recipe
 /// This is now the same as SingleOutputRecipe
 pub type Stage0Recipe = SingleOutputRecipe;
+
+#[cfg(test)]
+mod test {
+    // make a roundtrip test from yaml -> struct -> yaml
+    use super::*;
+
+    fn roundtrip(yaml: &str) -> String {
+        let recipe = parse_recipe_from_source(yaml).unwrap();
+        serde_yaml::to_string(&recipe).unwrap()
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        // load `conditionals.yaml` from the test-data directory
+        let yaml = include_str!("../../test-data/conditionals.yaml");
+        let roundtripped = roundtrip(yaml);
+        insta::assert_snapshot!(roundtripped);
+    }
+}

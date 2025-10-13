@@ -1,0 +1,20 @@
+# Error: Staging output with run requirements (not allowed)
+schema_version: 1
+
+recipe:
+  name: staging-with-run
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    requirements:
+      build:
+        - gcc
+      host:
+        - zlib
+      run:
+        - libgcc
+    build:
+      script:
+        - make

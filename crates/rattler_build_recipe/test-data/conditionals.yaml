@@ -27,6 +27,9 @@ requirements:
       then: libcxx
     - if: win
       then: msvc-runtime
+    - ${{ compiler('c') }}
+    - ${{ some_variable }}
+
   run_exports:
     strong:
       - conditional-package
