@@ -2048,6 +2048,7 @@ def test_merge_build_and_host(
     )
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Not applicable on Windows")
 def test_error_on_binary_prefix(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
