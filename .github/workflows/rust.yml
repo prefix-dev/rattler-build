@@ -44,7 +44,7 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
       - uses: prefix-dev/setup-pixi@v0.9.1
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' }}
         with:
           cache: true
       - name: Set up GNU patch on MacOS
