@@ -28,9 +28,14 @@ class RattlerBuild:
             return result
         else:
             try:
-                output = check_output([str(self.path), *args], **kwds)
+                # Explicitly handle encoding for UTF-8 output on all platforms
+                kwds_copy = dict(kwds)
+                if "text" not in kwds_copy and "encoding" not in kwds_copy:
+                    kwds_copy["encoding"] = "utf-8"
+                    kwds_copy["errors"] = "replace"
+                output = check_output([str(self.path), *args], **kwds_copy)
                 if "text" not in kwds:
-                    return output.decode("utf-8")
+                    return output
                 return output
             except CalledProcessError as e:
                 if kwds.get("stderr") is None:
