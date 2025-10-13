@@ -90,11 +90,11 @@ pub fn parse_recipe_or_multi(yaml: &MarkedNode) -> ParseResult<crate::stage0::Re
     if mapping.get("outputs").is_some() {
         // Multi-output recipe
         let multi = parse_multi_output_recipe(mapping)?;
-        Ok(crate::stage0::Recipe::MultiOutput(multi))
+        Ok(crate::stage0::Recipe::MultiOutput(Box::new(multi)))
     } else {
         // Single-output recipe
         let single = parse_single_output_recipe(yaml)?;
-        Ok(crate::stage0::Recipe::SingleOutput(single))
+        Ok(crate::stage0::Recipe::SingleOutput(Box::new(single)))
     }
 }
 

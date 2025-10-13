@@ -977,7 +977,7 @@ pub enum ScriptContent {
     /// Simple command string or file path
     Command(String),
     /// Inline script with optional interpreter, env vars, and content/file
-    Inline(InlineScript),
+    Inline(Box<InlineScript>),
 }
 
 impl Display for ScriptContent {

@@ -265,7 +265,7 @@ pub(crate) fn parse_script(
 
         let span = get_span(node);
         let items = vec![Item::Value(Value::new_concrete(
-            ScriptContent::Inline(inline_script),
+            ScriptContent::Inline(Box::new(inline_script)),
             span,
         ))];
         return Ok(ConditionalList::new(items));
