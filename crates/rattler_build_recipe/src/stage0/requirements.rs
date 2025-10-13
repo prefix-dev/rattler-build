@@ -162,9 +162,9 @@ mod tests {
 
         let items = vec![
             Item::Value(Value::new_concrete(
-                MatchSpecWrapper::Parsed(
+                MatchSpecWrapper::Parsed(Box::new(
                     MatchSpec::from_str("gcc", ParseStrictness::Strict).unwrap(),
-                ),
+                )),
                 crate::span::Span::unknown(),
             )),
             Item::Value(Value::new_template(
@@ -228,9 +228,9 @@ mod tests {
         // Create requirements with parsed matchspecs and templates
         let items = vec![
             Item::Value(Value::new_concrete(
-                MatchSpecWrapper::Parsed(
+                MatchSpecWrapper::Parsed(Box::new(
                     MatchSpec::from_str("python >=3.8", ParseStrictness::Strict).unwrap(),
-                ),
+                )),
                 crate::span::Span::unknown(),
             )),
             Item::Value(Value::new_template(
