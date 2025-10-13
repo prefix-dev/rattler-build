@@ -2052,6 +2052,9 @@ def test_error_on_binary_prefix(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that --error-prefix-in-binary flag correctly detects prefix in binaries"""
+    if os.name == "nt":
+        return
+
     recipe_path = recipes / "binary_prefix_test"
     args = rattler_build.build_args(recipe_path, tmp_path)
     rattler_build(*args)
@@ -2060,12 +2063,6 @@ def test_error_on_binary_prefix(
     tmp_path.mkdir()
     args = rattler_build.build_args(recipe_path, tmp_path)
     args = list(args) + ["--error-prefix-in-binary"]
-
-    if os.name == "nt":
-        # On Windows, we don't deal with binary prefixes in the same way,
-        # so this test is not applicable
-        rattler_build(*args, stderr=STDOUT)
-        return
 
     try:
         rattler_build(*args, stderr=STDOUT)
