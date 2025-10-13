@@ -52,7 +52,7 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         run: pixi global install patch=2.7.6
       - name: Run tests
-        run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
+        run: cargo test --all-targets --features=tui,recipe-generation --verbose -- --nocapture
       - name: Run patch apply tests
         # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}

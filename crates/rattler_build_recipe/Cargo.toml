@@ -8,7 +8,7 @@ repository.workspace = true
 description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
 
 [features]
-default = []
+default = ["miette"]
 miette = ["dep:miette", "dep:thiserror", "dep:pathdiff"]
 
 [dependencies]
