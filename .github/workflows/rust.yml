@@ -51,6 +51,9 @@ jobs:
         # Needed to use GNU patch instead of whatever is builtin on macos (1 test fails)
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
         run: pixi global install patch=2.7.6
+      - name: Set up patchelf on MacOS
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: pixi global install patchelf
       - name: Run tests
         run: cargo test --all --features=tui,recipe-generation --verbose -- --nocapture
       - name: Run patch apply tests
