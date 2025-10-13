@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use rattler_conda_types::{MatchSpec, ParseStrictness};
 use serde::{Deserialize, Serialize};
 
 /// Trait for types that can report which template variables they use
@@ -123,7 +124,7 @@ impl<'de> Deserialize<'de> for JinjaExpression {
     }
 }
 
-/// Wrapper around rattler_conda_types::MatchSpec with Serialize/Deserialize support
+/// Wrapper around MatchSpec with Serialize/Deserialize support
 /// This allows MatchSpec to be validated at parse time while working with the Value<T> infrastructure
 ///
 /// Supports two variants:
@@ -132,19 +133,19 @@ impl<'de> Deserialize<'de> for JinjaExpression {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MatchSpecWrapper {
     /// A validated MatchSpec (parsed at parse time)
-    Parsed(rattler_conda_types::MatchSpec),
+    Parsed(Box<MatchSpec>),
     /// A template string that will be validated during evaluation (stage0 -> stage1)
     Deferred(String),
 }
 
 impl MatchSpecWrapper {
     /// Create a new MatchSpecWrapper from a MatchSpec
-    pub fn new(spec: rattler_conda_types::MatchSpec) -> Self {
-        Self::Parsed(spec)
+    pub fn new(spec: MatchSpec) -> Self {
+        Self::Parsed(Box::new(spec))
     }
 
     /// Get a reference to the inner MatchSpec (panics if Deferred)
-    pub fn inner(&self) -> &rattler_conda_types::MatchSpec {
+    pub fn inner(&self) -> &MatchSpec {
         match self {
             MatchSpecWrapper::Parsed(spec) => spec,
             MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
@@ -152,7 +153,7 @@ impl MatchSpecWrapper {
     }
 
     /// Consume the wrapper and return the inner MatchSpec (panics if Deferred)
-    pub fn into_inner(self) -> rattler_conda_types::MatchSpec {
+    pub fn into_inner(self) -> Box<MatchSpec> {
         match self {
             MatchSpecWrapper::Parsed(spec) => spec,
             MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
@@ -192,9 +193,8 @@ impl FromStr for MatchSpecWrapper {
         }
 
         // Otherwise, validate as MatchSpec now
-        use rattler_conda_types::ParseStrictness;
-        rattler_conda_types::MatchSpec::from_str(s, ParseStrictness::Strict)
-            .map(MatchSpecWrapper::Parsed)
+        MatchSpec::from_str(s, ParseStrictness::Strict)
+            .map(|spec| MatchSpecWrapper::Parsed(Box::new(spec)))
             .map_err(|e| format!("Invalid match spec: {}", e))
     }
 }
@@ -222,7 +222,7 @@ impl<'de> Deserialize<'de> for MatchSpecWrapper {
 impl Default for MatchSpecWrapper {
     fn default() -> Self {
         // Default MatchSpec is an empty spec
-        MatchSpecWrapper::Parsed(rattler_conda_types::MatchSpec::default())
+        MatchSpecWrapper::Parsed(Box::default())
     }
 }
 
