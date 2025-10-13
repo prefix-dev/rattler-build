@@ -30,20 +30,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{
-    console_utils::github_integration_enabled,
-    hash::HashInfo,
-    normalized_key::NormalizedKey,
-    recipe::{
-        jinja::SelectorConfig,
-        parser::{Recipe, Source},
-        variable::Variable,
-    },
-    render::resolved_dependencies::FinalizedDependencies,
-    script::SandboxConfiguration,
-    system_tools::SystemTools,
-    tool_configuration,
-    utils::remove_dir_all_force,
+    console_utils::github_integration_enabled, hash::HashInfo, normalized_key::NormalizedKey,
+    recipe::variable::Variable, render::resolved_dependencies::FinalizedDependencies,
+    script::SandboxConfiguration, selectors::SelectorConfig, system_tools::SystemTools,
+    tool_configuration, utils::remove_dir_all_force,
 };
+
+use rattler_build_recipe::{Stage1Recipe as Recipe, stage1::Source};
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
@@ -491,7 +484,8 @@ impl Output {
         self.recipe
             .build()
             .string
-            .as_resolved()
+            .clone()
+            // TODO bring back the resolved build string.
             .expect("Build string is not resolved")
             .into()
     }
@@ -684,6 +678,10 @@ impl Output {
             )?;
         }
         Ok(())
+    }
+
+    pub(crate) fn is_python_version_independent(&self) -> bool {
+        self.recipe.build().python.version_independent
     }
 }
 

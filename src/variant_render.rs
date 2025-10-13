@@ -10,19 +10,87 @@ use crate::{
     env_vars,
     hash::HashInfo,
     normalized_key::NormalizedKey,
-    recipe::{
-        Jinja, ParsingError, Recipe,
-        custom_yaml::Node,
-        parser::{BuildString, Dependency},
-        variable::Variable,
-    },
+    recipe::variable::Variable,
     selectors::SelectorConfig,
     source_code::SourceCode,
-    used_variables::used_vars_from_expressions,
-    variant_config::{
-        ParseErrors, VariantConfig, VariantConfigError, VariantError, VariantExpandError,
-    },
+    variant_config::{VariantConfig, VariantConfigError, VariantError, VariantExpandError},
 };
+use rattler_build_recipe::stage0::{
+    Recipe as Stage0Recipe, SingleOutputRecipe as Stage0SingleRecipe,
+    parse_recipe_or_multi_from_source,
+};
+use rattler_build_recipe::stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe};
+
+/// Extracted information from Stage0 Recipe needed for variant computation
+#[derive(Debug, Clone)]
+pub struct VariantInfo {
+    /// Variables from dependencies without version specifiers (host and build)
+    pub deps_without_version: HashSet<NormalizedKey>,
+    /// Exact pins from pin_subpackage(exact=True)
+    pub exact_pins: HashSet<PackageName>,
+    /// Extra variant keys from build.variant.use_keys
+    pub use_keys: Vec<NormalizedKey>,
+    /// Keys to ignore from build.variant.ignore_keys
+    pub ignore_keys: HashSet<NormalizedKey>,
+    /// Whether this is a noarch: python build
+    pub is_noarch_python: bool,
+}
+
+/// Extract variant information from a Stage0 Recipe
+fn extract_variant_info_from_stage0(recipe: &Recipe) -> VariantInfo {
+    let mut deps_without_version = HashSet::new();
+    let mut exact_pins = HashSet::new();
+
+    // Extract dependencies without version specifiers from build-time requirements
+    for dep in recipe.build_time_requirements() {
+        if let Dependency::Spec(spec) = dep {
+            let is_simple = spec.version.is_none() && spec.build.is_none();
+            if is_simple {
+                if let Some(ref name) = spec.name {
+                    deps_without_version.insert(name.as_normalized().into());
+                }
+            }
+        }
+    }
+
+    // Extract exact pins from pin_subpackage
+    for pin in recipe.requirements().all_pin_subpackage() {
+        if pin.args.exact {
+            let name = pin.name.clone().as_normalized().to_string();
+            deps_without_version.insert(name.into());
+            exact_pins.insert(pin.name.clone());
+        }
+    }
+
+    // Extract use_keys and ignore_keys from build.variant
+    let use_keys = recipe
+        .build()
+        .variant()
+        .use_keys
+        .clone()
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    let ignore_keys = recipe
+        .build()
+        .variant()
+        .ignore_keys
+        .clone()
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    let is_noarch_python = recipe.build().noarch().is_python();
+
+    VariantInfo {
+        deps_without_version,
+        exact_pins,
+        use_keys,
+        ignore_keys,
+        is_noarch_python,
+    }
+}
 
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
@@ -127,7 +195,6 @@ pub(crate) fn stage_0_render<S: SourceCode>(
 pub struct Stage1Inner {
     pub(crate) used_vars_from_dependencies: HashSet<NormalizedKey>,
     pub(crate) exact_pins: HashSet<PackageName>,
-    pub(crate) recipe: Recipe,
     pub(crate) selector_config: SelectorConfig,
 }
 
@@ -143,9 +210,10 @@ pub struct Stage1Render<S: SourceCode> {
 
 impl<S: SourceCode> Stage1Render<S> {
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
-        self.inner
+        self.stage_0_render
+            .rendered_outputs
             .iter()
-            .position(|x| x.recipe.package().name() == package_name)
+            .position(|x| x.package().name() == package_name)
     }
 
     pub fn variant_for_output(
@@ -169,8 +237,8 @@ impl<S: SourceCode> Stage1Render<S> {
             }
         }
 
-        // Add in virtual packages
-        let recipe = &self.inner[idx].recipe;
+        // Add in virtual packages - use Stage0 recipe
+        let recipe = &self.stage_0_render.rendered_outputs[idx];
         for run_requirement in recipe.requirements().run() {
             if let Dependency::Spec(spec) = run_requirement {
                 if let Some(ref name) = spec.name {
@@ -192,7 +260,9 @@ impl<S: SourceCode> Stage1Render<S> {
             };
             // find the referenced output
             let build_string = self.build_string_for_output(other_idx)?;
-            let version = self.inner[other_idx].recipe.package().version();
+            let version = self.stage_0_render.rendered_outputs[other_idx]
+                .package()
+                .version();
             variant.insert(
                 pin.as_normalized().into(),
                 format!("{} {}", version, build_string).into(),
@@ -286,25 +356,48 @@ impl<S: SourceCode> Stage1Render<S> {
     #[allow(clippy::type_complexity)]
     pub fn into_sorted_outputs(
         self,
-    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, Variable>)>, VariantExpandError> {
-        // zip node from stage0 and final render output
+    ) -> Result<Vec<((Node, Stage1Recipe), BTreeMap<NormalizedKey, Variable>)>, VariantExpandError>
+    {
         let sorted_indices = self.sorted_indices()?;
+        let mut outputs = Vec::new();
 
-        let raw_nodes = self.stage_0_render.raw_outputs.vec.clone().into_iter();
-        let outputs = self.inner.clone().into_iter().map(|i| i.recipe);
-
-        let zipped = raw_nodes.zip(outputs).collect::<Vec<_>>();
-        let mut result = Vec::new();
         for idx in sorted_indices {
-            let mut recipe = zipped[idx].clone();
-            let build_string = self.build_string_for_output(idx)?;
-            // Resolve the build string and store the resolved one in the recipe
-            recipe.1.build.string = BuildString::Resolved(build_string);
+            // Get the raw Node and variant for this output
+            let node = &self.stage_0_render.raw_outputs.vec[idx];
             let variant = self.variant_for_output(idx)?;
-            result.push((recipe, variant));
+
+            // Get the Stage0 Recipe from rendered_outputs (old parser Recipe)
+            let stage0_recipe = &self.stage_0_render.rendered_outputs[idx];
+
+            // Create EvaluationContext with the variant variables
+            let mut eval_context = EvaluationContext::new();
+            for (key, value) in &variant {
+                eval_context.insert(key.normalize(), value.to_string());
+            }
+
+            // TODO: Stage0 Recipe from old parser needs to be converted to new parser Stage0 Recipe
+            // before we can evaluate it. For now, this is blocked by the fact that we have two
+            // different Stage0 Recipe types (old parser vs new parser).
+            //
+            // The old parser Recipe is in src/recipe/parser/mod.rs
+            // The new parser Stage0 Recipe is in crates/rattler_build_recipe/src/stage0/output.rs
+            //
+            // We need a conversion layer or need to use the new parser throughout.
+
+            return Err(VariantExpandError::MissingOutput(
+                "Stage0->Stage1 conversion requires converting old parser Recipe to new parser Stage0 Recipe".to_string()
+            ));
+
+            // Once conversion is available, the code would look like:
+            // let new_stage0_recipe = convert_old_to_new_stage0(stage0_recipe)?;
+            // let mut stage1_recipe = new_stage0_recipe.evaluate(&eval_context)
+            //     .map_err(|e| VariantExpandError::MissingOutput(format!("Failed to evaluate Stage0->Stage1: {:?}", e)))?;
+            // let build_string = self.build_string_for_output(idx)?;
+            // stage1_recipe.build.string = Some(build_string);
+            // outputs.push(((node.clone(), stage1_recipe), variant));
         }
 
-        Ok(result)
+        Ok(outputs)
     }
 }
 
@@ -320,47 +413,18 @@ pub(crate) fn stage_1_render<S: SourceCode>(
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
         let mut exact_pins_per_output: Vec<HashSet<PackageName>> = Vec::new();
+
+        // Extract variant info from each Stage0 output
         for (idx, output) in r.rendered_outputs.iter().enumerate() {
-            let mut additional_variables = HashSet::<NormalizedKey>::new();
-            let mut exact_pins = HashSet::<PackageName>::new();
-            // Add in variants from the dependencies as we find them
-            for dep in output.build_time_requirements() {
-                if let Dependency::Spec(spec) = dep {
-                    let is_simple = spec.version.is_none() && spec.build.is_none();
-                    // add in the variant key for this dependency that has no version specifier
-                    if is_simple {
-                        if let Some(ref name) = spec.name {
-                            additional_variables.insert(name.as_normalized().into());
-                        }
-                    }
-                }
-            }
+            let variant_info = extract_variant_info_from_stage0(output);
 
-            // We want to add something to packages that are requiring a subpackage
-            // _exactly_ because that creates additional variants
-            for pin in output.requirements.all_pin_subpackage() {
-                if pin.args.exact {
-                    let name = pin.name.clone().as_normalized().to_string();
-                    additional_variables.insert(name.into());
-                    exact_pins.insert(pin.name.clone());
-                }
-            }
+            let mut additional_variables = variant_info.deps_without_version;
 
-            // Add in extra `use` keys from the output
-            let extra_use_keys = output
-                .build()
-                .variant()
-                .use_keys
-                .clone()
-                .into_iter()
-                .map(Into::into)
-                .collect::<Vec<NormalizedKey>>();
+            // Add use_keys
+            additional_variables.extend(variant_info.use_keys);
 
-            additional_variables.extend(extra_use_keys);
-
-            // If the recipe is `noarch: python` we can remove an empty python key that
-            // comes from the dependencies
-            if output.build().noarch().is_python() {
+            // If the recipe is `noarch: python` we can remove python key from dependencies
+            if variant_info.is_noarch_python {
                 additional_variables.remove(&"python".into());
             }
 
@@ -382,18 +446,10 @@ pub(crate) fn stage_1_render<S: SourceCode>(
             additional_variables.extend(env_vars.keys().cloned().map(Into::into));
 
             // filter out any ignore keys
-            let extra_ignore_keys: HashSet<NormalizedKey> = output
-                .build()
-                .variant()
-                .ignore_keys
-                .clone()
-                .into_iter()
-                .map(Into::into)
-                .collect();
+            additional_variables.retain(|x| !variant_info.ignore_keys.contains(x));
 
-            additional_variables.retain(|x| !extra_ignore_keys.contains(x));
             extra_vars_per_output.push(additional_variables);
-            exact_pins_per_output.push(exact_pins);
+            exact_pins_per_output.push(variant_info.exact_pins);
         }
 
         // Create the additional combinations and attach the whole variant x outputs to
@@ -413,21 +469,11 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
 
-                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
-                    .map_err(|err| {
-                        let errs: ParseErrors<_> = err
-                            .into_iter()
-                            .map(|err| ParsingError::from_partial(r.source.clone(), err))
-                            .collect::<Vec<_>>()
-                            .into();
-                        errs
-                    })
-                    .map_err(VariantConfigError::from)?;
-
+                // We don't need to create a Recipe here - we only need the variant info
+                // which we already extracted from Stage0
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),
                     exact_pins: exact_pins_per_output[idx].clone(),
-                    recipe: parsed_recipe,
                     selector_config: config_with_variant,
                 })
             }

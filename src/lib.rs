@@ -71,7 +71,7 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::parser::{Dependency, find_outputs_from_src};
 use recipe::variable::Variable;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
@@ -82,6 +82,7 @@ use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
+use rattler_build_recipe::stage1::TestType;
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -257,7 +258,7 @@ pub async fn get_build_output(
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
-        let skipped = if discovered_output.recipe.build().skip() {
+        let skipped = if !discovered_output.recipe.build().skip.is_empty() {
             console::style(" (skipped)").red().to_string()
         } else {
             "".to_string()
@@ -294,7 +295,7 @@ pub async fn get_build_output(
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
-        if recipe.build().skip() {
+        if !recipe.build().skip.is_empty() {
             continue;
         }
 
@@ -307,11 +308,8 @@ pub async fn get_build_output(
             },
         );
 
-        let build_name = if recipe.cache.is_some() {
-            global_build_name.clone()
-        } else {
-            recipe.package().name().as_normalized().to_string()
-        };
+        // Use the package name as the build name
+        let build_name = recipe.package().name().as_normalized().to_string();
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -376,7 +374,7 @@ pub async fn get_build_output(
                     &output_dir,
                     build_data.no_build_id,
                     &timestamp,
-                    recipe.build().merge_build_and_host_envs(),
+                    recipe.build().merge_build_and_host_envs,
                 )
                 .into_diagnostic()?,
                 channels,
@@ -451,7 +449,7 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 
     // Also check that for all script tests
     for test in output.recipe.tests() {
-        if let TestType::Command(command) = test {
+        if let TestType::Commands(command) = test {
             for dep in command
                 .requirements
                 .build
@@ -951,25 +949,25 @@ pub fn sort_build_outputs_topologically(
         let output_idx = *name_to_index
             .get(output.name())
             .expect("We just inserted it");
-        for dep in output.recipe.requirements().run_build_host() {
-            let dep_name = match dep {
-                Dependency::Spec(spec) => spec
-                    .name
-                    .clone()
-                    .expect("MatchSpec should always have a name"),
-                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
-            };
+        // for dep in output.recipe.requirements().run_build_host() {
+        //     let dep_name = match dep {
+        //         Dependency::Spec(spec) => spec
+        //             .name
+        //             .clone()
+        //             .expect("MatchSpec should always have a name"),
+        //         Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+        //         Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+        //     };
 
-            if let Some(&dep_idx) = name_to_index.get(&dep_name) {
-                // do not point to self (circular dependency) - this can happen with
-                // pin_subpackage in run_exports, for example.
-                if output_idx == dep_idx {
-                    continue;
-                }
-                graph.add_edge(output_idx, dep_idx, ());
-            }
-        }
+        //     if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+        //         // do not point to self (circular dependency) - this can happen with
+        //         // pin_subpackage in run_exports, for example.
+        //         if output_idx == dep_idx {
+        //             continue;
+        //         }
+        //         graph.add_edge(output_idx, dep_idx, ());
+        //     }
+        // }
     }
 
     let sorted_indices = if let Some(up_to) = up_to {

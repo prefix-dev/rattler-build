@@ -366,9 +366,9 @@ impl Output {
         env_vars.extend(self.env_vars_from_variant());
 
         let selector_config = self.build_configuration.selector_config();
-        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
+        let jinja = Jinja::new(selector_config.clone()); // TODO .with_context(&self.recipe.context);
 
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
         } else {
             Some(&self.build_configuration.directories.build_prefix)
@@ -376,11 +376,12 @@ impl Output {
 
         let work_dir = &self.build_configuration.directories.work_dir;
         Ok(ExecutionArgs {
-            script: self.recipe.build().script().resolve_content(
-                &self.build_configuration.directories.recipe_dir,
-                Some(jinja.clone()),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
-            )?,
+            script: ResolvedScriptContents::Inline(self.recipe.build().script.join("\n")),
+            // script: self.recipe.build().script.resolve_content(
+            //     &self.build_configuration.directories.recipe_dir,
+            //     Some(jinja.clone()),
+            //     if cfg!(windows) { &["bat"] } else { &["sh"] },
+            // )?,
             env_vars: env_vars
                 .into_iter()
                 .filter_map(|(k, v)| v.map(|v| (k, v)))
@@ -412,33 +413,33 @@ impl Output {
         let _enter = span.enter();
 
         let exec_args = self.prepare_build_script().await?;
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
         } else {
             Some(&self.build_configuration.directories.build_prefix)
         };
 
-        self.recipe
-            .build()
-            .script()
-            .run_script(
-                exec_args
-                    .env_vars
-                    .into_iter()
-                    .map(|(k, v)| (k, Some(v)))
-                    .collect(),
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(
-                    Jinja::new(self.build_configuration.selector_config())
-                        .with_context(&self.recipe.context),
-                ),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.debug,
-            )
-            .await?;
+        // self.recipe
+        //     .build()
+        //     .script()
+        //     .run_script(
+        //         exec_args
+        //             .env_vars
+        //             .into_iter()
+        //             .map(|(k, v)| (k, Some(v)))
+        //             .collect(),
+        //         &self.build_configuration.directories.work_dir,
+        //         &self.build_configuration.directories.recipe_dir,
+        //         &self.build_configuration.directories.host_prefix,
+        //         build_prefix,
+        //         Some(
+        //             Jinja::new(self.build_configuration.selector_config())
+        //                 .with_context(&self.recipe.context),
+        //         ),
+        //         self.build_configuration.sandbox_config(),
+        //         self.build_configuration.debug,
+        //     )
+        //     .await?;
 
         Ok(())
     }

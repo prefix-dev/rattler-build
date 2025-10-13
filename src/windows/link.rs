@@ -9,11 +9,9 @@ use goblin::pe::PE;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
 
-use crate::{
-    post_process::relink::{RelinkError, Relinker},
-    recipe::parser::GlobVec,
-};
+use crate::post_process::relink::{RelinkError, Relinker};
 
+use rattler_build_recipe::stage1::GlobVec;
 #[derive(Debug)]
 pub struct Dll {
     /// Path to the DLL

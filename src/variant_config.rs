@@ -20,7 +20,7 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
-        Jinja, Recipe, Render,
+        Jinja, Render,
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         variable::Variable,
@@ -29,6 +29,7 @@ use crate::{
     source_code::SourceCode,
     variant_render::{stage_0_render, stage_1_render},
 };
+use rattler_build_recipe::stage1::Recipe;
 
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
@@ -518,42 +519,68 @@ impl VariantConfig {
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
             for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
-                let target_platform = if recipe.build().noarch().is_none() {
+                let target_platform = if recipe.build.noarch.is_none() {
                     selector_config.target_platform
                 } else {
                     Platform::NoArch
                 };
 
                 let build_string = recipe
-                    .build()
-                    .string()
-                    .as_resolved()
+                    .build
+                    .string
+                    .as_ref()
                     .expect("Build string has to be resolved")
                     .to_string();
 
-                if recipe.build().python().version_independent {
-                    recipe
+                if recipe.build.python.version_independent {
+                    // Stage1 ignore_run_exports uses Vec<String> not HashSet
+                    if !recipe
                         .requirements
                         .ignore_run_exports
                         .from_package
-                        .insert("python".parse().unwrap());
-                    recipe
+                        .contains(&"python".to_string())
+                    {
+                        recipe
+                            .requirements
+                            .ignore_run_exports
+                            .from_package
+                            .push("python".to_string());
+                    }
+                    if !recipe
                         .requirements
                         .ignore_run_exports
                         .by_name
-                        .insert("python".parse().unwrap());
+                        .contains(&"python".to_string())
+                    {
+                        recipe
+                            .requirements
+                            .ignore_run_exports
+                            .by_name
+                            .push("python".to_string());
+                    }
                 }
 
+                // Convert Stage1 Option<NoArchType> to rattler_conda_types::NoArchType
+                let noarch_type = match &recipe.build.noarch {
+                    Some(rattler_build_recipe::stage1::build::NoArchType::Generic) => {
+                        NoArchType::python()
+                    }
+                    Some(rattler_build_recipe::stage1::build::NoArchType::Python) => {
+                        NoArchType::python()
+                    }
+                    None => NoArchType::none(),
+                };
+
                 recipes.insert(DiscoveredOutput {
-                    name: recipe.package().name.as_normalized().to_string(),
-                    version: recipe.package().version.to_string(),
+                    name: recipe.package.name.as_normalized().to_string(),
+                    version: recipe.package.version.to_string(),
                     build_string,
-                    noarch_type: *recipe.build().noarch(),
+                    noarch_type,
                     target_platform,
                     node,
                     used_vars: variant.clone(),
                     recipe: recipe.clone(),
-                    hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
+                    hash: HashInfo::from_variant(&variant, &noarch_type),
                 });
             }
         }

@@ -8,14 +8,14 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use rattler_conda_types::{PackageName, Version};
+use rattler_conda_types::{PackageName, VersionWithSource};
 
 use crate::{
     ErrorKind, ParseError, Span,
     stage0::{
-        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, Package as Stage0Package,
-        Requirements as Stage0Requirements, Source as Stage0Source, Stage0Recipe,
-        TestType as Stage0TestType,
+        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
+        Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
+        Stage0Recipe, TestType as Stage0TestType,
         build::{
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
             ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
@@ -288,6 +288,56 @@ pub fn evaluate_string_list(
                     // Evaluate the "else" items
                     for val in cond.else_value.iter() {
                         results.push(val.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Evaluate a ConditionalList<EntryPoint> into Vec<EntryPoint>
+/// Entry points can be concrete values or templates that render to strings
+pub fn evaluate_entry_point_list(
+    list: &ConditionalList<rattler_conda_types::package::EntryPoint>,
+    context: &EvaluationContext,
+) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
+    let mut results = Vec::new();
+
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                match value {
+                    Value::Concrete { value: ep, .. } => {
+                        results.push(ep.clone());
+                    }
+                    Value::Template { template, span } => {
+                        // Render the template and parse as EntryPoint
+                        let s = render_template(template.source(), context, span)?;
+                        let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
+                            .map_err(|e| ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: *span,
+                                message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                                suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                            })?;
+                        results.push(ep);
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+
+                if condition_met {
+                    // Evaluate the "then" items
+                    for ep in cond.then.iter() {
+                        results.push(ep.clone());
+                    }
+                } else {
+                    // Evaluate the "else" items
+                    for ep in cond.else_value.iter() {
+                        results.push(ep.clone());
                     }
                 }
             }
@@ -659,7 +709,7 @@ impl Evaluate for Stage0Package {
             suggestion: None,
         })?;
 
-        let version = Version::from_str(&version_str).map_err(|e| ParseError {
+        let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
             span: Span::unknown(),
             message: Some(format!(
@@ -705,10 +755,10 @@ impl Evaluate for Stage0About {
         let license = match &self.license {
             None => None,
             Some(v) => match v {
-                Value::Concrete { value: license, .. } => Some(license.0.clone()),
+                Value::Concrete { value: license, .. } => Some(license.clone()),
                 Value::Template { template, span } => {
                     let s = render_template(template.source(), context, span)?;
-                    Some(s.parse::<spdx::Expression>().map_err(|e| ParseError {
+                    Some(s.parse::<License>().map_err(|e| ParseError {
                         kind: ErrorKind::InvalidValue,
                         span: *span,
                         message: Some(format!("Invalid SPDX license expression: {}", e)),
@@ -724,6 +774,7 @@ impl Evaluate for Stage0About {
             documentation,
             license,
             license_file: evaluate_string_list(&self.license_file, context)?,
+            license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
         })
@@ -776,7 +827,7 @@ impl Evaluate for Stage0PythonBuild {
             GlobVec::from_strings(evaluate_string_list(&self.skip_pyc_compilation, context)?)?;
 
         Ok(Stage1PythonBuild {
-            entry_points: evaluate_string_list(&self.entry_points, context)?,
+            entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
             skip_pyc_compilation,
             use_python_app_entrypoint: self.use_python_app_entrypoint,
             version_independent: self.version_independent,
@@ -870,9 +921,17 @@ impl Evaluate for Stage0PostProcess {
     type Output = Stage1PostProcess;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let regex_str = evaluate_string_value(&self.regex, context)?;
+        let regex = regex::Regex::new(&regex_str).map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: Span::unknown(),
+            message: Some(format!("Invalid regular expression: {}", e)),
+            suggestion: Some("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.".to_string()),
+        })?;
+
         Ok(Stage1PostProcess {
             files: GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?,
-            regex: evaluate_string_value(&self.regex, context)?,
+            regex,
             replacement: evaluate_string_value(&self.replacement, context)?,
         })
     }
@@ -1486,23 +1545,33 @@ impl Evaluate for Stage0Recipe {
     type Output = Stage1Recipe;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let package = self.package.evaluate(context)?;
-        let build = self.build.evaluate(context)?;
-        let about = self.about.evaluate(context)?;
-        let requirements = self.requirements.evaluate(context)?;
-        let extra = self.extra.evaluate(context)?;
+        // First, evaluate the context variables and merge them into a new context
+        let context_with_vars = if !self.context.is_empty() {
+            context.with_context(&self.context)?
+        } else {
+            context.clone()
+        };
+
+        let package = self.package.evaluate(&context_with_vars)?;
+        let build = self.build.evaluate(&context_with_vars)?;
+        let about = self.about.evaluate(&context_with_vars)?;
+        let requirements = self.requirements.evaluate(&context_with_vars)?;
+        let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list
         let mut source = Vec::new();
         for src in &self.source {
-            source.push(src.evaluate(context)?);
+            source.push(src.evaluate(&context_with_vars)?);
         }
 
         // Evaluate tests list
         let mut tests = Vec::new();
         for test in &self.tests {
-            tests.push(test.evaluate(context)?);
+            tests.push(test.evaluate(&context_with_vars)?);
         }
+
+        // Extract the resolved context variables (all variables from the evaluation context)
+        let resolved_context = context_with_vars.variables().clone();
 
         Ok(Stage1Recipe::new(
             package,
@@ -1512,6 +1581,7 @@ impl Evaluate for Stage0Recipe {
             extra,
             source,
             tests,
+            resolved_context,
         ))
     }
 }

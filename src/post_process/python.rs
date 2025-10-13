@@ -158,13 +158,14 @@ pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf
     let version = output.version();
     let mut result = HashSet::new();
 
-    if !output.recipe.build().is_python_version_independent() {
-        result.extend(compile_pyc(
-            output,
-            &temp_files.files,
-            temp_files.temp_dir.path(),
-            &output.recipe.build().python().skip_pyc_compilation,
-        )?);
+    if !output.is_python_version_independent() {
+        // TODO?
+        // result.extend(compile_pyc(
+        //     output,
+        //     &temp_files.files,
+        //     temp_files.temp_dir.path(),
+        //     &output.recipe.build().python.skip_pyc_compilation,
+        // )?);
 
         // create entry points if it is not a noarch package
         result.extend(create_entry_points(output, temp_files.temp_dir.path())?);
@@ -294,7 +295,7 @@ pub(crate) fn create_entry_points(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Vec<PathBuf>, PackagingError> {
-    if output.recipe.build().python().entry_points.is_empty() {
+    if output.recipe.build.python.entry_points.is_empty() {
         return Ok(Vec::new());
     }
 
@@ -316,7 +317,7 @@ pub(crate) fn create_entry_points(
                 ))
             })?;
 
-    for ep in &output.recipe.build().python().entry_points {
+    for ep in &output.recipe.build.python.entry_points {
         let script = python_entry_point_template(
             &output.prefix().to_string_lossy(),
             output.target_platform().is_windows(),
@@ -351,12 +352,12 @@ pub(crate) fn create_entry_points(
             )?;
 
             if output.target_platform().is_osx()
-                && output.recipe.build().python().use_python_app_entrypoint
+                && output.recipe.build.python.use_python_app_entrypoint
             {
                 fix_shebang(
                     &script_path,
                     output.prefix(),
-                    output.recipe.build().python().use_python_app_entrypoint,
+                    output.recipe.build.python.use_python_app_entrypoint,
                 )?;
             }
 

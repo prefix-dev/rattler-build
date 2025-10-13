@@ -1,6 +1,6 @@
 //! Stage 1 Package - evaluated package information with concrete values
 
-use rattler_conda_types::{PackageName, Version};
+use rattler_conda_types::{PackageName, VersionWithSource};
 use serde::{Deserialize, Serialize};
 
 /// Evaluated package information with all templates and conditionals resolved
@@ -10,12 +10,12 @@ pub struct Package {
     pub name: PackageName,
 
     /// The package version (validated version)
-    pub version: Version,
+    pub version: VersionWithSource,
 }
 
 impl Package {
     /// Create a new Package
-    pub fn new(name: PackageName, version: Version) -> Self {
+    pub fn new(name: PackageName, version: VersionWithSource) -> Self {
         Self { name, version }
     }
 
@@ -25,7 +25,7 @@ impl Package {
     }
 
     /// Get the package version
-    pub fn version(&self) -> &Version {
+    pub fn version(&self) -> &VersionWithSource {
         &self.version
     }
 }
@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn test_package_creation() {
         let name = PackageName::from_str("foo").unwrap();
-        let version = Version::from_str("1.0.0").unwrap();
+        let version = VersionWithSource::from_str("1.0.0").unwrap();
         let pkg = Package::new(name.clone(), version.clone());
         assert_eq!(pkg.name(), &name);
         assert_eq!(pkg.version(), &version);

@@ -1,5 +1,6 @@
 use content_inspector::ContentType;
 use fs_err as fs;
+use rattler_build_recipe::stage1::GlobVec;
 use rattler_conda_types::PrefixRecord;
 use std::{
     collections::{HashMap, HashSet},
@@ -9,7 +10,7 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use crate::{metadata::Output, recipe::parser::GlobVec};
+use crate::metadata::Output;
 
 use super::{PackagingError, file_mapper, normalize_path_for_comparison};
 

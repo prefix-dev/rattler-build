@@ -2,12 +2,8 @@
 source: src/recipe/parser/output.rs
 expression: find_outputs_from_src(src.as_str()).unwrap_err()
 ---
-  × invalid field `randomkey`.
-    ╭─[11:1]
- 10 │ 
- 11 │ randomkey:
-    · ────┬────
-    ·     ╰── here
+  × an unspecified error occurred.
+    ╭────
  12 │   - bla
     ╰────
-  help: invalid key `randomkey` in root node
+  help: Parser error: invalid value

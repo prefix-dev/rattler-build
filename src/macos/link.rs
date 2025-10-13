@@ -13,10 +13,11 @@ use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
-use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
+
+use rattler_build_recipe::stage1::GlobVec;
 
 /// A macOS dylib (Mach-O)
 #[derive(Debug)]

@@ -5,13 +5,9 @@ expression: err
   × Failed to parse recipe
 
 Error: 
-  × mixed types in sequence: subsequent member is `number` in a list of
-  │ `string`.
-   ╭─[6:15]
- 5 │             - bar
- 6 │             - 3
-   ·               ┬
-   ·               ╰── here
- 7 │             - 4
-   ╰────
-  help: sequence `context` must have all members of the same scalar type
+  × an unspecified error occurred.
+    ╭─[13:9]
+ 12 │             version: 0.1.0
+ 13 │         
+    ╰────
+  help: Parser error: unexpected type

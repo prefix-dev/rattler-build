@@ -337,7 +337,7 @@ impl PackageContentsTest {
 
         let mut collected_issues = Vec::new();
         let mut matched_paths = HashSet::<&PathBuf>::new();
-        let version_independent = output.recipe.build().is_python_version_independent();
+        let version_independent = output.is_python_version_independent();
 
         // Check all sections for both exists and not_exists
         let sections = [

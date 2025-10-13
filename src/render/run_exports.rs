@@ -4,7 +4,7 @@ use rattler_conda_types::{
     MatchSpec, PackageName, ParseMatchSpecError, ParseStrictness, package::RunExportsJson,
 };
 
-use crate::recipe::parser::IgnoreRunExports;
+use rattler_build_recipe::stage1::requirements::IgnoreRunExports;
 
 use super::resolved_dependencies::{DependencyInfo, RunExportDependency};
 
@@ -31,14 +31,26 @@ impl FilteredRunExports {
     }
 }
 
-impl IgnoreRunExports {
-    pub fn filter(
+pub trait IgnoreRunExportsExt {
+    fn filter(
+        &self,
+        run_export_map: &HashMap<PackageName, RunExportsJson>,
+        from_env: &str,
+    ) -> Result<FilteredRunExports, ParseMatchSpecError>;
+}
+
+impl IgnoreRunExportsExt for IgnoreRunExports {
+    fn filter(
         &self,
         run_export_map: &HashMap<PackageName, RunExportsJson>,
         from_env: &str,
     ) -> Result<FilteredRunExports, ParseMatchSpecError> {
         let mut run_export_map = run_export_map.clone();
-        run_export_map.retain(|name, _| !self.from_package().contains(name));
+        run_export_map.retain(|name, _| {
+            !self
+                .from_package
+                .contains(&name.as_normalized().to_string())
+        });
 
         let mut filtered_run_exports = FilteredRunExports::default();
 
@@ -52,7 +64,7 @@ impl IgnoreRunExports {
                         if spec
                             .name
                             .as_ref()
-                            .map(|n| !self.by_name().contains(n))
+                            .map(|n| !self.by_name.contains(&n.as_normalized().to_string()))
                             .unwrap_or(false)
                         {
                             Some(Ok(spec))
@@ -74,7 +86,10 @@ impl IgnoreRunExports {
         };
 
         for (name, run_export) in run_export_map.iter() {
-            if self.from_package().contains(name) {
+            if self
+                .from_package
+                .contains(&name.as_normalized().to_string())
+            {
                 continue;
             }
 

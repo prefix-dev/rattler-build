@@ -27,6 +27,7 @@ url = { workspace = true }
 spdx = { workspace = true }
 globset = "0.4.16"
 fs-err.workspace = true
+regex = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

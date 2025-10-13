@@ -107,77 +107,79 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir_work = copy_dir::CopyDir::new(
-            &output.build_configuration.directories.work_dir,
-            &licenses_folder,
-        )
-        .with_globvec(&output.recipe.about().license_file)
-        .use_gitignore(false)
-        .run()?;
+        // TODO: use globvec in parser directly.
+        // let copy_dir_work = copy_dir::CopyDir::new(
+        //     &output.build_configuration.directories.work_dir,
+        //     &licenses_folder,
+        // )
+        // .with_globvec(&output.recipe.about().license_file)
+        // .use_gitignore(false)
+        // .run()?;
 
-        let copied_files_work_dir = copy_dir_work.copied_paths();
+        // let copied_files_work_dir = copy_dir_work.copied_paths();
 
-        let copy_dir_recipe = copy_dir::CopyDir::new(
-            &output.build_configuration.directories.recipe_dir,
-            &licenses_folder,
-        )
-        .with_globvec(&output.recipe.about().license_file)
-        .use_gitignore(false)
-        .overwrite(true)
-        .run()?;
+        // let copy_dir_recipe = copy_dir::CopyDir::new(
+        //     &output.build_configuration.directories.recipe_dir,
+        //     &licenses_folder,
+        // )
+        // .with_globvec(&output.recipe.about().license_file)
+        // .use_gitignore(false)
+        // .overwrite(true)
+        // .run()?;
 
-        let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
+        // let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
 
         // if a file was copied from the recipe dir, and the work dir, we should
         // issue a warning
-        for file in copied_files_recipe_dir {
-            if copied_files_work_dir.contains(file) {
-                let warn_str = format!(
-                    "License file from source directory was overwritten by license file from recipe folder ({})",
-                    file.display()
-                );
-                tracing::warn!(warn_str);
-                output.record_warning(&warn_str);
-            }
-        }
+        // for file in copied_files_recipe_dir {
+        //     if copied_files_work_dir.contains(file) {
+        //         let warn_str = format!(
+        //             "License file from source directory was overwritten by license file from recipe folder ({})",
+        //             file.display()
+        //         );
+        //         tracing::warn!(warn_str);
+        //         output.record_warning(&warn_str);
+        //     }
+        // }
 
-        let copied_files = copied_files_recipe_dir
-            .iter()
-            .chain(copied_files_work_dir)
-            .map(PathBuf::from)
-            .collect::<HashSet<PathBuf>>();
+        // let copied_files = copied_files_recipe_dir
+        //     .iter()
+        //     .chain(copied_files_work_dir)
+        //     .map(PathBuf::from)
+        //     .collect::<HashSet<PathBuf>>();
 
-        // Check which globs didn't match any files
-        let mut missing_globs = Vec::new();
+        // // Check which globs didn't match any files
+        // let mut missing_globs = Vec::new();
 
-        // Check globs from both work and recipe dir results
-        for (glob_str, match_obj) in copy_dir_work.include_globs() {
-            if !match_obj.get_matched() {
-                // Check if it matched in the recipe dir
-                if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
-                    if !recipe_match.get_matched() {
-                        missing_globs.push(glob_str.clone());
-                    }
-                } else {
-                    missing_globs.push(glob_str.clone());
-                }
-            }
-        }
+        // // Check globs from both work and recipe dir results
+        // for (glob_str, match_obj) in copy_dir_work.include_globs() {
+        //     if !match_obj.get_matched() {
+        //         // Check if it matched in the recipe dir
+        //         if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
+        //             if !recipe_match.get_matched() {
+        //                 missing_globs.push(glob_str.clone());
+        //             }
+        //         } else {
+        //             missing_globs.push(glob_str.clone());
+        //         }
+        //     }
+        // }
 
-        if !missing_globs.is_empty() {
-            let error_str = format!(
-                "The following license files were not found: {}",
-                missing_globs.join(", ")
-            );
-            tracing::error!(error_str);
-            return Err(PackagingError::LicensesNotFound);
-        }
+        // if !missing_globs.is_empty() {
+        //     let error_str = format!(
+        //         "The following license files were not found: {}",
+        //         missing_globs.join(", ")
+        //     );
+        //     tracing::error!(error_str);
+        //     return Err(PackagingError::LicensesNotFound);
+        // }
 
-        if copied_files.is_empty() {
-            Err(PackagingError::LicensesNotFound)
-        } else {
-            Ok(Some(copied_files))
-        }
+        // if copied_files.is_empty() {
+        //     Err(PackagingError::LicensesNotFound)
+        // } else {
+        //     Ok(Some(copied_files))
+        // }
+        return Ok(Some(HashSet::new()));
     }
 }
 
@@ -432,7 +434,7 @@ pub fn package_conda(
 
     tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
-    if output.recipe.build().is_python_version_independent() {
+    if output.is_python_version_independent() {
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);
@@ -574,8 +576,8 @@ impl Output {
         let _enter = span.enter();
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
-            self.recipe.build().always_include_files(),
-            self.recipe.build().files(),
+            &self.recipe.build().always_include_files,
+            &self.recipe.build().files,
         )?;
 
         package_conda(self, tool_configuration, &files_after)

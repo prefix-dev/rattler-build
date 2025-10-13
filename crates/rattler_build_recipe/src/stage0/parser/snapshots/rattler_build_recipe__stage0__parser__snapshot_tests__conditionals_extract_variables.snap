@@ -3,10 +3,12 @@ source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
 expression: vars
 ---
 [
+    "compiler",
     "cuda",
     "linux",
     "openmp",
     "osx",
+    "some_variable",
     "unix",
     "win",
 ]

@@ -5,11 +5,9 @@ expression: err
   × Failed to parse recipe
 
 Error: 
-  × failed to parse URL: relative URL without a base
-   ╭─[7:23]
- 6 │         about:
+  × an unspecified error occurred.
+   ╭─[8:9]
  7 │             homepage: license_urla.asda:://sdskd
-   ·                       ─────────────┬────────────
-   ·                                    ╰── failed to parse URL
  8 │         
    ╰────
+  help: Parser error: invalid value

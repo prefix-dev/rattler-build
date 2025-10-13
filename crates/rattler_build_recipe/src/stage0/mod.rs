@@ -14,7 +14,7 @@ mod source;
 mod tests;
 mod types;
 
-pub use about::About;
+pub use about::{About, License};
 pub use build::Build;
 pub use extra::Extra;
 pub use output::{
