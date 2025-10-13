@@ -11,6 +11,19 @@ use crate::{ParseError, source_code::Source};
 #[cfg(feature = "miette")]
 const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/errors");
 
+/// Macro to format and snapshot miette diagnostic reports
+#[cfg(feature = "miette")]
+macro_rules! assert_miette_snapshot {
+    ($value:expr) => {{
+        let mut value = String::new();
+        ::miette::GraphicalReportHandler::new_themed(::miette::GraphicalTheme::unicode_nocolor())
+            .with_width(80)
+            .render_report(&mut value, &$value)
+            .unwrap();
+        ::insta::assert_snapshot!(::insta::_macro_support::AutoName, value, stringify!($value));
+    }};
+}
+
 /// Wrapper that combines a ParseError with its Source for miette reporting
 #[cfg(feature = "miette")]
 #[derive(Debug, miette::Diagnostic)]
@@ -112,21 +125,6 @@ fn load_error_test(filename: &str) -> Source {
 }
 
 #[cfg(feature = "miette")]
-fn format_miette_report(error: ParseErrorWithSource) -> String {
-    // Format the error using miette's GraphicalReportHandler
-    use miette::{GraphicalReportHandler, GraphicalTheme};
-
-    let mut output = String::new();
-    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode_nocolor());
-
-    if let Ok(()) = handler.render_report(&mut output, &error) {
-        output
-    } else {
-        format!("{:?}", error)
-    }
-}
-
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_missing_package() {
     let source = load_error_test("missing_package.yaml");
@@ -136,7 +134,7 @@ fn test_error_missing_package() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -149,7 +147,7 @@ fn test_error_missing_name() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -162,7 +160,7 @@ fn test_error_missing_version() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -175,7 +173,7 @@ fn test_error_invalid_package_name() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -188,7 +186,7 @@ fn test_error_unknown_top_level_field() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -201,7 +199,7 @@ fn test_error_unknown_about_field() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -214,7 +212,7 @@ fn test_error_invalid_jinja() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -227,7 +225,46 @@ fn test_error_unknown_requirements_field() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_invalid_license() {
+    let source = load_error_test("error_license.yaml");
+    let result = parse_recipe_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_invalid_build_number() {
+    let source = load_error_test("error.yaml");
+    let result = parse_recipe_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_invalid_matchspec() {
+    let source = load_error_test("error_matchspec.yaml");
+    let result = parse_recipe_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
 }
 
 // ============================================================================
@@ -244,7 +281,7 @@ fn test_error_multi_output_missing_outputs() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -257,7 +294,7 @@ fn test_error_multi_output_staging_with_run_requirements() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -270,7 +307,7 @@ fn test_error_multi_output_staging_with_about() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }
 
 #[cfg(feature = "miette")]
@@ -283,5 +320,5 @@ fn test_error_multi_output_empty_outputs() {
     let err = result.unwrap_err();
 
     let error_with_source = ParseErrorWithSource::new(source, err);
-    insta::assert_snapshot!(format_miette_report(error_with_source));
+    assert_miette_snapshot!(error_with_source);
 }

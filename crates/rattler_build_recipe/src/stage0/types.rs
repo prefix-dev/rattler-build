@@ -123,6 +123,109 @@ impl<'de> Deserialize<'de> for JinjaExpression {
     }
 }
 
+/// Wrapper around rattler_conda_types::MatchSpec with Serialize/Deserialize support
+/// This allows MatchSpec to be validated at parse time while working with the Value<T> infrastructure
+///
+/// Supports two variants:
+/// - Parsed: A validated MatchSpec (for concrete strings without templates)
+/// - Deferred: A template string that will be validated later during evaluation
+#[derive(Debug, Clone, PartialEq)]
+pub enum MatchSpecWrapper {
+    /// A validated MatchSpec (parsed at parse time)
+    Parsed(rattler_conda_types::MatchSpec),
+    /// A template string that will be validated during evaluation (stage0 -> stage1)
+    Deferred(String),
+}
+
+impl MatchSpecWrapper {
+    /// Create a new MatchSpecWrapper from a MatchSpec
+    pub fn new(spec: rattler_conda_types::MatchSpec) -> Self {
+        Self::Parsed(spec)
+    }
+
+    /// Get a reference to the inner MatchSpec (panics if Deferred)
+    pub fn inner(&self) -> &rattler_conda_types::MatchSpec {
+        match self {
+            MatchSpecWrapper::Parsed(spec) => spec,
+            MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
+        }
+    }
+
+    /// Consume the wrapper and return the inner MatchSpec (panics if Deferred)
+    pub fn into_inner(self) -> rattler_conda_types::MatchSpec {
+        match self {
+            MatchSpecWrapper::Parsed(spec) => spec,
+            MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
+        }
+    }
+
+    /// Get the string representation (either from MatchSpec or the deferred template)
+    pub fn as_str(&self) -> String {
+        match self {
+            MatchSpecWrapper::Parsed(spec) => spec.to_string(),
+            MatchSpecWrapper::Deferred(s) => s.clone(),
+        }
+    }
+
+    /// Check if this wrapper contains a template
+    pub fn is_deferred(&self) -> bool {
+        matches!(self, MatchSpecWrapper::Deferred(_))
+    }
+}
+
+impl Display for MatchSpecWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MatchSpecWrapper::Parsed(spec) => write!(f, "{}", spec),
+            MatchSpecWrapper::Deferred(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl FromStr for MatchSpecWrapper {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // If the string contains a template, defer validation until evaluation
+        if s.contains("${{") {
+            return Ok(MatchSpecWrapper::Deferred(s.to_string()));
+        }
+
+        // Otherwise, validate as MatchSpec now
+        use rattler_conda_types::ParseStrictness;
+        rattler_conda_types::MatchSpec::from_str(s, ParseStrictness::Strict)
+            .map(MatchSpecWrapper::Parsed)
+            .map_err(|e| format!("Invalid match spec: {}", e))
+    }
+}
+
+impl Serialize for MatchSpecWrapper {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as string using Display
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MatchSpecWrapper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let source = String::deserialize(deserializer)?;
+        MatchSpecWrapper::from_str(&source).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Default for MatchSpecWrapper {
+    fn default() -> Self {
+        // Default MatchSpec is an empty spec
+        MatchSpecWrapper::Parsed(rattler_conda_types::MatchSpec::default())
+    }
+}
+
 /// Extract variable names from a Jinja2 template string using minijinja's AST parsing
 /// Returns Result for validation during construction of JinjaTemplate
 fn extract_variables_from_template(template: &str) -> Result<Vec<String>, minijinja::Error> {

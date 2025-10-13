@@ -189,7 +189,7 @@ requirements:
     - if: linux
       then: libgcc
     - if: osx
-      then: libc++
+      then: libcxx
   run_exports:
     strong:
       - complex-package

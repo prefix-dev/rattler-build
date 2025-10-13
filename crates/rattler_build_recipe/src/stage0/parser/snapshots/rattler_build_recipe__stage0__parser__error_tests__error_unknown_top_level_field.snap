@@ -1,8 +1,9 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
-expression: format_miette_report(error_with_source)
+expression: error_with_source
 ---
-  × invalid value: invalid value for recipe: unknown top-level field 'unknown_section'
+  × invalid value: invalid value for recipe: unknown top-level field
+  │ 'unknown_section'
    ╭─[unknown_top_level_field.yaml:8:1]
  7 │ 
  8 │ unknown_section:
@@ -10,4 +11,5 @@ expression: format_miette_report(error_with_source)
    ·        ╰── invalid value for recipe: unknown top-level field 'unknown_section'
  9 │   some_field: some_value
    ╰────
-  help: valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context
+  help: valid top-level fields are: package, build, about, requirements,
+        extra, source, tests, schema_version, context

@@ -297,19 +297,22 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
-/// Evaluate a ConditionalList<String> into Vec<Dependency>
+/// Evaluate a ConditionalList<MatchSpecWrapper> into Vec<Dependency>
 ///
-/// This parses string dependencies into MatchSpec or handles pin_subpackage/pin_compatible.
-/// The strings can be either:
+/// This handles dependencies which may be:
+/// - Concrete MatchSpecs (already validated at parse time)
+/// - Templates that render to MatchSpecs or pin expressions
+/// - Conditionals with MatchSpecs or templates in then/else branches
+///
+/// The template strings can be either:
 /// - Regular match specs (e.g., "python >=3.8")
 /// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
 /// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
 pub fn evaluate_dependency_list(
-    list: &ConditionalList<String>,
+    list: &crate::stage0::types::ConditionalList<crate::stage0::types::MatchSpecWrapper>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     use crate::stage1::Dependency;
-
     use rattler_conda_types::{MatchSpec, ParseStrictness};
 
     let mut results = Vec::new();
@@ -318,32 +321,83 @@ pub fn evaluate_dependency_list(
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                // Get the span from the Value - now we have it!
-                let span = value.span();
+                match value {
+                    Value::Concrete { value: wrapper, .. } => {
+                        match wrapper {
+                            crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
+                                // Concrete MatchSpec - already validated at parse time!
+                                results.push(Dependency::Spec(Box::new(spec.clone())));
+                            }
+                            crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
+                                // Deferred template string - need to render and parse now
+                                // This happens for strings like "cuda-toolkit ${{ cuda_version }}"
+                                // that were in conditional branches
+                                let s = template_str;
 
-                let s = evaluate_string_value(value, context)?;
+                                // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+                                if s.trim().starts_with('{') {
+                                    // Try to deserialize as Dependency (which handles pin types)
+                                    let dep: Dependency =
+                                        serde_yaml::from_str(s).map_err(|e| ParseError {
+                                            kind: ErrorKind::InvalidValue,
+                                            span: value.span(),
+                                            message: Some(format!(
+                                                "Failed to parse pin dependency: {}",
+                                                e
+                                            )),
+                                            suggestion: None,
+                                        })?;
+                                    results.push(dep);
+                                } else {
+                                    // It's a template string - render it first
+                                    let rendered = render_template(s, context, &value.span())?;
 
-                // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                if s.trim().starts_with('{') {
-                    // Try to deserialize as Dependency (which handles pin types)
-                    let dep: Dependency = serde_yaml::from_str(&s).map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span,
-                        message: Some(format!("Failed to parse pin dependency: {}", e)),
-                        suggestion: None,
-                    })?;
-                    results.push(dep);
-                } else {
-                    // It's a regular MatchSpec string
-                    let spec = MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
-                        ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span,
-                            message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                            suggestion: None,
+                                    // Then parse as MatchSpec
+                                    let spec =
+                                        MatchSpec::from_str(&rendered, ParseStrictness::Strict)
+                                            .map_err(|e| ParseError {
+                                                kind: ErrorKind::InvalidValue,
+                                                span: value.span(),
+                                                message: Some(format!(
+                                                    "Invalid match spec '{}': {}",
+                                                    rendered, e
+                                                )),
+                                                suggestion: None,
+                                            })?;
+                                    results.push(Dependency::Spec(Box::new(spec)));
+                                }
+                            }
                         }
-                    })?;
-                    results.push(Dependency::Spec(Box::new(spec)));
+                    }
+                    Value::Template { template, span } => {
+                        // Template - need to render and parse
+                        let s = render_template(template.source(), context, span)?;
+
+                        // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+                        if s.trim().starts_with('{') {
+                            // Try to deserialize as Dependency (which handles pin types)
+                            let dep: Dependency =
+                                serde_yaml::from_str(&s).map_err(|e| ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: *span,
+                                    message: Some(format!("Failed to parse pin dependency: {}", e)),
+                                    suggestion: None,
+                                })?;
+                            results.push(dep);
+                        } else {
+                            // It's a regular MatchSpec string
+                            let spec =
+                                MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
+                                    ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: *span,
+                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
+                                        suggestion: None,
+                                    }
+                                })?;
+                            results.push(Dependency::Spec(Box::new(spec)));
+                        }
+                    }
                 }
             }
             Item::Conditional(cond) => {
@@ -356,29 +410,48 @@ pub fn evaluate_dependency_list(
                 };
 
                 // Process the selected branch
-                for s in items_to_process.iter() {
-                    // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                    if s.trim().starts_with('{') {
-                        // Try to deserialize as Dependency (which handles pin types)
-                        let dep: Dependency = serde_yaml::from_str(s).map_err(|e| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(), // Conditional branches don't preserve individual spans yet
-                            message: Some(format!("Failed to parse pin dependency: {}", e)),
-                            suggestion: None,
-                        })?;
-                        results.push(dep);
-                    } else {
-                        // It's a regular MatchSpec string
-                        let spec =
-                            MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
-                                ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(), // Conditional branches don't preserve individual spans yet
-                                    message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                                    suggestion: None,
-                                }
-                            })?;
-                        results.push(Dependency::Spec(Box::new(spec)));
+                for wrapper in items_to_process.iter() {
+                    // In conditional branches, we have MatchSpecWrapper directly
+                    match wrapper {
+                        crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
+                            // Already validated - use as-is
+                            results.push(Dependency::Spec(Box::new(spec.clone())));
+                        }
+                        crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
+                            // Deferred template - need to render and parse
+                            let s = template_str;
+
+                            // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+                            if s.trim().starts_with('{') {
+                                let dep: Dependency =
+                                    serde_yaml::from_str(s).map_err(|e| ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: Span::unknown(),
+                                        message: Some(format!(
+                                            "Failed to parse pin dependency: {}",
+                                            e
+                                        )),
+                                        suggestion: None,
+                                    })?;
+                                results.push(dep);
+                            } else {
+                                // Render the template
+                                let rendered = render_template(s, context, &Span::unknown())?;
+
+                                // Parse as MatchSpec
+                                let spec = MatchSpec::from_str(&rendered, ParseStrictness::Strict)
+                                    .map_err(|e| ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: Span::unknown(),
+                                        message: Some(format!(
+                                            "Invalid match spec '{}': {}",
+                                            rendered, e
+                                        )),
+                                        suggestion: None,
+                                    })?;
+                                results.push(Dependency::Spec(Box::new(spec)));
+                            }
+                        }
                     }
                 }
             }
