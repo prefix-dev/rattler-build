@@ -1,6 +1,6 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
-expression: format_miette_report(error_with_source)
+expression: error_with_source
 ---
   × invalid value: invalid value for requirements: unknown field 'install'
    ╭─[unknown_requirements_field.yaml:8:3]
@@ -10,4 +10,5 @@ expression: format_miette_report(error_with_source)
    ·      ╰── invalid value for requirements: unknown field 'install'
  9 │     - python
    ╰────
-  help: valid fields are: build, host, run, run_constraints, run_exports, ignore_run_exports
+  help: valid fields are: build, host, run, run_constraints, run_exports,
+        ignore_run_exports

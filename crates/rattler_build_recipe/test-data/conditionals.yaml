@@ -24,7 +24,7 @@ requirements:
     - if: linux
       then: libgcc
     - if: osx
-      then: libc++
+      then: libcxx
     - if: win
       then: msvc-runtime
   run_exports:

@@ -16,7 +16,7 @@ mod source;
 mod test_parser;
 mod value;
 
-#[cfg(all(test, feature = "miette"))]
+#[cfg(test)]
 mod error_tests;
 #[cfg(test)]
 mod recipe_tests;
