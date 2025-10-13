@@ -326,7 +326,7 @@ pub fn evaluate_dependency_list(
                         match wrapper {
                             crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
                                 // Concrete MatchSpec - already validated at parse time!
-                                results.push(Dependency::Spec(Box::new(spec.clone())));
+                                results.push(Dependency::Spec(spec.clone()));
                             }
                             crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
                                 // Deferred template string - need to render and parse now
@@ -415,7 +415,7 @@ pub fn evaluate_dependency_list(
                     match wrapper {
                         crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
                             // Already validated - use as-is
-                            results.push(Dependency::Spec(Box::new(spec.clone())));
+                            results.push(Dependency::Spec(spec.clone()));
                         }
                         crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
                             // Deferred template - need to render and parse
