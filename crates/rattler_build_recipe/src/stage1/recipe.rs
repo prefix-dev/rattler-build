@@ -135,7 +135,7 @@ mod tests {
             ..Default::default()
         };
         let reqs = Requirements {
-            run: vec![Dependency::Spec("python".parse().unwrap())],
+            run: vec![Dependency::Spec(Box::new("python".parse().unwrap()))],
             ..Default::default()
         };
         let extra = Extra {

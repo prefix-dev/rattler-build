@@ -54,7 +54,7 @@ pub struct PinCompatible {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Dependency {
     /// A regular matchspec dependency
-    Spec(MatchSpec),
+    Spec(Box<MatchSpec>),
     /// A pin_subpackage dependency
     PinSubpackage(PinSubpackage),
     /// A pin_compatible dependency
@@ -64,7 +64,7 @@ pub enum Dependency {
 impl std::fmt::Display for Dependency {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Dependency::Spec(spec) => write!(f, "{}", spec),
+            Dependency::Spec(spec) => write!(f, "{}", spec.as_ref()),
             Dependency::PinSubpackage(pin) => {
                 write!(
                     f,
@@ -103,7 +103,7 @@ impl Serialize for Dependency {
         }
 
         let raw = match self {
-            Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
+            Dependency::Spec(dep) => RawSpec::String(dep.as_ref().to_string()),
             Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
             Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
         };
@@ -136,7 +136,9 @@ impl<'de> Deserialize<'de> for Dependency {
 
         let raw_spec = RawSpec::deserialize(deserializer)?;
         Ok(match raw_spec {
-            RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
+            RawSpec::String(spec) => {
+                Dependency::Spec(Box::new(spec.parse().map_err(D::Error::custom)?))
+            }
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
         })
@@ -253,13 +255,13 @@ mod tests {
     fn test_requirements_with_deps() {
         let reqs = Requirements {
             build: vec![
-                Dependency::Spec("gcc".parse().unwrap()),
-                Dependency::Spec("make".parse().unwrap()),
+                Dependency::Spec(Box::new("gcc".parse().unwrap())),
+                Dependency::Spec(Box::new("make".parse().unwrap())),
             ],
-            host: vec![Dependency::Spec("python".parse().unwrap())],
+            host: vec![Dependency::Spec(Box::new("python".parse().unwrap()))],
             run: vec![
-                Dependency::Spec("python".parse().unwrap()),
-                Dependency::Spec("numpy".parse().unwrap()),
+                Dependency::Spec(Box::new("python".parse().unwrap())),
+                Dependency::Spec(Box::new("numpy".parse().unwrap())),
             ],
             ..Default::default()
         };
@@ -276,7 +278,7 @@ mod tests {
         assert!(re.is_empty());
 
         let re = RunExports {
-            weak: vec![Dependency::Spec("foo".parse().unwrap())],
+            weak: vec![Dependency::Spec(Box::new("foo".parse().unwrap()))],
             ..Default::default()
         };
         assert!(!re.is_empty());

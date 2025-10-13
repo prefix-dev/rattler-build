@@ -343,7 +343,7 @@ pub fn evaluate_dependency_list(
                             suggestion: None,
                         }
                     })?;
-                    results.push(Dependency::Spec(spec));
+                    results.push(Dependency::Spec(Box::new(spec)));
                 }
             }
             Item::Conditional(cond) => {
@@ -378,7 +378,7 @@ pub fn evaluate_dependency_list(
                                     suggestion: None,
                                 }
                             })?;
-                        results.push(Dependency::Spec(spec));
+                        results.push(Dependency::Spec(Box::new(spec)));
                     }
                 }
             }
