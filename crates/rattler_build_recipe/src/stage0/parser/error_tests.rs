@@ -4,7 +4,7 @@
 //! when encountering various error conditions.
 
 #[cfg(feature = "miette")]
-use crate::stage0::parser::parse_recipe_from_source;
+use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
 #[cfg(feature = "miette")]
 use crate::{ParseError, source_code::Source};
 
@@ -222,6 +222,62 @@ fn test_error_invalid_jinja() {
 fn test_error_unknown_requirements_field() {
     let source = load_error_test("unknown_requirements_field.yaml");
     let result = parse_recipe_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    insta::assert_snapshot!(format_miette_report(error_with_source));
+}
+
+// ============================================================================
+// Multi-output recipe error tests
+// ============================================================================
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_multi_output_missing_outputs() {
+    let source = load_error_test("multi_output_missing_outputs.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    insta::assert_snapshot!(format_miette_report(error_with_source));
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_multi_output_staging_with_run_requirements() {
+    let source = load_error_test("multi_output_staging_with_run.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    insta::assert_snapshot!(format_miette_report(error_with_source));
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_multi_output_staging_with_about() {
+    let source = load_error_test("multi_output_staging_with_about.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    insta::assert_snapshot!(format_miette_report(error_with_source));
+}
+
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_multi_output_empty_outputs() {
+    let source = load_error_test("multi_output_empty_outputs.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
 
     assert!(result.is_err());
     let err = result.unwrap_err();

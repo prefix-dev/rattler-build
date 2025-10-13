@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use rattler_build_recipe::stage0::parse_recipe_from_source;
+use rattler_build_recipe::stage0::{Recipe, parse_recipe_or_multi_from_source};
 
 /// Helper to find all recipe.yaml files in test-data/recipes
 fn find_recipe_files() -> Vec<std::path::PathBuf> {
@@ -58,10 +58,17 @@ fn test_parse_all_test_recipes() {
             .unwrap_or(recipe_path);
 
         match fs_err::read_to_string(recipe_path) {
-            Ok(content) => match parse_recipe_from_source(&content) {
-                Ok(_recipe) => {
+            Ok(content) => match parse_recipe_or_multi_from_source(&content) {
+                Ok(recipe) => {
                     successful += 1;
-                    println!("✓ {}", relative_path.display());
+                    match recipe {
+                        Recipe::SingleOutput(_) => {
+                            println!("✓ {} [single-output]", relative_path.display());
+                        }
+                        Recipe::MultiOutput(_) => {
+                            println!("✓ {} [multi-output]", relative_path.display());
+                        }
+                    }
                 }
                 Err(e) => {
                     failed.push((relative_path.to_path_buf(), e.to_string()));
@@ -118,16 +125,29 @@ fn test_parse_specific_known_recipes() {
         if recipe_path.exists() {
             let content = fs_err::read_to_string(&recipe_path).expect("Failed to read recipe");
 
-            let result = parse_recipe_from_source(&content);
+            let result = parse_recipe_or_multi_from_source(&content);
 
             match result {
                 Ok(recipe) => {
-                    println!(
-                        "✓ Parsed {}: package = {:?}",
-                        recipe_name, recipe.package.name
-                    );
-                    // Basic sanity checks
-                    assert!(!recipe.package.name.to_string().is_empty());
+                    match recipe {
+                        Recipe::SingleOutput(single) => {
+                            println!(
+                                "✓ Parsed {} [single-output]: package = {:?}",
+                                recipe_name, single.package.name
+                            );
+                            // Basic sanity checks
+                            assert!(!single.package.name.to_string().is_empty());
+                        }
+                        Recipe::MultiOutput(multi) => {
+                            println!(
+                                "✓ Parsed {} [multi-output]: {} outputs",
+                                recipe_name,
+                                multi.outputs.len()
+                            );
+                            // Basic sanity checks
+                            assert!(!multi.outputs.is_empty());
+                        }
+                    }
                 }
                 Err(e) => {
                     println!("✗ Failed to parse {}: {}", recipe_name, e);

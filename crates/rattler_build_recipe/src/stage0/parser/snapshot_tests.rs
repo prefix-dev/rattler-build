@@ -2,7 +2,7 @@
 //!
 //! These tests parse real recipe files from test-data/ and snapshot the results
 
-use crate::stage0::parser::parse_recipe_from_source;
+use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
 
 const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data");
 
@@ -89,5 +89,83 @@ fn test_script_parsing_snapshot() {
 fn test_license_files_snapshot() {
     let source = load_test_recipe("license_files.yaml");
     let recipe = parse_recipe_from_source(&source).expect("Failed to parse license_files recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+// ============================================================================
+// Multi-output recipe tests
+// ============================================================================
+
+#[test]
+fn test_multi_output_minimal_snapshot() {
+    let source = load_test_recipe("multi_output_minimal.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output minimal recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_multi_output_full_snapshot() {
+    let source = load_test_recipe("multi_output_full.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output full recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_multi_output_templates_snapshot() {
+    let source = load_test_recipe("multi_output_templates.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output templates recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_multi_output_conditionals_snapshot() {
+    let source = load_test_recipe("multi_output_conditionals.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output conditionals recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_multi_output_top_level_inherit_snapshot() {
+    let source = load_test_recipe("multi_output_top_level_inherit.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output top-level inherit recipe");
+    insta::assert_debug_snapshot!(recipe);
+}
+
+#[test]
+fn test_multi_output_extract_variables() {
+    let source = load_test_recipe("multi_output_full.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output full recipe");
+    let vars = recipe.used_variables();
+    insta::assert_debug_snapshot!(vars);
+}
+
+#[test]
+fn test_multi_output_templates_extract_variables() {
+    let source = load_test_recipe("multi_output_templates.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse multi-output templates recipe");
+    let vars = recipe.used_variables();
+    insta::assert_debug_snapshot!(vars);
+}
+
+#[test]
+fn test_single_output_compatibility() {
+    // Test that single-output recipes still work with new parser
+    let source = load_test_recipe("minimal.yaml");
+    let recipe = parse_recipe_or_multi_from_source(&source)
+        .expect("Failed to parse single-output recipe with multi parser");
+
+    // Verify it's parsed as SingleOutput variant
+    match recipe {
+        crate::stage0::Recipe::SingleOutput(_) => {}
+        crate::stage0::Recipe::MultiOutput(_) => panic!("Expected SingleOutput, got MultiOutput"),
+    }
+
     insta::assert_debug_snapshot!(recipe);
 }

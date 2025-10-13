@@ -26,7 +26,7 @@ fn test_parse_concrete_value() {
     let yaml = parse_yaml_field("hello", "value");
     let result: crate::stage0::types::Value<String> = parse_value(&yaml).unwrap();
     match result {
-        crate::stage0::types::Value::Concrete(s) => assert_eq!(s, "hello"),
+        crate::stage0::types::Value::Concrete { value: s, .. } => assert_eq!(s, "hello"),
         _ => panic!("Expected concrete value"),
     }
 }
@@ -36,7 +36,7 @@ fn test_parse_template_value() {
     let yaml = parse_yaml_field("'${{ name }}'", "value");
     let result: crate::stage0::types::Value<String> = parse_value(&yaml).unwrap();
     match result {
-        crate::stage0::types::Value::Template(t) => {
+        crate::stage0::types::Value::Template { template: t, .. } => {
             assert_eq!(t.as_str(), "${{ name }}");
             assert_eq!(t.used_variables(), &["name"]);
         }

@@ -6,6 +6,7 @@ mod build;
 pub mod evaluate;
 mod extra;
 pub mod jinja_functions;
+mod output;
 mod package;
 mod parser;
 mod requirements;
@@ -16,8 +17,15 @@ mod types;
 pub use about::About;
 pub use build::Build;
 pub use extra::Extra;
-pub use package::Package;
-pub use parser::{parse_recipe, parse_recipe_from_source};
+pub use output::{
+    CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, Recipe, RecipeMetadata,
+    SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput, StagingRequirements,
+};
+pub use package::{Package, PackageMetadata, PackageName};
+pub use parser::{
+    parse_recipe, parse_recipe_from_source, parse_recipe_or_multi,
+    parse_recipe_or_multi_from_source,
+};
 pub use requirements::Requirements;
 pub use source::Source;
 pub use tests::TestType;
@@ -26,46 +34,6 @@ pub use types::{
     Value,
 };
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct Stage0Recipe {
-    /// Schema version (optional, defaults to None). Only version 1 is supported.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schema_version: Option<u32>,
-
-    /// Context variables for Jinja template rendering (order-preserving)
-    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, types::Value<String>>,
-
-    pub package: package::Package,
-    pub build: build::Build,
-    pub requirements: Requirements,
-    pub about: about::About,
-    pub extra: extra::Extra,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<source::Source>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tests: Vec<tests::TestType>,
-}
-
-impl Stage0Recipe {
-    pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.package.used_variables();
-        vars.extend(self.build.used_variables());
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.about.used_variables());
-        vars.extend(self.extra.used_variables());
-        for src in &self.source {
-            vars.extend(src.used_variables());
-        }
-        for test in &self.tests {
-            vars.extend(test.used_variables());
-        }
-        // Add variables from context
-        for value in self.context.values() {
-            vars.extend(value.used_variables());
-        }
-        vars.sort();
-        vars.dedup();
-        vars
-    }
-}
+/// Backwards compatibility alias for Stage0Recipe
+/// This is now the same as SingleOutputRecipe
+pub type Stage0Recipe = SingleOutputRecipe;

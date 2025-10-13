@@ -1078,22 +1078,27 @@ mod tests {
 
     #[test]
     fn test_value_concrete_no_variables() {
-        let value: Value<String> = Value::Concrete("hello".to_string());
+        let value: Value<String> =
+            Value::new_concrete("hello".to_string(), crate::span::Span::unknown());
         assert_eq!(value.used_variables(), Vec::<String>::new());
     }
 
     #[test]
     fn test_value_template_simple_variable() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ name }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ name }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let vars = value.used_variables();
         assert_eq!(vars, vec!["name"]);
     }
 
     #[test]
     fn test_value_template_multiple_variables() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let mut vars = value.used_variables();
         vars.sort();
         assert_eq!(vars, vec!["name", "version"]);
@@ -1101,17 +1106,20 @@ mod tests {
 
     #[test]
     fn test_value_template_with_filter() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ name | lower }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ name | lower }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let vars = value.used_variables();
         assert_eq!(vars, vec!["name"]);
     }
 
     #[test]
     fn test_value_template_with_complex_expression() {
-        let value: Value<String> = Value::Template(
+        let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ name ~ '-' ~ version if linux else name }}".to_string())
                 .unwrap(),
+            crate::span::Span::unknown(),
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -1141,8 +1149,9 @@ mod tests {
 
     #[test]
     fn test_item_value_variant() {
-        let item: Item<String> = Item::Value(Value::Template(
+        let item: Item<String> = Item::Value(Value::new_template(
             JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
         ));
         let vars = item.used_variables();
         assert_eq!(vars, vec!["compiler"]);
@@ -1161,9 +1170,13 @@ mod tests {
     #[test]
     fn test_conditional_list_mixed_items() {
         let items = vec![
-            Item::Value(Value::Concrete("static-dep".to_string())),
-            Item::Value(Value::Template(
+            Item::Value(Value::new_concrete(
+                "static-dep".to_string(),
+                crate::span::Span::unknown(),
+            )),
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
             )),
             Item::Conditional(
                 Conditional::new(
@@ -1173,8 +1186,9 @@ mod tests {
                 .unwrap()
                 .with_else(ListOrItem::single("other-compiler".to_string())),
             ),
-            Item::Value(Value::Template(
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ python }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
             )),
         ];
 
@@ -1188,11 +1202,13 @@ mod tests {
     #[test]
     fn test_conditional_list_deduplication() {
         let items = vec![
-            Item::Value(Value::Template(
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ name }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
             )),
-            Item::Value(Value::Template(
+            Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
+                crate::span::Span::unknown(),
             )),
             Item::Conditional(
                 Conditional::new(
@@ -1231,8 +1247,10 @@ mod tests {
 
     #[test]
     fn test_template_with_binary_operators() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ x + y * z }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ x + y * z }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let mut vars = value.used_variables();
         vars.sort();
         assert_eq!(vars, vec!["x", "y", "z"]);
@@ -1240,11 +1258,12 @@ mod tests {
 
     #[test]
     fn test_template_with_comparison() {
-        let value: Value<String> = Value::Template(
+        let value: Value<String> = Value::new_template(
             JinjaTemplate::new(
                 "${{ version >= min_version and version < max_version }}".to_string(),
             )
             .unwrap(),
+            crate::span::Span::unknown(),
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -1253,16 +1272,20 @@ mod tests {
 
     #[test]
     fn test_template_with_attribute_access() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ build.number }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ build.number }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let vars = value.used_variables();
         assert_eq!(vars, vec!["build"]);
     }
 
     #[test]
     fn test_template_with_list() {
-        let value: Value<String> =
-            Value::Template(JinjaTemplate::new("${{ [a, b, c] }}".to_string()).unwrap());
+        let value: Value<String> = Value::new_template(
+            JinjaTemplate::new("${{ [a, b, c] }}".to_string()).unwrap(),
+            crate::span::Span::unknown(),
+        );
         let mut vars = value.used_variables();
         vars.sort();
         assert_eq!(vars, vec!["a", "b", "c"]);

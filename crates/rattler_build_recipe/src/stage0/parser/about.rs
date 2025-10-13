@@ -192,14 +192,14 @@ mod tests {
 
         // Verify templates
         match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Template(t) => {
+            crate::stage0::types::Value::Template { template: t, .. } => {
                 assert_eq!(t.used_variables(), &["homepage"]);
             }
             _ => panic!("Expected template value"),
         }
 
         match about.summary.as_ref().unwrap() {
-            crate::stage0::types::Value::Template(t) => {
+            crate::stage0::types::Value::Template { template: t, .. } => {
                 let mut vars = t.used_variables().to_vec();
                 vars.sort();
                 assert_eq!(vars, vec!["name", "summary"]);
