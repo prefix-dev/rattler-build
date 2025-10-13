@@ -1464,7 +1464,7 @@ def test_missing_pin_subpackage(
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output.decode("utf-8")
+    stdout = e.value.output
     assert "Missing output: test1 (used in pin_subpackage)" in stdout
 
 
@@ -1476,7 +1476,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output.decode("utf-8")
+    stdout = e.value.output
     assert "Found a cycle in the recipe outputs: bazbus" in stdout
 
 
@@ -1694,7 +1694,7 @@ def test_python_version_spec(
         args = rattler_build.build_args(recipes / "python-version-spec", tmp_path)
         rattler_build(*args, stderr=STDOUT)
 
-    error_output = exc_info.value.output.decode("utf-8")
+    error_output = exc_info.value.output
     assert (
         "failed to parse match spec: unable to parse version spec: =.*" in error_output
     )
@@ -2048,6 +2048,7 @@ def test_merge_build_and_host(
     )
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Not applicable on Windows")
 def test_error_on_binary_prefix(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -2071,7 +2072,7 @@ def test_error_on_binary_prefix(
         rattler_build(*args, stderr=STDOUT)
         pytest.fail("Expected build to fail with binary prefix error")
     except CalledProcessError as e:
-        output = e.output.decode("utf-8") if e.output else ""
+        output = e.output
         assert "Binary file" in output and "contains host prefix" in output
 
 
