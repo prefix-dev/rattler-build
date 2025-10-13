@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: error_with_source
+---
+  × invalid value: invalid value for build.number: invalid digit found in
+  │ string
+   ╭─[error.yaml:6:11]
+ 5 │ build:
+ 6 │   number: abc
+   ·           ─┬─
+   ·            ╰── invalid value for build.number: invalid digit found in string
+   ╰────

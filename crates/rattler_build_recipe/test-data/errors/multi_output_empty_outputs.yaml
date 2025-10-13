@@ -1,0 +1,8 @@
+# Error: Multi-output recipe with empty outputs list
+schema_version: 1
+
+recipe:
+  name: empty-outputs
+  version: 1.0.0
+
+outputs: []
