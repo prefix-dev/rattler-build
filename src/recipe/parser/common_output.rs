@@ -4,7 +4,7 @@ use crate::{
     _partialerror,
     recipe::{
         ParsingError,
-        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{HasSpan, RenderedNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
     },
     source_code::SourceCode,
@@ -185,18 +185,6 @@ pub fn merge_mapping_if_not_exists(
     }
 }
 
-/// Merge items from source mapping into target mapping if keys don't already exist (RenderedMappingNode version)
-pub fn merge_rendered_mapping_if_not_exists(
-    target: &mut RenderedMappingNode,
-    source: &RenderedMappingNode,
-) {
-    for (k, v) in source.iter() {
-        if !target.contains_key(k.as_str()) {
-            target.insert(k.clone(), v.clone());
-        }
-    }
-}
-
 /// Validate recipe mapping and extract version
 /// This helper validates that the recipe mapping only contains 'name' and 'version' fields
 fn validate_and_extract_version<'a, S, K, V, I, F, G>(
@@ -249,54 +237,4 @@ pub fn extract_recipe_version_marked<S: SourceCode>(
     };
 
     validate_and_extract_version(recipe_mapping.iter(), src, |k| k.as_str(), |k| *k.span())
-}
-
-/// Extract recipe version from the recipe mapping (RenderedNode version)
-pub fn extract_recipe_version_rendered<S: SourceCode>(
-    root_map: &RenderedMappingNode,
-    src: &S,
-) -> Result<Option<RenderedNode>, ParsingError<S>> {
-    let Some(recipe_node) = root_map.get("recipe") else {
-        return Ok(None);
-    };
-
-    let Some(recipe_mapping) = recipe_node.as_mapping() else {
-        return Ok(None);
-    };
-
-    validate_and_extract_version(recipe_mapping.iter(), src, |k| k.as_str(), |k| *k.span())
-}
-
-/// Validate that outputs is a sequence and return it (RenderedNode version)
-pub fn validate_outputs_sequence_rendered<'a, S: SourceCode>(
-    outputs: &'a RenderedNode,
-    src: &S,
-) -> Result<&'a crate::recipe::custom_yaml::RenderedSequenceNode, ParsingError<S>> {
-    outputs.as_sequence().ok_or_else(|| {
-        ParsingError::from_partial(
-            src.clone(),
-            _partialerror!(
-                *outputs.span(),
-                ErrorKind::ExpectedSequence,
-                help = "`outputs` must always be a sequence"
-            ),
-        )
-    })
-}
-
-/// Parse root node as mapping (RenderedNode version)
-pub fn parse_root_as_mapping_rendered<'a, S: SourceCode>(
-    root_node: &'a RenderedNode,
-    src: &S,
-) -> Result<&'a RenderedMappingNode, ParsingError<S>> {
-    root_node.as_mapping().ok_or_else(|| {
-        ParsingError::from_partial(
-            src.clone(),
-            _partialerror!(
-                *root_node.span(),
-                ErrorKind::ExpectedMapping,
-                help = "root node must always be a mapping"
-            ),
-        )
-    })
 }

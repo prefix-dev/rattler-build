@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::{Kwargs, Object, from_args};
-use minijinja::{Environment, Value};
+use minijinja::{AutoEscape, Environment, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::normalized_key::NormalizedKey;
@@ -57,7 +57,8 @@ pub struct Jinja {
 impl Jinja {
     /// Create a new Jinja instance with the given selector configuration.
     pub fn new(config: SelectorConfig) -> Self {
-        let env = set_jinja(&config);
+        let mut env = set_jinja(&config);
+        env.set_auto_escape_callback(|_| AutoEscape::None);
         let context = config.into_context();
         Self { env, context }
     }

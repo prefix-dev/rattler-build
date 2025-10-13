@@ -112,8 +112,38 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
+    // Handle cache outputs first
     let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
+        let output = output.build_or_fetch_cache(tool_configuration).await?;
+        
+        // Warn if output defines additional sources on top of cache
+        if !output.recipe.sources().is_empty() && output.finalized_cache_sources.is_some() {
+            tracing::warn!(
+                "Output defines sources in addition to cache sources. \
+                 This may overwrite files from the cache. \
+                 Consider using 'target_directory' in source definitions to avoid conflicts."
+            );
+        }
+        output
+    } else if !output.cache_outputs_to_build.is_empty() {
+        // Cache outputs from outputs array
+        let mut current_output = output;
+        let cache_outputs = current_output.cache_outputs_to_build.clone();
+        for cache_output in &cache_outputs {
+            current_output = current_output
+                .build_or_fetch_cache_output(cache_output, tool_configuration)
+                .await?;
+        }
+        
+        // Warn if output defines additional sources on top of cache
+        if !current_output.recipe.sources().is_empty() && current_output.finalized_cache_sources.is_some() {
+            tracing::warn!(
+                "Output defines sources in addition to cache sources. \
+                 This may overwrite files from the cache. \
+                 Consider using 'target_directory' in source definitions to avoid conflicts."
+            );
+        }
+        current_output
     } else {
         output
             .fetch_sources(tool_configuration)
@@ -126,22 +156,33 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-    output
-        .install_environments(tool_configuration)
-        .await
-        .into_diagnostic()?;
+    // Fast-path: If this output used a cache (inherit) and has no explicit build script,
+    // skip environment installation and script execution. We only distribute files based on build.files.
+    let use_fast_path = output.finalized_cache_dependencies.is_some()
+        && output.recipe.build().script().is_default();
 
-    match output.run_build_script().await {
-        Ok(_) => {}
-        Err(InterpreterError::Debug(info)) => {
-            tracing::info!("{}", info);
-            return Err(miette::miette!(
-                "Script not executed because debug mode is enabled"
-            ));
+    if !use_fast_path {
+        output
+            .install_environments(tool_configuration)
+            .await
+            .into_diagnostic()?;
+
+        match output.run_build_script().await {
+            Ok(_) => {}
+            Err(InterpreterError::Debug(info)) => {
+                tracing::info!("{}", info);
+                return Err(miette::miette!(
+                    "Script not executed because debug mode is enabled"
+                ));
+            }
+            Err(InterpreterError::ExecutionFailed(_)) => {
+                return Err(miette::miette!("Script failed to execute"));
+            }
         }
-        Err(InterpreterError::ExecutionFailed(_)) => {
-            return Err(miette::miette!("Script failed to execute"));
-        }
+    } else {
+        tracing::info!(
+            "Using fast-path: inherited cache detected and no build.script specified; skipping env setup and script execution."
+        );
     }
 
     // Package all the new files

@@ -82,6 +82,7 @@ pub struct Build {
     pub skip: Skip,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
+    /// When using multi-output recipes, the default script is not automatically inferred; you must set it explicitly.
     #[serde(default, skip_serializing_if = "Script::is_default")]
     pub script: Script,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
@@ -207,6 +208,48 @@ pub struct PostProcess {
 }
 
 impl Build {
+    /// Deep merge another Build into this one
+    /// Values in self take precedence over values in other
+    pub fn merge_from(&mut self, other: &Build) {
+        if self.python.is_default() && !other.python.is_default() {
+            self.python = other.python.clone();
+        }
+
+        if self.dynamic_linking.is_default() && !other.dynamic_linking.is_default() {
+            self.dynamic_linking = other.dynamic_linking.clone();
+        }
+
+        if self.prefix_detection.is_default() && !other.prefix_detection.is_default() {
+            self.prefix_detection = other.prefix_detection.clone();
+        }
+
+        if self.variant.is_default() && !other.variant.is_default() {
+            self.variant = other.variant.clone();
+        }
+
+        if self.post_process.is_empty() && !other.post_process.is_empty() {
+            self.post_process = other.post_process.clone();
+        }
+
+        if !self.merge_build_and_host_envs && other.merge_build_and_host_envs {
+            self.merge_build_and_host_envs = other.merge_build_and_host_envs;
+        }
+
+        if self.noarch.is_none() && !other.noarch.is_none() {
+            self.noarch = other.noarch;
+        }
+
+        if self.files.is_empty() && !other.files.is_empty() {
+            self.files = other.files.clone();
+        }
+        if self.always_include_files.is_empty() && !other.always_include_files.is_empty() {
+            self.always_include_files = other.always_include_files.clone();
+        }
+        if self.always_copy_files.is_empty() && !other.always_copy_files.is_empty() {
+            self.always_copy_files = other.always_copy_files.clone();
+        }
+    }
+
     /// Get the merge build host flag.
     pub const fn merge_build_and_host_envs(&self) -> bool {
         self.merge_build_and_host_envs

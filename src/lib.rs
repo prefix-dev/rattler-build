@@ -72,7 +72,7 @@ use rattler_conda_types::{
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
 use source_code::Source;
 use system_tools::SystemTools;
@@ -220,7 +220,45 @@ pub async fn get_build_output(
 
     // First find all outputs from the recipe
     let named_source = Source::from_path(recipe_path).into_diagnostic()?;
-    let outputs = find_outputs_from_src(named_source.clone())?;
+    let mut outputs = find_outputs_from_src(named_source.clone())?;
+    let has_cache_or_inheritance = outputs.iter().any(|output| {
+        if let Some(mapping) = output.as_mapping() {
+            mapping.contains_key("cache")
+                || (mapping.contains_key("package")
+                    && mapping
+                        .get("package")
+                        .and_then(|p| p.as_mapping())
+                        .and_then(|pm| pm.get("inherit"))
+                        .is_some())
+        } else {
+            false
+        }
+    });
+
+    let mut global_cache_outputs = Vec::new();
+    let mut inheritance_relationships = std::collections::HashMap::new();
+
+    if has_cache_or_inheritance {
+        let has_toplevel_cache = outputs.iter().any(|output| {
+            if let Ok(recipe) = Recipe::from_node(output, SelectorConfig::default()) {
+                recipe.cache.is_some()
+            } else {
+                false
+            }
+        });
+
+        let jinja = recipe::Jinja::new(selector_config.clone());
+        let (resolved_outputs, cache_outputs, relationships) =
+            recipe::parser::output::resolve_cache_inheritance_with_caches(
+                outputs,
+                has_toplevel_cache,
+                selector_config.experimental,
+                &jinja,
+            )?;
+        outputs = resolved_outputs;
+        global_cache_outputs = cache_outputs;
+        inheritance_relationships = relationships;
+    }
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -255,8 +293,13 @@ pub async fn get_build_output(
 
     let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
 
-    let outputs_and_variants =
-        variant_config.find_variants(&outputs, named_source, &selector_config)?;
+    let outputs_and_variants = variant_config.find_variants(
+        &outputs,
+        named_source,
+        &selector_config,
+        &global_cache_outputs,
+        &inheritance_relationships,
+    )?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
@@ -398,6 +441,13 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
+            restored_cache_prefix_files: None,
+            restored_cache_work_dir_files: None,
+            cache_outputs_to_build: recipe.get_cache_outputs_for_package(
+                recipe.package.name.as_normalized(),
+                &global_cache_outputs,
+                &inheritance_relationships,
+            ),
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(

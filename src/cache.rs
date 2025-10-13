@@ -59,9 +59,91 @@ pub struct Cache {
     /// The prefix that was used at build time (needs to be replaced when
     /// restoring the files)
     pub prefix: PathBuf,
+
+    /// The work_dir that was used at build time (used to rewrite restored files
+    /// if the absolute path changes between cache build and restore)
+    #[serde(default)]
+    pub work_dir: PathBuf,
+
+    /// The run exports declared by the cache at build time (rendered form is computed later)
+    #[serde(default)]
+    pub run_exports: crate::recipe::parser::RunExports,
+
+    /// Files (relative to prefix/work_dir) that contain the old prefix string and
+    /// should be rewritten when restoring to a different location.
+    #[serde(default)]
+    pub files_with_prefix: Vec<PathBuf>,
+
+    /// Files (relative to work_dir) that contain the old work_dir path and
+    /// should be rewritten when restoring to a different location.
+    #[serde(default)]
+    pub files_with_work_dir: Vec<PathBuf>,
+
+    /// Source files from the cache build (relative to work_dir)
+    /// Used to detect potential conflicts when outputs add additional sources
+    #[serde(default)]
+    pub source_files: Vec<PathBuf>,
 }
 
 impl Output {
+    /// Compute cache key for a specific cache output
+    pub fn cache_key_for(
+        &self,
+        cache_name: &str,
+        cache_reqs: &crate::recipe::parser::CacheRequirements,
+    ) -> Result<String, CacheKeyError> {
+        let mut requirement_names: HashSet<_> = cache_reqs
+            .build
+            .iter()
+            .chain(cache_reqs.host.iter())
+            .filter_map(|x| {
+                if let crate::recipe::parser::Dependency::Spec(spec) = x {
+                    if spec.version.is_none() && spec.build.is_none() {
+                        spec.name.as_ref().map(|n| n.as_normalized().to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Also include explicit variant.use keys from the cache build (if any)
+        if let Some(cache) = &self.recipe.cache {
+            for key in cache.build.variant.use_keys.iter() {
+                requirement_names.insert(key.clone());
+            }
+        }
+
+        let mut selected_variant = BTreeMap::new();
+        for key in &requirement_names {
+            if let Some(value) = self.variant().get(&key.as_str().into()) {
+                selected_variant.insert(key.as_str(), value.clone());
+            }
+        }
+
+        selected_variant.insert(
+            "host_platform",
+            self.host_platform().platform.to_string().into(),
+        );
+        selected_variant.insert(
+            "build_platform",
+            self.build_configuration
+                .build_platform
+                .platform
+                .to_string()
+                .into(),
+        );
+
+        // Include cache name for uniqueness. Do NOT include absolute paths to keep
+        // the cache key stable across different build roots.
+        let rebuild_key = (cache_name, cache_reqs, selected_variant);
+        let mut hasher = Sha256::new();
+        rebuild_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
     /// Compute a cache key that contains all the information that was used to
     /// build the cache, including the relevant variant information.
     pub fn cache_key(&self) -> Result<String, CacheKeyError> {
@@ -108,7 +190,9 @@ impl Output {
                     .into(),
             );
 
-            let cache_key = (cache, selected_variant, self.prefix());
+            // Do NOT include absolute paths to keep the cache key stable across
+            // different build roots.
+            let cache_key = (cache, selected_variant);
             // serialize to json and hash
             let mut hasher = Sha256::new();
             cache_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
@@ -126,6 +210,13 @@ impl Output {
     ) -> Result<Output, miette::Error> {
         let cache_prefix_dir = cache_dir.join("prefix");
         let copied_prefix = CopyDir::new(&cache_prefix_dir, self.prefix())
+            .overwrite(true)
+            .on_overwrite(|path| {
+                tracing::warn!(
+                    "File {} restored from cache will be overwritten during output build",
+                    path.display()
+                );
+            })
             .run()
             .into_diagnostic()?;
 
@@ -135,25 +226,338 @@ impl Output {
             &cache_dir_work,
             &self.build_configuration.directories.work_dir,
         )
+        .overwrite(true)
+        .on_overwrite(|path| {
+            tracing::warn!(
+                "File {} restored from cache will be overwritten during output build",
+                path.display()
+            );
+        })
         .run()
         .into_diagnostic()?;
 
-        let combined_files = copied_prefix.copied_paths().len() + copied_cache.copied_paths().len();
+        // Track cached files for conflict detection.
+        let cached_prefix_files = copied_prefix.copied_paths_owned();
+        let cached_work_files = copied_cache.copied_paths_owned();
+
+        // If the output also specifies additional sources, proactively warn when
+        // extraction would clobber files restored from cache work_dir.
+        if !self.recipe.source.is_empty() {
+            for rel in &cached_work_files {
+                let target = self.build_configuration.directories.work_dir.join(rel);
+                if target.exists() {
+                    tracing::warn!(
+                        "Source extraction may overwrite restored cache work file: {}",
+                        target.display()
+                    );
+                    self.record_warning(&format!(
+                        "Source extraction may overwrite restored cache work file: {}",
+                        target.display()
+                    ));
+                }
+            }
+        }
+        let combined_files = cached_prefix_files.len() + cached_work_files.len();
         tracing::info!(
             "Restored {} source and prefix files from cache",
             combined_files
         );
 
+        // If the cache was built under a different prefix, rewrite occurrences of
+        // the old prefix in restored text files.
+        if cache.prefix != *self.prefix() {
+            let old = cache.prefix.to_string_lossy().to_string();
+            let new = self.prefix().to_string_lossy().to_string();
+            for rel in cache.files_with_prefix.iter() {
+                for base in [self.prefix(), &self.build_configuration.directories.work_dir] {
+                    let path = base.join(rel);
+                    if !path.exists() {
+                        continue;
+                    }
+                    if let Ok(contents) = fs::read_to_string(&path) {
+                        if contents.contains(&old) {
+                            let replaced = contents.replace(&old, &new);
+                            if let Err(e) = fs::write(&path, replaced) {
+                                tracing::warn!(
+                                    "Failed to rewrite restored file {}: {}",
+                                    path.display(),
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If the cache was built under a different work_dir, rewrite occurrences
+        // of the old work_dir path in restored text files located under the new work_dir.
+        if !cache.work_dir.as_os_str().is_empty()
+            && cache.work_dir != self.build_configuration.directories.work_dir
+        {
+            let old = cache.work_dir.to_string_lossy().to_string();
+            let new = self
+                .build_configuration
+                .directories
+                .work_dir
+                .to_string_lossy()
+                .to_string();
+            for rel in cache.files_with_work_dir.iter() {
+                let path = self.build_configuration.directories.work_dir.join(rel);
+                if !path.exists() {
+                    continue;
+                }
+                if let Ok(contents) = fs::read_to_string(&path) {
+                    if contents.contains(&old) {
+                        let replaced = contents.replace(&old, &new);
+                        if let Err(e) = fs::write(&path, replaced) {
+                            tracing::warn!(
+                                "Failed to rewrite restored work_dir file {}: {}",
+                                path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
             finalized_cache_sources: Some(cache.finalized_sources.clone()),
+            // Also merge cache-declared run_exports into the recipe
+            recipe: {
+                let mut recipe = self.recipe.clone();
+                recipe.requirements.run_exports.extend_from(&cache.run_exports);
+                recipe
+            },
+            restored_cache_prefix_files: Some(cached_prefix_files),
+            restored_cache_work_dir_files: Some(cached_work_files.clone()),
             ..self.clone()
+        })
+    }
+
+    /// Build or fetch a specific cache output
+    pub async fn build_or_fetch_cache_output(
+        mut self,
+        cache_output: &crate::recipe::parser::CacheOutput,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<Self, miette::Error> {
+        let cache_name = &cache_output.name;
+        let cache_key = self
+            .cache_key_for(cache_name, &cache_output.requirements)
+            .into_diagnostic()?;
+
+        tracing::info!("Building cache: {} with key: {}", cache_name, cache_key);
+
+        let cache_dir = self
+            .build_configuration
+            .directories
+            .cache_dir
+            .join(format!("{}_{}", cache_name, cache_key));
+
+        // Check if cache exists
+        if cache_dir.exists() {
+            let cache_json = cache_dir.join("cache.json");
+            if let Ok(text) = fs::read_to_string(&cache_json) {
+                match serde_json::from_str::<Cache>(&text) {
+                    Ok(cache) => {
+                        tracing::info!("Restoring cache from {:?}", cache_dir);
+                        self = self
+                            .fetch_sources(tool_configuration)
+                            .await
+                            .into_diagnostic()?;
+                        return self.restore_cache(cache, cache_dir).await;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to parse cache.json at {}: {} - rebuilding",
+                            cache_json.display(),
+                            e
+                        );
+                        fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                    }
+                }
+            }
+        }
+
+        // Build the cache
+        let rendered_sources = fetch_sources(
+            &cache_output.source,
+            &self.build_configuration.directories,
+            &self.system_tools,
+            tool_configuration,
+        )
+        .await
+        .into_diagnostic()?;
+
+        let target_platform = self.build_configuration.target_platform;
+        let mut env_vars = env_vars::vars(&self, "BUILD");
+        env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+
+        let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
+            .await
+            .into_diagnostic()?;
+
+        // Convert CacheRequirements to Requirements
+        let requirements = crate::recipe::parser::Requirements {
+            build: cache_output.requirements.build.clone(),
+            host: cache_output.requirements.host.clone(),
+            run: Vec::new(),
+            run_constraints: Vec::new(),
+            run_exports: crate::recipe::parser::RunExports::default(),
+            ignore_run_exports: cache_output.ignore_run_exports.clone().unwrap_or_default(),
+        };
+
+        let finalized_dependencies =
+            resolve_dependencies(&requirements, &self, &channels, tool_configuration)
+                .await
+                .unwrap();
+
+        install_environments(&self, &finalized_dependencies, tool_configuration)
+            .await
+            .into_diagnostic()?;
+
+        let selector_config = self.build_configuration.selector_config();
+        let mut jinja = Jinja::new(selector_config);
+        for (k, v) in self.recipe.context.iter() {
+            jinja.context_mut().insert(k.clone(), v.clone().into());
+        }
+
+        let build_prefix = if cache_output.build.script.is_some() {
+            Some(&self.build_configuration.directories.build_prefix)
+        } else {
+            None
+        };
+
+        if let Some(script) = &cache_output.build.script {
+            script
+                .run_script(
+                    env_vars,
+                    &self.build_configuration.directories.work_dir,
+                    &self.build_configuration.directories.recipe_dir,
+                    &self.build_configuration.directories.host_prefix,
+                    build_prefix,
+                    Some(jinja),
+                    None,
+                    self.build_configuration.debug,
+                )
+                .await
+                .into_diagnostic()?;
+        }
+
+        // Collect new files and save cache
+        let new_files = Files::from_prefix(
+            self.prefix(),
+            cache_output.build.always_include_files(),
+            cache_output.build.files(),
+        )
+        .into_diagnostic()?;
+
+        fs::create_dir_all(&cache_dir).into_diagnostic()?;
+        let prefix_cache_dir = cache_dir.join("prefix");
+        fs::create_dir_all(&prefix_cache_dir).into_diagnostic()?;
+
+        let mut copied_files = Vec::new();
+        let copy_options = CopyOptions::default();
+        let mut creation_cache = HashSet::new();
+
+        // Track files that contain the old prefix for later path rewriting
+        let mut files_with_prefix: Vec<PathBuf> = Vec::new();
+        let old_prefix_str = self.prefix().to_string_lossy().to_string();
+
+        for file in &new_files.new_files {
+            if file.is_dir() && !file.is_symlink() {
+                continue;
+            }
+            let stripped = file.strip_prefix(self.prefix()).unwrap();
+            let dest = prefix_cache_dir.join(stripped);
+            copy_file(file, &dest, &mut creation_cache, &copy_options).into_diagnostic()?;
+            copied_files.push(stripped.to_path_buf());
+            if let Ok(contents) = fs::read_to_string(file) {
+                if contents.contains(&old_prefix_str) {
+                    files_with_prefix.push(stripped.to_path_buf());
+                }
+            }
+        }
+
+        let work_dir_files = CopyDir::new(
+            &self.build_configuration.directories.work_dir,
+            &cache_dir.join("work_dir"),
+        )
+        .run()
+        .into_diagnostic()?;
+
+        let cache = Cache {
+            requirements: requirements.clone(),
+            finalized_dependencies: finalized_dependencies.clone(),
+            finalized_sources: rendered_sources.clone(),
+            prefix_files: copied_files,
+            work_dir_files: work_dir_files.copied_paths().to_vec(),
+            prefix: self.prefix().to_path_buf(),
+            work_dir: self.build_configuration.directories.work_dir.clone(),
+            run_exports: cache_output.run_exports.clone(),
+            files_with_prefix,
+            files_with_work_dir: {
+                let mut files = Vec::new();
+                let old_work_dir_str = self
+                    .build_configuration
+                    .directories
+                    .work_dir
+                    .to_string_lossy()
+                    .to_string();
+                for rel in work_dir_files.copied_paths() {
+                    let abs = self.build_configuration.directories.work_dir.join(rel);
+                    if abs.is_dir() {
+                        continue;
+                    }
+                    if let Ok(contents) = fs::read_to_string(&abs) {
+                        if contents.contains(&old_work_dir_str) {
+                            files.push(rel.to_path_buf());
+                        }
+                    }
+                }
+                files
+            },
+            source_files: work_dir_files.copied_paths().to_vec(),
+        };
+
+        fs::write(
+            cache_dir.join("cache.json"),
+            serde_json::to_string(&cache).unwrap(),
+        )
+        .into_diagnostic()?;
+
+        fs::remove_dir_all(self.prefix()).into_diagnostic()?;
+        CopyDir::new(&prefix_cache_dir, self.prefix())
+            .run()
+            .into_diagnostic()?;
+
+        Ok(Output {
+            finalized_cache_dependencies: Some(finalized_dependencies),
+            finalized_cache_sources: Some(rendered_sources),
+            ..self
         })
     }
 
     /// This will fetch sources and build the cache if it doesn't exist
     /// Note: this modifies the output in place
     pub(crate) async fn build_or_fetch_cache(
+        self,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<Self, miette::Error> {
+        if let Some(synthetic_cache) = self.recipe.synthetic_cache_output() {
+            // Convert to synthetic cache output
+            self.build_or_fetch_cache_output(&synthetic_cache, tool_configuration)
+                .await
+        } else {
+            Ok(self)
+        }
+    }
+
+    /// Didn't remove this one completely just in case.
+    #[allow(dead_code)]
+    async fn build_or_fetch_cache_legacy(
         mut self,
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<Self, miette::Error> {
@@ -301,6 +705,11 @@ impl Output {
                 prefix_files: copied_files,
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),
+                work_dir: self.build_configuration.directories.work_dir.clone(),
+                run_exports: crate::recipe::parser::RunExports::default(),
+                files_with_prefix: Vec::new(),
+                files_with_work_dir: Vec::new(),
+                source_files: work_dir_files.copied_paths().to_vec(),
             };
 
             let cache_file = cache_dir.join("cache.json");

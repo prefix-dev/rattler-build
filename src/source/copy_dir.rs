@@ -23,6 +23,8 @@ pub struct CopyOptions {
     pub skip_exist: bool,
     /// Buffer size for copying files (default: 8 MiB)
     pub buffer_size: usize,
+    /// Optional callback invoked when a destination file is about to be overwritten
+    pub on_overwrite: Option<Box<dyn Fn(&Path) + Send + Sync + 'static>>,
 }
 
 impl Default for CopyOptions {
@@ -31,6 +33,7 @@ impl Default for CopyOptions {
             overwrite: false,
             skip_exist: false,
             buffer_size: 8 * 1024 * 1024,
+            on_overwrite: None,
         }
     }
 }
@@ -113,7 +116,11 @@ pub(crate) fn copy_file(
                 } else if options.skip_exist {
                     tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
                 } else if options.overwrite {
-                    tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+                    if let Some(callback) = &options.on_overwrite {
+                        callback(dest_path);
+                    } else {
+                        tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+                    }
                 }
             }
             reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
@@ -199,6 +206,15 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn overwrite(mut self, b: bool) -> Self {
         self.copy_options.overwrite = b;
+        self
+    }
+
+    #[allow(unused)]
+    pub fn on_overwrite<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(&Path) + Send + Sync + 'static,
+    {
+        self.copy_options.on_overwrite = Some(Box::new(callback));
         self
     }
 
@@ -453,6 +469,10 @@ pub(crate) struct CopyDirResult {
 impl CopyDirResult {
     pub fn copied_paths(&self) -> &[PathBuf] {
         &self.copied_paths
+    }
+
+    pub fn copied_paths_owned(&self) -> Vec<PathBuf> {
+        self.copied_paths.clone()
     }
 
     pub fn include_globs(&self) -> &HashMap<String, Match> {

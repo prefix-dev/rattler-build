@@ -508,9 +508,18 @@ impl VariantConfig {
         outputs: &[Node],
         recipe: S,
         selector_config: &SelectorConfig,
+        cache_outputs: &[crate::recipe::parser::CacheOutput],
+        inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError<S>> {
         // find all jinja variables
-        let stage_0 = stage_0_render(outputs, recipe, selector_config, self)?;
+        let stage_0 = stage_0_render(
+            outputs,
+            recipe,
+            selector_config,
+            self,
+            cache_outputs,
+            inheritance_relationships,
+        )?;
         let stage_1 = stage_1_render(stage_0, selector_config, self)?;
 
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
@@ -771,7 +780,13 @@ mod tests {
         let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
-            .find_variants(&outputs, recipe_text.as_str(), &selector_config)
+            .find_variants(
+                &outputs,
+                recipe_text.as_str(),
+                &selector_config,
+                &[],
+                &std::collections::HashMap::new(),
+            )
             .unwrap();
 
         let used_variables_all: Vec<&BTreeMap<NormalizedKey, Variable>> = outputs_and_variants
@@ -852,7 +867,13 @@ mod tests {
                 crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
             let variant_config = VariantConfig::from_files(&[], &selector_config).unwrap();
             let outputs_and_variants = variant_config
-                .find_variants(&outputs, recipe_text.as_str(), &selector_config)
+                .find_variants(
+                    &outputs,
+                    recipe_text.as_str(),
+                    &selector_config,
+                    &[],
+                    &std::collections::HashMap::new(),
+                )
                 .unwrap();
 
             // assert output order
@@ -882,7 +903,13 @@ mod tests {
         let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
-            .find_variants(&outputs, recipe_text.as_str(), &selector_config)
+            .find_variants(
+                &outputs,
+                recipe_text.as_str(),
+                &selector_config,
+                &[],
+                &std::collections::HashMap::new(),
+            )
             .unwrap();
 
         let used_variables_all: Vec<&BTreeMap<NormalizedKey, Variable>> = outputs_and_variants

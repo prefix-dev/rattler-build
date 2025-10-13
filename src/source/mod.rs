@@ -137,6 +137,13 @@ pub async fn fetch_sources(
                     || {
                         copy_dir::CopyDir::new(&result.0, &dest_dir)
                             .use_gitignore(false)
+                            .overwrite(true)
+                            .on_overwrite(|p| {
+                                tracing::warn!(
+                                    "Source file {} overwrote an existing file in work dir (possible clobber)",
+                                    p.display()
+                                );
+                            })
                             .run()
                     },
                 )?;
@@ -182,6 +189,13 @@ pub async fn fetch_sources(
                         || {
                             copy_dir::CopyDir::new(&res, &dest_dir)
                                 .use_gitignore(false)
+                                .overwrite(true)
+                                .on_overwrite(|p| {
+                                    tracing::warn!(
+                                        "Source file {} overwrote an existing file in work dir (possible clobber)",
+                                        p.display()
+                                    );
+                                })
                                 .run()
                         },
                     )?;
@@ -230,6 +244,13 @@ pub async fn fetch_sources(
                             copy_dir::CopyDir::new(&src_path, &dest_dir)
                                 .use_gitignore(src.use_gitignore())
                                 .with_globvec(&src.filter)
+                                .overwrite(true)
+                                .on_overwrite(|p| {
+                                    tracing::warn!(
+                                        "Source file {} overwrote an existing file in work dir (possible clobber)",
+                                        p.display()
+                                    );
+                                })
                                 .run()
                         },
                     )?;

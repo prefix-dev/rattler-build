@@ -26,9 +26,8 @@ mod cache_output;
 mod common_output;
 mod glob_vec;
 mod helper;
-mod output;
+pub mod output;
 mod output_parser;
-mod output_v2;
 mod package;
 mod parsing_utils;
 mod regex;
@@ -47,12 +46,10 @@ pub use self::{
     glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
     output_parser::{Output, OutputType},
-    output_v2::{find_outputs_v2, resolve_inheritance},
     package::{OutputPackage, Package},
     parsing_utils::{
         StandardTryConvert, invalid_field_error, missing_field_error, parse_bool,
-        parse_required_string, validate_mapping_keys,
-        validate_multi_output_root_keys,
+        parse_required_string, validate_mapping_keys, validate_multi_output_root_keys,
     },
     regex::SerializableRegex,
     requirements::{
@@ -98,6 +95,12 @@ pub struct Recipe {
     /// Extra information as a map with string keys and any value
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub extra: IndexMap<String, serde_yaml::Value>,
+    /// Cache outputs discovered during inheritance resolution
+    #[serde(skip)]
+    pub cache_outputs: Vec<CacheOutput>,
+    /// Cache inheritance relationships (package name -> cache names)
+    #[serde(skip)]
+    pub cache_inheritance: std::collections::HashMap<String, Vec<String>>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -267,6 +270,8 @@ impl Recipe {
         let mut about = About::default();
         let mut cache = None;
         let mut extra = IndexMap::default();
+        let mut cache_outputs_result = Vec::new();
+        let mut cache_inheritance = std::collections::HashMap::new();
 
         rendered_node
             .iter()
@@ -330,7 +335,7 @@ impl Recipe {
             );
         }
 
-        let recipe = Recipe {
+        let mut recipe = Recipe {
             schema_version,
             context,
             package: package.ok_or_else(|| {
@@ -348,6 +353,8 @@ impl Recipe {
             tests,
             about,
             extra,
+            cache_outputs: cache_outputs_result,
+            cache_inheritance,
         };
 
         Ok(recipe)
@@ -381,6 +388,59 @@ impl Recipe {
     /// Get the about information.
     pub const fn about(&self) -> &About {
         &self.about
+    }
+
+    /// Convert top-level cache to a synthetic CacheOutput
+    pub fn synthetic_cache_output(&self) -> Option<CacheOutput> {
+        self.cache.as_ref().map(|cache| CacheOutput {
+            name: format!("__recipe_{}_cache", self.package.name.as_normalized()),
+            source: cache.source.clone(),
+            build: CacheBuild {
+                script: Some(cache.build.script.clone()),
+                files: cache.build.files.clone(),
+                always_include_files: cache.build.always_include_files.clone(),
+            },
+            requirements: CacheRequirements {
+                build: cache.requirements.build.clone(),
+                host: cache.requirements.host.clone(),
+            },
+            run_exports: RunExports::default(),
+            ignore_run_exports: Some(cache.requirements.ignore_run_exports.clone()),
+            about: None,
+        })
+    }
+
+    /// Check if recipe uses legacy top-level cache format
+    pub fn has_toplevel_cache(&self) -> bool {
+        self.cache.is_some()
+    }
+
+    /// Extract cache outputs from resolved inheritance
+    /// This method looks at the resolved outputs and extracts cache outputs that this package depends on
+    pub fn extract_cache_outputs_from_inheritance(&self) -> Vec<CacheOutput> {
+        self.cache_outputs.clone()
+    }
+
+    /// Get cache outputs that this package depends on based on inheritance
+    /// This is called during Output creation to populate cache_outputs_to_build
+    pub fn get_cache_outputs_for_package(
+        &self,
+        package_name: &str,
+        all_cache_outputs: &[CacheOutput],
+        inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Vec<CacheOutput> {
+        if let Some(cache_names) = inheritance_relationships.get(package_name) {
+            let mut result = Vec::new();
+            for cache_name in cache_names {
+                if let Some(cache_output) = all_cache_outputs.iter().find(|c| &c.name == cache_name)
+                {
+                    result.push(cache_output.clone());
+                }
+            }
+            result
+        } else {
+            Vec::new()
+        }
     }
 }
 

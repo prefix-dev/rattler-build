@@ -689,13 +689,27 @@ pub(crate) async fn resolve_dependencies(
 
     let mut compatibility_specs = HashMap::new();
 
-    let build_env = if !requirements.build.is_empty() && !merge_build_host {
-        let build_env_specs = apply_variant(
+    // Build env: include both output build requirements and cache build requirements
+    // If merge_build_host is enabled, we still compute a separate build env to propagate run_exports correctly.
+    let build_env = {
+        let mut build_env_specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
             true,
         )?;
+
+        // Merge in Cache build specs if available
+        if let Some(cache) = &output.finalized_cache_dependencies {
+            if let Some(cache_build) = &cache.build {
+                build_env_specs.extend(cache_build.specs.iter().cloned());
+            }
+        }
+
+        if build_env_specs.is_empty() || merge_build_host {
+            // If there are no specs (and we are not merging separately), skip creating a separate build env
+            // unless merge_build_host is false and we really have specs to solve.
+        }
 
         let match_specs = build_env_specs
             .iter()
@@ -739,12 +753,7 @@ pub(crate) async fn resolve_dependencies(
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
         });
 
-        Some(ResolvedDependencies {
-            specs: build_env_specs,
-            resolved,
-        })
-    } else {
-        None
+        Some(ResolvedDependencies { specs: build_env_specs, resolved })
     };
 
     // host env
@@ -754,6 +763,13 @@ pub(crate) async fn resolve_dependencies(
         &compatibility_specs,
         true,
     )?;
+
+    // Merge in Cache host specs
+    if let Some(cache) = &output.finalized_cache_dependencies {
+        if let Some(cache_host) = &cache.host {
+            host_env_specs.extend(cache_host.specs.iter().cloned());
+        }
+    }
 
     // Apply the strong run exports from the build environment to the host
     // environment
@@ -857,31 +873,6 @@ pub(crate) async fn resolve_dependencies(
         false,
     )?;
 
-    // add in dependencies from the finalized cache
-    if let Some(finalized_cache) = &output.finalized_cache_dependencies {
-        tracing::info!(
-            "Adding dependencies from finalized cache: {:?}",
-            finalized_cache.run.depends
-        );
-
-        depends = depends
-            .iter()
-            .chain(finalized_cache.run.depends.iter())
-            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
-            .cloned()
-            .collect();
-
-        tracing::info!(
-            "Adding constraints from finalized cache: {:?}",
-            finalized_cache.run.constraints
-        );
-        constraints = constraints
-            .iter()
-            .chain(finalized_cache.run.constraints.iter())
-            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
-            .cloned()
-            .collect();
-    }
 
     let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
 

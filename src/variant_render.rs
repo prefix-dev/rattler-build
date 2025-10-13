@@ -55,6 +55,8 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     source: S,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
+    cache_outputs: &[crate::recipe::parser::CacheOutput],
+    inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
     let used_vars = outputs
         .iter()
@@ -98,7 +100,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
             let config_with_variant =
                 selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
-            let parsed_recipe = Recipe::from_node(output, config_with_variant)
+            let mut parsed_recipe = Recipe::from_node(output, config_with_variant)
                 .map_err(|err| {
                     let errs: ParseErrors<_> = err
                         .into_iter()
@@ -108,6 +110,22 @@ pub(crate) fn stage_0_render<S: SourceCode>(
                     errs
                 })
                 .map_err(VariantConfigError::from)?;
+
+            let package_name = parsed_recipe.package.name.as_normalized().to_string();
+            if let Some(caches) = inheritance_relationships.get(&package_name) {
+                let mut cache_list = Vec::new();
+                for cache_name in caches {
+                    if let Some(cache_output) = cache_outputs.iter().find(|c| &c.name == cache_name)
+                    {
+                        cache_list.push(cache_output.clone());
+                    }
+                }
+                parsed_recipe.cache_outputs = cache_list;
+            }
+
+            if let Some(synthetic) = parsed_recipe.synthetic_cache_output() {
+                parsed_recipe.cache_outputs.push(synthetic);
+            }
 
             rendered_outputs.push(parsed_recipe);
         }
@@ -316,7 +334,6 @@ pub(crate) fn stage_1_render<S: SourceCode>(
 ) -> Result<Vec<Stage1Render<S>>, VariantError<S>> {
     let mut stage_1_renders = Vec::new();
 
-    // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
         let mut exact_pins_per_output: Vec<HashSet<PackageName>> = Vec::new();
@@ -334,6 +351,18 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                         }
                     }
                 }
+            }
+
+            // Add variant keys from cache build if present (for top-level cache)
+            if let Some(cache) = &output.cache {
+                let cache_use_keys = cache
+                    .build
+                    .variant()
+                    .use_keys
+                    .iter()
+                    .map(|k| k.as_str().into())
+                    .collect::<Vec<NormalizedKey>>();
+                additional_variables.extend(cache_use_keys);
             }
 
             // We want to add something to packages that are requiring a subpackage

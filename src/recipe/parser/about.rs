@@ -61,6 +61,32 @@ impl About {
     pub fn is_default(&self) -> bool {
         self == &Self::default()
     }
+
+    /// Deep merge another About into this one
+    /// Values in self take precedence over values in other
+    pub fn merge_from(&mut self, other: &About) {
+        macro_rules! merge_field {
+            ($field:ident) => {
+                if self.$field.is_none() && other.$field.is_some() {
+                    self.$field = other.$field.clone();
+                }
+            };
+        }
+
+        merge_field!(homepage);
+        merge_field!(repository);
+        merge_field!(documentation);
+        merge_field!(license);
+        merge_field!(license_family);
+        merge_field!(license_url);
+        merge_field!(summary);
+        merge_field!(description);
+        merge_field!(prelink_message);
+
+        if self.license_file.is_empty() && !other.license_file.is_empty() {
+            self.license_file = other.license_file.clone();
+        }
+    }
 }
 
 impl TryConvertNode<About> for RenderedNode {

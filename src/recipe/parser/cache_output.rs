@@ -17,6 +17,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 use super::{Script, Source};
+use super::requirements::RunExports;
+use super::glob_vec::GlobVec;
 
 /// A cache output that produces intermediate build artifacts
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,9 +32,18 @@ pub struct CacheOutput {
     pub build: CacheBuild,
     /// Requirements for building the cache (only build and host allowed)
     pub requirements: CacheRequirements,
+    /// Run exports declared by the cache; can be inherited by packages
+    #[serde(default, skip_serializing_if = "RunExports::is_empty")]
+    pub run_exports: RunExports,
     /// Run exports to ignore
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ignore_run_exports: Option<super::requirements::IgnoreRunExports>,
+    /// About information that can be inherited by packages
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<super::About>,
+    /// Span of the output mapping (for diagnostics)
+    #[serde(skip)]
+    pub span: marked_yaml::Span,
 }
 
 /// Build configuration specific to cache outputs
@@ -41,6 +52,24 @@ pub struct CacheBuild {
     /// The build script - only script key is allowed for cache outputs
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script: Option<Script>,
+    /// Include files in the cache (glob patterns to select files)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub files: GlobVec,
+    /// Files that are always included in the cache
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub always_include_files: GlobVec,
+}
+
+impl CacheBuild {
+    /// Get the files settings for this cache build
+    pub fn files(&self) -> &GlobVec {
+        &self.files
+    }
+
+    /// Get the always_include_files settings for this cache build
+    pub fn always_include_files(&self) -> &GlobVec {
+        &self.always_include_files
+    }
 }
 
 /// Requirements specific to cache outputs (no run or run_constraints allowed)
@@ -66,7 +95,11 @@ impl StandardTryConvert for CacheOutput {
         let mut source = Vec::new();
         let mut build = CacheBuild::default();
         let mut requirements = CacheRequirements::default();
+        let mut run_exports = RunExports::default();
         let mut ignore_run_exports = None;
+        let mut about = None;
+
+        let span = *mapping.span();
 
         for (key, value) in mapping.iter() {
             match key.as_str() {
@@ -93,15 +126,30 @@ impl StandardTryConvert for CacheOutput {
                 "requirements" => {
                     requirements = parse_cache_requirements(value)?;
                 }
+                "run_exports" => {
+                    run_exports = value.try_convert("cache.run_exports")?;
+                }
                 "ignore_run_exports" => {
                     ignore_run_exports = Some(value.try_convert("cache.ignore_run_exports")?);
+                }
+                "about" => {
+                    about = Some(value.try_convert("cache.about")?);
+                }
+                "inherit" => {
+                    return Err(vec![invalid_field_error(
+                        *key.span(),
+                        key.as_str(),
+                        Some(
+                            "cache outputs cannot use 'inherit' - caches must be built from scratch and cannot inherit from packages or other caches",
+                        ),
+                    )]);
                 }
                 _ => {
                     return Err(vec![invalid_field_error(
                         *key.span(),
                         key.as_str(),
                         Some(
-                            "valid fields for cache outputs are: 'cache', 'source', 'build', 'requirements', and 'ignore_run_exports'",
+                            "valid fields for cache outputs are: 'cache', 'source', 'build', 'requirements', 'run_exports', 'ignore_run_exports', and 'about'",
                         ),
                     )]);
                 }
@@ -116,17 +164,28 @@ impl StandardTryConvert for CacheOutput {
             )]
         })?;
 
+        if build.script.is_none() {
+            return Err(vec![missing_field_error(
+                *mapping.span(),
+                "build.script",
+                "cache outputs (cache outputs require an explicit build script)",
+            )]);
+        }
+
         Ok(CacheOutput {
             name,
             source,
             build,
             requirements,
+            run_exports,
             ignore_run_exports,
+            about,
+            span,
         })
     }
 }
 
-/// Parse cache build section, ensuring only 'script' is allowed
+/// Parse cache build section, ensuring only allowed keys are present
 fn parse_cache_build(value: &RenderedNode) -> Result<CacheBuild, Vec<PartialParsingError>> {
     let build_node = value
         .as_mapping()
@@ -137,12 +196,21 @@ fn parse_cache_build(value: &RenderedNode) -> Result<CacheBuild, Vec<PartialPars
     // Validate allowed keys
     validate_mapping_keys(
         build_node,
-        &["script"],
-        "cache build section (only 'script' is allowed)",
+        &["script", "files", "always_include_files"],
+        "cache build section (only 'script', 'files', and 'always_include_files' are allowed)",
     )?;
 
     if let Some(script_value) = build_node.get("script") {
         build.script = Some(script_value.try_convert("cache.build.script")?);
+    }
+
+    if let Some(files_value) = build_node.get("files") {
+        build.files = files_value.try_convert("cache.build.files")?;
+    }
+
+    if let Some(always_include_value) = build_node.get("always_include_files") {
+        build.always_include_files =
+            always_include_value.try_convert("cache.build.always_include_files")?;
     }
 
     Ok(build)
@@ -201,209 +269,5 @@ impl TryConvertNode<CacheOutput> for crate::recipe::custom_yaml::RenderedScalarN
             ErrorKind::ExpectedMapping,
             help = "cache outputs must be mappings, not scalars"
         )])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::recipe::parser::{OutputType, find_outputs_v2, resolve_inheritance};
-
-    #[test]
-    fn test_basic_cache_output() {
-        let yaml = r#"
-schema_version: 1
-
-outputs:
-  - cache:
-      name: foo-cache
-
-    source:
-      - url: https://foo.bar/source.tar.bz2
-        sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-
-    requirements:
-      build:
-        - gcc
-        - cmake
-        - ninja
-      host:
-        - libzlib
-        - libfoo
-
-    build:
-      script: build_cache.sh
-
-  - package:
-      name: foo-headers
-
-    inherit:
-      from: foo-cache
-      run_exports: false
-
-    build:
-      files:
-        - include/
-
-  - package:
-      name: foo
-
-    inherit: foo-cache
-"#;
-
-        let outputs = find_outputs_v2(yaml).expect("Failed to parse outputs");
-        assert_eq!(outputs.len(), 3);
-
-        match &outputs[0] {
-            OutputType::Cache(cache) => {
-                assert_eq!(cache.name, "foo-cache");
-                assert_eq!(cache.source.len(), 1);
-                assert_eq!(cache.requirements.build.len(), 3);
-                assert_eq!(cache.requirements.host.len(), 2);
-            }
-            _ => panic!("Expected cache output"),
-        }
-
-        match &outputs[1] {
-            OutputType::Package(pkg) => {
-                assert_eq!(pkg.package.name().as_normalized(), "foo-headers");
-                assert!(pkg.inherit.is_some());
-                let inherit = pkg.inherit.as_ref().unwrap();
-                assert_eq!(inherit.cache_name(), "foo-cache");
-                assert!(!inherit.inherit_run_exports());
-            }
-            _ => panic!("Expected package output"),
-        }
-
-        match &outputs[2] {
-            OutputType::Package(pkg) => {
-                assert_eq!(pkg.package.name().as_normalized(), "foo");
-                assert!(pkg.inherit.is_some());
-                let inherit = pkg.inherit.as_ref().unwrap();
-                assert_eq!(inherit.cache_name(), "foo-cache");
-                assert!(inherit.inherit_run_exports());
-            }
-            _ => panic!("Expected package output"),
-        }
-    }
-
-    #[test]
-    fn test_file_patterns() {
-        let yaml = r#"
-outputs:
-  - cache:
-      name: build-cache
-
-    build:
-      script: |
-        mkdir -p include lib bin
-        touch include/foo.h lib/libfoo.so bin/foo
-
-  - package:
-      name: headers
-
-    inherit: build-cache
-
-    build:
-      files:
-        - include/**/*.h
-
-  - package:
-      name: libs
-
-    inherit: build-cache
-
-    build:
-      files:
-        include:
-          - lib/**/*.so
-        exclude:
-          - lib/**/*.a
-"#;
-
-        let outputs = find_outputs_v2(yaml).expect("Failed to parse outputs");
-        assert_eq!(outputs.len(), 3);
-        match &outputs[1] {
-            OutputType::Package(pkg) => {
-                // Files are in build.files, not pkg.files
-                assert!(!pkg.build.files.is_empty());
-            }
-            _ => panic!("Expected package output"),
-        }
-    }
-
-    #[test]
-    fn test_cache_without_run_requirements() {
-        // This should succeed - cache outputs cannot have run requirements
-        let yaml = r#"
-outputs:
-  - cache:
-      name: test-cache
-
-    requirements:
-      build:
-        - cmake
-      host:
-        - libfoo
-"#;
-
-        let outputs = find_outputs_v2(yaml).expect("Failed to parse outputs");
-        assert_eq!(outputs.len(), 1);
-    }
-
-    #[test]
-    fn test_cache_with_run_requirements_fails() {
-        // This should fail - cache outputs cannot have run requirements
-        let yaml = r#"
-outputs:
-  - cache:
-      name: test-cache
-
-    requirements:
-      run:
-        - python
-"#;
-
-        let result = find_outputs_v2(yaml);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_inheritance_resolution() {
-        let yaml = r#"
-outputs:
-  - cache:
-      name: common-build
-
-    source:
-      - url: https://example.com/source.tar.gz
-        sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-
-    build:
-      script: build.sh
-
-  - package:
-      name: pkg1
-
-    inherit: common-build
-
-  - package:
-      name: pkg2
-
-    inherit:
-      from: common-build
-      run_exports: false
-"#;
-
-        let mut outputs = find_outputs_v2(yaml).expect("Failed to parse outputs");
-        resolve_inheritance(&mut outputs).expect("Failed to resolve inheritance");
-
-        for output in outputs.iter().skip(1).take(2) {
-            match output {
-                OutputType::Package(pkg) => {
-                    assert!(pkg.inherit.is_some());
-                }
-                _ => panic!("Expected package output"),
-            }
-        }
     }
 }

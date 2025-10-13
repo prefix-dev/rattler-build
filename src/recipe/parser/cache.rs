@@ -40,6 +40,16 @@ impl TryConvertNode<Cache> for RenderedMappingNode {
 
         validate_keys!(cache, self.iter(), source, build, requirements, outputs);
 
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "source" => cache.source = value.try_convert("cache.source")?,
+                "build" => cache.build = value.try_convert("cache.build")?,
+                "requirements" => cache.requirements = value.try_convert("cache.requirements")?,
+                "outputs" => cache.outputs = value.try_convert("cache.outputs")?,
+                _ => {}
+            }
+        }
+
         Ok(cache)
     }
 }

@@ -459,6 +459,17 @@ pub struct Output {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finalized_cache_sources: Option<Vec<Source>>,
 
+    /// Files restored from cache prefix
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored_cache_prefix_files: Option<Vec<std::path::PathBuf>>,
+    /// Files restored from cache work dir
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored_cache_work_dir_files: Option<Vec<std::path::PathBuf>>,
+
+    /// Cache outputs that need to be built before this package output
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub cache_outputs_to_build: Vec<crate::recipe::parser::CacheOutput>,
+
     /// Summary of the build
     #[serde(skip)]
     pub build_summary: Arc<Mutex<BuildSummary>>,
