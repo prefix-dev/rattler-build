@@ -3,6 +3,7 @@ source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
 expression: vars
 ---
 [
+    "CPU_COUNT",
     "compiler",
     "name",
     "pin_subpackage",

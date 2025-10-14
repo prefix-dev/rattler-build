@@ -58,6 +58,7 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
 ///   homepage: https://example.com
 ///   license: MIT
 ///   license_file: LICENSE
+///   license_family: MIT
 ///   summary: A short description
 ///   description: A longer description
 ///   documentation: https://docs.example.com

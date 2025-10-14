@@ -69,6 +69,20 @@ impl ParseError {
     pub fn jinja_error(error: String, span: Span) -> Self {
         Self::new(ErrorKind::JinjaError, span).with_message(format!("Jinja error: {}", error))
     }
+
+    /// Create an error for an IO operation
+    pub fn io_error(error: std::io::Error, path: std::path::PathBuf) -> Self {
+        Self::new(ErrorKind::ParseError, Span::unknown()).with_message(format!(
+            "IO error reading {}: {}",
+            path.display(),
+            error
+        ))
+    }
+
+    /// Create a generic parse error with a message
+    pub fn from_message(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::ParseError, Span::unknown()).with_message(message)
+    }
 }
 
 #[cfg(not(feature = "miette"))]

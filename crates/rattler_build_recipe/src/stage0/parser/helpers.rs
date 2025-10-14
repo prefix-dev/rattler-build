@@ -16,34 +16,34 @@ pub(crate) fn get_span(node: &MarkedNode) -> Span {
     }
 }
 
-/// Parse a ListOrItem<T> from YAML
+/// Parse a ListOrItem<Value<T>> from YAML
 ///
-/// Note: ListOrItem is a newtype wrapper around Vec<T>, so we parse
-/// a list of items or a single item and wrap it appropriately
+/// Note: ListOrItem is a newtype wrapper around Vec<Value<T>>, so we parse
+/// a list of Value items or a single Value item and wrap it appropriately
 pub(super) fn parse_list_or_item<T>(
     yaml: &MarkedNode,
-) -> ParseResult<crate::stage0::types::ListOrItem<T>>
+) -> ParseResult<crate::stage0::types::ListOrItem<crate::stage0::types::Value<T>>>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
     if let Some(sequence) = yaml.as_sequence() {
         let mut items = Vec::new();
         for item in sequence.iter() {
-            let parsed = parse_string_value(item)?;
+            let parsed = parse_value(item)?;
             items.push(parsed);
         }
         Ok(crate::stage0::types::ListOrItem::new(items))
     } else {
-        let item = parse_string_value(yaml)?;
+        let item = parse_value(yaml)?;
         Ok(crate::stage0::types::ListOrItem::single(item))
     }
 }
 
-/// Parse a simple string value (not an Item, just T)
-pub(super) fn parse_string_value<T>(yaml: &MarkedNode) -> ParseResult<T>
+/// Parse a Value<T> from YAML (handling both templates and concrete values)
+fn parse_value<T>(yaml: &MarkedNode) -> ParseResult<crate::stage0::types::Value<T>>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
     let scalar = yaml
@@ -51,10 +51,25 @@ where
         .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(yaml)))?;
 
     let spanned = SpannedString::from(scalar);
-    spanned
-        .as_str()
-        .parse::<T>()
-        .map_err(|e| ParseError::invalid_value("value", &e.to_string(), spanned.span()))
+    let s = spanned.as_str();
+
+    // Check if it's a template
+    if s.contains("${{") && s.contains("}}") {
+        let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
+            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+        Ok(crate::stage0::types::Value::new_template(
+            template,
+            spanned.span(),
+        ))
+    } else {
+        let value = s
+            .parse::<T>()
+            .map_err(|e| ParseError::invalid_value("value", &e.to_string(), spanned.span()))?;
+        Ok(crate::stage0::types::Value::new_concrete(
+            value,
+            spanned.span(),
+        ))
+    }
 }
 
 /// Helper for validating that all fields in a mapping are known

@@ -8,14 +8,14 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use rattler_conda_types::{PackageName, Version};
+use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, VersionWithSource};
 
 use crate::{
     ErrorKind, ParseError, Span,
     stage0::{
-        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, Package as Stage0Package,
-        Requirements as Stage0Requirements, Source as Stage0Source, Stage0Recipe,
-        TestType as Stage0TestType,
+        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
+        Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
+        Stage0Recipe, TestType as Stage0TestType,
         build::{
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
             ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
@@ -42,8 +42,8 @@ use crate::{
         types::{ConditionalList, Item, JinjaExpression, ScriptContent, Value},
     },
     stage1::{
-        About as Stage1About, AllOrGlobVec, Evaluate, EvaluationContext, Extra as Stage1Extra,
-        GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
+        About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
+        Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements,
         build::{
             Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
@@ -282,12 +282,14 @@ pub fn evaluate_string_list(
                 if condition_met {
                     // Evaluate the "then" items
                     for val in cond.then.iter() {
-                        results.push(val.clone());
+                        let s = evaluate_string_value(val, context)?;
+                        results.push(s);
                     }
                 } else {
                     // Evaluate the "else" items
                     for val in cond.else_value.iter() {
-                        results.push(val.clone());
+                        let s = evaluate_string_value(val, context)?;
+                        results.push(s);
                     }
                 }
             }
@@ -297,7 +299,87 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
-/// Evaluate a ConditionalList<MatchSpecWrapper> into Vec<Dependency>
+/// Evaluate a ConditionalList<EntryPoint> into Vec<EntryPoint>
+/// Entry points can be concrete values or templates that render to strings
+pub fn evaluate_entry_point_list(
+    list: &ConditionalList<rattler_conda_types::package::EntryPoint>,
+    context: &EvaluationContext,
+) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
+    let mut results = Vec::new();
+
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                match value {
+                    Value::Concrete { value: ep, .. } => {
+                        results.push(ep.clone());
+                    }
+                    Value::Template { template, span } => {
+                        // Render the template and parse as EntryPoint
+                        let s = render_template(template.source(), context, span)?;
+                        let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
+                            .map_err(|e| ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: *span,
+                                message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                                suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                            })?;
+                        results.push(ep);
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+
+                if condition_met {
+                    // Evaluate the "then" items
+                    for val in cond.then.iter() {
+                        match val {
+                            Value::Concrete { value: ep, .. } => {
+                                results.push(ep.clone());
+                            }
+                            Value::Template { template, span } => {
+                                let s = render_template(template.source(), context, span)?;
+                                let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
+                                    .map_err(|e| ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: *span,
+                                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                                    })?;
+                                results.push(ep);
+                            }
+                        }
+                    }
+                } else {
+                    // Evaluate the "else" items
+                    for val in cond.else_value.iter() {
+                        match val {
+                            Value::Concrete { value: ep, .. } => {
+                                results.push(ep.clone());
+                            }
+                            Value::Template { template, span } => {
+                                let s = render_template(template.source(), context, span)?;
+                                let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
+                                    .map_err(|e| ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: *span,
+                                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                                    })?;
+                                results.push(ep);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
 /// This handles dependencies which may be:
 /// - Concrete MatchSpecs (already validated at parse time)
@@ -309,12 +391,9 @@ pub fn evaluate_string_list(
 /// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
 /// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
 pub fn evaluate_dependency_list(
-    list: &crate::stage0::types::ConditionalList<crate::stage0::types::MatchSpecWrapper>,
+    list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
-    use crate::stage1::Dependency;
-    use rattler_conda_types::{MatchSpec, ParseStrictness};
-
     let mut results = Vec::new();
 
     // Iterate over the conditional list items directly to preserve span information
@@ -322,52 +401,11 @@ pub fn evaluate_dependency_list(
         match item {
             Item::Value(value) => {
                 match value {
-                    Value::Concrete { value: wrapper, .. } => {
-                        match wrapper {
-                            crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
-                                // Concrete MatchSpec - already validated at parse time!
-                                results.push(Dependency::Spec(spec.clone()));
-                            }
-                            crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
-                                // Deferred template string - need to render and parse now
-                                // This happens for strings like "cuda-toolkit ${{ cuda_version }}"
-                                // that were in conditional branches
-                                let s = template_str;
-
-                                // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                                if s.trim().starts_with('{') {
-                                    // Try to deserialize as Dependency (which handles pin types)
-                                    let dep: Dependency =
-                                        serde_yaml::from_str(s).map_err(|e| ParseError {
-                                            kind: ErrorKind::InvalidValue,
-                                            span: value.span(),
-                                            message: Some(format!(
-                                                "Failed to parse pin dependency: {}",
-                                                e
-                                            )),
-                                            suggestion: None,
-                                        })?;
-                                    results.push(dep);
-                                } else {
-                                    // It's a template string - render it first
-                                    let rendered = render_template(s, context, &value.span())?;
-
-                                    // Then parse as MatchSpec
-                                    let spec =
-                                        MatchSpec::from_str(&rendered, ParseStrictness::Strict)
-                                            .map_err(|e| ParseError {
-                                                kind: ErrorKind::InvalidValue,
-                                                span: value.span(),
-                                                message: Some(format!(
-                                                    "Invalid match spec '{}': {}",
-                                                    rendered, e
-                                                )),
-                                                suggestion: None,
-                                            })?;
-                                    results.push(Dependency::Spec(Box::new(spec)));
-                                }
-                            }
-                        }
+                    Value::Concrete {
+                        value: match_spec, ..
+                    } => {
+                        // Concrete MatchSpec - already validated at parse time!
+                        results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
                     }
                     Value::Template { template, span } => {
                         // Template - need to render and parse
@@ -409,48 +447,26 @@ pub fn evaluate_dependency_list(
                     &cond.else_value
                 };
 
-                // Process the selected branch
-                for wrapper in items_to_process.iter() {
-                    // In conditional branches, we have MatchSpecWrapper directly
-                    match wrapper {
-                        crate::stage0::types::MatchSpecWrapper::Parsed(spec) => {
-                            // Already validated - use as-is
-                            results.push(Dependency::Spec(spec.clone()));
+                for val in items_to_process.iter() {
+                    match val {
+                        Value::Concrete {
+                            value: match_spec, ..
+                        } => {
+                            results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
                         }
-                        crate::stage0::types::MatchSpecWrapper::Deferred(template_str) => {
-                            // Deferred template - need to render and parse
-                            let s = template_str;
-
-                            // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                            if s.trim().starts_with('{') {
-                                let dep: Dependency =
-                                    serde_yaml::from_str(s).map_err(|e| ParseError {
+                        Value::Template { template, span } => {
+                            // Render the template and parse as matchspec
+                            let s = render_template(template.source(), context, span)?;
+                            let spec =
+                                MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
+                                    ParseError {
                                         kind: ErrorKind::InvalidValue,
-                                        span: Span::unknown(),
-                                        message: Some(format!(
-                                            "Failed to parse pin dependency: {}",
-                                            e
-                                        )),
+                                        span: *span,
+                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
                                         suggestion: None,
-                                    })?;
-                                results.push(dep);
-                            } else {
-                                // Render the template
-                                let rendered = render_template(s, context, &Span::unknown())?;
-
-                                // Parse as MatchSpec
-                                let spec = MatchSpec::from_str(&rendered, ParseStrictness::Strict)
-                                    .map_err(|e| ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: Span::unknown(),
-                                        message: Some(format!(
-                                            "Invalid match spec '{}': {}",
-                                            rendered, e
-                                        )),
-                                        suggestion: None,
-                                    })?;
-                                results.push(Dependency::Spec(Box::new(spec)));
-                            }
+                                    }
+                                })?;
+                            results.push(Dependency::Spec(Box::new(spec)));
                         }
                     }
                 }
@@ -522,15 +538,49 @@ pub fn evaluate_script_list(
 
                 if condition_met {
                     // Evaluate the "then" items
-                    for script_content in cond.then.iter() {
-                        let s = evaluate_script_content(script_content, context)?;
-                        results.push(s);
+                    for val in cond.then.iter() {
+                        match val {
+                            Value::Concrete {
+                                value: script_content,
+                                ..
+                            } => {
+                                let s = evaluate_script_content(script_content, context)?;
+                                results.push(s);
+                            }
+                            Value::Template { .. } => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: Span::unknown(),
+                                    message: Some(
+                                        "Script content cannot be a template".to_string(),
+                                    ),
+                                    suggestion: None,
+                                });
+                            }
+                        }
                     }
                 } else {
                     // Evaluate the "else" items
-                    for script_content in cond.else_value.iter() {
-                        let s = evaluate_script_content(script_content, context)?;
-                        results.push(s);
+                    for val in cond.else_value.iter() {
+                        match val {
+                            Value::Concrete {
+                                value: script_content,
+                                ..
+                            } => {
+                                let s = evaluate_script_content(script_content, context)?;
+                                results.push(s);
+                            }
+                            Value::Template { .. } => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: Span::unknown(),
+                                    message: Some(
+                                        "Script content cannot be a template".to_string(),
+                                    ),
+                                    suggestion: None,
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -659,7 +709,7 @@ impl Evaluate for Stage0Package {
             suggestion: None,
         })?;
 
-        let version = Version::from_str(&version_str).map_err(|e| ParseError {
+        let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
             span: Span::unknown(),
             message: Some(format!(
@@ -705,10 +755,10 @@ impl Evaluate for Stage0About {
         let license = match &self.license {
             None => None,
             Some(v) => match v {
-                Value::Concrete { value: license, .. } => Some(license.0.clone()),
+                Value::Concrete { value: license, .. } => Some(license.clone()),
                 Value::Template { template, span } => {
                     let s = render_template(template.source(), context, span)?;
-                    Some(s.parse::<spdx::Expression>().map_err(|e| ParseError {
+                    Some(s.parse::<License>().map_err(|e| ParseError {
                         kind: ErrorKind::InvalidValue,
                         span: *span,
                         message: Some(format!("Invalid SPDX license expression: {}", e)),
@@ -724,6 +774,7 @@ impl Evaluate for Stage0About {
             documentation,
             license,
             license_file: evaluate_string_list(&self.license_file, context)?,
+            license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
         })
@@ -776,7 +827,7 @@ impl Evaluate for Stage0PythonBuild {
             GlobVec::from_strings(evaluate_string_list(&self.skip_pyc_compilation, context)?)?;
 
         Ok(Stage1PythonBuild {
-            entry_points: evaluate_string_list(&self.entry_points, context)?,
+            entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
             skip_pyc_compilation,
             use_python_app_entrypoint: self.use_python_app_entrypoint,
             version_independent: self.version_independent,
@@ -870,9 +921,17 @@ impl Evaluate for Stage0PostProcess {
     type Output = Stage1PostProcess;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let regex_str = evaluate_string_value(&self.regex, context)?;
+        let regex = regex::Regex::new(&regex_str).map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: Span::unknown(),
+            message: Some(format!("Invalid regular expression: {}", e)),
+            suggestion: Some("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.".to_string()),
+        })?;
+
         Ok(Stage1PostProcess {
             files: GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?,
-            regex: evaluate_string_value(&self.regex, context)?,
+            regex,
             replacement: evaluate_string_value(&self.replacement, context)?,
         })
     }
@@ -1486,23 +1545,33 @@ impl Evaluate for Stage0Recipe {
     type Output = Stage1Recipe;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let package = self.package.evaluate(context)?;
-        let build = self.build.evaluate(context)?;
-        let about = self.about.evaluate(context)?;
-        let requirements = self.requirements.evaluate(context)?;
-        let extra = self.extra.evaluate(context)?;
+        // First, evaluate the context variables and merge them into a new context
+        let context_with_vars = if !self.context.is_empty() {
+            context.with_context(&self.context)?
+        } else {
+            context.clone()
+        };
+
+        let package = self.package.evaluate(&context_with_vars)?;
+        let build = self.build.evaluate(&context_with_vars)?;
+        let about = self.about.evaluate(&context_with_vars)?;
+        let requirements = self.requirements.evaluate(&context_with_vars)?;
+        let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list
         let mut source = Vec::new();
         for src in &self.source {
-            source.push(src.evaluate(context)?);
+            source.push(src.evaluate(&context_with_vars)?);
         }
 
         // Evaluate tests list
         let mut tests = Vec::new();
         for test in &self.tests {
-            tests.push(test.evaluate(context)?);
+            tests.push(test.evaluate(&context_with_vars)?);
         }
+
+        // Extract the resolved context variables (all variables from the evaluation context)
+        let resolved_context = context_with_vars.variables().clone();
 
         Ok(Stage1Recipe::new(
             package,
@@ -1512,6 +1581,7 @@ impl Evaluate for Stage0Recipe {
             extra,
             source,
             tests,
+            resolved_context,
         ))
     }
 }
@@ -1600,8 +1670,14 @@ mod tests {
             Item::Value(Value::new_concrete("python".to_string(), Span::unknown())),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
-                then: ListOrItem::new(vec!["gcc".to_string()]),
-                else_value: ListOrItem::new(vec!["msvc".to_string()]),
+                then: ListOrItem::new(vec![Value::new_concrete(
+                    "gcc".to_string(),
+                    Span::unknown(),
+                )]),
+                else_value: ListOrItem::new(vec![Value::new_concrete(
+                    "msvc".to_string(),
+                    Span::unknown(),
+                )]),
             }),
         ]);
 
@@ -1649,8 +1725,14 @@ mod tests {
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
-            then: ListOrItem::new(vec!["gcc".to_string()]),
-            else_value: ListOrItem::new(vec!["msvc".to_string()]),
+            then: ListOrItem::new(vec![Value::new_concrete(
+                "gcc".to_string(),
+                Span::unknown(),
+            )]),
+            else_value: ListOrItem::new(vec![Value::new_concrete(
+                "msvc".to_string(),
+                Span::unknown(),
+            )]),
         })]);
 
         // Evaluate the list - only unix branch is taken

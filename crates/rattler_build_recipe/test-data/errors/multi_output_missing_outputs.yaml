@@ -1,5 +1,6 @@
-# Error: Multi-output recipe with outputs key but missing version
+# Error: Multi-output recipe missing the outputs field
 schema_version: 1
 
 recipe:
-  name: missing-version
+  name: test-package
+  version: 1.0.0
