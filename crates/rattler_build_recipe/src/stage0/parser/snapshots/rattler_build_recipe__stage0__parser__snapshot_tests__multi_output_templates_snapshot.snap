@@ -64,20 +64,16 @@ outputs:
     - ${{ compiler('c') }}
     - if: unix
       then: make
-      else: []
     - if: win
       then: nmake
-      else: []
     host:
     - python ${{ python_version }}
   build:
     script:
     - if: unix
       then: make -j${{ CPU_COUNT }}
-      else: []
     - if: win
       then: nmake
-      else: []
 - package:
     name: ${{ name }}
     version: ${{ version }}

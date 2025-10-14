@@ -108,9 +108,9 @@ where
 
     // Get optional "else" field
     let else_value = if let Some(else_yaml) = mapping.get("else") {
-        parse_list_or_item(else_yaml)?
+        Some(parse_list_or_item(else_yaml)?)
     } else {
-        crate::stage0::types::ListOrItem::new(Vec::new())
+        None
     };
 
     Ok(crate::stage0::types::Item::Conditional(

@@ -286,9 +286,11 @@ pub fn evaluate_string_list(
                     }
                 } else {
                     // Evaluate the "else" items
-                    for val in cond.else_value.iter() {
-                        let s = evaluate_string_value(val, context)?;
-                        results.push(s);
+                    if let Some(else_value) = &cond.else_value {
+                        for val in else_value.iter() {
+                            let s = evaluate_string_value(val, context)?;
+                            results.push(s);
+                        }
                     }
                 }
             }
@@ -306,69 +308,39 @@ pub fn evaluate_entry_point_list(
 ) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
     let mut results = Vec::new();
 
+    // Helper to evaluate a single Value<EntryPoint>
+    let evaluate_entry_point = |val: &Value<rattler_conda_types::package::EntryPoint>| -> Result<rattler_conda_types::package::EntryPoint, ParseError> {
+        match val {
+            Value::Concrete { value: ep, .. } => Ok(ep.clone()),
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span)?;
+                s.parse::<rattler_conda_types::package::EntryPoint>()
+                    .map_err(|e| ParseError {
+                        kind: ErrorKind::InvalidValue,
+                        span: *span,
+                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                    })
+            }
+        }
+    };
+
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                match value {
-                    Value::Concrete { value: ep, .. } => {
-                        results.push(ep.clone());
-                    }
-                    Value::Template { template, span } => {
-                        // Render the template and parse as EntryPoint
-                        let s = render_template(template.source(), context, span)?;
-                        let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
-                            .map_err(|e| ParseError {
-                                kind: ErrorKind::InvalidValue,
-                                span: *span,
-                                message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                                suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
-                            })?;
-                        results.push(ep);
-                    }
-                }
+                results.push(evaluate_entry_point(value)?);
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
-
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        match val {
-                            Value::Concrete { value: ep, .. } => {
-                                results.push(ep.clone());
-                            }
-                            Value::Template { template, span } => {
-                                let s = render_template(template.source(), context, span)?;
-                                let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
-                                    .map_err(|e| ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: *span,
-                                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
-                                    })?;
-                                results.push(ep);
-                            }
-                        }
-                    }
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
                 } else {
-                    // Evaluate the "else" items
-                    for val in cond.else_value.iter() {
-                        match val {
-                            Value::Concrete { value: ep, .. } => {
-                                results.push(ep.clone());
-                            }
-                            Value::Template { template, span } => {
-                                let s = render_template(template.source(), context, span)?;
-                                let ep = s.parse::<rattler_conda_types::package::EntryPoint>()
-                                    .map_err(|e| ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: *span,
-                                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
-                                    })?;
-                                results.push(ep);
-                            }
-                        }
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        results.push(evaluate_entry_point(val)?);
                     }
                 }
             }
@@ -441,31 +413,30 @@ pub fn evaluate_dependency_list(
                 let condition_met = evaluate_condition(&cond.condition, context)?;
 
                 let items_to_process = if condition_met {
-                    &cond.then
+                    Some(&cond.then)
                 } else {
-                    &cond.else_value
+                    cond.else_value.as_ref()
                 };
-
-                for val in items_to_process.iter() {
-                    match val {
-                        Value::Concrete {
-                            value: match_spec, ..
-                        } => {
-                            results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-                        }
-                        Value::Template { template, span } => {
-                            // Render the template and parse as matchspec
-                            let s = render_template(template.source(), context, span)?;
-                            let spec =
-                                MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
-                                    ParseError {
+                if let Some(items_to_process) = items_to_process {
+                    for val in items_to_process.iter() {
+                        match val {
+                            Value::Concrete {
+                                value: match_spec, ..
+                            } => {
+                                results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
+                            }
+                            Value::Template { template, span } => {
+                                // Render the template and parse as matchspec
+                                let s = render_template(template.source(), context, span)?;
+                                let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
+                                    .map_err(|e| ParseError {
                                         kind: ErrorKind::InvalidValue,
                                         span: *span,
                                         message: Some(format!("Invalid match spec '{}': {}", s, e)),
                                         suggestion: None,
-                                    }
-                                })?;
-                            results.push(Dependency::Spec(Box::new(spec)));
+                                    })?;
+                                results.push(Dependency::Spec(Box::new(spec)));
+                            }
                         }
                     }
                 }
@@ -560,24 +531,26 @@ pub fn evaluate_script_list(
                     }
                 } else {
                     // Evaluate the "else" items
-                    for val in cond.else_value.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: script_content,
-                                ..
-                            } => {
-                                let s = evaluate_script_content(script_content, context)?;
-                                results.push(s);
-                            }
-                            Value::Template { .. } => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
-                                    message: Some(
-                                        "Script content cannot be a template".to_string(),
-                                    ),
-                                    suggestion: None,
-                                });
+                    if let Some(else_value) = &cond.else_value {
+                        for val in else_value.iter() {
+                            match val {
+                                Value::Concrete {
+                                    value: script_content,
+                                    ..
+                                } => {
+                                    let s = evaluate_script_content(script_content, context)?;
+                                    results.push(s);
+                                }
+                                Value::Template { .. } => {
+                                    return Err(ParseError {
+                                        kind: ErrorKind::InvalidValue,
+                                        span: Span::unknown(),
+                                        message: Some(
+                                            "Script content cannot be a template".to_string(),
+                                        ),
+                                        suggestion: None,
+                                    });
+                                }
                             }
                         }
                     }
@@ -1725,10 +1698,10 @@ mod tests {
                     "gcc".to_string(),
                     Span::unknown(),
                 )]),
-                else_value: ListOrItem::new(vec![Value::new_concrete(
+                else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                     "msvc".to_string(),
                     Span::unknown(),
-                )]),
+                )])),
             }),
         ]);
 
@@ -1780,10 +1753,10 @@ mod tests {
                 "gcc".to_string(),
                 Span::unknown(),
             )]),
-            else_value: ListOrItem::new(vec![Value::new_concrete(
+            else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                 "msvc".to_string(),
                 Span::unknown(),
-            )]),
+            )])),
         })]);
 
         // Evaluate the list - only unix branch is taken

@@ -45,42 +45,34 @@ requirements:
   - ${{ compiler("cxx") }}
   - if: unix
     then: make
-    else: []
   - if: win
     then: cmake
-    else: []
   host:
   - python ${{ python }}
   - setuptools >=45
   - wheel
   - if: build_type == "cuda"
     then: cuda-toolkit ${{ cuda_version }}
-    else: []
   run:
   - python ${{ python }}
   - numpy >=1.19,<2.0a0
   - ${{ pin_compatible("numpy") }}
   - if: linux
     then: libgcc-ng >=9.3.0
-    else: []
   - if: osx
     then: libcxx >=10.0.0
-    else: []
   - if: build_type == "cuda"
     then: cuda-toolkit ${{ cuda_version }}
-    else: []
   run_constraints:
   - scipy >=1.5,<2.0a0
   - if: extra_deps
     then: pandas >=1.0
-    else: []
   run_exports:
     strong:
     - ${{ pin_subpackage(name, max_pin="x.x") }}
     weak:
     - if: has_cpp_lib
       then: libstdcxx-ng >=9.3.0
-      else: []
   ignore_run_exports:
     by_name:
     - qt

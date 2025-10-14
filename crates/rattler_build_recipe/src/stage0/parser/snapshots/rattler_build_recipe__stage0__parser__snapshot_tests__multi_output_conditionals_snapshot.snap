@@ -64,10 +64,8 @@ outputs:
     host:
     - if: linux
       then: glibc
-      else: []
     - if: osx
       then: libcxx
-      else: []
   build:
     script:
     - if: unix
@@ -83,13 +81,10 @@ outputs:
       then:
       - libgcc-ng
       - libstdcxx-ng
-      else: []
     - if: osx
       then: libcxx
-      else: []
     - if: win
       then: vs2019-runtime
-      else: []
   build:
     number: 0
     string: null
@@ -136,7 +131,5 @@ outputs:
   - script:
     - if: unix
       then: test -f $PREFIX/bin/conditional-pkg
-      else: []
     - if: win
       then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1
-      else: []
