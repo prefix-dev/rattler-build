@@ -244,8 +244,10 @@ mod tests {
         let reqs = parse_requirements(&yaml).unwrap();
 
         let vars = reqs.used_variables();
-        assert!(vars.contains(&"compiler".to_string()));
-        assert!(vars.contains(&"pin_subpackage".to_string()));
+        // compiler("c") expands to c_compiler and c_compiler_version
+        assert!(vars.contains(&"c_compiler".to_string()));
+        assert!(vars.contains(&"c_compiler_version".to_string()));
+        // pin_subpackage doesn't expand the function name, only extracts variables from arguments
     }
 
     #[test]

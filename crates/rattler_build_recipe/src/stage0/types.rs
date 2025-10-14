@@ -333,11 +333,9 @@ fn collect_variables_from_call(
 fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Option<String> {
     use minijinja::machinery::ast::{CallArg, Expr};
 
-    if let Some(CallArg::Pos(expr)) = args.first() {
-        if let Expr::Const(c) = expr {
-            if let Some(s) = c.value.as_str() {
-                return Some(s.to_string());
-            }
+    if let Some(CallArg::Pos(Expr::Const(c))) = args.first() {
+        if let Some(s) = c.value.as_str() {
+            return Some(s.to_string());
         }
     }
     None
@@ -1243,8 +1241,11 @@ mod tests {
         let list = ConditionalList::new(items);
         let mut vars = list.used_variables();
         vars.sort();
-        // "compiler" is a function call, so it should extract "compiler" as a variable
-        assert_eq!(vars, vec!["compiler", "linux", "python"]);
+        // compiler('c') expands to c_compiler and c_compiler_version
+        assert_eq!(
+            vars,
+            vec!["c_compiler", "c_compiler_version", "linux", "python"]
+        );
     }
 
     #[test]
