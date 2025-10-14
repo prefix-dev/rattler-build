@@ -4,6 +4,9 @@ expression: vars
 ---
 [
     "build_number",
-    "compiler",
+    "c_compiler",
+    "c_compiler_version",
+    "cxx_compiler",
+    "cxx_compiler_version",
     "version",
 ]

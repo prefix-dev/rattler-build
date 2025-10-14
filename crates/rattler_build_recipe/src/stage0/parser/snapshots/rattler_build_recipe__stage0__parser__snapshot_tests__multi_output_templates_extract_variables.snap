@@ -4,9 +4,9 @@ expression: vars
 ---
 [
     "CPU_COUNT",
-    "compiler",
+    "c_compiler",
+    "c_compiler_version",
     "name",
-    "pin_subpackage",
     "python_version",
     "staging_name",
     "unix",

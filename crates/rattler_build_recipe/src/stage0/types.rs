@@ -245,14 +245,102 @@ fn collect_variables_from_ast(
 }
 
 /// Collect variables from a Call expression
+/// Special handling for rattler-build Jinja functions that expand to variant variables
 fn collect_variables_from_call(
     call: &minijinja::machinery::ast::Call,
     variables: &mut BTreeSet<String>,
 ) {
-    collect_variables_from_expr(&call.expr, variables);
-    for arg in &call.args {
-        collect_variables_from_call_arg(arg, variables);
+    use minijinja::machinery::ast::Expr;
+
+    // Check if this is a special function call that we should expand
+    if let Expr::Var(var) = &call.expr {
+        let function_name = var.id.to_string();
+
+        match function_name.as_str() {
+            "compiler" => {
+                // compiler('c') expands to c_compiler and c_compiler_version
+                if let Some(lang) = extract_first_string_arg(&call.args) {
+                    variables.insert(format!("{}_compiler", lang));
+                    variables.insert(format!("{}_compiler_version", lang));
+                } else {
+                    // If we can't extract the argument, collect the arguments as variables
+                    for arg in &call.args {
+                        collect_variables_from_call_arg(arg, variables);
+                    }
+                }
+            }
+            "stdlib" => {
+                // stdlib('c') expands to c_stdlib and c_stdlib_version
+                if let Some(lang) = extract_first_string_arg(&call.args) {
+                    variables.insert(format!("{}_stdlib", lang));
+                    variables.insert(format!("{}_stdlib_version", lang));
+                } else {
+                    for arg in &call.args {
+                        collect_variables_from_call_arg(arg, variables);
+                    }
+                }
+            }
+            "pin_subpackage" => {
+                // pin_subpackage(name) expands to the name variable (unless it's a string literal)
+                // pin_subpackage("literal") doesn't expand
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        // Don't add string literals as variables
+                        if !matches!(expr, Expr::Const(_)) {
+                            collect_variables_from_expr(expr, variables);
+                        }
+                    }
+                }
+            }
+            "pin_compatible" => {
+                // pin_compatible(name) expands to the name variable (unless it's a string literal)
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        if !matches!(expr, Expr::Const(_)) {
+                            collect_variables_from_expr(expr, variables);
+                        }
+                    }
+                }
+            }
+            "match" => {
+                // match(var, spec) - first arg is a variable, second is a string
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        // Both arguments could be variables
+                        collect_variables_from_expr(expr, variables);
+                    }
+                }
+            }
+            _ => {
+                // For other functions, collect the function name and arguments normally
+                collect_variables_from_expr(&call.expr, variables);
+                for arg in &call.args {
+                    collect_variables_from_call_arg(arg, variables);
+                }
+            }
+        }
+    } else {
+        // Not a simple function call, collect normally
+        collect_variables_from_expr(&call.expr, variables);
+        for arg in &call.args {
+            collect_variables_from_call_arg(arg, variables);
+        }
     }
+}
+
+/// Extract the first string literal argument from a function call
+/// Returns None if the first argument is not a string literal
+fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Option<String> {
+    use minijinja::machinery::ast::{CallArg, Expr};
+
+    if let Some(CallArg::Pos(expr)) = args.first() {
+        if let Expr::Const(c) = expr {
+            if let Some(s) = c.value.as_str() {
+                return Some(s.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Collect variables from a CallArg
