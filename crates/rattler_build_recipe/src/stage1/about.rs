@@ -1,10 +1,12 @@
 //! Stage 1 About - evaluated package metadata with concrete values
 
-use spdx::Expression;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::stage0::License;
+
 /// Evaluated package metadata with all templates and conditionals resolved
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct About {
     /// Package homepage URL (validated)
     pub homepage: Option<Url>,
@@ -16,10 +18,13 @@ pub struct About {
     pub documentation: Option<Url>,
 
     /// License expression (validated SPDX)
-    pub license: Option<Expression>,
+    pub license: Option<License>,
 
     /// License file paths
     pub license_file: Vec<String>,
+
+    /// License family (e.g., MIT, BSD, etc.)
+    pub license_family: Option<String>,
 
     /// Package summary/description
     pub summary: Option<String>,
@@ -41,6 +46,7 @@ impl About {
             && self.documentation.is_none()
             && self.license.is_none()
             && self.license_file.is_empty()
+            && self.license_family.is_none()
             && self.summary.is_none()
             && self.description.is_none()
     }
@@ -49,6 +55,7 @@ impl About {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_about_creation() {
@@ -60,7 +67,7 @@ mod tests {
     fn test_about_with_fields() {
         let about = About {
             homepage: Some(Url::parse("https://example.com").unwrap()),
-            license: Some(Expression::parse("MIT").unwrap()),
+            license: Some(License::from_str("MIT").unwrap()),
             summary: Some("A test package".to_string()),
             ..Default::default()
         };
@@ -70,7 +77,10 @@ mod tests {
             about.homepage.as_ref().map(|u| u.as_str()),
             Some("https://example.com/")
         );
-        assert_eq!(about.license.as_ref().map(|l| l.as_ref()), Some("MIT"));
+        assert_eq!(
+            about.license.as_ref().map(|l| l.to_string()),
+            Some("MIT".to_string())
+        );
         assert_eq!(about.summary, Some("A test package".to_string()));
         assert_eq!(about.repository, None);
     }

@@ -1,0 +1,39 @@
+[package]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+description = "Variant configuration system for rattler-build"
+
+[features]
+default = ["parser"]
+parser = ["minijinja", "marked-yaml", "miette"]
+
+[dependencies]
+# Core serde
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Rattler crates
+rattler_conda_types = { workspace = true }
+
+# Template rendering and YAML parsing (optional with 'parser' feature)
+minijinja = { version = "2.11.0", features = [
+  "unstable_machinery",
+  "custom_syntax",
+], optional = true }
+marked-yaml = { version = "0.8.0", optional = true }
+
+# Error handling
+thiserror = "2.0.17"
+miette = { workspace = true, optional = true }
+
+# Utilities
+tracing = { workspace = true }
+fs-err.workspace = true
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml", "filters"] }

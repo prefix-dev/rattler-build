@@ -1,9 +1,12 @@
 //! Stage 1 Recipe - evaluated recipe with all templates and conditionals resolved
 
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+
 use super::{About, Build, Extra, Package, Requirements, Source, TestType};
 
 /// Evaluated recipe with all templates and conditionals resolved
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Recipe {
     /// Package information (required)
     pub package: Package,
@@ -25,10 +28,15 @@ pub struct Recipe {
 
     /// Tests (can be multiple tests)
     pub tests: Vec<TestType>,
+
+    /// Resolved context variables (the evaluated context after template rendering)
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub context: IndexMap<String, String>,
 }
 
 impl Recipe {
     /// Create a new Recipe
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         package: Package,
         build: Build,
@@ -37,6 +45,7 @@ impl Recipe {
         extra: Extra,
         source: Vec<Source>,
         tests: Vec<TestType>,
+        context: IndexMap<String, String>,
     ) -> Self {
         Self {
             package,
@@ -46,6 +55,7 @@ impl Recipe {
             extra,
             source,
             tests,
+            context,
         }
     }
 
@@ -83,18 +93,24 @@ impl Recipe {
     pub fn tests(&self) -> &[TestType] {
         &self.tests
     }
+
+    /// Get the resolved context variables
+    pub fn context(&self) -> &IndexMap<String, String> {
+        &self.context
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rattler_conda_types::{PackageName, Version};
+    use crate::stage0::License;
+    use rattler_conda_types::{PackageName, VersionWithSource};
     use std::str::FromStr;
 
     #[test]
     fn test_recipe_minimal() {
         let name = PackageName::from_str("foo").unwrap();
-        let version = Version::from_str("1.0.0").unwrap();
+        let version = VersionWithSource::from_str("1.0.0").unwrap();
         let pkg = Package::new(name, version);
         let build = Build::default();
         let about = About::default();
@@ -109,6 +125,7 @@ mod tests {
             extra.clone(),
             Vec::new(),
             Vec::new(),
+            IndexMap::new(),
         );
 
         assert_eq!(recipe.package(), &pkg);
@@ -123,14 +140,13 @@ mod tests {
     #[test]
     fn test_recipe_with_all_sections() {
         use crate::stage1::Dependency;
-        use spdx::Expression;
 
         let name = PackageName::from_str("bar").unwrap();
-        let version = Version::from_str("2.0.0").unwrap();
+        let version = VersionWithSource::from_str("2.0.0").unwrap();
         let pkg = Package::new(name, version);
         let build = Build::with_number(3);
         let about = About {
-            license: Some(Expression::parse("MIT").unwrap()),
+            license: Some(License::from_str("MIT").unwrap()),
             summary: Some("A test package".to_string()),
             ..Default::default()
         };
@@ -150,6 +166,7 @@ mod tests {
             extra.clone(),
             Vec::new(),
             Vec::new(),
+            IndexMap::new(),
         );
 
         assert_eq!(recipe.package(), &pkg);
