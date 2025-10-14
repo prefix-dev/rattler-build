@@ -271,18 +271,18 @@ fn test_error_invalid_matchspec() {
 // Multi-output recipe error tests
 // ============================================================================
 
-// #[cfg(feature = "miette")]
-// #[test]
-// fn test_error_multi_output_missing_outputs() {
-//     let source = load_error_test("multi_output_missing_outputs.yaml");
-//     let result = parse_recipe_or_multi_from_source(source.as_ref());
+#[cfg(feature = "miette")]
+#[test]
+fn test_error_multi_output_missing_outputs() {
+    let source = load_error_test("multi_output_missing_outputs.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
 
-//     assert!(result.is_err());
-//     let err = result.unwrap_err();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
 
-//     let error_with_source = ParseErrorWithSource::new(source, err);
-//     assert_miette_snapshot!(error_with_source);
-// }
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
+}
 
 #[cfg(feature = "miette")]
 #[test]

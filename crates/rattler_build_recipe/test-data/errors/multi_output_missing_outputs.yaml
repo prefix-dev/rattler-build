@@ -3,8 +3,3 @@ schema_version: 1
 
 recipe:
   name: missing-version
-
-outputs:
-  - package:
-      name: my-package
-      version: 1.0.0
