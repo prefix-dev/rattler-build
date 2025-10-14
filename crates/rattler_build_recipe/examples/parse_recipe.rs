@@ -194,50 +194,7 @@ fn main() -> Result<()> {
     }
 
     println!("\n=== Stage1 Recipe (evaluated with concrete types) ===");
-    println!(
-        "Package: {} {}",
-        stage1_recipe.package().name().as_normalized(),
-        stage1_recipe.package().version()
-    );
-
-    if let Some(homepage) = &stage1_recipe.about().homepage {
-        println!("Homepage: {}", homepage);
-    }
-
-    if let Some(license) = &stage1_recipe.about().license {
-        println!("License: {}", license);
-    }
-
-    if !stage1_recipe.requirements().build.is_empty() {
-        println!("\nBuild requirements:");
-        for dep in &stage1_recipe.requirements().build {
-            println!("  - {}", dep);
-        }
-    }
-
-    if !stage1_recipe.requirements().host.is_empty() {
-        println!("\nHost requirements:");
-        for dep in &stage1_recipe.requirements().host {
-            println!("  - {}", dep);
-        }
-    }
-
-    if !stage1_recipe.requirements().run.is_empty() {
-        println!("\nRun requirements:");
-        for dep in &stage1_recipe.requirements().run {
-            println!("  - {}", dep);
-        }
-    }
-
-    if !stage1_recipe.extra().recipe_maintainers.is_empty() {
-        println!("\nMaintainers:");
-        for maintainer in &stage1_recipe.extra().recipe_maintainers {
-            println!("  - {}", maintainer);
-        }
-    }
-
-    println!("\n=== Complete Stage1 Recipe ===");
-    println!("{:#?}", stage1_recipe);
+    println!("{}", serde_yaml::to_string(&stage1_recipe).unwrap());
 
     Ok(())
 }

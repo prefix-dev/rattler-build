@@ -280,8 +280,9 @@ impl Build {
             vars.extend(item.used_variables());
         }
 
-        // Note: entry_points don't support template variables since they're structured data
-        // (EntryPoint doesn't implement ToString + Default required for used_variables)
+        for item in &self.python.entry_points {
+            vars.extend(item.used_variables());
+        }
 
         for item in &self.python.skip_pyc_compilation {
             vars.extend(item.used_variables());

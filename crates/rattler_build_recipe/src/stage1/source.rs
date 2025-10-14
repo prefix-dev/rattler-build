@@ -1,4 +1,6 @@
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -17,7 +19,7 @@ pub enum Source {
 }
 
 /// A git revision (branch, tag or commit) - evaluated
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GitRev {
     /// A git branch
     Branch(String),
@@ -27,6 +29,23 @@ pub enum GitRev {
     Commit(String),
     /// The default revision (HEAD)
     Head,
+}
+
+/// Serialize a GitRev to a string
+fn serialize_gitrev<S>(rev: &GitRev, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&rev.to_string())
+}
+
+/// Deserialize a GitRev from a string
+fn deserialize_gitrev<'de, D>(deserializer: D) -> Result<GitRev, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    GitRev::from_str(&s).map_err(serde::de::Error::custom)
 }
 
 impl GitRev {
@@ -99,7 +118,12 @@ pub struct GitSource {
     pub url: GitUrl,
 
     /// Revision to checkout (defaults to HEAD)
-    #[serde(default, skip_serializing_if = "GitRev::is_head")]
+    #[serde(
+        default,
+        skip_serializing_if = "GitRev::is_head",
+        serialize_with = "serialize_gitrev",
+        deserialize_with = "deserialize_gitrev"
+    )]
     pub rev: GitRev,
 
     /// Optionally a depth to clone the repository
@@ -123,24 +147,22 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-/// Checksum for verification
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Checksum {
-    /// SHA256 checksum (hex string)
-    Sha256(String),
-    /// MD5 checksum (hex string)
-    Md5(String),
-}
-
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url(s) to the source code
     pub url: Vec<Url>,
 
-    /// Optional checksum to verify the downloaded file
+    /// Optional SHA256 checksum to verify the downloaded file
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<Checksum>,
+    #[serde_as(as = "Option<SerializableHash::<Sha256>>")]
+    pub sha256: Option<Sha256Hash>,
+
+    /// Optional MD5 checksum to verify the downloaded file
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<Md5>>")]
+    pub md5: Option<Md5Hash>,
 
     /// Optionally a file name to rename the downloaded file
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,14 +178,21 @@ pub struct UrlSource {
 }
 
 /// A local path source (evaluated)
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PathSource {
     /// Path to the local source code
     pub path: PathBuf,
 
-    /// Optional checksum to verify the source code
+    /// Optional SHA256 checksum to verify the source code
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<Checksum>,
+    #[serde_as(as = "Option<SerializableHash::<Sha256>>")]
+    pub sha256: Option<Sha256Hash>,
+
+    /// Optional MD5 checksum to verify the source code
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<Md5>>")]
+    pub md5: Option<Md5Hash>,
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

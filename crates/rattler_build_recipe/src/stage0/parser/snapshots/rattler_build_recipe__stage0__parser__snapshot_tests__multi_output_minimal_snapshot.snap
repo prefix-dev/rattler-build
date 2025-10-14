@@ -1,562 +1,122 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-expression: recipe
+expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
-MultiOutput(
-    MultiOutputRecipe {
-        schema_version: Some(
-            1,
-        ),
-        context: {},
-        recipe: RecipeMetadata {
-            name: Some(
-                Concrete {
-                    value: PackageName(
-                        PackageName {
-                            normalized: None,
-                            source: "myproject",
-                        },
-                    ),
-                    span: Span {
-                        start: 97,
-                        end: 97,
-                        start_line: 5,
-                        start_column: 9,
-                        end_line: 5,
-                        end_column: 9,
-                    },
-                },
-            ),
-            version: Some(
-                Concrete {
-                    value: VersionWithSource {
-                        version: Version {
-                            version: [[0], [1], [0], [0]],
-                            local: [],
-                        },
-                        source: Some(
-                            "1.0.0",
-                        ),
-                    },
-                    span: Span {
-                        start: 118,
-                        end: 118,
-                        start_line: 6,
-                        start_column: 12,
-                        end_line: 6,
-                        end_column: 12,
-                    },
-                },
-            ),
-        },
-        source: [
-            Url(
-                UrlSource {
-                    url: [
-                        Concrete {
-                            value: "https://example.com/source.tar.gz",
-                            span: Span {
-                                start: 142,
-                                end: 142,
-                                start_line: 9,
-                                start_column: 10,
-                                end_line: 9,
-                                end_column: 10,
-                            },
-                        },
-                    ],
-                    sha256: Some(
-                        Concrete {
-                            value: "abc123",
-                            span: Span {
-                                start: 188,
-                                end: 188,
-                                start_line: 10,
-                                start_column: 13,
-                                end_line: 10,
-                                end_column: 13,
-                            },
-                        },
-                    ),
-                    md5: None,
-                    file_name: None,
-                    patches: ConditionalList(
-                        [],
-                    ),
-                    target_directory: None,
-                },
-            ),
-        ],
-        build: Build {
-            number: Concrete {
-                value: 0,
-                span: Span {
-                    start: 0,
-                    end: 0,
-                    start_line: 0,
-                    start_column: 0,
-                    end_line: 0,
-                    end_column: 0,
-                },
-            },
-            string: None,
-            script: ConditionalList(
-                [],
-            ),
-            noarch: None,
-            python: PythonBuild {
-                entry_points: ConditionalList(
-                    [],
-                ),
-                skip_pyc_compilation: ConditionalList(
-                    [],
-                ),
-                use_python_app_entrypoint: false,
-                version_independent: false,
-                site_packages_path: None,
-            },
-            skip: ConditionalList(
-                [],
-            ),
-            always_copy_files: ConditionalList(
-                [],
-            ),
-            always_include_files: ConditionalList(
-                [],
-            ),
-            merge_build_and_host_envs: false,
-            files: List(
-                ConditionalList(
-                    [],
-                ),
-            ),
-            dynamic_linking: DynamicLinking {
-                rpaths: ConditionalList(
-                    [],
-                ),
-                binary_relocation: Boolean(
-                    Concrete {
-                        value: true,
-                        span: Span {
-                            start: 0,
-                            end: 0,
-                            start_line: 0,
-                            start_column: 0,
-                            end_line: 0,
-                            end_column: 0,
-                        },
-                    },
-                ),
-                missing_dso_allowlist: ConditionalList(
-                    [],
-                ),
-                rpath_allowlist: ConditionalList(
-                    [],
-                ),
-                overdepending_behavior: None,
-                overlinking_behavior: None,
-            },
-            variant: VariantKeyUsage {
-                use_keys: ConditionalList(
-                    [],
-                ),
-                ignore_keys: ConditionalList(
-                    [],
-                ),
-                down_prioritize_variant: None,
-            },
-            prefix_detection: PrefixDetection {
-                force_file_type: ForceFileType {
-                    text: ConditionalList(
-                        [],
-                    ),
-                    binary: ConditionalList(
-                        [],
-                    ),
-                },
-                ignore: Boolean(
-                    Concrete {
-                        value: false,
-                        span: Span {
-                            start: 0,
-                            end: 0,
-                            start_line: 0,
-                            start_column: 0,
-                            end_line: 0,
-                            end_column: 0,
-                        },
-                    },
-                ),
-                ignore_binary_files: false,
-            },
-            post_process: [],
-        },
-        about: About {
-            homepage: None,
-            license: None,
-            license_file: ConditionalList(
-                [],
-            ),
-            license_family: None,
-            summary: None,
-            description: None,
-            documentation: None,
-            repository: None,
-        },
-        extra: Extra {
-            recipe_maintainers: ConditionalList(
-                [],
-            ),
-        },
-        outputs: [
-            Staging(
-                StagingOutput {
-                    staging: StagingMetadata {
-                        name: Concrete {
-                            value: "build-cache",
-                            span: Span {
-                                start: 230,
-                                end: 230,
-                                start_line: 14,
-                                start_column: 13,
-                                end_line: 14,
-                                end_column: 13,
-                            },
-                        },
-                    },
-                    source: [
-                        Url(
-                            UrlSource {
-                                url: [
-                                    Concrete {
-                                        value: "https://example.com/build-source.tar.gz",
-                                        span: Span {
-                                            start: 267,
-                                            end: 267,
-                                            start_line: 16,
-                                            start_column: 14,
-                                            end_line: 16,
-                                            end_column: 14,
-                                        },
-                                    },
-                                ],
-                                sha256: Some(
-                                    Concrete {
-                                        value: "def456",
-                                        span: Span {
-                                            start: 323,
-                                            end: 323,
-                                            start_line: 17,
-                                            start_column: 17,
-                                            end_line: 17,
-                                            end_column: 17,
-                                        },
-                                    },
-                                ),
-                                md5: None,
-                                file_name: None,
-                                patches: ConditionalList(
-                                    [],
-                                ),
-                                target_directory: None,
-                            },
-                        ),
-                    ],
-                    requirements: Requirements {
-                        build: ConditionalList(
-                            [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 371, end: 371, start_line: 20, start_column: 11, end_line: 20, end_column: 11 } }),
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 385, end: 385, start_line: 21, start_column: 11, end_line: 21, end_column: 11 } }),
-                            ],
-                        ),
-                        host: ConditionalList(
-                            [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "zlib" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 413, end: 413, start_line: 23, start_column: 11, end_line: 23, end_column: 11 } }),
-                            ],
-                        ),
-                        run: ConditionalList(
-                            [],
-                        ),
-                        run_constraints: ConditionalList(
-                            [],
-                        ),
-                        run_exports: RunExports {
-                            noarch: ConditionalList(
-                                [],
-                            ),
-                            strong: ConditionalList(
-                                [],
-                            ),
-                            strong_constraints: ConditionalList(
-                                [],
-                            ),
-                            weak: ConditionalList(
-                                [],
-                            ),
-                            weak_constraints: ConditionalList(
-                                [],
-                            ),
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList(
-                                [],
-                            ),
-                            from_package: ConditionalList(
-                                [],
-                            ),
-                        },
-                    },
-                    build: StagingBuild {
-                        script: ConditionalList(
-                            [
-                                Value(Concrete { value: Command("cmake -S . -B build"), span: Span { start: 453, end: 453, start_line: 26, start_column: 11, end_line: 26, end_column: 11 } }),
-                                Value(Concrete { value: Command("cmake --build build"), span: Span { start: 483, end: 483, start_line: 27, start_column: 11, end_line: 27, end_column: 11 } }),
-                            ],
-                        ),
-                    },
-                },
-            ),
-            Package(
-                PackageOutput {
-                    package: PackageMetadata {
-                        name: Concrete {
-                            value: PackageName(
-                                PackageName {
-                                    normalized: None,
-                                    source: "mylib",
-                                },
-                            ),
-                            span: Span {
-                                start: 529,
-                                end: 529,
-                                start_line: 30,
-                                start_column: 13,
-                                end_line: 30,
-                                end_column: 13,
-                            },
-                        },
-                        version: Some(
-                            Concrete {
-                                value: VersionWithSource {
-                                    version: Version {
-                                        version: [[0], [1], [0], [0]],
-                                        local: [],
-                                    },
-                                    source: Some(
-                                        "1.0.0",
-                                    ),
-                                },
-                                span: Span {
-                                    start: 550,
-                                    end: 550,
-                                    start_line: 31,
-                                    start_column: 16,
-                                    end_line: 31,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                    },
-                    inherit: CacheName(
-                        Concrete {
-                            value: "build-cache",
-                            span: Span {
-                                start: 569,
-                                end: 569,
-                                start_line: 32,
-                                start_column: 14,
-                                end_line: 32,
-                                end_column: 14,
-                            },
-                        },
-                    ),
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList(
-                            [],
-                        ),
-                        host: ConditionalList(
-                            [],
-                        ),
-                        run: ConditionalList(
-                            [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 620, end: 620, start_line: 35, start_column: 11, end_line: 35, end_column: 11 } }),
-                            ],
-                        ),
-                        run_constraints: ConditionalList(
-                            [],
-                        ),
-                        run_exports: RunExports {
-                            noarch: ConditionalList(
-                                [],
-                            ),
-                            strong: ConditionalList(
-                                [],
-                            ),
-                            strong_constraints: ConditionalList(
-                                [],
-                            ),
-                            weak: ConditionalList(
-                                [],
-                            ),
-                            weak_constraints: ConditionalList(
-                                [],
-                            ),
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList(
-                                [],
-                            ),
-                            from_package: ConditionalList(
-                                [],
-                            ),
-                        },
-                    },
-                    build: Build {
-                        number: Concrete {
-                            value: 0,
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                                start_line: 0,
-                                start_column: 0,
-                                end_line: 0,
-                                end_column: 0,
-                            },
-                        },
-                        string: None,
-                        script: ConditionalList(
-                            [],
-                        ),
-                        noarch: None,
-                        python: PythonBuild {
-                            entry_points: ConditionalList(
-                                [],
-                            ),
-                            skip_pyc_compilation: ConditionalList(
-                                [],
-                            ),
-                            use_python_app_entrypoint: false,
-                            version_independent: false,
-                            site_packages_path: None,
-                        },
-                        skip: ConditionalList(
-                            [],
-                        ),
-                        always_copy_files: ConditionalList(
-                            [],
-                        ),
-                        always_include_files: ConditionalList(
-                            [],
-                        ),
-                        merge_build_and_host_envs: false,
-                        files: List(
-                            ConditionalList(
-                                [],
-                            ),
-                        ),
-                        dynamic_linking: DynamicLinking {
-                            rpaths: ConditionalList(
-                                [],
-                            ),
-                            binary_relocation: Boolean(
-                                Concrete {
-                                    value: true,
-                                    span: Span {
-                                        start: 0,
-                                        end: 0,
-                                        start_line: 0,
-                                        start_column: 0,
-                                        end_line: 0,
-                                        end_column: 0,
-                                    },
-                                },
-                            ),
-                            missing_dso_allowlist: ConditionalList(
-                                [],
-                            ),
-                            rpath_allowlist: ConditionalList(
-                                [],
-                            ),
-                            overdepending_behavior: None,
-                            overlinking_behavior: None,
-                        },
-                        variant: VariantKeyUsage {
-                            use_keys: ConditionalList(
-                                [],
-                            ),
-                            ignore_keys: ConditionalList(
-                                [],
-                            ),
-                            down_prioritize_variant: None,
-                        },
-                        prefix_detection: PrefixDetection {
-                            force_file_type: ForceFileType {
-                                text: ConditionalList(
-                                    [],
-                                ),
-                                binary: ConditionalList(
-                                    [],
-                                ),
-                            },
-                            ignore: Boolean(
-                                Concrete {
-                                    value: false,
-                                    span: Span {
-                                        start: 0,
-                                        end: 0,
-                                        start_line: 0,
-                                        start_column: 0,
-                                        end_line: 0,
-                                        end_column: 0,
-                                    },
-                                },
-                            ),
-                            ignore_binary_files: false,
-                        },
-                        post_process: [],
-                    },
-                    about: About {
-                        homepage: None,
-                        license: Some(
-                            Concrete {
-                                value: License(
-                                    MIT,
-                                ),
-                                span: Span {
-                                    start: 687,
-                                    end: 687,
-                                    start_line: 38,
-                                    start_column: 16,
-                                    end_line: 38,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                        license_file: ConditionalList(
-                            [],
-                        ),
-                        license_family: None,
-                        summary: Some(
-                            Concrete {
-                                value: "My awesome library",
-                                span: Span {
-                                    start: 653,
-                                    end: 653,
-                                    start_line: 37,
-                                    start_column: 16,
-                                    end_line: 37,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                        description: None,
-                        documentation: None,
-                        repository: None,
-                    },
-                    tests: [],
-                },
-            ),
-        ],
-    },
-)
+schema_version: 1
+recipe:
+  name: myproject
+  version: 1.0.0
+source:
+- url:
+  - https://example.com/source.tar.gz
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers: []
+outputs:
+- staging:
+    name: build-cache
+  source:
+  - url:
+    - https://example.com/build-source.tar.gz
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  requirements:
+    build:
+    - gcc
+    - cmake
+    host:
+    - zlib
+  build:
+    script:
+    - cmake -S . -B build
+    - cmake --build build
+- package:
+    name: mylib
+    version: 1.0.0
+  inherit: build-cache
+  requirements:
+    run:
+    - libgcc
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: MIT
+    license_family: null
+    summary: My awesome library
+    description: null
+    documentation: null
+    repository: null

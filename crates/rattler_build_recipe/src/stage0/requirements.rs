@@ -87,7 +87,7 @@ impl Requirements {
                 }
                 super::types::Item::Conditional(conditional) => {
                     // Process both then and else branches
-                    for value in conditional.then.iter().chain(conditional.else_value.iter()) {
+                    for value in conditional.then.iter() {
                         if let super::types::Value::Concrete { value, .. } = value {
                             let matchspec = &value.0;
 
@@ -95,6 +95,20 @@ impl Requirements {
                             if matchspec.version.is_none() && matchspec.build.is_none() {
                                 if let Some(name) = &matchspec.name {
                                     specs.push(name.clone());
+                                }
+                            }
+                        }
+                    }
+                    if let Some(else_branch) = &conditional.else_value {
+                        for value in else_branch.iter() {
+                            if let super::types::Value::Concrete { value, .. } = value {
+                                let matchspec = &value.0;
+
+                                // A spec is "free" if it has no version and no build constraints
+                                if matchspec.version.is_none() && matchspec.build.is_none() {
+                                    if let Some(name) = &matchspec.name {
+                                        specs.push(name.clone());
+                                    }
                                 }
                             }
                         }

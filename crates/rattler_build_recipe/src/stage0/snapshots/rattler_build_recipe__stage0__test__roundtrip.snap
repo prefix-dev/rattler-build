@@ -47,23 +47,18 @@ requirements:
     else: clang
   - if: unix
     then: make
-    else: []
   host:
   - python
   - if: linux
     then: patchelf
-    else: []
   run:
   - python
   - if: linux
     then: libgcc
-    else: []
   - if: osx
     then: libcxx
-    else: []
   - if: win
     then: msvc-runtime
-    else: []
   - ${{ compiler('c') }}
   - ${{ some_variable }}
   run_exports:
@@ -71,11 +66,9 @@ requirements:
     - conditional-package
     - if: cuda
       then: cuda-toolkit
-      else: []
     weak:
     - if: openmp
       then: libgomp
-      else: []
 about:
   homepage: https://example.com/
   license: Apache-2.0

@@ -12,21 +12,27 @@ pub struct Recipe {
     pub package: Package,
 
     /// Build configuration
+    #[serde(default, skip_serializing_if = "Build::is_default")]
     pub build: Build,
 
     /// About metadata
+    #[serde(default, skip_serializing_if = "About::is_empty")]
     pub about: About,
 
     /// Requirements/dependencies
+    #[serde(default, skip_serializing_if = "Requirements::is_empty")]
     pub requirements: Requirements,
 
     /// Extra metadata
+    #[serde(default, skip_serializing_if = "Extra::is_empty")]
     pub extra: Extra,
 
     /// Source information (can be multiple sources)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
 
     /// Tests (can be multiple tests)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tests: Vec<TestType>,
 
     /// Resolved context variables (the evaluated context after template rendering)

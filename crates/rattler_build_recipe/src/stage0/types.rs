@@ -499,7 +499,7 @@ impl<T> Item<T> {
         Ok(Item::Conditional(Conditional {
             condition,
             then: ListOrItem::new(then),
-            else_value: ListOrItem::new(else_value),
+            else_value: Some(ListOrItem::new(else_value)),
         }))
     }
 }
@@ -572,7 +572,7 @@ impl<T> Item<T> {
     /// Note: Requires T to be ToString for Conditional variant
     pub fn used_variables(&self) -> Vec<String>
     where
-        T: ToString + Default + Debug,
+        T: ToString + Debug,
     {
         match self {
             Item::Value(v) => v.used_variables(),
@@ -733,7 +733,7 @@ impl<T> ListOrItem<T> {
 pub struct Conditional<T> {
     pub condition: JinjaExpression,
     pub then: ListOrItem<Value<T>>,
-    pub else_value: ListOrItem<Value<T>>,
+    pub else_value: Option<ListOrItem<Value<T>>>,
 }
 
 // Custom serialization for Conditional
@@ -747,7 +747,9 @@ impl<T: Serialize> Serialize for Conditional<T> {
         let mut state = serializer.serialize_struct("Conditional", 3)?;
         state.serialize_field("if", self.condition.source())?;
         state.serialize_field("then", &self.then)?;
-        state.serialize_field("else", &self.else_value)?;
+        if let Some(else_value) = &self.else_value {
+            state.serialize_field("else", else_value)?;
+        }
         state.end()
     }
 }
@@ -800,7 +802,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Conditional<T> {
                 Ok(Conditional {
                     condition: condition.ok_or_else(|| A::Error::missing_field("if"))?,
                     then: then.ok_or_else(|| A::Error::missing_field("then"))?,
-                    else_value: else_value.unwrap_or_default(),
+                    else_value,
                 })
             }
         }
@@ -825,13 +827,11 @@ impl<T: Debug> Debug for Conditional<T> {
 
 impl<T: Display> Display for Conditional<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "if {} then {} else {}",
-            self.condition.source(),
-            self.then,
-            self.else_value
-        )
+        write!(f, "if {} then {}", self.condition.source(), self.then,)?;
+        if let Some(else_value) = &self.else_value {
+            write!(f, " else {}", else_value)?;
+        }
+        Ok(())
     }
 }
 
@@ -877,7 +877,7 @@ impl<'a, T> IntoIterator for &'a ConditionalList<T> {
     }
 }
 
-impl<T: ToString + Default + Debug> ConditionalList<T> {
+impl<T: ToString + Debug> ConditionalList<T> {
     // used variables in all items
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
@@ -919,7 +919,7 @@ impl<T> Default for IncludeExclude<T> {
     }
 }
 
-impl<T: ToString + Default + Debug> IncludeExclude<T> {
+impl<T: ToString + Debug> IncludeExclude<T> {
     /// Collect all variables used in this include/exclude pattern
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
@@ -938,18 +938,18 @@ impl<T: ToString + Default + Debug> IncludeExclude<T> {
     }
 }
 
-impl<T: ToString + Default + Debug> Conditional<T> {
+impl<T: ToString + Debug> Conditional<T> {
     pub fn new(condition: String, then_value: ListOrItem<Value<T>>) -> Result<Self, String> {
         let condition = JinjaExpression::new(condition)?;
         Ok(Self {
             condition,
             then: then_value,
-            else_value: ListOrItem::default(),
+            else_value: None,
         })
     }
 
     pub fn with_else(mut self, else_value: ListOrItem<Value<T>>) -> Self {
-        self.else_value = else_value;
+        self.else_value = Some(else_value);
         self
     }
 
@@ -963,8 +963,10 @@ impl<T: ToString + Default + Debug> Conditional<T> {
         }
 
         // Collect variables from else values
-        for value in self.else_value.iter() {
-            vars.extend(value.used_variables());
+        if let Some(else_value) = &self.else_value {
+            for value in else_value.iter() {
+                vars.extend(value.used_variables());
+            }
         }
 
         vars.sort();

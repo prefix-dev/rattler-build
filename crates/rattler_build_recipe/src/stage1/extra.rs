@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Extra {
     /// List of recipe maintainers
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recipe_maintainers: Vec<String>,
 }
 

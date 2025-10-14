@@ -49,7 +49,7 @@ package:
 
 source:
   url: https://example.com/archive.tar.gz
-  sha256: abc123def456
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
   file_name: archive.tar.gz
 
 build:
@@ -132,7 +132,7 @@ source:
   - git: https://github.com/example/repo.git
     tag: v1.0.0
   - url: https://example.com/archive.tar.gz
-    sha256: abc123
+    sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
   - path: ./local/source
 
 build:

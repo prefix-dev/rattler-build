@@ -180,20 +180,28 @@ pub struct PackageOutput {
     pub tests: Vec<TestType>,
 }
 
+/// Serialize TopLevel as null
+fn serialize_top_level<S>(serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_none()
+}
+
 /// Inheritance configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 #[serde(untagged)]
 pub enum Inherit {
-    /// Inherit from top-level (null or omitted)
-    #[default]
-    #[serde(skip)]
-    TopLevel,
-
     /// Inherit from a named staging cache (short form: just the name)
     CacheName(Value<String>),
 
     /// Inherit from a staging cache with options (long form: mapping)
     CacheWithOptions(CacheInherit),
+
+    /// Inherit from top-level (null or omitted)
+    #[default]
+    #[serde(serialize_with = "serialize_top_level")]
+    TopLevel,
 }
 
 /// Cache inheritance with options

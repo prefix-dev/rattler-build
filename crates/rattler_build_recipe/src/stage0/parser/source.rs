@@ -1,4 +1,5 @@
 use marked_yaml::Node;
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 
 use crate::{
     ParseError,
@@ -6,11 +7,75 @@ use crate::{
     stage0::{
         parser::helpers::get_span,
         source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-        types::{IncludeExclude, Value},
+        types::{IncludeExclude, JinjaTemplate, Value},
     },
 };
 
 use super::{parse_conditional_list, parse_value};
+
+/// Parse a SHA256 hash value (can be concrete or template)
+fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
+    // Check if it's a template
+    if let Some(scalar) = node.as_scalar() {
+        let spanned = SpannedString::from(scalar);
+        let s = spanned.as_str();
+
+        // Check if it contains Jinja template syntax
+        if s.contains("${{") {
+            let template = JinjaTemplate::new(s.to_string())
+                .map_err(|e| ParseError::invalid_value("sha256", &e, spanned.span()))?;
+            return Ok(Value::new_template(template, spanned.span()));
+        }
+
+        // Otherwise parse as concrete SHA256 hash
+        let hash = rattler_digest::parse_digest_from_hex::<Sha256>(s).ok_or_else(|| {
+            ParseError::invalid_value(
+                "sha256",
+                &format!("Invalid SHA256 checksum: {}", s),
+                spanned.span(),
+            )
+        })?;
+        Ok(Value::new_concrete(hash, spanned.span()))
+    } else {
+        Err(ParseError::expected_type(
+            "scalar",
+            "non-scalar",
+            get_span(node),
+        ))
+    }
+}
+
+/// Parse an MD5 hash value (can be concrete or template)
+fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
+    // Check if it's a template
+    if let Some(scalar) = node.as_scalar() {
+        let spanned = SpannedString::from(scalar);
+        let s = spanned.as_str();
+
+        // Check if it contains Jinja template syntax
+        if s.contains("${{") {
+            let template = JinjaTemplate::new(s.to_string())
+                .map_err(|e| ParseError::invalid_value("md5", &e, spanned.span()))?;
+            return Ok(Value::new_template(template, spanned.span()));
+        }
+
+        // Otherwise parse as concrete MD5 hash
+        let hash = rattler_digest::parse_digest_from_hex::<Md5>(s).ok_or_else(|| {
+            ParseError::invalid_value(
+                "md5",
+                &format!("Invalid MD5 checksum: {}", s),
+                spanned.span(),
+            )
+        })?;
+        Ok(Value::new_concrete(hash, spanned.span()))
+    } else {
+        Err(ParseError::expected_type(
+            "scalar",
+            "non-scalar",
+            get_span(node),
+        ))
+    }
+}
 
 /// Parse source filter field - can be a list or include/exclude mapping
 fn parse_source_filter(node: &Node) -> Result<IncludeExclude, ParseError> {
@@ -214,10 +279,10 @@ fn parse_url_source(
                 }
             }
             "sha256" => {
-                sha256 = Some(parse_value(value_node)?);
+                sha256 = Some(parse_sha256_value(value_node)?);
             }
             "md5" => {
-                md5 = Some(parse_value(value_node)?);
+                md5 = Some(parse_md5_value(value_node)?);
             }
             "file_name" => {
                 file_name = Some(parse_value(value_node)?);
@@ -280,10 +345,10 @@ fn parse_path_source(
                 path = Some(parse_value(value_node)?);
             }
             "sha256" => {
-                sha256 = Some(parse_value(value_node)?);
+                sha256 = Some(parse_sha256_value(value_node)?);
             }
             "md5" => {
-                md5 = Some(parse_value(value_node)?);
+                md5 = Some(parse_md5_value(value_node)?);
             }
             "patches" => {
                 patches = parse_conditional_list(value_node)?;
