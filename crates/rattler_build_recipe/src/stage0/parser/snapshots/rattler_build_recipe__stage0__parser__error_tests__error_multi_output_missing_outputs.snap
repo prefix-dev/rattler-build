@@ -1,0 +1,13 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: error_with_source
+---
+  × missing field: missing required field: package
+   ╭─[multi_output_missing_outputs.yaml:2:15]
+ 1 │     # Error: Multi-output recipe with outputs key but missing version
+ 2 │ ╭─▶ schema_version: 1
+ 3 │ │   
+ 4 │ │   recipe:
+ 5 │ ├─▶   name: missing-version
+   · ╰──── missing required field: package
+   ╰────
