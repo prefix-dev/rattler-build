@@ -4,10 +4,10 @@
 
 use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
 
-const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data");
-
+#[cfg(not(target_os = "windows"))]
 fn load_test_recipe(filename: &str) -> String {
-    let path = format!("{}/{}", TEST_DATA_DIR, filename);
+    let test_data_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data");
+    let path = format!("{}/{}", test_data_dir, filename);
     fs_err::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read test file {}: {}", path, e))
 }
