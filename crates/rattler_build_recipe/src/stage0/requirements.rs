@@ -1,5 +1,6 @@
 //! Stage0 requirements - unrendered requirements with templates and conditionals
 
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::SerializableMatchSpec;
@@ -61,6 +62,50 @@ impl Requirements {
         vars.sort();
         vars.dedup();
         vars
+    }
+
+    /// Find all matchspecs that are free in `build` and `host` (i.e. do not have a version or build constraint)
+    /// These are also used as "variants" in the build system.
+    /// Note: since this is before rendering, we consider both branches of conditionals (then and else)
+    pub fn free_specs(&self) -> Vec<PackageName> {
+        let mut specs = Vec::new();
+
+        for item in self.build.iter().chain(self.host.iter()) {
+            match item {
+                super::types::Item::Value(value) => {
+                    // Only process concrete (non-template) values
+                    if let super::types::Value::Concrete { value, .. } = value {
+                        let matchspec = &value.0;
+
+                        // A spec is "free" if it has no version and no build constraints
+                        if matchspec.version.is_none() && matchspec.build.is_none() {
+                            if let Some(name) = &matchspec.name {
+                                specs.push(name.clone());
+                            }
+                        }
+                    }
+                }
+                super::types::Item::Conditional(conditional) => {
+                    // Process both then and else branches
+                    for value in conditional.then.iter().chain(conditional.else_value.iter()) {
+                        if let super::types::Value::Concrete { value, .. } = value {
+                            let matchspec = &value.0;
+
+                            // A spec is "free" if it has no version and no build constraints
+                            if matchspec.version.is_none() && matchspec.build.is_none() {
+                                if let Some(name) = &matchspec.name {
+                                    specs.push(name.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        specs.sort();
+        specs.dedup();
+        specs
     }
 }
 

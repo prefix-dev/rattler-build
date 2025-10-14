@@ -1,0 +1,6 @@
+python:
+  - "3.9"
+  - "3.10"
+
+compiler:
+  - gcc

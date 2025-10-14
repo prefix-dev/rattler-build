@@ -310,33 +310,54 @@ MultiOutput(
                         },
                     },
                     source: [],
-                    requirements: StagingRequirements {
+                    requirements: Requirements {
                         build: ConditionalList(
                             [
                                 Value(Template { template: JinjaTemplate { source: "${{ compiler('c') }}", variables: ["compiler"] }, span: Span { start: 636, end: 636, start_line: 35, start_column: 11, end_line: 35, end_column: 11 } }),
                                 Value(Template { template: JinjaTemplate { source: "${{ compiler('cxx') }}", variables: ["compiler"] }, span: Span { start: 667, end: 667, start_line: 36, start_column: 11, end_line: 36, end_column: 11 } }),
-                                Value(Concrete { value: "cmake", span: Span { start: 700, end: 700, start_line: 37, start_column: 11, end_line: 37, end_column: 11 } }),
-                                Value(Concrete { value: "ninja", span: Span { start: 716, end: 716, start_line: 38, start_column: 11, end_line: 38, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 700, end: 700, start_line: 37, start_column: 11, end_line: 37, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "ninja" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 716, end: 716, start_line: 38, start_column: 11, end_line: 38, end_column: 11 } }),
                             ],
                         ),
                         host: ConditionalList(
                             [
-                                Value(Concrete { value: "zlib", span: Span { start: 744, end: 744, start_line: 40, start_column: 11, end_line: 40, end_column: 11 } }),
-                                Value(Concrete { value: "openssl", span: Span { start: 759, end: 759, start_line: 41, start_column: 11, end_line: 41, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "zlib" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 744, end: 744, start_line: 40, start_column: 11, end_line: 40, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "openssl" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 759, end: 759, start_line: 41, start_column: 11, end_line: 41, end_column: 11 } }),
                             ],
                         ),
-                        ignore_run_exports: Some(
-                            IgnoreRunExports {
-                                by_name: ConditionalList(
-                                    [
-                                        Value(Concrete { value: "openssl", span: Span { start: 822, end: 822, start_line: 44, start_column: 13, end_line: 44, end_column: 13 } }),
-                                    ],
-                                ),
-                                from_package: ConditionalList(
-                                    [],
-                                ),
-                            },
+                        run: ConditionalList(
+                            [],
                         ),
+                        run_constraints: ConditionalList(
+                            [],
+                        ),
+                        run_exports: RunExports {
+                            noarch: ConditionalList(
+                                [],
+                            ),
+                            strong: ConditionalList(
+                                [],
+                            ),
+                            strong_constraints: ConditionalList(
+                                [],
+                            ),
+                            weak: ConditionalList(
+                                [],
+                            ),
+                            weak_constraints: ConditionalList(
+                                [],
+                            ),
+                        },
+                        ignore_run_exports: IgnoreRunExports {
+                            by_name: ConditionalList(
+                                [
+                                    Value(Concrete { value: "openssl", span: Span { start: 822, end: 822, start_line: 44, start_column: 13, end_line: 44, end_column: 13 } }),
+                                ],
+                            ),
+                            from_package: ConditionalList(
+                                [],
+                            ),
+                        },
                     },
                     build: StagingBuild {
                         script: ConditionalList(
@@ -364,21 +385,51 @@ MultiOutput(
                         },
                     },
                     source: [],
-                    requirements: StagingRequirements {
+                    requirements: Requirements {
                         build: ConditionalList(
                             [
-                                Value(Concrete { value: "python", span: Span { start: 1055, end: 1055, start_line: 55, start_column: 11, end_line: 55, end_column: 11 } }),
-                                Value(Concrete { value: "setuptools", span: Span { start: 1072, end: 1072, start_line: 56, start_column: 11, end_line: 56, end_column: 11 } }),
-                                Value(Concrete { value: "wheel", span: Span { start: 1093, end: 1093, start_line: 57, start_column: 11, end_line: 57, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1055, end: 1055, start_line: 55, start_column: 11, end_line: 55, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "setuptools" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1072, end: 1072, start_line: 56, start_column: 11, end_line: 56, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "wheel" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1093, end: 1093, start_line: 57, start_column: 11, end_line: 57, end_column: 11 } }),
                             ],
                         ),
                         host: ConditionalList(
                             [
-                                Value(Concrete { value: "python", span: Span { start: 1121, end: 1121, start_line: 59, start_column: 11, end_line: 59, end_column: 11 } }),
-                                Value(Concrete { value: "pybind11", span: Span { start: 1138, end: 1138, start_line: 60, start_column: 11, end_line: 60, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1121, end: 1121, start_line: 59, start_column: 11, end_line: 59, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "pybind11" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1138, end: 1138, start_line: 60, start_column: 11, end_line: 60, end_column: 11 } }),
                             ],
                         ),
-                        ignore_run_exports: None,
+                        run: ConditionalList(
+                            [],
+                        ),
+                        run_constraints: ConditionalList(
+                            [],
+                        ),
+                        run_exports: RunExports {
+                            noarch: ConditionalList(
+                                [],
+                            ),
+                            strong: ConditionalList(
+                                [],
+                            ),
+                            strong_constraints: ConditionalList(
+                                [],
+                            ),
+                            weak: ConditionalList(
+                                [],
+                            ),
+                            weak_constraints: ConditionalList(
+                                [],
+                            ),
+                        },
+                        ignore_run_exports: IgnoreRunExports {
+                            by_name: ConditionalList(
+                                [],
+                            ),
+                            from_package: ConditionalList(
+                                [],
+                            ),
+                        },
                     },
                     build: StagingBuild {
                         script: ConditionalList(

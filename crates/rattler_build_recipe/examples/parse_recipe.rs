@@ -1,19 +1,55 @@
 //! Example binary to parse and evaluate a recipe YAML file
 //!
-//! Usage:
-//!   cargo run --example parse_recipe <recipe.yaml> [key=value ...]
+//! # Usage
 //!
-//! Examples:
-//!   cargo run --example parse_recipe recipe.yaml
-//!   cargo run --example parse_recipe recipe.yaml name=foo version=1.0.0
-//!   cargo run --example parse_recipe recipe.yaml name=bar version=2.0 unix=true
+//! **Easiest** - Use the cargo alias (automatically enables all features):
+//! ```bash
+//! cargo example parse_recipe -- <recipe.yaml> [OPTIONS]
+//! ```
+//!
+//! Or run with all features enabled manually:
+//! ```bash
+//! cargo run --example parse_recipe --all-features -- <recipe.yaml> [OPTIONS]
+//! ```
+//!
+//! # Examples
+//!
+//! ```bash
+//! # Parse a simple recipe
+//! cargo example parse_recipe -- recipe.yaml
+//!
+//! # Define context variables
+//! cargo example parse_recipe -- recipe.yaml -Dname=foo -Dversion=1.0.0
+//!
+//! # Use variant configuration
+//! cargo example parse_recipe -- recipe.yaml --variants variants.yaml
+//!
+//! # Combine variants with extra context
+//! cargo example parse_recipe -- recipe.yaml --variants variants.yaml -Dunix=true
+//! ```
 
-use std::env;
-use std::process;
-
+use clap::Parser;
 use indexmap::IndexMap;
 use miette::{IntoDiagnostic, NamedSource, Result};
+use rattler_build_recipe::variant_render::{RenderConfig, render_recipe_with_variants};
 use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
+
+#[derive(Parser)]
+#[command(name = "parse_recipe")]
+#[command(about = "Parse and evaluate a recipe YAML file", long_about = None)]
+struct Args {
+    /// Path to the recipe YAML file
+    recipe: String,
+
+    /// Path to variant configuration file (e.g., variants.yaml)
+    #[arg(short, long)]
+    variants: Option<String>,
+
+    /// Define context variables (can be used multiple times)
+    /// Format: key=value
+    #[arg(short = 'D', long = "define", value_name = "KEY=VALUE")]
+    variables: Vec<String>,
+}
 
 fn main() -> Result<()> {
     // Install miette panic handler for better error messages
@@ -26,40 +62,33 @@ fn main() -> Result<()> {
     }))
     .ok();
 
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
 
-    if args.len() < 2 {
-        eprintln!("Usage: {} <recipe.yaml> [key=value ...]", args[0]);
-        eprintln!();
-        eprintln!("Examples:");
-        eprintln!("  {} recipe.yaml", args[0]);
-        eprintln!("  {} recipe.yaml name=foo version=1.0.0", args[0]);
-        eprintln!("  {} recipe.yaml name=bar version=2.0 unix=true", args[0]);
-        process::exit(1);
-    }
-
-    let recipe_path = &args[1];
-
-    // Parse variable arguments (key=value pairs)
+    // Parse key=value variables
     let mut variables = IndexMap::new();
-    for arg in &args[2..] {
-        if let Some((key, value)) = arg.split_once('=') {
+    for var in &args.variables {
+        if let Some((key, value)) = var.split_once('=') {
             variables.insert(key.to_string(), value.to_string());
         } else {
             eprintln!(
-                "Warning: ignoring invalid argument '{}' (expected key=value)",
-                arg
+                "Warning: ignoring invalid variable '{}' (expected key=value)",
+                var
             );
         }
     }
 
-    // Read the recipe file
-    let yaml_content = fs_err::read_to_string(recipe_path).into_diagnostic()?;
+    // Check if we should use variant rendering
+    if let Some(ref variant_file) = args.variants {
+        return render_with_variants(&args.recipe, variant_file, variables);
+    }
 
-    println!("=== Parsing recipe: {} ===\n", recipe_path);
+    // Read the recipe file
+    let yaml_content = fs_err::read_to_string(&args.recipe).into_diagnostic()?;
+
+    println!("=== Parsing recipe: {} ===\n", args.recipe);
 
     // Create a named source for better error messages with miette
-    let source = NamedSource::new(recipe_path, yaml_content.clone());
+    let source = NamedSource::new(&args.recipe, yaml_content.clone());
 
     // Parse stage0 recipe
     let stage0_recipe = stage0::parse_recipe_from_source(&yaml_content)
@@ -209,6 +238,101 @@ fn main() -> Result<()> {
 
     println!("\n=== Complete Stage1 Recipe ===");
     println!("{:#?}", stage1_recipe);
+
+    Ok(())
+}
+
+fn render_with_variants(
+    recipe_path: &str,
+    variant_file: &str,
+    extra_context: IndexMap<String, String>,
+) -> Result<()> {
+    use std::path::Path;
+
+    println!("=== Rendering recipe with variants ===");
+    println!("Recipe: {}", recipe_path);
+    println!("Variants: {}", variant_file);
+
+    if !extra_context.is_empty() {
+        println!("\nExtra context:");
+        for (key, value) in &extra_context {
+            println!("  {} = {}", key, value);
+        }
+    }
+
+    // Create render config
+    let mut config = RenderConfig::new();
+    for (key, value) in extra_context {
+        config = config.with_context(key, value);
+    }
+
+    // Render the recipe with all variant combinations
+    let rendered = render_recipe_with_variants(
+        Path::new(recipe_path),
+        &[Path::new(variant_file)],
+        Some(config),
+    )
+    .into_diagnostic()?;
+
+    println!(
+        "\n=== Found {} variant combination(s) ===\n",
+        rendered.len()
+    );
+
+    // Display each variant
+    for (idx, variant_result) in rendered.iter().enumerate() {
+        println!("╔══════════════════════════════════════════════════════════════");
+        println!("║ Variant #{}", idx + 1);
+        println!("╚══════════════════════════════════════════════════════════════");
+
+        if !variant_result.variant.is_empty() {
+            println!("\n📦 Variant values:");
+            for (key, value) in &variant_result.variant {
+                println!("  {} = {}", key.normalize(), value);
+            }
+        } else {
+            println!("\n(No variant values - using defaults)");
+        }
+
+        let recipe = &variant_result.recipe;
+
+        println!("\n📋 Package:");
+        println!("  Name:    {}", recipe.package().name().as_normalized());
+        println!("  Version: {}", recipe.package().version());
+
+        if !recipe.requirements().build.is_empty() {
+            println!("\n🔨 Build requirements:");
+            for dep in &recipe.requirements().build {
+                println!("  - {}", dep);
+            }
+        }
+
+        if !recipe.requirements().host.is_empty() {
+            println!("\n🏠 Host requirements:");
+            for dep in &recipe.requirements().host {
+                println!("  - {}", dep);
+            }
+        }
+
+        if !recipe.requirements().run.is_empty() {
+            println!("\n🏃 Run requirements:");
+            for dep in &recipe.requirements().run {
+                println!("  - {}", dep);
+            }
+        }
+
+        if let Some(homepage) = &recipe.about().homepage {
+            println!("\n🌐 Homepage: {}", homepage);
+        }
+
+        if let Some(license) = &recipe.about().license {
+            println!("📄 License: {}", license);
+        }
+
+        println!();
+    }
+
+    println!("✓ Successfully rendered {} variant(s)", rendered.len());
 
     Ok(())
 }

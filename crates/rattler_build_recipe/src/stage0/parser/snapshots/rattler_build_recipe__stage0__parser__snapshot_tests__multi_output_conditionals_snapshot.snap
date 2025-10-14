@@ -188,20 +188,50 @@ MultiOutput(
                         },
                     },
                     source: [],
-                    requirements: StagingRequirements {
+                    requirements: Requirements {
                         build: ConditionalList(
                             [
-                                Conditional(Conditional { condition: unix, then: ListOrItem([Concrete { value: "gcc", span: Span { start: 259, end: 259, start_line: 15, start_column: 15, end_line: 15, end_column: 15 } }, Concrete { value: "make", span: Span { start: 277, end: 277, start_line: 16, start_column: 15, end_line: 16, end_column: 15 } }]), else: ListOrItem(Concrete { value: "msvc", span: Span { start: 298, end: 298, start_line: 17, start_column: 17, end_line: 17, end_column: 17 } }) }),
-                                Value(Concrete { value: "cmake", span: Span { start: 313, end: 313, start_line: 18, start_column: 11, end_line: 18, end_column: 11 } }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem([Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 259, end: 259, start_line: 15, start_column: 15, end_line: 15, end_column: 15 } }, Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "make" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 277, end: 277, start_line: 16, start_column: 15, end_line: 16, end_column: 15 } }]), else: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "msvc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 298, end: 298, start_line: 17, start_column: 17, end_line: 17, end_column: 17 } }) }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 313, end: 313, start_line: 18, start_column: 11, end_line: 18, end_column: 11 } }),
                             ],
                         ),
                         host: ConditionalList(
                             [
-                                Conditional(Conditional { condition: linux, then: ListOrItem(Concrete { value: "glibc", span: Span { start: 367, end: 367, start_line: 21, start_column: 17, end_line: 21, end_column: 17 } }), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: "libcxx", span: Span { start: 407, end: 407, start_line: 23, start_column: 17, end_line: 23, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: linux, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "glibc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 367, end: 367, start_line: 21, start_column: 17, end_line: 21, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 407, end: 407, start_line: 23, start_column: 17, end_line: 23, end_column: 17 } }), else: ListOrItem([]) }),
                             ],
                         ),
-                        ignore_run_exports: None,
+                        run: ConditionalList(
+                            [],
+                        ),
+                        run_constraints: ConditionalList(
+                            [],
+                        ),
+                        run_exports: RunExports {
+                            noarch: ConditionalList(
+                                [],
+                            ),
+                            strong: ConditionalList(
+                                [],
+                            ),
+                            strong_constraints: ConditionalList(
+                                [],
+                            ),
+                            weak: ConditionalList(
+                                [],
+                            ),
+                            weak_constraints: ConditionalList(
+                                [],
+                            ),
+                        },
+                        ignore_run_exports: IgnoreRunExports {
+                            by_name: ConditionalList(
+                                [],
+                            ),
+                            from_package: ConditionalList(
+                                [],
+                            ),
+                        },
                     },
                     build: StagingBuild {
                         script: ConditionalList(

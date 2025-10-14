@@ -21,7 +21,7 @@ pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{
     CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, Recipe, RecipeMetadata,
-    SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput, StagingRequirements,
+    SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput,
 };
 pub use package::{Package, PackageMetadata, PackageName};
 pub use parser::{
