@@ -166,6 +166,8 @@ SingleOutputRecipe {
                 Conditional(Conditional { condition: linux, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
                 Conditional(Conditional { condition: osx, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
                 Conditional(Conditional { condition: win, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "msvc-runtime" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
+                Value(Template { template: JinjaTemplate { source: "${{ compiler('c') }}", variables: ["compiler"] }, span: Span { start: 473, end: 473, start_line: 30, start_column: 7, end_line: 30, end_column: 7 } }),
+                Value(Template { template: JinjaTemplate { source: "${{ some_variable }}", variables: ["some_variable"] }, span: Span { start: 500, end: 500, start_line: 31, start_column: 7, end_line: 31, end_column: 7 } }),
             ],
         ),
         run_constraints: ConditionalList(
@@ -177,7 +179,7 @@ SingleOutputRecipe {
             ),
             strong: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "conditional-package" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 502, end: 502, start_line: 32, start_column: 9, end_line: 32, end_column: 9 } }),
+                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "conditional-package" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 557, end: 557, start_line: 35, start_column: 9, end_line: 35, end_column: 9 } }),
                     Conditional(Conditional { condition: cuda, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "cuda-toolkit" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
                 ],
             ),
@@ -269,7 +271,7 @@ SingleOutputRecipe {
     extra: Extra {
         recipe_maintainers: ConditionalList(
             [
-                Value(Concrete { value: "maintainer1", span: Span { start: 653, end: 653, start_line: 41, start_column: 7, end_line: 41, end_column: 7 } }),
+                Value(Concrete { value: "maintainer1", span: Span { start: 708, end: 708, start_line: 44, start_column: 7, end_line: 44, end_column: 7 } }),
             ],
         ),
     },

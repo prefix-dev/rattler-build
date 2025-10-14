@@ -6,7 +6,7 @@ expression: error_with_source
   │ version spec: ><1234
    ╭─[error_matchspec.yaml:8:7]
  7 │     - python
- 8 │     - foobar ><1234  # error in parsing
+ 8 │     - foobar ><1234 # error in parsing
    ·       ───┬──
    ·          ╰── invalid value for item: Invalid match spec: unable to parse version spec: ><1234
    ╰────
