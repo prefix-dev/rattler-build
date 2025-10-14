@@ -93,7 +93,9 @@ requirements:
     let vars = recipe.used_variables();
     assert!(vars.contains(&"name".to_string()));
     assert!(vars.contains(&"version".to_string()));
-    assert!(vars.contains(&"compiler".to_string()));
+    // compiler("c") expands to c_compiler and c_compiler_version
+    assert!(vars.contains(&"c_compiler".to_string()));
+    assert!(vars.contains(&"c_compiler_version".to_string()));
 }
 
 #[test]
@@ -202,7 +204,11 @@ requirements:
     assert!(!recipe.requirements.run_exports.is_empty());
 
     let vars = recipe.used_variables();
-    assert!(vars.contains(&"compiler".to_string()));
+    // compiler("c") and compiler("cxx") expand to their respective variant variables
+    assert!(vars.contains(&"c_compiler".to_string()));
+    assert!(vars.contains(&"c_compiler_version".to_string()));
+    assert!(vars.contains(&"cxx_compiler".to_string()));
+    assert!(vars.contains(&"cxx_compiler_version".to_string()));
     assert!(vars.contains(&"linux".to_string()));
     assert!(vars.contains(&"osx".to_string()));
 }

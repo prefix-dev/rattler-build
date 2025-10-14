@@ -3,7 +3,8 @@ source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
 expression: vars
 ---
 [
-    "compiler",
+    "c_compiler",
+    "c_compiler_version",
     "cuda",
     "linux",
     "openmp",

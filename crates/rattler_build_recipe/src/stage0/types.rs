@@ -245,14 +245,100 @@ fn collect_variables_from_ast(
 }
 
 /// Collect variables from a Call expression
+/// Special handling for rattler-build Jinja functions that expand to variant variables
 fn collect_variables_from_call(
     call: &minijinja::machinery::ast::Call,
     variables: &mut BTreeSet<String>,
 ) {
-    collect_variables_from_expr(&call.expr, variables);
-    for arg in &call.args {
-        collect_variables_from_call_arg(arg, variables);
+    use minijinja::machinery::ast::Expr;
+
+    // Check if this is a special function call that we should expand
+    if let Expr::Var(var) = &call.expr {
+        let function_name = var.id.to_string();
+
+        match function_name.as_str() {
+            "compiler" => {
+                // compiler('c') expands to c_compiler and c_compiler_version
+                if let Some(lang) = extract_first_string_arg(&call.args) {
+                    variables.insert(format!("{}_compiler", lang));
+                    variables.insert(format!("{}_compiler_version", lang));
+                } else {
+                    // If we can't extract the argument, collect the arguments as variables
+                    for arg in &call.args {
+                        collect_variables_from_call_arg(arg, variables);
+                    }
+                }
+            }
+            "stdlib" => {
+                // stdlib('c') expands to c_stdlib and c_stdlib_version
+                if let Some(lang) = extract_first_string_arg(&call.args) {
+                    variables.insert(format!("{}_stdlib", lang));
+                    variables.insert(format!("{}_stdlib_version", lang));
+                } else {
+                    for arg in &call.args {
+                        collect_variables_from_call_arg(arg, variables);
+                    }
+                }
+            }
+            "pin_subpackage" => {
+                // pin_subpackage(name) expands to the name variable (unless it's a string literal)
+                // pin_subpackage("literal") doesn't expand
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        // Don't add string literals as variables
+                        if !matches!(expr, Expr::Const(_)) {
+                            collect_variables_from_expr(expr, variables);
+                        }
+                    }
+                }
+            }
+            "pin_compatible" => {
+                // pin_compatible(name) expands to the name variable (unless it's a string literal)
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        if !matches!(expr, Expr::Const(_)) {
+                            collect_variables_from_expr(expr, variables);
+                        }
+                    }
+                }
+            }
+            "match" => {
+                // match(var, spec) - first arg is a variable, second is a string
+                for arg in &call.args {
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
+                        // Both arguments could be variables
+                        collect_variables_from_expr(expr, variables);
+                    }
+                }
+            }
+            _ => {
+                // For other functions, collect the function name and arguments normally
+                collect_variables_from_expr(&call.expr, variables);
+                for arg in &call.args {
+                    collect_variables_from_call_arg(arg, variables);
+                }
+            }
+        }
+    } else {
+        // Not a simple function call, collect normally
+        collect_variables_from_expr(&call.expr, variables);
+        for arg in &call.args {
+            collect_variables_from_call_arg(arg, variables);
+        }
     }
+}
+
+/// Extract the first string literal argument from a function call
+/// Returns None if the first argument is not a string literal
+fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Option<String> {
+    use minijinja::machinery::ast::{CallArg, Expr};
+
+    if let Some(CallArg::Pos(Expr::Const(c))) = args.first() {
+        if let Some(s) = c.value.as_str() {
+            return Some(s.to_string());
+        }
+    }
+    None
 }
 
 /// Collect variables from a CallArg
@@ -729,100 +815,18 @@ impl<T> ListOrItem<T> {
 }
 
 // Conditional structure for if-else logic
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conditional<T> {
+    /// The condition to be evaluated
+    #[serde(rename = "if")]
     pub condition: JinjaExpression,
+
+    /// The then branch
     pub then: ListOrItem<Value<T>>,
+
+    /// The optional else branch
+    #[serde(skip_serializing_if = "Option::is_none", rename = "else")]
     pub else_value: Option<ListOrItem<Value<T>>>,
-}
-
-// Custom serialization for Conditional
-impl<T: Serialize> Serialize for Conditional<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        let mut state = serializer.serialize_struct("Conditional", 3)?;
-        state.serialize_field("if", self.condition.source())?;
-        state.serialize_field("then", &self.then)?;
-        if let Some(else_value) = &self.else_value {
-            state.serialize_field("else", else_value)?;
-        }
-        state.end()
-    }
-}
-
-// Custom deserialization for Conditional
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Conditional<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{Error, MapAccess, Visitor};
-        use std::fmt;
-
-        struct ConditionalVisitor<T>(std::marker::PhantomData<T>);
-
-        impl<'de, T: Deserialize<'de>> Visitor<'de> for ConditionalVisitor<T> {
-            type Value = Conditional<T>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a conditional with if/then/else fields")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut condition = None;
-                let mut then = None;
-                let mut else_value = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "if" => {
-                            let cond_str: String = map.next_value()?;
-                            condition =
-                                Some(JinjaExpression::new(cond_str).map_err(A::Error::custom)?);
-                        }
-                        "then" => {
-                            then = Some(map.next_value()?);
-                        }
-                        "else" => {
-                            else_value = Some(map.next_value()?);
-                        }
-                        _ => {
-                            let _: serde::de::IgnoredAny = map.next_value()?;
-                        }
-                    }
-                }
-
-                Ok(Conditional {
-                    condition: condition.ok_or_else(|| A::Error::missing_field("if"))?,
-                    then: then.ok_or_else(|| A::Error::missing_field("then"))?,
-                    else_value,
-                })
-            }
-        }
-
-        deserializer.deserialize_struct(
-            "Conditional",
-            &["if", "then", "else"],
-            ConditionalVisitor(std::marker::PhantomData),
-        )
-    }
-}
-
-impl<T: Debug> Debug for Conditional<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Conditional {{ condition: {}, then: {:?}, else: {:?} }}",
-            self.condition, self.then, self.else_value
-        )
-    }
 }
 
 impl<T: Display> Display for Conditional<T> {
@@ -1237,8 +1241,11 @@ mod tests {
         let list = ConditionalList::new(items);
         let mut vars = list.used_variables();
         vars.sort();
-        // "compiler" is a function call, so it should extract "compiler" as a variable
-        assert_eq!(vars, vec!["compiler", "linux", "python"]);
+        // compiler('c') expands to c_compiler and c_compiler_version
+        assert_eq!(
+            vars,
+            vec!["c_compiler", "c_compiler_version", "linux", "python"]
+        );
     }
 
     #[test]

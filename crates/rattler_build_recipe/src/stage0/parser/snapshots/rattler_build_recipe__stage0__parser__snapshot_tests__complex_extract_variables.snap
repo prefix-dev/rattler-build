@@ -4,8 +4,11 @@ expression: vars
 ---
 [
     "build_type",
-    "compiler",
+    "c_compiler",
+    "c_compiler_version",
     "cuda_version",
+    "cxx_compiler",
+    "cxx_compiler_version",
     "description",
     "extra_deps",
     "has_cpp_lib",
@@ -16,8 +19,6 @@ expression: vars
     "name",
     "org",
     "osx",
-    "pin_compatible",
-    "pin_subpackage",
     "python",
     "summary",
     "unix",
