@@ -729,100 +729,18 @@ impl<T> ListOrItem<T> {
 }
 
 // Conditional structure for if-else logic
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conditional<T> {
+    /// The condition to be evaluated
+    #[serde(rename = "if")]
     pub condition: JinjaExpression,
+
+    /// The then branch
     pub then: ListOrItem<Value<T>>,
+
+    /// The optional else branch
+    #[serde(skip_serializing_if = "Option::is_none", rename = "else")]
     pub else_value: Option<ListOrItem<Value<T>>>,
-}
-
-// Custom serialization for Conditional
-impl<T: Serialize> Serialize for Conditional<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        let mut state = serializer.serialize_struct("Conditional", 3)?;
-        state.serialize_field("if", self.condition.source())?;
-        state.serialize_field("then", &self.then)?;
-        if let Some(else_value) = &self.else_value {
-            state.serialize_field("else", else_value)?;
-        }
-        state.end()
-    }
-}
-
-// Custom deserialization for Conditional
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Conditional<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{Error, MapAccess, Visitor};
-        use std::fmt;
-
-        struct ConditionalVisitor<T>(std::marker::PhantomData<T>);
-
-        impl<'de, T: Deserialize<'de>> Visitor<'de> for ConditionalVisitor<T> {
-            type Value = Conditional<T>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a conditional with if/then/else fields")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut condition = None;
-                let mut then = None;
-                let mut else_value = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "if" => {
-                            let cond_str: String = map.next_value()?;
-                            condition =
-                                Some(JinjaExpression::new(cond_str).map_err(A::Error::custom)?);
-                        }
-                        "then" => {
-                            then = Some(map.next_value()?);
-                        }
-                        "else" => {
-                            else_value = Some(map.next_value()?);
-                        }
-                        _ => {
-                            let _: serde::de::IgnoredAny = map.next_value()?;
-                        }
-                    }
-                }
-
-                Ok(Conditional {
-                    condition: condition.ok_or_else(|| A::Error::missing_field("if"))?,
-                    then: then.ok_or_else(|| A::Error::missing_field("then"))?,
-                    else_value,
-                })
-            }
-        }
-
-        deserializer.deserialize_struct(
-            "Conditional",
-            &["if", "then", "else"],
-            ConditionalVisitor(std::marker::PhantomData),
-        )
-    }
-}
-
-impl<T: Debug> Debug for Conditional<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Conditional {{ condition: {}, then: {:?}, else: {:?} }}",
-            self.condition, self.then, self.else_value
-        )
-    }
 }
 
 impl<T: Display> Display for Conditional<T> {
