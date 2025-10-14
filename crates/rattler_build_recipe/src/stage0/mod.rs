@@ -6,6 +6,7 @@ mod build;
 pub mod evaluate;
 mod extra;
 pub mod jinja_functions;
+mod match_spec;
 mod output;
 mod package;
 mod parser;
@@ -17,6 +18,7 @@ mod types;
 pub use about::{About, License};
 pub use build::Build;
 pub use extra::Extra;
+pub use match_spec::SerializableMatchSpec;
 pub use output::{
     CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, Recipe, RecipeMetadata,
     SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput, StagingRequirements,

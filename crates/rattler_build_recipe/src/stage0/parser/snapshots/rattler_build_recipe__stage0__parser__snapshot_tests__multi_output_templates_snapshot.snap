@@ -260,8 +260,8 @@ MultiOutput(
                         build: ConditionalList(
                             [
                                 Value(Template { template: JinjaTemplate { source: "${{ compiler('c') }}", variables: ["compiler"] }, span: Span { start: 417, end: 417, start_line: 20, start_column: 11, end_line: 20, end_column: 11 } }),
-                                Conditional(Conditional { condition: unix, then: ListOrItem("make"), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: win, then: ListOrItem("nmake"), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: "make", span: Span { start: 473, end: 473, start_line: 22, start_column: 17, end_line: 22, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: "nmake", span: Span { start: 512, end: 512, start_line: 24, start_column: 17, end_line: 24, end_column: 17 } }), else: ListOrItem([]) }),
                             ],
                         ),
                         host: ConditionalList(
@@ -274,8 +274,8 @@ MultiOutput(
                     build: StagingBuild {
                         script: ConditionalList(
                             [
-                                Conditional(Conditional { condition: unix, then: ListOrItem(Command("make -j${{ CPU_COUNT }}")), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: win, then: ListOrItem(Command("nmake")), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem(Template { template: JinjaTemplate { source: "make -j${{ CPU_COUNT }}", variables: ["CPU_COUNT"] }, span: Span { start: 629, end: 629, start_line: 30, start_column: 17, end_line: 30, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: Command("nmake"), span: Span { start: 687, end: 687, start_line: 32, start_column: 17, end_line: 32, end_column: 17 } }), else: ListOrItem([]) }),
                             ],
                         ),
                     },
@@ -614,7 +614,7 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1208, end: 1208, start_line: 53, start_column: 11, end_line: 53, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1208, end: 1208, start_line: 53, start_column: 11, end_line: 53, end_column: 11 } }),
                             ],
                         ),
                         run_constraints: ConditionalList(

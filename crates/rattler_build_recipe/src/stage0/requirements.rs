@@ -2,7 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{ConditionalList, MatchSpecWrapper};
+use crate::stage0::SerializableMatchSpec;
+
+use super::types::ConditionalList;
 
 /// The requirements section of a stage0 recipe (before rendering).
 /// All dependency strings can contain Jinja2 templates and conditional statements.
@@ -11,19 +13,19 @@ use super::types::{ConditionalList, MatchSpecWrapper};
 pub struct Requirements {
     /// Build-time requirements (resolved with build platform)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub build: ConditionalList<MatchSpecWrapper>,
+    pub build: ConditionalList<SerializableMatchSpec>,
 
     /// Host-time requirements (resolved with target platform)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub host: ConditionalList<MatchSpecWrapper>,
+    pub host: ConditionalList<SerializableMatchSpec>,
 
     /// Run-time requirements (resolved with target platform)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub run: ConditionalList<MatchSpecWrapper>,
+    pub run: ConditionalList<SerializableMatchSpec>,
 
     /// Runtime constraints (optional requirements that constrain the environment)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub run_constraints: ConditionalList<MatchSpecWrapper>,
+    pub run_constraints: ConditionalList<SerializableMatchSpec>,
 
     /// Run exports configuration
     #[serde(default, skip_serializing_if = "RunExports::is_empty")]
@@ -67,23 +69,23 @@ impl Requirements {
 pub struct RunExports {
     /// Noarch run exports
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub noarch: ConditionalList<MatchSpecWrapper>,
+    pub noarch: ConditionalList<SerializableMatchSpec>,
 
     /// Strong run exports (apply from build and host env to run env)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub strong: ConditionalList<MatchSpecWrapper>,
+    pub strong: ConditionalList<SerializableMatchSpec>,
 
     /// Strong run constraints
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub strong_constraints: ConditionalList<MatchSpecWrapper>,
+    pub strong_constraints: ConditionalList<SerializableMatchSpec>,
 
     /// Weak run exports (apply from host env to run env)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub weak: ConditionalList<MatchSpecWrapper>,
+    pub weak: ConditionalList<SerializableMatchSpec>,
 
     /// Weak run constraints
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub weak_constraints: ConditionalList<MatchSpecWrapper>,
+    pub weak_constraints: ConditionalList<SerializableMatchSpec>,
 }
 
 impl RunExports {
@@ -146,7 +148,10 @@ impl IgnoreRunExports {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stage0::types::{Item, JinjaTemplate, Value};
+    use crate::{
+        Span,
+        stage0::types::{Item, JinjaTemplate, Value},
+    };
 
     #[test]
     fn test_requirements_empty() {
@@ -157,14 +162,9 @@ mod tests {
 
     #[test]
     fn test_requirements_with_build_deps() {
-        use rattler_conda_types::MatchSpec;
-        use rattler_conda_types::ParseStrictness;
-
         let items = vec![
             Item::Value(Value::new_concrete(
-                MatchSpecWrapper::Parsed(Box::new(
-                    MatchSpec::from_str("gcc", ParseStrictness::Strict).unwrap(),
-                )),
+                SerializableMatchSpec::from("gcc"),
                 crate::span::Span::unknown(),
             )),
             Item::Value(Value::new_template(
@@ -222,24 +222,19 @@ mod tests {
 
     #[test]
     fn test_requirements_serialize_deserialize() {
-        use rattler_conda_types::MatchSpec;
-        use rattler_conda_types::ParseStrictness;
-
         // Create requirements with parsed matchspecs and templates
         let items = vec![
             Item::Value(Value::new_concrete(
-                MatchSpecWrapper::Parsed(Box::new(
-                    MatchSpec::from_str("python >=3.8", ParseStrictness::Strict).unwrap(),
-                )),
-                crate::span::Span::unknown(),
+                SerializableMatchSpec::from("python >=3.8"),
+                Span::unknown(),
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("cuda-toolkit ${{ cuda_version }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                Span::unknown(),
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                Span::unknown(),
             )),
         ];
 

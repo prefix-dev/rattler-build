@@ -45,6 +45,9 @@ requirements:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
     - cmake
+    - if: linux
+      then:
+        - gcc ${{ gcc_version }}
   host:
     - zlib
   run:

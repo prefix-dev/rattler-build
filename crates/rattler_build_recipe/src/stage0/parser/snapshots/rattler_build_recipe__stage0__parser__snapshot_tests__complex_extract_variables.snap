@@ -5,6 +5,7 @@ expression: vars
 [
     "build_type",
     "compiler",
+    "cuda_version",
     "description",
     "extra_deps",
     "has_cpp_lib",

@@ -8,10 +8,10 @@
 //!   cargo run --example parse_recipe recipe.yaml name=foo version=1.0.0
 //!   cargo run --example parse_recipe recipe.yaml name=bar version=2.0 unix=true
 
-use std::collections::HashMap;
 use std::env;
 use std::process;
 
+use indexmap::IndexMap;
 use miette::{IntoDiagnostic, NamedSource, Result};
 use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
 
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let recipe_path = &args[1];
 
     // Parse variable arguments (key=value pairs)
-    let mut variables = HashMap::new();
+    let mut variables = IndexMap::new();
     for arg in &args[2..] {
         if let Some((key, value)) = arg.split_once('=') {
             variables.insert(key.to_string(), value.to_string());
@@ -176,7 +176,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(license) = &stage1_recipe.about().license {
-        println!("License: {}", license.as_ref());
+        println!("License: {}", license);
     }
 
     if !stage1_recipe.requirements().build.is_empty() {

@@ -453,7 +453,7 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "zlib" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1409, end: 1409, start_line: 74, start_column: 11, end_line: 74, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "zlib" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1409, end: 1409, start_line: 74, start_column: 11, end_line: 74, end_column: 11 } }),
                             ],
                         ),
                         run_constraints: ConditionalList(
@@ -703,7 +703,7 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1738, end: 1738, start_line: 89, start_column: 11, end_line: 89, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1738, end: 1738, start_line: 89, start_column: 11, end_line: 89, end_column: 11 } }),
                                 Value(Template { template: JinjaTemplate { source: "libcomplex ${{ version }}", variables: ["version"] }, span: Span { start: 1755, end: 1755, start_line: 90, start_column: 11, end_line: 90, end_column: 11 } }),
                             ],
                         ),

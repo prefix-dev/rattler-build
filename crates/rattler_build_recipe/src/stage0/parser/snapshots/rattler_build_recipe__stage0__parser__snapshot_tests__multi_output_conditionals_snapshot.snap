@@ -191,14 +191,14 @@ MultiOutput(
                     requirements: StagingRequirements {
                         build: ConditionalList(
                             [
-                                Conditional(Conditional { condition: unix, then: ListOrItem(["gcc", "make"]), else: ListOrItem("msvc") }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem([Concrete { value: "gcc", span: Span { start: 259, end: 259, start_line: 15, start_column: 15, end_line: 15, end_column: 15 } }, Concrete { value: "make", span: Span { start: 277, end: 277, start_line: 16, start_column: 15, end_line: 16, end_column: 15 } }]), else: ListOrItem(Concrete { value: "msvc", span: Span { start: 298, end: 298, start_line: 17, start_column: 17, end_line: 17, end_column: 17 } }) }),
                                 Value(Concrete { value: "cmake", span: Span { start: 313, end: 313, start_line: 18, start_column: 11, end_line: 18, end_column: 11 } }),
                             ],
                         ),
                         host: ConditionalList(
                             [
-                                Conditional(Conditional { condition: linux, then: ListOrItem("glibc"), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: osx, then: ListOrItem("libcxx"), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: linux, then: ListOrItem(Concrete { value: "glibc", span: Span { start: 367, end: 367, start_line: 21, start_column: 17, end_line: 21, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: "libcxx", span: Span { start: 407, end: 407, start_line: 23, start_column: 17, end_line: 23, end_column: 17 } }), else: ListOrItem([]) }),
                             ],
                         ),
                         ignore_run_exports: None,
@@ -206,7 +206,7 @@ MultiOutput(
                     build: StagingBuild {
                         script: ConditionalList(
                             [
-                                Conditional(Conditional { condition: unix, then: ListOrItem(Command("make all")), else: ListOrItem(Command("nmake all")) }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: Command("make all"), span: Span { start: 474, end: 474, start_line: 27, start_column: 17, end_line: 27, end_column: 17 } }), else: ListOrItem(Concrete { value: Command("nmake all"), span: Span { start: 499, end: 499, start_line: 28, start_column: 17, end_line: 28, end_column: 17 } }) }),
                             ],
                         ),
                     },
@@ -276,9 +276,9 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Conditional(Conditional { condition: linux, then: ListOrItem([Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libstdcxx-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })]), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: osx, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: win, then: ListOrItem(Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "vs2019-runtime" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None })), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: linux, then: ListOrItem([Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 676, end: 676, start_line: 38, start_column: 15, end_line: 38, end_column: 15 } }, Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libstdcxx-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 700, end: 700, start_line: 39, start_column: 15, end_line: 39, end_column: 15 } }]), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 747, end: 747, start_line: 41, start_column: 17, end_line: 41, end_column: 17 } }), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "vs2019-runtime" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 788, end: 788, start_line: 43, start_column: 17, end_line: 43, end_column: 17 } }), else: ListOrItem([]) }),
                             ],
                         ),
                         run_constraints: ConditionalList(
@@ -457,8 +457,8 @@ MultiOutput(
                             CommandsTest {
                                 script: ConditionalList(
                                     [
-                                        Conditional(Conditional { condition: unix, then: ListOrItem(Command("test -f $PREFIX/bin/conditional-pkg")), else: ListOrItem([]) }),
-                                        Conditional(Conditional { condition: win, then: ListOrItem(Command("if not exist %PREFIX%\\\\Library\\\\bin\\\\conditional-pkg.exe exit 1")), else: ListOrItem([]) }),
+                                        Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: Command("test -f $PREFIX/bin/conditional-pkg"), span: Span { start: 967, end: 967, start_line: 50, start_column: 19, end_line: 50, end_column: 19 } }), else: ListOrItem([]) }),
+                                        Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: Command("if not exist %PREFIX%\\\\Library\\\\bin\\\\conditional-pkg.exe exit 1"), span: Span { start: 1041, end: 1041, start_line: 52, start_column: 19, end_line: 52, end_column: 19 } }), else: ListOrItem([]) }),
                                     ],
                                 ),
                                 requirements: None,
