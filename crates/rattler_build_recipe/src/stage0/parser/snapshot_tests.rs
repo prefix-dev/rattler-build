@@ -1,7 +1,7 @@
 //! Snapshot tests for recipe parsing using insta
 //!
 //! These tests parse real recipe files from test-data/ and snapshot the results
-
+#[cfg(not(target_os = "windows"))]
 use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
 
 #[cfg(not(target_os = "windows"))]
