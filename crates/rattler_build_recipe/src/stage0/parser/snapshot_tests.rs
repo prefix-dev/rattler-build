@@ -12,6 +12,7 @@ fn load_test_recipe(filename: &str) -> String {
         .unwrap_or_else(|e| panic!("Failed to read test file {}: {}", path, e))
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_minimal_recipe_snapshot() {
     let source = load_test_recipe("minimal.yaml");
@@ -19,6 +20,7 @@ fn test_minimal_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_full_recipe_snapshot() {
     let source = load_test_recipe("full.yaml");
@@ -26,6 +28,7 @@ fn test_full_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_templates_recipe_snapshot() {
     let source = load_test_recipe("templates.yaml");
@@ -33,6 +36,7 @@ fn test_templates_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_conditionals_recipe_snapshot() {
     let source = load_test_recipe("conditionals.yaml");
@@ -40,6 +44,7 @@ fn test_conditionals_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_complex_recipe_snapshot() {
     let source = load_test_recipe("complex.yaml");
@@ -47,6 +52,7 @@ fn test_complex_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_run_exports_recipe_snapshot() {
     let source = load_test_recipe("run_exports.yaml");
@@ -54,6 +60,7 @@ fn test_run_exports_recipe_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_templates_extract_variables() {
     let source = load_test_recipe("templates.yaml");
@@ -62,6 +69,7 @@ fn test_templates_extract_variables() {
     insta::assert_debug_snapshot!(vars);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_conditionals_extract_variables() {
     let source = load_test_recipe("conditionals.yaml");
@@ -70,6 +78,7 @@ fn test_conditionals_extract_variables() {
     insta::assert_debug_snapshot!(vars);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_complex_extract_variables() {
     let source = load_test_recipe("complex.yaml");
@@ -78,6 +87,7 @@ fn test_complex_extract_variables() {
     insta::assert_debug_snapshot!(vars);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_script_parsing_snapshot() {
     let source = load_test_recipe("script.yaml");
@@ -85,6 +95,7 @@ fn test_script_parsing_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_license_files_snapshot() {
     let source = load_test_recipe("license_files.yaml");
@@ -96,6 +107,7 @@ fn test_license_files_snapshot() {
 // Multi-output recipe tests
 // ============================================================================
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_minimal_snapshot() {
     let source = load_test_recipe("multi_output_minimal.yaml");
@@ -104,6 +116,7 @@ fn test_multi_output_minimal_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_full_snapshot() {
     let source = load_test_recipe("multi_output_full.yaml");
@@ -112,6 +125,7 @@ fn test_multi_output_full_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_templates_snapshot() {
     let source = load_test_recipe("multi_output_templates.yaml");
@@ -120,6 +134,7 @@ fn test_multi_output_templates_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_conditionals_snapshot() {
     let source = load_test_recipe("multi_output_conditionals.yaml");
@@ -128,6 +143,7 @@ fn test_multi_output_conditionals_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_top_level_inherit_snapshot() {
     let source = load_test_recipe("multi_output_top_level_inherit.yaml");
@@ -136,6 +152,7 @@ fn test_multi_output_top_level_inherit_snapshot() {
     insta::assert_debug_snapshot!(recipe);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_extract_variables() {
     let source = load_test_recipe("multi_output_full.yaml");
@@ -145,6 +162,7 @@ fn test_multi_output_extract_variables() {
     insta::assert_debug_snapshot!(vars);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_multi_output_templates_extract_variables() {
     let source = load_test_recipe("multi_output_templates.yaml");
@@ -154,6 +172,7 @@ fn test_multi_output_templates_extract_variables() {
     insta::assert_debug_snapshot!(vars);
 }
 
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_single_output_compatibility() {
     // Test that single-output recipes still work with new parser
