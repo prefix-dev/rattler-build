@@ -80,7 +80,7 @@ impl ParseError {
     }
 
     /// Create a generic parse error with a message
-    pub fn parse_error(message: impl Into<String>) -> Self {
+    pub fn from_message(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::ParseError, Span::unknown()).with_message(message)
     }
 }

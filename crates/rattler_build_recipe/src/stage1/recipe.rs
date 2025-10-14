@@ -36,6 +36,7 @@ pub struct Recipe {
 
 impl Recipe {
     /// Create a new Recipe
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         package: Package,
         build: Build,
