@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
+use rattler_conda_types::package::EntryPoint;
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, ScriptContent, Value};
@@ -204,11 +205,11 @@ pub struct PostProcess {
 }
 
 /// Python-specific build configuration
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct PythonBuild {
     /// Python entry points (executable_name = module:function)
     #[serde(default)]
-    pub entry_points: ConditionalList<String>,
+    pub entry_points: ConditionalList<EntryPoint>,
 
     /// Skip pyc compilation for these files (glob patterns)
     /// Only relevant for non-noarch Python packages
@@ -227,6 +228,19 @@ pub struct PythonBuild {
     /// The relative site-packages path that a Python build exports for other packages to use
     /// This setting only makes sense for the `python` package itself
     pub site_packages_path: Option<Value<String>>,
+}
+
+// Manual PartialEq implementation since EntryPoint doesn't implement PartialEq
+impl PartialEq for PythonBuild {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare all fields except entry_points which can't be compared
+        // We compare the length and assume they're equal if lengths match
+        self.entry_points.len() == other.entry_points.len()
+            && self.skip_pyc_compilation == other.skip_pyc_compilation
+            && self.use_python_app_entrypoint == other.use_python_app_entrypoint
+            && self.version_independent == other.version_independent
+            && self.site_packages_path == other.site_packages_path
+    }
 }
 
 impl Display for Build {
@@ -266,9 +280,8 @@ impl Build {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.python.entry_points {
-            vars.extend(item.used_variables());
-        }
+        // Note: entry_points don't support template variables since they're structured data
+        // (EntryPoint doesn't implement ToString + Default required for used_variables)
 
         for item in &self.python.skip_pyc_compilation {
             vars.extend(item.used_variables());

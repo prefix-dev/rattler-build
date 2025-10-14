@@ -1,4 +1,5 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
+use rattler_conda_types::package::EntryPoint;
 use serde::{Deserialize, Serialize};
 
 use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
@@ -45,14 +46,60 @@ pub struct ForceFileType {
 }
 
 /// Post-processing operations using regex replacements
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PostProcess {
     /// Files to apply this post-processing to
     pub files: GlobVec,
     /// Regular expression pattern to match
-    pub regex: String,
+    pub regex: regex::Regex,
     /// Replacement string
     pub replacement: String,
+}
+
+impl PartialEq for PostProcess {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare regex patterns as strings since Regex doesn't implement PartialEq
+        self.files == other.files
+            && self.regex.as_str() == other.regex.as_str()
+            && self.replacement == other.replacement
+    }
+}
+
+impl serde::Serialize for PostProcess {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PostProcess", 3)?;
+        state.serialize_field("files", &self.files)?;
+        state.serialize_field("regex", self.regex.as_str())?;
+        state.serialize_field("replacement", &self.replacement)?;
+        state.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PostProcess {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct PostProcessHelper {
+            files: GlobVec,
+            regex: String,
+            replacement: String,
+        }
+
+        let helper = PostProcessHelper::deserialize(deserializer)?;
+        let regex = regex::Regex::new(&helper.regex).map_err(serde::de::Error::custom)?;
+
+        Ok(PostProcess {
+            files: helper.files,
+            regex,
+            replacement: helper.replacement,
+        })
+    }
 }
 
 /// Evaluated build configuration with all templates and conditionals resolved
@@ -151,10 +198,10 @@ pub enum LinkingCheckBehavior {
 }
 
 /// Python-specific build configuration
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PythonBuild {
     /// Python entry points (executable_name = module:function)
-    pub entry_points: Vec<String>,
+    pub entry_points: Vec<EntryPoint>,
 
     /// Skip pyc compilation for these files (validated glob patterns)
     /// Only relevant for non-noarch Python packages
@@ -170,6 +217,19 @@ pub struct PythonBuild {
     /// The relative site-packages path that a Python build exports for other packages to use
     /// This setting only makes sense for the `python` package itself
     pub site_packages_path: Option<String>,
+}
+
+// Manual PartialEq implementation since EntryPoint doesn't implement PartialEq
+impl PartialEq for PythonBuild {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare all fields except entry_points which can't be compared
+        // We compare the length and assume they're equal if lengths match
+        self.entry_points.len() == other.entry_points.len()
+            && self.skip_pyc_compilation == other.skip_pyc_compilation
+            && self.use_python_app_entrypoint == other.use_python_app_entrypoint
+            && self.version_independent == other.version_independent
+            && self.site_packages_path == other.site_packages_path
+    }
 }
 
 /// NoArch type for platform-independent packages

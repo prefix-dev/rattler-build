@@ -6,13 +6,14 @@ use crate::{
     error::{ParseError, ParseResult},
     span::SpannedString,
     stage0::{
+        Requirements,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
-            StagingBuild, StagingMetadata, StagingOutput, StagingRequirements,
+            StagingBuild, StagingMetadata, StagingOutput,
         },
         parser::{
-            get_span, parse_about, parse_build, parse_conditional_list, parse_extra,
-            parse_requirements, parse_source, parse_tests, parse_value,
+            get_span, parse_about, parse_build, parse_extra, parse_requirements, parse_source,
+            parse_tests, parse_value,
         },
     },
 };
@@ -268,7 +269,7 @@ fn parse_staging_output(
     let requirements = if let Some(req_node) = mapping.get("requirements") {
         parse_staging_requirements(req_node)?
     } else {
-        StagingRequirements::default()
+        Requirements::default()
     };
 
     // Parse optional build (only script allowed)
@@ -347,30 +348,18 @@ fn parse_staging_metadata(yaml: &MarkedNode) -> ParseResult<StagingMetadata> {
 }
 
 /// Parse staging requirements (only build/host/ignore_run_exports allowed)
-fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<StagingRequirements> {
+fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("requirements must be a mapping")
     })?;
 
-    let mut requirements = StagingRequirements::default();
-
-    for (key_node, value_node) in mapping.iter() {
+    // First validate that only allowed fields are present
+    for (key_node, _) in mapping.iter() {
         let key = key_node.as_str();
-
         match key {
-            "build" => {
-                requirements.build = parse_conditional_list(value_node)?;
-            }
-            "host" => {
-                requirements.host = parse_conditional_list(value_node)?;
-            }
-            "ignore_run_exports" => {
-                requirements.ignore_run_exports = Some(
-                    crate::stage0::parser::requirements::parse_ignore_run_exports(value_node)?,
-                );
-            }
-            "run" | "run_constraints" => {
+            "build" | "host" | "ignore_run_exports" => {}
+            "run" | "run_constraints" | "run_exports" => {
                 return Err(ParseError::invalid_value(
                     "staging requirements",
                     &format!("'{}' is not allowed in staging requirements", key),
@@ -391,7 +380,8 @@ fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<StagingRequireme
         }
     }
 
-    Ok(requirements)
+    // Parse using the regular parse_requirements function
+    parse_requirements(yaml)
 }
 
 /// Parse staging build (only script allowed)

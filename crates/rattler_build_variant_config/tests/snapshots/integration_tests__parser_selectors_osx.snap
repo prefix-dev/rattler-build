@@ -1,0 +1,18 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+compiler:
+  - clang
+filter:
+  - appears
+foobar:
+  - unknown
+mixed:
+  - static_value
+  - jinja_value
+python:
+  - "3.14"
+  - "3.15"
+target:
+  - osx-arm64

@@ -2,6 +2,36 @@
 
 This directory contains examples demonstrating the `rattler_build_recipe` crate functionality.
 
+## Running Examples
+
+### Easy Method (Recommended)
+
+The repository includes cargo aliases that automatically enable all required features:
+
+**From the crate directory** (`crates/rattler_build_recipe`):
+```bash
+cargo example parse_recipe -- recipe.yaml
+```
+
+**From the workspace root**:
+```bash
+cargo example-recipe parse_recipe -- recipe.yaml
+```
+
+### Manual Method
+
+If the cargo alias doesn't work or you prefer manual control:
+
+```bash
+# With all features (recommended)
+cargo run --example parse_recipe --all-features -- <recipe.yaml> [OPTIONS]
+
+# With specific features
+cargo run --example parse_recipe --features "miette,variant-config" -- <recipe.yaml> [OPTIONS]
+```
+
+**Note:** Examples require the `miette` and `variant-config` features to be enabled.
+
 ## Parse Recipe Example
 
 The `parse_recipe` binary demonstrates parsing and evaluating recipe YAML files.
@@ -9,37 +39,52 @@ The `parse_recipe` binary demonstrates parsing and evaluating recipe YAML files.
 ### Usage
 
 ```bash
-cargo run --example parse_recipe <recipe.yaml> [key=value ...]
+cargo example parse_recipe -- <recipe.yaml> [OPTIONS]
 ```
+
+### Command-line Options
+
+- `-v, --variants <FILE>`: Path to variant configuration file (e.g., `variants.yaml`)
+- `-D, --define <KEY=VALUE>`: Define context variables (can be used multiple times)
 
 ### Examples
 
 **Basic usage (no variables):**
 ```bash
-cargo run --example parse_recipe examples/simple_recipe.yaml
+cargo example parse_recipe -- examples/simple_recipe.yaml
 ```
 
 **With variable substitution:**
 ```bash
-cargo run --example parse_recipe examples/simple_recipe.yaml \
-  name=mypackage \
-  version=1.2.3 \
-  org=myorg \
-  maintainer="Bob Smith" \
-  unix=true \
-  python_version=3.11 \
-  adjective=cool
+cargo example parse_recipe -- examples/simple_recipe.yaml \
+  -Dname=mypackage \
+  -Dversion=1.2.3 \
+  -Dorg=myorg \
+  -Dmaintainer="Bob Smith" \
+  -Dunix=true \
+  -Dpython_version=3.11 \
+  -Dadjective=cool
+```
+
+**With variant configuration (build matrices):**
+```bash
+cargo example parse_recipe -- recipe.yaml --variants variants.yaml
+```
+
+**Combining variants with extra context:**
+```bash
+cargo example parse_recipe -- recipe.yaml --variants variants.yaml -Dunix=true
 ```
 
 **With conditionals (unix vs windows):**
 ```bash
 # Unix build
-cargo run --example parse_recipe examples/simple_recipe.yaml \
-  name=foo version=1.0.0 unix=true python_version=3.11
+cargo example parse_recipe -- examples/simple_recipe.yaml \
+  -Dname=foo -Dversion=1.0.0 -Dunix=true -Dpython_version=3.11
 
 # Windows build
-cargo run --example parse_recipe examples/simple_recipe.yaml \
-  name=foo version=1.0.0 python_version=3.11
+cargo example parse_recipe -- examples/simple_recipe.yaml \
+  -Dname=foo -Dversion=1.0.0 -Dpython_version=3.11
 ```
 
 ### What it shows

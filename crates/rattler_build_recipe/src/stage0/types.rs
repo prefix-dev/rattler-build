@@ -4,7 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use rattler_conda_types::{MatchSpec, ParseStrictness};
 use serde::{Deserialize, Serialize};
 
 /// Trait for types that can report which template variables they use
@@ -121,108 +120,6 @@ impl<'de> Deserialize<'de> for JinjaExpression {
     {
         let source = String::deserialize(deserializer)?;
         JinjaExpression::new(source).map_err(serde::de::Error::custom)
-    }
-}
-
-/// Wrapper around MatchSpec with Serialize/Deserialize support
-/// This allows MatchSpec to be validated at parse time while working with the Value<T> infrastructure
-///
-/// Supports two variants:
-/// - Parsed: A validated MatchSpec (for concrete strings without templates)
-/// - Deferred: A template string that will be validated later during evaluation
-#[derive(Debug, Clone, PartialEq)]
-pub enum MatchSpecWrapper {
-    /// A validated MatchSpec (parsed at parse time)
-    Parsed(Box<MatchSpec>),
-    /// A template string that will be validated during evaluation (stage0 -> stage1)
-    Deferred(String),
-}
-
-impl MatchSpecWrapper {
-    /// Create a new MatchSpecWrapper from a MatchSpec
-    pub fn new(spec: MatchSpec) -> Self {
-        Self::Parsed(Box::new(spec))
-    }
-
-    /// Get a reference to the inner MatchSpec (panics if Deferred)
-    pub fn inner(&self) -> &MatchSpec {
-        match self {
-            MatchSpecWrapper::Parsed(spec) => spec,
-            MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
-        }
-    }
-
-    /// Consume the wrapper and return the inner MatchSpec (panics if Deferred)
-    pub fn into_inner(self) -> Box<MatchSpec> {
-        match self {
-            MatchSpecWrapper::Parsed(spec) => spec,
-            MatchSpecWrapper::Deferred(_) => panic!("Cannot get MatchSpec from deferred template"),
-        }
-    }
-
-    /// Get the string representation (either from MatchSpec or the deferred template)
-    pub fn as_str(&self) -> String {
-        match self {
-            MatchSpecWrapper::Parsed(spec) => spec.to_string(),
-            MatchSpecWrapper::Deferred(s) => s.clone(),
-        }
-    }
-
-    /// Check if this wrapper contains a template
-    pub fn is_deferred(&self) -> bool {
-        matches!(self, MatchSpecWrapper::Deferred(_))
-    }
-}
-
-impl Display for MatchSpecWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MatchSpecWrapper::Parsed(spec) => write!(f, "{}", spec),
-            MatchSpecWrapper::Deferred(s) => write!(f, "{}", s),
-        }
-    }
-}
-
-impl FromStr for MatchSpecWrapper {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // If the string contains a template, defer validation until evaluation
-        if s.contains("${{") {
-            return Ok(MatchSpecWrapper::Deferred(s.to_string()));
-        }
-
-        // Otherwise, validate as MatchSpec now
-        MatchSpec::from_str(s, ParseStrictness::Strict)
-            .map(|spec| MatchSpecWrapper::Parsed(Box::new(spec)))
-            .map_err(|e| format!("Invalid match spec: {}", e))
-    }
-}
-
-impl Serialize for MatchSpecWrapper {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        // Serialize as string using Display
-        self.as_str().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for MatchSpecWrapper {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let source = String::deserialize(deserializer)?;
-        MatchSpecWrapper::from_str(&source).map_err(serde::de::Error::custom)
-    }
-}
-
-impl Default for MatchSpecWrapper {
-    fn default() -> Self {
-        // Default MatchSpec is an empty spec
-        MatchSpecWrapper::Parsed(Box::default())
     }
 }
 
@@ -595,8 +492,8 @@ pub enum Item<T> {
 impl<T> Item<T> {
     pub fn new_from_conditional(
         condition: String,
-        then: Vec<T>,
-        else_value: Vec<T>,
+        then: Vec<Value<T>>,
+        else_value: Vec<Value<T>>,
     ) -> Result<Self, String> {
         let condition = JinjaExpression::new(condition)?;
         Ok(Item::Conditional(Conditional {
@@ -835,8 +732,8 @@ impl<T> ListOrItem<T> {
 #[derive(Clone, PartialEq)]
 pub struct Conditional<T> {
     pub condition: JinjaExpression,
-    pub then: ListOrItem<T>,
-    pub else_value: ListOrItem<T>,
+    pub then: ListOrItem<Value<T>>,
+    pub else_value: ListOrItem<Value<T>>,
 }
 
 // Custom serialization for Conditional
@@ -1042,7 +939,7 @@ impl<T: ToString + Default + Debug> IncludeExclude<T> {
 }
 
 impl<T: ToString + Default + Debug> Conditional<T> {
-    pub fn new(condition: String, then_value: ListOrItem<T>) -> Result<Self, String> {
+    pub fn new(condition: String, then_value: ListOrItem<Value<T>>) -> Result<Self, String> {
         let condition = JinjaExpression::new(condition)?;
         Ok(Self {
             condition,
@@ -1051,15 +948,28 @@ impl<T: ToString + Default + Debug> Conditional<T> {
         })
     }
 
-    pub fn with_else(mut self, else_value: ListOrItem<T>) -> Self {
+    pub fn with_else(mut self, else_value: ListOrItem<Value<T>>) -> Self {
         self.else_value = else_value;
         self
     }
 
-    /// Collect all variables used in this conditional (cached, O(1))
+    /// Collect all variables used in this conditional
     pub fn used_variables(&self) -> Vec<String> {
-        // Variables are pre-computed and cached in JinjaExpression
-        self.condition.used_variables().to_vec()
+        let mut vars = self.condition.used_variables().to_vec();
+
+        // Collect variables from then values
+        for value in self.then.iter() {
+            vars.extend(value.used_variables());
+        }
+
+        // Collect variables from else values
+        for value in self.else_value.iter() {
+            vars.extend(value.used_variables());
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
     }
 }
 
@@ -1231,9 +1141,18 @@ mod tests {
 
     #[test]
     fn test_conditional_simple() {
-        let cond = Conditional::new("linux".to_string(), ListOrItem::single("gcc".to_string()))
-            .unwrap()
-            .with_else(ListOrItem::single("clang".to_string()));
+        let cond = Conditional::new(
+            "linux".to_string(),
+            ListOrItem::single(Value::new_concrete(
+                "gcc".to_string(),
+                crate::span::Span::unknown(),
+            )),
+        )
+        .unwrap()
+        .with_else(ListOrItem::single(Value::new_concrete(
+            "clang".to_string(),
+            crate::span::Span::unknown(),
+        )));
         let vars = cond.used_variables();
         assert_eq!(vars, vec!["linux"]);
     }
@@ -1242,7 +1161,10 @@ mod tests {
     fn test_conditional_complex_expression() {
         let cond = Conditional::new(
             "target_platform == 'linux' and version >= '3.0'".to_string(),
-            ListOrItem::single("gcc".to_string()),
+            ListOrItem::single(Value::new_concrete(
+                "gcc".to_string(),
+                crate::span::Span::unknown(),
+            )),
         )
         .unwrap();
         let mut vars = cond.used_variables();
@@ -1262,9 +1184,18 @@ mod tests {
 
     #[test]
     fn test_item_conditional_variant() {
-        let cond = Conditional::new("unix".to_string(), ListOrItem::single("bash".to_string()))
-            .unwrap()
-            .with_else(ListOrItem::single("cmd".to_string()));
+        let cond = Conditional::new(
+            "unix".to_string(),
+            ListOrItem::single(Value::new_concrete(
+                "bash".to_string(),
+                crate::span::Span::unknown(),
+            )),
+        )
+        .unwrap()
+        .with_else(ListOrItem::single(Value::new_concrete(
+            "cmd".to_string(),
+            crate::span::Span::unknown(),
+        )));
         let item: Item<String> = Item::Conditional(cond);
         let vars = item.used_variables();
         assert_eq!(vars, vec!["unix"]);
@@ -1284,10 +1215,16 @@ mod tests {
             Item::Conditional(
                 Conditional::new(
                     "linux".to_string(),
-                    ListOrItem::single("linux-gcc".to_string()),
+                    ListOrItem::single(Value::new_concrete(
+                        "linux-gcc".to_string(),
+                        crate::span::Span::unknown(),
+                    )),
                 )
                 .unwrap()
-                .with_else(ListOrItem::single("other-compiler".to_string())),
+                .with_else(ListOrItem::single(Value::new_concrete(
+                    "other-compiler".to_string(),
+                    crate::span::Span::unknown(),
+                ))),
             ),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ python }}".to_string()).unwrap(),
@@ -1316,7 +1253,10 @@ mod tests {
             Item::Conditional(
                 Conditional::new(
                     "name == 'foo'".to_string(),
-                    ListOrItem::single("bar".to_string()),
+                    ListOrItem::single(Value::new_concrete(
+                        "bar".to_string(),
+                        crate::span::Span::unknown(),
+                    )),
                 )
                 .unwrap(),
             ),

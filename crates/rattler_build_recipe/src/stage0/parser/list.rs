@@ -15,7 +15,7 @@ pub fn parse_conditional_list<T>(
     yaml: &MarkedNode,
 ) -> ParseResult<crate::stage0::types::ConditionalList<T>>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
     let sequence = yaml
@@ -34,7 +34,7 @@ where
 /// This handles both simple values and conditional (if/then/else) items
 fn parse_item<T>(yaml: &MarkedNode) -> ParseResult<crate::stage0::types::Item<T>>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
     // Check if it's a mapping with "if" key (conditional)
@@ -76,7 +76,7 @@ where
 /// Parse a Conditional<T> from YAML
 fn parse_conditional<T>(yaml: &MarkedNode) -> ParseResult<crate::stage0::types::Item<T>>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
     let mapping = yaml.as_mapping().ok_or_else(|| {

@@ -119,7 +119,7 @@ pub struct StagingOutput {
 
     /// Requirements for staging build (only build/host/ignore_run_exports allowed)
     #[serde(default)]
-    pub requirements: StagingRequirements,
+    pub requirements: Requirements,
 
     /// Build configuration (only script is allowed)
     #[serde(default)]
@@ -131,31 +131,6 @@ pub struct StagingOutput {
 pub struct StagingMetadata {
     /// Name of the staging cache (required, must follow PackageName rules)
     pub name: Value<String>,
-}
-
-/// Requirements for staging outputs
-///
-/// Only build, host, and ignore_run_exports are allowed.
-/// run and run_constraints are not permitted.
-#[derive(Debug, Clone, PartialEq, Serialize, Default)]
-pub struct StagingRequirements {
-    /// Build-time dependencies
-    #[serde(
-        default,
-        skip_serializing_if = "crate::stage0::types::ConditionalList::is_empty"
-    )]
-    pub build: crate::stage0::types::ConditionalList<String>,
-
-    /// Host dependencies
-    #[serde(
-        default,
-        skip_serializing_if = "crate::stage0::types::ConditionalList::is_empty"
-    )]
-    pub host: crate::stage0::types::ConditionalList<String>,
-
-    /// Ignore run exports configuration
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ignore_run_exports: Option<crate::stage0::requirements::IgnoreRunExports>,
 }
 
 /// Build configuration for staging outputs
@@ -239,6 +214,14 @@ impl Recipe {
             Recipe::MultiOutput(multi) => multi.as_ref().used_variables(),
         }
     }
+
+    /// Get all free specs (specs without version or build constraints) across the entire recipe
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        match self {
+            Recipe::SingleOutput(single) => single.as_ref().free_specs(),
+            Recipe::MultiOutput(multi) => multi.as_ref().free_specs(),
+        }
+    }
 }
 
 impl SingleOutputRecipe {
@@ -261,6 +244,11 @@ impl SingleOutputRecipe {
         vars.sort();
         vars.dedup();
         vars
+    }
+
+    /// Get all free specs (specs without version or build constraints) in this single-output recipe
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        self.requirements.free_specs()
     }
 }
 
@@ -297,6 +285,20 @@ impl MultiOutputRecipe {
         vars.dedup();
         vars
     }
+
+    /// Get all free specs (specs without version or build constraints) across all outputs
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        let mut specs = Vec::new();
+
+        // Collect free specs from all outputs
+        for output in &self.outputs {
+            specs.extend(output.free_specs());
+        }
+
+        specs.sort();
+        specs.dedup();
+        specs
+    }
 }
 
 impl Output {
@@ -305,6 +307,14 @@ impl Output {
         match self {
             Output::Staging(staging) => staging.as_ref().used_variables(),
             Output::Package(package) => package.as_ref().used_variables(),
+        }
+    }
+
+    /// Get all free specs (specs without version or build constraints) in this output
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        match self {
+            Output::Staging(staging) => staging.as_ref().free_specs(),
+            Output::Package(package) => package.as_ref().free_specs(),
         }
     }
 }
@@ -321,6 +331,11 @@ impl StagingOutput {
         vars.sort();
         vars.dedup();
         vars
+    }
+
+    /// Get all free specs (specs without version or build constraints) in this staging output
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        self.requirements.free_specs()
     }
 }
 
@@ -342,6 +357,11 @@ impl PackageOutput {
         vars.dedup();
         vars
     }
+
+    /// Get all free specs (specs without version or build constraints) in this package output
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        self.requirements.free_specs()
+    }
 }
 
 impl Inherit {
@@ -352,21 +372,6 @@ impl Inherit {
             Inherit::CacheName(name) => name.used_variables(),
             Inherit::CacheWithOptions(options) => options.from.used_variables(),
         }
-    }
-}
-
-impl StagingRequirements {
-    /// Get all used variables in staging requirements
-    pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = Vec::new();
-        vars.extend(self.build.used_variables());
-        vars.extend(self.host.used_variables());
-        if let Some(ignore) = &self.ignore_run_exports {
-            vars.extend(ignore.used_variables());
-        }
-        vars.sort();
-        vars.dedup();
-        vars
     }
 }
 

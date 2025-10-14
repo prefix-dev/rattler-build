@@ -149,17 +149,17 @@ SingleOutputRecipe {
     requirements: Requirements {
         build: ConditionalList(
             [
-                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 194, end: 194, start_line: 12, start_column: 7, end_line: 12, end_column: 7 } }),
+                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 194, end: 194, start_line: 12, start_column: 7, end_line: 12, end_column: 7 } }),
             ],
         ),
         host: ConditionalList(
             [
-                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 212, end: 212, start_line: 14, start_column: 7, end_line: 14, end_column: 7 } }),
+                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 212, end: 212, start_line: 14, start_column: 7, end_line: 14, end_column: 7 } }),
             ],
         ),
         run: ConditionalList(
             [
-                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 232, end: 232, start_line: 16, start_column: 7, end_line: 16, end_column: 7 } }),
+                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 232, end: 232, start_line: 16, start_column: 7, end_line: 16, end_column: 7 } }),
             ],
         ),
         run_constraints: ConditionalList(
@@ -168,28 +168,28 @@ SingleOutputRecipe {
         run_exports: RunExports {
             noarch: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "library-with-exports-noarch" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 274, end: 274, start_line: 19, start_column: 9, end_line: 19, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "library-with-exports-noarch" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 274, end: 274, start_line: 19, start_column: 9, end_line: 19, end_column: 9 } }),
                 ],
             ),
             strong: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "library-with-exports" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 322, end: 322, start_line: 21, start_column: 9, end_line: 21, end_column: 9 } }),
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libfoo" }), version: Some(Range(GreaterEquals, Version { version: [[0], [1], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 351, end: 351, start_line: 22, start_column: 9, end_line: 22, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "library-with-exports" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 322, end: 322, start_line: 21, start_column: 9, end_line: 21, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libfoo" }), version: Some(Range(GreaterEquals, Version { version: [[0], [1], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 351, end: 351, start_line: 22, start_column: 9, end_line: 22, end_column: 9 } }),
                 ],
             ),
             strong_constraints: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libbar" }), version: Some(Range(Less, Version { version: [[0], [2], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 396, end: 396, start_line: 24, start_column: 9, end_line: 24, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libbar" }), version: Some(Range(Less, Version { version: [[0], [2], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 396, end: 396, start_line: 24, start_column: 9, end_line: 24, end_column: 9 } }),
                 ],
             ),
             weak: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "optional-dep" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 426, end: 426, start_line: 26, start_column: 9, end_line: 26, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "optional-dep" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 426, end: 426, start_line: 26, start_column: 9, end_line: 26, end_column: 9 } }),
                 ],
             ),
             weak_constraints: ConditionalList(
                 [
-                    Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "another-optional" }), version: Some(Range(Less, Version { version: [[0], [3], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 469, end: 469, start_line: 28, start_column: 9, end_line: 28, end_column: 9 } }),
+                    Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "another-optional" }), version: Some(Range(Less, Version { version: [[0], [3], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 469, end: 469, start_line: 28, start_column: 9, end_line: 28, end_column: 9 } }),
                 ],
             ),
         },

@@ -4294,6 +4294,7 @@ dependencies = [
 name = "rattler_build_recipe"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "fs-err",
  "globset",
  "indexmap 2.11.4",
@@ -4303,7 +4304,9 @@ dependencies = [
  "miette",
  "minijinja",
  "pathdiff",
+ "rattler_build_variant_config",
  "rattler_conda_types",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4342,6 +4345,22 @@ dependencies = [
  "tracing",
  "url",
  "zip 5.1.1",
+]
+
+[[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_conda_types",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tracing",
 ]
 
 [[package]]

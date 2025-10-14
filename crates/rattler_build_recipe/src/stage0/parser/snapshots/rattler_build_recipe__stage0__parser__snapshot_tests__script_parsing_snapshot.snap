@@ -232,7 +232,7 @@ SingleOutputRecipe {
             CommandsTest {
                 script: ConditionalList(
                     [
-                        Conditional(Conditional { condition: unix, then: ListOrItem(Command("echo \"This is a unix-like system\"")), else: ListOrItem(Command("echo \"This is not a unix-like system\"")) }),
+                        Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: Command("echo \"This is a unix-like system\""), span: Span { start: 229, end: 229, start_line: 14, start_column: 13, end_line: 14, end_column: 13 } }), else: ListOrItem(Concrete { value: Command("echo \"This is not a unix-like system\""), span: Span { start: 289, end: 289, start_line: 16, start_column: 13, end_line: 16, end_column: 13 } }) }),
                     ],
                 ),
                 requirements: None,

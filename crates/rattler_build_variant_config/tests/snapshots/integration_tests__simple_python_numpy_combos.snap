@@ -1,0 +1,22 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: combinations
+---
+- numpy: "1.20"
+  python: "3.10"
+- numpy: "1.20"
+  python: "3.11"
+- numpy: "1.20"
+  python: "3.9"
+- numpy: "1.21"
+  python: "3.10"
+- numpy: "1.21"
+  python: "3.11"
+- numpy: "1.21"
+  python: "3.9"
+- numpy: "1.22"
+  python: "3.10"
+- numpy: "1.22"
+  python: "3.11"
+- numpy: "1.22"
+  python: "3.9"

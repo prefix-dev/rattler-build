@@ -8,7 +8,7 @@
 //! The transformation from stage0 to stage1 happens through the `Evaluate` trait.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     sync::{Arc, Mutex},
 };
 
@@ -30,6 +30,7 @@ pub use all_or_glob_vec::AllOrGlobVec;
 pub use build::Build;
 pub use extra::Extra;
 pub use glob_vec::GlobVec;
+use indexmap::IndexMap;
 pub use package::Package;
 pub use recipe::Recipe;
 pub use requirements::{Dependency, Pin, PinArgs, PinCompatible, PinSubpackage, Requirements};
@@ -40,7 +41,7 @@ pub use tests::TestType;
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
     /// Variables available during evaluation (e.g., "name", "version", "py", "target_platform")
-    variables: HashMap<String, String>,
+    variables: IndexMap<String, String>,
     /// Configuration for Jinja functions (compiler, cdt, etc.)
     jinja_config: JinjaConfig,
     /// Set of variables that were actually accessed during evaluation (tracked via thread-safe interior mutability)
@@ -52,7 +53,7 @@ pub struct EvaluationContext {
 impl Default for EvaluationContext {
     fn default() -> Self {
         Self {
-            variables: HashMap::new(),
+            variables: IndexMap::new(),
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -67,7 +68,7 @@ impl EvaluationContext {
     }
 
     /// Create an evaluation context from a map of variables
-    pub fn from_map(variables: HashMap<String, String>) -> Self {
+    pub fn from_map(variables: IndexMap<String, String>) -> Self {
         Self {
             variables,
             jinja_config: JinjaConfig::default(),
@@ -77,7 +78,7 @@ impl EvaluationContext {
     }
 
     /// Create an evaluation context with variables and Jinja config
-    pub fn with_config(variables: HashMap<String, String>, jinja_config: JinjaConfig) -> Self {
+    pub fn with_config(variables: IndexMap<String, String>, jinja_config: JinjaConfig) -> Self {
         Self {
             variables,
             jinja_config,
@@ -102,7 +103,7 @@ impl EvaluationContext {
     }
 
     /// Get all variables as a reference
-    pub fn variables(&self) -> &HashMap<String, String> {
+    pub fn variables(&self) -> &IndexMap<String, String> {
         &self.variables
     }
 
@@ -234,7 +235,7 @@ mod unit_tests {
 
     #[test]
     fn test_evaluation_context_from_map() {
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         map.insert("py".to_string(), "3.11".to_string());
         map.insert("target_platform".to_string(), "linux-64".to_string());
 
