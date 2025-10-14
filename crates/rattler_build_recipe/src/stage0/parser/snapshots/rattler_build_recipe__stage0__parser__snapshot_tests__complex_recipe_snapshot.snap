@@ -1,342 +1,107 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-expression: recipe
+expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
-SingleOutputRecipe {
-    schema_version: None,
-    context: {},
-    package: Package {
-        name: Template {
-            template: JinjaTemplate {
-                source: "${{ name | lower }}",
-                variables: [
-                    "name",
-                ],
-            },
-            span: Span {
-                start: 17,
-                end: 17,
-                start_line: 2,
-                start_column: 9,
-                end_line: 2,
-                end_column: 9,
-            },
-        },
-        version: Template {
-            template: JinjaTemplate {
-                source: "${{ version }}",
-                variables: [
-                    "version",
-                ],
-            },
-            span: Span {
-                start: 50,
-                end: 50,
-                start_line: 3,
-                start_column: 12,
-                end_line: 3,
-                end_column: 12,
-            },
-        },
-    },
-    build: Build {
-        number: Concrete {
-            value: 0,
-            span: Span {
-                start: 0,
-                end: 0,
-                start_line: 0,
-                start_column: 0,
-                end_line: 0,
-                end_column: 0,
-            },
-        },
-        string: None,
-        script: ConditionalList(
-            [],
-        ),
-        noarch: None,
-        python: PythonBuild {
-            entry_points: ConditionalList(
-                [],
-            ),
-            skip_pyc_compilation: ConditionalList(
-                [],
-            ),
-            use_python_app_entrypoint: false,
-            version_independent: false,
-            site_packages_path: None,
-        },
-        skip: ConditionalList(
-            [],
-        ),
-        always_copy_files: ConditionalList(
-            [],
-        ),
-        always_include_files: ConditionalList(
-            [],
-        ),
-        merge_build_and_host_envs: false,
-        files: List(
-            ConditionalList(
-                [],
-            ),
-        ),
-        dynamic_linking: DynamicLinking {
-            rpaths: ConditionalList(
-                [],
-            ),
-            binary_relocation: Boolean(
-                Concrete {
-                    value: true,
-                    span: Span {
-                        start: 0,
-                        end: 0,
-                        start_line: 0,
-                        start_column: 0,
-                        end_line: 0,
-                        end_column: 0,
-                    },
-                },
-            ),
-            missing_dso_allowlist: ConditionalList(
-                [],
-            ),
-            rpath_allowlist: ConditionalList(
-                [],
-            ),
-            overdepending_behavior: None,
-            overlinking_behavior: None,
-        },
-        variant: VariantKeyUsage {
-            use_keys: ConditionalList(
-                [],
-            ),
-            ignore_keys: ConditionalList(
-                [],
-            ),
-            down_prioritize_variant: None,
-        },
-        prefix_detection: PrefixDetection {
-            force_file_type: ForceFileType {
-                text: ConditionalList(
-                    [],
-                ),
-                binary: ConditionalList(
-                    [],
-                ),
-            },
-            ignore: Boolean(
-                Concrete {
-                    value: false,
-                    span: Span {
-                        start: 0,
-                        end: 0,
-                        start_line: 0,
-                        start_column: 0,
-                        end_line: 0,
-                        end_column: 0,
-                    },
-                },
-            ),
-            ignore_binary_files: false,
-        },
-        post_process: [],
-    },
-    requirements: Requirements {
-        build: ConditionalList(
-            [
-                Value(Template { template: JinjaTemplate { source: "${{ compiler(\"c\") }}", variables: ["compiler"] }, span: Span { start: 482, end: 482, start_line: 20, start_column: 7, end_line: 20, end_column: 7 } }),
-                Value(Template { template: JinjaTemplate { source: "${{ compiler(\"cxx\") }}", variables: ["compiler"] }, span: Span { start: 511, end: 511, start_line: 21, start_column: 7, end_line: 21, end_column: 7 } }),
-                Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "make" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 563, end: 563, start_line: 23, start_column: 13, end_line: 23, end_column: 13 } }), else: ListOrItem([]) }),
-                Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 594, end: 594, start_line: 25, start_column: 13, end_line: 25, end_column: 13 } }), else: ListOrItem([]) }),
-            ],
-        ),
-        host: ConditionalList(
-            [
-                Value(Template { template: JinjaTemplate { source: "python ${{ python }}", variables: ["python"] }, span: Span { start: 614, end: 614, start_line: 27, start_column: 7, end_line: 27, end_column: 7 } }),
-                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "setuptools" }), version: Some(Range(GreaterEquals, Version { version: [[0], [45]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 641, end: 641, start_line: 28, start_column: 7, end_line: 28, end_column: 7 } }),
-                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "wheel" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 663, end: 663, start_line: 29, start_column: 7, end_line: 29, end_column: 7 } }),
-                Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem(Template { template: JinjaTemplate { source: "cuda-toolkit ${{ cuda_version }}", variables: ["cuda_version"] }, span: Span { start: 712, end: 712, start_line: 31, start_column: 13, end_line: 31, end_column: 13 } }), else: ListOrItem([]) }),
-            ],
-        ),
-        run: ConditionalList(
-            [
-                Value(Template { template: JinjaTemplate { source: "python ${{ python }}", variables: ["python"] }, span: Span { start: 758, end: 758, start_line: 33, start_column: 7, end_line: 33, end_column: 7 } }),
-                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "numpy" }), version: Some(Group(And, [Range(GreaterEquals, Version { version: [[0], [1], [19]], local: [] }), Range(Less, Version { version: [[0], [2], [0, 'a', 0]], local: [] })])), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 785, end: 785, start_line: 34, start_column: 7, end_line: 34, end_column: 7 } }),
-                Value(Template { template: JinjaTemplate { source: "${{ pin_compatible(\"numpy\") }}", variables: ["pin_compatible"] }, span: Span { start: 811, end: 811, start_line: 35, start_column: 7, end_line: 35, end_column: 7 } }),
-                Conditional(Conditional { condition: linux, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: Some(Range(GreaterEquals, Version { version: [[0], [9], [3], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 872, end: 872, start_line: 37, start_column: 13, end_line: 37, end_column: 13 } }), else: ListOrItem([]) }),
-                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: Some(Range(GreaterEquals, Version { version: [[0], [10], [0], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 916, end: 916, start_line: 39, start_column: 13, end_line: 39, end_column: 13 } }), else: ListOrItem([]) }),
-                Conditional(Conditional { condition: build_type == "cuda", then: ListOrItem(Template { template: JinjaTemplate { source: "cuda-toolkit ${{ cuda_version }}", variables: ["cuda_version"] }, span: Span { start: 975, end: 975, start_line: 41, start_column: 13, end_line: 41, end_column: 13 } }), else: ListOrItem([]) }),
-            ],
-        ),
-        run_constraints: ConditionalList(
-            [
-                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "scipy" }), version: Some(Group(And, [Range(GreaterEquals, Version { version: [[0], [1], [5]], local: [] }), Range(Less, Version { version: [[0], [2], [0, 'a', 0]], local: [] })])), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1033, end: 1033, start_line: 43, start_column: 7, end_line: 43, end_column: 7 } }),
-                Conditional(Conditional { condition: extra_deps, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "pandas" }), version: Some(Range(GreaterEquals, Version { version: [[0], [1], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1085, end: 1085, start_line: 45, start_column: 13, end_line: 45, end_column: 13 } }), else: ListOrItem([]) }),
-            ],
-        ),
-        run_exports: RunExports {
-            noarch: ConditionalList(
-                [],
-            ),
-            strong: ConditionalList(
-                [
-                    Value(Template { template: JinjaTemplate { source: "${{ pin_subpackage(name, max_pin=\"x.x\") }}", variables: ["name", "pin_subpackage"] }, span: Span { start: 1133, end: 1133, start_line: 48, start_column: 9, end_line: 48, end_column: 9 } }),
-                ],
-            ),
-            strong_constraints: ConditionalList(
-                [],
-            ),
-            weak: ConditionalList(
-                [
-                    Conditional(Conditional { condition: has_cpp_lib, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libstdcxx-ng" }), version: Some(Range(GreaterEquals, Version { version: [[0], [9], [3], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1226, end: 1226, start_line: 51, start_column: 15, end_line: 51, end_column: 15 } }), else: ListOrItem([]) }),
-                ],
-            ),
-            weak_constraints: ConditionalList(
-                [],
-            ),
-        },
-        ignore_run_exports: IgnoreRunExports {
-            by_name: ConditionalList(
-                [
-                    Value(Concrete { value: "qt", span: Span { start: 1290, end: 1290, start_line: 54, start_column: 9, end_line: 54, end_column: 9 } }),
-                    Value(Concrete { value: "tk", span: Span { start: 1301, end: 1301, start_line: 55, start_column: 9, end_line: 55, end_column: 9 } }),
-                ],
-            ),
-            from_package: ConditionalList(
-                [
-                    Value(Concrete { value: "python", span: Span { start: 1330, end: 1330, start_line: 57, start_column: 9, end_line: 57, end_column: 9 } }),
-                ],
-            ),
-        },
-    },
-    about: About {
-        homepage: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "https://github.com/${{ org }}/${{ name }}",
-                    variables: [
-                        "name",
-                        "org",
-                    ],
-                },
-                span: Span {
-                    start: 87,
-                    end: 87,
-                    start_line: 6,
-                    start_column: 13,
-                    end_line: 6,
-                    end_column: 13,
-                },
-            },
-        ),
-        license: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "${{ license }}",
-                    variables: [
-                        "license",
-                    ],
-                },
-                span: Span {
-                    start: 140,
-                    end: 140,
-                    start_line: 7,
-                    start_column: 12,
-                    end_line: 7,
-                    end_column: 12,
-                },
-            },
-        ),
-        license_file: ConditionalList(
-            [
-                Value(Concrete { value: "LICENSE.txt", span: Span { start: 173, end: 173, start_line: 8, start_column: 17, end_line: 8, end_column: 17 } }),
-            ],
-        ),
-        license_family: None,
-        summary: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "${{ summary }}",
-                    variables: [
-                        "summary",
-                    ],
-                },
-                span: Span {
-                    start: 196,
-                    end: 196,
-                    start_line: 9,
-                    start_column: 12,
-                    end_line: 9,
-                    end_column: 12,
-                },
-            },
-        ),
-        description: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "${{ description }}\n\nThis is a multi-line description that can contain\ntemplates and other formatting.\n",
-                    variables: [
-                        "description",
-                    ],
-                },
-                span: Span {
-                    start: 234,
-                    end: 234,
-                    start_line: 11,
-                    start_column: 5,
-                    end_line: 11,
-                    end_column: 5,
-                },
-            },
-        ),
-        documentation: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "https://${{ name }}.readthedocs.io",
-                    variables: [
-                        "name",
-                    ],
-                },
-                span: Span {
-                    start: 361,
-                    end: 361,
-                    start_line: 15,
-                    start_column: 18,
-                    end_line: 15,
-                    end_column: 18,
-                },
-            },
-        ),
-        repository: Some(
-            Template {
-                template: JinjaTemplate {
-                    source: "https://github.com/${{ org }}/${{ name }}",
-                    variables: [
-                        "name",
-                        "org",
-                    ],
-                },
-                span: Span {
-                    start: 410,
-                    end: 410,
-                    start_line: 16,
-                    start_column: 15,
-                    end_line: 16,
-                    end_column: 15,
-                },
-            },
-        ),
-    },
-    extra: Extra {
-        recipe_maintainers: ConditionalList(
-            [
-                Value(Template { template: JinjaTemplate { source: "${{ maintainer1 }}", variables: ["maintainer1"] }, span: Span { start: 1373, end: 1373, start_line: 61, start_column: 7, end_line: 61, end_column: 7 } }),
-                Value(Template { template: JinjaTemplate { source: "${{ maintainer2 }}", variables: ["maintainer2"] }, span: Span { start: 1400, end: 1400, start_line: 62, start_column: 7, end_line: 62, end_column: 7 } }),
-            ],
-        ),
-    },
-    source: [],
-    tests: [],
-}
+package:
+  name: ${{ name | lower }}
+  version: ${{ version }}
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+requirements:
+  build:
+  - ${{ compiler("c") }}
+  - ${{ compiler("cxx") }}
+  - if: unix
+    then: make
+    else: []
+  - if: win
+    then: cmake
+    else: []
+  host:
+  - python ${{ python }}
+  - setuptools >=45
+  - wheel
+  - if: build_type == "cuda"
+    then: cuda-toolkit ${{ cuda_version }}
+    else: []
+  run:
+  - python ${{ python }}
+  - numpy >=1.19,<2.0a0
+  - ${{ pin_compatible("numpy") }}
+  - if: linux
+    then: libgcc-ng >=9.3.0
+    else: []
+  - if: osx
+    then: libcxx >=10.0.0
+    else: []
+  - if: build_type == "cuda"
+    then: cuda-toolkit ${{ cuda_version }}
+    else: []
+  run_constraints:
+  - scipy >=1.5,<2.0a0
+  - if: extra_deps
+    then: pandas >=1.0
+    else: []
+  run_exports:
+    strong:
+    - ${{ pin_subpackage(name, max_pin="x.x") }}
+    weak:
+    - if: has_cpp_lib
+      then: libstdcxx-ng >=9.3.0
+      else: []
+  ignore_run_exports:
+    by_name:
+    - qt
+    - tk
+    from_package:
+    - python
+about:
+  homepage: https://github.com/${{ org }}/${{ name }}
+  license: ${{ license }}
+  license_file:
+  - LICENSE.txt
+  license_family: null
+  summary: ${{ summary }}
+  description: |
+    ${{ description }}
+
+    This is a multi-line description that can contain
+    templates and other formatting.
+  documentation: https://${{ name }}.readthedocs.io
+  repository: https://github.com/${{ org }}/${{ name }}
+extra:
+  recipe-maintainers:
+  - ${{ maintainer1 }}
+  - ${{ maintainer2 }}

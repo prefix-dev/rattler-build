@@ -1,503 +1,142 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-expression: recipe
+expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
-MultiOutput(
-    MultiOutputRecipe {
-        schema_version: Some(
-            1,
-        ),
-        context: {},
-        recipe: RecipeMetadata {
-            name: Some(
-                Concrete {
-                    value: PackageName(
-                        PackageName {
-                            normalized: None,
-                            source: "conditional-pkg",
-                        },
-                    ),
-                    span: Span {
-                        start: 99,
-                        end: 99,
-                        start_line: 5,
-                        start_column: 9,
-                        end_line: 5,
-                        end_column: 9,
-                    },
-                },
-            ),
-            version: Some(
-                Concrete {
-                    value: VersionWithSource {
-                        version: Version {
-                            version: [[0], [3], [0], [0]],
-                            local: [],
-                        },
-                        source: Some(
-                            "3.0.0",
-                        ),
-                    },
-                    span: Span {
-                        start: 126,
-                        end: 126,
-                        start_line: 6,
-                        start_column: 12,
-                        end_line: 6,
-                        end_column: 12,
-                    },
-                },
-            ),
-        },
-        source: [],
-        build: Build {
-            number: Concrete {
-                value: 0,
-                span: Span {
-                    start: 0,
-                    end: 0,
-                    start_line: 0,
-                    start_column: 0,
-                    end_line: 0,
-                    end_column: 0,
-                },
-            },
-            string: None,
-            script: ConditionalList(
-                [],
-            ),
-            noarch: None,
-            python: PythonBuild {
-                entry_points: ConditionalList(
-                    [],
-                ),
-                skip_pyc_compilation: ConditionalList(
-                    [],
-                ),
-                use_python_app_entrypoint: false,
-                version_independent: false,
-                site_packages_path: None,
-            },
-            skip: ConditionalList(
-                [],
-            ),
-            always_copy_files: ConditionalList(
-                [],
-            ),
-            always_include_files: ConditionalList(
-                [],
-            ),
-            merge_build_and_host_envs: false,
-            files: List(
-                ConditionalList(
-                    [],
-                ),
-            ),
-            dynamic_linking: DynamicLinking {
-                rpaths: ConditionalList(
-                    [],
-                ),
-                binary_relocation: Boolean(
-                    Concrete {
-                        value: true,
-                        span: Span {
-                            start: 0,
-                            end: 0,
-                            start_line: 0,
-                            start_column: 0,
-                            end_line: 0,
-                            end_column: 0,
-                        },
-                    },
-                ),
-                missing_dso_allowlist: ConditionalList(
-                    [],
-                ),
-                rpath_allowlist: ConditionalList(
-                    [],
-                ),
-                overdepending_behavior: None,
-                overlinking_behavior: None,
-            },
-            variant: VariantKeyUsage {
-                use_keys: ConditionalList(
-                    [],
-                ),
-                ignore_keys: ConditionalList(
-                    [],
-                ),
-                down_prioritize_variant: None,
-            },
-            prefix_detection: PrefixDetection {
-                force_file_type: ForceFileType {
-                    text: ConditionalList(
-                        [],
-                    ),
-                    binary: ConditionalList(
-                        [],
-                    ),
-                },
-                ignore: Boolean(
-                    Concrete {
-                        value: false,
-                        span: Span {
-                            start: 0,
-                            end: 0,
-                            start_line: 0,
-                            start_column: 0,
-                            end_line: 0,
-                            end_column: 0,
-                        },
-                    },
-                ),
-                ignore_binary_files: false,
-            },
-            post_process: [],
-        },
-        about: About {
-            homepage: None,
-            license: None,
-            license_file: ConditionalList(
-                [],
-            ),
-            license_family: None,
-            summary: None,
-            description: None,
-            documentation: None,
-            repository: None,
-        },
-        extra: Extra {
-            recipe_maintainers: ConditionalList(
-                [],
-            ),
-        },
-        outputs: [
-            Staging(
-                StagingOutput {
-                    staging: StagingMetadata {
-                        name: Concrete {
-                            value: "build-stage",
-                            span: Span {
-                                start: 167,
-                                end: 167,
-                                start_line: 10,
-                                start_column: 13,
-                                end_line: 10,
-                                end_column: 13,
-                            },
-                        },
-                    },
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList(
-                            [
-                                Conditional(Conditional { condition: unix, then: ListOrItem([Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 259, end: 259, start_line: 15, start_column: 15, end_line: 15, end_column: 15 } }, Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "make" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 277, end: 277, start_line: 16, start_column: 15, end_line: 16, end_column: 15 } }]), else: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "msvc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 298, end: 298, start_line: 17, start_column: 17, end_line: 17, end_column: 17 } }) }),
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 313, end: 313, start_line: 18, start_column: 11, end_line: 18, end_column: 11 } }),
-                            ],
-                        ),
-                        host: ConditionalList(
-                            [
-                                Conditional(Conditional { condition: linux, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "glibc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 367, end: 367, start_line: 21, start_column: 17, end_line: 21, end_column: 17 } }), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 407, end: 407, start_line: 23, start_column: 17, end_line: 23, end_column: 17 } }), else: ListOrItem([]) }),
-                            ],
-                        ),
-                        run: ConditionalList(
-                            [],
-                        ),
-                        run_constraints: ConditionalList(
-                            [],
-                        ),
-                        run_exports: RunExports {
-                            noarch: ConditionalList(
-                                [],
-                            ),
-                            strong: ConditionalList(
-                                [],
-                            ),
-                            strong_constraints: ConditionalList(
-                                [],
-                            ),
-                            weak: ConditionalList(
-                                [],
-                            ),
-                            weak_constraints: ConditionalList(
-                                [],
-                            ),
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList(
-                                [],
-                            ),
-                            from_package: ConditionalList(
-                                [],
-                            ),
-                        },
-                    },
-                    build: StagingBuild {
-                        script: ConditionalList(
-                            [
-                                Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: Command("make all"), span: Span { start: 474, end: 474, start_line: 27, start_column: 17, end_line: 27, end_column: 17 } }), else: ListOrItem(Concrete { value: Command("nmake all"), span: Span { start: 499, end: 499, start_line: 28, start_column: 17, end_line: 28, end_column: 17 } }) }),
-                            ],
-                        ),
-                    },
-                },
-            ),
-            Package(
-                PackageOutput {
-                    package: PackageMetadata {
-                        name: Concrete {
-                            value: PackageName(
-                                PackageName {
-                                    normalized: None,
-                                    source: "conditional-pkg",
-                                },
-                            ),
-                            span: Span {
-                                start: 535,
-                                end: 535,
-                                start_line: 31,
-                                start_column: 13,
-                                end_line: 31,
-                                end_column: 13,
-                            },
-                        },
-                        version: Some(
-                            Concrete {
-                                value: VersionWithSource {
-                                    version: Version {
-                                        version: [[0], [3], [0], [0]],
-                                        local: [],
-                                    },
-                                    source: Some(
-                                        "3.0.0",
-                                    ),
-                                },
-                                span: Span {
-                                    start: 566,
-                                    end: 566,
-                                    start_line: 32,
-                                    start_column: 16,
-                                    end_line: 32,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                    },
-                    inherit: CacheName(
-                        Concrete {
-                            value: "build-stage",
-                            span: Span {
-                                start: 585,
-                                end: 585,
-                                start_line: 33,
-                                start_column: 14,
-                                end_line: 33,
-                                end_column: 14,
-                            },
-                        },
-                    ),
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList(
-                            [],
-                        ),
-                        host: ConditionalList(
-                            [],
-                        ),
-                        run: ConditionalList(
-                            [
-                                Conditional(Conditional { condition: linux, then: ListOrItem([Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 676, end: 676, start_line: 38, start_column: 15, end_line: 38, end_column: 15 } }, Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libstdcxx-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 700, end: 700, start_line: 39, start_column: 15, end_line: 39, end_column: 15 } }]), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: osx, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "libcxx" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 747, end: 747, start_line: 41, start_column: 17, end_line: 41, end_column: 17 } }), else: ListOrItem([]) }),
-                                Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "vs2019-runtime" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 788, end: 788, start_line: 43, start_column: 17, end_line: 43, end_column: 17 } }), else: ListOrItem([]) }),
-                            ],
-                        ),
-                        run_constraints: ConditionalList(
-                            [],
-                        ),
-                        run_exports: RunExports {
-                            noarch: ConditionalList(
-                                [],
-                            ),
-                            strong: ConditionalList(
-                                [],
-                            ),
-                            strong_constraints: ConditionalList(
-                                [],
-                            ),
-                            weak: ConditionalList(
-                                [],
-                            ),
-                            weak_constraints: ConditionalList(
-                                [],
-                            ),
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList(
-                                [],
-                            ),
-                            from_package: ConditionalList(
-                                [],
-                            ),
-                        },
-                    },
-                    build: Build {
-                        number: Concrete {
-                            value: 0,
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                                start_line: 0,
-                                start_column: 0,
-                                end_line: 0,
-                                end_column: 0,
-                            },
-                        },
-                        string: None,
-                        script: ConditionalList(
-                            [],
-                        ),
-                        noarch: None,
-                        python: PythonBuild {
-                            entry_points: ConditionalList(
-                                [],
-                            ),
-                            skip_pyc_compilation: ConditionalList(
-                                [],
-                            ),
-                            use_python_app_entrypoint: false,
-                            version_independent: false,
-                            site_packages_path: None,
-                        },
-                        skip: ConditionalList(
-                            [],
-                        ),
-                        always_copy_files: ConditionalList(
-                            [],
-                        ),
-                        always_include_files: ConditionalList(
-                            [],
-                        ),
-                        merge_build_and_host_envs: false,
-                        files: List(
-                            ConditionalList(
-                                [],
-                            ),
-                        ),
-                        dynamic_linking: DynamicLinking {
-                            rpaths: ConditionalList(
-                                [],
-                            ),
-                            binary_relocation: Boolean(
-                                Concrete {
-                                    value: true,
-                                    span: Span {
-                                        start: 0,
-                                        end: 0,
-                                        start_line: 0,
-                                        start_column: 0,
-                                        end_line: 0,
-                                        end_column: 0,
-                                    },
-                                },
-                            ),
-                            missing_dso_allowlist: ConditionalList(
-                                [],
-                            ),
-                            rpath_allowlist: ConditionalList(
-                                [],
-                            ),
-                            overdepending_behavior: None,
-                            overlinking_behavior: None,
-                        },
-                        variant: VariantKeyUsage {
-                            use_keys: ConditionalList(
-                                [],
-                            ),
-                            ignore_keys: ConditionalList(
-                                [],
-                            ),
-                            down_prioritize_variant: None,
-                        },
-                        prefix_detection: PrefixDetection {
-                            force_file_type: ForceFileType {
-                                text: ConditionalList(
-                                    [],
-                                ),
-                                binary: ConditionalList(
-                                    [],
-                                ),
-                            },
-                            ignore: Boolean(
-                                Concrete {
-                                    value: false,
-                                    span: Span {
-                                        start: 0,
-                                        end: 0,
-                                        start_line: 0,
-                                        start_column: 0,
-                                        end_line: 0,
-                                        end_column: 0,
-                                    },
-                                },
-                            ),
-                            ignore_binary_files: false,
-                        },
-                        post_process: [],
-                    },
-                    about: About {
-                        homepage: None,
-                        license: Some(
-                            Concrete {
-                                value: License(
-                                    BSD-3-Clause,
-                                ),
-                                span: Span {
-                                    start: 888,
-                                    end: 888,
-                                    start_line: 46,
-                                    start_column: 16,
-                                    end_line: 46,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                        license_file: ConditionalList(
-                            [],
-                        ),
-                        license_family: None,
-                        summary: Some(
-                            Concrete {
-                                value: "Package with platform-specific dependencies",
-                                span: Span {
-                                    start: 829,
-                                    end: 829,
-                                    start_line: 45,
-                                    start_column: 16,
-                                    end_line: 45,
-                                    end_column: 16,
-                                },
-                            },
-                        ),
-                        description: None,
-                        documentation: None,
-                        repository: None,
-                    },
-                    tests: [
-                        Commands(
-                            CommandsTest {
-                                script: ConditionalList(
-                                    [
-                                        Conditional(Conditional { condition: unix, then: ListOrItem(Concrete { value: Command("test -f $PREFIX/bin/conditional-pkg"), span: Span { start: 967, end: 967, start_line: 50, start_column: 19, end_line: 50, end_column: 19 } }), else: ListOrItem([]) }),
-                                        Conditional(Conditional { condition: win, then: ListOrItem(Concrete { value: Command("if not exist %PREFIX%\\\\Library\\\\bin\\\\conditional-pkg.exe exit 1"), span: Span { start: 1041, end: 1041, start_line: 52, start_column: 19, end_line: 52, end_column: 19 } }), else: ListOrItem([]) }),
-                                    ],
-                                ),
-                                requirements: None,
-                                files: None,
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
-    },
-)
+schema_version: 1
+recipe:
+  name: conditional-pkg
+  version: 3.0.0
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers: []
+outputs:
+- staging:
+    name: build-stage
+  requirements:
+    build:
+    - if: unix
+      then:
+      - gcc
+      - make
+      else: msvc
+    - cmake
+    host:
+    - if: linux
+      then: glibc
+      else: []
+    - if: osx
+      then: libcxx
+      else: []
+  build:
+    script:
+    - if: unix
+      then: make all
+      else: nmake all
+- package:
+    name: conditional-pkg
+    version: 3.0.0
+  inherit: build-stage
+  requirements:
+    run:
+    - if: linux
+      then:
+      - libgcc-ng
+      - libstdcxx-ng
+      else: []
+    - if: osx
+      then: libcxx
+      else: []
+    - if: win
+      then: vs2019-runtime
+      else: []
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: BSD-3-Clause
+    license_family: null
+    summary: Package with platform-specific dependencies
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - script:
+    - if: unix
+      then: test -f $PREFIX/bin/conditional-pkg
+      else: []
+    - if: win
+      then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1
+      else: []

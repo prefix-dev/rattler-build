@@ -1,207 +1,52 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-expression: recipe
+expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
-SingleOutputRecipe {
-    schema_version: None,
-    context: {},
-    package: Package {
-        name: Concrete {
-            value: PackageName(
-                PackageName {
-                    normalized: None,
-                    source: "minimal-package",
-                },
-            ),
-            span: Span {
-                start: 17,
-                end: 17,
-                start_line: 2,
-                start_column: 9,
-                end_line: 2,
-                end_column: 9,
-            },
-        },
-        version: Concrete {
-            value: VersionWithSource {
-                version: Version {
-                    version: [[0], [1], [0], [0]],
-                    local: [],
-                },
-                source: Some(
-                    "1.0.0",
-                ),
-            },
-            span: Span {
-                start: 44,
-                end: 44,
-                start_line: 3,
-                start_column: 12,
-                end_line: 3,
-                end_column: 12,
-            },
-        },
-    },
-    build: Build {
-        number: Concrete {
-            value: 0,
-            span: Span {
-                start: 0,
-                end: 0,
-                start_line: 0,
-                start_column: 0,
-                end_line: 0,
-                end_column: 0,
-            },
-        },
-        string: None,
-        script: ConditionalList(
-            [],
-        ),
-        noarch: None,
-        python: PythonBuild {
-            entry_points: ConditionalList(
-                [],
-            ),
-            skip_pyc_compilation: ConditionalList(
-                [],
-            ),
-            use_python_app_entrypoint: false,
-            version_independent: false,
-            site_packages_path: None,
-        },
-        skip: ConditionalList(
-            [],
-        ),
-        always_copy_files: ConditionalList(
-            [],
-        ),
-        always_include_files: ConditionalList(
-            [],
-        ),
-        merge_build_and_host_envs: false,
-        files: List(
-            ConditionalList(
-                [],
-            ),
-        ),
-        dynamic_linking: DynamicLinking {
-            rpaths: ConditionalList(
-                [],
-            ),
-            binary_relocation: Boolean(
-                Concrete {
-                    value: true,
-                    span: Span {
-                        start: 0,
-                        end: 0,
-                        start_line: 0,
-                        start_column: 0,
-                        end_line: 0,
-                        end_column: 0,
-                    },
-                },
-            ),
-            missing_dso_allowlist: ConditionalList(
-                [],
-            ),
-            rpath_allowlist: ConditionalList(
-                [],
-            ),
-            overdepending_behavior: None,
-            overlinking_behavior: None,
-        },
-        variant: VariantKeyUsage {
-            use_keys: ConditionalList(
-                [],
-            ),
-            ignore_keys: ConditionalList(
-                [],
-            ),
-            down_prioritize_variant: None,
-        },
-        prefix_detection: PrefixDetection {
-            force_file_type: ForceFileType {
-                text: ConditionalList(
-                    [],
-                ),
-                binary: ConditionalList(
-                    [],
-                ),
-            },
-            ignore: Boolean(
-                Concrete {
-                    value: false,
-                    span: Span {
-                        start: 0,
-                        end: 0,
-                        start_line: 0,
-                        start_column: 0,
-                        end_line: 0,
-                        end_column: 0,
-                    },
-                },
-            ),
-            ignore_binary_files: false,
-        },
-        post_process: [],
-    },
-    requirements: Requirements {
-        build: ConditionalList(
-            [],
-        ),
-        host: ConditionalList(
-            [],
-        ),
-        run: ConditionalList(
-            [],
-        ),
-        run_constraints: ConditionalList(
-            [],
-        ),
-        run_exports: RunExports {
-            noarch: ConditionalList(
-                [],
-            ),
-            strong: ConditionalList(
-                [],
-            ),
-            strong_constraints: ConditionalList(
-                [],
-            ),
-            weak: ConditionalList(
-                [],
-            ),
-            weak_constraints: ConditionalList(
-                [],
-            ),
-        },
-        ignore_run_exports: IgnoreRunExports {
-            by_name: ConditionalList(
-                [],
-            ),
-            from_package: ConditionalList(
-                [],
-            ),
-        },
-    },
-    about: About {
-        homepage: None,
-        license: None,
-        license_file: ConditionalList(
-            [],
-        ),
-        license_family: None,
-        summary: None,
-        description: None,
-        documentation: None,
-        repository: None,
-    },
-    extra: Extra {
-        recipe_maintainers: ConditionalList(
-            [],
-        ),
-    },
-    source: [],
-    tests: [],
-}
+package:
+  name: minimal-package
+  version: 1.0.0
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+requirements: {}
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers: []

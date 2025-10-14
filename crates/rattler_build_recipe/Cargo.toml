@@ -32,7 +32,7 @@ fs-err.workspace = true
 regex = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 walkdir = "2"
 clap = { workspace = true }
 
