@@ -1,6 +1,6 @@
 ---
 source: src/recipe/parser/output.rs
-expression: find_outputs_from_src(&src).unwrap()
+expression: find_outputs_from_src(src.as_str()).unwrap()
 ---
 [
     Mapping(

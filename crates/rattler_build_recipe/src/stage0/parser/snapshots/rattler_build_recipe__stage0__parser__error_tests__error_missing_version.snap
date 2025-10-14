@@ -1,0 +1,13 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: format_miette_report(error_with_source)
+---
+  × missing field: missing required field: version
+   ╭─[missing_version.yaml:2:7]
+ 1 │     package:
+ 2 │ ╭─▶   name: test-package
+ 3 │ ├─▶ 
+   · ╰──── missing required field: version
+ 4 │     about:
+ 5 │       license: MIT
+   ╰────

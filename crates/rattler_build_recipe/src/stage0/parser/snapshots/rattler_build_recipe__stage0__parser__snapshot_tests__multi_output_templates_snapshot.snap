@@ -1,0 +1,801 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+MultiOutput(
+    MultiOutputRecipe {
+        schema_version: Some(
+            1,
+        ),
+        context: {
+            "name": Concrete {
+                value: "templated-pkg",
+                span: Span {
+                    start: 94,
+                    end: 94,
+                    start_line: 5,
+                    start_column: 9,
+                    end_line: 5,
+                    end_column: 9,
+                },
+            },
+            "version": Concrete {
+                value: "1.2.3",
+                span: Span {
+                    start: 121,
+                    end: 121,
+                    start_line: 6,
+                    start_column: 12,
+                    end_line: 6,
+                    end_column: 12,
+                },
+            },
+            "major_minor": Template {
+                template: JinjaTemplate {
+                    source: "${{ version.split('.')[0] }}.{{ version.split('.')[1] }}",
+                    variables: [
+                        "version",
+                    ],
+                },
+                span: Span {
+                    start: 144,
+                    end: 144,
+                    start_line: 7,
+                    start_column: 16,
+                    end_line: 7,
+                    end_column: 16,
+                },
+            },
+            "python_version": Concrete {
+                value: "3.11",
+                span: Span {
+                    start: 221,
+                    end: 221,
+                    start_line: 8,
+                    start_column: 19,
+                    end_line: 8,
+                    end_column: 19,
+                },
+            },
+            "staging_name": Template {
+                template: JinjaTemplate {
+                    source: "${{ name }}-staging",
+                    variables: [
+                        "name",
+                    ],
+                },
+                span: Span {
+                    start: 244,
+                    end: 244,
+                    start_line: 9,
+                    start_column: 17,
+                    end_line: 9,
+                    end_column: 17,
+                },
+            },
+        },
+        recipe: RecipeMetadata {
+            name: Some(
+                Template {
+                    template: JinjaTemplate {
+                        source: "${{ name }}",
+                        variables: [
+                            "name",
+                        ],
+                    },
+                    span: Span {
+                        start: 283,
+                        end: 283,
+                        start_line: 12,
+                        start_column: 9,
+                        end_line: 12,
+                        end_column: 9,
+                    },
+                },
+            ),
+            version: Some(
+                Template {
+                    template: JinjaTemplate {
+                        source: "${{ version }}",
+                        variables: [
+                            "version",
+                        ],
+                    },
+                    span: Span {
+                        start: 306,
+                        end: 306,
+                        start_line: 13,
+                        start_column: 12,
+                        end_line: 13,
+                        end_column: 12,
+                    },
+                },
+            ),
+        },
+        source: [],
+        build: Build {
+            number: Concrete {
+                value: 0,
+                span: Span {
+                    start: 0,
+                    end: 0,
+                    start_line: 0,
+                    start_column: 0,
+                    end_line: 0,
+                    end_column: 0,
+                },
+            },
+            string: None,
+            script: ConditionalList(
+                [],
+            ),
+            noarch: None,
+            python: PythonBuild {
+                entry_points: ConditionalList(
+                    [],
+                ),
+                skip_pyc_compilation: ConditionalList(
+                    [],
+                ),
+                use_python_app_entrypoint: false,
+                version_independent: false,
+                site_packages_path: None,
+            },
+            skip: ConditionalList(
+                [],
+            ),
+            always_copy_files: ConditionalList(
+                [],
+            ),
+            always_include_files: ConditionalList(
+                [],
+            ),
+            merge_build_and_host_envs: false,
+            files: List(
+                ConditionalList(
+                    [],
+                ),
+            ),
+            dynamic_linking: DynamicLinking {
+                rpaths: ConditionalList(
+                    [],
+                ),
+                binary_relocation: Boolean(
+                    Concrete {
+                        value: true,
+                        span: Span {
+                            start: 0,
+                            end: 0,
+                            start_line: 0,
+                            start_column: 0,
+                            end_line: 0,
+                            end_column: 0,
+                        },
+                    },
+                ),
+                missing_dso_allowlist: ConditionalList(
+                    [],
+                ),
+                rpath_allowlist: ConditionalList(
+                    [],
+                ),
+                overdepending_behavior: None,
+                overlinking_behavior: None,
+            },
+            variant: VariantKeyUsage {
+                use_keys: ConditionalList(
+                    [],
+                ),
+                ignore_keys: ConditionalList(
+                    [],
+                ),
+                down_prioritize_variant: None,
+            },
+            prefix_detection: PrefixDetection {
+                force_file_type: ForceFileType {
+                    text: ConditionalList(
+                        [],
+                    ),
+                    binary: ConditionalList(
+                        [],
+                    ),
+                },
+                ignore: Boolean(
+                    Concrete {
+                        value: false,
+                        span: Span {
+                            start: 0,
+                            end: 0,
+                            start_line: 0,
+                            start_column: 0,
+                            end_line: 0,
+                            end_column: 0,
+                        },
+                    },
+                ),
+                ignore_binary_files: false,
+            },
+            post_process: [],
+        },
+        about: About {
+            homepage: None,
+            license: None,
+            license_file: ConditionalList(
+                [],
+            ),
+            license_family: None,
+            summary: None,
+            description: None,
+            documentation: None,
+            repository: None,
+        },
+        extra: Extra {
+            recipe_maintainers: ConditionalList(
+                [],
+            ),
+        },
+        outputs: [
+            Staging(
+                StagingOutput {
+                    staging: StagingMetadata {
+                        name: Template {
+                            template: JinjaTemplate {
+                                source: "${{ staging_name }}",
+                                variables: [
+                                    "staging_name",
+                                ],
+                            },
+                            span: Span {
+                                start: 356,
+                                end: 356,
+                                start_line: 17,
+                                start_column: 13,
+                                end_line: 17,
+                                end_column: 13,
+                            },
+                        },
+                    },
+                    source: [],
+                    requirements: StagingRequirements {
+                        build: ConditionalList(
+                            [
+                                Value(Template { template: JinjaTemplate { source: "${{ compiler('c') }}", variables: ["compiler"] }, span: Span { start: 417, end: 417, start_line: 20, start_column: 11, end_line: 20, end_column: 11 } }),
+                                Conditional(Conditional { condition: unix, then: ListOrItem("make"), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: win, then: ListOrItem("nmake"), else: ListOrItem([]) }),
+                            ],
+                        ),
+                        host: ConditionalList(
+                            [
+                                Value(Template { template: JinjaTemplate { source: "python ${{ python_version }}", variables: ["python_version"] }, span: Span { start: 540, end: 540, start_line: 26, start_column: 11, end_line: 26, end_column: 11 } }),
+                            ],
+                        ),
+                        ignore_run_exports: None,
+                    },
+                    build: StagingBuild {
+                        script: ConditionalList(
+                            [
+                                Conditional(Conditional { condition: unix, then: ListOrItem(Command("make -j${{ CPU_COUNT }}")), else: ListOrItem([]) }),
+                                Conditional(Conditional { condition: win, then: ListOrItem(Command("nmake")), else: ListOrItem([]) }),
+                            ],
+                        ),
+                    },
+                },
+            ),
+            Package(
+                PackageOutput {
+                    package: PackageMetadata {
+                        name: Template {
+                            template: JinjaTemplate {
+                                source: "${{ name }}",
+                                variables: [
+                                    "name",
+                                ],
+                            },
+                            span: Span {
+                                start: 719,
+                                end: 719,
+                                start_line: 35,
+                                start_column: 13,
+                                end_line: 35,
+                                end_column: 13,
+                            },
+                        },
+                        version: Some(
+                            Template {
+                                template: JinjaTemplate {
+                                    source: "${{ version }}",
+                                    variables: [
+                                        "version",
+                                    ],
+                                },
+                                span: Span {
+                                    start: 746,
+                                    end: 746,
+                                    start_line: 36,
+                                    start_column: 16,
+                                    end_line: 36,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                    },
+                    inherit: CacheName(
+                        Template {
+                            template: JinjaTemplate {
+                                source: "${{ staging_name }}",
+                                variables: [
+                                    "staging_name",
+                                ],
+                            },
+                            span: Span {
+                                start: 774,
+                                end: 774,
+                                start_line: 37,
+                                start_column: 14,
+                                end_line: 37,
+                                end_column: 14,
+                            },
+                        },
+                    ),
+                    source: [],
+                    requirements: Requirements {
+                        build: ConditionalList(
+                            [],
+                        ),
+                        host: ConditionalList(
+                            [],
+                        ),
+                        run: ConditionalList(
+                            [
+                                Value(Template { template: JinjaTemplate { source: "python ${{ python_version }}.*", variables: ["python_version"] }, span: Span { start: 833, end: 833, start_line: 40, start_column: 11, end_line: 40, end_column: 11 } }),
+                                Value(Template { template: JinjaTemplate { source: "${{ pin_subpackage(name ~ \"-lib\", max_pin=\"x.x\") }}", variables: ["name", "pin_subpackage"] }, span: Span { start: 874, end: 874, start_line: 41, start_column: 11, end_line: 41, end_column: 11 } }),
+                            ],
+                        ),
+                        run_constraints: ConditionalList(
+                            [],
+                        ),
+                        run_exports: RunExports {
+                            noarch: ConditionalList(
+                                [],
+                            ),
+                            strong: ConditionalList(
+                                [],
+                            ),
+                            strong_constraints: ConditionalList(
+                                [],
+                            ),
+                            weak: ConditionalList(
+                                [],
+                            ),
+                            weak_constraints: ConditionalList(
+                                [],
+                            ),
+                        },
+                        ignore_run_exports: IgnoreRunExports {
+                            by_name: ConditionalList(
+                                [],
+                            ),
+                            from_package: ConditionalList(
+                                [],
+                            ),
+                        },
+                    },
+                    build: Build {
+                        number: Concrete {
+                            value: 0,
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                                start_line: 0,
+                                start_column: 0,
+                                end_line: 0,
+                                end_column: 0,
+                            },
+                        },
+                        string: None,
+                        script: ConditionalList(
+                            [],
+                        ),
+                        noarch: None,
+                        python: PythonBuild {
+                            entry_points: ConditionalList(
+                                [],
+                            ),
+                            skip_pyc_compilation: ConditionalList(
+                                [],
+                            ),
+                            use_python_app_entrypoint: false,
+                            version_independent: false,
+                            site_packages_path: None,
+                        },
+                        skip: ConditionalList(
+                            [],
+                        ),
+                        always_copy_files: ConditionalList(
+                            [],
+                        ),
+                        always_include_files: ConditionalList(
+                            [],
+                        ),
+                        merge_build_and_host_envs: false,
+                        files: List(
+                            ConditionalList(
+                                [],
+                            ),
+                        ),
+                        dynamic_linking: DynamicLinking {
+                            rpaths: ConditionalList(
+                                [],
+                            ),
+                            binary_relocation: Boolean(
+                                Concrete {
+                                    value: true,
+                                    span: Span {
+                                        start: 0,
+                                        end: 0,
+                                        start_line: 0,
+                                        start_column: 0,
+                                        end_line: 0,
+                                        end_column: 0,
+                                    },
+                                },
+                            ),
+                            missing_dso_allowlist: ConditionalList(
+                                [],
+                            ),
+                            rpath_allowlist: ConditionalList(
+                                [],
+                            ),
+                            overdepending_behavior: None,
+                            overlinking_behavior: None,
+                        },
+                        variant: VariantKeyUsage {
+                            use_keys: ConditionalList(
+                                [],
+                            ),
+                            ignore_keys: ConditionalList(
+                                [],
+                            ),
+                            down_prioritize_variant: None,
+                        },
+                        prefix_detection: PrefixDetection {
+                            force_file_type: ForceFileType {
+                                text: ConditionalList(
+                                    [],
+                                ),
+                                binary: ConditionalList(
+                                    [],
+                                ),
+                            },
+                            ignore: Boolean(
+                                Concrete {
+                                    value: false,
+                                    span: Span {
+                                        start: 0,
+                                        end: 0,
+                                        start_line: 0,
+                                        start_column: 0,
+                                        end_line: 0,
+                                        end_column: 0,
+                                    },
+                                },
+                            ),
+                            ignore_binary_files: false,
+                        },
+                        post_process: [],
+                    },
+                    about: About {
+                        homepage: Some(
+                            Template {
+                                template: JinjaTemplate {
+                                    source: "https://example.com/${{ name }}",
+                                    variables: [
+                                        "name",
+                                    ],
+                                },
+                                span: Span {
+                                    start: 1032,
+                                    end: 1032,
+                                    start_line: 45,
+                                    start_column: 17,
+                                    end_line: 45,
+                                    end_column: 17,
+                                },
+                            },
+                        ),
+                        license: Some(
+                            Concrete {
+                                value: License(
+                                    MIT,
+                                ),
+                                span: Span {
+                                    start: 1012,
+                                    end: 1012,
+                                    start_line: 44,
+                                    start_column: 16,
+                                    end_line: 44,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                        license_file: ConditionalList(
+                            [],
+                        ),
+                        license_family: None,
+                        summary: Some(
+                            Template {
+                                template: JinjaTemplate {
+                                    source: "Package ${{ name }} version ${{ version }}",
+                                    variables: [
+                                        "name",
+                                        "version",
+                                    ],
+                                },
+                                span: Span {
+                                    start: 952,
+                                    end: 952,
+                                    start_line: 43,
+                                    start_column: 16,
+                                    end_line: 43,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                        description: None,
+                        documentation: None,
+                        repository: None,
+                    },
+                    tests: [],
+                },
+            ),
+            Package(
+                PackageOutput {
+                    package: PackageMetadata {
+                        name: Template {
+                            template: JinjaTemplate {
+                                source: "${{ name }}-lib",
+                                variables: [
+                                    "name",
+                                ],
+                            },
+                            span: Span {
+                                start: 1090,
+                                end: 1090,
+                                start_line: 48,
+                                start_column: 13,
+                                end_line: 48,
+                                end_column: 13,
+                            },
+                        },
+                        version: Some(
+                            Template {
+                                template: JinjaTemplate {
+                                    source: "${{ version }}",
+                                    variables: [
+                                        "version",
+                                    ],
+                                },
+                                span: Span {
+                                    start: 1121,
+                                    end: 1121,
+                                    start_line: 49,
+                                    start_column: 16,
+                                    end_line: 49,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                    },
+                    inherit: CacheName(
+                        Template {
+                            template: JinjaTemplate {
+                                source: "${{ staging_name }}",
+                                variables: [
+                                    "staging_name",
+                                ],
+                            },
+                            span: Span {
+                                start: 1149,
+                                end: 1149,
+                                start_line: 50,
+                                start_column: 14,
+                                end_line: 50,
+                                end_column: 14,
+                            },
+                        },
+                    ),
+                    source: [],
+                    requirements: Requirements {
+                        build: ConditionalList(
+                            [],
+                        ),
+                        host: ConditionalList(
+                            [],
+                        ),
+                        run: ConditionalList(
+                            [
+                                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "libgcc-ng" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1208, end: 1208, start_line: 53, start_column: 11, end_line: 53, end_column: 11 } }),
+                            ],
+                        ),
+                        run_constraints: ConditionalList(
+                            [],
+                        ),
+                        run_exports: RunExports {
+                            noarch: ConditionalList(
+                                [],
+                            ),
+                            strong: ConditionalList(
+                                [],
+                            ),
+                            strong_constraints: ConditionalList(
+                                [],
+                            ),
+                            weak: ConditionalList(
+                                [],
+                            ),
+                            weak_constraints: ConditionalList(
+                                [],
+                            ),
+                        },
+                        ignore_run_exports: IgnoreRunExports {
+                            by_name: ConditionalList(
+                                [],
+                            ),
+                            from_package: ConditionalList(
+                                [],
+                            ),
+                        },
+                    },
+                    build: Build {
+                        number: Concrete {
+                            value: 0,
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                                start_line: 0,
+                                start_column: 0,
+                                end_line: 0,
+                                end_column: 0,
+                            },
+                        },
+                        string: None,
+                        script: ConditionalList(
+                            [],
+                        ),
+                        noarch: None,
+                        python: PythonBuild {
+                            entry_points: ConditionalList(
+                                [],
+                            ),
+                            skip_pyc_compilation: ConditionalList(
+                                [],
+                            ),
+                            use_python_app_entrypoint: false,
+                            version_independent: false,
+                            site_packages_path: None,
+                        },
+                        skip: ConditionalList(
+                            [],
+                        ),
+                        always_copy_files: ConditionalList(
+                            [],
+                        ),
+                        always_include_files: ConditionalList(
+                            [],
+                        ),
+                        merge_build_and_host_envs: false,
+                        files: List(
+                            ConditionalList(
+                                [],
+                            ),
+                        ),
+                        dynamic_linking: DynamicLinking {
+                            rpaths: ConditionalList(
+                                [],
+                            ),
+                            binary_relocation: Boolean(
+                                Concrete {
+                                    value: true,
+                                    span: Span {
+                                        start: 0,
+                                        end: 0,
+                                        start_line: 0,
+                                        start_column: 0,
+                                        end_line: 0,
+                                        end_column: 0,
+                                    },
+                                },
+                            ),
+                            missing_dso_allowlist: ConditionalList(
+                                [],
+                            ),
+                            rpath_allowlist: ConditionalList(
+                                [],
+                            ),
+                            overdepending_behavior: None,
+                            overlinking_behavior: None,
+                        },
+                        variant: VariantKeyUsage {
+                            use_keys: ConditionalList(
+                                [],
+                            ),
+                            ignore_keys: ConditionalList(
+                                [],
+                            ),
+                            down_prioritize_variant: None,
+                        },
+                        prefix_detection: PrefixDetection {
+                            force_file_type: ForceFileType {
+                                text: ConditionalList(
+                                    [],
+                                ),
+                                binary: ConditionalList(
+                                    [],
+                                ),
+                            },
+                            ignore: Boolean(
+                                Concrete {
+                                    value: false,
+                                    span: Span {
+                                        start: 0,
+                                        end: 0,
+                                        start_line: 0,
+                                        start_column: 0,
+                                        end_line: 0,
+                                        end_column: 0,
+                                    },
+                                },
+                            ),
+                            ignore_binary_files: false,
+                        },
+                        post_process: [],
+                    },
+                    about: About {
+                        homepage: None,
+                        license: Some(
+                            Concrete {
+                                value: License(
+                                    MIT,
+                                ),
+                                span: Span {
+                                    start: 1283,
+                                    end: 1283,
+                                    start_line: 56,
+                                    start_column: 16,
+                                    end_line: 56,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                        license_file: ConditionalList(
+                            [],
+                        ),
+                        license_family: None,
+                        summary: Some(
+                            Template {
+                                template: JinjaTemplate {
+                                    source: "Library for ${{ name }}",
+                                    variables: [
+                                        "name",
+                                    ],
+                                },
+                                span: Span {
+                                    start: 1244,
+                                    end: 1244,
+                                    start_line: 55,
+                                    start_column: 16,
+                                    end_line: 55,
+                                    end_column: 16,
+                                },
+                            },
+                        ),
+                        description: None,
+                        documentation: None,
+                        repository: None,
+                    },
+                    tests: [],
+                },
+            ),
+        ],
+    },
+)

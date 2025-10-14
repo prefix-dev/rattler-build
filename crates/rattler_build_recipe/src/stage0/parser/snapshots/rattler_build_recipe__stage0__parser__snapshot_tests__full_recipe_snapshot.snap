@@ -1,0 +1,341 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+SingleOutputRecipe {
+    schema_version: None,
+    context: {},
+    package: Package {
+        name: Concrete {
+            value: PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "full-package",
+                },
+            ),
+            span: Span {
+                start: 17,
+                end: 17,
+                start_line: 2,
+                start_column: 9,
+                end_line: 2,
+                end_column: 9,
+            },
+        },
+        version: Concrete {
+            value: VersionWithSource {
+                version: Version {
+                    version: [[0], [2], [5], [1]],
+                    local: [],
+                },
+                source: Some(
+                    "2.5.1",
+                ),
+            },
+            span: Span {
+                start: 41,
+                end: 41,
+                start_line: 3,
+                start_column: 12,
+                end_line: 3,
+                end_column: 12,
+            },
+        },
+    },
+    build: Build {
+        number: Concrete {
+            value: 0,
+            span: Span {
+                start: 0,
+                end: 0,
+                start_line: 0,
+                start_column: 0,
+                end_line: 0,
+                end_column: 0,
+            },
+        },
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: ConditionalList(
+            [],
+        ),
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: List(
+            ConditionalList(
+                [],
+            ),
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete {
+                    value: true,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete {
+                    value: false,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "gcc" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 366, end: 366, start_line: 16, start_column: 7, end_line: 16, end_column: 7 } }),
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "make" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 376, end: 376, start_line: 17, start_column: 7, end_line: 17, end_column: 7 } }),
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "cmake" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 387, end: 387, start_line: 18, start_column: 7, end_line: 18, end_column: 7 } }),
+            ],
+        ),
+        host: ConditionalList(
+            [
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: Some(Range(GreaterEquals, Version { version: [[0], [3], [8]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 407, end: 407, start_line: 20, start_column: 7, end_line: 20, end_column: 7 } }),
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "setuptools" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 426, end: 426, start_line: 21, start_column: 7, end_line: 21, end_column: 7 } }),
+            ],
+        ),
+        run: ConditionalList(
+            [
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: Some(Range(GreaterEquals, Version { version: [[0], [3], [8]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 450, end: 450, start_line: 23, start_column: 7, end_line: 23, end_column: 7 } }),
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "numpy" }), version: Some(Range(GreaterEquals, Version { version: [[0], [1], [19]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 469, end: 469, start_line: 24, start_column: 7, end_line: 24, end_column: 7 } }),
+            ],
+        ),
+        run_constraints: ConditionalList(
+            [
+                Value(Concrete { value: Parsed(MatchSpec { name: Some(PackageName { normalized: None, source: "scipy" }), version: Some(Range(Less, Version { version: [[0], [2], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 507, end: 507, start_line: 26, start_column: 7, end_line: 26, end_column: 7 } }),
+            ],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: Some(
+            Concrete {
+                value: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "example.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+                span: Span {
+                    start: 67,
+                    end: 67,
+                    start_line: 6,
+                    start_column: 13,
+                    end_line: 6,
+                    end_column: 13,
+                },
+            },
+        ),
+        license: Some(
+            Concrete {
+                value: License(
+                    MIT,
+                ),
+                span: Span {
+                    start: 98,
+                    end: 98,
+                    start_line: 7,
+                    start_column: 12,
+                    end_line: 7,
+                    end_column: 12,
+                },
+            },
+        ),
+        license_file: ConditionalList(
+            [
+                Value(Concrete { value: "LICENSE", span: Span { start: 118, end: 118, start_line: 8, start_column: 17, end_line: 8, end_column: 17 } }),
+            ],
+        ),
+        license_family: None,
+        summary: Some(
+            Concrete {
+                value: "A comprehensive test package",
+                span: Span {
+                    start: 137,
+                    end: 137,
+                    start_line: 9,
+                    start_column: 12,
+                    end_line: 9,
+                    end_column: 12,
+                },
+            },
+        ),
+        description: Some(
+            Concrete {
+                value: "This package demonstrates all available fields in a recipe",
+                span: Span {
+                    start: 181,
+                    end: 181,
+                    start_line: 10,
+                    start_column: 16,
+                    end_line: 10,
+                    end_column: 16,
+                },
+            },
+        ),
+        documentation: Some(
+            Concrete {
+                value: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "docs.example.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+                span: Span {
+                    start: 257,
+                    end: 257,
+                    start_line: 11,
+                    start_column: 18,
+                    end_line: 11,
+                    end_column: 18,
+                },
+            },
+        ),
+        repository: Some(
+            Concrete {
+                value: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/example/full-package",
+                    query: None,
+                    fragment: None,
+                },
+                span: Span {
+                    start: 296,
+                    end: 296,
+                    start_line: 12,
+                    start_column: 15,
+                    end_line: 12,
+                    end_column: 15,
+                },
+            },
+        ),
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [
+                Value(Concrete { value: "alice", span: Span { start: 554, end: 554, start_line: 30, start_column: 7, end_line: 30, end_column: 7 } }),
+                Value(Concrete { value: "bob", span: Span { start: 566, end: 566, start_line: 31, start_column: 7, end_line: 31, end_column: 7 } }),
+                Value(Concrete { value: "charlie", span: Span { start: 576, end: 576, start_line: 32, start_column: 7, end_line: 32, end_column: 7 } }),
+            ],
+        ),
+    },
+    source: [],
+    tests: [],
+}

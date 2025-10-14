@@ -1,0 +1,236 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+SingleOutputRecipe {
+    schema_version: None,
+    context: {},
+    package: Package {
+        name: Concrete {
+            value: PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "test-license-files",
+                },
+            ),
+            span: Span {
+                start: 17,
+                end: 17,
+                start_line: 2,
+                start_column: 9,
+                end_line: 2,
+                end_column: 9,
+            },
+        },
+        version: Concrete {
+            value: VersionWithSource {
+                version: Version {
+                    version: [[0], [1], [0], [0]],
+                    local: [],
+                },
+                source: Some(
+                    "1.0.0",
+                ),
+            },
+            span: Span {
+                start: 47,
+                end: 47,
+                start_line: 3,
+                start_column: 12,
+                end_line: 3,
+                end_column: 12,
+            },
+        },
+    },
+    build: Build {
+        number: Concrete {
+            value: 0,
+            span: Span {
+                start: 0,
+                end: 0,
+                start_line: 0,
+                start_column: 0,
+                end_line: 0,
+                end_column: 0,
+            },
+        },
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: ConditionalList(
+            [],
+        ),
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: List(
+            ConditionalList(
+                [],
+            ),
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete {
+                    value: true,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete {
+                    value: false,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [],
+        ),
+        host: ConditionalList(
+            [],
+        ),
+        run: ConditionalList(
+            [],
+        ),
+        run_constraints: ConditionalList(
+            [],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: None,
+        license: Some(
+            Concrete {
+                value: License(
+                    GPL-1.0-or-later Artistic-1.0-Perl OR,
+                ),
+                span: Span {
+                    start: 72,
+                    end: 72,
+                    start_line: 6,
+                    start_column: 12,
+                    end_line: 6,
+                    end_column: 12,
+                },
+            },
+        ),
+        license_file: ConditionalList(
+            [
+                Value(Concrete { value: "LICENSE-ARTISTIC", span: Span { start: 132, end: 132, start_line: 8, start_column: 7, end_line: 8, end_column: 7 } }),
+                Value(Concrete { value: "LICENSE-GPL", span: Span { start: 155, end: 155, start_line: 9, start_column: 7, end_line: 9, end_column: 7 } }),
+            ],
+        ),
+        license_family: None,
+        summary: Some(
+            Concrete {
+                value: "Test multiple license files",
+                span: Span {
+                    start: 178,
+                    end: 178,
+                    start_line: 10,
+                    start_column: 12,
+                    end_line: 10,
+                    end_column: 12,
+                },
+            },
+        ),
+        description: None,
+        documentation: None,
+        repository: None,
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [],
+        ),
+    },
+    source: [],
+    tests: [],
+}

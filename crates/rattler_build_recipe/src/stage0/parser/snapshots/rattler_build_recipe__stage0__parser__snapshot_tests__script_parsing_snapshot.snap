@@ -1,0 +1,298 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: recipe
+---
+SingleOutputRecipe {
+    schema_version: None,
+    context: {},
+    package: Package {
+        name: Concrete {
+            value: PackageName(
+                PackageName {
+                    normalized: None,
+                    source: "test-script-parsing",
+                },
+            ),
+            span: Span {
+                start: 17,
+                end: 17,
+                start_line: 2,
+                start_column: 9,
+                end_line: 2,
+                end_column: 9,
+            },
+        },
+        version: Concrete {
+            value: VersionWithSource {
+                version: Version {
+                    version: [[0], [0], [1], [0]],
+                    local: [],
+                },
+                source: Some(
+                    "0.1.0",
+                ),
+            },
+            span: Span {
+                start: 48,
+                end: 48,
+                start_line: 3,
+                start_column: 12,
+                end_line: 3,
+                end_column: 12,
+            },
+        },
+    },
+    build: Build {
+        number: Concrete {
+            value: 0,
+            span: Span {
+                start: 0,
+                end: 0,
+                start_line: 0,
+                start_column: 0,
+                end_line: 0,
+                end_column: 0,
+            },
+        },
+        string: None,
+        script: ConditionalList(
+            [],
+        ),
+        noarch: None,
+        python: PythonBuild {
+            entry_points: ConditionalList(
+                [],
+            ),
+            skip_pyc_compilation: ConditionalList(
+                [],
+            ),
+            use_python_app_entrypoint: false,
+            version_independent: false,
+            site_packages_path: None,
+        },
+        skip: ConditionalList(
+            [],
+        ),
+        always_copy_files: ConditionalList(
+            [],
+        ),
+        always_include_files: ConditionalList(
+            [],
+        ),
+        merge_build_and_host_envs: false,
+        files: List(
+            ConditionalList(
+                [],
+            ),
+        ),
+        dynamic_linking: DynamicLinking {
+            rpaths: ConditionalList(
+                [],
+            ),
+            binary_relocation: Boolean(
+                Concrete {
+                    value: true,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            missing_dso_allowlist: ConditionalList(
+                [],
+            ),
+            rpath_allowlist: ConditionalList(
+                [],
+            ),
+            overdepending_behavior: None,
+            overlinking_behavior: None,
+        },
+        variant: VariantKeyUsage {
+            use_keys: ConditionalList(
+                [],
+            ),
+            ignore_keys: ConditionalList(
+                [],
+            ),
+            down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: ConditionalList(
+                    [],
+                ),
+                binary: ConditionalList(
+                    [],
+                ),
+            },
+            ignore: Boolean(
+                Concrete {
+                    value: false,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                        start_line: 0,
+                        start_column: 0,
+                        end_line: 0,
+                        end_column: 0,
+                    },
+                },
+            ),
+            ignore_binary_files: false,
+        },
+        post_process: [],
+    },
+    requirements: Requirements {
+        build: ConditionalList(
+            [],
+        ),
+        host: ConditionalList(
+            [],
+        ),
+        run: ConditionalList(
+            [],
+        ),
+        run_constraints: ConditionalList(
+            [],
+        ),
+        run_exports: RunExports {
+            noarch: ConditionalList(
+                [],
+            ),
+            strong: ConditionalList(
+                [],
+            ),
+            strong_constraints: ConditionalList(
+                [],
+            ),
+            weak: ConditionalList(
+                [],
+            ),
+            weak_constraints: ConditionalList(
+                [],
+            ),
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: ConditionalList(
+                [],
+            ),
+            from_package: ConditionalList(
+                [],
+            ),
+        },
+    },
+    about: About {
+        homepage: None,
+        license: None,
+        license_file: ConditionalList(
+            [],
+        ),
+        license_family: None,
+        summary: None,
+        description: None,
+        documentation: None,
+        repository: None,
+    },
+    extra: Extra {
+        recipe_maintainers: ConditionalList(
+            [],
+        ),
+    },
+    source: [],
+    tests: [
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Command("test.sh"), span: Span { start: 74, end: 74, start_line: 6, start_column: 13, end_line: 6, end_column: 13 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Command("echo \"hello list\""), span: Span { start: 102, end: 102, start_line: 8, start_column: 9, end_line: 8, end_column: 9 } }),
+                        Value(Concrete { value: Command("echo \"of commands\""), span: Span { start: 128, end: 128, start_line: 9, start_column: 9, end_line: 9, end_column: 9 } }),
+                        Value(Concrete { value: Command("echo \"in a script\""), span: Span { start: 155, end: 155, start_line: 10, start_column: 9, end_line: 10, end_column: 9 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Conditional(Conditional { condition: unix, then: ListOrItem(Command("echo \"This is a unix-like system\"")), else: ListOrItem(Command("echo \"This is not a unix-like system\"")) }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Inline(InlineScript { interpreter: None, env: {}, secrets: [], content: Some(ConditionalList([Value(Concrete { value: "#!/usr/bin/env bash", span: Span { start: 364, end: 364, start_line: 19, start_column: 9, end_line: 19, end_column: 9 } }), Value(Concrete { value: "echo \"This is a script provided as content\"", span: Span { start: 364, end: 364, start_line: 19, start_column: 9, end_line: 19, end_column: 9 } })])), file: None }), span: Span { start: 352, end: 438, start_line: 18, start_column: 14, end_line: 21, end_column: 3 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Inline(InlineScript { interpreter: Some(Concrete { value: "bash", span: Span { start: 467, end: 467, start_line: 22, start_column: 20, end_line: 22, end_column: 20 } }), env: {}, secrets: [], content: Some(ConditionalList([Value(Concrete { value: "echo \"This is a script provided as content\"", span: Span { start: 497, end: 497, start_line: 24, start_column: 9, end_line: 24, end_column: 9 } })])), file: None }), span: Span { start: 465, end: 543, start_line: 22, start_column: 18, end_line: 25, end_column: 3 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Inline(InlineScript { interpreter: None, env: {}, secrets: [], content: None, file: Some(Concrete { value: "test.sh", span: Span { start: 565, end: 565, start_line: 26, start_column: 13, end_line: 26, end_column: 13 } }) }), span: Span { start: 563, end: 575, start_line: 26, start_column: 11, end_line: 27, end_column: 3 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Inline(InlineScript { interpreter: Some(Concrete { value: "bash", span: Span { start: 604, end: 604, start_line: 28, start_column: 20, end_line: 28, end_column: 20 } }), env: {}, secrets: [], content: None, file: Some(Concrete { value: "test.sh", span: Span { start: 621, end: 621, start_line: 29, start_column: 13, end_line: 29, end_column: 13 } }) }), span: Span { start: 602, end: 631, start_line: 28, start_column: 18, end_line: 30, end_column: 3 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+        Commands(
+            CommandsTest {
+                script: ConditionalList(
+                    [
+                        Value(Concrete { value: Inline(InlineScript { interpreter: None, env: {"TEST_ENV": Concrete { value: "Hello, world!", span: Span { start: 670, end: 670, start_line: 32, start_column: 19, end_line: 32, end_column: 19 } }, "FOOBAR": Concrete { value: "42", span: Span { start: 702, end: 702, start_line: 33, start_column: 17, end_line: 33, end_column: 17 } }}, secrets: [], content: Some(ConditionalList([Value(Concrete { value: "echo \"This is a script with environment variables\"", span: Span { start: 732, end: 732, start_line: 35, start_column: 9, end_line: 35, end_column: 9 } })])), file: None }), span: Span { start: 650, end: 783, start_line: 31, start_column: 10, end_line: 36, end_column: 1 } }),
+                    ],
+                ),
+                requirements: None,
+                files: None,
+            },
+        ),
+    ],
+}

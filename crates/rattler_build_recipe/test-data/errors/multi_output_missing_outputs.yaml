@@ -1,0 +1,5 @@
+# Error: Multi-output recipe with outputs key but missing version
+schema_version: 1
+
+recipe:
+  name: missing-version

@@ -1,0 +1,64 @@
+# Multi-output recipe demonstrating top-level inheritance
+schema_version: 1
+
+recipe:
+  version: 5.0.0
+
+source:
+  - url: https://example.com/top-level-source.tar.gz
+    sha256: fedcba9876543210
+
+build:
+  number: 0
+  script:
+    - echo "Top-level build script"
+
+about:
+  license: GPL-3.0-or-later
+  homepage: https://top-level-example.com
+
+outputs:
+  # This package inherits from top-level (explicit null)
+  - package:
+      name: main-package
+      version: 5.0.0
+    inherit: null
+    requirements:
+      run:
+        - python
+    about:
+      summary: Main package inheriting from top-level
+    tests:
+      - python:
+          imports:
+            - main_package
+
+  # This package also inherits from top-level (implicit - no inherit specified)
+  - package:
+      name: sub-package
+      version: 5.0.0
+    requirements:
+      run:
+        - python
+        - main-package ==5.0.0
+    about:
+      summary: Sub package also inheriting from top-level
+    tests:
+      - script:
+          - python -c "import sub_package"
+
+  # This package inherits from top-level with some overrides
+  - package:
+      name: custom-package
+      version: 5.0.0
+    inherit: null
+    build:
+      number: 1
+      script:
+        - echo "Custom build overriding top-level"
+    about:
+      summary: Custom package with overridden build
+      license: MIT
+    requirements:
+      run:
+        - python

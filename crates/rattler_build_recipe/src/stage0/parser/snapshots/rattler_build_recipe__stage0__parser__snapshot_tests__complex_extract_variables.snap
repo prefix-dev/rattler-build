@@ -1,0 +1,25 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: vars
+---
+[
+    "build_type",
+    "compiler",
+    "description",
+    "extra_deps",
+    "has_cpp_lib",
+    "license",
+    "linux",
+    "maintainer1",
+    "maintainer2",
+    "name",
+    "org",
+    "osx",
+    "pin_compatible",
+    "pin_subpackage",
+    "python",
+    "summary",
+    "unix",
+    "version",
+    "win",
+]
