@@ -92,7 +92,7 @@ impl fmt::Display for GitUrl {
 }
 
 /// Git source information (evaluated)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
     #[serde(rename = "git")]
@@ -119,8 +119,56 @@ pub struct GitSource {
     pub lfs: bool,
 }
 
-fn is_false(value: &bool) -> bool {
-    !*value
+impl Serialize for GitSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut len = 1; // git url is always present
+        if !self.rev.is_head() {
+            len += 1;
+        }
+        if self.depth.is_some() {
+            len += 1;
+        }
+        if !self.patches.is_empty() {
+            len += 1;
+        }
+        if self.target_directory.is_some() {
+            len += 1;
+        }
+        if self.lfs {
+            len += 1;
+        }
+
+        let mut map = serializer.serialize_map(Some(len))?;
+        map.serialize_entry("git", &self.url)?;
+
+        // Serialize rev as flattened fields based on variant
+        match &self.rev {
+            GitRev::Branch(branch) => map.serialize_entry("branch", branch)?,
+            GitRev::Tag(tag) => map.serialize_entry("tag", tag)?,
+            GitRev::Commit(commit) => map.serialize_entry("rev", commit)?,
+            GitRev::Head => {} // Skip HEAD as it's the default
+        }
+
+        if let Some(depth) = &self.depth {
+            map.serialize_entry("depth", depth)?;
+        }
+        if !self.patches.is_empty() {
+            map.serialize_entry("patches", &self.patches)?;
+        }
+        if let Some(target_directory) = &self.target_directory {
+            map.serialize_entry("target_directory", target_directory)?;
+        }
+        if self.lfs {
+            map.serialize_entry("lfs", &self.lfs)?;
+        }
+
+        map.end()
+    }
 }
 
 /// Checksum for verification
@@ -133,7 +181,7 @@ pub enum Checksum {
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct UrlSource {
     /// Url(s) to the source code
     pub url: Vec<Url>,
@@ -155,8 +203,54 @@ pub struct UrlSource {
     pub target_directory: Option<PathBuf>,
 }
 
+impl Serialize for UrlSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut len = 1; // url is always present
+        if self.checksum.is_some() {
+            len += 1;
+        }
+        if self.file_name.is_some() {
+            len += 1;
+        }
+        if !self.patches.is_empty() {
+            len += 1;
+        }
+        if self.target_directory.is_some() {
+            len += 1;
+        }
+
+        let mut map = serializer.serialize_map(Some(len))?;
+        map.serialize_entry("url", &self.url)?;
+
+        // Serialize checksum as flattened fields based on variant
+        if let Some(checksum) = &self.checksum {
+            match checksum {
+                Checksum::Sha256(hash) => map.serialize_entry("sha256", hash)?,
+                Checksum::Md5(hash) => map.serialize_entry("md5", hash)?,
+            }
+        }
+
+        if let Some(file_name) = &self.file_name {
+            map.serialize_entry("file_name", file_name)?;
+        }
+        if !self.patches.is_empty() {
+            map.serialize_entry("patches", &self.patches)?;
+        }
+        if let Some(target_directory) = &self.target_directory {
+            map.serialize_entry("target_directory", target_directory)?;
+        }
+
+        map.end()
+    }
+}
+
 /// A local path source (evaluated)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct PathSource {
     /// Path to the local source code
     pub path: PathBuf,
@@ -186,12 +280,66 @@ pub struct PathSource {
     pub filter: GlobVec,
 }
 
-fn default_use_gitignore() -> bool {
-    true
+impl Serialize for PathSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut len = 1; // path is always present
+        if self.checksum.is_some() {
+            len += 1;
+        }
+        if !self.patches.is_empty() {
+            len += 1;
+        }
+        if self.target_directory.is_some() {
+            len += 1;
+        }
+        if self.file_name.is_some() {
+            len += 1;
+        }
+        if self.use_gitignore {
+            len += 1;
+        }
+        if !self.filter.is_empty() {
+            len += 1;
+        }
+
+        let mut map = serializer.serialize_map(Some(len))?;
+        map.serialize_entry("path", &self.path)?;
+
+        // Serialize checksum as flattened fields based on variant
+        if let Some(checksum) = &self.checksum {
+            match checksum {
+                Checksum::Sha256(hash) => map.serialize_entry("sha256", hash)?,
+                Checksum::Md5(hash) => map.serialize_entry("md5", hash)?,
+            }
+        }
+
+        if !self.patches.is_empty() {
+            map.serialize_entry("patches", &self.patches)?;
+        }
+        if let Some(target_directory) = &self.target_directory {
+            map.serialize_entry("target_directory", target_directory)?;
+        }
+        if let Some(file_name) = &self.file_name {
+            map.serialize_entry("file_name", file_name)?;
+        }
+        if self.use_gitignore {
+            map.serialize_entry("use_gitignore", &self.use_gitignore)?;
+        }
+        if !self.filter.is_empty() {
+            map.serialize_entry("filter", &self.filter)?;
+        }
+
+        map.end()
+    }
 }
 
-fn is_true(value: &bool) -> bool {
-    *value
+fn default_use_gitignore() -> bool {
+    true
 }
 
 impl Source {

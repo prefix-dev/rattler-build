@@ -257,6 +257,7 @@ impl DynamicLinking {
 
 /// What to do during linking checks
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LinkingCheckBehavior {
     /// Ignore the issue (default)
     #[default]
@@ -325,6 +326,7 @@ impl PartialEq for PythonBuild {
 
 /// NoArch type for platform-independent packages
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NoArchType {
     /// Python noarch package (pure Python, no compiled extensions)
     Python,
