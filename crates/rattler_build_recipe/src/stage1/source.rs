@@ -1,4 +1,6 @@
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -17,7 +19,7 @@ pub enum Source {
 }
 
 /// A git revision (branch, tag or commit) - evaluated
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GitRev {
     /// A git branch
     Branch(String),
@@ -27,6 +29,23 @@ pub enum GitRev {
     Commit(String),
     /// The default revision (HEAD)
     Head,
+}
+
+/// Serialize a GitRev to a string
+fn serialize_gitrev<S>(rev: &GitRev, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&rev.to_string())
+}
+
+/// Deserialize a GitRev from a string
+fn deserialize_gitrev<'de, D>(deserializer: D) -> Result<GitRev, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    GitRev::from_str(&s).map_err(serde::de::Error::custom)
 }
 
 impl GitRev {
@@ -92,14 +111,19 @@ impl fmt::Display for GitUrl {
 }
 
 /// Git source information (evaluated)
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
     #[serde(rename = "git")]
     pub url: GitUrl,
 
     /// Revision to checkout (defaults to HEAD)
-    #[serde(default, skip_serializing_if = "GitRev::is_head")]
+    #[serde(
+        default,
+        skip_serializing_if = "GitRev::is_head",
+        serialize_with = "serialize_gitrev",
+        deserialize_with = "deserialize_gitrev"
+    )]
     pub rev: GitRev,
 
     /// Optionally a depth to clone the repository
@@ -119,76 +143,26 @@ pub struct GitSource {
     pub lfs: bool,
 }
 
-impl Serialize for GitSource {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-
-        let mut len = 1; // git url is always present
-        if !self.rev.is_head() {
-            len += 1;
-        }
-        if self.depth.is_some() {
-            len += 1;
-        }
-        if !self.patches.is_empty() {
-            len += 1;
-        }
-        if self.target_directory.is_some() {
-            len += 1;
-        }
-        if self.lfs {
-            len += 1;
-        }
-
-        let mut map = serializer.serialize_map(Some(len))?;
-        map.serialize_entry("git", &self.url)?;
-
-        // Serialize rev as flattened fields based on variant
-        match &self.rev {
-            GitRev::Branch(branch) => map.serialize_entry("branch", branch)?,
-            GitRev::Tag(tag) => map.serialize_entry("tag", tag)?,
-            GitRev::Commit(commit) => map.serialize_entry("rev", commit)?,
-            GitRev::Head => {} // Skip HEAD as it's the default
-        }
-
-        if let Some(depth) = &self.depth {
-            map.serialize_entry("depth", depth)?;
-        }
-        if !self.patches.is_empty() {
-            map.serialize_entry("patches", &self.patches)?;
-        }
-        if let Some(target_directory) = &self.target_directory {
-            map.serialize_entry("target_directory", target_directory)?;
-        }
-        if self.lfs {
-            map.serialize_entry("lfs", &self.lfs)?;
-        }
-
-        map.end()
-    }
-}
-
-/// Checksum for verification
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Checksum {
-    /// SHA256 checksum (hex string)
-    Sha256(String),
-    /// MD5 checksum (hex string)
-    Md5(String),
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url(s) to the source code
     pub url: Vec<Url>,
 
-    /// Optional checksum to verify the downloaded file
+    /// Optional SHA256 checksum to verify the downloaded file
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<Checksum>,
+    #[serde_as(as = "Option<SerializableHash::<Sha256>>")]
+    pub sha256: Option<Sha256Hash>,
+
+    /// Optional MD5 checksum to verify the downloaded file
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<Md5>>")]
+    pub md5: Option<Md5Hash>,
 
     /// Optionally a file name to rename the downloaded file
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -203,61 +177,22 @@ pub struct UrlSource {
     pub target_directory: Option<PathBuf>,
 }
 
-impl Serialize for UrlSource {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-
-        let mut len = 1; // url is always present
-        if self.checksum.is_some() {
-            len += 1;
-        }
-        if self.file_name.is_some() {
-            len += 1;
-        }
-        if !self.patches.is_empty() {
-            len += 1;
-        }
-        if self.target_directory.is_some() {
-            len += 1;
-        }
-
-        let mut map = serializer.serialize_map(Some(len))?;
-        map.serialize_entry("url", &self.url)?;
-
-        // Serialize checksum as flattened fields based on variant
-        if let Some(checksum) = &self.checksum {
-            match checksum {
-                Checksum::Sha256(hash) => map.serialize_entry("sha256", hash)?,
-                Checksum::Md5(hash) => map.serialize_entry("md5", hash)?,
-            }
-        }
-
-        if let Some(file_name) = &self.file_name {
-            map.serialize_entry("file_name", file_name)?;
-        }
-        if !self.patches.is_empty() {
-            map.serialize_entry("patches", &self.patches)?;
-        }
-        if let Some(target_directory) = &self.target_directory {
-            map.serialize_entry("target_directory", target_directory)?;
-        }
-
-        map.end()
-    }
-}
-
 /// A local path source (evaluated)
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PathSource {
     /// Path to the local source code
     pub path: PathBuf,
 
-    /// Optional checksum to verify the source code
+    /// Optional SHA256 checksum to verify the source code
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<Checksum>,
+    #[serde_as(as = "Option<SerializableHash::<Sha256>>")]
+    pub sha256: Option<Sha256Hash>,
+
+    /// Optional MD5 checksum to verify the source code
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<Md5>>")]
+    pub md5: Option<Md5Hash>,
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -280,66 +215,12 @@ pub struct PathSource {
     pub filter: GlobVec,
 }
 
-impl Serialize for PathSource {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-
-        let mut len = 1; // path is always present
-        if self.checksum.is_some() {
-            len += 1;
-        }
-        if !self.patches.is_empty() {
-            len += 1;
-        }
-        if self.target_directory.is_some() {
-            len += 1;
-        }
-        if self.file_name.is_some() {
-            len += 1;
-        }
-        if self.use_gitignore {
-            len += 1;
-        }
-        if !self.filter.is_empty() {
-            len += 1;
-        }
-
-        let mut map = serializer.serialize_map(Some(len))?;
-        map.serialize_entry("path", &self.path)?;
-
-        // Serialize checksum as flattened fields based on variant
-        if let Some(checksum) = &self.checksum {
-            match checksum {
-                Checksum::Sha256(hash) => map.serialize_entry("sha256", hash)?,
-                Checksum::Md5(hash) => map.serialize_entry("md5", hash)?,
-            }
-        }
-
-        if !self.patches.is_empty() {
-            map.serialize_entry("patches", &self.patches)?;
-        }
-        if let Some(target_directory) = &self.target_directory {
-            map.serialize_entry("target_directory", target_directory)?;
-        }
-        if let Some(file_name) = &self.file_name {
-            map.serialize_entry("file_name", file_name)?;
-        }
-        if self.use_gitignore {
-            map.serialize_entry("use_gitignore", &self.use_gitignore)?;
-        }
-        if !self.filter.is_empty() {
-            map.serialize_entry("filter", &self.filter)?;
-        }
-
-        map.end()
-    }
-}
-
 fn default_use_gitignore() -> bool {
     true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 impl Source {

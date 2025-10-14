@@ -1,4 +1,6 @@
+use rattler_digest::{Md5Hash, Sha256Hash};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::path::PathBuf;
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, Value};
@@ -74,18 +76,27 @@ pub struct GitSource {
 
 /// A url source (usually a tar.gz or tar.bz2 archive)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde_as]
 pub struct UrlSource {
     /// Url to the source code (template or concrete, can be list)
     #[serde(default)]
     pub url: Vec<Value<String>>,
 
     /// Optionally a sha256 checksum to verify the downloaded file
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sha256: Option<Value<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "sha256_serialization::serialize"
+    )]
+    pub sha256: Option<Value<Sha256Hash>>,
 
     /// Optionally a md5 checksum to verify the downloaded file
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub md5: Option<Value<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "md5_serialization::serialize"
+    )]
+    pub md5: Option<Value<Md5Hash>>,
 
     /// Optionally a file name to rename the downloaded file
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -107,12 +118,20 @@ pub struct PathSource {
     pub path: Value<PathBuf>,
 
     /// Optionally a sha256 checksum to verify the source code
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sha256: Option<Value<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "sha256_serialization::serialize"
+    )]
+    pub sha256: Option<Value<Sha256Hash>>,
 
     /// Optionally a md5 checksum to verify the source code
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub md5: Option<Value<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "md5_serialization::serialize"
+    )]
+    pub md5: Option<Value<Md5Hash>>,
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
@@ -141,6 +160,44 @@ fn default_use_gitignore() -> bool {
 
 fn is_true(value: &bool) -> bool {
     *value
+}
+
+/// Serialize a SHA256 hash Value as a hex string
+mod sha256_serialization {
+    use super::*;
+    use serde::Serializer;
+
+    pub fn serialize<S>(value: &Option<Value<Sha256Hash>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            None => serializer.serialize_none(),
+            Some(Value::Concrete { value, .. }) => {
+                serializer.serialize_str(&format!("{:x}", value))
+            }
+            Some(Value::Template { template, .. }) => serializer.serialize_str(template.source()),
+        }
+    }
+}
+
+/// Serialize an MD5 hash Value as a hex string
+mod md5_serialization {
+    use super::*;
+    use serde::Serializer;
+
+    pub fn serialize<S>(value: &Option<Value<Md5Hash>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            None => serializer.serialize_none(),
+            Some(Value::Concrete { value, .. }) => {
+                serializer.serialize_str(&format!("{:x}", value))
+            }
+            Some(Value::Template { template, .. }) => serializer.serialize_str(template.source()),
+        }
+    }
 }
 
 impl Source {

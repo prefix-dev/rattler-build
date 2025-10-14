@@ -17,7 +17,9 @@ rattler_build_variant_config = { path = "../rattler_build_variant_config", optio
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+serde_with = { workspace = true }
 rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }
 minijinja = { workspace = true, features = ["unstable_machinery"] }

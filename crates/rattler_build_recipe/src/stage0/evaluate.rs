@@ -55,9 +55,8 @@ use crate::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
         },
         source::{
-            Checksum as Stage1Checksum, GitRev as Stage1GitRev, GitSource as Stage1GitSource,
-            GitUrl as Stage1GitUrl, PathSource as Stage1PathSource, Source as Stage1Source,
-            UrlSource as Stage1UrlSource,
+            GitRev as Stage1GitRev, GitSource as Stage1GitSource, GitUrl as Stage1GitUrl,
+            PathSource as Stage1PathSource, Source as Stage1Source, UrlSource as Stage1UrlSource,
         },
         tests::{
             CommandsTest as Stage1CommandsTest, CommandsTestFiles as Stage1CommandsTestFiles,
@@ -1252,15 +1251,40 @@ impl Evaluate for Stage0UrlSource {
             urls.push(url);
         }
 
-        // Evaluate checksum (sha256 or md5, but only one can be set)
-        let checksum = if let Some(sha256) = &self.sha256 {
-            let sha256_str = evaluate_string_value(sha256, context)?;
-            Some(Stage1Checksum::Sha256(sha256_str))
-        } else if let Some(md5) = &self.md5 {
-            let md5_str = evaluate_string_value(md5, context)?;
-            Some(Stage1Checksum::Md5(md5_str))
-        } else {
-            None
+        // Evaluate checksum fields separately (both can be set)
+        // For hash types, we can just extract the concrete value or evaluate templates
+        let sha256 = match &self.sha256 {
+            None => None,
+            Some(Value::Concrete { value, .. }) => Some(*value),
+            Some(Value::Template { template, span }) => {
+                let sha256_str = render_template(template.source(), context, span)?;
+                let sha256_hash =
+                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
+                        .ok_or_else(|| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: *span,
+                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
+                            suggestion: None,
+                        })?;
+                Some(sha256_hash)
+            }
+        };
+
+        let md5 = match &self.md5 {
+            None => None,
+            Some(Value::Concrete { value, .. }) => Some(*value),
+            Some(Value::Template { template, span }) => {
+                let md5_str = render_template(template.source(), context, span)?;
+                let md5_hash =
+                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
+                        .ok_or_else(|| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: *span,
+                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
+                            suggestion: None,
+                        })?;
+                Some(md5_hash)
+            }
         };
 
         // Evaluate file_name
@@ -1286,7 +1310,8 @@ impl Evaluate for Stage0UrlSource {
 
         Ok(Stage1UrlSource {
             url: urls,
-            checksum,
+            sha256,
+            md5,
             file_name,
             patches,
             target_directory,
@@ -1307,15 +1332,40 @@ impl Evaluate for Stage0PathSource {
             }
         };
 
-        // Evaluate checksum (sha256 or md5, but only one can be set)
-        let checksum = if let Some(sha256) = &self.sha256 {
-            let sha256_str = evaluate_string_value(sha256, context)?;
-            Some(Stage1Checksum::Sha256(sha256_str))
-        } else if let Some(md5) = &self.md5 {
-            let md5_str = evaluate_string_value(md5, context)?;
-            Some(Stage1Checksum::Md5(md5_str))
-        } else {
-            None
+        // Evaluate checksum fields separately (both can be set)
+        // For hash types, we can just extract the concrete value or evaluate templates
+        let sha256 = match &self.sha256 {
+            None => None,
+            Some(Value::Concrete { value, .. }) => Some(*value),
+            Some(Value::Template { template, span }) => {
+                let sha256_str = render_template(template.source(), context, span)?;
+                let sha256_hash =
+                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
+                        .ok_or_else(|| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: *span,
+                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
+                            suggestion: None,
+                        })?;
+                Some(sha256_hash)
+            }
+        };
+
+        let md5 = match &self.md5 {
+            None => None,
+            Some(Value::Concrete { value, .. }) => Some(*value),
+            Some(Value::Template { template, span }) => {
+                let md5_str = render_template(template.source(), context, span)?;
+                let md5_hash =
+                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
+                        .ok_or_else(|| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: *span,
+                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
+                            suggestion: None,
+                        })?;
+                Some(md5_hash)
+            }
         };
 
         // Evaluate patches
@@ -1365,7 +1415,8 @@ impl Evaluate for Stage0PathSource {
 
         Ok(Stage1PathSource {
             path,
-            checksum,
+            sha256,
+            md5,
             patches,
             target_directory,
             file_name,

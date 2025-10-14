@@ -109,8 +109,7 @@ fn test_multi_output_full_snapshot() {
     let source = load_test_recipe("multi_output_full.yaml");
     let recipe = parse_recipe_or_multi_from_source(&source)
         .expect("Failed to parse multi-output full recipe");
-    // Use debug snapshot as this recipe has TopLevel inherit which can't be serialized to YAML
-    insta::assert_debug_snapshot!(recipe);
+    insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
 }
 
 #[test]

@@ -50,7 +50,40 @@ MultiOutput(
                     ],
                     sha256: Some(
                         Concrete {
-                            value: "fedcba9876543210",
+                            value: [
+                                227,
+                                176,
+                                196,
+                                66,
+                                152,
+                                252,
+                                28,
+                                20,
+                                154,
+                                251,
+                                244,
+                                200,
+                                153,
+                                111,
+                                185,
+                                36,
+                                39,
+                                174,
+                                65,
+                                228,
+                                100,
+                                155,
+                                147,
+                                76,
+                                164,
+                                149,
+                                153,
+                                27,
+                                120,
+                                82,
+                                184,
+                                85,
+                            ],
                             span: Span {
                                 start: 176,
                                 end: 176,
@@ -74,8 +107,8 @@ MultiOutput(
             number: Concrete {
                 value: 0,
                 span: Span {
-                    start: 211,
-                    end: 211,
+                    start: 259,
+                    end: 259,
                     start_line: 12,
                     start_column: 11,
                     end_line: 12,
@@ -85,7 +118,7 @@ MultiOutput(
             string: None,
             script: ConditionalList(
                 [
-                    Value(Concrete { value: Command("echo \"Top-level build script\""), span: Span { start: 229, end: 229, start_line: 14, start_column: 7, end_line: 14, end_column: 7 } }),
+                    Value(Concrete { value: Command("echo \"Top-level build script\""), span: Span { start: 277, end: 277, start_line: 14, start_column: 7, end_line: 14, end_column: 7 } }),
                 ],
             ),
             noarch: None,
@@ -195,8 +228,8 @@ MultiOutput(
                         fragment: None,
                     },
                     span: Span {
-                        start: 307,
-                        end: 307,
+                        start: 355,
+                        end: 355,
                         start_line: 18,
                         start_column: 13,
                         end_line: 18,
@@ -210,8 +243,8 @@ MultiOutput(
                         GPL-3.0-or-later,
                     ),
                     span: Span {
-                        start: 278,
-                        end: 278,
+                        start: 326,
+                        end: 326,
                         start_line: 17,
                         start_column: 12,
                         end_line: 17,
@@ -245,8 +278,8 @@ MultiOutput(
                                 },
                             ),
                             span: Span {
-                                start: 429,
-                                end: 429,
+                                start: 477,
+                                end: 477,
                                 start_line: 23,
                                 start_column: 13,
                                 end_line: 23,
@@ -265,8 +298,8 @@ MultiOutput(
                                     ),
                                 },
                                 span: Span {
-                                    start: 457,
-                                    end: 457,
+                                    start: 505,
+                                    end: 505,
                                     start_line: 24,
                                     start_column: 16,
                                     end_line: 24,
@@ -286,7 +319,7 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 520, end: 520, start_line: 28, start_column: 11, end_line: 28, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 568, end: 568, start_line: 28, start_column: 11, end_line: 28, end_column: 11 } }),
                             ],
                         ),
                         run_constraints: ConditionalList(
@@ -433,8 +466,8 @@ MultiOutput(
                             Concrete {
                                 value: "Main package inheriting from top-level",
                                 span: Span {
-                                    start: 553,
-                                    end: 553,
+                                    start: 601,
+                                    end: 601,
                                     start_line: 30,
                                     start_column: 16,
                                     end_line: 30,
@@ -451,7 +484,7 @@ MultiOutput(
                             python: PythonTest {
                                 imports: ConditionalList(
                                     [
-                                        Value(Concrete { value: "main_package", span: Span { start: 652, end: 652, start_line: 34, start_column: 15, end_line: 34, end_column: 15 } }),
+                                        Value(Concrete { value: "main_package", span: Span { start: 700, end: 700, start_line: 34, start_column: 15, end_line: 34, end_column: 15 } }),
                                     ],
                                 ),
                                 pip_check: None,
@@ -472,8 +505,8 @@ MultiOutput(
                                 },
                             ),
                             span: Span {
-                                start: 771,
-                                end: 771,
+                                start: 819,
+                                end: 819,
                                 start_line: 38,
                                 start_column: 13,
                                 end_line: 38,
@@ -492,8 +525,8 @@ MultiOutput(
                                     ),
                                 },
                                 span: Span {
-                                    start: 798,
-                                    end: 798,
+                                    start: 846,
+                                    end: 846,
                                     start_line: 39,
                                     start_column: 16,
                                     end_line: 39,
@@ -513,8 +546,8 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 843, end: 843, start_line: 42, start_column: 11, end_line: 42, end_column: 11 } }),
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "main-package" }), version: Some(Exact(Equals, Version { version: [[0], [5], [0], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 860, end: 860, start_line: 43, start_column: 11, end_line: 43, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 891, end: 891, start_line: 42, start_column: 11, end_line: 42, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "main-package" }), version: Some(Exact(Equals, Version { version: [[0], [5], [0], [0]], local: [] })), build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 908, end: 908, start_line: 43, start_column: 11, end_line: 43, end_column: 11 } }),
                             ],
                         ),
                         run_constraints: ConditionalList(
@@ -661,8 +694,8 @@ MultiOutput(
                             Concrete {
                                 value: "Sub package also inheriting from top-level",
                                 span: Span {
-                                    start: 907,
-                                    end: 907,
+                                    start: 955,
+                                    end: 955,
                                     start_line: 45,
                                     start_column: 16,
                                     end_line: 45,
@@ -679,7 +712,7 @@ MultiOutput(
                             CommandsTest {
                                 script: ConditionalList(
                                     [
-                                        Value(Concrete { value: Command("python -c \"import sub_package\""), span: Span { start: 989, end: 989, start_line: 48, start_column: 13, end_line: 48, end_column: 13 } }),
+                                        Value(Concrete { value: Command("python -c \"import sub_package\""), span: Span { start: 1037, end: 1037, start_line: 48, start_column: 13, end_line: 48, end_column: 13 } }),
                                     ],
                                 ),
                                 requirements: None,
@@ -700,8 +733,8 @@ MultiOutput(
                                 },
                             ),
                             span: Span {
-                                start: 1107,
-                                end: 1107,
+                                start: 1155,
+                                end: 1155,
                                 start_line: 52,
                                 start_column: 13,
                                 end_line: 52,
@@ -720,8 +753,8 @@ MultiOutput(
                                     ),
                                 },
                                 span: Span {
-                                    start: 1137,
-                                    end: 1137,
+                                    start: 1185,
+                                    end: 1185,
                                     start_line: 53,
                                     start_column: 16,
                                     end_line: 53,
@@ -741,7 +774,7 @@ MultiOutput(
                         ),
                         run: ConditionalList(
                             [
-                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1374, end: 1374, start_line: 64, start_column: 11, end_line: 64, end_column: 11 } }),
+                                Value(Concrete { value: SerializableMatchSpec(MatchSpec { name: Some(PackageName { normalized: None, source: "python" }), version: None, build: None, build_number: None, file_name: None, extras: None, channel: None, subdir: None, namespace: None, md5: None, sha256: None, url: None, license: None }), span: Span { start: 1422, end: 1422, start_line: 64, start_column: 11, end_line: 64, end_column: 11 } }),
                             ],
                         ),
                         run_constraints: ConditionalList(
@@ -777,8 +810,8 @@ MultiOutput(
                         number: Concrete {
                             value: 1,
                             span: Span {
-                                start: 1186,
-                                end: 1186,
+                                start: 1234,
+                                end: 1234,
                                 start_line: 56,
                                 start_column: 15,
                                 end_line: 56,
@@ -788,7 +821,7 @@ MultiOutput(
                         string: None,
                         script: ConditionalList(
                             [
-                                Value(Concrete { value: Command("echo \"Custom build overriding top-level\""), span: Span { start: 1212, end: 1212, start_line: 58, start_column: 11, end_line: 58, end_column: 11 } }),
+                                Value(Concrete { value: Command("echo \"Custom build overriding top-level\""), span: Span { start: 1260, end: 1260, start_line: 58, start_column: 11, end_line: 58, end_column: 11 } }),
                             ],
                         ),
                         noarch: None,
@@ -887,8 +920,8 @@ MultiOutput(
                                     MIT,
                                 ),
                                 span: Span {
-                                    start: 1331,
-                                    end: 1331,
+                                    start: 1379,
+                                    end: 1379,
                                     start_line: 61,
                                     start_column: 16,
                                     end_line: 61,
@@ -904,8 +937,8 @@ MultiOutput(
                             Concrete {
                                 value: "Custom package with overridden build",
                                 span: Span {
-                                    start: 1279,
-                                    end: 1279,
+                                    start: 1327,
+                                    end: 1327,
                                     start_line: 60,
                                     start_column: 16,
                                     end_line: 60,

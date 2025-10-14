@@ -9,7 +9,7 @@ recipe:
 source:
 - url:
   - https://example.com/source.tar.gz
-  sha256: abc123
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 build:
   number: 0
   string: null
@@ -60,7 +60,7 @@ outputs:
   source:
   - url:
     - https://example.com/build-source.tar.gz
-    sha256: def456
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   requirements:
     build:
     - gcc
