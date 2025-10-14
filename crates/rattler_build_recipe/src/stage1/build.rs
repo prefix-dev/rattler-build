@@ -4,25 +4,45 @@ use serde::{Deserialize, Serialize};
 
 use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
 
+/// Helper function to check if a u64 is zero (for skip_serializing_if)
+fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
+
 /// Variant key usage configuration (evaluated)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
     /// Variant keys to use
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub use_keys: Vec<String>,
     /// Variant keys to ignore
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignore_keys: Vec<String>,
     /// Down-prioritize variant (negative priority value)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down_prioritize_variant: Option<i32>,
+}
+
+impl VariantKeyUsage {
+    /// Check if this is the default configuration
+    pub fn is_default(&self) -> bool {
+        self.use_keys.is_empty()
+            && self.ignore_keys.is_empty()
+            && self.down_prioritize_variant.is_none()
+    }
 }
 
 /// Prefix detection configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrefixDetection {
     /// Force file type detection (text or binary)
+    #[serde(default, skip_serializing_if = "ForceFileType::is_default")]
     pub force_file_type: ForceFileType,
     /// Files to ignore for prefix replacement
+    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
     pub ignore: AllOrGlobVec,
     /// Ignore binary files for prefix replacement (Unix only)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ignore_binary_files: bool,
 }
 
@@ -36,13 +56,29 @@ impl Default for PrefixDetection {
     }
 }
 
+impl PrefixDetection {
+    /// Check if this is the default configuration
+    pub fn is_default(&self) -> bool {
+        self.force_file_type.is_default() && self.ignore.is_none() && !self.ignore_binary_files
+    }
+}
+
 /// Force file type for prefix detection
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ForceFileType {
     /// Force these files to be treated as text files
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub text: GlobVec,
     /// Force these files to be treated as binary files
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub binary: GlobVec,
+}
+
+impl ForceFileType {
+    /// Check if this is the default configuration
+    pub fn is_default(&self) -> bool {
+        self.text.is_empty() && self.binary.is_empty()
+    }
 }
 
 /// Post-processing operations using regex replacements
@@ -106,46 +142,60 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub number: u64,
 
     /// Build string (usually auto-generated from variant hash)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub string: Option<String>,
 
     /// Build script - list of commands or reference to a file
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub script: Vec<String>,
 
     /// Noarch type - "python" or "generic" if set
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<NoArchType>,
 
     /// Python-specific configuration
+    #[serde(default, skip_serializing_if = "PythonBuild::is_default")]
     pub python: PythonBuild,
 
     /// Skip conditions - can be boolean expressions or platform names
     /// For example: ["win", "platform == 'osx-64'"]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skip: Vec<String>,
 
     /// Always copy these files (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub always_copy_files: GlobVec,
 
     /// Always include these files (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub always_include_files: GlobVec,
 
     /// Merge build and host environments
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub merge_build_and_host_envs: bool,
 
     /// Files to include in the package (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub files: GlobVec,
 
     /// Dynamic linking configuration
+    #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
     pub dynamic_linking: DynamicLinking,
 
     /// Variant key usage configuration
+    #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
     pub variant: VariantKeyUsage,
 
     /// Prefix detection configuration
+    #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
     pub prefix_detection: PrefixDetection,
 
     /// Post-processing operations
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
 }
 
@@ -153,24 +203,30 @@ pub struct Build {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DynamicLinking {
     /// RPaths to use (Linux/macOS only)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rpaths: Vec<String>,
 
     /// Binary relocation setting
     /// - All(true): relocate all binaries (default)
     /// - All(false): don't relocate any binaries
     /// - SpecificPaths(globs): relocate only specific paths
+    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_all")]
     pub binary_relocation: AllOrGlobVec,
 
     /// Allow these missing DSOs (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub missing_dso_allowlist: GlobVec,
 
     /// Allow rpath to point to these locations (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub rpath_allowlist: GlobVec,
 
     /// What to do when detecting overdepending (ignore or error)
+    #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_ignore")]
     pub overdepending_behavior: LinkingCheckBehavior,
 
     /// What to do when detecting overlinking (ignore or error)
+    #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_ignore")]
     pub overlinking_behavior: LinkingCheckBehavior,
 }
 
@@ -187,6 +243,18 @@ impl Default for DynamicLinking {
     }
 }
 
+impl DynamicLinking {
+    /// Check if this is the default configuration
+    pub fn is_default(&self) -> bool {
+        self.rpaths.is_empty()
+            && self.binary_relocation.is_all()
+            && self.missing_dso_allowlist.is_empty()
+            && self.rpath_allowlist.is_empty()
+            && self.overdepending_behavior.is_ignore()
+            && self.overlinking_behavior.is_ignore()
+    }
+}
+
 /// What to do during linking checks
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LinkingCheckBehavior {
@@ -197,26 +265,49 @@ pub enum LinkingCheckBehavior {
     Error,
 }
 
+impl LinkingCheckBehavior {
+    /// Check if this is Ignore (the default)
+    pub fn is_ignore(&self) -> bool {
+        matches!(self, LinkingCheckBehavior::Ignore)
+    }
+}
+
 /// Python-specific build configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PythonBuild {
     /// Python entry points (executable_name = module:function)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entry_points: Vec<EntryPoint>,
 
     /// Skip pyc compilation for these files (validated glob patterns)
     /// Only relevant for non-noarch Python packages
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub skip_pyc_compilation: GlobVec,
 
     /// Use Python.app on macOS for GUI applications
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,
 
     /// Whether the package is Python version independent
     /// This is used for abi3 packages that are not tied to a specific Python version
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub version_independent: bool,
 
     /// The relative site-packages path that a Python build exports for other packages to use
     /// This setting only makes sense for the `python` package itself
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site_packages_path: Option<String>,
+}
+
+impl PythonBuild {
+    /// Check if this is the default configuration
+    pub fn is_default(&self) -> bool {
+        self.entry_points.is_empty()
+            && self.skip_pyc_compilation.is_empty()
+            && !self.use_python_app_entrypoint
+            && !self.version_independent
+            && self.site_packages_path.is_none()
+    }
 }
 
 // Manual PartialEq implementation since EntryPoint doesn't implement PartialEq

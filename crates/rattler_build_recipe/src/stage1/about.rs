@@ -9,27 +9,35 @@ use crate::stage0::License;
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct About {
     /// Package homepage URL (validated)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homepage: Option<Url>,
 
     /// Repository URL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository: Option<Url>,
 
     /// Documentation URL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub documentation: Option<Url>,
 
     /// License expression (validated SPDX)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license: Option<License>,
 
     /// License file paths
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub license_file: Vec<String>,
 
     /// License family (e.g., MIT, BSD, etc.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_family: Option<String>,
 
     /// Package summary/description
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 
     /// Longer package description
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 

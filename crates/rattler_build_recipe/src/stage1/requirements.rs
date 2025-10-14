@@ -149,18 +149,23 @@ impl<'de> Deserialize<'de> for Dependency {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub noarch: Vec<Dependency>,
 
     /// Strong run exports (apply from build and host env to run env)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub strong: Vec<Dependency>,
 
     /// Strong run constraints
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub strong_constraints: Vec<Dependency>,
 
     /// Weak run exports (apply from host env to run env)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub weak: Vec<Dependency>,
 
     /// Weak run constraints
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub weak_constraints: Vec<Dependency>,
 }
 
@@ -184,9 +189,11 @@ impl RunExports {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct IgnoreRunExports {
     /// Packages to ignore run exports from by name
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub by_name: Vec<String>,
 
     /// Packages whose run_exports to ignore
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub from_package: Vec<String>,
 }
 
@@ -206,21 +213,27 @@ impl IgnoreRunExports {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Requirements {
     /// Build-time dependencies (available during build)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub build: Vec<Dependency>,
 
     /// Host dependencies (available during build and runtime)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub host: Vec<Dependency>,
 
     /// Runtime dependencies
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run: Vec<Dependency>,
 
     /// Runtime constraints (optional requirements that constrain the environment)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_constraints: Vec<Dependency>,
 
     /// Run exports configuration
+    #[serde(default, skip_serializing_if = "RunExports::is_empty")]
     pub run_exports: RunExports,
 
     /// Ignore run exports from specific packages
+    #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
 }
 
