@@ -1,11 +1,19 @@
 //! Module for types and functions related to minijinja setup for recipes.
 use fs_err as fs;
 use indexmap::IndexMap;
-use minijinja::{Environment, Value, syntax::SyntaxConfig, value::Kwargs};
+use minijinja::{
+    Environment, Value,
+    syntax::SyntaxConfig,
+    value::{Kwargs, Object},
+};
 use rattler_build_types::{NormalizedKey, Pin, PinArgs};
 use std::io::Read;
-use std::sync::Arc;
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr as _};
+use std::sync::{Arc, Mutex};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+    str::FromStr as _,
+};
 
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -45,6 +53,54 @@ impl Default for JinjaConfig {
     }
 }
 
+/// A wrapper around the context that tracks variable access
+///
+/// This allows us to know which variables were actually used during template rendering,
+/// which is important for understanding which variables are used and which are undefined.
+#[derive(Debug, Clone)]
+struct TrackingContext {
+    context: BTreeMap<String, Value>,
+    accessed_variables: Arc<Mutex<HashSet<String>>>,
+    undefined_variables: Arc<Mutex<HashSet<String>>>,
+}
+
+impl TrackingContext {
+    fn new(
+        context: BTreeMap<String, Value>,
+        accessed_variables: Arc<Mutex<HashSet<String>>>,
+        undefined_variables: Arc<Mutex<HashSet<String>>>,
+    ) -> Self {
+        Self {
+            context,
+            accessed_variables,
+            undefined_variables,
+        }
+    }
+}
+
+impl Object for TrackingContext {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let key_str = key.as_str()?;
+
+        // Track that this variable was accessed
+        if let Ok(mut accessed) = self.accessed_variables.lock() {
+            accessed.insert(key_str.to_string());
+        }
+
+        // Get the value from the context
+        match self.context.get(key_str) {
+            Some(v) => Some(v.clone()),
+            None => {
+                // Track that this variable was undefined
+                if let Ok(mut undefined) = self.undefined_variables.lock() {
+                    undefined.insert(key_str.to_string());
+                }
+                None
+            }
+        }
+    }
+}
+
 /// The internal representation of the pin function.
 pub enum InternalRepr {
     /// The pin function is used to pin a subpackage.
@@ -79,6 +135,10 @@ impl InternalRepr {
 pub struct Jinja {
     env: Environment<'static>,
     context: BTreeMap<String, Value>,
+    /// Set of variables that were accessed during template rendering
+    accessed_variables: Arc<Mutex<HashSet<String>>>,
+    /// Set of variables that were accessed but undefined
+    undefined_variables: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Jinja {
@@ -129,7 +189,12 @@ impl Jinja {
             context.insert(key.normalize(), value.clone().into());
         }
 
-        Self { env, context }
+        Self {
+            env,
+            context,
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+        }
     }
 
     /// Add in the variables from the given context.
@@ -165,14 +230,53 @@ impl Jinja {
     }
 
     /// Render a template with the current context.
+    ///
+    /// This will track accessed and undefined variables during rendering using
+    /// a TrackingContext object wrapper.
     pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
-        self.env.render_str(template, &self.context)
+        // Create a TrackingContext that wraps our context
+        let tracking_context = TrackingContext::new(
+            self.context.clone(),
+            self.accessed_variables.clone(),
+            self.undefined_variables.clone(),
+        );
+
+        // Render with the tracking context as a minijinja Object
+        // The Value::from_object wraps it in an Arc internally
+        self.env
+            .render_str(template, Value::from_object(tracking_context))
     }
 
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
         let expr = self.env.compile_expression(str)?;
         expr.eval(self.context())
+    }
+
+    /// Get the set of variables that were accessed during rendering
+    pub fn accessed_variables(&self) -> HashSet<String> {
+        self.accessed_variables
+            .lock()
+            .map(|accessed| accessed.clone())
+            .unwrap_or_default()
+    }
+
+    /// Get the set of variables that were accessed but undefined
+    pub fn undefined_variables(&self) -> HashSet<String> {
+        self.undefined_variables
+            .lock()
+            .map(|undefined| undefined.clone())
+            .unwrap_or_default()
+    }
+
+    /// Clear the accessed and undefined variables trackers
+    pub fn clear_tracking(&self) {
+        if let Ok(mut accessed) = self.accessed_variables.lock() {
+            accessed.clear();
+        }
+        if let Ok(mut undefined) = self.undefined_variables.lock() {
+            undefined.clear();
+        }
     }
 }
 
@@ -460,7 +564,7 @@ fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
     } = config.clone();
 
     let mut env = Environment::empty();
-    // env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
     default_tests(&mut env);
     default_filters(&mut env);
 
@@ -1254,6 +1358,100 @@ mod tests {
         let jinja = Jinja::new(Default::default());
         assert!(jinja.eval("cmp(python, '==3.7')").is_err());
         assert!(jinja.eval("${{ \"foo\" | escape }}").is_err());
+    }
+
+    #[test]
+    fn test_variable_tracking() {
+        let mut jinja = Jinja::new(Default::default());
+        jinja
+            .context_mut()
+            .insert("name".to_string(), Value::from("foo"));
+        jinja
+            .context_mut()
+            .insert("version".to_string(), Value::from("1.0.0"));
+
+        // Render a template
+        let result = jinja.render_str("${{ name }}-${{ version }}");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "foo-1.0.0");
+
+        // Check accessed variables
+        let accessed = jinja.accessed_variables();
+        assert_eq!(accessed.len(), 2);
+        assert!(accessed.contains("name"));
+        assert!(accessed.contains("version"));
+
+        // No undefined variables
+        assert_eq!(jinja.undefined_variables().len(), 0);
+    }
+
+    #[test]
+    fn test_undefined_variable_tracking() {
+        let mut jinja = Jinja::new(Default::default());
+        jinja
+            .context_mut()
+            .insert("name".to_string(), Value::from("foo"));
+        // Note: "version" is NOT defined
+
+        // Set strict undefined behavior
+        jinja
+            .env_mut()
+            .set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+
+        // Try to render a template with undefined variable
+        let result = jinja.render_str("${{ name }}-${{ version }}");
+        assert!(result.is_err());
+
+        // Check that both variables were accessed
+        let accessed = jinja.accessed_variables();
+        assert_eq!(accessed.len(), 2);
+        assert!(accessed.contains("name"));
+        assert!(accessed.contains("version"));
+
+        // Check that only "version" is undefined
+        let undefined = jinja.undefined_variables();
+        assert_eq!(undefined.len(), 1);
+        assert!(undefined.contains("version"));
+    }
+
+    #[test]
+    fn test_multiple_undefined_variables_tracking() {
+        let jinja = Jinja::new(Default::default());
+        // No variables defined
+
+        // Try to render a template with multiple undefined variables
+        // With Lenient mode (default), this will succeed but render undefined variables as empty strings
+        let result = jinja.render_str("${{ platform }} for ${{ arch }}");
+        assert!(result.is_ok());
+        // Both undefined variables will be tracked even though rendering succeeds
+        assert_eq!(result.unwrap(), " for "); // Undefined variables render as empty
+
+        // Both undefined variables should be tracked
+        let undefined = jinja.undefined_variables();
+        assert_eq!(undefined.len(), 2);
+        assert!(undefined.contains("platform"));
+        assert!(undefined.contains("arch"));
+    }
+
+    #[test]
+    fn test_clear_tracking() {
+        let mut jinja = Jinja::new(Default::default());
+        jinja
+            .context_mut()
+            .insert("name".to_string(), Value::from("foo"));
+
+        // Render a template
+        let _ = jinja.render_str("${{ name }}");
+
+        // Variables should be tracked
+        assert!(!jinja.accessed_variables().is_empty());
+
+        // Clear tracking
+        jinja.clear_tracking();
+
+        // Variables should be cleared
+        assert!(jinja.accessed_variables().is_empty());
+        assert!(jinja.undefined_variables().is_empty());
     }
 
     #[test]

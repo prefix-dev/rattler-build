@@ -5,7 +5,6 @@ mod about;
 mod build;
 pub mod evaluate;
 mod extra;
-pub mod jinja_functions;
 mod match_spec;
 mod output;
 mod package;

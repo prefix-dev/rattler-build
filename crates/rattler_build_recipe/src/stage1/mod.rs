@@ -12,7 +12,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{ParseError, stage0::jinja_functions::JinjaConfig};
+use crate::ParseError;
+use rattler_build_jinja::JinjaConfig;
 
 pub mod about;
 pub mod all_or_glob_vec;
