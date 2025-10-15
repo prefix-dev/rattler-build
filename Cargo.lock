@@ -4395,6 +4395,8 @@ dependencies = [
  "marked-yaml",
  "miette",
  "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
  "rattler_conda_types",
  "serde",
  "serde_yaml",

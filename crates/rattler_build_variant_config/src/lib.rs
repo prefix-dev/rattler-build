@@ -11,7 +11,8 @@
 //! ## Example
 //!
 //! ```rust
-//! use rattler_build_variant_config::{VariantConfig, NormalizedKey};
+//! use rattler_build_types::NormalizedKey;
+//! use rattler_build_variant_config::VariantConfig;
 //! use std::collections::HashSet;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,8 +113,6 @@ pub mod combination;
 pub mod conda_build_config;
 pub mod config;
 pub mod error;
-pub mod normalized_key;
-pub mod variable;
 
 #[cfg(feature = "parser")]
 pub mod parser;
@@ -123,8 +122,6 @@ pub use combination::compute_combinations;
 pub use conda_build_config::{SelectorContext, load_conda_build_config};
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
-pub use normalized_key::NormalizedKey;
-pub use variable::Variable;
 
 #[cfg(feature = "parser")]
 pub use parser::{parse_variant_file, parse_variant_str};

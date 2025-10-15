@@ -20,6 +20,10 @@ serde_yaml = { workspace = true }
 # Rattler crates
 rattler_conda_types = { workspace = true }
 
+# Rattler-build crates
+rattler_build_types = { workspace = true }
+rattler_build_jinja = { workspace = true }
+
 # Template rendering and YAML parsing (optional with 'parser' feature)
 minijinja = { version = "2.11.0", features = [
   "unstable_machinery",

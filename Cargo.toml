@@ -30,6 +30,7 @@ rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
+rattler_build_jinja = { path = "crates/rattler_build_jinja" }
 regex = "1.11.1"
 reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
 serde = { version = "1.0.219", features = ["derive"] }
