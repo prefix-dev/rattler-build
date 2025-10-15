@@ -3,6 +3,8 @@ members = [
   "rust-tests",
   "crates/rattler_build_recipe_generator",
   "crates/rattler_build_recipe",
+  "crates/rattler_build_types",
+  "crates/rattler_build_jinja",
 ]
 
 [workspace.package]
@@ -21,11 +23,13 @@ fs-err = "3.1.1"
 indexmap = "2.11.4"
 insta = "1.41.1"
 itertools = "0.14.0"
+lazy_static = "1.5.0"
 miette = "7.6.0"
 rattler_conda_types = { version = "0.40.0", default-features = false }
 rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
+rattler_build_types = { path = "crates/rattler_build_types" }
 regex = "1.11.1"
 reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -44,7 +48,10 @@ spdx = "0.12.0"
 thiserror = "2.0.17"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
-minijinja = { version = "2.11.0", features = ["unstable_machinery"] }
+minijinja = { version = "2.11.0", features = [
+  "unstable_machinery",
+  "custom_syntax",
+] }
 
 [package]
 name = "rattler-build"
@@ -215,7 +222,7 @@ rattler_solve = { version = "3.0.5", default-features = false, features = [
 rattler_virtual_packages = { version = "2.2.1", default-features = false }
 rattler_package_streaming = { version = "0.23.7", default-features = false }
 rattler_menuinst = "0.2.29"
-lazy_static = "1.5.0"
+lazy_static = { workspace = true }
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"
 strum = "0.27.2"
