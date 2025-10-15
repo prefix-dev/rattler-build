@@ -1420,17 +1420,13 @@ mod tests {
         // No variables defined
 
         // Try to render a template with multiple undefined variables
-        // With Lenient mode (default), this will succeed but render undefined variables as empty strings
         let result = jinja.render_str("${{ platform }} for ${{ arch }}");
-        assert!(result.is_ok());
-        // Both undefined variables will be tracked even though rendering succeeds
-        assert_eq!(result.unwrap(), " for "); // Undefined variables render as empty
+        assert!(result.is_err());
 
         // Both undefined variables should be tracked
         let undefined = jinja.undefined_variables();
-        assert_eq!(undefined.len(), 2);
+        assert_eq!(undefined.len(), 1);
         assert!(undefined.contains("platform"));
-        assert!(undefined.contains("arch"));
     }
 
     #[test]
