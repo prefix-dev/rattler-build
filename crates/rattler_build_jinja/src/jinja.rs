@@ -19,6 +19,8 @@ use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version,
 
 use crate::variable::Variable;
 
+pub use minijinja::UndefinedBehavior;
+
 /// Configuration for Jinja template rendering in rattler-build
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
@@ -32,10 +34,10 @@ pub struct JinjaConfig {
     pub variant: BTreeMap<NormalizedKey, Variable>,
     /// Whether experimental features are enabled
     pub experimental: bool,
-    /// Whether undefined variables should be allowed
-    pub allow_undefined: bool,
     /// Path to the recipe file (for relative path resolution in load_from_file)
     pub recipe_path: Option<PathBuf>,
+    /// Undefined behavior for minijinja (defaults to SemiStrict)
+    pub undefined_behavior: UndefinedBehavior,
 }
 
 impl Default for JinjaConfig {
@@ -47,8 +49,8 @@ impl Default for JinjaConfig {
             host_platform: current,
             variant: BTreeMap::new(),
             experimental: false,
-            allow_undefined: false,
             recipe_path: None,
+            undefined_behavior: UndefinedBehavior::SemiStrict,
         }
     }
 }
@@ -559,12 +561,12 @@ fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
         build_platform,
         variant,
         experimental,
-        allow_undefined,
         recipe_path,
+        undefined_behavior,
     } = config.clone();
 
     let mut env = Environment::empty();
-    env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
+    env.set_undefined_behavior(undefined_behavior);
     default_tests(&mut env);
     default_filters(&mut env);
 
@@ -659,6 +661,10 @@ fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
     });
 
     let variant_clone = variant.clone();
+    let allow_undefined = !matches!(
+        config.undefined_behavior,
+        UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict
+    );
     env.add_function("stdlib", move |lang: String| {
         let res = compiler_stdlib_eval(&lang, target_platform, &variant_clone, "stdlib");
         if allow_undefined {

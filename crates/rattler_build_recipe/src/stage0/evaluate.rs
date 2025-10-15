@@ -80,7 +80,6 @@ fn render_template(
     let jinja_config = context.jinja_config().clone();
     let mut jinja = Jinja::new(jinja_config);
 
-    // Note: The Jinja environment is configured with Lenient (semistrict) undefined behavior
     // This allows our TrackingContext to intercept undefined variable access and track them
 
     // Add the evaluation context variables to the Jinja context
@@ -1578,6 +1577,9 @@ impl Evaluate for Stage0Recipe {
 
 #[cfg(test)]
 mod tests {
+    use minijinja::UndefinedBehavior;
+    use rattler_build_jinja::JinjaConfig;
+
     use super::*;
     use crate::stage0::types::{
         Conditional, ConditionalList, Item, JinjaTemplate, ListOrItem, Value,
@@ -1787,54 +1789,6 @@ mod tests {
     }
 
     #[test]
-    fn test_undefined_variable_error() {
-        let ctx = EvaluationContext::new();
-        // No variables set
-
-        // Try to render a template with an undefined variable
-        // With Lenient mode, this will succeed but render the undefined variable as empty string
-        let template = "${{ undefined_var }}";
-        let result = render_template(template, &ctx, &Span::unknown());
-
-        // With Lenient mode, rendering succeeds
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ""); // Undefined variables render as empty
-
-        // Check that the undefined variable was tracked
-        let undefined = ctx.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("undefined_var"));
-    }
-
-    #[test]
-    fn test_undefined_variable_tracking() {
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        // version is not defined
-
-        // Try to render a template with an undefined variable
-        // With Lenient mode, this will succeed but render undefined variables as empty
-        let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown());
-
-        // With Lenient mode, rendering succeeds
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "foo-"); // Undefined variables render as empty
-
-        // Check that only "version" was tracked as undefined, not "name"
-        let undefined = ctx.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("version"));
-        assert!(!undefined.contains("name"));
-
-        // Check that both were tracked as accessed
-        let accessed = ctx.accessed_variables();
-        assert_eq!(accessed.len(), 2);
-        assert!(accessed.contains("name"));
-        assert!(accessed.contains("version"));
-    }
-
-    #[test]
     fn test_multiple_undefined_variables() {
         let ctx = EvaluationContext::new();
         // No variables set
@@ -1842,17 +1796,40 @@ mod tests {
         let template = "${{ platform }} for ${{ arch }}";
         let result = render_template(template, &ctx, &Span::unknown());
 
-        // With Lenient mode, rendering succeeds
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), " for "); // Undefined variables render as empty
+        assert!(result.is_err());
 
-        // Both undefined variables are tracked via TrackingContext
+        // First undefined variable encountered is 'platform'
+        let undefined = ctx.undefined_variables();
+        assert_eq!(undefined.len(), 1);
+        assert!(undefined.contains("platform"));
+
+        let accessed = ctx.accessed_variables();
+        assert_eq!(accessed.len(), 1);
+        assert!(accessed.contains("platform"));
+    }
+
+    #[test]
+    fn test_multiple_undefined_variables_lenient() {
+        let jinja_config = JinjaConfig {
+            undefined_behavior: UndefinedBehavior::Lenient,
+            ..Default::default()
+        };
+        let mut ctx = EvaluationContext::new();
+        ctx.set_jinja_config(jinja_config);
+        // No variables set
+
+        let template = "${{ platform }} for ${{ arch }}";
+        let result = render_template(template, &ctx, &Span::unknown());
+
+        assert!(result.is_ok());
+        assert!(result.unwrap() == " for ");
+
+        // First undefined variable encountered is 'platform'
         let undefined = ctx.undefined_variables();
         assert_eq!(undefined.len(), 2);
         assert!(undefined.contains("platform"));
         assert!(undefined.contains("arch"));
 
-        // Both are also tracked as accessed
         let accessed = ctx.accessed_variables();
         assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("platform"));
