@@ -9,6 +9,15 @@ preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
 build-variants = { python = ["3.8"] }
 
+[dependencies]
+# for linting
+ruff = "*"
+requests = ">=2.32.3,<2.33"
+types-requests = ">=2.32.0.20240602,<2.32.1"
+
+[develop]
+py-rattler-build = { path = "." }
+
 [package.build]
 backend = { name = "pixi-build-python", version = "*" }
 
@@ -22,12 +31,7 @@ maturin = "~=1.2.2"
 [package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
 
-[feature.lint.dependencies]
-# we need rust for cargo-fmt and clippy
-rust = ">=1.86.0,<1.87"
-ruff = ">=0.3.3,<0.4"
-
-[feature.lint.tasks]
+[tasks]
 fmt = { depends-on = ["fmt-python", "fmt-rust"] }
 fmt-python = "ruff format rattler_build examples tests"
 fmt-rust = "cargo fmt --all"
@@ -78,10 +82,5 @@ docs = { cmd = "mkdocs serve" }
 build-docs = { cmd = "mkdocs build" }
 
 [environments]
-lint = { features = ["lint"] }
 test = { features = ["test"], solve-group = "default" }
 docs = ["docs"]
-
-[dependencies]
-requests = ">=2.32.3,<2.33"
-types-requests = ">=2.32.0.20240602,<2.32.1"
