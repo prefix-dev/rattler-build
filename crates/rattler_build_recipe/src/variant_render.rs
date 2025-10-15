@@ -8,6 +8,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use indexmap::IndexMap;
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::{
