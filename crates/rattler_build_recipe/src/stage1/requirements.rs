@@ -252,6 +252,47 @@ impl Requirements {
             && self.run_exports.is_empty()
             && self.ignore_run_exports.is_empty()
     }
+
+    /// Extract all pin_subpackage references from this requirements section
+    ///
+    /// Returns a list of package names that are referenced via pin_subpackage.
+    /// This is used to determine the dependency order for multi-output recipes.
+    pub fn pin_subpackage_refs(&self) -> Vec<PackageName> {
+        let mut refs = Vec::new();
+
+        // Check all dependency lists
+        for dep in self
+            .build
+            .iter()
+            .chain(self.host.iter())
+            .chain(self.run.iter())
+            .chain(self.run_constraints.iter())
+        {
+            if let Dependency::PinSubpackage(pin) = dep {
+                refs.push(pin.pin_subpackage.name.clone());
+            }
+        }
+
+        // Check run_exports
+        for dep in self
+            .run_exports
+            .noarch
+            .iter()
+            .chain(self.run_exports.strong.iter())
+            .chain(self.run_exports.strong_constraints.iter())
+            .chain(self.run_exports.weak.iter())
+            .chain(self.run_exports.weak_constraints.iter())
+        {
+            if let Dependency::PinSubpackage(pin) = dep {
+                refs.push(pin.pin_subpackage.name.clone());
+            }
+        }
+
+        // Deduplicate
+        refs.sort();
+        refs.dedup();
+        refs
+    }
 }
 
 #[cfg(test)]

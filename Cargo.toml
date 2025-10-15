@@ -3,6 +3,7 @@ members = [
   "rust-tests",
   "crates/rattler_build_recipe_generator",
   "crates/rattler_build_recipe",
+  "crates/rattler_build_types",
 ]
 
 [workspace.package]
