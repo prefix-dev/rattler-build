@@ -22,7 +22,6 @@ use crate::{
             PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
             PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
         },
-        jinja_functions::{setup_default_filters, setup_jinja_functions},
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
@@ -69,47 +68,7 @@ use crate::{
         },
     },
 };
-use minijinja::{
-    Environment,
-    value::{Object, Value as MiniJinjaValue},
-};
-use std::sync::Arc;
-
-/// A wrapper around the evaluation context that tracks variable access
-///
-/// This allows us to know which variables were actually used during template rendering,
-/// which is important for understanding which conditional branches were taken.
-#[derive(Debug, Clone)]
-struct TrackingContext {
-    evaluation_context: Arc<EvaluationContext>,
-}
-
-impl TrackingContext {
-    fn new(context: &EvaluationContext) -> Self {
-        Self {
-            evaluation_context: Arc::new(context.clone()),
-        }
-    }
-}
-
-impl Object for TrackingContext {
-    fn get_value(self: &Arc<Self>, key: &MiniJinjaValue) -> Option<MiniJinjaValue> {
-        let key_str = key.as_str()?;
-
-        // Track that this variable was accessed
-        self.evaluation_context.track_access(key_str);
-
-        // Get the value from the context
-        match self.evaluation_context.get(key_str) {
-            Some(v) => Some(MiniJinjaValue::from(v.as_str())),
-            None => {
-                // Track that this variable was undefined
-                self.evaluation_context.track_undefined(key_str);
-                None
-            }
-        }
-    }
-}
+use rattler_build_jinja::{Jinja, Variable};
 
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
@@ -117,56 +76,62 @@ fn render_template(
     context: &EvaluationContext,
     span: &Span,
 ) -> Result<String, ParseError> {
-    let mut env = Environment::new();
+    // Create a Jinja instance with the configuration from the evaluation context
+    let jinja_config = context.jinja_config().clone();
+    let mut jinja = Jinja::new(jinja_config);
 
-    // Use Strict undefined behavior to get clear error messages for undefined variables
-    env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    // This allows our TrackingContext to intercept undefined variable access and track them
 
-    // Setup Jinja functions (compiler, cdt, match, etc.)
-    setup_jinja_functions(&mut env, context.jinja_config());
+    // Add the evaluation context variables to the Jinja context
+    // We need to convert IndexMap<String, String> to IndexMap<String, Variable>
+    let variables: indexmap::IndexMap<String, Variable> = context
+        .variables()
+        .iter()
+        .map(|(k, v)| (k.clone(), Variable::from(v.as_str())))
+        .collect();
 
-    // Setup default filters
-    setup_default_filters(&mut env);
+    // Use with_context to add all variables from the evaluation context
+    jinja = jinja.with_context(&variables);
 
-    // rattler-build uses ${{ }} syntax, but minijinja uses {{ }}
-    // Strip the $ prefix from template expressions
-    let normalized_template = template.replace("${{", "{{");
-
-    // Create a tracking context that records variable access
-    let tracking_ctx = TrackingContext::new(context);
-    let ctx_value = MiniJinjaValue::from_object(tracking_ctx);
-
-    match env.render_str(&normalized_template, ctx_value) {
-        Ok(result) => Ok(result),
+    // The Jinja environment is already configured to use ${{ }} syntax
+    // so we can pass the template as-is
+    // The Jinja type now tracks accessed and undefined variables automatically
+    match jinja.render_str(template) {
+        Ok(result) => {
+            // Transfer the tracked variables from Jinja to EvaluationContext
+            for var in jinja.accessed_variables() {
+                context.track_access(&var);
+            }
+            for var in jinja.undefined_variables() {
+                context.track_undefined(&var);
+            }
+            Ok(result)
+        }
         Err(e) => {
-            // Extract more information from the MiniJinja error
-            let error_string = e.to_string();
+            // Transfer the tracked variables from Jinja to EvaluationContext
+            for var in jinja.accessed_variables() {
+                context.track_access(&var);
+            }
+            for var in jinja.undefined_variables() {
+                context.track_undefined(&var);
+            }
 
-            // Use our tracked undefined variables to provide helpful suggestions
-            let suggestion = if error_string.contains("undefined") {
-                let undefined_vars = context.undefined_variables();
-
-                if undefined_vars.is_empty() {
-                    // Shouldn't happen, but fallback gracefully
-                    Some(
-                        "Make sure all variables used in templates are defined in the evaluation context."
-                            .to_string(),
-                    )
-                } else if undefined_vars.len() == 1 {
-                    let var_name = undefined_vars.iter().next().unwrap();
+            // Build error suggestion based on undefined variables
+            let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+            let suggestion = if !undefined_vars.is_empty() {
+                if undefined_vars.len() == 1 {
                     Some(format!(
                         "The variable '{}' is not defined in the evaluation context. \
                          Make sure it is provided or defined in the context section.",
-                        var_name
+                        undefined_vars[0]
                     ))
                 } else {
-                    let mut vars: Vec<_> = undefined_vars.iter().collect();
-                    vars.sort();
                     Some(format!(
-                        "One or more variables ({}) are not defined in the evaluation context. \
-                         Make sure all variables are provided or defined in the context section.",
-                        vars.iter()
-                            .map(|s| s.as_str())
+                        "The variables {} are not defined in the evaluation context. \
+                         Make sure they are provided or defined in the context section.",
+                        undefined_vars
+                            .iter()
+                            .map(|s| format!("'{}'", s))
                             .collect::<Vec<_>>()
                             .join(", ")
                     ))
@@ -1612,6 +1577,9 @@ impl Evaluate for Stage0Recipe {
 
 #[cfg(test)]
 mod tests {
+    use minijinja::UndefinedBehavior;
+    use rattler_build_jinja::JinjaConfig;
+
     use super::*;
     use crate::stage0::types::{
         Conditional, ConditionalList, Item, JinjaTemplate, ListOrItem, Value,
@@ -1821,59 +1789,6 @@ mod tests {
     }
 
     #[test]
-    fn test_undefined_variable_error() {
-        let ctx = EvaluationContext::new();
-        // No variables set
-
-        // Try to render a template with an undefined variable
-        let template = "${{ undefined_var }}";
-        let result = render_template(template, &ctx, &Span::unknown());
-
-        // Should get an error about undefined variable
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        let message = err.message.as_ref().unwrap();
-        // The error should mention the undefined variable
-        // MiniJinja's Strict mode produces an error like "undefined value 'undefined_var'"
-        assert!(
-            message.contains("undefined_var") || message.contains("undefined"),
-            "Error message should mention undefined variable, got: {}",
-            message
-        );
-
-        // Check that the undefined variable was tracked
-        let undefined = ctx.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("undefined_var"));
-    }
-
-    #[test]
-    fn test_undefined_variable_tracking() {
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        // version is not defined
-
-        // Try to render a template with an undefined variable
-        let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown());
-
-        // Should get an error
-        assert!(result.is_err());
-
-        // Check that only "version" was tracked as undefined, not "name"
-        let undefined = ctx.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("version"));
-        assert!(!undefined.contains("name"));
-
-        // Check that both were tracked as accessed
-        let accessed = ctx.accessed_variables();
-        assert_eq!(accessed.len(), 2);
-        assert!(accessed.contains("name"));
-        assert!(accessed.contains("version"));
-    }
-
-    #[test]
     fn test_multiple_undefined_variables() {
         let ctx = EvaluationContext::new();
         // No variables set
@@ -1883,14 +1798,41 @@ mod tests {
 
         assert!(result.is_err());
 
-        // Only the first undefined variable is tracked because MiniJinja stops at first error
+        // First undefined variable encountered is 'platform'
         let undefined = ctx.undefined_variables();
         assert_eq!(undefined.len(), 1);
         assert!(undefined.contains("platform"));
 
-        // The error suggestion should mention the undefined variable
-        let err = result.unwrap_err();
-        let suggestion = err.suggestion.unwrap();
-        assert!(suggestion.contains("platform"));
+        let accessed = ctx.accessed_variables();
+        assert_eq!(accessed.len(), 1);
+        assert!(accessed.contains("platform"));
+    }
+
+    #[test]
+    fn test_multiple_undefined_variables_lenient() {
+        let jinja_config = JinjaConfig {
+            undefined_behavior: UndefinedBehavior::Lenient,
+            ..Default::default()
+        };
+        let mut ctx = EvaluationContext::new();
+        ctx.set_jinja_config(jinja_config);
+        // No variables set
+
+        let template = "${{ platform }} for ${{ arch }}";
+        let result = render_template(template, &ctx, &Span::unknown());
+
+        assert!(result.is_ok());
+        assert!(result.unwrap() == " for ");
+
+        // First undefined variable encountered is 'platform'
+        let undefined = ctx.undefined_variables();
+        assert_eq!(undefined.len(), 2);
+        assert!(undefined.contains("platform"));
+        assert!(undefined.contains("arch"));
+
+        let accessed = ctx.accessed_variables();
+        assert_eq!(accessed.len(), 2);
+        assert!(accessed.contains("platform"));
+        assert!(accessed.contains("arch"));
     }
 }

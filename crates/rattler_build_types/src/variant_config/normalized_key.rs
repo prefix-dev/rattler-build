@@ -1,3 +1,6 @@
+//! A normalized key in a variant configuration.
+//! The normalization replaces `-`, `_` because YAML keys in conda_build_config cannot historically contain a `-`.
+
 use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;

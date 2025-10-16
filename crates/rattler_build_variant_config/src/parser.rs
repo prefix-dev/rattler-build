@@ -8,11 +8,12 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use minijinja::{Environment, Value};
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use serde_yaml;
 
 use crate::{
-    NormalizedKey, Variable, conda_build_config::SelectorContext, config::VariantConfig,
-    error::VariantConfigError,
+    conda_build_config::SelectorContext, config::VariantConfig, error::VariantConfigError,
 };
 
 /// Parse a variant configuration file with full Jinja and conditional support

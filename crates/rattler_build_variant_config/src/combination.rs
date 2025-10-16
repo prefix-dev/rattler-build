@@ -1,6 +1,9 @@
 //! Variant combination logic - computing all possible combinations of variants
 
-use crate::{NormalizedKey, Variable, error::VariantExpandError};
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
+
+use crate::error::VariantExpandError;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Internal representation of a variant key

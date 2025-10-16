@@ -1,3 +1,5 @@
+//! This module defines the `Variable` type, which represents a variable in a recipe.
+//! Variables can be strings, numbers, booleans, or lists of these types.
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};

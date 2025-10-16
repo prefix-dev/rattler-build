@@ -1,11 +1,12 @@
 //! Main variant configuration structure
 
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use crate::{
-    NormalizedKey, Variable,
     combination::compute_combinations,
     error::{VariantConfigError, VariantExpandError},
 };

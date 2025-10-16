@@ -13,6 +13,8 @@ miette = ["dep:miette", "dep:thiserror", "dep:pathdiff"]
 variant-config = ["dep:rattler_build_variant_config"]
 
 [dependencies]
+rattler_build_types = { workspace = true }
+rattler_build_jinja = { workspace = true }
 rattler_build_variant_config = { path = "../rattler_build_variant_config", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

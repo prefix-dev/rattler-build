@@ -4291,6 +4291,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_jinja"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fs-err",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "lazy_static",
+ "minijinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "tempfile",
+ "thiserror 2.0.17",
+ "toml",
+]
+
+[[package]]
 name = "rattler_build_recipe"
 version = "0.1.0"
 dependencies = [
@@ -4304,6 +4326,8 @@ dependencies = [
  "miette",
  "minijinja",
  "pathdiff",
+ "rattler_build_jinja",
+ "rattler_build_types",
  "rattler_build_variant_config",
  "rattler_conda_types",
  "rattler_digest",
@@ -4350,6 +4374,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_types"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "itertools 0.14.0",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "rattler_build_variant_config"
 version = "0.1.0"
 dependencies = [
@@ -4358,6 +4397,8 @@ dependencies = [
  "marked-yaml",
  "miette",
  "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
  "rattler_conda_types",
  "serde",
  "serde_yaml",
