@@ -56,9 +56,11 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_build_jinja::Variable;
-use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
+
+// Re-export types needed by Python bindings and external consumers
+pub use rattler_build_jinja::Variable;
+pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
     package::ArchiveType,

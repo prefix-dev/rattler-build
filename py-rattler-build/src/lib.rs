@@ -7,11 +7,11 @@ use std::{
 };
 
 use ::rattler_build::{
-    NormalizedKey, build_recipes, get_rattler_build_version,
+    NormalizedKey, Variable, build_recipes, get_rattler_build_version,
     hash::HashInfo,
     metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
-    recipe::{parser::Recipe, variable::Variable},
+    recipe::parser::Recipe,
     recipe_generator::{
         CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
         generate_pypi_recipe_string, generate_r_recipe_string,
