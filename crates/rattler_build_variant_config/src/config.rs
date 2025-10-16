@@ -111,10 +111,7 @@ impl VariantConfig {
             .as_sequence()
             .ok_or_else(|| "Variant values must be a list".to_string())?;
 
-        sequence
-            .iter()
-            .map(|item| Self::serde_value_to_variable(item))
-            .collect()
+        sequence.iter().map(Self::serde_value_to_variable).collect()
     }
 
     /// Convert serde_yaml::Value to Variable, treating floats as strings

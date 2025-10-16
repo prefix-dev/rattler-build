@@ -1696,7 +1696,9 @@ def test_python_version_spec(
 
     error_output = exc_info.value.output
     # Check that the error mentions the invalid version spec
-    assert "=.*" in error_output and ("MatchSpecParsing" in error_output or "parse version spec" in error_output)
+    assert "=.*" in error_output and (
+        "MatchSpecParsing" in error_output or "parse version spec" in error_output
+    )
 
 
 def test_hatch_vcs_versions(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
