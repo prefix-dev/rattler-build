@@ -142,6 +142,7 @@ impl AsyncPrefixGuard {
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(false)
                 .open(&guard_path)?;
 
             lock_exclusive(&file)?;
