@@ -316,28 +316,23 @@ fn parse_context_value(
 
             let s = scalar.as_str();
 
-            // Try to parse as different types
-            let variable = if let Ok(b) = s.parse::<bool>() {
-                Variable::from(b)
-            } else if let Ok(i) = s.parse::<i64>() {
-                Variable::from(i)
+            // Parse the scalar value based on its type:
+            // - Booleans: true/false remain as booleans
+            // - Integers: whole numbers without decimals remain as integers
+            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
+            // - Everything else: strings
+            let variable = if s == "true" || s == "false" {
+                Variable::from(s.parse::<bool>().unwrap())
+            } else if let Ok(int_val) = s.parse::<i64>() {
+                // Only treat as integer if it doesn't contain a decimal point
+                if !s.contains('.') {
+                    Variable::from(int_val)
+                } else {
+                    Variable::from(s.to_string())
+                }
             } else {
                 Variable::from(s.to_string())
             };
-
-            // Check type uniformity
-            let current_kind = variable.as_ref().kind();
-            if let Some(expected) = expected_kind {
-                if current_kind != expected {
-                    return Err(ParseError::invalid_value(
-                        &format!("context.{}", key),
-                        &format!("mixed types in list - expected {:?}, found {:?}", expected, current_kind),
-                        helpers::get_span(item_node),
-                    ).with_suggestion("all elements in a context list must be of the same type (all strings, all numbers, or all booleans)"));
-                }
-            } else {
-                expected_kind = Some(current_kind);
-            }
 
             variables.push(variable);
         }
@@ -362,11 +357,20 @@ fn parse_context_value(
                 .map_err(|e| ParseError::jinja_error(e, span))?;
             Ok(crate::stage0::types::Value::new_template(template, span))
         } else {
-            // Try to parse as different scalar types
-            let variable = if let Ok(b) = s.parse::<bool>() {
-                Variable::from(b)
-            } else if let Ok(i) = s.parse::<i64>() {
-                Variable::from(i)
+            // Parse the scalar value based on its type:
+            // - Booleans: true/false remain as booleans
+            // - Integers: whole numbers without decimals remain as integers
+            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
+            // - Everything else: strings
+            let variable = if s == "true" || s == "false" {
+                Variable::from(s.parse::<bool>().unwrap())
+            } else if let Ok(int_val) = s.parse::<i64>() {
+                // Only treat as integer if it doesn't contain a decimal point
+                if !s.contains('.') {
+                    Variable::from(int_val)
+                } else {
+                    Variable::from(s.to_string())
+                }
             } else {
                 Variable::from(s.to_string())
             };
