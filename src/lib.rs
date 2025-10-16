@@ -343,6 +343,16 @@ pub async fn get_build_output(
 
     let mut variant_config = VariantConfig::from_files(&variant_configs)?;
 
+    // Always insert target_platform and build_platform
+    variant_config.variants.insert(
+        "target_platform".into(),
+        vec![Variable::from(selector_config.target_platform.to_string())],
+    );
+    variant_config.variants.insert(
+        "build_platform".into(),
+        vec![Variable::from(selector_config.build_platform.to_string())],
+    );
+
     // Apply variant overrides from command line
     for (key, values) in &build_data.variant_overrides {
         let normalized_key = NormalizedKey::from(key.as_str());
