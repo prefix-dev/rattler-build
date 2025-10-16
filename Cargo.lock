@@ -4340,10 +4340,10 @@ dependencies = [
  "futures",
  "hex",
  "indicatif",
- "libc",
  "md-5",
  "rattler_build_networking",
  "rattler_git",
+ "rattler_prefix_guard",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
@@ -4358,7 +4358,6 @@ dependencies = [
  "tracing",
  "url",
  "walkdir",
- "windows-sys 0.59.0",
  "xz2",
  "zip 6.0.0",
  "zstd",
@@ -4482,7 +4481,7 @@ dependencies = [
  "dashmap",
  "dunce",
  "fs-err",
- "libc",
+ "rattler_prefix_guard",
  "reqwest",
  "reqwest-middleware",
  "serde",
@@ -4493,7 +4492,6 @@ dependencies = [
  "url",
  "urlencoding",
  "which",
- "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4631,6 +4629,18 @@ dependencies = [
  "url",
  "zip 4.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_prefix_guard"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "libc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

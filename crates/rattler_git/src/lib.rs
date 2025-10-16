@@ -7,7 +7,6 @@ use sha::{GitSha, OidParseError};
 
 pub mod credentials;
 pub mod git;
-pub mod guard;
 pub mod resolver;
 pub mod sha;
 pub mod source;

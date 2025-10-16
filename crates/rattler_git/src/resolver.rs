@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::guard::AsyncPrefixGuard;
+use rattler_prefix_guard::AsyncPrefixGuard;
 use tracing::debug;
 
 use crate::{

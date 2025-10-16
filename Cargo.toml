@@ -5,6 +5,7 @@ members = [
   "crates/rattler_build_networking",
   "crates/rattler_build_source_cache",
   "crates/rattler_build_recipe_generator",
+  "crates/rattler_prefix_guard",
 ]
 
 [workspace.package]
