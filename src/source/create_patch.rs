@@ -124,7 +124,8 @@ pub fn create_patch<P: AsRef<Path>>(
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
-                    let original_dir = find_url_cache_dir(cache_dir, url_src)?;
+                    let original_dir =
+                        find_url_cache_dir(cache_dir, url_src, &source_info, source_idx)?;
                     let target_dir = if let Some(target) = url_src.target_directory() {
                         work_dir.join(target)
                     } else {
@@ -395,7 +396,17 @@ fn create_directory_diff(
 fn find_url_cache_dir(
     cache_dir: &Path,
     url_src: &crate::recipe::parser::UrlSource,
+    source_info: &SourceInformation,
+    source_idx: usize,
 ) -> Result<PathBuf, SourceError> {
+    // First, check if the extracted path is provided in source_info
+    if let Some(extracted_path) = source_info.extracted_paths.get(&source_idx) {
+        let full_path = cache_dir.join(extracted_path);
+        if full_path.exists() {
+            return Ok(full_path);
+        }
+    }
+
     use rattler_build_source_cache::{CacheIndex, Checksum as CacheChecksum, source::ChecksumKind};
 
     // Convert checksum to cache checksum
@@ -431,32 +442,6 @@ fn find_url_cache_dir(
     if extracted_dir.exists() {
         Ok(extracted_dir)
     } else {
-        // Try to find by scanning the cache directory for extracted directories
-        // (fallback in case the naming changed)
-        for entry in fs::read_dir(cache_dir).map_err(SourceError::Io)? {
-            let entry = entry.map_err(SourceError::Io)?;
-            let path = entry.path();
-            if path.is_dir()
-                && path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.ends_with("_extracted"))
-                    .unwrap_or(false)
-            {
-                // This is an extracted directory, check if it's the one we're looking for
-                // by checking if it was recently accessed (heuristic)
-                if let Ok(metadata) = fs::metadata(&path) {
-                    if let Ok(modified) = metadata.modified() {
-                        // Consider directories modified in the last hour as candidates
-                        if let Ok(elapsed) = modified.elapsed() {
-                            if elapsed.as_secs() < 3600 && path > extracted_dir {
-                                return Ok(path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
         Err(SourceError::FileNotFound(extracted_dir))
     }
 }

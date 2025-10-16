@@ -20,7 +20,7 @@ pub mod system_tools;
 pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
-mod url_with_trailing_slash;
+pub mod types;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
@@ -41,7 +41,6 @@ mod windows;
 mod package_cache_reporter;
 pub mod source_code;
 
-use crate::render::resolved_dependencies::RunExportsDownload;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
@@ -56,10 +55,6 @@ use dialoguer::Confirm;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
-use metadata::{
-    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
-    build_reindexed_channels,
-};
 use miette::{Context, IntoDiagnostic};
 pub use normalized_key::NormalizedKey;
 use opt::*;
@@ -74,15 +69,20 @@ use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
+use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
+use types::Directories;
+use types::{
+    BuildConfiguration, BuildSummary, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels,
+};
 use variant_config::VariantConfig;
 
-use crate::metadata::Debug;
-use crate::metadata::PlatformWithVirtualPackages;
+use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -355,7 +355,7 @@ pub async fn get_build_output(
 
         let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
-        let output = metadata::Output {
+        let output = Output {
             recipe: recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
@@ -822,7 +822,7 @@ pub async fn rebuild(
     let rendered_recipe =
         fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
-    let mut output: metadata::Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
+    let mut output: Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;

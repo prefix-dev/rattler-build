@@ -21,14 +21,6 @@ use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {
-    // Initialize sandbox in sync/single-threaded context before anything else
-    #[cfg(any(
-        all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "aarch64"),
-        target_os = "macos"
-    ))]
-    rattler_sandbox::init_sandbox();
-
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default

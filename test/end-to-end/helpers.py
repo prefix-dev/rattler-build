@@ -28,9 +28,19 @@ class RattlerBuild:
             return result
         else:
             try:
-                output = check_output([str(self.path), *args], **kwds)
-                if "text" not in kwds:
-                    return output.decode("utf-8")
+                # Explicitly handle encoding for UTF-8 output on all platforms
+                kwds_copy = dict(kwds)
+                # Check if we need to add encoding
+                needs_encoding = "text" not in kwds_copy and "encoding" not in kwds_copy
+                if needs_encoding:
+                    kwds_copy["encoding"] = "utf-8"
+                    kwds_copy["errors"] = "replace"
+
+                output = check_output([str(self.path), *args], **kwds_copy)
+
+                # If we added encoding, output is already a string
+                # If text was in kwds, output is also a string
+                # Otherwise, it's bytes and needs decoding (but we added encoding, so this won't happen)
                 return output
             except CalledProcessError as e:
                 if kwds.get("stderr") is None:
@@ -166,7 +176,9 @@ def setup_patch_test_environment(
     work_dir.mkdir(parents=True, exist_ok=True)
     recipe_dir.mkdir(parents=True, exist_ok=True)
 
-    orig_dir_name = "example_01234567"
+    # Use a simple directory name ending with _extracted
+    # The Rust code will find any directory with this suffix
+    orig_dir_name = "test_source_extracted"
     orig_dir = cache_dir / orig_dir_name
     orig_dir.mkdir(parents=True, exist_ok=True)
 
@@ -189,6 +201,9 @@ def setup_patch_test_environment(
         "recipe_path": str(recipe_path),
         "source_cache": str(cache_dir),
         "sources": [source_entry],
+        "extracted_paths": {
+            "0": orig_dir_name  # Map source index 0 to the extracted directory name
+        },
     }
     (work_dir / ".source_info.json").write_text(json.dumps(source_info))
 
@@ -197,6 +212,7 @@ def setup_patch_test_environment(
         "work_dir": work_dir,
         "recipe_dir": recipe_dir,
         "recipe_path": recipe_path,
+        "orig_dir": orig_dir,
     }
 
 
