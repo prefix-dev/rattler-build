@@ -3,26 +3,52 @@ use std::{
     path::PathBuf,
 };
 
-use petgraph::graph::DiGraph;
-use rattler_conda_types::PackageName;
-
 use crate::{
     env_vars,
     hash::HashInfo,
-    normalized_key::NormalizedKey,
     recipe::{
         Jinja, ParsingError, Recipe,
         custom_yaml::Node,
         parser::{BuildString, Dependency},
-        variable::Variable,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
     used_variables::used_vars_from_expressions,
-    variant_config::{
-        ParseErrors, VariantConfig, VariantConfigError, VariantError, VariantExpandError,
-    },
 };
+use petgraph::graph::DiGraph;
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
+use rattler_build_variant_config::{VariantConfig, VariantError, VariantExpandError};
+use rattler_conda_types::PackageName;
+
+/// Wrapper type for multiple parsing errors
+///
+/// This type converts parsing errors to a displayable format that doesn't
+/// require keeping the source code around, making it 'static.
+#[derive(Debug)]
+struct ParseErrors {
+    errors: Vec<String>,
+}
+
+impl<S: SourceCode> From<Vec<ParsingError<S>>> for ParseErrors {
+    fn from(errors: Vec<ParsingError<S>>) -> Self {
+        Self {
+            errors: errors.into_iter().map(|e| format!("{:?}", e)).collect(),
+        }
+    }
+}
+
+impl std::fmt::Display for ParseErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} parsing error(s) occurred:", self.errors.len())?;
+        for (i, err) in self.errors.iter().enumerate() {
+            writeln!(f, "  {}. {}", i + 1, err)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for ParseErrors {}
 
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
@@ -55,7 +81,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     source: S,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
-) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
+) -> Result<Vec<Stage0Render<S>>, VariantError> {
     let used_vars = outputs
         .iter()
         .map(|output| {
@@ -63,9 +89,9 @@ pub(crate) fn stage_0_render<S: SourceCode>(
                 .map(|x| x.into_iter().map(Into::into).collect())
         })
         .collect::<Result<_, _>>()
-        .map_err(|errs| {
-            let errs: ParseErrors<S> = errs.into();
-            VariantConfigError::RecipeParseErrors(errs)
+        .map_err(|errs: Vec<ParsingError<S>>| {
+            let errs: ParseErrors = errs.into();
+            VariantError::RecipeParseErrors(Box::new(errs))
         })?;
 
     let raw_output_vec = RawOutputVec {
@@ -78,9 +104,9 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     for output in outputs {
         used_vars.extend(
             used_vars_from_expressions(output, source.clone())
-                .map_err(|errs| {
-                    let errs: ParseErrors<_> = errs.into();
-                    VariantConfigError::RecipeParseErrors(errs)
+                .map_err(|errs: Vec<ParsingError<S>>| {
+                    let errs: ParseErrors = errs.into();
+                    VariantError::RecipeParseErrors(Box::new(errs))
                 })?
                 .into_iter()
                 .map(Into::into),
@@ -98,16 +124,14 @@ pub(crate) fn stage_0_render<S: SourceCode>(
             let config_with_variant =
                 selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
-            let parsed_recipe = Recipe::from_node(output, config_with_variant)
-                .map_err(|err| {
-                    let errs: ParseErrors<_> = err
-                        .into_iter()
-                        .map(|err| ParsingError::from_partial(source.clone(), err))
-                        .collect::<Vec<ParsingError<_>>>()
-                        .into();
-                    errs
-                })
-                .map_err(VariantConfigError::from)?;
+            let parsed_recipe = Recipe::from_node(output, config_with_variant).map_err(|err| {
+                let parsing_errors: Vec<ParsingError<S>> = err
+                    .into_iter()
+                    .map(|err| ParsingError::from_partial(source.clone(), err))
+                    .collect();
+                let errs: ParseErrors = parsing_errors.into();
+                VariantError::RecipeParseErrors(Box::new(errs))
+            })?;
 
             rendered_outputs.push(parsed_recipe);
         }
@@ -313,7 +337,7 @@ pub(crate) fn stage_1_render<S: SourceCode>(
     stage0_renders: Vec<Stage0Render<S>>,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
-) -> Result<Vec<Stage1Render<S>>, VariantError<S>> {
+) -> Result<Vec<Stage1Render<S>>, VariantError> {
     let mut stage_1_renders = Vec::new();
 
     // TODO we need to add variables from the cache output here!
@@ -415,14 +439,13 @@ pub(crate) fn stage_1_render<S: SourceCode>(
 
                 let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
                     .map_err(|err| {
-                        let errs: ParseErrors<_> = err
+                        let parsing_errors: Vec<ParsingError<S>> = err
                             .into_iter()
                             .map(|err| ParsingError::from_partial(r.source.clone(), err))
-                            .collect::<Vec<_>>()
-                            .into();
-                        errs
-                    })
-                    .map_err(VariantConfigError::from)?;
+                            .collect();
+                        let errs: ParseErrors = parsing_errors.into();
+                        VariantError::RecipeParseErrors(Box::new(errs))
+                    })?;
 
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),

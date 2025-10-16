@@ -3,6 +3,7 @@
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
+use rattler_build_types::NormalizedKey;
 use std::io::Read;
 use std::process::Command;
 use std::sync::Arc;
@@ -12,13 +13,12 @@ use minijinja::value::{Kwargs, Object, from_args};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
-use crate::normalized_key::NormalizedKey;
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
 
 use super::parser::{Dependency, PinCompatible, PinSubpackage};
-use super::variable::Variable;
+use rattler_build_jinja::Variable;
 
 /// The internal representation of the pin function.
 pub enum InternalRepr {
