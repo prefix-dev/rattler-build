@@ -302,7 +302,6 @@ fn parse_context_value(
     if let Some(sequence) = yaml.as_sequence() {
         // Parse list of uniform scalar values
         let mut variables = Vec::new();
-        let mut expected_kind: Option<minijinja::value::ValueKind> = None;
 
         for (index, item_node) in sequence.iter().enumerate() {
             // Each item must be a scalar
