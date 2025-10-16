@@ -172,9 +172,12 @@ impl EvaluationContext {
     /// A new EvaluationContext with the evaluated context variables merged in
     pub fn with_context(
         &self,
-        context_vars: &indexmap::IndexMap<String, crate::stage0::Value<String>>,
+        context_vars: &indexmap::IndexMap<
+            String,
+            crate::stage0::Value<rattler_build_jinja::Variable>,
+        >,
     ) -> Result<Self, ParseError> {
-        use crate::stage0::evaluate::evaluate_string_value;
+        use rattler_build_jinja::Variable;
 
         // Clone the current context
         let mut new_context = self.clone();
@@ -182,10 +185,26 @@ impl EvaluationContext {
         // Evaluate each context variable in order
         for (key, value) in context_vars {
             // Evaluate the value using the current context (which includes previously evaluated context vars)
-            let evaluated = evaluate_string_value(value, &new_context)?;
+            let evaluated_var = match value {
+                crate::stage0::Value::Concrete { value: var, .. } => {
+                    // Already a concrete Variable, just clone it
+                    var.clone()
+                }
+                crate::stage0::Value::Template { .. } => {
+                    // Render the template to a string first
+                    // We need to create a Value<Variable> from the template
+                    // For now, convert template to string and parse it as Variable
+                    let rendered =
+                        crate::stage0::evaluate::evaluate_value_to_string(value, &new_context)?;
+                    Variable::from(rendered)
+                }
+            };
 
-            // Add the evaluated value to the context
-            new_context.variables.insert(key.clone(), evaluated);
+            // Convert Variable to minijinja::Value and add to context
+            let minijinja_value: minijinja::Value = evaluated_var.clone().into();
+            new_context
+                .variables
+                .insert(key.clone(), minijinja_value.to_string());
         }
 
         Ok(new_context)
@@ -257,17 +276,18 @@ mod unit_tests {
     #[test]
     fn test_context_evaluation_simple() {
         use crate::stage0::Value;
+        use rattler_build_jinja::Variable;
 
         let ctx = EvaluationContext::new();
 
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete("mypackage".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete("1.0.0".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("1.0.0"), crate::span::Span::unknown()),
         );
 
         let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
@@ -279,6 +299,7 @@ mod unit_tests {
     #[test]
     fn test_context_evaluation_with_templates() {
         use crate::stage0::{JinjaTemplate, Value};
+        use rattler_build_jinja::Variable;
 
         let mut ctx = EvaluationContext::new();
         ctx.insert("base".to_string(), "myorg".to_string());
@@ -286,7 +307,7 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete("mypackage".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "full_name".to_string(),
@@ -308,17 +329,18 @@ mod unit_tests {
     #[test]
     fn test_context_evaluation_forward_references() {
         use crate::stage0::{JinjaTemplate, Value};
+        use rattler_build_jinja::Variable;
 
         let ctx = EvaluationContext::new();
 
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete("mypackage".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete("1.0.0".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("1.0.0"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "package_version".to_string(),
@@ -350,6 +372,7 @@ mod unit_tests {
     #[test]
     fn test_context_evaluation_order_matters() {
         use crate::stage0::{JinjaTemplate, Value};
+        use rattler_build_jinja::Variable;
 
         let ctx = EvaluationContext::new();
 
@@ -357,11 +380,11 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete("mypackage".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete("2.0.0".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("2.0.0"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "package_version".to_string(),
@@ -382,6 +405,7 @@ mod unit_tests {
     #[test]
     fn test_context_evaluation_with_existing_context() {
         use crate::stage0::{JinjaTemplate, Value};
+        use rattler_build_jinja::Variable;
 
         let mut ctx = EvaluationContext::new();
         ctx.insert("platform".to_string(), "linux".to_string());
@@ -389,7 +413,7 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete("mypackage".to_string(), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
         );
         context_vars.insert(
             "full_name".to_string(),

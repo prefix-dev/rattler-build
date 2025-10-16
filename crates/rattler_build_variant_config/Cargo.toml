@@ -10,7 +10,7 @@ description = "Variant configuration system for rattler-build"
 
 [features]
 default = ["parser"]
-parser = ["minijinja", "marked-yaml", "miette"]
+parser = ["minijinja", "miette"]
 
 [dependencies]
 # Core serde
@@ -24,12 +24,14 @@ rattler_conda_types = { workspace = true }
 rattler_build_types = { workspace = true }
 rattler_build_jinja = { workspace = true }
 
-# Template rendering and YAML parsing (optional with 'parser' feature)
+# YAML parsing
+marked-yaml = { version = "0.8.0" }
+
+# Template rendering (optional with 'parser' feature)
 minijinja = { version = "2.11.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ], optional = true }
-marked-yaml = { version = "0.8.0", optional = true }
 
 # Error handling
 thiserror = "2.0.17"

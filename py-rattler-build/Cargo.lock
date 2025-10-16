@@ -926,9 +926,9 @@ dependencies = [
 
 [[package]]
 name = "bzip2"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea8dcd42434048e4f7a304411d9273a411f647446c1234a65ce0554923f4cff"
+checksum = "f3a53fac24f34a81bc9954b5d6cfce0c21e18ec6959f44f56e8e90e4bb7c346c"
 dependencies = [
  "libbz2-rs-sys",
 ]
@@ -1031,18 +1031,18 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.58"
+version = "4.5.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75bf0b32ad2e152de789bb635ea4d3078f6b838ad7974143e99b99f45a04af4a"
+checksum = "2348487adcd4631696ced64ccdb40d38ac4d31cae7f2eec8817fcea1b9d1c43c"
 dependencies = [
  "clap",
 ]
 
 [[package]]
 name = "clap_complete_nushell"
-version = "4.5.8"
+version = "4.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a0c951694691e65bf9d421d597d68416c22de9632e884c28412cb8cd8b73dce"
+checksum = "811159f339691baacdf7d534df2946b9d217014081099e23d31d887d99521e70"
 dependencies = [
  "clap",
  "clap_complete",
@@ -2021,9 +2021,9 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "globset"
-version = "0.4.16"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54a1028dfc5f5df5da8a56a73e6c153c9a9708ec57232470703592a3f18e49f5"
+checksum = "eab69130804d941f8075cfd713bf8848a2c3b3f201a9457a11e6f87e1ab62305"
 dependencies = [
  "aho-corasick",
  "bstr",
@@ -2515,9 +2515,9 @@ dependencies = [
 
 [[package]]
 name = "ignore"
-version = "0.4.23"
+version = "0.4.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d89fd380afde86567dfba715db065673989d6253f42b88179abd3eae47bda4b"
+checksum = "81776e6f9464432afcc28d03e52eb101c93b6f0566f52aef2427663e700f0403"
 dependencies = [
  "crossbeam-deque",
  "globset",
@@ -3990,7 +3990,10 @@ dependencies = [
  "pathdiff",
  "petgraph",
  "rattler",
+ "rattler_build_jinja",
  "rattler_build_recipe_generator",
+ "rattler_build_types",
+ "rattler_build_variant_config",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4043,6 +4046,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_jinja"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "indexmap 2.11.4",
+ "itertools 0.14.0",
+ "lazy_static",
+ "minijinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "toml",
+]
+
+[[package]]
 name = "rattler_build_recipe_generator"
 version = "0.1.0"
 dependencies = [
@@ -4069,6 +4091,36 @@ dependencies = [
  "tracing",
  "url",
  "zip 5.1.1",
+]
+
+[[package]]
+name = "rattler_build_types"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.14.0",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tracing",
 ]
 
 [[package]]

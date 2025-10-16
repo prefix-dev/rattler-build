@@ -64,7 +64,78 @@ impl VariantConfig {
 
     /// Parse variant configuration from a YAML string
     pub fn from_yaml_str(yaml: &str) -> Result<Self, String> {
-        serde_yaml::from_str(yaml).map_err(|e| e.to_string())
+        // Parse YAML twice:
+        // 1. With serde_yaml to get proper type information (quoted vs unquoted)
+        // 2. With marked_yaml to have span information available for future error messages
+        let serde_value: serde_yaml::Value =
+            serde_yaml::from_str(yaml).map_err(|e| e.to_string())?;
+        let marked_node = marked_yaml::parse_yaml(0, yaml).map_err(|e| e.to_string())?;
+
+        // Convert using serde types, but keep marked_node for future span-based errors
+        Self::from_yaml_with_types(&serde_value, &marked_node)
+    }
+
+    /// Convert YAML to VariantConfig using type info from serde_yaml and spans from marked_yaml
+    fn from_yaml_with_types(
+        serde_value: &serde_yaml::Value,
+        _marked_node: &marked_yaml::Node,
+    ) -> Result<Self, String> {
+        let mapping = serde_value
+            .as_mapping()
+            .ok_or_else(|| "Variant config must be a YAML mapping".to_string())?;
+
+        let mut zip_keys = None;
+        let mut variants = BTreeMap::new();
+
+        for (key, val) in mapping {
+            let key_str = key
+                .as_str()
+                .ok_or_else(|| "Variant config keys must be strings".to_string())?;
+
+            if key_str == "zip_keys" {
+                // Parse zip_keys using serde
+                zip_keys = Some(serde_yaml::from_value(val.clone()).map_err(|e| e.to_string())?);
+            } else {
+                // Parse variant values using serde types
+                let values = Self::parse_serde_variant_values(val)?;
+                variants.insert(key_str.into(), values);
+            }
+        }
+
+        Ok(VariantConfig { zip_keys, variants })
+    }
+
+    /// Parse variant values from serde_yaml::Value
+    fn parse_serde_variant_values(value: &serde_yaml::Value) -> Result<Vec<Variable>, String> {
+        let sequence = value
+            .as_sequence()
+            .ok_or_else(|| "Variant values must be a list".to_string())?;
+
+        sequence.iter().map(Self::serde_value_to_variable).collect()
+    }
+
+    /// Convert serde_yaml::Value to Variable, treating floats as strings
+    fn serde_value_to_variable(value: &serde_yaml::Value) -> Result<Variable, String> {
+        match value {
+            serde_yaml::Value::String(s) => {
+                // String in YAML (was quoted) - keep as string
+                Ok(Variable::from_string(s))
+            }
+            serde_yaml::Value::Bool(b) => {
+                // Boolean (unquoted true/false)
+                Ok(Variable::from(*b))
+            }
+            serde_yaml::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    // Integer - keep as integer
+                    Ok(Variable::from(i))
+                } else {
+                    // Float - convert to string to preserve version numbers like "1.23"
+                    Ok(Variable::from_string(&n.to_string()))
+                }
+            }
+            _ => Err(format!("Unsupported variant value type: {:?}", value)),
+        }
     }
 
     /// Load multiple variant configuration files and merge them
@@ -227,5 +298,44 @@ zip_keys:
 
         assert_eq!(parsed.variants.len(), config.variants.len());
         assert_eq!(parsed.zip_keys, config.zip_keys);
+    }
+
+    #[test]
+    fn test_quoted_vs_unquoted() {
+        let yaml = r#"
+quoted_bool:
+  - "true"
+quoted_int:
+  - "5"
+unquoted_bool:
+  - true
+unquoted_int:
+  - 5
+float_val:
+  - 1.23
+"#;
+        let config = VariantConfig::from_yaml_str(yaml).unwrap();
+
+        // Quoted values should be strings
+        let quoted_bool = &config.get(&"quoted_bool".into()).unwrap()[0];
+        assert_eq!(quoted_bool.to_string(), "true");
+        // Check if it's actually a string, not a boolean
+        assert!(quoted_bool.as_ref().as_str().is_some());
+
+        let quoted_int = &config.get(&"quoted_int".into()).unwrap()[0];
+        assert_eq!(quoted_int.to_string(), "5");
+        assert!(quoted_int.as_ref().as_str().is_some());
+
+        // Unquoted values should be their respective types
+        let unquoted_bool = &config.get(&"unquoted_bool".into()).unwrap()[0];
+        assert!(unquoted_bool.as_ref().is_true());
+
+        let unquoted_int = &config.get(&"unquoted_int".into()).unwrap()[0];
+        assert!(unquoted_int.as_ref().is_number());
+
+        // Float should be a string
+        let float_val = &config.get(&"float_val".into()).unwrap()[0];
+        assert_eq!(float_val.to_string(), "1.23");
+        assert!(float_val.as_ref().as_str().is_some());
     }
 }
