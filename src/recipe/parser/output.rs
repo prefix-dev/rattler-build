@@ -290,7 +290,7 @@ mod tests {
                     .map(|err| ParsingError::from_partial(src.as_str(), err))
                     .collect::<Vec<_>>()
             });
-        let err: crate::variant_config::ParseErrors<_> = parsed_recipe.unwrap_err().into();
+        let err: crate::recipe::ParseErrors<_> = parsed_recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_extra_keys.yaml");

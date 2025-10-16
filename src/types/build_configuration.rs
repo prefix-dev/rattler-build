@@ -1,14 +1,15 @@
 //! All the metadata that makes up a recipe file
 use std::collections::BTreeMap;
 
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{ChannelUrl, PackageName, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     hash::HashInfo,
-    normalized_key::NormalizedKey,
-    recipe::{jinja::SelectorConfig, variable::Variable},
+    recipe::jinja::SelectorConfig,
     script::SandboxConfiguration,
     types::{
         Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,

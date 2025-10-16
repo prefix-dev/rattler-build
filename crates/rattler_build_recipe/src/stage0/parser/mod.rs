@@ -262,7 +262,9 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
 /// Order is important because later context values can reference earlier ones.
 pub(crate) fn parse_context(
     yaml: &MarkedNode,
-) -> ParseResult<indexmap::IndexMap<String, crate::stage0::types::Value<String>>> {
+) -> ParseResult<
+    indexmap::IndexMap<String, crate::stage0::types::Value<rattler_build_jinja::Variable>>,
+> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
             .with_message("context must be a mapping")
@@ -272,11 +274,115 @@ pub(crate) fn parse_context(
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str().to_string();
-        let value = parse_value(value_node)?;
+
+        // Check for hyphens in variable names
+        if key.contains('-') {
+            return Err(ParseError::invalid_value(
+                "context variable name",
+                "variable names cannot contain hyphens (-) as they are not valid in Jinja expressions",
+                (*key_node.span()).into(),
+            ));
+        }
+
+        let value = parse_context_value(value_node, &key)?;
         context.insert(key, value);
     }
 
     Ok(context)
+}
+
+/// Parse a context value - can be either a scalar or a list of uniform scalars
+fn parse_context_value(
+    yaml: &MarkedNode,
+    key: &str,
+) -> ParseResult<crate::stage0::types::Value<rattler_build_jinja::Variable>> {
+    use rattler_build_jinja::Variable;
+
+    // Check if it's a sequence (list)
+    if let Some(sequence) = yaml.as_sequence() {
+        // Parse list of uniform scalar values
+        let mut variables = Vec::new();
+
+        for (index, item_node) in sequence.iter().enumerate() {
+            // Each item must be a scalar
+            let scalar = item_node.as_scalar().ok_or_else(|| {
+                ParseError::expected_type("scalar", "non-scalar", helpers::get_span(item_node))
+                    .with_message(format!(
+                        "context.{}[{}] must be a scalar (string, number, or boolean)",
+                        key, index
+                    ))
+            })?;
+
+            let s = scalar.as_str();
+
+            // Parse the scalar value based on its type:
+            // - Booleans: true/false remain as booleans
+            // - Integers: whole numbers without decimals remain as integers
+            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
+            // - Everything else: strings
+            let variable = if s == "true" || s == "false" {
+                Variable::from(s.parse::<bool>().unwrap())
+            } else if let Ok(int_val) = s.parse::<i64>() {
+                // Only treat as integer if it doesn't contain a decimal point
+                if !s.contains('.') {
+                    Variable::from(int_val)
+                } else {
+                    Variable::from(s.to_string())
+                }
+            } else {
+                Variable::from(s.to_string())
+            };
+
+            variables.push(variable);
+        }
+
+        // Return a concrete value containing a Variable list
+        let list_variable = Variable::from(variables);
+        Ok(crate::stage0::types::Value::new_concrete(
+            list_variable,
+            helpers::get_span(yaml),
+        ))
+    } else if let Some(scalar) = yaml.as_scalar() {
+        // Parse scalar value
+        let spanned = crate::span::SpannedString::from(scalar);
+        let s = spanned.as_str();
+        let span = spanned.span();
+
+        // Check if it contains a Jinja template
+        if s.contains("${{") && s.contains("}}") {
+            // It's a template - we'll store it as a string template for now
+            // The actual Variable will be created during evaluation
+            let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
+                .map_err(|e| ParseError::jinja_error(e, span))?;
+            Ok(crate::stage0::types::Value::new_template(template, span))
+        } else {
+            // Parse the scalar value based on its type:
+            // - Booleans: true/false remain as booleans
+            // - Integers: whole numbers without decimals remain as integers
+            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
+            // - Everything else: strings
+            let variable = if s == "true" || s == "false" {
+                Variable::from(s.parse::<bool>().unwrap())
+            } else if let Ok(int_val) = s.parse::<i64>() {
+                // Only treat as integer if it doesn't contain a decimal point
+                if !s.contains('.') {
+                    Variable::from(int_val)
+                } else {
+                    Variable::from(s.to_string())
+                }
+            } else {
+                Variable::from(s.to_string())
+            };
+
+            Ok(crate::stage0::types::Value::new_concrete(variable, span))
+        }
+    } else {
+        Err(ParseError::expected_type(
+            "scalar or list",
+            "non-scalar/non-list",
+            helpers::get_span(yaml),
+        ).with_message("context values must be scalars (strings, numbers, booleans) or lists of uniform scalars"))
+    }
 }
 
 // All section parsers (parse_package, parse_about, parse_extra, parse_requirements)

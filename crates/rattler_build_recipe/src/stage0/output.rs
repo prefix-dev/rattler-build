@@ -34,7 +34,7 @@ pub struct SingleOutputRecipe {
 
     /// Context variables for Jinja template rendering (order-preserving)
     #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<String>>,
+    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     pub package: Package,
     pub build: Build,
@@ -56,7 +56,7 @@ pub struct MultiOutputRecipe {
 
     /// Context variables for Jinja template rendering (order-preserving)
     #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<String>>,
+    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     /// Recipe metadata (name is optional, version is required)
     pub recipe: RecipeMetadata,

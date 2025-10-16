@@ -5,14 +5,12 @@ use std::path::PathBuf;
 
 use crate::{
     hash::HashInfo,
-    normalized_key::NormalizedKey,
-    recipe::{
-        jinja::{Env, Git},
-        variable::Variable,
-    },
+    recipe::jinja::{Env, Git},
 };
 
 use minijinja::value::Value;
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::Platform;
 use strum::IntoEnumIterator as _;
 

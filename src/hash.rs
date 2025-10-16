@@ -1,12 +1,12 @@
 //! Compute the build string / hash info for a given variant
 use std::collections::{BTreeMap, HashMap};
 
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use sha1::{Digest, Sha1};
-
-use crate::{normalized_key::NormalizedKey, recipe::variable::Variable};
 
 /// A hash will be added if all of these are true for any dependency:
 ///

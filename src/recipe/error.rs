@@ -523,10 +523,40 @@ pub(crate) fn jinja_error_to_label(err: &minijinja::Error) -> String {
     }
 }
 
+/// Collection of parse errors for building related diagnostics
+#[derive(Error, Debug, Diagnostic)]
+#[error("Failed to parse recipe")]
+pub struct ParseErrors<S: SourceCode> {
+    /// Related errors
+    #[related]
+    pub errs: Vec<ParsingError<S>>,
+}
+
+impl<S: SourceCode> ParseErrors<S> {
+    /// Create ParseErrors from a vector of PartialParsingErrors
+    pub fn from_partial_vec(source: S, errs: Vec<PartialParsingError>) -> Self
+    where
+        S: Clone + AsRef<str>,
+    {
+        Self {
+            errs: ParsingError::from_partial_vec(source, errs),
+        }
+    }
+}
+
+impl<S: SourceCode> From<Vec<ParsingError<S>>> for ParseErrors<S> {
+    fn from(errs: Vec<ParsingError<S>>) -> Self {
+        Self { errs }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::{assert_miette_snapshot, recipe::Recipe, variant_config::ParseErrors};
+    use crate::{
+        assert_miette_snapshot,
+        recipe::{ParseErrors, Recipe},
+    };
 
     #[test]
     fn miette_output() {

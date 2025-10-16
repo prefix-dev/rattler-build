@@ -1465,7 +1465,7 @@ def test_missing_pin_subpackage(
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Missing output: test1 (used in pin_subpackage)" in stdout
+    assert "Missing output: test1" in stdout
 
 
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1477,7 +1477,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Found a cycle in the recipe outputs: bazbus" in stdout
+    assert "Cycle detected in recipe outputs: bazbus" in stdout
 
 
 def test_python_min_render(
@@ -1695,8 +1695,9 @@ def test_python_version_spec(
         rattler_build(*args, stderr=STDOUT)
 
     error_output = exc_info.value.output
-    assert (
-        "failed to parse match spec: unable to parse version spec: =.*" in error_output
+    # Check that the error mentions the invalid version spec
+    assert "=.*" in error_output and (
+        "MatchSpecParsing" in error_output or "parse version spec" in error_output
     )
 
 

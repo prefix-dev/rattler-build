@@ -4,10 +4,8 @@
 
 pub mod build;
 pub mod cache;
-pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
-mod normalized_key;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
@@ -23,7 +21,6 @@ pub mod tui;
 pub mod types;
 pub mod used_variables;
 pub mod utils;
-pub mod variant_config;
 mod variant_render;
 
 mod consts;
@@ -56,10 +53,14 @@ use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
-pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use rattler_build_variant_config::VariantConfig;
+
+// Re-export types needed by Python bindings and external consumers
+pub use rattler_build_jinja::Variable;
+pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
     package::ArchiveType,
@@ -68,7 +69,6 @@ use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{Dependency, TestType, find_outputs_from_src};
-use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
@@ -80,9 +80,108 @@ use types::{
     BuildConfiguration, BuildSummary, PackageIdentifier, PackagingSettings,
     build_reindexed_channels,
 };
-use variant_config::VariantConfig;
 
+use crate::hash::HashInfo;
 use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::recipe::Recipe;
+use crate::recipe::custom_yaml::Node;
+use crate::source_code::SourceCode;
+use crate::variant_render::{stage_0_render, stage_1_render};
+use indexmap::IndexSet;
+use rattler_build_variant_config::VariantError;
+use rattler_conda_types::NoArchType;
+
+/// A discovered output from variant expansion
+#[allow(missing_docs)]
+#[derive(Debug, Clone)]
+pub struct DiscoveredOutput {
+    pub name: String,
+    pub version: String,
+    pub build_string: String,
+    pub noarch_type: NoArchType,
+    pub target_platform: Platform,
+    pub node: Node,
+    pub used_vars: BTreeMap<NormalizedKey, Variable>,
+    pub recipe: Recipe,
+    pub hash: HashInfo,
+}
+
+impl Eq for DiscoveredOutput {}
+
+impl PartialEq for DiscoveredOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.build_string == other.build_string
+            && self.noarch_type == other.noarch_type
+            && self.target_platform == other.target_platform
+    }
+}
+
+impl std::hash::Hash for DiscoveredOutput {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.version.hash(state);
+        self.build_string.hash(state);
+        self.noarch_type.hash(state);
+        self.target_platform.hash(state);
+    }
+}
+
+/// Find all variants from the recipe and variant config
+fn find_variants<S: SourceCode>(
+    variant_config: &VariantConfig,
+    outputs: &[Node],
+    recipe: S,
+    selector_config: &SelectorConfig,
+) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
+    // find all jinja variables
+    let stage_0 = stage_0_render(outputs, recipe, selector_config, variant_config)?;
+    let stage_1 = stage_1_render(stage_0, selector_config, variant_config)?;
+
+    // Now we need to convert the stage 1 renders to DiscoveredOutputs
+    let mut recipes = IndexSet::new();
+    for sx in stage_1 {
+        for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
+            let target_platform = if recipe.build().noarch().is_none() {
+                selector_config.target_platform
+            } else {
+                Platform::NoArch
+            };
+
+            let build_string = recipe
+                .build()
+                .string()
+                .as_resolved()
+                .expect("Build string has to be resolved")
+                .to_string();
+
+            if recipe.build().python().version_independent {
+                recipe
+                    .requirements
+                    .ignore_run_exports
+                    .by_name
+                    .insert(PackageName::try_from("python").unwrap());
+            }
+
+            let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
+
+            recipes.insert(DiscoveredOutput {
+                name: recipe.package().name().as_source().to_string(),
+                version: recipe.package().version().to_string(),
+                build_string,
+                noarch_type: *recipe.build().noarch(),
+                target_platform,
+                node,
+                used_vars: variant,
+                recipe,
+                hash,
+            });
+        }
+    }
+
+    Ok(recipes)
+}
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -244,7 +343,17 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+    let mut variant_config = VariantConfig::from_files(&variant_configs)?;
+
+    // Always insert target_platform and build_platform
+    variant_config.variants.insert(
+        "target_platform".into(),
+        vec![Variable::from(selector_config.target_platform.to_string())],
+    );
+    variant_config.variants.insert(
+        "build_platform".into(),
+        vec![Variable::from(selector_config.build_platform.to_string())],
+    );
 
     // Apply variant overrides from command line
     for (key, values) in &build_data.variant_overrides {
@@ -254,7 +363,7 @@ pub async fn get_build_output(
     }
 
     let outputs_and_variants =
-        variant_config.find_variants(&outputs, named_source, &selector_config)?;
+        find_variants(&variant_config, &outputs, named_source, &selector_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
