@@ -3,7 +3,6 @@
 #[cfg(test)]
 mod source_cache_tests {
     use super::super::*;
-    use crate::lock::LockManager;
     use tempfile::TempDir;
 
     #[tokio::test]
@@ -79,27 +78,6 @@ mod source_cache_tests {
         assert_eq!(retrieved.url, entry.url);
         assert_eq!(retrieved.checksum, entry.checksum);
         assert_eq!(retrieved.actual_filename, entry.actual_filename);
-    }
-
-    #[tokio::test]
-    async fn test_lock_manager() {
-        let temp_dir = TempDir::new().unwrap();
-        let lock_manager = LockManager::new(temp_dir.path()).await.unwrap();
-
-        // Acquire a lock
-        let guard1 = lock_manager.acquire("test_lock").await.unwrap();
-        assert!(guard1.path().exists());
-
-        // Try to acquire the same lock (should fail with try_acquire)
-        let result = lock_manager.try_acquire("test_lock");
-        assert!(result.is_err());
-
-        // Drop the first guard
-        drop(guard1);
-
-        // Now we should be able to acquire it
-        let guard2 = lock_manager.acquire("test_lock").await.unwrap();
-        assert!(guard2.path().exists());
     }
 
     #[tokio::test]

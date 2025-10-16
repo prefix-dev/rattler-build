@@ -565,7 +565,10 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
         # Skip test if we couldn't set up the environment
         # This might happen in CI without network access
         import pytest
-        pytest.skip("Could not fetch xtensor sources (network issue or missing dependencies)")
+
+        pytest.skip(
+            "Could not fetch xtensor sources (network issue or missing dependencies)"
+        )
 
     work_dir = work_dirs[0]
 
@@ -573,18 +576,21 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
     source_info_path = work_dir / ".source_info.json"
     if not source_info_path.exists():
         import pytest
+
         pytest.skip("Source info not created (build dependencies missing)")
 
     # Verify source info has extracted_paths
     source_info = json.loads(source_info_path.read_text())
     if not source_info.get("extracted_paths"):
         import pytest
+
         pytest.skip("No extracted paths in source info")
 
     # Find a header file to modify (xtensor is header-only)
     header_files = list(work_dir.rglob("*.hpp"))
     if not header_files:
         import pytest
+
         pytest.skip("No header files found in xtensor source")
 
     # Modify a header file
@@ -616,10 +622,18 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
 
     # Verify the patch contains our modification
     patch_content = patch_file.read_text()
-    assert "Test modification for create-patch" in patch_content, "Patch doesn't contain our modification"
+    assert (
+        "Test modification for create-patch" in patch_content
+    ), "Patch doesn't contain our modification"
 
     # Verify it's a proper unified diff
     relative_path = test_file.relative_to(work_dir)
-    assert f"--- a/{relative_path}" in patch_content or f"a/{relative_path}" in patch_content
-    assert f"+++ b/{relative_path}" in patch_content or f"b/{relative_path}" in patch_content
+    assert (
+        f"--- a/{relative_path}" in patch_content
+        or f"a/{relative_path}" in patch_content
+    )
+    assert (
+        f"+++ b/{relative_path}" in patch_content
+        or f"b/{relative_path}" in patch_content
+    )
     assert "+// Test modification for create-patch" in patch_content
