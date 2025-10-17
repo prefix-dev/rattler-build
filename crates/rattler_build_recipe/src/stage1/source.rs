@@ -4,7 +4,7 @@ use serde_with::serde_as;
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
-use super::glob_vec::GlobVec;
+use super::GlobVec;
 
 /// Source information - can be Git, Url, or Path (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

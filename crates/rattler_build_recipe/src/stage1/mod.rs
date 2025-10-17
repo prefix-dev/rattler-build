@@ -16,10 +16,8 @@ use crate::ParseError;
 use rattler_build_jinja::{JinjaConfig, Variable};
 
 pub mod about;
-pub mod all_or_glob_vec;
 pub mod build;
 pub mod extra;
-pub mod glob_vec;
 pub mod package;
 pub mod recipe;
 pub mod requirements;
@@ -27,16 +25,17 @@ pub mod source;
 pub mod tests;
 
 pub use about::About;
-pub use all_or_glob_vec::AllOrGlobVec;
 pub use build::Build;
 pub use extra::Extra;
-pub use glob_vec::GlobVec;
 use indexmap::IndexMap;
 pub use package::Package;
 pub use recipe::Recipe;
 pub use requirements::{Dependency, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
 pub use tests::TestType;
+
+// Re-export glob types from rattler_build_types
+pub use rattler_build_types::{AllOrGlobVec, GlobCheckerVec, GlobVec, GlobWithSource};
 
 /// Evaluation context containing variables for template rendering and conditional evaluation
 #[derive(Debug, Clone)]

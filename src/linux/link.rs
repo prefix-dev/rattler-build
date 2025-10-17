@@ -488,7 +488,7 @@ mod test {
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
-        let globvec = GlobVec::from_strings(vec!["/usr/lib/custom**".to_string()]).unwrap();
+        let globvec = GlobVec::from_strings(vec!["/usr/lib/custom**".to_string()], vec![]).unwrap();
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib

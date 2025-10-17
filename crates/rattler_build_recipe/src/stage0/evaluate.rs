@@ -255,6 +255,188 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
+/// Evaluate a ConditionalList<String> into a GlobVec (include-only), preserving span information for error reporting
+pub fn evaluate_glob_vec_simple(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    let mut globs = Vec::new();
+
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                // Validate the glob pattern immediately with proper error reporting
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Create the GlobVec with only include patterns
+    GlobVec::from_strings(globs, Vec::new()).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!("Failed to build glob set: {}", e)),
+        suggestion: None,
+    })
+}
+
+/// Evaluate an IncludeExclude into a GlobVec, preserving span information for error reporting
+pub fn evaluate_glob_vec(
+    include_exclude: &crate::stage0::types::IncludeExclude<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    let (include_list, exclude_list) = match include_exclude {
+        crate::stage0::types::IncludeExclude::List(list) => (list, &ConditionalList::default()),
+        crate::stage0::types::IncludeExclude::Mapping { include, exclude } => (include, exclude),
+    };
+
+    // Evaluate and parse include patterns
+    let mut include_globs = Vec::new();
+    for item in include_list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                // Validate the glob pattern immediately with proper error reporting
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => include_globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => include_globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Evaluate and parse exclude patterns
+    let mut exclude_globs = Vec::new();
+    for item in exclude_list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => exclude_globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => exclude_globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Now create the GlobVec - this should not fail since we've already validated
+    GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!("Failed to build glob set: {}", e)),
+        suggestion: None,
+    })
+}
+
 /// Evaluate a ConditionalList<EntryPoint> into Vec<EntryPoint>
 /// Entry points can be concrete values or templates that render to strings
 pub fn evaluate_entry_point_list(
@@ -736,10 +918,7 @@ impl Evaluate for Stage0About {
             repository,
             documentation,
             license,
-            license_file: GlobVec::from_strings(evaluate_string_list(
-                &self.license_file,
-                context,
-            )?)?,
+            license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -789,8 +968,7 @@ impl Evaluate for Stage0PythonBuild {
     type Output = Stage1PythonBuild;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let skip_pyc_compilation =
-            GlobVec::from_strings(evaluate_string_list(&self.skip_pyc_compilation, context)?)?;
+        let skip_pyc_compilation = evaluate_glob_vec_simple(&self.skip_pyc_compilation, context)?;
 
         Ok(Stage1PythonBuild {
             entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
@@ -835,8 +1013,8 @@ impl Evaluate for Stage0ForceFileType {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1ForceFileType {
-            text: GlobVec::from_strings(evaluate_string_list(&self.text, context)?)?,
-            binary: GlobVec::from_strings(evaluate_string_list(&self.binary, context)?)?,
+            text: evaluate_glob_vec_simple(&self.text, context)?,
+            binary: evaluate_glob_vec_simple(&self.binary, context)?,
         })
     }
 }
@@ -871,7 +1049,7 @@ impl Evaluate for Stage0PrefixDetection {
                 AllOrGlobVec::All(bool_val)
             }
             Stage0PrefixIgnore::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
@@ -896,7 +1074,7 @@ impl Evaluate for Stage0PostProcess {
         })?;
 
         Ok(Stage1PostProcess {
-            files: GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?,
+            files: evaluate_glob_vec_simple(&self.files, context)?,
             regex,
             replacement: evaluate_string_value(&self.replacement, context)?,
         })
@@ -936,15 +1114,13 @@ impl Evaluate for Stage0DynamicLinking {
                 AllOrGlobVec::All(bool_val)
             }
             Stage0BinaryRelocation::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
         // Evaluate and validate glob patterns
-        let missing_dso_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.missing_dso_allowlist, context)?)?;
-        let rpath_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.rpath_allowlist, context)?)?;
+        let missing_dso_allowlist = evaluate_glob_vec_simple(&self.missing_dso_allowlist, context)?;
+        let rpath_allowlist = evaluate_glob_vec_simple(&self.rpath_allowlist, context)?;
 
         // Parse overdepending_behavior
         let overdepending_behavior = match &self.overdepending_behavior {
@@ -1043,25 +1219,11 @@ impl Evaluate for Stage0Build {
         let python = self.python.evaluate(context)?;
 
         // Evaluate file lists and validate glob patterns
-        let always_copy_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_copy_files, context)?)?;
-        let always_include_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_include_files, context)?)?;
+        let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
+        let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
         // Evaluate files (handle both list and include/exclude variants)
-        let files = match &self.files {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
+        let files = evaluate_glob_vec(&self.files, context)?;
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -1366,19 +1528,7 @@ impl Evaluate for Stage0PathSource {
         };
 
         // Evaluate filter and convert to GlobVec (handle both list and include/exclude variants)
-        let filter = match &self.filter {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
+        let filter = evaluate_glob_vec(&self.filter, context)?;
 
         Ok(Stage1PathSource {
             path,
@@ -1461,8 +1611,8 @@ impl Evaluate for Stage0CommandsTestFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1CommandsTestFiles {
-            source: GlobVec::from_strings(evaluate_string_list(&self.source, context)?)?,
-            recipe: GlobVec::from_strings(evaluate_string_list(&self.recipe, context)?)?,
+            source: evaluate_glob_vec_simple(&self.source, context)?,
+            recipe: evaluate_glob_vec_simple(&self.recipe, context)?,
         })
     }
 }
@@ -1500,8 +1650,8 @@ impl Evaluate for Stage0PackageContentsCheckFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1PackageContentsCheckFiles {
-            exists: GlobVec::from_strings(evaluate_string_list(&self.exists, context)?)?,
-            not_exists: GlobVec::from_strings(evaluate_string_list(&self.not_exists, context)?)?,
+            exists: evaluate_glob_vec_simple(&self.exists, context)?,
+            not_exists: evaluate_glob_vec_simple(&self.not_exists, context)?,
         })
     }
 }

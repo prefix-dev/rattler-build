@@ -1,7 +1,7 @@
 use rattler_build_script::Script;
 use serde::{Deserialize, Serialize};
 
-use super::glob_vec::GlobVec;
+use super::GlobVec;
 
 /// Python version specification for tests (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

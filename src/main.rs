@@ -21,8 +21,6 @@ use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {
-    println!("Starting rattler-build...");
-    eprintln!("Starting rattler-build...");
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
@@ -54,12 +52,7 @@ fn main() -> miette::Result<()> {
 }
 
 async fn async_main() -> miette::Result<()> {
-    eprintln!("Parsing command line arguments...");
     let app = App::parse();
-    println!(
-        "Let's go: rattler-build {}",
-        rattler_build::get_rattler_build_version()
-    );
     let log_handler = if !app.is_tui() {
         Some(
             init_logging(
@@ -110,7 +103,6 @@ async fn async_main() -> miette::Result<()> {
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
-            println!("Found {} recipe(s) to build.", recipe_paths.len());
             if recipe_paths.is_empty() {
                 if recipe_dir.is_some() {
                     tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);

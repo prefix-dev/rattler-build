@@ -3,7 +3,7 @@ use rattler_build_script::Script;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
+use super::{AllOrGlobVec, GlobVec};
 
 /// Helper function to check if a u64 is zero (for skip_serializing_if)
 fn is_zero(value: &u64) -> bool {
