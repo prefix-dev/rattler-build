@@ -6,6 +6,7 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
+use rattler_build_script::Debug as ScriptDebug;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -247,6 +248,9 @@ impl Output {
                 Some(&self.build_configuration.directories.build_prefix)
             };
 
+            let jinja_renderer = |template: &str| -> Result<String, String> {
+                jinja.render_str(template).map_err(|e| e.to_string())
+            };
             cache
                 .build
                 .script()
@@ -256,9 +260,9 @@ impl Output {
                     &self.build_configuration.directories.recipe_dir,
                     &self.build_configuration.directories.host_prefix,
                     build_prefix,
-                    Some(jinja),
+                    Some(jinja_renderer),
                     None, // sandbox config
-                    self.build_configuration.debug,
+                    ScriptDebug::new(self.build_configuration.debug.is_enabled()),
                 )
                 .await
                 .into_diagnostic()?;

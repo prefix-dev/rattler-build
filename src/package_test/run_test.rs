@@ -135,7 +135,7 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(
+                    .run_script::<fn(&str) -> Result<String, String>>(
                         env_vars,
                         tmp_dir.path(),
                         cwd,
@@ -143,7 +143,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(false),
+                        crate::script::ScriptDebug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -156,7 +156,7 @@ impl Tests {
                 };
 
                 script
-                    .run_script(
+                    .run_script::<fn(&str) -> Result<String, String>>(
                         env_vars,
                         tmp_dir.path(),
                         cwd,
@@ -164,7 +164,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::new(false),
+                        crate::script::ScriptDebug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -640,7 +640,7 @@ impl PythonTest {
         let test_dir = prefix.join("test");
         fs::create_dir_all(&test_dir)?;
         script
-            .run_script(
+            .run_script::<fn(&str) -> Result<String, String>>(
                 Default::default(),
                 &test_dir,
                 path,
@@ -648,7 +648,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
-                config.debug,
+                crate::script::ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -664,7 +664,7 @@ impl PythonTest {
                 ..Script::default()
             };
             script
-                .run_script(
+                .run_script::<fn(&str) -> Result<String, String>>(
                     Default::default(),
                     path,
                     path,
@@ -672,7 +672,7 @@ impl PythonTest {
                     None,
                     None,
                     None,
-                    config.debug,
+                    crate::script::ScriptDebug::new(config.debug.is_enabled()),
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -741,7 +741,7 @@ impl PerlTest {
         let test_folder = prefix.join("test_files");
         fs::create_dir_all(&test_folder)?;
         script
-            .run_script(
+            .run_script::<fn(&str) -> Result<String, String>>(
                 Default::default(),
                 &test_folder,
                 path,
@@ -749,7 +749,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
-                config.debug,
+                crate::script::ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -853,7 +853,7 @@ impl CommandsTest {
 
         tracing::info!("Testing commands:");
         self.script
-            .run_script(
+            .run_script::<fn(&str) -> Result<String, String>>(
                 env_vars,
                 &test_dir,
                 path,
@@ -861,7 +861,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
-                config.debug,
+                crate::script::ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1012,7 +1012,7 @@ impl RTest {
         let test_folder = prefix.join("test_files");
         fs::create_dir_all(&test_folder)?;
         script
-            .run_script(
+            .run_script::<fn(&str) -> Result<String, String>>(
                 Default::default(),
                 &test_folder,
                 path,
@@ -1020,7 +1020,7 @@ impl RTest {
                 None,
                 None,
                 None,
-                config.debug,
+                crate::script::ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1084,7 +1084,7 @@ impl RubyTest {
         let test_folder = prefix.join("test_files");
         fs::create_dir_all(&test_folder)?;
         script
-            .run_script(
+            .run_script::<fn(&str) -> Result<String, String>>(
                 Default::default(),
                 &test_folder,
                 path,
@@ -1092,7 +1092,7 @@ impl RubyTest {
                 None,
                 None,
                 None,
-                config.debug,
+                crate::script::ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;

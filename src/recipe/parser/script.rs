@@ -6,7 +6,6 @@ use crate::{
     },
     recipe::error::{ErrorKind, PartialParsingError},
 };
-use indexmap::IndexMap;
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf};
 
