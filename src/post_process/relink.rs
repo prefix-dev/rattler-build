@@ -193,7 +193,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                         relinker.relink(
                             tmp_prefix,
                             encoded_prefix,
-                            &rpaths,
+                            rpaths,
                             rpath_allowlist,
                             &system_tools,
                         )?;

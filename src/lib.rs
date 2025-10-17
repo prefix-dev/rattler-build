@@ -55,7 +55,7 @@ use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_build_recipe::{
-    Stage1Recipe, stage0,
+    stage0,
     stage1::Dependency,
     stage1::Recipe,
     variant_render::{RenderConfig, render_recipe_with_variant_config},
@@ -399,10 +399,10 @@ pub async fn get_build_output(
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
 
-    let global_build_name = outputs_and_variants
-        .first()
-        .map(|o| o.name.clone())
-        .unwrap_or_default();
+    // let global_build_name = outputs_and_variants
+    //     .first()
+    //     .map(|o| o.name.clone())
+    //     .unwrap_or_default();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;

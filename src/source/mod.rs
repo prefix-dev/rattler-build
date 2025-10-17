@@ -12,7 +12,7 @@ use crate::{
 
 use fs_err as fs;
 use rattler_build_recipe::stage1::{Source, source::GitRev};
-use rattler_build_source_cache::cache::is_tarball;
+use rattler_build_source_cache::{Checksum, cache::is_tarball};
 use rattler_build_source_cache::{
     GitSource as CacheGitSource, Source as CacheSource, UrlSource as CacheUrlSource,
 };
@@ -54,7 +54,7 @@ pub enum SourceError {
     PatchNotFound(PathBuf),
 
     #[error("Patch application error: {0}")]
-    PatchApplyError(#[from] diffy::ApplyError),
+    PatchApplyError(#[from] rattler_build_diffy::ApplyError),
 
     #[error("Failed to parse patch: {0}")]
     PatchParseFailed(PathBuf),
@@ -198,16 +198,8 @@ fn convert_url_source(
 /// Convert a stage1 PathSource checksum to a cache Checksum
 fn convert_path_checksum(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
-) -> Option<rattler_build_source_cache::Checksum> {
-    use rattler_build_source_cache::Checksum;
-
-    if let Some(sha256) = &path_src.sha256 {
-        Some(Checksum::Sha256(sha256.to_vec()))
-    } else if let Some(md5) = &path_src.md5 {
-        Some(Checksum::Md5(md5.to_vec()))
-    } else {
-        None
-    }
+) -> Option<Checksum> {
+    path_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
 }
 
 /// Result of fetching a single source

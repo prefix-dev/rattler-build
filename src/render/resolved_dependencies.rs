@@ -826,7 +826,7 @@ pub(crate) async fn resolve_dependencies(
         build_run_exports.extend(build_env.run_exports(true));
     }
 
-    let mut build_run_exports = filter_run_exports(
+    let build_run_exports = filter_run_exports(
         &requirements.ignore_run_exports,
         &build_run_exports,
         "build",
@@ -971,7 +971,7 @@ pub(crate) async fn resolve_dependencies(
     }
 
     // And filter the run exports
-    let mut host_run_exports =
+    let host_run_exports =
         filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
 
     // if let Some(cache) = &output.finalized_cache_dependencies {

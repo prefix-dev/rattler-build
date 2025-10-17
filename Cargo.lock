@@ -1649,16 +1649,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
-name = "diffy"
-version = "0.4.2"
-source = "git+https://github.com/prefix-dev/diffy.git?branch=master#f916e25c31a8d9e7483116c9e8aa6a36e20f947a"
-dependencies = [
- "nu-ansi-term",
- "strsim",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2465,7 +2455,8 @@ dependencies = [
 [[package]]
 name = "http-range-client"
 version = "0.9.1"
-source = "git+https://github.com/pka/http-range-client.git#fccfa852dbe7e875a50802c55ee6c5f69c634827"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5f72a73344fc9576e74e42a0f1d7a05d7c6c50950a15f44faea133a91f622b"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -4205,7 +4196,6 @@ dependencies = [
  "criterion",
  "crossterm 0.28.1",
  "dialoguer",
- "diffy",
  "dunce",
  "flate2",
  "fs-err",
@@ -4233,6 +4223,7 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "rattler",
+ "rattler_build_diffy",
  "rattler_build_jinja",
  "rattler_build_networking",
  "rattler_build_recipe",
@@ -4297,6 +4288,15 @@ dependencies = [
  "xz2",
  "zip 6.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_build_diffy"
+version = "0.4.2"
+dependencies = [
+ "nu-ansi-term",
+ "strsim",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

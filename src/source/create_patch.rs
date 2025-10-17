@@ -1,11 +1,11 @@
-//! Functions to create a new patch for a given directory using `diffy`.
+//! Functions to create a new patch for a given directory using `rattler_build_diffy`.
 //! We take all files found in this directory and compare them to the original files
 //! from the source cache. Any differences will be written to a patch file.
 
-use diffy::DiffOptions;
 use fs_err as fs;
 use globset::{Glob, GlobSet};
 use miette::Diagnostic;
+use rattler_build_diffy::DiffOptions;
 use rattler_build_recipe::stage1::Source;
 use rattler_build_recipe::stage1::source::UrlSource;
 use std::collections::HashMap;
@@ -312,11 +312,15 @@ fn create_directory_diff(
                         .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                         .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                         .create_patch(&original_content, &modified_content);
-                    let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                    let formatted = rattler_build_diffy::PatchFormatter::new()
+                        .fmt_patch(&patch)
+                        .to_string();
                     patch_content.push_str(&formatted);
                     tracing::info!(
                         "{}",
-                        diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                        rattler_build_diffy::PatchFormatter::new()
+                            .with_color()
+                            .fmt_patch(&patch)
                     );
                 }
             }
@@ -326,11 +330,15 @@ fn create_directory_diff(
                     .set_original_filename("/dev/null")
                     .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                     .create_patch("", &modified_content);
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                    rattler_build_diffy::PatchFormatter::new()
+                        .with_color()
+                        .fmt_patch(&patch)
                 );
             }
         }
@@ -367,7 +375,9 @@ fn create_directory_diff(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch("", "");
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 continue;
             }
@@ -381,11 +391,15 @@ fn create_directory_diff(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch(&original_content, "");
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                    rattler_build_diffy::PatchFormatter::new()
+                        .with_color()
+                        .fmt_patch(&patch)
                 );
             }
         }

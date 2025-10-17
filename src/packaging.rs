@@ -9,6 +9,7 @@ use std::{
 use fs_err as fs;
 use fs_err::File;
 use metadata::clean_url;
+use rattler_build_types::GlobVec;
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
@@ -115,7 +116,6 @@ fn copy_license_files(
         .run()?;
 
         let copied_files_work_dir = copy_dir_work.copied_paths();
-
         let copy_dir_recipe = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
@@ -201,9 +201,8 @@ fn write_recipe_folder(
             output_dir.to_string_lossy()
         );
         let output_dir_glob = format!("{}/**", ignore_output.to_string_lossy());
-        // TODO(refactor): fix globvec constructor to make this work.
-        // let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
-        // copy_builder = copy_builder.with_globvec(&glob_vec);
+        let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
+        copy_builder = copy_builder.with_globvec(&glob_vec);
     }
 
     let copy_result = copy_builder.run()?;

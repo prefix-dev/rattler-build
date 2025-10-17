@@ -10,6 +10,7 @@ members = [
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
   "crates/rattler_build_script",
+  "crates/rattler_build_diffy",
 ]
 
 [workspace.package]
@@ -254,13 +255,13 @@ retry-policies = "0.5.1"
 strum = "0.27.2"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
-diffy = { git = "https://github.com/prefix-dev/diffy.git", branch = "master" }
-http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
+sevenz-rust2 = "0.19.1"
+dialoguer = "0.12.0"
+# needed to download test files. Possibly we can move this to dev dependencies.
+http-range-client = { version = "0.9.1", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.19.1"
-dialoguer = "0.12.0"
 
 # Local rattler-build crates
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
@@ -273,6 +274,7 @@ rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
   "variant-config",
 ] }
 rattler_git = { path = "crates/rattler_git" }
+rattler_build_diffy = { path = "crates/rattler_build_diffy" }
 rattler_build_networking = { path = "crates/rattler_build_networking", features = [
   "middleware",
 ] }
@@ -293,6 +295,7 @@ tracing-indicatif = "0.3.13"
 serial_test = "3.2.0"
 criterion = { version = "0.7.0", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
+
 
 [[bench]]
 name = "line_breaks"
