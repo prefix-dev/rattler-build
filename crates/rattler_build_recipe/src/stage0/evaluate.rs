@@ -402,53 +402,64 @@ pub fn evaluate_dependency_list(
     Ok(results)
 }
 
-/// Evaluate a ScriptContent into a string
-fn evaluate_script_content(
-    content: &ScriptContent,
-    context: &EvaluationContext,
-) -> Result<String, ParseError> {
-    match content {
-        ScriptContent::Command(cmd) => Ok(cmd.clone()),
-        ScriptContent::Inline(inline) => {
-            // For inline scripts, we need to evaluate the content or file
-            if let Some(content_list) = &inline.content {
-                // Evaluate the conditional list to get a Vec<String> of commands
-                let commands = evaluate_string_list(content_list, context)?;
-                // Join the commands with newlines to create a single script
-                Ok(commands.join("\n"))
-            } else if let Some(file_val) = &inline.file {
-                evaluate_string_value(file_val, context)
-            } else {
-                Ok(String::new())
-            }
-        }
-    }
-}
-
-/// Evaluate a ConditionalList<ScriptContent> into Vec<String>
+/// Evaluate a ConditionalList<ScriptContent> into rattler_build_script::Script
 pub fn evaluate_script_list(
     list: &ConditionalList<ScriptContent>,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
-    let mut results = Vec::new();
+) -> Result<rattler_build_script::Script, ParseError> {
+    use rattler_build_script::{Script, ScriptContent as ScriptContentOutput};
+
+    // If the list is empty, return default script
+    if list.is_empty() {
+        return Ok(Script::default());
+    }
+
+    // Collect all script items after evaluating conditionals
+    let mut all_commands = Vec::new();
+    let mut interpreter: Option<String> = None;
+    let mut env = indexmap::IndexMap::new();
+    let mut secrets = Vec::new();
+    let mut file_path: Option<PathBuf> = None;
 
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                // ScriptContent doesn't use Value wrapper, so we match on it directly
-                // Actually wait, Item<ScriptContent> means Item can be Value(Value<ScriptContent>) or Conditional(Conditional<ScriptContent>)
-                // But ScriptContent is not wrapped in Value...
-                // Let me check the type more carefully
                 match value {
                     Value::Concrete {
                         value: script_content,
                         ..
                     } => {
-                        let s = evaluate_script_content(script_content, context)?;
-                        results.push(s);
+                        match script_content {
+                            ScriptContent::Command(cmd) => {
+                                all_commands.push(cmd.clone());
+                            }
+                            ScriptContent::Inline(inline) => {
+                                // Extract interpreter if specified
+                                if let Some(interp) = &inline.interpreter {
+                                    interpreter = Some(evaluate_string_value(interp, context)?);
+                                }
+
+                                // Extract environment variables
+                                for (key, val) in &inline.env {
+                                    let evaluated_val = evaluate_string_value(val, context)?;
+                                    env.insert(key.clone(), evaluated_val);
+                                }
+
+                                // Extract secrets
+                                secrets.extend(inline.secrets.clone());
+
+                                // Extract content or file
+                                if let Some(content_list) = &inline.content {
+                                    let commands = evaluate_string_list(content_list, context)?;
+                                    all_commands.extend(commands);
+                                } else if let Some(file_val) = &inline.file {
+                                    let file_str = evaluate_string_value(file_val, context)?;
+                                    file_path = Some(PathBuf::from(file_str));
+                                }
+                            }
+                        }
                     }
                     Value::Template { .. } => {
-                        // ScriptContent can't be a template itself
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
                             span: Span::unknown(),
@@ -461,52 +472,58 @@ pub fn evaluate_script_list(
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
 
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: script_content,
-                                ..
-                            } => {
-                                let s = evaluate_script_content(script_content, context)?;
-                                results.push(s);
-                            }
-                            Value::Template { .. } => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
-                                    message: Some(
-                                        "Script content cannot be a template".to_string(),
-                                    ),
-                                    suggestion: None,
-                                });
+                let items_to_process = if condition_met {
+                    &cond.then.0
+                } else {
+                    cond.else_value
+                        .as_ref()
+                        .map(|v| v.0.as_slice())
+                        .unwrap_or(&[])
+                };
+
+                for val in items_to_process {
+                    match val {
+                        Value::Concrete {
+                            value: script_content,
+                            ..
+                        } => {
+                            match script_content {
+                                ScriptContent::Command(cmd) => {
+                                    all_commands.push(cmd.clone());
+                                }
+                                ScriptContent::Inline(inline) => {
+                                    // Extract interpreter if specified
+                                    if let Some(interp) = &inline.interpreter {
+                                        interpreter = Some(evaluate_string_value(interp, context)?);
+                                    }
+
+                                    // Extract environment variables
+                                    for (key, val) in &inline.env {
+                                        let evaluated_val = evaluate_string_value(val, context)?;
+                                        env.insert(key.clone(), evaluated_val);
+                                    }
+
+                                    // Extract secrets
+                                    secrets.extend(inline.secrets.clone());
+
+                                    // Extract content or file
+                                    if let Some(content_list) = &inline.content {
+                                        let commands = evaluate_string_list(content_list, context)?;
+                                        all_commands.extend(commands);
+                                    } else if let Some(file_val) = &inline.file {
+                                        let file_str = evaluate_string_value(file_val, context)?;
+                                        file_path = Some(PathBuf::from(file_str));
+                                    }
+                                }
                             }
                         }
-                    }
-                } else {
-                    // Evaluate the "else" items
-                    if let Some(else_value) = &cond.else_value {
-                        for val in else_value.iter() {
-                            match val {
-                                Value::Concrete {
-                                    value: script_content,
-                                    ..
-                                } => {
-                                    let s = evaluate_script_content(script_content, context)?;
-                                    results.push(s);
-                                }
-                                Value::Template { .. } => {
-                                    return Err(ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: Span::unknown(),
-                                        message: Some(
-                                            "Script content cannot be a template".to_string(),
-                                        ),
-                                        suggestion: None,
-                                    });
-                                }
-                            }
+                        Value::Template { .. } => {
+                            return Err(ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: Span::unknown(),
+                                message: Some("Script content cannot be a template".to_string()),
+                                suggestion: None,
+                            });
                         }
                     }
                 }
@@ -514,7 +531,26 @@ pub fn evaluate_script_list(
         }
     }
 
-    Ok(results)
+    // Build the final Script content
+    let content = if let Some(path) = file_path {
+        ScriptContentOutput::Path(path)
+    } else if all_commands.is_empty() {
+        ScriptContentOutput::Default
+    } else if all_commands.len() == 1 {
+        // Single command - could be a path or command, use CommandOrPath
+        ScriptContentOutput::CommandOrPath(all_commands.into_iter().next().unwrap())
+    } else {
+        // Multiple commands
+        ScriptContentOutput::Commands(all_commands)
+    };
+
+    Ok(Script {
+        interpreter,
+        env,
+        secrets,
+        content,
+        cwd: None,
+    })
 }
 
 /// Parse a boolean from a string (case-insensitive)

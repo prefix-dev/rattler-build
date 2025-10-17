@@ -5,6 +5,7 @@
 
 use indexmap::IndexMap;
 use minijinja::Value;
+use rattler_build_jinja::Jinja;
 use rattler_conda_types::Platform;
 use std::{collections::HashMap, collections::HashSet};
 

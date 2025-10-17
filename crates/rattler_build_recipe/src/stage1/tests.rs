@@ -1,3 +1,4 @@
+use rattler_build_script::Script;
 use serde::{Deserialize, Serialize};
 
 use super::glob_vec::GlobVec;
@@ -112,8 +113,9 @@ impl CommandsTestFiles {
 /// A test that executes a script in a freshly created environment (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
-    /// The script to run (list of commands)
-    pub script: Vec<String>,
+    /// The script to run - contains script content, interpreter, environment variables, etc.
+    #[serde(default, skip_serializing_if = "Script::is_default")]
+    pub script: Script,
 
     /// The (extra) requirements for the test.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]

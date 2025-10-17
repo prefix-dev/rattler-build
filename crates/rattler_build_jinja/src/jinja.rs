@@ -1,5 +1,4 @@
 //! Module for types and functions related to minijinja setup for recipes.
-use core::hash;
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::{
