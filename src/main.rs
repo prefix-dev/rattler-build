@@ -21,6 +21,8 @@ use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {
+    println!("Starting rattler-build...");
+    eprintln!("Starting rattler-build...");
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
@@ -52,7 +54,12 @@ fn main() -> miette::Result<()> {
 }
 
 async fn async_main() -> miette::Result<()> {
+    eprintln!("Parsing command line arguments...");
     let app = App::parse();
+    println!(
+        "Let's go: rattler-build {}",
+        rattler_build::get_rattler_build_version()
+    );
     let log_handler = if !app.is_tui() {
         Some(
             init_logging(
@@ -103,7 +110,7 @@ async fn async_main() -> miette::Result<()> {
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
-
+            println!("Found {} recipe(s) to build.", recipe_paths.len());
             if recipe_paths.is_empty() {
                 if recipe_dir.is_some() {
                     tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
@@ -189,35 +196,35 @@ fn recipe_paths(
 ) -> Result<(Vec<PathBuf>, Option<TempDir>), miette::Error> {
     let mut recipe_paths = Vec::new();
     let mut temp_dir_opt = None;
-    if !std::io::stdin().is_terminal()
-        && recipes.len() == 1
-        && get_recipe_path(&recipes[0]).is_err()
-    {
-        let temp_dir = tempdir().into_diagnostic()?;
+    // if !std::io::stdin().is_terminal()
+    //     && recipes.len() == 1
+    //     && get_recipe_path(&recipes[0]).is_err()
+    // {
+    //     let temp_dir = tempdir().into_diagnostic()?;
 
-        let recipe_path = temp_dir.path().join("recipe.yaml");
-        io::copy(
-            &mut io::stdin(),
-            &mut File::create(&recipe_path).into_diagnostic()?,
-        )
-        .into_diagnostic()?;
-        recipe_paths.push(get_recipe_path(&recipe_path)?);
-        temp_dir_opt = Some(temp_dir);
-    } else {
-        for recipe_path in &recipes {
-            recipe_paths.push(get_recipe_path(recipe_path)?);
-        }
-        if let Some(recipe_dir) = &recipe_dir {
-            for entry in ignore::Walk::new(recipe_dir) {
-                let entry = entry.into_diagnostic()?;
-                if entry.path().is_dir() {
-                    if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                        recipe_paths.push(recipe_path);
-                    }
+    //     let recipe_path = temp_dir.path().join("recipe.yaml");
+    //     io::copy(
+    //         &mut io::stdin(),
+    //         &mut File::create(&recipe_path).into_diagnostic()?,
+    //     )
+    //     .into_diagnostic()?;
+    //     recipe_paths.push(get_recipe_path(&recipe_path)?);
+    //     temp_dir_opt = Some(temp_dir);
+    // } else {
+    for recipe_path in &recipes {
+        recipe_paths.push(get_recipe_path(recipe_path)?);
+    }
+    if let Some(recipe_dir) = &recipe_dir {
+        for entry in ignore::Walk::new(recipe_dir) {
+            let entry = entry.into_diagnostic()?;
+            if entry.path().is_dir() {
+                if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                    recipe_paths.push(recipe_path);
                 }
             }
         }
     }
+    // }
 
     Ok((recipe_paths, temp_dir_opt))
 }
