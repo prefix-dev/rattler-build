@@ -1,7 +1,11 @@
 [workspace]
 members = [
   "rust-tests",
+  "crates/rattler_git",
+  "crates/rattler_build_networking",
+  "crates/rattler_build_source_cache",
   "crates/rattler_build_recipe_generator",
+  "crates/rattler_prefix_guard",
   "crates/rattler_build_recipe",
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
@@ -17,12 +21,22 @@ repository = "https://github.com/prefix-dev/rattler-build"
 [workspace.dependencies]
 async-once-cell = "0.5.4"
 async-recursion = "1.1.1"
+async-trait = "0.1"
+bzip2 = "0.6.0"
+chrono = "0.4.41"
 clap = { version = "4.5.45", features = ["derive"] }
+dashmap = "6.1"
+dunce = "1.0.5"
 flate2 = "1.1.2"
 fs-err = "3.1.1"
+futures = "0.3.31"
 indexmap = "2.11.4"
+indicatif = "0.18.0"
 insta = "1.41.1"
 itertools = "0.14.0"
+hex = "0.4.3"
+libc = "0.2"
+md-5 = "0.10"
 lazy_static = "1.5.0"
 miette = "7.6.0"
 rattler_conda_types = { version = "0.40.0", default-features = false }
@@ -33,20 +47,29 @@ rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
 regex = "1.11.1"
 reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
+reqwest-middleware = "0.4.2"
+reqwest-retry = "0.7.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 serde_with = "3.14.0"
 serde_yaml = "0.9.34"
+sevenz-rust2 = "0.19.1"
 sha2 = "0.10.9"
 tar = "0.4.44"
 tempfile = "3.21.0"
+thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = ["rt", "macros"] }
 toml = "0.9.5"
 tracing = "0.1.41"
 url = "2.5.4"
-zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
+urlencoding = "2.1"
+walkdir = "2.5.0"
+which = "8.0.0"
+windows-sys = "0.59"
+xz2 = "0.1.7"
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
+zstd = "0.13.3"
 spdx = "0.12.0"
-thiserror = "2.0.17"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 minijinja = { version = "2.11.0", features = [
@@ -237,12 +260,18 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
 sevenz-rust2 = "0.19.1"
 dialoguer = "0.12.0"
 
+# Local rattler-build crates
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
   "cli",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_git = { path = "crates/rattler_git" }
+rattler_build_networking = { path = "crates/rattler_build_networking", features = [
+  "middleware",
+] }
+rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }
