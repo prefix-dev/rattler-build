@@ -1,6 +1,7 @@
 //! Stage 1 Recipe - evaluated recipe with all templates and conditionals resolved
 
 use indexmap::IndexMap;
+use rattler_build_jinja::Variable;
 use serde::{Deserialize, Serialize};
 
 use super::{About, Build, Extra, Package, Requirements, Source, TestType};
@@ -37,7 +38,7 @@ pub struct Recipe {
 
     /// Resolved context variables (the evaluated context after template rendering)
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub context: IndexMap<String, String>,
+    pub context: IndexMap<String, Variable>,
 }
 
 impl Recipe {
@@ -51,7 +52,7 @@ impl Recipe {
         extra: Extra,
         source: Vec<Source>,
         tests: Vec<TestType>,
-        context: IndexMap<String, String>,
+        context: IndexMap<String, Variable>,
     ) -> Self {
         Self {
             package,
@@ -101,7 +102,7 @@ impl Recipe {
     }
 
     /// Get the resolved context variables
-    pub fn context(&self) -> &IndexMap<String, String> {
+    pub fn context(&self) -> &IndexMap<String, Variable> {
         &self.context
     }
 }

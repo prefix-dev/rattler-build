@@ -11,7 +11,7 @@ use rattler_conda_types::{
 };
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PinExpression(#[serde(deserialize_with = "deserialize_pin_expression")] String);
 
 fn deserialize_pin_expression<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -38,7 +38,7 @@ impl FromStr for PinExpression {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PinBound {
     Expression(PinExpression),
@@ -66,7 +66,7 @@ impl Display for PinExpression {
 }
 
 /// A pin to a specific version of a package
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Pin {
     /// The name of the package to pin
     pub name: PackageName,
@@ -76,7 +76,7 @@ pub struct Pin {
     pub args: PinArgs,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PinArgs {
     /// A minimum pin to a version, using `x.x.x...` as syntax
     #[serde(default, skip_serializing_if = "Option::is_none")]

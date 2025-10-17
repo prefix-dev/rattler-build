@@ -1,5 +1,5 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
-use rattler_conda_types::package::EntryPoint;
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
@@ -324,16 +324,6 @@ impl PartialEq for PythonBuild {
     }
 }
 
-/// NoArch type for platform-independent packages
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum NoArchType {
-    /// Python noarch package (pure Python, no compiled extensions)
-    Python,
-    /// Generic noarch package (platform-independent)
-    Generic,
-}
-
 impl Build {
     /// Create a new build configuration with default values
     pub fn new() -> Self {
@@ -408,16 +398,5 @@ mod tests {
 
         assert!(!build.is_default());
         assert_eq!(build.script.len(), 2);
-    }
-
-    #[test]
-    fn test_noarch_python() {
-        let build = Build {
-            noarch: Some(NoArchType::Python),
-            ..Default::default()
-        };
-
-        assert!(!build.is_default());
-        assert!(matches!(build.noarch, Some(NoArchType::Python)));
     }
 }

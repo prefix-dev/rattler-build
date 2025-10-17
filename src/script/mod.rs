@@ -369,7 +369,7 @@ impl Output {
         let selector_config = self.build_configuration.selector_config();
         let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
 
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
         } else {
             Some(&self.build_configuration.directories.build_prefix)

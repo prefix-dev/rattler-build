@@ -3,12 +3,13 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
+use rattler_build_recipe::stage1::TestType;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
     apply_patch_custom, metadata::Output, metadata::build_reindexed_channels,
-    recipe::parser::TestType, render::resolved_dependencies::RunExportsDownload,
-    render::solver::load_repodatas, script::InterpreterError, tool_configuration,
+    render::resolved_dependencies::RunExportsDownload, render::solver::load_repodatas,
+    script::InterpreterError, tool_configuration,
 };
 
 /// Behavior for handling the working directory during the build process
@@ -124,14 +125,14 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
-    } else {
-        output
-            .fetch_sources(tool_configuration, apply_patch_custom)
-            .await
-            .into_diagnostic()?
-    };
+    // let output = if output.recipe.cache.is_some() {
+    //     output.build_or_fetch_cache(tool_configuration).await?
+    // } else {
+    let output = output
+        .fetch_sources(tool_configuration, apply_patch_custom)
+        .await
+        .into_diagnostic()?;
+    // };
 
     let output = output
         .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
@@ -184,10 +185,14 @@ pub async fn run_build(
 
     // We run all the package content tests
     for test in output.recipe.tests() {
-        if let TestType::PackageContents { package_contents } = test {
-            package_contents
-                .run_test(&paths_json, &output)
-                .into_diagnostic()?;
+        if let TestType::PackageContents {
+            package_contents: _,
+        } = test
+        {
+            // TODO implement
+            // package_contents
+            //     .run_test(&paths_json, &output)
+            //     .into_diagnostic()?;
         }
     }
 

@@ -4234,6 +4234,7 @@ dependencies = [
  "ratatui",
  "rattler",
  "rattler_build_jinja",
+ "rattler_build_recipe",
  "rattler_build_recipe_generator",
  "rattler_build_types",
  "rattler_build_variant_config",

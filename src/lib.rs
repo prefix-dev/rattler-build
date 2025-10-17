@@ -3,7 +3,7 @@
 //! rattler-build library.
 
 pub mod build;
-pub mod cache;
+// pub mod cache;
 pub mod console_utils;
 pub mod metadata;
 pub mod opt;
@@ -56,6 +56,7 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use rattler_build_recipe::Stage1Recipe;
 use rattler_build_variant_config::VariantConfig;
 
 // Re-export types needed by Python bindings and external consumers
@@ -465,7 +466,8 @@ pub async fn get_build_output(
         let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = Output {
-            recipe: recipe.clone(),
+            // recipe: recipe.clone(),
+            recipe: Stage1Recipe::default(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages::detect_for_platform(
@@ -561,25 +563,26 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 
     // Also check that for all script tests
     for test in output.recipe.tests() {
-        if let TestType::Command(command) = test {
-            for dep in command
-                .requirements
-                .build
-                .iter()
-                .chain(command.requirements.run.iter())
-            {
-                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-                if all_output_names
-                    .iter()
-                    .any(|o| Some(*o) == dep_spec.name.as_ref())
-                {
-                    // this dependency might not be built yet
-                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
-                        return false;
-                    }
-                }
-            }
-        }
+        // TODO: implement this properly
+        // if let TestType::Command(command) = test {
+        //     for dep in command
+        //         .requirements
+        //         .build
+        //         .iter()
+        //         .chain(command.requirements.run.iter())
+        //     {
+        //         let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
+        //         if all_output_names
+        //             .iter()
+        //             .any(|o| Some(*o) == dep_spec.name.as_ref())
+        //         {
+        //             // this dependency might not be built yet
+        //             if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+        //                 return false;
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     true

@@ -3991,6 +3991,7 @@ dependencies = [
  "petgraph",
  "rattler",
  "rattler_build_jinja",
+ "rattler_build_recipe",
  "rattler_build_recipe_generator",
  "rattler_build_types",
  "rattler_build_variant_config",
@@ -4062,6 +4063,32 @@ dependencies = [
  "serde_yaml",
  "thiserror 2.0.17",
  "toml",
+]
+
+[[package]]
+name = "rattler_build_recipe"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "globset",
+ "indexmap 2.11.4",
+ "itertools 0.14.0",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "pathdiff",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "rattler_digest",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "spdx",
+ "thiserror 2.0.17",
+ "url",
 ]
 
 [[package]]

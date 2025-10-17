@@ -1,38 +1,8 @@
 //! Stage 1 Requirements - evaluated dependencies with concrete values
 
-use rattler_conda_types::{MatchSpec, PackageName};
+use rattler_build_types::Pin;
+use rattler_conda_types::MatchSpec;
 use serde::{Deserialize, Serialize};
-
-/// A pin to a specific version of a package (used in pin_subpackage and pin_compatible)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Pin {
-    /// The name of the package to pin
-    pub name: PackageName,
-
-    /// The pin arguments
-    #[serde(flatten)]
-    pub args: PinArgs,
-}
-
-/// Arguments for pinning a package
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PinArgs {
-    /// A minimum pin to a version, using `x.x.x...` as syntax or a concrete version
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lower_bound: Option<String>,
-
-    /// A maximum pin to a version, using `x.x.x...` as syntax or a concrete version
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub upper_bound: Option<String>,
-
-    /// If an exact pin is given, we pin the exact version & hash
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub exact: bool,
-
-    /// Optional build string matcher
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub build: Option<String>,
-}
 
 /// A pin_subpackage dependency - pins to another output of the same recipe
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -189,6 +159,7 @@ impl RunExports {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct IgnoreRunExports {
     /// Packages to ignore run exports from by name
+    /// TODO: move to PackageName perhaps (or spec!?)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub by_name: Vec<String>,
 

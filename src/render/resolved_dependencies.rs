@@ -7,6 +7,8 @@ use std::{
 
 use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
+use rattler_build_recipe::stage1::{Dependency, Requirements};
+use rattler_build_types::PinArgs;
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
@@ -21,11 +23,7 @@ use crate::{
     metadata::Output,
     metadata::{BuildConfiguration, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
-    recipe::parser::{Dependency, Requirements},
-    render::{
-        pin::PinArgs,
-        solver::{install_packages, solve_environment},
-    },
+    render::solver::{install_packages, solve_environment},
     tool_configuration::{self, Configuration},
 };
 
@@ -530,36 +528,36 @@ pub fn apply_variant(
                             }
                         }
                     }
-                    Ok(SourceDependency { spec: m }.into())
+                    Ok(SourceDependency { spec: *m }.into())
                 }
                 Dependency::PinSubpackage(pin) => {
-                    let name = &pin.pin_value().name;
+                    let name = &pin.pin_subpackage.name;
                     let subpackage = subpackages
                         .get(name)
                         .ok_or(ResolveError::PinSubpackageNotFound(name.clone()))?;
                     let pinned = pin
-                        .pin_value()
+                        .pin_subpackage
                         .apply(&subpackage.version, &subpackage.build_string)?;
                     Ok(PinSubpackageDependency {
                         spec: pinned,
                         name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
+                        args: pin.pin_subpackage.args.clone(),
                     }
                     .into())
                 }
                 Dependency::PinCompatible(pin) => {
-                    let name = &pin.pin_value().name;
+                    let name = &pin.pin_compatible.name;
                     let pin_package = compatibility_specs
                         .get(name)
                         .ok_or(ResolveError::PinCompatibleNotFound(name.clone()))?;
 
                     let pinned = pin
-                        .pin_value()
+                        .pin_compatible
                         .apply(&pin_package.version, &pin_package.build)?;
                     Ok(PinCompatibleDependency {
                         spec: pinned,
                         name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
+                        args: pin.pin_compatible.args.clone(),
                     }
                     .into())
                 }
@@ -695,15 +693,15 @@ fn render_run_exports(
             .collect::<Vec<_>>())
     };
 
-    let run_exports = output.recipe.requirements().run_exports();
+    let run_exports = &output.recipe.requirements().run_exports;
 
     if !run_exports.is_empty() {
         Ok(RunExportsJson {
-            strong: render_run_exports(run_exports.strong())?,
-            weak: render_run_exports(run_exports.weak())?,
-            noarch: render_run_exports(run_exports.noarch())?,
-            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
-            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
+            strong: render_run_exports(&run_exports.strong)?,
+            weak: render_run_exports(&run_exports.weak)?,
+            noarch: render_run_exports(&run_exports.noarch)?,
+            strong_constrains: render_run_exports(&run_exports.strong_constraints)?,
+            weak_constrains: render_run_exports(&run_exports.weak_constraints)?,
         })
     } else {
         Ok(RunExportsJson::default())
@@ -727,7 +725,7 @@ pub(crate) async fn resolve_dependencies(
     tool_configuration: &tool_configuration::Configuration,
     download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
-    let merge_build_host = output.recipe.build().merge_build_and_host_envs();
+    let merge_build_host = output.recipe.build().merge_build_and_host_envs;
 
     let mut compatibility_specs = HashMap::new();
 
@@ -747,7 +745,7 @@ pub(crate) async fn resolve_dependencies(
 
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let build_env_specs = apply_variant(
-            requirements.build(),
+            &requirements.build,
             &output.build_configuration,
             &compatibility_specs,
             true,
@@ -814,7 +812,7 @@ pub(crate) async fn resolve_dependencies(
 
     // host env
     let mut host_env_specs = apply_variant(
-        requirements.host(),
+        &requirements.host,
         &output.build_configuration,
         &compatibility_specs,
         true,
@@ -827,23 +825,24 @@ pub(crate) async fn resolve_dependencies(
         build_run_exports.extend(build_env.run_exports(true));
     }
 
-    let output_ignore_run_exports = requirements.ignore_run_exports(None);
+    let output_ignore_run_exports = &requirements.ignore_run_exports;
     let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_build_env) = &cache.build {
-            let cache_build_run_exports = cache_build_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_build_run_exports, "cache-build")?;
-            build_run_exports.extend(&filtered);
-        }
-    }
+    // TODO: re-enable cache
+    // if let Some(cache) = &output.finalized_cache_dependencies {
+    //     if let Some(cache_build_env) = &cache.build {
+    //         let cache_build_run_exports = cache_build_env.run_exports(true);
+    //         let filtered = output
+    //             .recipe
+    //             .cache
+    //             .as_ref()
+    //             .expect("recipe should have cache section")
+    //             .requirements
+    //             .ignore_run_exports(Some(&output_ignore_run_exports))
+    //             .filter(&cache_build_run_exports, "cache-build")?;
+    //         build_run_exports.extend(&filtered);
+    //     }
+    // }
 
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
 
@@ -854,7 +853,7 @@ pub(crate) async fn resolve_dependencies(
     if merge_build_host {
         // add the requirements of build to host
         let specs = apply_variant(
-            requirements.build(),
+            &requirements.build,
             &output.build_configuration,
             &compatibility_specs,
             true,
@@ -970,20 +969,20 @@ pub(crate) async fn resolve_dependencies(
     // And filter the run exports
     let mut host_run_exports = output_ignore_run_exports.filter(&host_run_exports, "host")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_host_env) = &cache.host {
-            let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
-            host_run_exports.extend(&filtered);
-        }
-    }
+    // if let Some(cache) = &output.finalized_cache_dependencies {
+    //     if let Some(cache_host_env) = &cache.host {
+    //         let cache_host_run_exports = cache_host_env.run_exports(true);
+    //         let filtered = output
+    //             .recipe
+    //             .cache
+    //             .as_ref()
+    //             .expect("recipe should have cache section")
+    //             .requirements
+    //             .ignore_run_exports(Some(&output_ignore_run_exports))
+    //             .filter(&cache_host_run_exports, "cache-host")?;
+    //         host_run_exports.extend(&filtered);
+    //     }
+    // }
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
@@ -1002,19 +1001,28 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         // add in the run exports from the cache
         // filter run dependencies that came from run exports
-        let ignore_run_exports = requirements.ignore_run_exports(None);
+        let ignore_run_exports = &requirements.ignore_run_exports;
         // Note: these run exports are already filtered
         let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
             DependencyInfo::RunExport(run_export) => {
                 let source_package: Option<PackageName> = run_export.source_package.parse().ok();
                 let spec_name = &run_export.spec.name;
 
+                // TODO use package names here.
                 let by_name = spec_name
                     .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
+                    .map(|n| {
+                        ignore_run_exports
+                            .by_name
+                            .contains(&n.as_normalized().to_string())
+                    })
                     .unwrap_or(false);
                 let by_package = source_package
-                    .map(|s| ignore_run_exports.from_package().contains(&s))
+                    .map(|s| {
+                        ignore_run_exports
+                            .from_package
+                            .contains(&s.as_normalized().to_string())
+                    })
                     .unwrap_or(false);
 
                 !by_name && !by_package

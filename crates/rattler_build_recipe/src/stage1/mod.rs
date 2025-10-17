@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::ParseError;
-use rattler_build_jinja::JinjaConfig;
+use rattler_build_jinja::{JinjaConfig, Variable};
 
 pub mod about;
 pub mod all_or_glob_vec;
@@ -34,7 +34,7 @@ pub use glob_vec::GlobVec;
 use indexmap::IndexMap;
 pub use package::Package;
 pub use recipe::Recipe;
-pub use requirements::{Dependency, Pin, PinArgs, PinCompatible, PinSubpackage, Requirements};
+pub use requirements::{Dependency, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
 pub use tests::TestType;
 
@@ -42,7 +42,7 @@ pub use tests::TestType;
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
     /// Variables available during evaluation (e.g., "name", "version", "py", "target_platform")
-    variables: IndexMap<String, String>,
+    variables: IndexMap<String, Variable>,
     /// Configuration for Jinja functions (compiler, cdt, etc.)
     jinja_config: JinjaConfig,
     /// Set of variables that were actually accessed during evaluation (tracked via thread-safe interior mutability)
@@ -71,7 +71,10 @@ impl EvaluationContext {
     /// Create an evaluation context from a map of variables
     pub fn from_map(variables: IndexMap<String, String>) -> Self {
         Self {
-            variables,
+            variables: variables
+                .into_iter()
+                .map(|(k, v)| (k, Variable::from(v)))
+                .collect(),
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -81,7 +84,10 @@ impl EvaluationContext {
     /// Create an evaluation context with variables and Jinja config
     pub fn with_config(variables: IndexMap<String, String>, jinja_config: JinjaConfig) -> Self {
         Self {
-            variables,
+            variables: variables
+                .into_iter()
+                .map(|(k, v)| (k, Variable::from(v)))
+                .collect(),
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -89,12 +95,12 @@ impl EvaluationContext {
     }
 
     /// Insert a variable into the context
-    pub fn insert(&mut self, key: String, value: String) {
+    pub fn insert(&mut self, key: String, value: Variable) {
         self.variables.insert(key, value);
     }
 
     /// Get a variable from the context
-    pub fn get(&self, key: &str) -> Option<&String> {
+    pub fn get(&self, key: &str) -> Option<&Variable> {
         self.variables.get(key)
     }
 
@@ -104,7 +110,7 @@ impl EvaluationContext {
     }
 
     /// Get all variables as a reference
-    pub fn variables(&self) -> &IndexMap<String, String> {
+    pub fn variables(&self) -> &IndexMap<String, Variable> {
         &self.variables
     }
 
@@ -200,11 +206,8 @@ impl EvaluationContext {
                 }
             };
 
-            // Convert Variable to minijinja::Value and add to context
-            let minijinja_value: minijinja::Value = evaluated_var.clone().into();
-            new_context
-                .variables
-                .insert(key.clone(), minijinja_value.to_string());
+            // Insert the evaluated variable directly
+            new_context.variables.insert(key.clone(), evaluated_var);
         }
 
         Ok(new_context)
@@ -245,11 +248,11 @@ mod unit_tests {
     #[test]
     fn test_evaluation_context_insert_get() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("name".to_string(), Variable::from("foo"));
+        ctx.insert("version".to_string(), Variable::from("1.0.0"));
 
-        assert_eq!(ctx.get("name"), Some(&"foo".to_string()));
-        assert_eq!(ctx.get("version"), Some(&"1.0.0".to_string()));
+        assert_eq!(ctx.get("name"), Some(&Variable::from("foo")));
+        assert_eq!(ctx.get("version"), Some(&Variable::from("1.0.0")));
         assert_eq!(ctx.get("unknown"), None);
     }
 
@@ -260,14 +263,17 @@ mod unit_tests {
         map.insert("target_platform".to_string(), "linux-64".to_string());
 
         let ctx = EvaluationContext::from_map(map);
-        assert_eq!(ctx.get("py"), Some(&"3.11".to_string()));
-        assert_eq!(ctx.get("target_platform"), Some(&"linux-64".to_string()));
+        assert_eq!(ctx.get("py"), Some(&Variable::from("3.11")));
+        assert_eq!(
+            ctx.get("target_platform"),
+            Some(&Variable::from("linux-64"))
+        );
     }
 
     #[test]
     fn test_evaluation_context_contains() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "test".to_string());
+        ctx.insert("name".to_string(), Variable::from("test"));
 
         assert!(ctx.contains("name"));
         assert!(!ctx.contains("version"));
@@ -292,8 +298,11 @@ mod unit_tests {
 
         let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
 
-        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
-        assert_eq!(evaluated_ctx.get("version"), Some(&"1.0.0".to_string()));
+        assert_eq!(
+            evaluated_ctx.get("name"),
+            Some(&Variable::from("mypackage"))
+        );
+        assert_eq!(evaluated_ctx.get("version"), Some(&Variable::from("1.0.0")));
     }
 
     #[test]
@@ -302,7 +311,7 @@ mod unit_tests {
         use rattler_build_jinja::Variable;
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("base".to_string(), "myorg".to_string());
+        ctx.insert("base".to_string(), Variable::from("myorg"));
 
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
@@ -319,10 +328,13 @@ mod unit_tests {
 
         let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
 
-        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
+        assert_eq!(
+            evaluated_ctx.get("name"),
+            Some(&Variable::from("mypackage"))
+        );
         assert_eq!(
             evaluated_ctx.get("full_name"),
-            Some(&"myorg/mypackage".to_string())
+            Some(&Variable::from("myorg/mypackage"))
         );
     }
 
@@ -361,11 +373,11 @@ mod unit_tests {
 
         assert_eq!(
             evaluated_ctx.get("package_version"),
-            Some(&"mypackage-1.0.0".to_string())
+            Some(&Variable::from("mypackage-1.0.0"))
         );
         assert_eq!(
             evaluated_ctx.get("full_id"),
-            Some(&"pkg:mypackage-1.0.0".to_string())
+            Some(&Variable::from("pkg:mypackage-1.0.0"))
         );
     }
 
@@ -398,7 +410,7 @@ mod unit_tests {
 
         assert_eq!(
             evaluated_ctx.get("package_version"),
-            Some(&"mypackage-2.0.0".to_string())
+            Some(&Variable::from("mypackage-2.0.0"))
         );
     }
 
@@ -408,7 +420,7 @@ mod unit_tests {
         use rattler_build_jinja::Variable;
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("platform".to_string(), "linux".to_string());
+        ctx.insert("platform".to_string(), Variable::from("linux"));
 
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
@@ -426,11 +438,17 @@ mod unit_tests {
         let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
 
         // Both the original context and the evaluated context should be present
-        assert_eq!(evaluated_ctx.get("platform"), Some(&"linux".to_string()));
-        assert_eq!(evaluated_ctx.get("name"), Some(&"mypackage".to_string()));
+        assert_eq!(
+            evaluated_ctx.get("platform"),
+            Some(&Variable::from("linux"))
+        );
+        assert_eq!(
+            evaluated_ctx.get("name"),
+            Some(&Variable::from("mypackage"))
+        );
         assert_eq!(
             evaluated_ctx.get("full_name"),
-            Some(&"mypackage-linux".to_string())
+            Some(&Variable::from("mypackage-linux"))
         );
     }
 }

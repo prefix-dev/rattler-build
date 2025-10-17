@@ -97,7 +97,7 @@ impl Output {
         dest_folder: &Path,
     ) -> Result<Option<PathBuf>, PackagingError> {
         let target_platform = &self.build_configuration.target_platform;
-        let entry_points = &self.recipe.build().python().entry_points;
+        let entry_points = &self.recipe.build().python.entry_points;
 
         let path_rel = path.strip_prefix(prefix)?;
 

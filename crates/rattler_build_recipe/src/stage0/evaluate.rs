@@ -8,7 +8,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, VersionWithSource};
+use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
 
 use crate::{
     ErrorKind, ParseError, Span,
@@ -46,7 +46,7 @@ use crate::{
         Requirements as Stage1Requirements,
         build::{
             Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, NoArchType, PostProcess as Stage1PostProcess,
+            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
@@ -68,7 +68,7 @@ use crate::{
         },
     },
 };
-use rattler_build_jinja::{Jinja, Variable};
+use rattler_build_jinja::Jinja;
 
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
@@ -80,18 +80,8 @@ fn render_template(
     let jinja_config = context.jinja_config().clone();
     let mut jinja = Jinja::new(jinja_config);
 
-    // This allows our TrackingContext to intercept undefined variable access and track them
-
-    // Add the evaluation context variables to the Jinja context
-    // We need to convert IndexMap<String, String> to IndexMap<String, Variable>
-    let variables: indexmap::IndexMap<String, Variable> = context
-        .variables()
-        .iter()
-        .map(|(k, v)| (k.clone(), Variable::from(v.as_str())))
-        .collect();
-
     // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(&variables);
+    jinja = jinja.with_context(context.variables());
 
     // The Jinja environment is already configured to use ${{ }} syntax
     // so we can pass the template as-is
@@ -710,7 +700,10 @@ impl Evaluate for Stage0About {
             repository,
             documentation,
             license,
-            license_file: evaluate_string_list(&self.license_file, context)?,
+            license_file: GlobVec::from_strings(evaluate_string_list(
+                &self.license_file,
+                context,
+            )?)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -990,8 +983,8 @@ impl Evaluate for Stage0Build {
             Some(v) => {
                 let s = evaluate_value_to_string(v, context)?;
                 match s.as_str() {
-                    "python" => Some(NoArchType::Python),
-                    "generic" => Some(NoArchType::Generic),
+                    "python" => Some(NoArchType::python()),
+                    "generic" => Some(NoArchType::generic()),
                     _ => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
@@ -1578,7 +1571,7 @@ impl Evaluate for Stage0Recipe {
 #[cfg(test)]
 mod tests {
     use minijinja::UndefinedBehavior;
-    use rattler_build_jinja::JinjaConfig;
+    use rattler_build_jinja::{JinjaConfig, Variable};
 
     use super::*;
     use crate::stage0::types::{
@@ -1588,7 +1581,7 @@ mod tests {
     #[test]
     fn test_evaluate_condition_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let expr = JinjaExpression::new("unix".to_string()).unwrap();
         assert!(evaluate_condition(&expr, &ctx).unwrap());
@@ -1600,7 +1593,7 @@ mod tests {
     #[test]
     fn test_evaluate_condition_not() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let expr = JinjaExpression::new("not unix".to_string()).unwrap();
         assert!(!evaluate_condition(&expr, &ctx).unwrap());
@@ -1612,8 +1605,8 @@ mod tests {
     #[test]
     fn test_render_template_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         let template = "${{ name }}-${{ version }}";
         let result = render_template(template, &ctx, &Span::unknown()).unwrap();
@@ -1637,8 +1630,8 @@ mod tests {
         );
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("greeting".to_string(), "Hello".to_string());
-        ctx.insert("name".to_string(), "World".to_string());
+        ctx.insert("greeting".to_string(), Variable::from_string("Hello"));
+        ctx.insert("name".to_string(), Variable::from_string("World"));
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
         assert_eq!(result, "Hello, World!");
@@ -1674,7 +1667,7 @@ mod tests {
         ]);
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let result = evaluate_string_list(&list, &ctx).unwrap();
         assert_eq!(result, vec!["python", "gcc"]);
@@ -1688,9 +1681,9 @@ mod tests {
     #[test]
     fn test_variable_tracking_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
-        ctx.insert("unused".to_string(), "bar".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
+        ctx.insert("unused".to_string(), Variable::from_string("bar"));
 
         // Before rendering, no variables should be accessed
         assert!(ctx.accessed_variables().is_empty());
@@ -1711,9 +1704,9 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_conditionals() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
-        ctx.insert("unix_var".to_string(), "gcc".to_string());
-        ctx.insert("win_var".to_string(), "msvc".to_string());
+        ctx.insert("unix".to_string(), Variable::from_string("true"));
+        ctx.insert("unix_var".to_string(), Variable::from_string("gcc"));
+        ctx.insert("win_var".to_string(), Variable::from_string("msvc"));
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
@@ -1741,8 +1734,8 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_template() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("compiler".to_string(), "gcc".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("compiler".to_string(), Variable::from_string("gcc"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         // Create a list with templates that will be evaluated
         let list = ConditionalList::new(vec![
@@ -1772,7 +1765,7 @@ mod tests {
     #[test]
     fn test_variable_tracking_clear() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
 
         // Render a template
         let template = "${{ name }}";
