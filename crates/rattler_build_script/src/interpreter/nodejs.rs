@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use rattler_conda_types::Platform;
 
-use crate::script::{ExecutionArgs, ResolvedScriptContents};
+use crate::execution::{ExecutionArgs, ResolvedScriptContents};
 
 use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
 
-pub(crate) struct NodeJsInterpreter;
+pub struct NodeJsInterpreter;
 
 // NodeJS interpreter calls either bash or cmd.exe interpreter for activation and then runs Node script
 impl Interpreter for NodeJsInterpreter {
