@@ -1,0 +1,55 @@
+[package]
+name = "rattler_build_recipe"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
+
+[features]
+default = ["miette"]
+miette = ["dep:miette", "dep:thiserror", "dep:pathdiff"]
+variant-config = ["dep:rattler_build_variant_config"]
+
+[dependencies]
+rattler_build_types = { workspace = true }
+rattler_build_jinja = { workspace = true }
+rattler_build_variant_config = { path = "../rattler_build_variant_config", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+serde_with = { workspace = true }
+rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
+itertools = { workspace = true }
+indexmap = { workspace = true }
+minijinja = { workspace = true, features = ["unstable_machinery"] }
+marked-yaml = { workspace = true }
+miette = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+pathdiff = { workspace = true, optional = true }
+url = { workspace = true }
+spdx = { workspace = true }
+globset = "0.4.16"
+fs-err.workspace = true
+regex = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml"] }
+walkdir = "2"
+clap = { workspace = true }
+
+# Enable miette for tests to demonstrate error messages
+[dev-dependencies.miette]
+workspace = true
+features = ["fancy"]
+
+# Examples automatically enable required features
+[[example]]
+name = "parse_recipe"
+required-features = ["miette", "variant-config"]
+
+[package.metadata.cargo-all-features]
+# Auto-enable features for examples
+always_include_features = ["miette", "variant-config"]

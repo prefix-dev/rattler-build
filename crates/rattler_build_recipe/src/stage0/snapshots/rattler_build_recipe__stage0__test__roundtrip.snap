@@ -1,0 +1,82 @@
+---
+source: crates/rattler_build_recipe/src/stage0/mod.rs
+expression: roundtripped
+---
+package:
+  name: conditional-package
+  version: 1.5.0
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+requirements:
+  build:
+  - gcc
+  - if: win
+    then: vs2019
+    else: clang
+  - if: unix
+    then: make
+  host:
+  - python
+  - if: linux
+    then: patchelf
+  run:
+  - python
+  - if: linux
+    then: libgcc
+  - if: osx
+    then: libcxx
+  - if: win
+    then: msvc-runtime
+  - ${{ compiler('c') }}
+  - ${{ some_variable }}
+  run_exports:
+    strong:
+    - conditional-package
+    - if: cuda
+      then: cuda-toolkit
+    weak:
+    - if: openmp
+      then: libgomp
+about:
+  homepage: https://example.com/
+  license: Apache-2.0
+  license_family: null
+  summary: Package with conditional dependencies
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers:
+  - maintainer1

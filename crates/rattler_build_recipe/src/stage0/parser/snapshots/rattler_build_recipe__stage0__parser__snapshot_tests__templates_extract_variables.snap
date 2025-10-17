@@ -1,0 +1,17 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: vars
+---
+[
+    "c_compiler",
+    "c_compiler_version",
+    "cxx_compiler",
+    "cxx_compiler_version",
+    "homepage",
+    "license",
+    "maintainer",
+    "name",
+    "platform",
+    "python",
+    "version",
+]

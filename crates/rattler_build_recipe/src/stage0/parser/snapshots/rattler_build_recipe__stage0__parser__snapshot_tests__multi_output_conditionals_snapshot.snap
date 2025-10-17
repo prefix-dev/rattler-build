@@ -1,0 +1,135 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+recipe:
+  name: conditional-pkg
+  version: 3.0.0
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers: []
+outputs:
+- staging:
+    name: build-stage
+  requirements:
+    build:
+    - if: unix
+      then:
+      - gcc
+      - make
+      else: msvc
+    - cmake
+    host:
+    - if: linux
+      then: glibc
+    - if: osx
+      then: libcxx
+  build:
+    script:
+    - if: unix
+      then: make all
+      else: nmake all
+- package:
+    name: conditional-pkg
+    version: 3.0.0
+  inherit: build-stage
+  requirements:
+    run:
+    - if: linux
+      then:
+      - libgcc-ng
+      - libstdcxx-ng
+    - if: osx
+      then: libcxx
+    - if: win
+      then: vs2019-runtime
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: BSD-3-Clause
+    license_family: null
+    summary: Package with platform-specific dependencies
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - script:
+    - if: unix
+      then: test -f $PREFIX/bin/conditional-pkg
+    - if: win
+      then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1

@@ -3,6 +3,7 @@
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use indexmap::IndexMap;
+use rattler_build_jinja::Variable;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -53,7 +54,7 @@ pub use self::{
     },
 };
 
-use crate::recipe::{custom_yaml::Node, variable::Variable};
+use crate::recipe::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -375,7 +376,7 @@ mod tests {
     use insta::{assert_snapshot, assert_yaml_snapshot};
     use rattler_conda_types::Platform;
 
-    use crate::{assert_miette_snapshot, variant_config::ParseErrors};
+    use crate::{assert_miette_snapshot, recipe::ParseErrors};
 
     use super::*;
 

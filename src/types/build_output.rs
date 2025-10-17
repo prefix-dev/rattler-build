@@ -1,5 +1,7 @@
 use fs_err as fs;
 use indicatif::HumanBytes;
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     PackageName, Platform, RepoDataRecord, VersionWithSource,
     package::{PathType, PathsEntry, PathsJson},
@@ -16,9 +18,8 @@ use std::{
 };
 
 use crate::{
-    NormalizedKey,
     console_utils::github_integration_enabled,
-    recipe::{Recipe, parser::Source, variable::Variable},
+    recipe::{Recipe, parser::Source},
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},

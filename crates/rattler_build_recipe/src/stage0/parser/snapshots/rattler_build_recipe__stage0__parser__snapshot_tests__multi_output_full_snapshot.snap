@@ -1,0 +1,253 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+context:
+  version: 2.5.0
+  build_number: 0
+recipe:
+  name: complex-project
+  version: ${{ version }}
+source:
+- url:
+  - https://github.com/example/project/archive/v${{ version }}.tar.gz
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+build:
+  number: ${{ build_number }}
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: https://example.com/
+  license: Apache-2.0
+  license_family: null
+  summary: A complex multi-output project
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers:
+  - alice
+  - bob
+outputs:
+- staging:
+    name: core-build
+  requirements:
+    build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+    host:
+    - zlib
+    - openssl
+    ignore_run_exports:
+      by_name:
+      - openssl
+  build:
+    script:
+    - cmake -GNinja -DCMAKE_BUILD_TYPE=Release .
+    - ninja
+- staging:
+    name: python-build
+  requirements:
+    build:
+    - python
+    - setuptools
+    - wheel
+    host:
+    - python
+    - pybind11
+  build:
+    script:
+    - python setup.py build_ext
+- package:
+    name: libcomplex
+    version: ${{ version }}
+  inherit:
+    from: core-build
+    run_exports: true
+  requirements:
+    run:
+    - zlib
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: Apache-2.0
+    license_family: null
+    summary: Complex project core library
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - script:
+    - test -f $PREFIX/lib/libcomplex.so
+- package:
+    name: py-complex
+    version: ${{ version }}
+  inherit: python-build
+  requirements:
+    run:
+    - python
+    - libcomplex ${{ version }}
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: Apache-2.0
+    license_family: null
+    summary: Python bindings for complex project
+    description: |
+      This package provides Python bindings for the complex project.
+      It allows you to use complex project functionality from Python.
+    documentation: null
+    repository: null
+  tests:
+  - python:
+      imports:
+      - complex
+      - complex.core
+- package:
+    name: libcomplex-dev
+    version: ${{ version }}
+  inherit: null
+  requirements:
+    run:
+    - libcomplex ${{ version }}
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: Apache-2.0
+    license_family: null
+    summary: Development headers for complex project
+    description: null
+    documentation: null
+    repository: null

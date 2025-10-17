@@ -1,0 +1,11 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: format_miette_report(error_with_source)
+---
+  × invalid value: invalid value for outputs: at least one output is required
+   ╭─[multi_output_empty_outputs.yaml:8:10]
+ 7 │ 
+ 8 │ outputs: []
+   ·          ┬
+   ·          ╰── invalid value for outputs: at least one output is required
+   ╰────

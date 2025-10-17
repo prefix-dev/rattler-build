@@ -1,0 +1,175 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+context:
+  name: templated-pkg
+  version: 1.2.3
+  major_minor: ${{ version.split('.')[0] }}.{{ version.split('.')[1] }}
+  python_version: '3.11'
+  staging_name: ${{ name }}-staging
+recipe:
+  name: ${{ name }}
+  version: ${{ version }}
+build:
+  number: 0
+  string: null
+  script: []
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers: []
+outputs:
+- staging:
+    name: ${{ staging_name }}
+  requirements:
+    build:
+    - ${{ compiler('c') }}
+    - if: unix
+      then: make
+    - if: win
+      then: nmake
+    host:
+    - python ${{ python_version }}
+  build:
+    script:
+    - if: unix
+      then: make -j${{ CPU_COUNT }}
+    - if: win
+      then: nmake
+- package:
+    name: ${{ name }}
+    version: ${{ version }}
+  inherit: ${{ staging_name }}
+  requirements:
+    run:
+    - python ${{ python_version }}.*
+    - ${{ pin_subpackage(name ~ "-lib", max_pin="x.x") }}
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: https://example.com/${{ name }}
+    license: MIT
+    license_family: null
+    summary: Package ${{ name }} version ${{ version }}
+    description: null
+    documentation: null
+    repository: null
+- package:
+    name: ${{ name }}-lib
+    version: ${{ version }}
+  inherit: ${{ staging_name }}
+  requirements:
+    run:
+    - libgcc-ng
+  build:
+    number: 0
+    string: null
+    script: []
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: MIT
+    license_family: null
+    summary: Library for ${{ name }}
+    description: null
+    documentation: null
+    repository: null

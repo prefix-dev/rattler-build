@@ -1,0 +1,15 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+zip_keys:
+  - - python
+    - numpy
+compiler:
+  - gcc
+numpy:
+  - "1.20"
+  - "1.21"
+python:
+  - "3.11"
+  - "3.12"

@@ -1,0 +1,10 @@
+python:
+  - "3.11"
+  - "3.12" # This should override the base
+
+numpy:
+  - "1.20"
+  - "1.21"
+
+zip_keys:
+  - [python, numpy]

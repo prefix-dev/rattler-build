@@ -945,9 +945,9 @@ dependencies = [
 
 [[package]]
 name = "bzip2"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea8dcd42434048e4f7a304411d9273a411f647446c1234a65ce0554923f4cff"
+checksum = "f3a53fac24f34a81bc9954b5d6cfce0c21e18ec6959f44f56e8e90e4bb7c346c"
 dependencies = [
  "libbz2-rs-sys",
 ]
@@ -2248,9 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "goblin"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7be320f077239a0361c20d608b4768c62a1b77aa4946dd76395aa4cd502cba7d"
+checksum = "51876e3748c4a347fe65b906f2b1ae46a1e55a497b22c94c1f4f2c469ff7673a"
 dependencies = [
  "log",
  "plain",
@@ -4223,9 +4223,12 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "rattler",
+ "rattler_build_jinja",
  "rattler_build_networking",
  "rattler_build_recipe_generator",
  "rattler_build_source_cache",
+ "rattler_build_types",
+ "rattler_build_variant_config",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4285,6 +4288,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_jinja"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fs-err",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "lazy_static",
+ "minijinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "tempfile",
+ "thiserror 2.0.17",
+ "toml",
+]
+
+[[package]]
 name = "rattler_build_networking"
 version = "0.1.0"
 dependencies = [
@@ -4294,6 +4319,36 @@ dependencies = [
  "reqwest-retry",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "rattler_build_recipe"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "fs-err",
+ "globset",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "pathdiff",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_build_variant_config",
+ "rattler_conda_types",
+ "rattler_digest",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "spdx",
+ "thiserror 2.0.17",
+ "url",
+ "walkdir",
 ]
 
 [[package]]
@@ -4361,6 +4416,39 @@ dependencies = [
  "xz2",
  "zip 6.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_build_types"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "itertools 0.14.0",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tracing",
 ]
 
 [[package]]

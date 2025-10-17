@@ -926,9 +926,9 @@ dependencies = [
 
 [[package]]
 name = "bzip2"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea8dcd42434048e4f7a304411d9273a411f647446c1234a65ce0554923f4cff"
+checksum = "f3a53fac24f34a81bc9954b5d6cfce0c21e18ec6959f44f56e8e90e4bb7c346c"
 dependencies = [
  "libbz2-rs-sys",
 ]
@@ -1738,16 +1738,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "file-lock"
-version = "2.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "040b48f80a749da50292d0f47a1e2d5bf1d772f52836c07f64bfccc62ba6e664"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "file_url"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,9 +2046,9 @@ dependencies = [
 
 [[package]]
 name = "goblin"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7be320f077239a0361c20d608b4768c62a1b77aa4946dd76395aa4cd502cba7d"
+checksum = "51876e3748c4a347fe65b906f2b1ae46a1e55a497b22c94c1f4f2c469ff7673a"
 dependencies = [
  "log",
  "plain",
@@ -3990,9 +3980,12 @@ dependencies = [
  "pathdiff",
  "petgraph",
  "rattler",
+ "rattler_build_jinja",
  "rattler_build_networking",
  "rattler_build_recipe_generator",
  "rattler_build_source_cache",
+ "rattler_build_types",
+ "rattler_build_variant_config",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4046,6 +4039,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_jinja"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "indexmap 2.11.4",
+ "itertools 0.14.0",
+ "lazy_static",
+ "minijinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "toml",
+]
+
+[[package]]
 name = "rattler_build_networking"
 version = "0.1.0"
 dependencies = [
@@ -4093,7 +4105,6 @@ dependencies = [
  "bzip2",
  "chrono",
  "dunce",
- "file-lock",
  "flate2",
  "fs-err",
  "futures",
@@ -4102,6 +4113,7 @@ dependencies = [
  "md-5",
  "rattler_build_networking",
  "rattler_git",
+ "rattler_prefix_guard",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
@@ -4119,6 +4131,36 @@ dependencies = [
  "xz2",
  "zip 6.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_build_types"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.14.0",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tracing",
 ]
 
 [[package]]
@@ -4238,8 +4280,8 @@ version = "0.1.0"
 dependencies = [
  "dashmap",
  "dunce",
- "file-lock",
  "fs-err",
+ "rattler_prefix_guard",
  "reqwest",
  "reqwest-middleware",
  "serde",
@@ -4386,6 +4428,18 @@ dependencies = [
  "url",
  "zip 4.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_prefix_guard"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "libc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
