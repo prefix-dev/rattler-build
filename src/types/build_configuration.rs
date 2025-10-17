@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     hash::HashInfo,
-    script::SandboxConfiguration,
     types::{
         Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
     },
 };
+
+use rattler_build_script::SandboxConfiguration;
 
 /// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {

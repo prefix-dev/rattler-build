@@ -7,11 +7,11 @@ use rattler_shell::{
     shell::{self, Shell, ShellEnum},
 };
 
-use crate::script::{ExecutionArgs, run_process_with_replacements};
+use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
 use super::{Interpreter, InterpreterError, find_interpreter};
 
-pub(crate) struct NuShellInterpreter;
+pub struct NuShellInterpreter;
 
 const NUSHELL_PREAMBLE: &str = r#"
 ## Start of bash preamble

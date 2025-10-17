@@ -10,13 +10,13 @@ mod ruby;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub(crate) use bash::BashInterpreter;
-pub(crate) use cmd_exe::CmdExeInterpreter;
-pub(crate) use nodejs::NodeJsInterpreter;
-pub(crate) use nushell::NuShellInterpreter;
-pub(crate) use perl::PerlInterpreter;
-pub(crate) use python::PythonInterpreter;
-pub(crate) use r::RInterpreter;
+pub use bash::BashInterpreter;
+pub use cmd_exe::CmdExeInterpreter;
+pub use nodejs::NodeJsInterpreter;
+pub use nushell::NuShellInterpreter;
+pub use perl::PerlInterpreter;
+pub use python::PythonInterpreter;
+pub use r::RInterpreter;
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{
@@ -25,9 +25,9 @@ use rattler_shell::{
     },
     shell::{self, Shell},
 };
-pub(crate) use ruby::RubyInterpreter;
+pub use ruby::RubyInterpreter;
 
-use super::ExecutionArgs;
+use crate::execution::ExecutionArgs;
 
 /// The error type for the interpreter
 #[derive(Debug, thiserror::Error)]

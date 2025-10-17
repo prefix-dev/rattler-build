@@ -7,6 +7,7 @@ use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
 };
@@ -20,7 +21,6 @@ use url::Url;
 use crate::{
     console_utils::{Color, LogStyle},
     metadata::Debug,
-    script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 #[cfg(feature = "recipe-generation")]

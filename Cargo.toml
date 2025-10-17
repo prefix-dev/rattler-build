@@ -9,6 +9,7 @@ members = [
   "crates/rattler_build_recipe",
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
+  "crates/rattler_build_script",
 ]
 
 [workspace.package]
@@ -27,6 +28,7 @@ chrono = "0.4.41"
 clap = { version = "4.5.45", features = ["derive"] }
 dashmap = "6.1"
 dunce = "1.0.5"
+console = { version = "0.16.1", features = ["windows-console-colors"] }
 flate2 = "1.1.2"
 fs-err = "3.1.1"
 futures = "0.3.31"
@@ -39,12 +41,19 @@ libc = "0.2"
 md-5 = "0.10"
 lazy_static = "1.5.0"
 miette = "7.6.0"
+minijinja = { version = "2.11.0", features = [
+  "unstable_machinery",
+  "custom_syntax",
+] }
 rattler_conda_types = { version = "0.40.0", default-features = false }
 rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_shell = { version = "0.25.2", default-features = false, features = [
+  "sysinfo",
+] }
 regex = "1.11.1"
 reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
 reqwest-middleware = "0.4.2"
@@ -59,6 +68,7 @@ tar = "0.4.44"
 tempfile = "3.21.0"
 thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = ["rt", "macros"] }
+tokio-util = { version = "0.7.16", features = ["codec", "compat"] }
 toml = "0.9.5"
 tracing = "0.1.41"
 url = "2.5.4"
@@ -72,10 +82,6 @@ zstd = "0.13.3"
 spdx = "0.12.0"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
-minijinja = { version = "2.11.0", features = [
-  "unstable_machinery",
-  "custom_syntax",
-] }
 
 [package]
 name = "rattler-build"
@@ -151,10 +157,7 @@ serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true, features = ["env", "cargo"] }
-minijinja = { version = "2.11.0", features = [
-  "unstable_machinery",
-  "custom_syntax",
-] }
+minijinja = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = [
   "env-filter",
   "fmt",
@@ -168,10 +171,10 @@ goblin = "0.10.1"
 scroll = "0.13.0"
 pathdiff = "0.2.3"
 comfy-table = "7.1.4"
-futures = "0.3.31"
+futures = { workspace = true }
 indicatif = { version = "0.18.0", features = ["in_memory"] }
-console = { version = "0.16.1", features = ["windows-console-colors"] }
-thiserror = "2.0.17"
+console = { workspace = true }
+thiserror = { workspace = true }
 tempfile = { workspace = true }
 chrono = "0.4.41"
 sha1 = "0.10.6"
@@ -236,9 +239,7 @@ rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.25.2", default-features = false, features = [
-  "sysinfo",
-] }
+rattler_shell = { workspace = true }
 rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",
@@ -275,6 +276,7 @@ rattler_build_networking = { path = "crates/rattler_build_networking", features 
   "middleware",
 ] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
+rattler_build_script = { path = "crates/rattler_build_script" }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }

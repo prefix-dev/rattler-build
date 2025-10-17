@@ -4,12 +4,13 @@ use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
+use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
     apply_patch_custom, metadata::Output, metadata::build_reindexed_channels,
     render::resolved_dependencies::RunExportsDownload, render::solver::load_repodatas,
-    script::InterpreterError, tool_configuration,
+    tool_configuration,
 };
 
 /// Behavior for handling the working directory during the build process
