@@ -1,0 +1,5 @@
+---
+source: crates/rattler_build_types/src/glob/all_or_glob_vec.rs
+expression: "&globs_all"
+---
+true
