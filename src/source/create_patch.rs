@@ -124,7 +124,8 @@ pub fn create_patch<P: AsRef<Path>>(
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
-                    let original_dir = find_url_cache_dir(cache_dir, url_src)?;
+                    let original_dir =
+                        find_url_cache_dir(cache_dir, url_src, &source_info, source_idx)?;
                     let target_dir = if let Some(target) = url_src.target_directory() {
                         work_dir.join(target)
                     } else {
@@ -391,36 +392,53 @@ fn create_directory_diff(
     Ok(patch_content)
 }
 
-/// Find the URL cache directory for a given URL source
+/// Find the URL cache directory for a given URL source using the new cache structure
 fn find_url_cache_dir(
     cache_dir: &Path,
     url_src: &crate::recipe::parser::UrlSource,
+    source_info: &SourceInformation,
+    source_idx: usize,
 ) -> Result<PathBuf, SourceError> {
-    // This should match the logic in url_source::extracted_folder
-    // You might need to recreate the cache name logic here
-    use crate::source::checksum::Checksum;
+    // First, check if the extracted path is provided in source_info
+    if let Some(extracted_path) = source_info.extracted_paths.get(&source_idx) {
+        let full_path = cache_dir.join(extracted_path);
+        if full_path.exists() {
+            return Ok(full_path);
+        }
+    }
 
-    let checksum = Checksum::from_url_source(url_src)
-        .ok_or_else(|| SourceError::NoChecksum("No checksum for URL source".to_string()))?;
+    use rattler_build_source_cache::{CacheIndex, Checksum as CacheChecksum, source::ChecksumKind};
+
+    // Convert checksum to cache checksum
+    let checksum = url_src
+        .sha256()
+        .map(|sha| {
+            let hex_str = hex::encode(sha);
+            CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Sha256)
+        })
+        .transpose()
+        .or_else(|_| {
+            url_src
+                .md5()
+                .map(|md5| {
+                    let hex_str = hex::encode(md5);
+                    CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Md5)
+                })
+                .transpose()
+        })
+        .map_err(|e| SourceError::UnknownError(format!("Invalid checksum: {}", e)))?;
 
     let first_url = url_src
         .urls()
         .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
-    // Recreate the cache name logic from url_source.rs
-    let filename = first_url
-        .path_segments()
-        .and_then(|segments| segments.filter(|x| !x.is_empty()).next_back())
-        .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
+    // Generate the cache key using the new cache's method
+    let key = CacheIndex::generate_cache_key(first_url, checksum.as_ref());
 
-    let (stem, _) = super::url_source::split_path(Path::new(filename))
-        .map_err(|e| SourceError::UnknownError(format!("Failed to split path: {}", e)))?;
+    // The extracted directory is stored as {key}_extracted
+    let extracted_dir = cache_dir.join(format!("{}_extracted", key));
 
-    let checksum_hex = checksum.to_hex();
-    let cache_name = format!("{}_{}", stem, &checksum_hex[..8]);
-
-    let extracted_dir = cache_dir.join(cache_name);
     if extracted_dir.exists() {
         Ok(extracted_dir)
     } else {

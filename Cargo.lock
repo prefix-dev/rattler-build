@@ -4234,14 +4234,17 @@ dependencies = [
  "ratatui",
  "rattler",
  "rattler_build_jinja",
+ "rattler_build_networking",
  "rattler_build_recipe",
  "rattler_build_recipe_generator",
+ "rattler_build_source_cache",
  "rattler_build_types",
  "rattler_build_variant_config",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
  "rattler_digest",
+ "rattler_git",
  "rattler_index",
  "rattler_menuinst",
  "rattler_networking",
@@ -4291,7 +4294,7 @@ dependencies = [
  "walkdir",
  "which",
  "xz2",
- "zip 5.1.1",
+ "zip 6.0.0",
  "zstd",
 ]
 
@@ -4315,6 +4318,18 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "toml",
+]
+
+[[package]]
+name = "rattler_build_networking"
+version = "0.1.0"
+dependencies = [
+ "rattler_networking",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -4375,7 +4390,43 @@ dependencies = [
  "toml",
  "tracing",
  "url",
- "zip 5.1.1",
+ "zip 6.0.0",
+]
+
+[[package]]
+name = "rattler_build_source_cache"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bzip2",
+ "chrono",
+ "dunce",
+ "flate2",
+ "fs-err",
+ "futures",
+ "hex",
+ "indicatif",
+ "md-5",
+ "rattler_build_networking",
+ "rattler_git",
+ "rattler_prefix_guard",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sevenz-rust2",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "url",
+ "walkdir",
+ "xz2",
+ "zip 6.0.0",
+ "zstd",
 ]
 
 [[package]]
@@ -4523,6 +4574,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_git"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "dunce",
+ "fs-err",
+ "rattler_prefix_guard",
+ "reqwest",
+ "reqwest-middleware",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "url",
+ "urlencoding",
+ "which",
+]
+
+[[package]]
 name = "rattler_index"
 version = "0.25.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4657,6 +4728,18 @@ dependencies = [
  "url",
  "zip 4.0.0",
  "zstd",
+]
+
+[[package]]
+name = "rattler_prefix_guard"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "libc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7732,9 +7815,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "5.1.1"
+version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f852905151ac8d4d06fdca66520a661c09730a74c6d4e2b0f27b436b382e532"
+checksum = "eb2a05c7c36fde6c09b08576c9f7fb4cda705990f73b58fe011abf7dfb24168b"
 dependencies = [
  "arbitrary",
  "crc32fast",

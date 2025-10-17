@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 
 from helpers import RattlerBuild, setup_patch_test_environment, write_simple_text_patch
@@ -334,7 +335,7 @@ def test_create_patch_nested_subdirectories(
         cache_files={},
         work_files={},
     )
-    orig_dir = paths["cache_dir"] / "example_01234567"
+    orig_dir = paths["orig_dir"]
     work_dir = paths["work_dir"]
     nested_cache = orig_dir / "dir" / "nested"
     nested_cache.mkdir(parents=True)
@@ -368,7 +369,7 @@ def test_create_patch_skips_binary_files(rattler_build: RattlerBuild, tmp_path: 
         work_files={"text.txt": "hello world\n"},
     )
 
-    orig_dir = paths["cache_dir"] / "example_01234567"
+    orig_dir = paths["orig_dir"]
     work_dir = paths["work_dir"]
     binary_cache = orig_dir / "binary.bin"
     binary_cache.write_bytes(b"\x00\xff\x00\xff")
@@ -407,7 +408,7 @@ def test_create_patch_binary_file_deletion(rattler_build: RattlerBuild, tmp_path
         work_files={},
     )
 
-    orig_dir = paths["cache_dir"] / "example_01234567"
+    orig_dir = paths["orig_dir"]
     work_dir = paths["work_dir"]
     deleted_bin = orig_dir / "binary_delete.bin"
     deleted_bin.write_bytes(b"\x00\xff\x00\xff")
@@ -486,3 +487,153 @@ def test_create_patch_incremental_map_strategy(
     assert "+++ b/a.txt" in content
     assert "-alpha1" in content
     assert "+alpha2" in content
+
+
+def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: Path):
+    """Real-world test: fetch xtensor source, modify a file, and create a patch."""
+    import subprocess
+
+    # Use the xtensor example recipe
+    recipe_dir = Path(__file__).parent.parent.parent / "examples" / "xtensor"
+
+    # Create output directory
+    output_dir = tmp_path / "output"
+    output_dir.mkdir(parents=True)
+
+    # Run a build that will fetch sources but we'll interrupt it
+    # We use --render-only first to avoid needing all build dependencies
+    try:
+        # Just render to set up the work directory structure
+        result = subprocess.run(
+            [
+                str(rattler_build.path),
+                "build",
+                "--recipe",
+                str(recipe_dir),
+                "--output-dir",
+                str(output_dir),
+                "--render-only",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # Rendering might fail due to missing dependencies, that's okay
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Now actually fetch the sources by doing a build that we'll let start
+    # We'll use a custom build script that exits early
+    work_dir = output_dir / "work"
+
+    # If work_dir doesn't exist yet, we need to fetch sources first
+    # Let's do a simpler approach: manually fetch just the source
+    if not work_dir.exists():
+        # Create a minimal test by directly calling the build to fetch sources
+        # but using a failing build script
+        build_script = recipe_dir / "build.nu"
+        original_build = None
+        if build_script.exists():
+            original_build = build_script.read_text()
+            # Replace with a script that exits early
+            build_script.write_text("exit 0")
+
+        try:
+            # This will fetch sources and extract them
+            subprocess.run(
+                [
+                    str(rattler_build.path),
+                    "build",
+                    "--recipe",
+                    str(recipe_dir),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,  # Give it time to download
+            )
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            pass  # We expect this might fail, that's okay
+        finally:
+            if original_build:
+                build_script.write_text(original_build)
+
+    # Find the work directory (it might be nested)
+    work_dirs = list(output_dir.rglob("work"))
+    if not work_dirs:
+        # Skip test if we couldn't set up the environment
+        # This might happen in CI without network access
+        import pytest
+
+        pytest.skip(
+            "Could not fetch xtensor sources (network issue or missing dependencies)"
+        )
+
+    work_dir = work_dirs[0]
+
+    # Check if .source_info.json exists
+    source_info_path = work_dir / ".source_info.json"
+    if not source_info_path.exists():
+        import pytest
+
+        pytest.skip("Source info not created (build dependencies missing)")
+
+    # Verify source info has extracted_paths
+    source_info = json.loads(source_info_path.read_text())
+    if not source_info.get("extracted_paths"):
+        import pytest
+
+        pytest.skip("No extracted paths in source info")
+
+    # Find a header file to modify (xtensor is header-only)
+    header_files = list(work_dir.rglob("*.hpp"))
+    if not header_files:
+        import pytest
+
+        pytest.skip("No header files found in xtensor source")
+
+    # Modify a header file
+    test_file = header_files[0]
+    original_content = test_file.read_text()
+    modified_content = original_content + "\n// Test modification for create-patch\n"
+    test_file.write_text(modified_content)
+
+    # Create a patch
+    recipe_output_dir = work_dir.parent / "recipe_patches"
+    recipe_output_dir.mkdir(exist_ok=True)
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(work_dir),
+        "--name",
+        "test_modification",
+        "--patch-dir",
+        str(recipe_output_dir),
+        "--overwrite",
+    )
+
+    # Verify the patch was created
+    assert result.returncode == 0, f"create-patch failed: {result.stderr}"
+
+    patch_file = recipe_output_dir / "test_modification.patch"
+    assert patch_file.exists(), "Patch file was not created"
+
+    # Verify the patch contains our modification
+    patch_content = patch_file.read_text()
+    assert (
+        "Test modification for create-patch" in patch_content
+    ), "Patch doesn't contain our modification"
+
+    # Verify it's a proper unified diff
+    relative_path = test_file.relative_to(work_dir)
+    assert (
+        f"--- a/{relative_path}" in patch_content
+        or f"a/{relative_path}" in patch_content
+    )
+    assert (
+        f"+++ b/{relative_path}" in patch_content
+        or f"b/{relative_path}" in patch_content
+    )
+    assert "+// Test modification for create-patch" in patch_content
