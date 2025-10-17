@@ -1,0 +1,25 @@
+From c603563920494a3eea528d567f34a2d03d013b75 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Thu, 1 Jul 2021 18:59:33 +0200
+Subject: [PATCH] Fix LDFLAGS for finding ldap
+
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index c6782fb..039d7c3 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1725,7 +1725,7 @@ if test "x$enables_ldap" = "xyes"; then
+     LDAP=yes
+ 
+     SAVE_LDFLAGS=$LDFLAGS
+-    LDFLAGS=-lpthread
++    LDFLAGS=$LDFLAGS -lpthread
+ 
+     AC_CHECK_LIB([ldap_r], [ldap_first_message], [
+       AC_CHECK_LIB([ldap_r], [ldap_initialize], [
+-- 
+2.28.0
+

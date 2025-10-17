@@ -1,0 +1,187 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0001-Fix-support-for-newer-GCC.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/CMakeModules/CompilerChecks.cmake",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/CMakeModules/CompilerChecks.cmake",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 59,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 59,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "if(\"${CMAKE_CXX_COMPILER_ID}\" STREQUAL \"Clang\" OR \"${CMAKE_CXX_COMPILER_ID}\" STR\n",
+                    ),
+                    lines: [
+                        Context(
+                            "    set(Hammer_SanitizeOptions \"${Hammer_SanitizeOptions} -fsanitize=address -fsanitize=undefined -fno-sanitize=vptr\")\n",
+                        ),
+                        Context(
+                            "elseif(\"${CMAKE_CXX_COMPILER_ID}\" STREQUAL \"GNU\")\n",
+                        ),
+                        Context(
+                            "\tmessage(STATUS \"Detected GNU compiler.\")\n",
+                        ),
+                        Delete(
+                            "\tset(Hammer_CompileOptions \"${Hammer_CompileOptions} -ansi -D_FILE_OFFSET_BITS=64 -Wno-unknown-pragmas\")\n",
+                        ),
+                        Insert(
+                            "\tset(Hammer_CompileOptions \"${Hammer_CompileOptions} -D_FILE_OFFSET_BITS=64 -Wno-unknown-pragmas\")\n",
+                        ),
+                        Context(
+                            "    set(Hammer_VerboseOptions \"${Hammer_VerboseOptions} -O0 -Wextra -fno-optimize-sibling-calls -fno-omit-frame-pointer\")\n",
+                        ),
+                        Context(
+                            "    set(Hammer_VerboseOptions \"${Hammer_VerboseOptions} -fno-sanitize-recover -fstack-protector\")\n",
+                        ),
+                        Context(
+                            "    set(Hammer_VerboseOptions \"${Hammer_VerboseOptions} -pedantic -Wall -Wextra -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wlogical-op\")\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/Tests/GTest/src/gtest-death-test.cc",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/Tests/GTest/src/gtest-death-test.cc",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1212,
+                        len: 14,
+                    },
+                    new_range: HunkRange {
+                        start: 1212,
+                        len: 14,
+                    },
+                    function_context: Some(
+                        "static int ExecDeathTestChildMain(void* child_arg) {\n",
+                    ),
+                    lines: [
+                        Context(
+                            "static void StackLowerThanAddress(const void* ptr,\n",
+                        ),
+                        Context(
+                            "                                  bool* result) GTEST_NO_INLINE_;\n",
+                        ),
+                        Context(
+                            "static void StackLowerThanAddress(const void* ptr, bool* result) {\n",
+                        ),
+                        Delete(
+                            "  int dummy;\n",
+                        ),
+                        Insert(
+                            "  int dummy = 0;\n",
+                        ),
+                        Context(
+                            "  *result = (&dummy < ptr);\n",
+                        ),
+                        Context(
+                            "}\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "// Make sure AddressSanitizer does not tamper with the stack here.\n",
+                        ),
+                        Context(
+                            "GTEST_ATTRIBUTE_NO_SANITIZE_ADDRESS_\n",
+                        ),
+                        Context(
+                            "static bool StackGrowsDown() {\n",
+                        ),
+                        Delete(
+                            "  int dummy;\n",
+                        ),
+                        Insert(
+                            "  int dummy = 0;\n",
+                        ),
+                        Context(
+                            "  bool result;\n",
+                        ),
+                        Context(
+                            "  StackLowerThanAddress(&dummy, &result);\n",
+                        ),
+                        Context(
+                            "  return result;\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/include/Hammer/Math/Utils.hh",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/include/Hammer/Math/Utils.hh",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 12,
+                        len: 6,
+                    },
+                    new_range: HunkRange {
+                        start: 12,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#ifndef HAMMER_MATH_UTILS\n",
+                        ),
+                        Context(
+                            "#define HAMMER_MATH_UTILS\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Insert(
+                            "#include <cstdint>\n",
+                        ),
+                        Context(
+                            "#include <complex>\n",
+                        ),
+                        Context(
+                            "#include <limits>\n",
+                        ),
+                        Context(
+                            "#include <climits>\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

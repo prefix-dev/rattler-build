@@ -1,0 +1,68 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/fix-model-path-in-config.prc-template.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/makepanda/config.in",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/makepanda/config.in",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 61,
+                        len: 8,
+                    },
+                    new_range: HunkRange {
+                        start: 61,
+                        len: 8,
+                    },
+                    function_context: Some(
+                        "default-directnotify-level warning\n",
+                    ),
+                    lines: [
+                        Context(
+                            "# particular Config.prc file.\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "model-path    $MAIN_DIR\n",
+                        ),
+                        Delete(
+                            "model-path    $THIS_PRC_DIR/..\n",
+                        ),
+                        Delete(
+                            "model-path    $THIS_PRC_DIR/../models\n",
+                        ),
+                        Insert(
+                            "model-path    $THIS_PRC_DIR/../../share/panda3d\n",
+                        ),
+                        Insert(
+                            "model-path    $THIS_PRC_DIR/../../share/panda3d/models\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# This enable the automatic creation of a TK window when running\n",
+                        ),
+                        Context(
+                            "# Direct.\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

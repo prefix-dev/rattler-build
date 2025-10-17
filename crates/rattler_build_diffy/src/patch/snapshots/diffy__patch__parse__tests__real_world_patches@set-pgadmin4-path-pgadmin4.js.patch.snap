@@ -1,0 +1,72 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/set-pgadmin4-path-pgadmin4.js.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "runtime/src/js/pgadmin.js",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "runtime/src/js/pgadmin.js",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 63,
+                        len: 5,
+                    },
+                    new_range: HunkRange {
+                        start: 63,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Delete(
+                            "if (fs.existsSync('dev_config.json')) {\n",
+                        ),
+                        Delete(
+                            "  try {\n",
+                        ),
+                        Delete(
+                            "    let dev_config = JSON.parse(fs.readFileSync('dev_config.json'));\n",
+                        ),
+                        Delete(
+                            "    pythonPath = path.resolve(dev_config['pythonPath']);\n",
+                        ),
+                        Delete(
+                            "    pgadminFile = path.resolve(dev_config['pgadminFile']);\n",
+                        ),
+                        Insert(
+                            "const configFilePath = path.join(__dirname, 'dev_config.json');\n",
+                        ),
+                        Insert(
+                            "if (fs.existsSync(configFilePath)) {\n",
+                        ),
+                        Insert(
+                            "  try {\n",
+                        ),
+                        Insert(
+                            "    const configFileContent = fs.readFileSync(configFilePath, 'utf8'); // Specify encoding\n",
+                        ),
+                        Insert(
+                            "    let dev_config = JSON.parse(configFileContent);\n",
+                        ),
+                        Insert(
+                            "    pythonPath = path.resolve(__dirname, dev_config['pythonPath']);\n",
+                        ),
+                        Insert(
+                            "    pgadminFile = path.resolve(__dirname, dev_config['pgadminFile']);\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

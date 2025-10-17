@@ -84,6 +84,7 @@ zstd = "0.13.3"
 spdx = "0.12.0"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
+rstest = "0.26.1"
 
 [package]
 name = "rattler-build"
@@ -289,7 +290,7 @@ sha2 = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
-rstest = "0.26.1"
+rstest = { workspace = true }
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
 serial_test = "3.2.0"

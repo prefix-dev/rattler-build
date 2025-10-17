@@ -1,0 +1,92 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0002-Fix-lib-suffix.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cmake/modules/DefineInstallationPaths.cmake",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cmake/modules/DefineInstallationPaths.cmake",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 5,
+                        len: 17,
+                    },
+                    new_range: HunkRange {
+                        start: 5,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "if (UNIX)\n",
+                    ),
+                    lines: [
+                        Context(
+                            "  ENDIF (NOT APPLICATION_NAME)\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# detect lib suffix\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "IF(EXISTS \"/usr/lib64\")\n",
+                        ),
+                        Delete(
+                            "\tSET(LIB_SUFFIX \"64\"\n",
+                        ),
+                        Delete(
+                            "\tCACHE STRING \"Suffix of the lib\")\n",
+                        ),
+                        Delete(
+                            "\tSET (PKG_ARCH \"x86_64\")\n",
+                        ),
+                        Delete(
+                            "ELSE(EXISTS \"/usr/lib64\" )\n",
+                        ),
+                        Delete(
+                            "SET(LIB_SUFFIX \"\"\n",
+                        ),
+                        Delete(
+                            "CACHE STRING \"Suffix of the lib\")\n",
+                        ),
+                        Delete(
+                            "SET (PKG_ARCH \"i386\")\n",
+                        ),
+                        Delete(
+                            "ENDIF(EXISTS \"/usr/lib64\" )\n",
+                        ),
+                        Insert(
+                            "SET(LIB_SUFFIX \"\" CACHE STRING \"Suffix of the lib\")\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "#  correct cmake netpath issue with cmake 2.8\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

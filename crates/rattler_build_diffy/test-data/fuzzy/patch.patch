@@ -1,0 +1,21 @@
+diff --git a/test/utils.py b/test/utils.py
+index 9186e6608..f0f9130da 100644
+--- a/test/utils.py
++++ b/test/utils.py
+@@ -2,6 +2,7 @@
+ import json
+ import os
+ import pathlib
++import platform
+ import sys
+ 
+ from dataclasses import dataclass
+@@ -36,7 +37,7 @@ def get_ffmpeg_major_version():
+ # not guarantee bit-for-bit equality across systems and architectures, so we
+ # also cannot. We currently use Linux on x86_64 as our reference system.
+ def assert_frames_equal(*args, **kwargs):
+-    if sys.platform == "linux":
++    if sys.platform == "linux" and platform.machine() == "x86_64":
+         if args[0].device.type == "cuda":
+             atol = 2
+             if get_ffmpeg_major_version() == 4:

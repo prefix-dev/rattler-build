@@ -1,0 +1,116 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0002-Allow-to-specify-git-sha-through-environment-variabl.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/setup.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/setup.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 19,
+                        len: 23,
+                    },
+                    new_range: HunkRange {
+                        start: 19,
+                        len: 9,
+                    },
+                    function_context: Some(
+                        "ROOT_DIR = Path(__file__).absolute().parent\n",
+                    ),
+                    lines: [
+                        Context(
+                            "def get_and_write_version():\n",
+                        ),
+                        Context(
+                            "    with open(ROOT_DIR / \"version.txt\") as f:\n",
+                        ),
+                        Context(
+                            "        version = f.readline().strip()\n",
+                        ),
+                        Delete(
+                            "    sha = \"Unknown\"\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "    try:\n",
+                        ),
+                        Delete(
+                            "        sha = (\n",
+                        ),
+                        Delete(
+                            "            subprocess.check_output([\"git\", \"rev-parse\", \"HEAD\"], cwd=str(ROOT_DIR))\n",
+                        ),
+                        Delete(
+                            "            .decode(\"ascii\")\n",
+                        ),
+                        Delete(
+                            "            .strip()\n",
+                        ),
+                        Delete(
+                            "        )\n",
+                        ),
+                        Delete(
+                            "    except Exception:\n",
+                        ),
+                        Delete(
+                            "        pass\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "    if os.getenv(\"BUILD_VERSION\"):\n",
+                        ),
+                        Delete(
+                            "        version = os.getenv(\"BUILD_VERSION\")\n",
+                        ),
+                        Delete(
+                            "    elif sha != \"Unknown\":\n",
+                        ),
+                        Delete(
+                            "        version += \"+\" + sha[:7]\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "    version = version.replace(\"+cpu\", \"\")\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "    sha = os.getenv(\"BUILD_GIT_SHA\", \"Unknown\")\n",
+                        ),
+                        Insert(
+                            "    version = os.getenv(\"BUILD_VERSION\")\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    with open(ROOT_DIR / \"torchvision_extra_decoders/version.py\", \"w\") as f:\n",
+                        ),
+                        Context(
+                            "        f.write(f\"__version__ = '{version}'\\n\")\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)
