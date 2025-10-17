@@ -188,35 +188,35 @@ fn recipe_paths(
 ) -> Result<(Vec<PathBuf>, Option<TempDir>), miette::Error> {
     let mut recipe_paths = Vec::new();
     let mut temp_dir_opt = None;
-    // if !std::io::stdin().is_terminal()
-    //     && recipes.len() == 1
-    //     && get_recipe_path(&recipes[0]).is_err()
-    // {
-    //     let temp_dir = tempdir().into_diagnostic()?;
+    if !std::io::stdin().is_terminal()
+        && recipes.len() == 1
+        && get_recipe_path(&recipes[0]).is_err()
+    {
+        let temp_dir = tempdir().into_diagnostic()?;
 
-    //     let recipe_path = temp_dir.path().join("recipe.yaml");
-    //     io::copy(
-    //         &mut io::stdin(),
-    //         &mut File::create(&recipe_path).into_diagnostic()?,
-    //     )
-    //     .into_diagnostic()?;
-    //     recipe_paths.push(get_recipe_path(&recipe_path)?);
-    //     temp_dir_opt = Some(temp_dir);
-    // } else {
-    for recipe_path in &recipes {
-        recipe_paths.push(get_recipe_path(recipe_path)?);
-    }
-    if let Some(recipe_dir) = &recipe_dir {
-        for entry in ignore::Walk::new(recipe_dir) {
-            let entry = entry.into_diagnostic()?;
-            if entry.path().is_dir() {
-                if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                    recipe_paths.push(recipe_path);
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        io::copy(
+            &mut io::stdin(),
+            &mut File::create(&recipe_path).into_diagnostic()?,
+        )
+        .into_diagnostic()?;
+        recipe_paths.push(get_recipe_path(&recipe_path)?);
+        temp_dir_opt = Some(temp_dir);
+    } else {
+        for recipe_path in &recipes {
+            recipe_paths.push(get_recipe_path(recipe_path)?);
+        }
+        if let Some(recipe_dir) = &recipe_dir {
+            for entry in ignore::Walk::new(recipe_dir) {
+                let entry = entry.into_diagnostic()?;
+                if entry.path().is_dir() {
+                    if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                        recipe_paths.push(recipe_path);
+                    }
                 }
             }
         }
     }
-    // }
 
     Ok((recipe_paths, temp_dir_opt))
 }
