@@ -13,6 +13,7 @@ use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
+use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
     ChannelUrl, NoArchType, Platform,
     package::{
@@ -25,7 +26,7 @@ use rayon::prelude::*;
 use url::Url;
 
 use super::{PackagingError, TempFiles};
-use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
+use crate::{hash::HashInput, metadata::Output};
 
 /// Safely check if a symlink resolves to a regular file, with basic loop protection
 fn is_symlink_to_file(path: &Path) -> bool {
@@ -332,7 +333,8 @@ impl Output {
         let noarch = if self.is_python_version_independent() {
             NoArchType::python()
         } else {
-            self.recipe.build().noarch
+            // TODO(refactor): perhaps normalize in the recipe parsing step?
+            self.recipe.build().noarch.unwrap_or(NoArchType::none())
         };
 
         if self.name().as_normalized() != self.name().as_source() {
@@ -577,7 +579,7 @@ mod test {
     use super::contains_prefix_binary;
     use super::fs;
     use super::{contains_prefix_text, create_prefix_placeholder};
-    use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
+    use crate::packaging::metadata::clean_url;
 
     #[test]
     fn detect_prefix() {
@@ -591,7 +593,7 @@ mod test {
             prefix,
             prefix,
             &ContentType::BINARY,
-            &PrefixDetection::default(),
+            &Default::default(),
         )
         .unwrap();
     }

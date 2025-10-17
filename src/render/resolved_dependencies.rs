@@ -8,7 +8,7 @@ use std::{
 use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
 use rattler_build_recipe::stage1::{Dependency, Requirements};
-use rattler_build_types::PinArgs;
+use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
     package::RunExportsJson,
@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
 
-use super::pin::PinError;
 use crate::{
     metadata::Output,
     metadata::{BuildConfiguration, build_reindexed_channels},

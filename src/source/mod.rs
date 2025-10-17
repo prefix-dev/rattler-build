@@ -5,13 +5,13 @@ use std::{
 };
 
 use crate::{
-    recipe::parser::Source,
     system_tools::ToolError,
     tool_configuration,
     types::{Directories, Output},
 };
 
 use fs_err as fs;
+use rattler_build_recipe::stage1::{Source, source::GitRev};
 use rattler_build_source_cache::cache::is_tarball;
 use serde::{Deserialize, Serialize};
 
@@ -157,7 +157,7 @@ async fn fetch_source(
                 .await
                 .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-            let dest_dir = compute_dest_dir(work_dir, git_src.target_directory());
+            let dest_dir = compute_dest_dir(work_dir, git_src.target_directory.as_ref());
             fs::create_dir_all(&dest_dir)?;
 
             tool_configuration.fancy_log_handler.wrap_in_progress(
@@ -169,11 +169,11 @@ async fn fetch_source(
                 },
             )?;
 
-            patch::apply_patches(git_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(&git_src.patches, &dest_dir, recipe_dir, apply_patch)?;
 
             let updated_src = if let Some(commit_sha) = result.git_commit {
                 let mut updated_git_src = git_src.clone();
-                updated_git_src.rev = crate::recipe::parser::GitRev::Commit(commit_sha);
+                updated_git_src.rev = GitRev::Commit(commit_sha);
                 Source::Git(updated_git_src)
             } else {
                 source.clone()
@@ -186,7 +186,7 @@ async fn fetch_source(
         }
         Source::Url(url_src) => {
             let first_url = url_src
-                .urls()
+                .url
                 .first()
                 .expect("we should have at least one URL");
             tracing::info!("Fetching source from url: {}", first_url);
@@ -199,7 +199,7 @@ async fn fetch_source(
                 .await
                 .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-            let dest_dir = compute_dest_dir(work_dir, url_src.target_directory());
+            let dest_dir = compute_dest_dir(work_dir, url_src.target_directory);
             fs::create_dir_all(&dest_dir)?;
 
             let extracted_path = if result.path.is_dir() {
@@ -217,12 +217,17 @@ async fn fetch_source(
                     .and_then(|mut segments| segments.next_back().map(|last| last.to_string()))
                     .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
-                let file_name = url_src.file_name().unwrap_or(&file_name_from_url);
-                copy_from_cache(&result.path, &dest_dir, Some(file_name), tool_configuration)?;
+                let file_name = url_src.file_name.clone().unwrap_or(file_name_from_url);
+                copy_from_cache(
+                    &result.path,
+                    &dest_dir,
+                    Some(&file_name),
+                    tool_configuration,
+                )?;
                 None
             };
 
-            patch::apply_patches(url_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(&url_src.patches, &dest_dir, recipe_dir, apply_patch)?;
 
             Ok(FetchResult {
                 rendered_source: source.clone(),
@@ -239,7 +244,7 @@ async fn fetch_source(
                 return Err(SourceError::FileNotFound(src_path));
             }
 
-            let dest_dir = compute_dest_dir(work_dir, path_src.target_directory());
+            let dest_dir = compute_dest_dir(work_dir, path_src.target_directory);
             fs::create_dir_all(&dest_dir)?;
 
             if src_path.is_dir() {
@@ -247,7 +252,7 @@ async fn fetch_source(
                     "copying source into isolated environment",
                     || {
                         copy_dir::CopyDir::new(&src_path, &dest_dir)
-                            .use_gitignore(path_src.use_gitignore())
+                            .use_gitignore(path_src.use_gitignore)
                             .with_globvec(&path_src.filter)
                             .run()
                     },
@@ -261,12 +266,12 @@ async fn fetch_source(
                     .file_name()
                     .map(|s| s.to_string_lossy().to_string());
                 let file_name = path_src
-                    .file_name()
-                    .cloned()
+                    .file_name
+                    .clone()
                     .or(file_name_from_path)
                     .ok_or_else(|| SourceError::FileNotFound(src_path.clone()))?;
 
-                let should_extract = path_src.file_name().is_none()
+                let should_extract = path_src.file_name.is_none()
                     && (is_tarball(&file_name)
                         || src_path.extension() == Some(OsStr::new("zip"))
                         || src_path.extension() == Some(OsStr::new("7z")));
@@ -313,7 +318,7 @@ async fn fetch_source(
                 }
             }
 
-            patch::apply_patches(path_src.patches(), &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(&path_src.patches, &dest_dir, recipe_dir, apply_patch)?;
 
             Ok(FetchResult {
                 rendered_source: source.clone(),
@@ -417,9 +422,10 @@ impl Output {
         let _enter = span.enter();
 
         let rendered_sources = fetch_sources(
-            self.finalized_sources
-                .as_deref()
-                .unwrap_or(self.recipe.sources()),
+            &self.recipe.source,
+            // self.finalized_sources
+            //     .as_deref()
+            //     .unwrap_or(self.recipe.source),
             &self.build_configuration.directories,
             &self.system_tools,
             tool_configuration,

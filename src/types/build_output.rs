@@ -1,7 +1,7 @@
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_build_jinja::Variable;
-use rattler_build_recipe::Stage1Recipe;
+use rattler_build_recipe::{Stage1Recipe, stage1::Source};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     PackageName, Platform, RepoDataRecord, VersionWithSource,
@@ -20,7 +20,6 @@ use std::{
 
 use crate::{
     console_utils::github_integration_enabled,
-    recipe::parser::Source,
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},

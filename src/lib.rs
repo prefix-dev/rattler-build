@@ -9,7 +9,6 @@ pub mod metadata;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
-pub mod recipe;
 pub mod render;
 pub mod script;
 pub mod selectors;
@@ -19,7 +18,6 @@ pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
 pub mod types;
-pub mod used_variables;
 pub mod utils;
 mod variant_render;
 
@@ -30,8 +28,6 @@ mod linux;
 mod macos;
 mod post_process;
 pub mod rebuild;
-#[cfg(feature = "recipe-generation")]
-pub mod recipe_generator;
 mod unix;
 mod windows;
 
@@ -56,7 +52,7 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_build_recipe::Stage1Recipe;
+use rattler_build_recipe::{Stage1Recipe, stage0::Recipe, stage1::Dependency};
 use rattler_build_variant_config::VariantConfig;
 
 // Re-export types needed by Python bindings and external consumers
@@ -69,7 +65,6 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
@@ -84,8 +79,6 @@ use types::{
 
 use crate::hash::HashInfo;
 use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
-use crate::recipe::Recipe;
-use crate::recipe::custom_yaml::Node;
 use crate::source_code::SourceCode;
 use crate::variant_render::{stage_0_render, stage_1_render};
 use indexmap::IndexSet;
@@ -101,7 +94,6 @@ pub struct DiscoveredOutput {
     pub build_string: String,
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
-    pub node: Node,
     pub used_vars: BTreeMap<NormalizedKey, Variable>,
     pub recipe: Recipe,
     pub hash: HashInfo,
@@ -1070,8 +1062,8 @@ pub fn sort_build_outputs_topologically(
                     .name
                     .clone()
                     .expect("MatchSpec should always have a name"),
-                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                Dependency::PinSubpackage(pin) => pin.pin_subpackage.name.clone(),
+                Dependency::PinCompatible(pin) => pin.pin_compatible.name.clone(),
             };
 
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {

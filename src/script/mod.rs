@@ -377,11 +377,13 @@ impl Output {
 
         let work_dir = &self.build_configuration.directories.work_dir;
         Ok(ExecutionArgs {
-            script: self.recipe.build().script().resolve_content(
-                &self.build_configuration.directories.recipe_dir,
-                Some(jinja.clone()),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
-            )?,
+            // TODO: fix
+            script: ResolvedScriptContents::Inline("echo hello".to_string()),
+            // script: self.recipe.build().script().resolve_content(
+            //     &self.build_configuration.directories.recipe_dir,
+            //     Some(jinja.clone()),
+            //     if cfg!(windows) { &["bat"] } else { &["sh"] },
+            // )?,
             env_vars: env_vars
                 .into_iter()
                 .filter_map(|(k, v)| v.map(|v| (k, v)))
@@ -413,7 +415,7 @@ impl Output {
         let _enter = span.enter();
 
         let exec_args = self.prepare_build_script().await?;
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
         } else {
             Some(&self.build_configuration.directories.build_prefix)

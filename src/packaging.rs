@@ -202,8 +202,9 @@ fn write_recipe_folder(
             output_dir.to_string_lossy()
         );
         let output_dir_glob = format!("{}/**", ignore_output.to_string_lossy());
-        let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
-        copy_builder = copy_builder.with_globvec(&glob_vec);
+        // TODO(refactor): fix globvec constructor to make this work.
+        // let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
+        // copy_builder = copy_builder.with_globvec(&glob_vec);
     }
 
     let copy_result = copy_builder.run()?;
