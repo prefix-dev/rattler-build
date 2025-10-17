@@ -4233,6 +4233,7 @@ dependencies = [
  "ratatui",
  "rattler",
  "rattler_build_recipe_generator",
+ "rattler_build_script",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
@@ -4319,6 +4320,29 @@ dependencies = [
  "tracing",
  "url",
  "zip 5.1.1",
+]
+
+[[package]]
+name = "rattler_build_script"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "console 0.16.1",
+ "fs-err",
+ "futures",
+ "indexmap 2.11.4",
+ "insta",
+ "itertools 0.14.0",
+ "minijinja",
+ "rattler_conda_types",
+ "rattler_shell",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "which",
 ]
 
 [[package]]
