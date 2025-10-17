@@ -12,11 +12,13 @@ use crate::{
 
 use fs_err as fs;
 use rattler_build_recipe::stage1::{Source, source::GitRev};
-use rattler_build_source_cache::cache::is_tarball;
+use rattler_build_source_cache::{Checksum, cache::is_tarball};
+use rattler_build_source_cache::{
+    GitSource as CacheGitSource, Source as CacheSource, UrlSource as CacheUrlSource,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::system_tools::SystemTools;
-pub mod checksum;
 pub mod copy_dir;
 pub mod create_patch;
 pub mod patch;
@@ -132,6 +134,23 @@ struct FetchResult {
     extracted_path: Option<PathBuf>,
 }
 
+fn convert_git_source(
+    git_src: &rattler_build_recipe::stage1::GitSource,
+    recipe_dir: &Path,
+) -> Result<CacheGitSource, SourceError> {
+    let rattler_git_url = RattlerGitUrl::new(&git_src.url)
+        .map_err(|e| SourceError::UnknownError(format!("Invalid git url: {}", e)))?;
+
+    let reference = match &git_src.rev {
+        GitRev::Branch(branch) => RattlerGitReference::Branch(branch.clone()),
+        GitRev::Tag(tag) => RattlerGitReference::Tag(tag.clone()),
+        GitRev::Commit(commit) => RattlerGitReference::Commit(commit.clone()),
+        GitRev::None => RattlerGitReference::None,
+    };
+
+    Ok(rattler_build_source_cache::GitSource {})
+}
+
 /// Fetch a single source and return the rendered source and extracted path
 async fn fetch_source(
     source: &Source,
@@ -142,8 +161,6 @@ async fn fetch_source(
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<FetchResult, SourceError> {
-    use rattler_build_source_cache::{Source as CacheSource, UrlSource as CacheUrlSource};
-
     match source {
         Source::Git(git_src) => {
             tracing::info!("Fetching source from git repo: {}", git_src.url());
@@ -199,7 +216,7 @@ async fn fetch_source(
                 .await
                 .map_err(|e| SourceError::UnknownError(e.to_string()))?;
 
-            let dest_dir = compute_dest_dir(work_dir, url_src.target_directory);
+            let dest_dir = compute_dest_dir(work_dir, url_src.target_directory.as_ref());
             fs::create_dir_all(&dest_dir)?;
 
             let extracted_path = if result.path.is_dir() {
@@ -235,7 +252,7 @@ async fn fetch_source(
             })
         }
         Source::Path(path_src) => {
-            let rel_src_path = path_src.path();
+            let rel_src_path = &path_src.path;
             tracing::debug!("Processing source path '{}'", rel_src_path.display());
             let src_path = fs::canonicalize(recipe_dir.join(rel_src_path))?;
             tracing::info!("Fetching source from path: {}", src_path.display());
@@ -244,7 +261,7 @@ async fn fetch_source(
                 return Err(SourceError::FileNotFound(src_path));
             }
 
-            let dest_dir = compute_dest_dir(work_dir, path_src.target_directory);
+            let dest_dir = compute_dest_dir(work_dir, path_src.target_directory.as_ref());
             fs::create_dir_all(&dest_dir)?;
 
             if src_path.is_dir() {
@@ -308,7 +325,7 @@ async fn fetch_source(
                         dest.display()
                     );
 
-                    if let Some(checksum) = checksum::Checksum::from_path_source(path_src) {
+                    if let Some(checksum) = Checksum::from_path_source(path_src) {
                         if !checksum.validate(&src_path) {
                             return Err(SourceError::ValidationFailed);
                         }

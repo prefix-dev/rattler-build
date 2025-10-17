@@ -11,7 +11,6 @@ pub mod package_test;
 pub mod packaging;
 pub mod render;
 pub mod script;
-pub mod selectors;
 pub mod source;
 pub mod system_tools;
 pub mod tool_configuration;
@@ -52,7 +51,7 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_build_recipe::{Stage1Recipe, stage0::Recipe, stage1::Dependency};
+use rattler_build_recipe::{Stage1Recipe, stage1::Dependency, stage1::Recipe};
 use rattler_build_variant_config::VariantConfig;
 
 // Re-export types needed by Python bindings and external consumers
@@ -165,7 +164,6 @@ fn find_variants<S: SourceCode>(
                 build_string,
                 noarch_type: *recipe.build().noarch(),
                 target_platform,
-                node,
                 used_vars: variant,
                 recipe,
                 hash,
@@ -397,9 +395,10 @@ pub async fn get_build_output(
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
-        if recipe.build().skip() {
-            continue;
-        }
+        // TODO: handle skipped builds
+        // if recipe.build().skip() {
+        //     continue;
+        // }
 
         subpackages.insert(
             recipe.package().name().clone(),
@@ -410,11 +409,13 @@ pub async fn get_build_output(
             },
         );
 
-        let build_name = if recipe.cache.is_some() {
-            global_build_name.clone()
-        } else {
-            recipe.package().name().as_normalized().to_string()
-        };
+        // TODO: determine build name properly
+        // let build_name = if recipe.cache.is_some() {
+        //     global_build_name.clone()
+        // } else {
+        //     recipe.package().name().as_normalized().to_string()
+        // };
+        let build_name = recipe.package().name().as_normalized().to_string();
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -480,7 +481,7 @@ pub async fn get_build_output(
                     &output_dir,
                     build_data.no_build_id,
                     &timestamp,
-                    recipe.build().merge_build_and_host_envs(),
+                    recipe.build().merge_build_and_host_envs,
                 )
                 .into_diagnostic()?,
                 channels,

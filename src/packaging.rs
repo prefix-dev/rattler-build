@@ -28,7 +28,6 @@ use crate::{
     metadata::Output,
     package_test::write_test_files,
     post_process,
-    recipe::parser::GlobVec,
     source::{self, copy_dir},
     tool_configuration,
 };

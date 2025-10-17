@@ -6,17 +6,15 @@
 //! * `commands` - run a list of commands and check their exit code
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
-
 use std::{
     collections::HashMap,
-    fmt::Write as fmt_write,
-    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
+use rattler_build_recipe::stage1::TestType;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     package::{ArchiveIdentifier, IndexJson, PackageFile},
@@ -32,10 +30,6 @@ use tempfile::TempDir;
 use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
-    recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest, Script,
-        ScriptContent, TestType,
-    },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
     tool_configuration,
@@ -120,10 +114,10 @@ impl Tests {
 
         match self {
             Tests::Commands(path) => {
-                let script = Script {
-                    content: ScriptContent::Path(path.clone()),
-                    ..Script::default()
-                };
+                // let script = Script {
+                //     content: ScriptContent::Path(path.clone()),
+                //     ..Script::default()
+                // };
 
                 // copy all test files to a temporary directory and set it as the working
                 // directory
@@ -134,40 +128,40 @@ impl Tests {
                     ))
                 })?;
 
-                script
-                    .run_script(
-                        env_vars,
-                        tmp_dir.path(),
-                        cwd,
-                        environment,
-                        None,
-                        None,
-                        None,
-                        Debug::new(false),
-                    )
-                    .await
-                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
+                // script
+                //     .run_script(
+                //         env_vars,
+                //         tmp_dir.path(),
+                //         cwd,
+                //         environment,
+                //         None,
+                //         None,
+                //         None,
+                //         Debug::new(false),
+                //     )
+                //     .await
+                //     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
             Tests::Python(path) => {
-                let script = Script {
-                    content: ScriptContent::Path(path.clone()),
-                    interpreter: Some("python".into()),
-                    ..Script::default()
-                };
+                // let script = Script {
+                //     content: ScriptContent::Path(path.clone()),
+                //     interpreter: Some("python".into()),
+                //     ..Script::default()
+                // };
 
-                script
-                    .run_script(
-                        env_vars,
-                        tmp_dir.path(),
-                        cwd,
-                        environment,
-                        None,
-                        None,
-                        None,
-                        Debug::new(false),
-                    )
-                    .await
-                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
+                // script
+                //     .run_script(
+                //         env_vars,
+                //         tmp_dir.path(),
+                //         cwd,
+                //         environment,
+                //         None,
+                //         None,
+                //         None,
+                //         Debug::new(false),
+                //     )
+                //     .await
+                //     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
         }
         Ok(())
@@ -478,39 +472,42 @@ pub async fn run_test(
             let test_prefix =
                 TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.keep();
             match test {
-                TestType::Command(c) => {
-                    c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)
-                        .await?
+                // TestType::Command(c) => {
+                //     c.run_test(&pkg, &package_folder, &test_prefix, &config, &env)
+                //         .await?
+                // }
+                // TestType::Python { python } => {
+                //     python
+                //         .run_test(&pkg, &package_folder, &test_prefix, &config)
+                //         .await?
+                // }
+                // TestType::Perl { perl } => {
+                //     perl.run_test(&pkg, &package_folder, &test_prefix, &config)
+                //         .await?
+                // }
+                // TestType::R { r } => {
+                //     r.run_test(&pkg, &package_folder, &test_prefix, &config)
+                //         .await?
+                // }
+                // TestType::Ruby { ruby } => {
+                //     ruby.run_test(&pkg, &package_folder, &test_prefix, &config)
+                //         .await?
+                // }
+                // TestType::Downstream(downstream) if downstream_package.is_none() => {
+                //     downstream
+                //         .run_test(&pkg, package_file, &test_prefix, &config)
+                //         .await?
+                // }
+                // TestType::Downstream(_) => {
+                //     tracing::info!(
+                //         "Skipping downstream test as we are already testing a downstream package"
+                //     )
+                // }
+                // // This test already runs during the build process and we don't need to run it again
+                // TestType::PackageContents { .. } => {}
+                _ => {
+                    todo!("Test type not implemented yet");
                 }
-                TestType::Python { python } => {
-                    python
-                        .run_test(&pkg, &package_folder, &test_prefix, &config)
-                        .await?
-                }
-                TestType::Perl { perl } => {
-                    perl.run_test(&pkg, &package_folder, &test_prefix, &config)
-                        .await?
-                }
-                TestType::R { r } => {
-                    r.run_test(&pkg, &package_folder, &test_prefix, &config)
-                        .await?
-                }
-                TestType::Ruby { ruby } => {
-                    ruby.run_test(&pkg, &package_folder, &test_prefix, &config)
-                        .await?
-                }
-                TestType::Downstream(downstream) if downstream_package.is_none() => {
-                    downstream
-                        .run_test(&pkg, package_file, &test_prefix, &config)
-                        .await?
-                }
-                TestType::Downstream(_) => {
-                    tracing::info!(
-                        "Skipping downstream test as we are already testing a downstream package"
-                    )
-                }
-                // This test already runs during the build process and we don't need to run it again
-                TestType::PackageContents { .. } => {}
             }
 
             if !config.keep_test_prefix {
@@ -527,576 +524,576 @@ pub async fn run_test(
     Ok(())
 }
 
-impl PythonTest {
-    /// Execute the Python test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running python test(s)");
-        let _guard = span.enter();
+// impl PythonTest {
+//     /// Execute the Python test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let span = tracing::info_span!("Running python test(s)");
+//         let _guard = span.enter();
 
-        // The version spec of the package being built
-        let match_spec = MatchSpec::from_str(
-            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-            ParseStrictness::Lenient,
-        )?;
+//         // The version spec of the package being built
+//         let match_spec = MatchSpec::from_str(
+//             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//             ParseStrictness::Lenient,
+//         )?;
 
-        // The dependencies for the test environment
-        // - python_version: null -> { "": ["mypackage=xx=xx"]}
-        // - python_version: 3.12 -> { "3.12": ["python=3.12", "mypackage=xx=xx"]}
-        // - python_version: [3.12, 3.13] -> { "3.12": ["python=3.12", "mypackage=xx=xx"], "3.13": ["python=3.13", "mypackage=xx=xx"]}
-        let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match &self.python_version {
-            PythonVersion::Multiple(versions) => versions
-                .iter()
-                .map(|version| {
-                    (
-                        version.clone(),
-                        vec![
-                            MatchSpec::from_str(
-                                &format!("python={}", version),
-                                ParseStrictness::Lenient,
-                            )
-                            .unwrap(),
-                            match_spec.clone(),
-                        ],
-                    )
-                })
-                .collect(),
-            PythonVersion::Single(version) => HashMap::from([(
-                version.clone(),
-                vec![
-                    MatchSpec::from_str(&format!("python={}", version), ParseStrictness::Lenient)
-                        .unwrap(),
-                    match_spec,
-                ],
-            )]),
-            PythonVersion::None => HashMap::from([("".to_string(), vec![match_spec])]),
-        };
+//         // The dependencies for the test environment
+//         // - python_version: null -> { "": ["mypackage=xx=xx"]}
+//         // - python_version: 3.12 -> { "3.12": ["python=3.12", "mypackage=xx=xx"]}
+//         // - python_version: [3.12, 3.13] -> { "3.12": ["python=3.12", "mypackage=xx=xx"], "3.13": ["python=3.13", "mypackage=xx=xx"]}
+//         let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match &self.python_version {
+//             PythonVersion::Multiple(versions) => versions
+//                 .iter()
+//                 .map(|version| {
+//                     (
+//                         version.clone(),
+//                         vec![
+//                             MatchSpec::from_str(
+//                                 &format!("python={}", version),
+//                                 ParseStrictness::Lenient,
+//                             )
+//                             .unwrap(),
+//                             match_spec.clone(),
+//                         ],
+//                     )
+//                 })
+//                 .collect(),
+//             PythonVersion::Single(version) => HashMap::from([(
+//                 version.clone(),
+//                 vec![
+//                     MatchSpec::from_str(&format!("python={}", version), ParseStrictness::Lenient)
+//                         .unwrap(),
+//                     match_spec,
+//                 ],
+//             )]),
+//             PythonVersion::None => HashMap::from([("".to_string(), vec![match_spec])]),
+//         };
 
-        // Add `pip` if pip_check is set to true
-        if self.pip_check {
-            dependencies_map
-                .iter_mut()
-                .for_each(|(_, v)| v.push("pip".parse().unwrap()));
-        }
+//         // Add `pip` if pip_check is set to true
+//         if self.pip_check {
+//             dependencies_map
+//                 .iter_mut()
+//                 .for_each(|(_, v)| v.push("pip".parse().unwrap()));
+//         }
 
-        // Run tests for each python version
-        for (python_version, dependencies) in dependencies_map {
-            self.run_test_inner(python_version, dependencies, path, prefix, config)
-                .await?;
-        }
+//         // Run tests for each python version
+//         for (python_version, dependencies) in dependencies_map {
+//             self.run_test_inner(python_version, dependencies, path, prefix, config)
+//                 .await?;
+//         }
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    async fn run_test_inner(
-        &self,
-        python_version: String,
-        dependencies: Vec<MatchSpec>,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let span_message = match python_version.as_str() {
-            "" => "Testing with default python version".to_string(),
-            _ => format!("Testing with python {}", python_version),
-        };
-        let span = tracing::info_span!("", message = %span_message);
-        let _guard = span.enter();
+//     async fn run_test_inner(
+//         &self,
+//         python_version: String,
+//         dependencies: Vec<MatchSpec>,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let span_message = match python_version.as_str() {
+//             "" => "Testing with default python version".to_string(),
+//             _ => format!("Testing with python {}", python_version),
+//         };
+//         let span = tracing::info_span!("", message = %span_message);
+//         let _guard = span.enter();
 
-        let test_prefix = prefix.join("test_env");
-        create_environment(
-            "test",
-            &dependencies,
-            config
-                .host_platform
-                .as_ref()
-                .unwrap_or(&config.current_platform),
-            &test_prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+//         let test_prefix = prefix.join("test_env");
+//         create_environment(
+//             "test",
+//             &dependencies,
+//             config
+//                 .host_platform
+//                 .as_ref()
+//                 .unwrap_or(&config.current_platform),
+//             &test_prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await
+//         .map_err(TestError::TestEnvironmentSetup)?;
 
-        let mut imports = String::new();
-        for import in &self.imports {
-            writeln!(imports, "import {}", import)?;
-        }
+//         let mut imports = String::new();
+//         for import in &self.imports {
+//             writeln!(imports, "import {}", import)?;
+//         }
 
-        let script = Script {
-            content: ScriptContent::Command(imports),
-            interpreter: Some("python".into()),
-            ..Script::default()
-        };
+//         let script = Script {
+//             content: ScriptContent::Command(imports),
+//             interpreter: Some("python".into()),
+//             ..Script::default()
+//         };
 
-        let test_dir = prefix.join("test");
-        fs::create_dir_all(&test_dir)?;
-        script
-            .run_script(
-                Default::default(),
-                &test_dir,
-                path,
-                &test_prefix,
-                None,
-                None,
-                None,
-                config.debug,
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         let test_dir = prefix.join("test");
+//         fs::create_dir_all(&test_dir)?;
+//         script
+//             .run_script(
+//                 Default::default(),
+//                 &test_dir,
+//                 path,
+//                 &test_prefix,
+//                 None,
+//                 None,
+//                 None,
+//                 config.debug,
+//             )
+//             .await
+//             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-        tracing::info!(
-            "{} python imports test passed!",
-            console::style(console::Emoji("✔", "")).green()
-        );
+//         tracing::info!(
+//             "{} python imports test passed!",
+//             console::style(console::Emoji("✔", "")).green()
+//         );
 
-        if self.pip_check {
-            let script = Script {
-                content: ScriptContent::Command("pip check".into()),
-                ..Script::default()
-            };
-            script
-                .run_script(
-                    Default::default(),
-                    path,
-                    path,
-                    &test_prefix,
-                    None,
-                    None,
-                    None,
-                    config.debug,
-                )
-                .await
-                .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         if self.pip_check {
+//             let script = Script {
+//                 content: ScriptContent::Command("pip check".into()),
+//                 ..Script::default()
+//             };
+//             script
+//                 .run_script(
+//                     Default::default(),
+//                     path,
+//                     path,
+//                     &test_prefix,
+//                     None,
+//                     None,
+//                     None,
+//                     config.debug,
+//                 )
+//                 .await
+//                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-            tracing::info!(
-                "{} pip check passed!",
-                console::style(console::Emoji("✔", "")).green()
-            );
-        }
-        Ok(())
-    }
-}
+//             tracing::info!(
+//                 "{} pip check passed!",
+//                 console::style(console::Emoji("✔", "")).green()
+//             );
+//         }
+//         Ok(())
+//     }
+// }
 
-impl PerlTest {
-    /// Execute the Perl test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running perl test");
-        let _guard = span.enter();
+// impl PerlTest {
+//     /// Execute the Perl test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let span = tracing::info_span!("Running perl test");
+//         let _guard = span.enter();
 
-        let match_spec = MatchSpec::from_str(
-            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-            ParseStrictness::Lenient,
-        )?;
+//         let match_spec = MatchSpec::from_str(
+//             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//             ParseStrictness::Lenient,
+//         )?;
 
-        let dependencies = vec!["perl".parse().unwrap(), match_spec];
+//         let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
-        let test_prefix = prefix.join("test_env");
-        create_environment(
-            "test",
-            &dependencies,
-            config
-                .host_platform
-                .as_ref()
-                .unwrap_or(&config.current_platform),
-            &test_prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+//         let test_prefix = prefix.join("test_env");
+//         create_environment(
+//             "test",
+//             &dependencies,
+//             config
+//                 .host_platform
+//                 .as_ref()
+//                 .unwrap_or(&config.current_platform),
+//             &test_prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await
+//         .map_err(TestError::TestEnvironmentSetup)?;
 
-        let mut imports = String::new();
-        tracing::info!("Testing perl imports:\n");
+//         let mut imports = String::new();
+//         tracing::info!("Testing perl imports:\n");
 
-        for module in &self.uses {
-            writeln!(imports, "use {};", module)?;
-            tracing::info!("  use {};", module);
-        }
-        tracing::info!("\n");
+//         for module in &self.uses {
+//             writeln!(imports, "use {};", module)?;
+//             tracing::info!("  use {};", module);
+//         }
+//         tracing::info!("\n");
 
-        let script = Script {
-            content: ScriptContent::Command(imports.clone()),
-            interpreter: Some("perl".into()),
-            ..Script::default()
-        };
+//         let script = Script {
+//             content: ScriptContent::Command(imports.clone()),
+//             interpreter: Some("perl".into()),
+//             ..Script::default()
+//         };
 
-        let test_folder = prefix.join("test_files");
-        fs::create_dir_all(&test_folder)?;
-        script
-            .run_script(
-                Default::default(),
-                &test_folder,
-                path,
-                &test_prefix,
-                None,
-                None,
-                None,
-                config.debug,
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         let test_folder = prefix.join("test_files");
+//         fs::create_dir_all(&test_folder)?;
+//         script
+//             .run_script(
+//                 Default::default(),
+//                 &test_folder,
+//                 path,
+//                 &test_prefix,
+//                 None,
+//                 None,
+//                 None,
+//                 config.debug,
+//             )
+//             .await
+//             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
-impl CommandsTest {
-    /// Execute the command test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        test_directory: &Path,
-        config: &TestConfiguration,
-        pkg_vars: &HashMap<String, String>,
-    ) -> Result<(), TestError> {
-        let deps = self.requirements.clone();
+// impl CommandsTest {
+//     /// Execute the command test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         test_directory: &Path,
+//         config: &TestConfiguration,
+//         pkg_vars: &HashMap<String, String>,
+//     ) -> Result<(), TestError> {
+//         let deps = self.requirements.clone();
 
-        let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
-        let _guard = span.enter();
+//         let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
+//         let _guard = span.enter();
 
-        let build_prefix = if !deps.build.is_empty() {
-            tracing::info!("Installing build dependencies");
-            let build_prefix = test_directory.join("test_build_env");
-            let build_dependencies = deps
-                .build
-                .iter()
-                .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
-                .collect::<Result<Vec<_>, _>>()?;
+//         let build_prefix = if !deps.build.is_empty() {
+//             tracing::info!("Installing build dependencies");
+//             let build_prefix = test_directory.join("test_build_env");
+//             let build_dependencies = deps
+//                 .build
+//                 .iter()
+//                 .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
+//                 .collect::<Result<Vec<_>, _>>()?;
 
-            create_environment(
-                "test",
-                &build_dependencies,
-                &config.current_platform,
-                &build_prefix,
-                &config.channels,
-                &config.tool_configuration,
-                config.channel_priority,
-                config.solve_strategy,
-                config.exclude_newer,
-            )
-            .await
-            .map_err(TestError::TestEnvironmentSetup)?;
-            Some(build_prefix)
-        } else {
-            None
-        };
+//             create_environment(
+//                 "test",
+//                 &build_dependencies,
+//                 &config.current_platform,
+//                 &build_prefix,
+//                 &config.channels,
+//                 &config.tool_configuration,
+//                 config.channel_priority,
+//                 config.solve_strategy,
+//                 config.exclude_newer,
+//             )
+//             .await
+//             .map_err(TestError::TestEnvironmentSetup)?;
+//             Some(build_prefix)
+//         } else {
+//             None
+//         };
 
-        let mut dependencies = deps
-            .run
-            .iter()
-            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
-            .collect::<Result<Vec<_>, _>>()?;
+//         let mut dependencies = deps
+//             .run
+//             .iter()
+//             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
+//             .collect::<Result<Vec<_>, _>>()?;
 
-        // create environment with the test dependencies
-        dependencies.push(MatchSpec::from_str(
-            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-            ParseStrictness::Lenient,
-        )?);
+//         // create environment with the test dependencies
+//         dependencies.push(MatchSpec::from_str(
+//             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//             ParseStrictness::Lenient,
+//         )?);
 
-        let platform = config
-            .host_platform
-            .as_ref()
-            .unwrap_or(&config.current_platform);
+//         let platform = config
+//             .host_platform
+//             .as_ref()
+//             .unwrap_or(&config.current_platform);
 
-        let run_prefix = test_directory.join("test_run_env");
-        create_environment(
-            "test",
-            &dependencies,
-            platform,
-            &run_prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+//         let run_prefix = test_directory.join("test_run_env");
+//         create_environment(
+//             "test",
+//             &dependencies,
+//             platform,
+//             &run_prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await
+//         .map_err(TestError::TestEnvironmentSetup)?;
 
-        let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
-        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-        env_vars.insert(
-            "PREFIX".to_string(),
-            Some(run_prefix.to_string_lossy().to_string()),
-        );
+//         let platform = Platform::current();
+//         let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
+//         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+//         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+//         env_vars.insert(
+//             "PREFIX".to_string(),
+//             Some(run_prefix.to_string_lossy().to_string()),
+//         );
 
-        // copy all test files to a temporary directory and set it as the working
-        // directory
-        let test_dir = test_directory.join("test");
-        CopyDir::new(path, &test_dir).run().map_err(|e| {
-            TestError::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to copy test files: {}", e),
-            ))
-        })?;
+//         // copy all test files to a temporary directory and set it as the working
+//         // directory
+//         let test_dir = test_directory.join("test");
+//         CopyDir::new(path, &test_dir).run().map_err(|e| {
+//             TestError::IoError(std::io::Error::new(
+//                 std::io::ErrorKind::Other,
+//                 format!("Failed to copy test files: {}", e),
+//             ))
+//         })?;
 
-        tracing::info!("Testing commands:");
-        self.script
-            .run_script(
-                env_vars,
-                &test_dir,
-                path,
-                &run_prefix,
-                build_prefix.as_ref(),
-                None,
-                None,
-                config.debug,
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         tracing::info!("Testing commands:");
+//         self.script
+//             .run_script(
+//                 env_vars,
+//                 &test_dir,
+//                 path,
+//                 &run_prefix,
+//                 build_prefix.as_ref(),
+//                 None,
+//                 None,
+//                 config.debug,
+//             )
+//             .await
+//             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
-impl DownstreamTest {
-    /// Execute the command test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let downstream_spec = self.downstream.clone();
+// impl DownstreamTest {
+//     /// Execute the command test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let downstream_spec = self.downstream.clone();
 
-        let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
-        let _guard = span.enter();
+//         let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+//         let _guard = span.enter();
 
-        // first try to resolve an environment with the downstream spec and our
-        // current package
-        let match_specs = [
-            MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
-            MatchSpec::from_str(
-                format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-                ParseStrictness::Lenient,
-            )?,
-        ];
+//         // first try to resolve an environment with the downstream spec and our
+//         // current package
+//         let match_specs = [
+//             MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
+//             MatchSpec::from_str(
+//                 format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//                 ParseStrictness::Lenient,
+//             )?,
+//         ];
 
-        let resolved = create_environment(
-            "test",
-            &match_specs,
-            &config.current_platform,
-            prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await;
+//         let resolved = create_environment(
+//             "test",
+//             &match_specs,
+//             &config.current_platform,
+//             prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await;
 
-        match resolved {
-            Ok(solution) => {
-                let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
-                // we found a solution, so let's run the downstream test with that particular
-                // package!
-                let downstream_package = solution
-                    .iter()
-                    .find(|s| s.package_record.name == spec_name)
-                    .ok_or_else(|| {
-                        TestError::TestFailed(
-                            "Could not find package in the resolved environment".to_string(),
-                        )
-                    })?;
+//         match resolved {
+//             Ok(solution) => {
+//                 let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
+//                 // we found a solution, so let's run the downstream test with that particular
+//                 // package!
+//                 let downstream_package = solution
+//                     .iter()
+//                     .find(|s| s.package_record.name == spec_name)
+//                     .ok_or_else(|| {
+//                         TestError::TestFailed(
+//                             "Could not find package in the resolved environment".to_string(),
+//                         )
+//                     })?;
 
-                let temp_dir = tempfile::tempdir()?;
-                let package_file = temp_dir.path().join(&downstream_package.file_name);
+//                 let temp_dir = tempfile::tempdir()?;
+//                 let package_file = temp_dir.path().join(&downstream_package.file_name);
 
-                if downstream_package.url.scheme() == "file" {
-                    fs::copy(
-                        downstream_package.url.to_file_path().unwrap(),
-                        &package_file,
-                    )?;
-                } else {
-                    let package_dl = reqwest::get(downstream_package.url.clone()).await.unwrap();
-                    // write out the package to a temporary directory
-                    let mut file = fs::File::create(&package_file)?;
-                    let bytes = package_dl.bytes().await.unwrap();
-                    file.write_all(&bytes)?;
-                }
+//                 if downstream_package.url.scheme() == "file" {
+//                     fs::copy(
+//                         downstream_package.url.to_file_path().unwrap(),
+//                         &package_file,
+//                     )?;
+//                 } else {
+//                     let package_dl = reqwest::get(downstream_package.url.clone()).await.unwrap();
+//                     // write out the package to a temporary directory
+//                     let mut file = fs::File::create(&package_file)?;
+//                     let bytes = package_dl.bytes().await.unwrap();
+//                     file.write_all(&bytes)?;
+//                 }
 
-                // run the test with the downstream package
-                tracing::info!("Running downstream test with {:?}", &package_file);
-                run_test(path, config, Some(package_file.clone()))
-                    .await
-                    .inspect_err(|_| {
-                        tracing::error!("Downstream test with {:?} failed", &package_file);
-                    })?;
-            }
-            Err(e) => {
-                // ignore the error
-                tracing::warn!(
-                    "Downstream test could not run. Environment might be unsolvable: {:?}",
-                    e
-                );
-            }
-        }
+//                 // run the test with the downstream package
+//                 tracing::info!("Running downstream test with {:?}", &package_file);
+//                 run_test(path, config, Some(package_file.clone()))
+//                     .await
+//                     .inspect_err(|_| {
+//                         tracing::error!("Downstream test with {:?} failed", &package_file);
+//                     })?;
+//             }
+//             Err(e) => {
+//                 // ignore the error
+//                 tracing::warn!(
+//                     "Downstream test could not run. Environment might be unsolvable: {:?}",
+//                     e
+//                 );
+//             }
+//         }
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
-impl RTest {
-    /// Execute the R test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running R test");
-        let _guard = span.enter();
+// impl RTest {
+//     /// Execute the R test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let span = tracing::info_span!("Running R test");
+//         let _guard = span.enter();
 
-        let match_spec = MatchSpec::from_str(
-            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-            ParseStrictness::Lenient,
-        )?;
+//         let match_spec = MatchSpec::from_str(
+//             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//             ParseStrictness::Lenient,
+//         )?;
 
-        let dependencies = vec!["r-base".parse().unwrap(), match_spec];
-        let test_prefix = prefix.join("test_env");
-        create_environment(
-            "test",
-            &dependencies,
-            config
-                .host_platform
-                .as_ref()
-                .unwrap_or(&config.current_platform),
-            &test_prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+//         let dependencies = vec!["r-base".parse().unwrap(), match_spec];
+//         let test_prefix = prefix.join("test_env");
+//         create_environment(
+//             "test",
+//             &dependencies,
+//             config
+//                 .host_platform
+//                 .as_ref()
+//                 .unwrap_or(&config.current_platform),
+//             &test_prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await
+//         .map_err(TestError::TestEnvironmentSetup)?;
 
-        let mut libraries = String::new();
-        tracing::info!("Testing R libraries:\n");
+//         let mut libraries = String::new();
+//         tracing::info!("Testing R libraries:\n");
 
-        for library in &self.libraries {
-            writeln!(libraries, "library({})", library)?;
-            tracing::info!("  library({})", library);
-        }
-        tracing::info!("\n");
+//         for library in &self.libraries {
+//             writeln!(libraries, "library({})", library)?;
+//             tracing::info!("  library({})", library);
+//         }
+//         tracing::info!("\n");
 
-        let script = Script {
-            content: ScriptContent::Command(libraries.clone()),
-            interpreter: Some("rscript".into()),
-            ..Script::default()
-        };
+//         let script = Script {
+//             content: ScriptContent::Command(libraries.clone()),
+//             interpreter: Some("rscript".into()),
+//             ..Script::default()
+//         };
 
-        let test_folder = prefix.join("test_files");
-        fs::create_dir_all(&test_folder)?;
-        script
-            .run_script(
-                Default::default(),
-                &test_folder,
-                path,
-                &test_prefix,
-                None,
-                None,
-                None,
-                config.debug,
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         let test_folder = prefix.join("test_files");
+//         fs::create_dir_all(&test_folder)?;
+//         script
+//             .run_script(
+//                 Default::default(),
+//                 &test_folder,
+//                 path,
+//                 &test_prefix,
+//                 None,
+//                 None,
+//                 None,
+//                 config.debug,
+//             )
+//             .await
+//             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
-impl RubyTest {
-    /// Execute the Ruby test
-    pub async fn run_test(
-        &self,
-        pkg: &ArchiveIdentifier,
-        path: &Path,
-        prefix: &Path,
-        config: &TestConfiguration,
-    ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running Ruby test");
-        let _guard = span.enter();
+// impl RubyTest {
+//     /// Execute the Ruby test
+//     pub async fn run_test(
+//         &self,
+//         pkg: &ArchiveIdentifier,
+//         path: &Path,
+//         prefix: &Path,
+//         config: &TestConfiguration,
+//     ) -> Result<(), TestError> {
+//         let span = tracing::info_span!("Running Ruby test");
+//         let _guard = span.enter();
 
-        let match_spec = MatchSpec::from_str(
-            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-            ParseStrictness::Lenient,
-        )?;
+//         let match_spec = MatchSpec::from_str(
+//             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+//             ParseStrictness::Lenient,
+//         )?;
 
-        let dependencies = vec!["ruby".parse().unwrap(), match_spec];
+//         let dependencies = vec!["ruby".parse().unwrap(), match_spec];
 
-        let test_prefix = prefix.join("test_env");
-        create_environment(
-            "test",
-            &dependencies,
-            config
-                .host_platform
-                .as_ref()
-                .unwrap_or(&config.current_platform),
-            &test_prefix,
-            &config.channels,
-            &config.tool_configuration,
-            config.channel_priority,
-            config.solve_strategy,
-            config.exclude_newer,
-        )
-        .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+//         let test_prefix = prefix.join("test_env");
+//         create_environment(
+//             "test",
+//             &dependencies,
+//             config
+//                 .host_platform
+//                 .as_ref()
+//                 .unwrap_or(&config.current_platform),
+//             &test_prefix,
+//             &config.channels,
+//             &config.tool_configuration,
+//             config.channel_priority,
+//             config.solve_strategy,
+//             config.exclude_newer,
+//         )
+//         .await
+//         .map_err(TestError::TestEnvironmentSetup)?;
 
-        let mut requires = String::new();
-        tracing::info!("Testing Ruby requires:\n");
+//         let mut requires = String::new();
+//         tracing::info!("Testing Ruby requires:\n");
 
-        for module in &self.requires {
-            writeln!(requires, "require '{}'", module)?;
-            tracing::info!("  require '{}'", module);
-        }
-        tracing::info!("\n");
+//         for module in &self.requires {
+//             writeln!(requires, "require '{}'", module)?;
+//             tracing::info!("  require '{}'", module);
+//         }
+//         tracing::info!("\n");
 
-        let script = Script {
-            content: ScriptContent::Command(requires.clone()),
-            interpreter: Some("ruby".into()),
-            ..Script::default()
-        };
+//         let script = Script {
+//             content: ScriptContent::Command(requires.clone()),
+//             interpreter: Some("ruby".into()),
+//             ..Script::default()
+//         };
 
-        let test_folder = prefix.join("test_files");
-        fs::create_dir_all(&test_folder)?;
-        script
-            .run_script(
-                Default::default(),
-                &test_folder,
-                path,
-                &test_prefix,
-                None,
-                None,
-                None,
-                config.debug,
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//         let test_folder = prefix.join("test_files");
+//         fs::create_dir_all(&test_folder)?;
+//         script
+//             .run_script(
+//                 Default::default(),
+//                 &test_folder,
+//                 path,
+//                 &test_prefix,
+//                 None,
+//                 None,
+//                 None,
+//                 config.debug,
+//             )
+//             .await
+//             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }

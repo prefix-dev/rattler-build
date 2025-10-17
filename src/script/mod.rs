@@ -2,6 +2,7 @@
 mod interpreter;
 mod sandbox;
 pub use interpreter::InterpreterError;
+use rattler_build_jinja::Jinja;
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
 use crate::script::interpreter::Interpreter;
@@ -33,10 +34,6 @@ use crate::{
     env_vars::{self},
     metadata::Debug,
     metadata::Output,
-    recipe::{
-        Jinja,
-        parser::{Script, ScriptContent},
-    },
 };
 
 /// Arguments for executing a script in a given interpreter.

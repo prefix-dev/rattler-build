@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 use rattler_build_recipe::stage1::TestType;
 
-use crate::{metadata::Output, packaging::PackagingError, recipe::Jinja};
+use crate::{metadata::Output, packaging::PackagingError};
 
 // impl CommandsTest {
 //     fn write_to_folder(
@@ -47,11 +47,6 @@ use crate::{metadata::Output, packaging::PackagingError, recipe::Jinja};
 //     }
 // }
 
-fn default_jinja_context(output: &Output) -> Jinja {
-    let selector_config = output.build_configuration.selector_config();
-    Jinja::new(selector_config).with_context(&output.recipe.context)
-}
-
 /// Write out the test files for the final package
 pub(crate) fn write_test_files(
     output: &Output,
@@ -68,8 +63,9 @@ pub(crate) fn write_test_files(
     tests.retain(|test| !matches!(test, TestType::PackageContents { .. }));
 
     // For each `Command` test, we need to copy the test files to the package
-    for (idx, test) in tests.iter_mut().enumerate() {
-        if let TestType::Commands(command_test) = test {
+    for (_idx, test) in tests.iter_mut().enumerate() {
+        if let TestType::Commands(_command_test) = test {
+            tracing::info!("Writing command test files for package '{name}'");
             // let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
             // let folder = tmp_dir_path.join(&cwd);
             // let files = command_test.write_to_folder(&folder, output)?;

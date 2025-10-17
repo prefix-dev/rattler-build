@@ -3,20 +3,10 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    env_vars,
-    hash::HashInfo,
-    recipe::{
-        Jinja, ParsingError, Recipe,
-        custom_yaml::Node,
-        parser::{BuildString, Dependency},
-    },
-    selectors::SelectorConfig,
-    source_code::SourceCode,
-    used_variables::used_vars_from_expressions,
-};
+use crate::{env_vars, hash::HashInfo, selectors::SelectorConfig, source_code::SourceCode};
 use petgraph::graph::DiGraph;
 use rattler_build_jinja::Variable;
+use rattler_build_recipe::stage1::Dependency;
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::{VariantConfig, VariantError, VariantExpandError};
 use rattler_conda_types::PackageName;

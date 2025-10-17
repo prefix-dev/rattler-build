@@ -19,10 +19,12 @@ use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
 
 use crate::{
-    metadata::Output,
-    metadata::{BuildConfiguration, build_reindexed_channels},
+    metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
-    render::solver::{install_packages, solve_environment},
+    render::{
+        run_exports::filter_run_exports,
+        solver::{install_packages, solve_environment},
+    },
     tool_configuration::{self, Configuration},
 };
 
@@ -824,8 +826,11 @@ pub(crate) async fn resolve_dependencies(
         build_run_exports.extend(build_env.run_exports(true));
     }
 
-    let output_ignore_run_exports = &requirements.ignore_run_exports;
-    let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
+    let mut build_run_exports = filter_run_exports(
+        &requirements.ignore_run_exports,
+        &build_run_exports,
+        "build",
+    )?;
 
     // TODO: re-enable cache
     // if let Some(cache) = &output.finalized_cache_dependencies {
@@ -966,7 +971,8 @@ pub(crate) async fn resolve_dependencies(
     }
 
     // And filter the run exports
-    let mut host_run_exports = output_ignore_run_exports.filter(&host_run_exports, "host")?;
+    let mut host_run_exports =
+        filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
 
     // if let Some(cache) = &output.finalized_cache_dependencies {
     //     if let Some(cache_host_env) = &cache.host {

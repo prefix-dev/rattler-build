@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     hash::HashInfo,
-    recipe::jinja::SelectorConfig,
     script::SandboxConfiguration,
+    selectors::SelectorConfig,
     types::{
         Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
     },
