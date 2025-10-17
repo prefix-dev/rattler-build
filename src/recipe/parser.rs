@@ -3,6 +3,7 @@
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use indexmap::IndexMap;
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -18,6 +19,7 @@ use crate::{
     selectors::SelectorConfig,
     source_code::SourceCode,
 };
+use marked_yaml;
 
 mod about;
 mod build;
@@ -270,8 +272,8 @@ impl Recipe {
         let mut about = About::default();
         let mut cache = None;
         let mut extra = IndexMap::default();
-        let mut cache_outputs_result = Vec::new();
-        let mut cache_inheritance = std::collections::HashMap::new();
+        let cache_outputs_result = Vec::new();
+        let cache_inheritance = std::collections::HashMap::new();
 
         rendered_node
             .iter()
@@ -335,7 +337,7 @@ impl Recipe {
             );
         }
 
-        let mut recipe = Recipe {
+        let recipe = Recipe {
             schema_version,
             context,
             package: package.ok_or_else(|| {
@@ -393,12 +395,16 @@ impl Recipe {
     /// Convert top-level cache to a synthetic CacheOutput
     pub fn synthetic_cache_output(&self) -> Option<CacheOutput> {
         self.cache.as_ref().map(|cache| CacheOutput {
-            name: format!("__recipe_{}_cache", self.package.name.as_normalized()),
+            name: PackageName::new_unchecked(format!(
+                "__recipe_{}_cache",
+                self.package.name.as_normalized()
+            )),
             source: cache.source.clone(),
             build: CacheBuild {
                 script: Some(cache.build.script.clone()),
-                files: cache.build.files.clone(),
-                always_include_files: cache.build.always_include_files.clone(),
+                variant: cache.build.variant().clone(),
+                files: GlobVec::default(),
+                always_include_files: GlobVec::default(),
             },
             requirements: CacheRequirements {
                 build: cache.requirements.build.clone(),
@@ -407,6 +413,7 @@ impl Recipe {
             run_exports: RunExports::default(),
             ignore_run_exports: Some(cache.requirements.ignore_run_exports.clone()),
             about: None,
+            span: marked_yaml::Span::new_blank(),
         })
     }
 
@@ -432,7 +439,9 @@ impl Recipe {
         if let Some(cache_names) = inheritance_relationships.get(package_name) {
             let mut result = Vec::new();
             for cache_name in cache_names {
-                if let Some(cache_output) = all_cache_outputs.iter().find(|c| &c.name == cache_name)
+                if let Some(cache_output) = all_cache_outputs
+                    .iter()
+                    .find(|c| c.name.as_normalized() == cache_name.as_str())
                 {
                     result.push(cache_output.clone());
                 }

@@ -2,6 +2,10 @@
 //!
 //! This module defines the cache output type which is an intermediate build artifact
 //! that can be inherited by regular package outputs.
+//!
+//! Cache outputs enable the "fast path" optimization where package outputs that inherit
+//! from a cache and specify no explicit build script can skip environment installation
+//! and script execution, significantly speeding up the build process.
 
 use crate::{
     _partialerror,
@@ -9,22 +13,30 @@ use crate::{
         custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
         parser::{
-            StandardTryConvert, invalid_field_error, missing_field_error, parse_required_string,
+            StandardTryConvert, build::VariantKeyUsage, invalid_field_error, missing_field_error,
             validate_mapping_keys,
         },
     },
 };
+use marked_yaml::Span;
+use rattler_conda_types::PackageName;
+use serde::de::{self, Deserialize as DeserializeTrait, Deserializer};
 use serde::{Deserialize, Serialize};
 
-use super::{Script, Source};
-use super::requirements::RunExports;
 use super::glob_vec::GlobVec;
+use super::requirements::RunExports;
+use super::{Script, Source};
 
 /// A cache output that produces intermediate build artifacts
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Cache outputs can be inherited by package outputs using the `inherit` key in the
+/// package output definition. This enables the "fast path" optimization where package
+/// outputs that inherit from a cache and have no explicit build script can skip
+/// environment installation and script execution, significantly improving build performance.
+#[derive(Debug, Clone, Serialize)]
 pub struct CacheOutput {
     /// The name of the cache output
-    pub name: String,
+    pub name: PackageName,
     /// Sources for this cache output
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
@@ -46,31 +58,138 @@ pub struct CacheOutput {
     pub span: marked_yaml::Span,
 }
 
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "lowercase")]
+enum Field {
+    Name,
+    Source,
+    Build,
+    Requirements,
+    RunExports,
+    IgnoreRunExports,
+    About,
+}
+
+// Manual implementation of Deserialize for CacheOutput
+impl<'de> DeserializeTrait<'de> for CacheOutput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct CacheOutputVisitor;
+
+        impl<'de> de::Visitor<'de> for CacheOutputVisitor {
+            type Value = CacheOutput;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct CacheOutput")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<CacheOutput, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let mut name = None;
+                let mut source = None;
+                let mut build = None;
+                let mut requirements = None;
+                let mut run_exports = None;
+                let mut ignore_run_exports = None;
+                let mut about = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name.is_some() {
+                                return Err(de::Error::duplicate_field("name"));
+                            }
+                            name = Some(map.next_value()?);
+                        }
+                        Field::Source => {
+                            if source.is_some() {
+                                return Err(de::Error::duplicate_field("source"));
+                            }
+                            source = Some(map.next_value()?);
+                        }
+                        Field::Build => {
+                            if build.is_some() {
+                                return Err(de::Error::duplicate_field("build"));
+                            }
+                            build = Some(map.next_value()?);
+                        }
+                        Field::Requirements => {
+                            if requirements.is_some() {
+                                return Err(de::Error::duplicate_field("requirements"));
+                            }
+                            requirements = Some(map.next_value()?);
+                        }
+                        Field::RunExports => {
+                            if run_exports.is_some() {
+                                return Err(de::Error::duplicate_field("run_exports"));
+                            }
+                            run_exports = Some(map.next_value()?);
+                        }
+                        Field::IgnoreRunExports => {
+                            if ignore_run_exports.is_some() {
+                                return Err(de::Error::duplicate_field("ignore_run_exports"));
+                            }
+                            ignore_run_exports = Some(map.next_value()?);
+                        }
+                        Field::About => {
+                            if about.is_some() {
+                                return Err(de::Error::duplicate_field("about"));
+                            }
+                            about = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
+                let source = source.unwrap_or_else(Vec::new);
+                let build = build.ok_or_else(|| de::Error::missing_field("build"))?;
+                let requirements = requirements.unwrap_or_else(CacheRequirements::default);
+                let run_exports = run_exports.unwrap_or_else(RunExports::default);
+                let ignore_run_exports = ignore_run_exports;
+                let about = about;
+
+                Ok(CacheOutput {
+                    name,
+                    source,
+                    build,
+                    requirements,
+                    run_exports,
+                    ignore_run_exports,
+                    about,
+                    span: Span::new_blank(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(CacheOutputVisitor)
+    }
+}
+
 /// Build configuration specific to cache outputs
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CacheBuild {
     /// The build script - only script key is allowed for cache outputs
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script: Option<Script>,
-    /// Include files in the cache (glob patterns to select files)
+
+    /// Variant ignore and use keys for cache outputs
+    #[serde(default)]
+    pub variant: VariantKeyUsage,
+
+    /// Include files in the cache
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub files: GlobVec,
-    /// Files that are always included in the cache
+
+    /// Setting to control whether to always include a file (even if it is already present in the host env)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub always_include_files: GlobVec,
 }
 
-impl CacheBuild {
-    /// Get the files settings for this cache build
-    pub fn files(&self) -> &GlobVec {
-        &self.files
-    }
-
-    /// Get the always_include_files settings for this cache build
-    pub fn always_include_files(&self) -> &GlobVec {
-        &self.always_include_files
-    }
-}
+impl CacheBuild {}
 
 /// Requirements specific to cache outputs (no run or run_constraints allowed)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -114,7 +233,7 @@ impl StandardTryConvert for CacheOutput {
 
                     // Parse the name field
                     if let Some(name_value) = cache_mapping.get("name") {
-                        name = Some(parse_required_string(name_value, "name", "cache")?);
+                        name = Some(name_value.try_convert("cache.name")?);
                     }
                 }
                 "source" => {
@@ -135,21 +254,13 @@ impl StandardTryConvert for CacheOutput {
                 "about" => {
                     about = Some(value.try_convert("cache.about")?);
                 }
-                "inherit" => {
-                    return Err(vec![invalid_field_error(
-                        *key.span(),
-                        key.as_str(),
-                        Some(
-                            "cache outputs cannot use 'inherit' - caches must be built from scratch and cannot inherit from packages or other caches",
-                        ),
-                    )]);
-                }
+                "inherit" => {}
                 _ => {
                     return Err(vec![invalid_field_error(
                         *key.span(),
                         key.as_str(),
                         Some(
-                            "valid fields for cache outputs are: 'cache', 'source', 'build', 'requirements', 'run_exports', 'ignore_run_exports', and 'about'",
+                            "valid fields for cache outputs are: 'cache', 'source', 'build', 'requirements', 'run_exports', 'ignore_run_exports', 'about', and 'inherit'",
                         ),
                     )]);
                 }
@@ -185,7 +296,7 @@ impl StandardTryConvert for CacheOutput {
     }
 }
 
-/// Parse cache build section, ensuring only allowed keys are present
+/// Parse cache build section
 fn parse_cache_build(value: &RenderedNode) -> Result<CacheBuild, Vec<PartialParsingError>> {
     let build_node = value
         .as_mapping()
@@ -193,15 +304,19 @@ fn parse_cache_build(value: &RenderedNode) -> Result<CacheBuild, Vec<PartialPars
 
     let mut build = CacheBuild::default();
 
-    // Validate allowed keys
+    let allowed_keys = ["script", "variant", "files", "always_include_files"];
     validate_mapping_keys(
         build_node,
-        &["script", "files", "always_include_files"],
-        "cache build section (only 'script', 'files', and 'always_include_files' are allowed)",
+        &allowed_keys,
+        "cache build section (valid keys are 'script', 'variant', 'files', 'always_include_files')",
     )?;
 
     if let Some(script_value) = build_node.get("script") {
         build.script = Some(script_value.try_convert("cache.build.script")?);
+    }
+
+    if let Some(variant_value) = build_node.get("variant") {
+        build.variant = variant_value.try_convert("cache.build.variant")?;
     }
 
     if let Some(files_value) = build_node.get("files") {

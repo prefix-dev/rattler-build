@@ -15,6 +15,8 @@ use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
 
+type OverwriteCallback = dyn Fn(&Path) + Send + Sync + 'static;
+
 /// The copy options for the copy_dir function.
 pub struct CopyOptions {
     /// Overwrite files if they already exist (default: false)
@@ -24,7 +26,7 @@ pub struct CopyOptions {
     /// Buffer size for copying files (default: 8 MiB)
     pub buffer_size: usize,
     /// Optional callback invoked when a destination file is about to be overwritten
-    pub on_overwrite: Option<Box<dyn Fn(&Path) + Send + Sync + 'static>>,
+    pub on_overwrite: Option<Box<OverwriteCallback>>,
 }
 
 impl Default for CopyOptions {

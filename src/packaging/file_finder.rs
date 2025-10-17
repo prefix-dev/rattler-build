@@ -213,6 +213,74 @@ impl Files {
         })
     }
 
+    /// Find all files in the given prefix and apply the provided filters, including restored cache files.
+    /// This method is used when cache files have been restored to the prefix and we need to select files
+    /// based on the output's build configuration.
+    pub fn from_prefix_with_filters(
+        prefix: &Path,
+        always_include: &GlobVec,
+        files: &GlobVec,
+        restored_cache_prefix_files: Option<&Vec<PathBuf>>,
+        _restored_cache_work_dir_files: Option<&Vec<PathBuf>>,
+    ) -> Result<Self, io::Error> {
+        if !prefix.exists() {
+            return Ok(Files {
+                new_files: HashSet::new(),
+                old_files: HashSet::new(),
+                prefix: prefix.to_owned(),
+            });
+        }
+
+        let current_files = record_files(prefix)?;
+        let mut selected_files = HashSet::new();
+        for file in &current_files {
+            if let Ok(file_without_prefix) = file.strip_prefix(prefix) {
+                if files.is_empty()
+                    || files.is_match(file_without_prefix)
+                    || always_include.is_match(file_without_prefix)
+                {
+                    if always_include.is_match(file_without_prefix) {
+                        tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
+                    }
+                    selected_files.insert(file.clone());
+                }
+            }
+        }
+
+        if let Some(cache_files) = restored_cache_prefix_files {
+            for cache_file in cache_files {
+                let full_path = prefix.join(cache_file);
+                if let Ok(file_without_prefix) = full_path.strip_prefix(prefix) {
+                    if (files.is_empty()
+                        || files.is_match(file_without_prefix)
+                        || always_include.is_match(file_without_prefix))
+                        && current_files.contains(&full_path)
+                    {
+                        selected_files.insert(full_path);
+                    }
+                }
+            }
+        }
+
+        let previous_files = if prefix.join("conda-meta").exists() {
+            let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
+            let mut previous_files = prefix_records
+                .into_iter()
+                .flat_map(|record| record.files.into_iter().map(|f| prefix.join(f)))
+                .collect::<HashSet<_>>();
+            previous_files.extend(record_files(&prefix.join("conda-meta"))?);
+            previous_files
+        } else {
+            HashSet::new()
+        };
+
+        Ok(Files {
+            new_files: selected_files,
+            old_files: previous_files,
+            prefix: prefix.to_owned(),
+        })
+    }
+
     /// Copy the new files to a temporary directory and return the temporary directory and the files that were copied.
     pub fn to_temp_folder(&self, output: &Output) -> Result<TempFiles, PackagingError> {
         let temp_dir = TempDir::with_prefix(output.name().as_normalized())?;

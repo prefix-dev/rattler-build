@@ -24,6 +24,9 @@ pub enum InheritSpec {
         /// Whether to inherit run_exports (default: true)
         #[serde(default = "default_true")]
         run_exports: bool,
+        /// Whether to inherit requirements (default: false)
+        #[serde(default)]
+        requirements: bool,
     },
 }
 
@@ -47,6 +50,14 @@ impl InheritSpec {
             InheritSpec::Long { run_exports, .. } => *run_exports,
         }
     }
+
+    /// Check if requirements should be inherited
+    pub fn inherit_requirements(&self) -> bool {
+        match self {
+            InheritSpec::Short(_) => false,
+            InheritSpec::Long { requirements, .. } => *requirements,
+        }
+    }
 }
 
 impl TryConvertNode<InheritSpec> for RenderedNode {
@@ -60,6 +71,7 @@ impl TryConvertNode<InheritSpec> for RenderedNode {
         if let Some(mapping) = self.as_mapping() {
             let mut from = None;
             let mut run_exports = true;
+            let mut requirements = false;
 
             for (key, value) in mapping.iter() {
                 match key.as_str() {
@@ -94,6 +106,22 @@ impl TryConvertNode<InheritSpec> for RenderedNode {
                             )]
                         })?;
                     }
+                    "requirements" => {
+                        let scalar = value.as_scalar().ok_or_else(|| {
+                            vec![_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                help = "expected a boolean"
+                            )]
+                        })?;
+                        requirements = scalar.as_bool().ok_or_else(|| {
+                            vec![_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                help = "expected a boolean"
+                            )]
+                        })?;
+                    }
                     _ => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -111,7 +139,11 @@ impl TryConvertNode<InheritSpec> for RenderedNode {
                 )]
             })?;
 
-            return Ok(InheritSpec::Long { from, run_exports });
+            return Ok(InheritSpec::Long {
+                from,
+                run_exports,
+                requirements,
+            });
         }
 
         Err(vec![_partialerror!(

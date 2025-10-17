@@ -115,7 +115,9 @@ pub(crate) fn stage_0_render<S: SourceCode>(
             if let Some(caches) = inheritance_relationships.get(&package_name) {
                 let mut cache_list = Vec::new();
                 for cache_name in caches {
-                    if let Some(cache_output) = cache_outputs.iter().find(|c| &c.name == cache_name)
+                    if let Some(cache_output) = cache_outputs
+                        .iter()
+                        .find(|c| c.name.as_normalized() == cache_name.as_str())
                     {
                         cache_list.push(cache_output.clone());
                     }
@@ -365,6 +367,33 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 additional_variables.extend(cache_use_keys);
             }
 
+            // Add variant keys from specific cache outputs referenced via inherit
+            for cache_output in &output.cache_outputs {
+                for dep in &cache_output.requirements.build {
+                    if let crate::recipe::parser::Dependency::Spec(spec) = dep {
+                        if spec.version.is_none() && spec.build.is_none() {
+                            if let Some(name) = &spec.name {
+                                additional_variables.insert(name.as_normalized().into());
+                            }
+                        }
+                    }
+                }
+
+                for dep in &cache_output.requirements.host {
+                    if let crate::recipe::parser::Dependency::Spec(spec) = dep {
+                        if spec.version.is_none() && spec.build.is_none() {
+                            if let Some(name) = &spec.name {
+                                additional_variables.insert(name.as_normalized().into());
+                            }
+                        }
+                    }
+                }
+
+                for key in &cache_output.build.variant.use_keys {
+                    additional_variables.insert(key.as_str().into());
+                }
+            }
+
             // We want to add something to packages that are requiring a subpackage
             // _exactly_ because that creates additional variants
             for pin in output.requirements.all_pin_subpackage() {
@@ -386,6 +415,33 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 .collect::<Vec<NormalizedKey>>();
 
             additional_variables.extend(extra_use_keys);
+
+            // Add variant keys from specific cache outputs referenced via inherit
+            for cache_output in &output.cache_outputs {
+                for dep in &cache_output.requirements.build {
+                    if let crate::recipe::parser::Dependency::Spec(spec) = dep {
+                        if spec.version.is_none() && spec.build.is_none() {
+                            if let Some(name) = &spec.name {
+                                additional_variables.insert(name.as_normalized().into());
+                            }
+                        }
+                    }
+                }
+
+                for dep in &cache_output.requirements.host {
+                    if let crate::recipe::parser::Dependency::Spec(spec) = dep {
+                        if spec.version.is_none() && spec.build.is_none() {
+                            if let Some(name) = &spec.name {
+                                additional_variables.insert(name.as_normalized().into());
+                            }
+                        }
+                    }
+                }
+
+                for key in &cache_output.build.variant.use_keys {
+                    additional_variables.insert(key.as_str().into());
+                }
+            }
 
             // If the recipe is `noarch: python` we can remove an empty python key that
             // comes from the dependencies

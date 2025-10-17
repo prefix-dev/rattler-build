@@ -5,6 +5,7 @@
 //! `test`, and `about` fields.
 
 use marked_yaml::types::MarkedMappingNode;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     _partialerror,
@@ -15,6 +16,8 @@ use crate::{
     },
     source_code::SourceCode,
 };
+
+use rattler_conda_types::PackageName;
 
 use super::common_output::{
     ALLOWED_KEYS_MULTI_OUTPUTS, DEEP_MERGE_KEYS, extract_recipe_version_marked,
@@ -30,6 +33,34 @@ type CacheInheritanceResult = Result<
     ),
     ParsingError<&'static str>,
 >;
+
+// Extract inherit information
+fn inherit_name_from(node: &Node) -> Option<String> {
+    node.as_scalar()
+        .map(|s| s.as_str().to_string())
+        .or_else(|| {
+            node.as_mapping()?
+                .get("from")?
+                .as_scalar()
+                .map(|s| s.as_str().to_string())
+        })
+}
+
+fn pkg_inherit_node(output: &Node) -> Option<&Node> {
+    output
+        .as_mapping()?
+        .get("package")?
+        .as_mapping()?
+        .get("inherit")
+}
+
+fn cache_inherit_node(output: &Node) -> Option<&Node> {
+    output
+        .as_mapping()?
+        .get("cache")?
+        .as_mapping()?
+        .get("inherit")
+}
 
 // Check if the `cache` top-level key is present. If it does not contain a
 // source, but there is a top-level `source` key, then we should warn the user
@@ -124,7 +155,9 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
                     let missing_script = outputs_seq.iter().any(|output| {
                         output
                             .as_mapping()
-                            .and_then(|mapping| mapping.get("cache").or_else(|| mapping.get("package")))
+                            .and_then(|mapping| {
+                                mapping.get("cache").or_else(|| mapping.get("package"))
+                            })
                             .map(|subnode| {
                                 subnode
                                     .as_mapping()
@@ -135,14 +168,13 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
                     });
 
                     if missing_script {
-                        let key = outputs_value
-                            .span();
+                        let key = outputs_value.span();
                         return Err(ParsingError::from_partial(
                             src,
                             _partialerror!(
                                 *key,
                                 ErrorKind::MissingField("build.script".into()),
-                                help = "Multi-output recipes must specify `build.script` for each output; implicit build/script.sh is not supported"
+                                help = "Multi-output recipes must specify `build.script` for each output; implicit build/script.sh is not supported. This is a breaking change from single-output recipes that default to script.sh."
                             ),
                         ));
                     }
@@ -268,31 +300,28 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
             .and_then(|pkg_map| pkg_map.get("inherit"));
 
         match inherit_spec {
-            Some(inherit_node) if inherit_node.is_null() => {}
-            Some(_) => {
-            }
+            Some(inherit_node)
+                if inherit_node
+                    .as_scalar()
+                    .is_some_and(|s| s.as_str().is_empty()) => {}
+            Some(_) => {}
             None => {
-                if let Some(req_node) = output_map.get("requirements") {
-                    return Err(ParsingError::from_partial(
-                        src.clone(),
-                        _partialerror!(
-                            *req_node.span(),
-                            ErrorKind::InvalidField("requirements".to_string().into()),
-                            help = "When inheriting from top-level, outputs must not define `requirements`."
-                        ),
-                    ));
+                // When inheriting from top-level, requirements and build.script are ignored (not forbidden)
+                // rather than throwing errors, we just warn about them
+                if let Some(_req_node) = output_map.get("requirements") {
+                    tracing::warn!(
+                        "When inheriting from top-level, the `requirements` field will be ignored. \
+                         The output will inherit all requirements from the top-level recipe."
+                    );
                 }
                 if let Some(build_node) = output_map.get("build") {
                     if let Some(build_map) = build_node.as_mapping() {
                         if build_map.contains_key("script") {
-                            return Err(ParsingError::from_partial(
-                                src.clone(),
-                                _partialerror!(
-                                    *build_node.span(),
-                                    ErrorKind::InvalidField("build.script".to_string().into()),
-                                    help = "When inheriting from top-level, outputs must not define `build.script`."
-                                ),
-                            ));
+                            tracing::warn!(
+                                "When inheriting from top-level (implicit inheritance), the `build.script` field will be ignored. \
+                                 This is a breaking change from older versions where explicit script definitions in output were used. \
+                                 The output will use the top-level recipe's build script instead."
+                            );
                         }
                     }
                 }
@@ -318,21 +347,24 @@ pub fn resolve_cache_inheritance(
     outputs: Vec<Node>,
     has_toplevel_cache: bool,
 ) -> Result<Vec<Node>, ParsingError<&'static str>> {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     // Collect cache names from outputs array
     let mut cache_names = HashSet::new();
     let mut duplicate_caches = Vec::new();
-
-    let mut cache_name_spans = std::collections::HashMap::new();
+    let mut cache_name_spans = HashMap::new();
+    let mut cache_inheritance = HashMap::new();
 
     for output in outputs.iter() {
         if let Some(cache_output) = parse_cache_output_from_node(output)? {
-            let cache_name = cache_output.name.clone();
+            let cache_name = cache_output.name.as_normalized().to_string();
             if !cache_names.insert(cache_name.clone()) {
                 duplicate_caches.push(cache_name);
             } else {
-                cache_name_spans.insert(cache_output.name.clone(), cache_output.span);
+                cache_name_spans.insert(
+                    cache_output.name.as_normalized().to_string(),
+                    cache_output.span,
+                );
             }
         }
     }
@@ -350,64 +382,179 @@ pub fn resolve_cache_inheritance(
         ));
     }
 
+    // Validate package outputs inheriting from cache outputs
     for output in outputs.iter() {
-        if let Some(mapping) = output.as_mapping() {
-            if mapping.contains_key("package") {
-                if let Some(package_node) = mapping.get("package") {
-                    if let Some(package_mapping) = package_node.as_mapping() {
-                        if let Some(inherit_node) = package_mapping.get("inherit") {
-                            let cache_name = if let Some(inherit_scalar) = inherit_node.as_scalar()
-                            {
-                                inherit_scalar.as_str().to_string()
-                            } else if let Some(inherit_mapping) = inherit_node.as_mapping() {
-                                if let Some(from_node) = inherit_mapping.get("from") {
-                                    if let Some(from_scalar) = from_node.as_scalar() {
-                                        from_scalar.as_str().to_string()
-                                    } else {
-                                        continue;
-                                    }
-                                } else {
-                                    continue;
-                                }
-                            } else {
-                                continue;
-                            };
+        let Some(cache_name) = pkg_inherit_node(output).and_then(inherit_name_from) else {
+            continue;
+        };
 
-                            // Check if cache exists (in outputs array)
-                            // Note: Explicit inheritance takes precedence over top-level cache.
-                            // If an output explicitly inherits from a named cache, it must exist
-                            // in the outputs array.
-                            if !cache_names.contains(&cache_name) {
-                                let available: Vec<_> =
-                                    cache_names.iter().map(|n| format!("'{}'", n)).collect();
-                                let help_msg = if available.is_empty() {
-                                    if has_toplevel_cache {
-                                        "No cache outputs defined in outputs array. To use top-level cache, omit the 'inherit' key.".to_string()
-                                    } else {
-                                        "No cache outputs defined".to_string()
-                                    }
-                                } else {
-                                    format!("Available caches: {}", available.join(", "))
-                                };
-                                return Err(ParsingError::from_partial(
-                                    "",
-                                    _partialerror!(
-                                        *output.span(),
-                                        ErrorKind::InvalidField(
-                                            format!("cache '{}' not found", cache_name).into()
-                                        ),
-                                        help = help_msg
-                                    ),
-                                ));
-                            }
-                        }
+        // Check if cache exists (in outputs array)
+        // Note: Explicit inheritance takes precedence over top-level cache.
+        // If an output explicitly inherits from a named cache, it must exist
+        // in the outputs array.
+        if !cache_names.contains(&cache_name) {
+            let available: Vec<_> = cache_names.iter().map(|n| format!("'{}'", n)).collect();
+            let help_msg = if available.is_empty() {
+                if has_toplevel_cache {
+                    "No cache outputs defined in outputs array. To use top-level cache, omit the 'inherit' key.".to_string()
+                } else {
+                    "No cache outputs defined".to_string()
+                }
+            } else {
+                format!("Available caches: {}", available.join(", "))
+            };
+            return Err(ParsingError::from_partial(
+                "",
+                _partialerror!(
+                    *output.span(),
+                    ErrorKind::InvalidField(format!("cache '{}' not found", cache_name).into()),
+                    help = help_msg
+                ),
+            ));
+        }
+    }
+
+    for output in outputs.iter() {
+        let Some(cache_mapping) = output
+            .as_mapping()
+            .and_then(|mapping| mapping.get("cache"))
+            .and_then(|cache_node| cache_node.as_mapping())
+        else {
+            continue;
+        };
+
+        let Some(inherit_node) = cache_mapping.get("inherit") else {
+            continue;
+        };
+
+        let Some(cache_name_to_inherit) = inherit_name_from(inherit_node) else {
+            continue;
+        };
+
+        let Some(this_cache_name) = cache_mapping
+            .get("name")
+            .and_then(|name_node| name_node.as_scalar())
+            .map(|name_scalar| name_scalar.as_str().to_string())
+        else {
+            continue;
+        };
+
+        // Cache outputs can only inherit from other cache outputs, not from package outputs
+        // Check if the cache to inherit from exists in the cache names we collected
+        if !cache_names.contains(&cache_name_to_inherit) {
+            let available: Vec<_> = cache_names.iter().map(|n| format!("'{}'", n)).collect();
+            let help_msg = if available.is_empty() {
+                "No cache outputs defined".to_string()
+            } else {
+                format!("Available caches: {}", available.join(", "))
+            };
+            return Err(ParsingError::from_partial(
+                "",
+                _partialerror!(
+                    *output.span(),
+                    ErrorKind::InvalidField(
+                        format!(
+                            "cache '{}' not found for cache inheritance",
+                            cache_name_to_inherit
+                        )
+                        .into()
+                    ),
+                    help = help_msg
+                ),
+            ));
+        }
+
+        // Store the inheritance relationship for cycle detection
+        cache_inheritance
+            .entry(this_cache_name.clone())
+            .or_insert_with(Vec::new)
+            .push(cache_name_to_inherit.clone());
+    }
+
+    // Detect cycles in cache-to-cache inheritance
+    if let Some(cycle) = detect_cache_inheritance_cycles(&cache_inheritance) {
+        return Err(ParsingError::from_partial(
+            "",
+            _partialerror!(
+                marked_yaml::Span::new_blank(),
+                ErrorKind::InvalidField(
+                    format!("cache inheritance cycle detected: {}", cycle.join(" -> ")).into()
+                ),
+                help = "Cache outputs cannot form inheritance cycles"
+            ),
+        ));
+    }
+
+    Ok(outputs)
+}
+
+/// Detect cycles in cache inheritance relationships using DFS
+fn detect_cache_inheritance_cycles(
+    inheritance: &HashMap<String, Vec<String>>,
+) -> Option<Vec<String>> {
+    let mut visited = std::collections::HashMap::new();
+    let mut recursion_stack = std::collections::HashMap::new();
+    let mut parent = std::collections::HashMap::new();
+
+    for cache_name in inheritance.keys() {
+        if !(*visited.get(cache_name).unwrap_or(&false)) {
+            let path = dfs_visit(
+                cache_name,
+                inheritance,
+                &mut visited,
+                &mut recursion_stack,
+                &mut parent,
+            );
+            if let Some(cycle_path) = path {
+                return Some(cycle_path);
+            }
+        }
+    }
+    None
+}
+
+/// Depth-first search to find cycles
+fn dfs_visit(
+    cache: &str,
+    inheritance: &HashMap<String, Vec<String>>,
+    visited: &mut std::collections::HashMap<String, bool>,
+    recursion_stack: &mut std::collections::HashMap<String, bool>,
+    parent: &mut std::collections::HashMap<String, String>,
+) -> Option<Vec<String>> {
+    visited.insert(cache.to_string(), true);
+    recursion_stack.insert(cache.to_string(), true);
+
+    if let Some(dependencies) = inheritance.get(cache) {
+        for dependency in dependencies {
+            if !(*visited.get(dependency).unwrap_or(&false)) {
+                parent.insert(dependency.clone(), cache.to_string());
+                if let Some(cycle) =
+                    dfs_visit(dependency, inheritance, visited, recursion_stack, parent)
+                {
+                    return Some(cycle);
+                }
+            } else if *recursion_stack.get(dependency).unwrap_or(&false) {
+                let mut cycle = vec![dependency.clone()];
+                let mut current = cache.to_string();
+
+                while current != *dependency {
+                    cycle.push(current.clone());
+                    if let Some(parent_cache) = parent.get(&current) {
+                        current = parent_cache.clone();
+                    } else {
+                        break;
                     }
                 }
+                cycle.push(dependency.clone());
+                cycle.reverse();
+
+                return Some(cycle);
             }
         }
     }
 
-    Ok(outputs)
+    recursion_stack.insert(cache.to_string(), false);
+    None
 }
 
 /// Parse a cache output from a Node using proper TryConvertNode
@@ -424,7 +571,19 @@ fn parse_cache_output_from_node(
                 if let Some(cache_mapping) = cache_node.as_mapping() {
                     let name = if let Some(name_node) = cache_mapping.get("name") {
                         if let Some(name_scalar) = name_node.as_scalar() {
-                            Some(name_scalar.as_str().to_string())
+                            match PackageName::try_from(name_scalar.as_str().to_string()) {
+                                Ok(package_name) => package_name,
+                                Err(err) => {
+                                    return Err(ParsingError::from_partial(
+                                        "",
+                                        _partialerror!(
+                                            *name_node.span(),
+                                            ErrorKind::from(err),
+                                            help = "cache name must be a valid package name"
+                                        ),
+                                    ));
+                                }
+                            }
                         } else {
                             return Err(ParsingError::from_partial(
                                 "",
@@ -436,17 +595,31 @@ fn parse_cache_output_from_node(
                             ));
                         }
                     } else {
-                        None
+                        match PackageName::try_from("default".to_string()) {
+                            Ok(package_name) => package_name,
+                            Err(_) => {
+                                return Err(ParsingError::from_partial(
+                                    "",
+                                    _partialerror!(
+                                        marked_yaml::Span::new_blank(),
+                                        ErrorKind::InvalidField("default".to_string().into()),
+                                        help = "internal error: default cache name is invalid"
+                                    ),
+                                ));
+                            }
+                        }
                     };
 
                     // For now, create a basic cache output with defaults
                     return Ok(Some(crate::recipe::parser::CacheOutput {
-                        name: name.unwrap_or_else(|| "default".to_string()),
+                        name,
                         source: Vec::new(),
                         build: crate::recipe::parser::CacheBuild::default(),
                         requirements: crate::recipe::parser::CacheRequirements::default(),
                         run_exports: crate::recipe::parser::RunExports::default(),
                         ignore_run_exports: None,
+                        about: None,
+                        span: *output.span(),
                     }));
                 }
             }
@@ -549,68 +722,103 @@ fn parse_cache_outputs_with_context(
     Ok(cache_outputs)
 }
 
-/// Apply cache inheritance to package outputs during parsing
-fn apply_inheritance_to_outputs(
+/// Parse cache-to-cache inheritance relationships from outputs
+fn parse_cache_to_cache_inheritance(
     outputs: &[Node],
-    cache_outputs: &[crate::recipe::parser::CacheOutput],
-    inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
-    jinja: &crate::recipe::Jinja,
-) -> Result<Vec<Node>, ParsingError<&'static str>> {
-    use super::output_parser::OutputType;
-    let mut resolved_outputs = Vec::new();
+) -> Result<HashMap<String, Vec<String>>, ParsingError<&'static str>> {
+    let mut relationships: HashMap<String, Vec<String>> = HashMap::new();
 
     for output in outputs {
-        let rendered_node: RenderedNode = output.render(jinja, "output").map_err(|e| {
-            ParsingError::from_partial_vec("", e)
-                .into_iter()
-                .next()
-                .unwrap_or_else(|| {
-                    ParsingError::from_partial(
-                        "",
-                        _partialerror!(
-                            marked_yaml::Span::new_blank(),
-                            ErrorKind::ExpectedMapping,
-                            help = "Failed to render output for inheritance resolution"
-                        ),
-                    )
-                })
-        })?;
+        if let Some(mapping) = output
+            .as_mapping()
+            .and_then(|m| m.get("cache"))
+            .and_then(|c| c.as_mapping())
+        {
+            let cache_name = mapping
+                .get("name")
+                .and_then(|n| n.as_scalar())
+                .map(|s| s.as_str().to_string());
 
-        match rendered_node.try_convert("output") {
-            Ok(OutputType::Package(mut package_output)) => {
-                let package_name = package_output.package.name().as_normalized().to_string();
-                if let Some(cache_names) = inheritance_relationships.get(&package_name) {
-                    for cache_name in cache_names {
-                        if let Some(cache_output) =
-                            cache_outputs.iter().find(|c| &c.name == cache_name)
-                        {
-                            package_output.apply_cache_inheritance(cache_output);
-                        }
-                    }
-                }
-                let rendered = serde_yaml::to_value(&package_output)
-                    .map_err(|err| ParsingError::from_partial(
-                        "",
-                        _partialerror!(
-                            marked_yaml::Span::new_blank(),
-                            ErrorKind::Other,
-                            label = format!("Failed to serialize inherited output: {}", err)
-                        ),
-                    ))?;
-                let node = Node::try_from(rendered)
-                    .map_err(|err| ParsingError::from_partial("", err))?;
-                resolved_outputs.push(node);
-            }
-            Ok(OutputType::Cache(_)) => {
-                resolved_outputs.push(output.clone());
-            }
-            Err(_) => {
-                resolved_outputs.push(output.clone());
+            let inherited_name = mapping.get("inherit").and_then(|inherit| {
+                inherit
+                    .as_scalar()
+                    .map(|s| s.as_str().to_string())
+                    .or_else(|| {
+                        inherit
+                            .as_mapping()
+                            .and_then(|m| m.get("from"))
+                            .and_then(|f| f.as_scalar())
+                            .map(|s| s.as_str().to_string())
+                    })
+            });
+
+            if let (Some(cache_name), Some(inherited_name)) = (cache_name, inherited_name) {
+                relationships
+                    .entry(cache_name)
+                    .or_default()
+                    .push(inherited_name);
             }
         }
     }
 
-    Ok(resolved_outputs)
+    Ok(relationships)
+}
+
+/// Apply cache-to-cache inheritance to the cache outputs
+fn apply_cache_to_cache_inheritance(
+    cache_outputs: Vec<crate::recipe::parser::CacheOutput>,
+    cache_inheritance_relationships: HashMap<String, Vec<String>>,
+) -> Vec<crate::recipe::parser::CacheOutput> {
+    let mut cache_map: HashMap<String, crate::recipe::parser::CacheOutput> = cache_outputs
+        .into_iter()
+        .map(|cache| (cache.name.as_normalized().to_string(), cache))
+        .collect();
+
+    for (cache_name, ancestors) in cache_inheritance_relationships {
+        let ancestor_data: Vec<_> = ancestors
+            .iter()
+            .filter_map(|ancestor_name| {
+                cache_map.get(ancestor_name).map(|ancestor_cache| {
+                    (
+                        ancestor_cache.run_exports.clone(),
+                        ancestor_cache.about.clone(),
+                        ancestor_cache.ignore_run_exports.clone(),
+                        ancestor_cache.requirements.build.clone(),
+                        ancestor_cache.requirements.host.clone(),
+                    )
+                })
+            })
+            .collect();
+
+        if let Some(target_cache) = cache_map.get_mut(&cache_name) {
+            for (run_exports, about, ignore_run_exports, build_reqs, host_reqs) in ancestor_data {
+                // Apply inheritance from ancestor cache
+                target_cache.run_exports.extend_from(&run_exports);
+
+                // Inherit about section
+                if let Some(ancestor_about) = about {
+                    target_cache
+                        .about
+                        .get_or_insert_with(|| ancestor_about.clone())
+                        .merge_from(&ancestor_about);
+                }
+
+                // Inherit ignore_run_exports
+                if let Some(ancestor_ignore) = ignore_run_exports {
+                    target_cache
+                        .ignore_run_exports
+                        .get_or_insert_with(|| ancestor_ignore.clone())
+                        .merge_from(&ancestor_ignore);
+                }
+
+                // Inherit requirements (build and host)
+                target_cache.requirements.build.extend(build_reqs);
+                target_cache.requirements.host.extend(host_reqs);
+            }
+        }
+    }
+
+    cache_map.into_values().collect()
 }
 
 /// Resolve cache inheritance and return both outputs and cache outputs
@@ -655,20 +863,104 @@ pub fn resolve_cache_inheritance_with_caches(
         }
     }
 
+    // Parse caches with context first
     let all_cache_outputs = parse_cache_outputs_with_context(&outputs, jinja)?;
-    let inheritance_relationships = parse_inheritance_relationships(&outputs)?;
-    let resolved_outputs = apply_inheritance_to_outputs(
-        &outputs,
-        &all_cache_outputs,
-        &inheritance_relationships,
-        jinja,
-    )?;
 
-    Ok((
-        resolved_outputs,
+    // Duplicate detection using a set (no nesting)
+    let mut seen = HashSet::new();
+    let mut duplicates = Vec::new();
+    for name in all_cache_outputs
+        .iter()
+        .map(|c| c.name.as_normalized().to_string())
+    {
+        if !seen.insert(name.clone()) {
+            duplicates.push(name);
+        }
+    }
+    if !duplicates.is_empty() {
+        return Err(ParsingError::from_partial(
+            "",
+            _partialerror!(
+                marked_yaml::Span::new_blank(),
+                ErrorKind::InvalidField(
+                    format!("duplicate cache names: {}", duplicates.join(", ")).into()
+                ),
+                help = "Each cache output must have a unique name"
+            ),
+        ));
+    }
+    let cache_names: HashSet<_> = seen;
+
+    // Validate package -> cache inheritance using iterator chains
+    if let Some((bad_output, bad_name)) = outputs
+        .iter()
+        .filter_map(|o| pkg_inherit_node(o).map(|n| (o, n)))
+        .filter_map(|(o, n)| inherit_name_from(n).map(|name| (o, name)))
+        .find(|(_, name)| !cache_names.contains(name))
+    {
+        let help_msg = if cache_names.is_empty() {
+            if has_toplevel_cache {
+                "No cache outputs defined in outputs array. To use top-level cache, omit the 'inherit' key.".to_string()
+            } else {
+                "No cache outputs defined".to_string()
+            }
+        } else {
+            format!(
+                "Available caches: {}",
+                cache_names
+                    .iter()
+                    .map(|n| format!("'{}'", n))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        return Err(ParsingError::from_partial(
+            "",
+            _partialerror!(
+                *bad_output.span(),
+                ErrorKind::InvalidField(format!("cache '{}' not found", bad_name).into()),
+                help = help_msg
+            ),
+        ));
+    }
+
+    // Validate cache -> cache inheritance using iterator chains
+    if let Some((bad_output, bad_name)) = outputs
+        .iter()
+        .filter_map(|o| cache_inherit_node(o).map(|n| (o, n)))
+        .filter_map(|(o, n)| inherit_name_from(n).map(|name| (o, name)))
+        .find(|(_, name)| !cache_names.contains(name))
+    {
+        let help_msg = format!(
+            "Available caches: {}",
+            cache_names
+                .iter()
+                .map(|n| format!("'{}'", n))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        return Err(ParsingError::from_partial(
+            "",
+            _partialerror!(
+                *bad_output.span(),
+                ErrorKind::InvalidField(
+                    format!("cache '{}' not found for cache inheritance", bad_name).into()
+                ),
+                help = help_msg
+            ),
+        ));
+    }
+
+    // Cache-to-cache graph + application
+    let cache_to_cache_inheritance_relationships = parse_cache_to_cache_inheritance(&outputs)?;
+    let inherited_cache_outputs = apply_cache_to_cache_inheritance(
         all_cache_outputs,
-        inheritance_relationships,
-    ))
+        cache_to_cache_inheritance_relationships,
+    );
+
+    let inheritance_relationships = parse_inheritance_relationships(&outputs)?;
+
+    Ok((outputs, inherited_cache_outputs, inheritance_relationships))
 }
 
 #[cfg(test)]

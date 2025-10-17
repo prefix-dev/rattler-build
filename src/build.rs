@@ -115,7 +115,7 @@ pub async fn run_build(
     // Handle cache outputs first
     let output = if output.recipe.cache.is_some() {
         let output = output.build_or_fetch_cache(tool_configuration).await?;
-        
+
         // Warn if output defines additional sources on top of cache
         if !output.recipe.sources().is_empty() && output.finalized_cache_sources.is_some() {
             tracing::warn!(
@@ -134,9 +134,11 @@ pub async fn run_build(
                 .build_or_fetch_cache_output(cache_output, tool_configuration)
                 .await?;
         }
-        
+
         // Warn if output defines additional sources on top of cache
-        if !current_output.recipe.sources().is_empty() && current_output.finalized_cache_sources.is_some() {
+        if !current_output.recipe.sources().is_empty()
+            && current_output.finalized_cache_sources.is_some()
+        {
             tracing::warn!(
                 "Output defines sources in addition to cache sources. \
                  This may overwrite files from the cache. \
@@ -156,10 +158,21 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-    // Fast-path: If this output used a cache (inherit) and has no explicit build script,
-    // skip environment installation and script execution. We only distribute files based on build.files.
+    // Fast-path optimization: When an output inherits from a cache and has no explicit build script,
+    // we can skip environment installation and script execution entirely. This is a key benefit
+    // of the outputs-based cache approach as it allows for significant performance
+    // improvements when building multiple outputs that depend on the same intermediate artifacts.
     let use_fast_path = output.finalized_cache_dependencies.is_some()
         && output.recipe.build().script().is_default();
+
+    // Verify that requirements inheritance is properly handled in fast path
+    // If there are inherited requirements but no build script, we still need to check if
+    // environment setup is needed for other purposes beyond script execution
+    if use_fast_path {
+        tracing::info!(
+            "Using fast-path optimization: output inherited cache and has no build.script; skipping environment setup and script execution for improved performance."
+        );
+    }
 
     if !use_fast_path {
         output
@@ -181,7 +194,7 @@ pub async fn run_build(
         }
     } else {
         tracing::info!(
-            "Using fast-path: inherited cache detected and no build.script specified; skipping env setup and script execution."
+            "Using fast-path optimization: output inherited cache and has no build.script; skipping environment setup and script execution for improved performance."
         );
     }
 

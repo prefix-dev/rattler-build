@@ -563,20 +563,30 @@ fn create_empty_build_folder(
 }
 
 impl Output {
-    /// Create a conda package from any new files in the host prefix. Note: the
+    /// Create a conda package from files in the host prefix. Note: the
     /// previous stages should have been completed before calling this
     /// function.
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
-        let span = tracing::info_span!("Packaging new files");
-        let _enter = span.enter();
-        let files_after = Files::from_prefix(
-            &self.build_configuration.directories.host_prefix,
-            self.recipe.build().always_include_files(),
-            self.recipe.build().files(),
-        )?;
+        // When cache files are present, the output's build.files should apply to all
+        // relevant files, not just "new" ones compared to conda-meta
+        let files_after = if self.has_restored_cache_files() {
+            Files::from_prefix_with_filters(
+                &self.build_configuration.directories.host_prefix,
+                self.recipe.build().always_include_files(),
+                self.recipe.build().files(),
+                self.restored_cache_prefix_files.as_ref(),
+                self.restored_cache_work_dir_files.as_ref(),
+            )?
+        } else {
+            Files::from_prefix(
+                &self.build_configuration.directories.host_prefix,
+                self.recipe.build().always_include_files(),
+                self.recipe.build().files(),
+            )?
+        };
 
         package_conda(self, tool_configuration, &files_after)
     }

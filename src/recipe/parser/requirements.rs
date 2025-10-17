@@ -558,6 +558,12 @@ impl IgnoreRunExports {
     pub fn is_empty(&self) -> bool {
         self.by_name.is_empty() && self.from_package.is_empty()
     }
+
+    /// Merge IgnoreRunExports with another
+    pub fn merge_from(&mut self, other: &IgnoreRunExports) {
+        self.by_name.extend(other.by_name.iter().cloned());
+        self.from_package.extend(other.from_package.iter().cloned());
+    }
 }
 
 impl TryConvertNode<IgnoreRunExports> for RenderedNode {

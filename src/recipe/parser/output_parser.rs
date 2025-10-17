@@ -167,12 +167,39 @@ impl Output {
 
     /// Apply inheritance from a cache output
     pub fn apply_cache_inheritance(&mut self, cache: &CacheOutput) {
-        if let Some(inherit_spec) = &self.inherit {
-            if inherit_spec.inherit_run_exports() {
-                if let Some(cache_ignore) = &cache.ignore_run_exports {
-                    self.requirements.ignore_run_exports =
-                        self.requirements.ignore_run_exports(Some(cache_ignore));
-                }
+        let should_inherit_run_exports = if let Some(inherit_spec) = &self.inherit {
+            if inherit_spec.inherit_requirements() {
+                self.requirements
+                    .build
+                    .extend(cache.requirements.build.iter().cloned());
+                self.requirements
+                    .host
+                    .extend(cache.requirements.host.iter().cloned());
+            }
+            inherit_spec.inherit_run_exports()
+        } else {
+            true
+        };
+
+        if should_inherit_run_exports {
+            self.requirements
+                .run_exports
+                .extend_from(&cache.run_exports);
+        }
+
+        if let Some(cache_ignore) = &cache.ignore_run_exports {
+            self.requirements.ignore_run_exports =
+                self.requirements.ignore_run_exports(Some(cache_ignore));
+        }
+
+        // Deep merge the build section from cache, excluding the script
+        let cache_build_for_merge = Build::default();
+        self.build.merge_from(&cache_build_for_merge);
+        if let Some(cache_about) = &cache.about {
+            if self.about.is_none() {
+                self.about = Some(cache_about.clone());
+            } else if let Some(ref mut about) = self.about {
+                about.merge_from(cache_about);
             }
         }
 

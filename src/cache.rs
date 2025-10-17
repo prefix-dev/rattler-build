@@ -269,7 +269,10 @@ impl Output {
             let old = cache.prefix.to_string_lossy().to_string();
             let new = self.prefix().to_string_lossy().to_string();
             for rel in cache.files_with_prefix.iter() {
-                for base in [self.prefix(), &self.build_configuration.directories.work_dir] {
+                for base in [
+                    self.prefix(),
+                    &self.build_configuration.directories.work_dir,
+                ] {
                     let path = base.join(rel);
                     if !path.exists() {
                         continue;
@@ -325,12 +328,9 @@ impl Output {
         Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
             finalized_cache_sources: Some(cache.finalized_sources.clone()),
-            // Also merge cache-declared run_exports into the recipe
-            recipe: {
-                let mut recipe = self.recipe.clone();
-                recipe.requirements.run_exports.extend_from(&cache.run_exports);
-                recipe
-            },
+            // Recipe already has run_exports merged during inheritance resolution,
+            // so we don't need to merge them again here
+            recipe: self.recipe.clone(),
             restored_cache_prefix_files: Some(cached_prefix_files),
             restored_cache_work_dir_files: Some(cached_work_files.clone()),
             ..self.clone()
@@ -343,7 +343,7 @@ impl Output {
         cache_output: &crate::recipe::parser::CacheOutput,
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<Self, miette::Error> {
-        let cache_name = &cache_output.name;
+        let cache_name = cache_output.name.as_normalized();
         let cache_key = self
             .cache_key_for(cache_name, &cache_output.requirements)
             .into_diagnostic()?;
@@ -449,8 +449,8 @@ impl Output {
         // Collect new files and save cache
         let new_files = Files::from_prefix(
             self.prefix(),
-            cache_output.build.always_include_files(),
-            cache_output.build.files(),
+            &cache_output.build.always_include_files,
+            &cache_output.build.files,
         )
         .into_diagnostic()?;
 

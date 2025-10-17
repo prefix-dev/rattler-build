@@ -551,6 +551,11 @@ impl Output {
         &self.build_configuration.directories.host_prefix
     }
 
+    /// Check if this output has restored cache files
+    pub fn has_restored_cache_files(&self) -> bool {
+        self.restored_cache_prefix_files.is_some() || self.restored_cache_work_dir_files.is_some()
+    }
+
     /// Shorthand to retrieve the build prefix for this output
     pub fn build_prefix(&self) -> &Path {
         &self.build_configuration.directories.build_prefix

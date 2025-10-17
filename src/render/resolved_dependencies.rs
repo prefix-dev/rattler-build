@@ -753,7 +753,10 @@ pub(crate) async fn resolve_dependencies(
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
         });
 
-        Some(ResolvedDependencies { specs: build_env_specs, resolved })
+        Some(ResolvedDependencies {
+            specs: build_env_specs,
+            resolved,
+        })
     };
 
     // host env
@@ -872,7 +875,6 @@ pub(crate) async fn resolve_dependencies(
         &compatibility_specs,
         false,
     )?;
-
 
     let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
 
