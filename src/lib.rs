@@ -65,7 +65,6 @@ use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
-use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;

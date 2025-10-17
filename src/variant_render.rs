@@ -3,9 +3,9 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{env_vars, hash::HashInfo, selectors::SelectorConfig, source_code::SourceCode};
+use crate::{env_vars, hash::HashInfo, source_code::SourceCode};
 use petgraph::graph::DiGraph;
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{Jinja, Variable};
 use rattler_build_recipe::stage1::Dependency;
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::{VariantConfig, VariantError, VariantExpandError};
