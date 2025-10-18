@@ -1,0 +1,122 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0003-link-conda-prefix.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "make.config",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "make.config",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 96,
+                        len: 23,
+                    },
+                    new_range: HunkRange {
+                        start: 96,
+                        len: 23,
+                    },
+                    function_context: Some(
+                        "ALLSOURCES=$(LIBSOURCES) $(addsuffix .f90, $(addprefix ../main/, $(PROGRAMS))) .\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# g95: \n",
+                        ),
+                        Context(
+                            "FC_G95               = g95\n",
+                        ),
+                        Delete(
+                            "FCOPTIONS_OPT_G95    = -O3 -fzero -fshort-circuit -std=f95 -fintrinsic-extensions \n",
+                        ),
+                        Insert(
+                            "FCOPTIONS_OPT_G95    = -O3 -fzero -fshort-circuit -std=f95 -fintrinsic-extensions\n",
+                        ),
+                        Context(
+                            "FCOPTIONS_DEB_G95    = -g -O0 -fbounds-check -fintrinsic-extensions -fzero -fshort-circuit -ftrace=full -std=f95\n",
+                        ),
+                        Context(
+                            "FC_INC_G95           = -I\n",
+                        ),
+                        Context(
+                            "FC_SHARED_G95        = -dynamiclib -single_module -read_only_relocs suppress\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# gfortran: \n",
+                        ),
+                        Context(
+                            "FC_GFORTRAN               = gfortran\n",
+                        ),
+                        Delete(
+                            "FCOPTIONS_OPT_GFORTRAN    = -O2 -fPIC -std=f95 -fall-intrinsics -cpp -flto -pipe -funroll-loops -fstack-arrays -fno-protect-parens\n",
+                        ),
+                        Delete(
+                            "FCOPTIONS_DEB_GFORTRAN    = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe\n",
+                        ),
+                        Insert(
+                            "FCOPTIONS_OPT_GFORTRAN    = ${FFLAGS} -O2 -fPIC -std=f95 -fall-intrinsics -cpp -pipe -funroll-loops -fstack-arrays -fno-protect-parens -L${PREFIX}/lib\n",
+                        ),
+                        Insert(
+                            "FCOPTIONS_DEB_GFORTRAN    = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe -L${PREFIX}/lib\n",
+                        ),
+                        Context(
+                            "FC_INC_GFORTRAN           = -I\n",
+                        ),
+                        Context(
+                            "FC_SHARED_GFORTRAN        = -shared\n",
+                        ),
+                        Context(
+                            "F2PY_FCOMPILER_GFORTRAN   = --fcompiler=gnu95\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# flang: \n",
+                        ),
+                        Context(
+                            "FC_FLANG                  = flang\n",
+                        ),
+                        Delete(
+                            "FCOPTIONS_OPT_FLANG       = -O2 -fPIC -std=f95 -fall-intrinsics -cpp -flto -pipe -funroll-loops -fstack-arrays -fno-protect-parens\n",
+                        ),
+                        Delete(
+                            "FCOPTIONS_DEB_FLANG       = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe\n",
+                        ),
+                        Insert(
+                            "FCOPTIONS_OPT_FLANG       = ${FFLAGS} -O2 -fPIC -std=f95 -fall-intrinsics -cpp -pipe -funroll-loops -fstack-arrays -fno-protect-parens -L${PREFIX}/lib\n",
+                        ),
+                        Insert(
+                            "FCOPTIONS_DEB_FLANG       = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe -L${PREFIX}/lib\n",
+                        ),
+                        Context(
+                            "FC_INC_FLANG              = -I\n",
+                        ),
+                        Context(
+                            "FC_SHARED_FLANG           = -shared\n",
+                        ),
+                        Context(
+                            "F2PY_FCOMPILER_FLANG      = --fcompiler=flang\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

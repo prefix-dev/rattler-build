@@ -17,6 +17,7 @@ serde_with = { workspace = true }
 rattler_conda_types = { workspace = true }
 thiserror = { workspace = true }
 itertools = { workspace = true }
+globset = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }

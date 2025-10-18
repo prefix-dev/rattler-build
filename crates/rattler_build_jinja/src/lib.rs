@@ -9,3 +9,6 @@ pub use ast_variables::{JinjaExpression, JinjaTemplate};
 pub use jinja::{Jinja, JinjaConfig};
 pub use rattler_build_types::NormalizedKey;
 pub use variable::Variable;
+
+// re-export undefined behavior enum
+pub use jinja::UndefinedBehavior;

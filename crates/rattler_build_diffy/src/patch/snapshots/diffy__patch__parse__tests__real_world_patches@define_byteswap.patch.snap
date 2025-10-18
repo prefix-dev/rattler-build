@@ -1,0 +1,116 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/define_byteswap.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/image/decode/segdec.c",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/image/decode/segdec.c",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 52,
+                        len: 6,
+                    },
+                    new_range: HunkRange {
+                        start: 52,
+                        len: 9,
+                    },
+                    function_context: Some(
+                        "static Int DecodeSignificantAbsLevel (struct CAdaptiveHuffman *pAHexpt, BitIOInf\r\n",
+                    ),
+                    lines: [
+                        Context(
+                            "//================================================================\r\n",
+                        ),
+                        Context(
+                            "// Memory access functions\r\n",
+                        ),
+                        Context(
+                            "//================================================================\r\n",
+                        ),
+                        Insert(
+                            "\r\n",
+                        ),
+                        Insert(
+                            "U32 _byteswap_ulong(U32 bits);\r\n",
+                        ),
+                        Insert(
+                            "\r\n",
+                        ),
+                        Context(
+                            "static U32 _FORCEINLINE _load4(void* pv)\r\n",
+                        ),
+                        Context(
+                            "{\r\n",
+                        ),
+                        Context(
+                            "#ifdef _BIG__ENDIAN_\r\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/jxrgluelib/JXRGlueJxr.c",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/jxrgluelib/JXRGlueJxr.c",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 28,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 28,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "//*@@@---@@@@******************************************************************\r\n",
+                        ),
+                        Context(
+                            "#include <limits.h>\r\n",
+                        ),
+                        Context(
+                            "#include <JXRGlue.h>\r\n",
+                        ),
+                        Delete(
+                            "\r\n",
+                        ),
+                        Insert(
+                            "#include <wchar.h>\r\n",
+                        ),
+                        Context(
+                            "\r\n",
+                        ),
+                        Context(
+                            "static const char szHDPhotoFormat[] = \"<dc:format>image/vnd.ms-photo</dc:format>\";\r\n",
+                        ),
+                        Context(
+                            "const U32 IFDEntryTypeSizes[] = { 0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8 };\r\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

@@ -5,6 +5,7 @@ use goblin::elf::{Dyn, Elf};
 use goblin::strtab::Strtab;
 use itertools::Itertools;
 use memmap2::MmapMut;
+use rattler_build_recipe::stage1::GlobVec;
 use scroll::Pwrite;
 use scroll::ctx::SizeWith;
 use std::collections::{HashMap, HashSet};
@@ -13,7 +14,6 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
-use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
@@ -488,7 +488,7 @@ mod test {
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
-        let globvec = GlobVec::from_vec(vec!["/usr/lib/custom**"], None);
+        let globvec = GlobVec::from_strings(vec!["/usr/lib/custom**".to_string()], vec![]).unwrap();
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib

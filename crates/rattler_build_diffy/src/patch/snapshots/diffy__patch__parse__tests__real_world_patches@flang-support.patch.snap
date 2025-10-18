@@ -1,0 +1,273 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/flang-support.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "mumps/src/mumps_common_orig.h",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "mumps/src/mumps_common.h",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 27,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 27,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            " *     knowledge, there is no way to perform the conversion with CPP\n",
+                        ),
+                        Context(
+                            " *     directives only.\n",
+                        ),
+                        Context(
+                            " */\n",
+                        ),
+                        Delete(
+                            "#if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                        ),
+                        Insert(
+                            "#if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "# define F_SYMBOL(lower_case,upper_case) MUMPS_##upper_case\n",
+                        ),
+                        Context(
+                            "#elif defined(Add_)\n",
+                        ),
+                        Context(
+                            "# define F_SYMBOL(lower_case,upper_case) mumps_##lower_case##_\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "mumps/src/mumps_c_orig.c",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "mumps/src/mumps_c.c",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 42,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 42,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            " *   CMUMPS_XXX in the code to get rid of any symbol convention annoyance.\n",
+                        ),
+                        Context(
+                            " */\n",
+                        ),
+                        Context(
+                            "#if MUMPS_ARITH == MUMPS_ARITH_s\n",
+                        ),
+                        Delete(
+                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                        ),
+                        Insert(
+                            "# if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) SMUMPS_##upper_case\n",
+                        ),
+                        Context(
+                            "# elif defined(Add_)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case##_\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 52,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 52,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case\n",
+                        ),
+                        Context(
+                            "# endif\n",
+                        ),
+                        Context(
+                            "#elif MUMPS_ARITH == MUMPS_ARITH_d\n",
+                        ),
+                        Delete(
+                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                        ),
+                        Insert(
+                            "# if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) DMUMPS_##upper_case\n",
+                        ),
+                        Context(
+                            "# elif defined(Add_)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case##_\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 62,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 62,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case\n",
+                        ),
+                        Context(
+                            "# endif\n",
+                        ),
+                        Context(
+                            "#elif MUMPS_ARITH == MUMPS_ARITH_c\n",
+                        ),
+                        Delete(
+                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                        ),
+                        Insert(
+                            "# if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) CMUMPS_##upper_case\n",
+                        ),
+                        Context(
+                            "# elif defined(Add_)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case##_\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 72,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 72,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case\n",
+                        ),
+                        Context(
+                            "# endif\n",
+                        ),
+                        Context(
+                            "#elif MUMPS_ARITH == MUMPS_ARITH_z\n",
+                        ),
+                        Delete(
+                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                        ),
+                        Insert(
+                            "# if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) ZMUMPS_##upper_case\n",
+                        ),
+                        Context(
+                            "# elif defined(Add_)\n",
+                        ),
+                        Context(
+                            "#  define F_SYM_ARITH(lower_case,upper_case) zmumps_##lower_case##_\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "mumps/libseq/elapse_orig.h",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "mumps/libseq/elapse.h",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 24,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 24,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#endif\n",
+                        ),
+                        Context(
+                            "#endif\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "#if (defined(_WIN32) && ! defined(__MINGW32__)) || defined(UPPER)\n",
+                        ),
+                        Insert(
+                            "#if defined(UPPER)\n",
+                        ),
+                        Context(
+                            "#define mumps_elapse MUMPS_ELAPSE\n",
+                        ),
+                        Context(
+                            "#elif defined(Add__)\n",
+                        ),
+                        Context(
+                            "#define mumps_elapse mumps_elapse__\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

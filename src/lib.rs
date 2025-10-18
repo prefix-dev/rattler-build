@@ -3,25 +3,25 @@
 //! rattler-build library.
 
 pub mod build;
-pub mod cache;
+// pub mod cache;
 pub mod console_utils;
 pub mod metadata;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
-pub mod recipe;
 pub mod render;
 pub mod script;
-pub mod selectors;
 pub mod source;
 pub mod system_tools;
 pub mod tool_configuration;
+
+// Re-export recipe generator
+#[cfg(feature = "recipe-generation")]
+pub use rattler_build_recipe_generator as recipe_generator;
 #[cfg(feature = "tui")]
 pub mod tui;
 pub mod types;
-pub mod used_variables;
 pub mod utils;
-mod variant_render;
 
 mod consts;
 mod env_vars;
@@ -30,8 +30,6 @@ mod linux;
 mod macos;
 mod post_process;
 pub mod rebuild;
-#[cfg(feature = "recipe-generation")]
-pub mod recipe_generator;
 mod unix;
 mod windows;
 
@@ -56,6 +54,12 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use rattler_build_recipe::{
+    stage0,
+    stage1::Dependency,
+    stage1::Recipe,
+    variant_render::{RenderConfig, render_recipe_with_variant_config},
+};
 use rattler_build_variant_config::VariantConfig;
 
 // Re-export types needed by Python bindings and external consumers
@@ -68,11 +72,8 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use render::resolved_dependencies::RunExportsDownload;
-use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
-use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -83,12 +84,7 @@ use types::{
 
 use crate::hash::HashInfo;
 use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
-use crate::recipe::Recipe;
-use crate::recipe::custom_yaml::Node;
-use crate::source_code::SourceCode;
-use crate::variant_render::{stage_0_render, stage_1_render};
 use indexmap::IndexSet;
-use rattler_build_variant_config::VariantError;
 use rattler_conda_types::NoArchType;
 
 /// A discovered output from variant expansion
@@ -100,7 +96,6 @@ pub struct DiscoveredOutput {
     pub build_string: String,
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
-    pub node: Node,
     pub used_vars: BTreeMap<NormalizedKey, Variable>,
     pub recipe: Recipe,
     pub hash: HashInfo,
@@ -129,55 +124,80 @@ impl std::hash::Hash for DiscoveredOutput {
 }
 
 /// Find all variants from the recipe and variant config
-fn find_variants<S: SourceCode>(
+fn find_variants(
     variant_config: &VariantConfig,
-    outputs: &[Node],
-    recipe: S,
-    selector_config: &SelectorConfig,
-) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
-    // find all jinja variables
-    let stage_0 = stage_0_render(outputs, recipe, selector_config, variant_config)?;
-    let stage_1 = stage_1_render(stage_0, selector_config, variant_config)?;
+    recipe_content: &str,
+    target_platform: Platform,
+    _build_platform: Platform,
+    _host_platform: Platform,
+) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
+    // Parse the recipe
+    tracing::info!("Parsing recipe for variant expansion");
+    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
+        .map_err(|e| miette::miette!("Failed to parse recipe: {}", e))?;
 
-    // Now we need to convert the stage 1 renders to DiscoveredOutputs
-    let mut recipes = IndexSet::new();
-    for sx in stage_1 {
-        for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
-            let target_platform = if recipe.build().noarch().is_none() {
-                selector_config.target_platform
-            } else {
-                Platform::NoArch
-            };
-
-            let build_string = recipe
-                .build()
-                .string()
-                .as_resolved()
-                .expect("Build string has to be resolved")
-                .to_string();
-
-            if recipe.build().python().version_independent {
-                recipe
-                    .requirements
-                    .ignore_run_exports
-                    .by_name
-                    .insert(PackageName::try_from("python").unwrap());
-            }
-
-            let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
-
-            recipes.insert(DiscoveredOutput {
-                name: recipe.package().name().as_source().to_string(),
-                version: recipe.package().version().to_string(),
-                build_string,
-                noarch_type: *recipe.build().noarch(),
-                target_platform,
-                node,
-                used_vars: variant,
-                recipe,
-                hash,
-            });
+    // For now, only handle single output recipes
+    let single_output = match stage0_recipe {
+        stage0::Recipe::SingleOutput(single) => single,
+        stage0::Recipe::MultiOutput(_) => {
+            return Err(miette::miette!(
+                "Multi-output recipes are not yet supported in the refactored code path"
+            ));
         }
+    };
+
+    // Build render config with platform information
+    let mut render_config = RenderConfig::new()
+        .with_context("target_platform", target_platform.to_string())
+        .with_context("build_platform", _build_platform.to_string())
+        .with_context("host_platform", _host_platform.to_string());
+
+    // Add platform selectors for conditionals as boolean values (unix, win, osx, linux)
+    // These are derived from target_platform and should be proper booleans in Jinja
+    render_config = render_config
+        .with_context("unix", target_platform.is_unix())
+        .with_context("win", target_platform.is_windows())
+        .with_context("linux", target_platform.is_linux())
+        .with_context("osx", target_platform.is_osx());
+
+    // Render with variant config
+    let rendered_variants = render_recipe_with_variant_config(
+        &stage0::Recipe::SingleOutput(single_output),
+        variant_config,
+        render_config,
+    )
+    .map_err(|e| miette::miette!("Failed to render recipe with variants: {}", e))?;
+
+    // Convert to DiscoveredOutputs
+    let mut recipes = IndexSet::new();
+    for rendered in rendered_variants {
+        let recipe = rendered.recipe;
+        let variant = rendered.variant;
+
+        let effective_target_platform = if recipe.build().noarch.is_none() {
+            target_platform
+        } else {
+            Platform::NoArch
+        };
+
+        let default_noarch = NoArchType::none();
+        let noarch = recipe.build().noarch.as_ref().unwrap_or(&default_noarch);
+        let hash = HashInfo::from_variant(&variant, noarch);
+
+        // TODO: Build string computation needs to be integrated
+        // For now, use the hash display which formats as "prefixh<hash>"
+        let build_string = hash.to_string();
+
+        recipes.insert(DiscoveredOutput {
+            name: recipe.package().name().as_source().to_string(),
+            version: recipe.package().version().to_string(),
+            build_string,
+            noarch_type: recipe.build().noarch.unwrap_or(NoArchType::none()),
+            target_platform: effective_target_platform,
+            used_vars: variant,
+            recipe,
+            hash,
+        });
     }
 
     Ok(recipes)
@@ -292,25 +312,11 @@ pub async fn get_build_output(
         build_data.target_platform
     );
 
-    let selector_config = SelectorConfig {
-        // We ignore noarch here
-        target_platform: build_data.target_platform,
-        host_platform: build_data.host_platform,
-        hash: None,
-        build_platform: build_data.build_platform,
-        variant: BTreeMap::new(),
-        experimental: build_data.common.experimental,
-        // allow undefined while finding the variants
-        allow_undefined: true,
-        recipe_path: Some(recipe_path.to_path_buf()),
-    };
-
     let span = tracing::info_span!("Finding outputs from recipe");
     let enter = span.enter();
 
-    // First find all outputs from the recipe
-    let named_source = Source::from_path(recipe_path).into_diagnostic()?;
-    let outputs = find_outputs_from_src(named_source.clone())?;
+    // Read the recipe content
+    let recipe_content = fs::read_to_string(recipe_path).into_diagnostic()?;
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -348,11 +354,11 @@ pub async fn get_build_output(
     // Always insert target_platform and build_platform
     variant_config.variants.insert(
         "target_platform".into(),
-        vec![Variable::from(selector_config.target_platform.to_string())],
+        vec![Variable::from(build_data.target_platform.to_string())],
     );
     variant_config.variants.insert(
         "build_platform".into(),
-        vec![Variable::from(selector_config.build_platform.to_string())],
+        vec![Variable::from(build_data.build_platform.to_string())],
     );
 
     // Apply variant overrides from command line
@@ -362,12 +368,17 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
-    let outputs_and_variants =
-        find_variants(&variant_config, &outputs, named_source, &selector_config)?;
+    let outputs_and_variants = find_variants(
+        &variant_config,
+        &recipe_content,
+        build_data.target_platform,
+        build_data.build_platform,
+        build_data.host_platform,
+    )?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
-        let skipped = if discovered_output.recipe.build().skip() {
+        let skipped = if !discovered_output.recipe.build().skip.is_empty() {
             console::style(" (skipped)").red().to_string()
         } else {
             "".to_string()
@@ -396,17 +407,18 @@ pub async fn get_build_output(
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
 
-    let global_build_name = outputs_and_variants
-        .first()
-        .map(|o| o.name.clone())
-        .unwrap_or_default();
+    // let global_build_name = outputs_and_variants
+    //     .first()
+    //     .map(|o| o.name.clone())
+    //     .unwrap_or_default();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
-        if recipe.build().skip() {
-            continue;
-        }
+        // TODO: handle skipped builds
+        // if recipe.build().skip() {
+        //     continue;
+        // }
 
         subpackages.insert(
             recipe.package().name().clone(),
@@ -417,11 +429,13 @@ pub async fn get_build_output(
             },
         );
 
-        let build_name = if recipe.cache.is_some() {
-            global_build_name.clone()
-        } else {
-            recipe.package().name().as_normalized().to_string()
-        };
+        // TODO: determine build name properly
+        // let build_name = if recipe.cache.is_some() {
+        //     global_build_name.clone()
+        // } else {
+        //     recipe.package().name().as_normalized().to_string()
+        // };
+        let build_name = recipe.package().name().as_normalized().to_string();
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -465,7 +479,7 @@ pub async fn get_build_output(
         let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = Output {
-            recipe: recipe.clone(),
+            recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages::detect_for_platform(
@@ -486,7 +500,7 @@ pub async fn get_build_output(
                     &output_dir,
                     build_data.no_build_id,
                     &timestamp,
-                    recipe.build().merge_build_and_host_envs(),
+                    recipe.build().merge_build_and_host_envs,
                 )
                 .into_diagnostic()?,
                 channels,
@@ -561,25 +575,26 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 
     // Also check that for all script tests
     for test in output.recipe.tests() {
-        if let TestType::Command(command) = test {
-            for dep in command
-                .requirements
-                .build
-                .iter()
-                .chain(command.requirements.run.iter())
-            {
-                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-                if all_output_names
-                    .iter()
-                    .any(|o| Some(*o) == dep_spec.name.as_ref())
-                {
-                    // this dependency might not be built yet
-                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
-                        return false;
-                    }
-                }
-            }
-        }
+        // TODO: implement this properly
+        // if let TestType::Command(command) = test {
+        //     for dep in command
+        //         .requirements
+        //         .build
+        //         .iter()
+        //         .chain(command.requirements.run.iter())
+        //     {
+        //         let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
+        //         if all_output_names
+        //             .iter()
+        //             .any(|o| Some(*o) == dep_spec.name.as_ref())
+        //         {
+        //             // this dependency might not be built yet
+        //             if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+        //                 return false;
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     true
@@ -598,7 +613,7 @@ pub async fn run_build_from_args(
         .iter()
         .map(|o| o.name())
         .collect::<Vec<_>>();
-
+    tracing::info!("Starting build of {} outputs", outputs_to_build.len());
     for (index, output) in outputs_to_build.iter().enumerate() {
         let (output, archive) = match run_build(
             output.clone(),
@@ -1067,8 +1082,8 @@ pub fn sort_build_outputs_topologically(
                     .name
                     .clone()
                     .expect("MatchSpec should always have a name"),
-                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                Dependency::PinSubpackage(pin) => pin.pin_subpackage.name.clone(),
+                Dependency::PinCompatible(pin) => pin.pin_compatible.name.clone(),
             };
 
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
@@ -1138,6 +1153,10 @@ pub async fn build_recipes(
     let tool_config = get_tool_config(&build_data, log_handler)?;
     let mut outputs = Vec::new();
     for recipe_path in &recipe_paths {
+        tracing::info!(
+            "Processing recipe at path: {}",
+            recipe_path.canonicalize().unwrap().display()
+        );
         let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
         outputs.extend(output);
     }

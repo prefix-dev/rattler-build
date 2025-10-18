@@ -31,6 +31,7 @@
 use clap::Parser;
 use indexmap::IndexMap;
 use miette::{IntoDiagnostic, NamedSource, Result};
+use rattler_build_jinja::Variable;
 use rattler_build_recipe::variant_render::{RenderConfig, render_recipe_with_variants};
 use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
 
@@ -64,11 +65,23 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    // Parse key=value variables
+    // Parse key=value variables, converting "true"/"false" to booleans and integers
     let mut variables = IndexMap::new();
     for var in &args.variables {
         if let Some((key, value)) = var.split_once('=') {
-            variables.insert(key.to_string(), value.to_string());
+            let parsed_value = match value {
+                "true" => Variable::from(true),
+                "false" => Variable::from(false),
+                _ => {
+                    // Try parsing as integer first
+                    if let Ok(int_val) = value.parse::<i64>() {
+                        Variable::from(int_val)
+                    } else {
+                        Variable::from(value.to_string())
+                    }
+                }
+            };
+            variables.insert(key.to_string(), parsed_value);
         } else {
             eprintln!(
                 "Warning: ignoring invalid variable '{}' (expected key=value)",
@@ -108,7 +121,7 @@ fn main() -> Result<()> {
     }
 
     // Create evaluation context
-    let mut context = EvaluationContext::from_map(variables.clone());
+    let mut context = EvaluationContext::from_variables(variables.clone());
 
     // Evaluate and merge the recipe's context section
     if !stage0_recipe.context.is_empty() {
@@ -202,7 +215,7 @@ fn main() -> Result<()> {
 fn render_with_variants(
     recipe_path: &str,
     variant_file: &str,
-    extra_context: IndexMap<String, String>,
+    extra_context: IndexMap<String, Variable>,
 ) -> Result<()> {
     use std::path::Path;
 

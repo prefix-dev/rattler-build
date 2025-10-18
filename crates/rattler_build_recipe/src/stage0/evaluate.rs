@@ -8,7 +8,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, VersionWithSource};
+use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
 
 use crate::{
     ErrorKind, ParseError, Span,
@@ -46,7 +46,7 @@ use crate::{
         Requirements as Stage1Requirements,
         build::{
             Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, NoArchType, PostProcess as Stage1PostProcess,
+            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
@@ -68,7 +68,7 @@ use crate::{
         },
     },
 };
-use rattler_build_jinja::{Jinja, Variable};
+use rattler_build_jinja::Jinja;
 
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
@@ -80,18 +80,8 @@ fn render_template(
     let jinja_config = context.jinja_config().clone();
     let mut jinja = Jinja::new(jinja_config);
 
-    // This allows our TrackingContext to intercept undefined variable access and track them
-
-    // Add the evaluation context variables to the Jinja context
-    // We need to convert IndexMap<String, String> to IndexMap<String, Variable>
-    let variables: indexmap::IndexMap<String, Variable> = context
-        .variables()
-        .iter()
-        .map(|(k, v)| (k.clone(), Variable::from(v.as_str())))
-        .collect();
-
     // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(&variables);
+    jinja = jinja.with_context(context.variables());
 
     // The Jinja environment is already configured to use ${{ }} syntax
     // so we can pass the template as-is
@@ -228,6 +218,10 @@ where
 }
 
 /// Evaluate a ConditionalList<String> into Vec<String>
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
 pub fn evaluate_string_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
@@ -238,7 +232,10 @@ pub fn evaluate_string_list(
         match item {
             Item::Value(value) => {
                 let s = evaluate_string_value(value, context)?;
-                results.push(s);
+                // Filter out empty strings from templates like `${{ "value" if condition }}`
+                if !s.is_empty() {
+                    results.push(s);
+                }
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
@@ -247,14 +244,18 @@ pub fn evaluate_string_list(
                     // Evaluate the "then" items
                     for val in cond.then.iter() {
                         let s = evaluate_string_value(val, context)?;
-                        results.push(s);
+                        if !s.is_empty() {
+                            results.push(s);
+                        }
                     }
                 } else {
                     // Evaluate the "else" items
                     if let Some(else_value) = &cond.else_value {
                         for val in else_value.iter() {
                             let s = evaluate_string_value(val, context)?;
-                            results.push(s);
+                            if !s.is_empty() {
+                                results.push(s);
+                            }
                         }
                     }
                 }
@@ -263,6 +264,188 @@ pub fn evaluate_string_list(
     }
 
     Ok(results)
+}
+
+/// Evaluate a ConditionalList<String> into a GlobVec (include-only), preserving span information for error reporting
+pub fn evaluate_glob_vec_simple(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    let mut globs = Vec::new();
+
+    for item in list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                // Validate the glob pattern immediately with proper error reporting
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Create the GlobVec with only include patterns
+    GlobVec::from_strings(globs, Vec::new()).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!("Failed to build glob set: {}", e)),
+        suggestion: None,
+    })
+}
+
+/// Evaluate an IncludeExclude into a GlobVec, preserving span information for error reporting
+pub fn evaluate_glob_vec(
+    include_exclude: &crate::stage0::types::IncludeExclude<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    let (include_list, exclude_list) = match include_exclude {
+        crate::stage0::types::IncludeExclude::List(list) => (list, &ConditionalList::default()),
+        crate::stage0::types::IncludeExclude::Mapping { include, exclude } => (include, exclude),
+    };
+
+    // Evaluate and parse include patterns
+    let mut include_globs = Vec::new();
+    for item in include_list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                // Validate the glob pattern immediately with proper error reporting
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => include_globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => include_globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Evaluate and parse exclude patterns
+    let mut exclude_globs = Vec::new();
+    for item in exclude_list.iter() {
+        match item {
+            Item::Value(value) => {
+                let pattern = evaluate_string_value(value, context)?;
+                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                    Ok(_) => exclude_globs.push(pattern),
+                    Err(e) => {
+                        return Err(ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: value.span(),
+                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
+                            suggestion: Some("Check your glob pattern syntax.".to_string()),
+                        });
+                    }
+                }
+            }
+            Item::Conditional(cond) => {
+                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let items_to_process = if condition_met {
+                    Some(&cond.then)
+                } else {
+                    cond.else_value.as_ref()
+                };
+
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        let pattern = evaluate_string_value(val, context)?;
+                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+                            Ok(_) => exclude_globs.push(pattern),
+                            Err(e) => {
+                                return Err(ParseError {
+                                    kind: ErrorKind::InvalidValue,
+                                    span: val.span(),
+                                    message: Some(format!(
+                                        "Invalid glob pattern '{}': {}",
+                                        pattern, e
+                                    )),
+                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Now create the GlobVec - this should not fail since we've already validated
+    GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!("Failed to build glob set: {}", e)),
+        suggestion: None,
+    })
 }
 
 /// Evaluate a ConditionalList<EntryPoint> into Vec<EntryPoint>
@@ -347,6 +530,11 @@ pub fn evaluate_dependency_list(
                         // Template - need to render and parse
                         let s = render_template(template.source(), context, span)?;
 
+                        // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+                        if s.is_empty() {
+                            continue;
+                        }
+
                         // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
                         if s.trim().starts_with('{') {
                             // Try to deserialize as Dependency (which handles pin types)
@@ -393,6 +581,12 @@ pub fn evaluate_dependency_list(
                             Value::Template { template, span } => {
                                 // Render the template and parse as matchspec
                                 let s = render_template(template.source(), context, span)?;
+
+                                // Filter out empty strings
+                                if s.is_empty() {
+                                    continue;
+                                }
+
                                 let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
                                     .map_err(|e| ParseError {
                                         kind: ErrorKind::InvalidValue,
@@ -412,53 +606,67 @@ pub fn evaluate_dependency_list(
     Ok(results)
 }
 
-/// Evaluate a ScriptContent into a string
-fn evaluate_script_content(
-    content: &ScriptContent,
-    context: &EvaluationContext,
-) -> Result<String, ParseError> {
-    match content {
-        ScriptContent::Command(cmd) => Ok(cmd.clone()),
-        ScriptContent::Inline(inline) => {
-            // For inline scripts, we need to evaluate the content or file
-            if let Some(content_list) = &inline.content {
-                // Evaluate the conditional list to get a Vec<String> of commands
-                let commands = evaluate_string_list(content_list, context)?;
-                // Join the commands with newlines to create a single script
-                Ok(commands.join("\n"))
-            } else if let Some(file_val) = &inline.file {
-                evaluate_string_value(file_val, context)
-            } else {
-                Ok(String::new())
-            }
-        }
-    }
-}
-
-/// Evaluate a ConditionalList<ScriptContent> into Vec<String>
+/// Evaluate a ConditionalList<ScriptContent> into rattler_build_script::Script
 pub fn evaluate_script_list(
     list: &ConditionalList<ScriptContent>,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
-    let mut results = Vec::new();
+) -> Result<rattler_build_script::Script, ParseError> {
+    use rattler_build_script::{Script, ScriptContent as ScriptContentOutput};
+
+    // If the list is empty, return default script
+    if list.is_empty() {
+        return Ok(Script::default());
+    }
+
+    // Collect all script items after evaluating conditionals
+    let mut all_commands = Vec::new();
+    let mut interpreter: Option<String> = None;
+    let mut env = indexmap::IndexMap::new();
+    let mut secrets = Vec::new();
+    let mut file_path: Option<PathBuf> = None;
 
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                // ScriptContent doesn't use Value wrapper, so we match on it directly
-                // Actually wait, Item<ScriptContent> means Item can be Value(Value<ScriptContent>) or Conditional(Conditional<ScriptContent>)
-                // But ScriptContent is not wrapped in Value...
-                // Let me check the type more carefully
                 match value {
                     Value::Concrete {
                         value: script_content,
                         ..
                     } => {
-                        let s = evaluate_script_content(script_content, context)?;
-                        results.push(s);
+                        match script_content {
+                            ScriptContent::Command(cmd) => {
+                                all_commands.push(cmd.clone());
+                            }
+                            ScriptContent::Inline(inline) => {
+                                // Extract interpreter if specified
+                                if let Some(interp) = &inline.interpreter {
+                                    interpreter = Some(evaluate_string_value(interp, context)?);
+                                }
+
+                                // Extract environment variables
+                                // Filter out keys whose values evaluate to empty strings
+                                for (key, val) in &inline.env {
+                                    let evaluated_val = evaluate_string_value(val, context)?;
+                                    if !evaluated_val.is_empty() {
+                                        env.insert(key.clone(), evaluated_val);
+                                    }
+                                }
+
+                                // Extract secrets
+                                secrets.extend(inline.secrets.clone());
+
+                                // Extract content or file
+                                if let Some(content_list) = &inline.content {
+                                    let commands = evaluate_string_list(content_list, context)?;
+                                    all_commands.extend(commands);
+                                } else if let Some(file_val) = &inline.file {
+                                    let file_str = evaluate_string_value(file_val, context)?;
+                                    file_path = Some(PathBuf::from(file_str));
+                                }
+                            }
+                        }
                     }
                     Value::Template { .. } => {
-                        // ScriptContent can't be a template itself
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
                             span: Span::unknown(),
@@ -471,52 +679,61 @@ pub fn evaluate_script_list(
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
 
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: script_content,
-                                ..
-                            } => {
-                                let s = evaluate_script_content(script_content, context)?;
-                                results.push(s);
-                            }
-                            Value::Template { .. } => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
-                                    message: Some(
-                                        "Script content cannot be a template".to_string(),
-                                    ),
-                                    suggestion: None,
-                                });
+                let items_to_process = if condition_met {
+                    &cond.then.0
+                } else {
+                    cond.else_value
+                        .as_ref()
+                        .map(|v| v.0.as_slice())
+                        .unwrap_or(&[])
+                };
+
+                for val in items_to_process {
+                    match val {
+                        Value::Concrete {
+                            value: script_content,
+                            ..
+                        } => {
+                            match script_content {
+                                ScriptContent::Command(cmd) => {
+                                    all_commands.push(cmd.clone());
+                                }
+                                ScriptContent::Inline(inline) => {
+                                    // Extract interpreter if specified
+                                    if let Some(interp) = &inline.interpreter {
+                                        interpreter = Some(evaluate_string_value(interp, context)?);
+                                    }
+
+                                    // Extract environment variables
+                                    // Filter out keys whose values evaluate to empty strings
+                                    for (key, val) in &inline.env {
+                                        let evaluated_val = evaluate_string_value(val, context)?;
+                                        if !evaluated_val.is_empty() {
+                                            env.insert(key.clone(), evaluated_val);
+                                        }
+                                    }
+
+                                    // Extract secrets
+                                    secrets.extend(inline.secrets.clone());
+
+                                    // Extract content or file
+                                    if let Some(content_list) = &inline.content {
+                                        let commands = evaluate_string_list(content_list, context)?;
+                                        all_commands.extend(commands);
+                                    } else if let Some(file_val) = &inline.file {
+                                        let file_str = evaluate_string_value(file_val, context)?;
+                                        file_path = Some(PathBuf::from(file_str));
+                                    }
+                                }
                             }
                         }
-                    }
-                } else {
-                    // Evaluate the "else" items
-                    if let Some(else_value) = &cond.else_value {
-                        for val in else_value.iter() {
-                            match val {
-                                Value::Concrete {
-                                    value: script_content,
-                                    ..
-                                } => {
-                                    let s = evaluate_script_content(script_content, context)?;
-                                    results.push(s);
-                                }
-                                Value::Template { .. } => {
-                                    return Err(ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: Span::unknown(),
-                                        message: Some(
-                                            "Script content cannot be a template".to_string(),
-                                        ),
-                                        suggestion: None,
-                                    });
-                                }
-                            }
+                        Value::Template { .. } => {
+                            return Err(ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: Span::unknown(),
+                                message: Some("Script content cannot be a template".to_string()),
+                                suggestion: None,
+                            });
                         }
                     }
                 }
@@ -524,7 +741,26 @@ pub fn evaluate_script_list(
         }
     }
 
-    Ok(results)
+    // Build the final Script content
+    let content = if let Some(path) = file_path {
+        ScriptContentOutput::Path(path)
+    } else if all_commands.is_empty() {
+        ScriptContentOutput::Default
+    } else if all_commands.len() == 1 {
+        // Single command - could be a path or command, use CommandOrPath
+        ScriptContentOutput::CommandOrPath(all_commands.into_iter().next().unwrap())
+    } else {
+        // Multiple commands
+        ScriptContentOutput::Commands(all_commands)
+    };
+
+    Ok(Script {
+        interpreter,
+        env,
+        secrets,
+        content,
+        cwd: None,
+    })
 }
 
 /// Parse a boolean from a string (case-insensitive)
@@ -710,7 +946,7 @@ impl Evaluate for Stage0About {
             repository,
             documentation,
             license,
-            license_file: evaluate_string_list(&self.license_file, context)?,
+            license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -760,8 +996,7 @@ impl Evaluate for Stage0PythonBuild {
     type Output = Stage1PythonBuild;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let skip_pyc_compilation =
-            GlobVec::from_strings(evaluate_string_list(&self.skip_pyc_compilation, context)?)?;
+        let skip_pyc_compilation = evaluate_glob_vec_simple(&self.skip_pyc_compilation, context)?;
 
         Ok(Stage1PythonBuild {
             entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
@@ -806,8 +1041,8 @@ impl Evaluate for Stage0ForceFileType {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1ForceFileType {
-            text: GlobVec::from_strings(evaluate_string_list(&self.text, context)?)?,
-            binary: GlobVec::from_strings(evaluate_string_list(&self.binary, context)?)?,
+            text: evaluate_glob_vec_simple(&self.text, context)?,
+            binary: evaluate_glob_vec_simple(&self.binary, context)?,
         })
     }
 }
@@ -842,7 +1077,7 @@ impl Evaluate for Stage0PrefixDetection {
                 AllOrGlobVec::All(bool_val)
             }
             Stage0PrefixIgnore::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
@@ -867,7 +1102,7 @@ impl Evaluate for Stage0PostProcess {
         })?;
 
         Ok(Stage1PostProcess {
-            files: GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?,
+            files: evaluate_glob_vec_simple(&self.files, context)?,
             regex,
             replacement: evaluate_string_value(&self.replacement, context)?,
         })
@@ -907,15 +1142,13 @@ impl Evaluate for Stage0DynamicLinking {
                 AllOrGlobVec::All(bool_val)
             }
             Stage0BinaryRelocation::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
         // Evaluate and validate glob patterns
-        let missing_dso_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.missing_dso_allowlist, context)?)?;
-        let rpath_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.rpath_allowlist, context)?)?;
+        let missing_dso_allowlist = evaluate_glob_vec_simple(&self.missing_dso_allowlist, context)?;
+        let rpath_allowlist = evaluate_glob_vec_simple(&self.rpath_allowlist, context)?;
 
         // Parse overdepending_behavior
         let overdepending_behavior = match &self.overdepending_behavior {
@@ -990,8 +1223,8 @@ impl Evaluate for Stage0Build {
             Some(v) => {
                 let s = evaluate_value_to_string(v, context)?;
                 match s.as_str() {
-                    "python" => Some(NoArchType::Python),
-                    "generic" => Some(NoArchType::Generic),
+                    "python" => Some(NoArchType::python()),
+                    "generic" => Some(NoArchType::generic()),
                     _ => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
@@ -1014,25 +1247,11 @@ impl Evaluate for Stage0Build {
         let python = self.python.evaluate(context)?;
 
         // Evaluate file lists and validate glob patterns
-        let always_copy_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_copy_files, context)?)?;
-        let always_include_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_include_files, context)?)?;
+        let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
+        let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
         // Evaluate files (handle both list and include/exclude variants)
-        let files = match &self.files {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
+        let files = evaluate_glob_vec(&self.files, context)?;
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -1337,19 +1556,7 @@ impl Evaluate for Stage0PathSource {
         };
 
         // Evaluate filter and convert to GlobVec (handle both list and include/exclude variants)
-        let filter = match &self.filter {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
+        let filter = evaluate_glob_vec(&self.filter, context)?;
 
         Ok(Stage1PathSource {
             path,
@@ -1432,8 +1639,8 @@ impl Evaluate for Stage0CommandsTestFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1CommandsTestFiles {
-            source: GlobVec::from_strings(evaluate_string_list(&self.source, context)?)?,
-            recipe: GlobVec::from_strings(evaluate_string_list(&self.recipe, context)?)?,
+            source: evaluate_glob_vec_simple(&self.source, context)?,
+            recipe: evaluate_glob_vec_simple(&self.recipe, context)?,
         })
     }
 }
@@ -1471,8 +1678,8 @@ impl Evaluate for Stage0PackageContentsCheckFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1PackageContentsCheckFiles {
-            exists: GlobVec::from_strings(evaluate_string_list(&self.exists, context)?)?,
-            not_exists: GlobVec::from_strings(evaluate_string_list(&self.not_exists, context)?)?,
+            exists: evaluate_glob_vec_simple(&self.exists, context)?,
+            not_exists: evaluate_glob_vec_simple(&self.not_exists, context)?,
         })
     }
 }
@@ -1578,7 +1785,7 @@ impl Evaluate for Stage0Recipe {
 #[cfg(test)]
 mod tests {
     use minijinja::UndefinedBehavior;
-    use rattler_build_jinja::JinjaConfig;
+    use rattler_build_jinja::{JinjaConfig, Variable};
 
     use super::*;
     use crate::stage0::types::{
@@ -1588,7 +1795,7 @@ mod tests {
     #[test]
     fn test_evaluate_condition_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let expr = JinjaExpression::new("unix".to_string()).unwrap();
         assert!(evaluate_condition(&expr, &ctx).unwrap());
@@ -1600,7 +1807,7 @@ mod tests {
     #[test]
     fn test_evaluate_condition_not() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let expr = JinjaExpression::new("not unix".to_string()).unwrap();
         assert!(!evaluate_condition(&expr, &ctx).unwrap());
@@ -1612,8 +1819,8 @@ mod tests {
     #[test]
     fn test_render_template_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         let template = "${{ name }}-${{ version }}";
         let result = render_template(template, &ctx, &Span::unknown()).unwrap();
@@ -1637,8 +1844,8 @@ mod tests {
         );
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("greeting".to_string(), "Hello".to_string());
-        ctx.insert("name".to_string(), "World".to_string());
+        ctx.insert("greeting".to_string(), Variable::from_string("Hello"));
+        ctx.insert("name".to_string(), Variable::from_string("World"));
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
         assert_eq!(result, "Hello, World!");
@@ -1674,7 +1881,7 @@ mod tests {
         ]);
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let result = evaluate_string_list(&list, &ctx).unwrap();
         assert_eq!(result, vec!["python", "gcc"]);
@@ -1688,9 +1895,9 @@ mod tests {
     #[test]
     fn test_variable_tracking_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
-        ctx.insert("unused".to_string(), "bar".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
+        ctx.insert("unused".to_string(), Variable::from_string("bar"));
 
         // Before rendering, no variables should be accessed
         assert!(ctx.accessed_variables().is_empty());
@@ -1711,9 +1918,9 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_conditionals() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
-        ctx.insert("unix_var".to_string(), "gcc".to_string());
-        ctx.insert("win_var".to_string(), "msvc".to_string());
+        ctx.insert("unix".to_string(), Variable::from_string("true"));
+        ctx.insert("unix_var".to_string(), Variable::from_string("gcc"));
+        ctx.insert("win_var".to_string(), Variable::from_string("msvc"));
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
@@ -1741,8 +1948,8 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_template() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("compiler".to_string(), "gcc".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("compiler".to_string(), Variable::from_string("gcc"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         // Create a list with templates that will be evaluated
         let list = ConditionalList::new(vec![
@@ -1772,7 +1979,7 @@ mod tests {
     #[test]
     fn test_variable_tracking_clear() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
 
         // Render a template
         let template = "${{ name }}";

@@ -1,7 +1,7 @@
 //! All the metadata that makes up a recipe file
 use std::collections::BTreeMap;
 
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{ChannelUrl, PackageName, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     hash::HashInfo,
-    recipe::jinja::SelectorConfig,
-    script::SandboxConfiguration,
     types::{
         Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
     },
 };
+
+use rattler_build_script::SandboxConfiguration;
 
 /// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
@@ -80,16 +80,16 @@ impl BuildConfiguration {
         self.sandbox_config.as_ref()
     }
 
-    /// Construct a `SelectorConfig` from the given `BuildConfiguration`
-    pub fn selector_config(&self) -> SelectorConfig {
-        SelectorConfig {
+    /// Construct a `JinjaConfig` from the given `BuildConfiguration`
+    pub fn selector_config(&self) -> JinjaConfig {
+        JinjaConfig {
             target_platform: self.target_platform,
             host_platform: self.host_platform.platform,
             build_platform: self.build_platform.platform,
             variant: self.variant.clone(),
-            hash: Some(self.hash.clone()),
+            hash: Some(self.hash.to_string()),
             experimental: false,
-            allow_undefined: false,
+            undefined_behavior: rattler_build_jinja::UndefinedBehavior::Lenient,
             recipe_path: None,
         }
     }

@@ -1,8 +1,9 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
-use rattler_conda_types::package::EntryPoint;
+use rattler_build_script::Script;
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use super::{all_or_glob_vec::AllOrGlobVec, glob_vec::GlobVec};
+use super::{AllOrGlobVec, GlobVec};
 
 /// Helper function to check if a u64 is zero (for skip_serializing_if)
 fn is_zero(value: &u64) -> bool {
@@ -149,9 +150,9 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub string: Option<String>,
 
-    /// Build script - list of commands or reference to a file
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub script: Vec<String>,
+    /// Build script - contains script content, interpreter, environment variables, etc.
+    #[serde(default, skip_serializing_if = "Script::is_default")]
+    pub script: Script,
 
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -324,16 +325,6 @@ impl PartialEq for PythonBuild {
     }
 }
 
-/// NoArch type for platform-independent packages
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum NoArchType {
-    /// Python noarch package (pure Python, no compiled extensions)
-    Python,
-    /// Generic noarch package (platform-independent)
-    Generic,
-}
-
 impl Build {
     /// Create a new build configuration with default values
     pub fn new() -> Self {
@@ -352,7 +343,7 @@ impl Build {
     pub fn is_default(&self) -> bool {
         self.number == 0
             && self.string.is_none()
-            && self.script.is_empty()
+            && self.script.is_default()
             && self.noarch.is_none()
             && self.python.entry_points.is_empty()
             && self.python.skip_pyc_compilation.is_empty()
@@ -401,23 +392,20 @@ mod tests {
 
     #[test]
     fn test_build_with_script() {
+        use rattler_build_script::ScriptContent;
+
         let build = Build {
-            script: vec!["echo hello".to_string(), "make install".to_string()],
+            script: Script {
+                content: ScriptContent::Commands(vec![
+                    "echo hello".to_string(),
+                    "make install".to_string(),
+                ]),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
         assert!(!build.is_default());
-        assert_eq!(build.script.len(), 2);
-    }
-
-    #[test]
-    fn test_noarch_python() {
-        let build = Build {
-            noarch: Some(NoArchType::Python),
-            ..Default::default()
-        };
-
-        assert!(!build.is_default());
-        assert!(matches!(build.noarch, Some(NoArchType::Python)));
+        assert!(!build.script.is_default());
     }
 }

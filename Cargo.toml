@@ -9,6 +9,8 @@ members = [
   "crates/rattler_build_recipe",
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
+  "crates/rattler_build_script",
+  "crates/rattler_build_diffy",
 ]
 
 [workspace.package]
@@ -27,9 +29,11 @@ chrono = "0.4.41"
 clap = { version = "4.5.45", features = ["derive"] }
 dashmap = "6.1"
 dunce = "1.0.5"
+console = { version = "0.16.1", features = ["windows-console-colors"] }
 flate2 = "1.1.2"
 fs-err = "3.1.1"
 futures = "0.3.31"
+globset = "0.4.17"
 indexmap = "2.11.4"
 indicatif = "0.18.0"
 insta = "1.41.1"
@@ -39,12 +43,19 @@ libc = "0.2"
 md-5 = "0.10"
 lazy_static = "1.5.0"
 miette = "7.6.0"
+minijinja = { version = "2.11.0", features = [
+  "unstable_machinery",
+  "custom_syntax",
+] }
 rattler_conda_types = { version = "0.40.0", default-features = false }
 rattler_digest = { version = "1.1.5", default-features = false, features = [
   "serde",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_shell = { version = "0.25.2", default-features = false, features = [
+  "sysinfo",
+] }
 regex = "1.11.1"
 reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
 reqwest-middleware = "0.4.2"
@@ -59,6 +70,7 @@ tar = "0.4.44"
 tempfile = "3.21.0"
 thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = ["rt", "macros"] }
+tokio-util = { version = "0.7.16", features = ["codec", "compat"] }
 toml = "0.9.5"
 tracing = "0.1.41"
 url = "2.5.4"
@@ -72,10 +84,7 @@ zstd = "0.13.3"
 spdx = "0.12.0"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
-minijinja = { version = "2.11.0", features = [
-  "unstable_machinery",
-  "custom_syntax",
-] }
+rstest = "0.26.1"
 
 [package]
 name = "rattler-build"
@@ -151,10 +160,7 @@ serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true, features = ["env", "cargo"] }
-minijinja = { version = "2.11.0", features = [
-  "unstable_machinery",
-  "custom_syntax",
-] }
+minijinja = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = [
   "env-filter",
   "fmt",
@@ -168,16 +174,16 @@ goblin = "0.10.1"
 scroll = "0.13.0"
 pathdiff = "0.2.3"
 comfy-table = "7.1.4"
-futures = "0.3.31"
+futures = { workspace = true }
 indicatif = { version = "0.18.0", features = ["in_memory"] }
-console = { version = "0.16.1", features = ["windows-console-colors"] }
-thiserror = "2.0.17"
+console = { workspace = true }
+thiserror = { workspace = true }
 tempfile = { workspace = true }
 chrono = "0.4.41"
 sha1 = "0.10.6"
 spdx = "0.12.0"
 ignore = "0.4.24"
-globset = "0.4.17"
+globset = { workspace = true }
 clap-verbosity-flag = "3.0.3"
 tracing-core = "0.1.34"
 petgraph = "0.8.2"
@@ -236,9 +242,7 @@ rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.25.2", default-features = false, features = [
-  "sysinfo",
-] }
+rattler_shell = { workspace = true }
 rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",
@@ -252,13 +256,13 @@ retry-policies = "0.5.1"
 strum = "0.27.2"
 unicode-normalization = "0.1.24"
 line-ending = "1.5.1"
-diffy = { git = "https://github.com/prefix-dev/diffy.git", branch = "master" }
-http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
+sevenz-rust2 = "0.19.1"
+dialoguer = "0.12.0"
+# needed to download test files. Possibly we can move this to dev dependencies.
+http-range-client = { version = "0.9.1", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.19.1"
-dialoguer = "0.12.0"
 
 # Local rattler-build crates
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
@@ -267,11 +271,16 @@ rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
+  "variant-config",
+] }
 rattler_git = { path = "crates/rattler_git" }
+rattler_build_diffy = { path = "crates/rattler_build_diffy" }
 rattler_build_networking = { path = "crates/rattler_build_networking", features = [
   "middleware",
 ] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
+rattler_build_script = { path = "crates/rattler_build_script" }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }
@@ -281,12 +290,13 @@ sha2 = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
-rstest = "0.26.1"
+rstest = { workspace = true }
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
 serial_test = "3.2.0"
 criterion = { version = "0.7.0", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
+
 
 [[bench]]
 name = "line_breaks"
