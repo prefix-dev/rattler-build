@@ -1,6 +1,6 @@
 use rattler_digest::{Md5Hash, Sha256Hash};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{OneOrMany, formats::PreferMany, serde_as};
 use std::path::PathBuf;
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, Value};
@@ -75,10 +75,12 @@ pub struct GitSource {
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
-    /// Url to the source code (template or concrete, can be list)
+    /// Url(s) to the source code (template or concrete)
+    /// Can be a single URL or a list of URLs (for mirrors)
+    #[serde_as(as = "OneOrMany<_, PreferMany>")]
     #[serde(default)]
     pub url: Vec<Value<String>>,
 

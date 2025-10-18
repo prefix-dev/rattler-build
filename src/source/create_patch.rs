@@ -91,7 +91,9 @@ pub fn create_patch<P: AsRef<Path>>(
     let source_info: SourceInformation =
         serde_json::from_reader(fs::File::open(&source_info_path)?).map_err(|e| {
             GeneratePatchError::SourceInfoReadError(format!(
-                "Failed to parse source information: {}",
+                "Failed to parse source information: {}\n\
+                 This may be due to an incompatible format from a previous version.\n\
+                 Try rebuilding the package to regenerate the source information.",
                 e
             ))
         })?;
@@ -203,24 +205,23 @@ pub fn create_patch<P: AsRef<Path>>(
 
             // Update the source information to include the newly created patch
             let patch_file_name = PathBuf::from(format!("{}.patch", name));
-            // TODO(refactor): re-enable updating source info with new patch
-            // match &mut updated_source_info.sources[source_idx] {
-            //     Source::Url(url_src) => {
-            //         if !url_src.patches.contains(&patch_file_name) {
-            //             url_src.patches.push(patch_file_name);
-            //         }
-            //     }
-            //     Source::Git(git_src) => {
-            //         if !git_src.patches.contains(&patch_file_name) {
-            //             git_src.patches.push(patch_file_name);
-            //         }
-            //     }
-            //     Source::Path(path_src) => {
-            //         if !path_src.patches.contains(&patch_file_name) {
-            //             path_src.patches.push(patch_file_name);
-            //         }
-            //     }
-            // }
+            match &mut updated_source_info.sources[source_idx] {
+                Source::Url(url_src) => {
+                    if !url_src.patches.contains(&patch_file_name) {
+                        url_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Git(git_src) => {
+                    if !git_src.patches.contains(&patch_file_name) {
+                        git_src.patches.push(patch_file_name);
+                    }
+                }
+                Source::Path(path_src) => {
+                    if !path_src.patches.contains(&patch_file_name) {
+                        path_src.patches.push(patch_file_name);
+                    }
+                }
+            }
         }
     }
 
