@@ -601,47 +601,52 @@ fn parse_inheritance_relationships(
     let mut relationships = std::collections::HashMap::new();
 
     for output in outputs {
-        if let Some(mapping) = output.as_mapping() {
-            if mapping.contains_key("package") {
-                if let Some(package_node) = mapping.get("package") {
-                    if let Some(package_mapping) = package_node.as_mapping() {
-                        let package_name = if let Some(name_node) = package_mapping.get("name") {
-                            if let Some(name_scalar) = name_node.as_scalar() {
-                                name_scalar.as_str().to_string()
-                            } else {
-                                continue;
-                            }
-                        } else {
-                            continue;
-                        };
+        let Some(mapping) = output.as_mapping() else {
+            continue;
+        };
 
-                        if let Some(inherit_node) = package_mapping.get("inherit") {
-                            let cache_name = if let Some(inherit_scalar) = inherit_node.as_scalar()
-                            {
-                                inherit_scalar.as_str().to_string()
-                            } else if let Some(inherit_mapping) = inherit_node.as_mapping() {
-                                if let Some(from_node) = inherit_mapping.get("from") {
-                                    if let Some(from_scalar) = from_node.as_scalar() {
-                                        from_scalar.as_str().to_string()
-                                    } else {
-                                        continue;
-                                    }
-                                } else {
-                                    continue;
-                                }
-                            } else {
-                                continue;
-                            };
+        let Some(package_node) = mapping.get("package") else {
+            continue;
+        };
 
-                            relationships
-                                .entry(package_name)
-                                .or_insert_with(Vec::new)
-                                .push(cache_name);
-                        }
-                    }
+        let Some(package_mapping) = package_node.as_mapping() else {
+            continue;
+        };
+        let Some(name_node) = package_mapping.get("name") else {
+            continue;
+        };
+        let Some(name_scalar) = name_node.as_scalar() else {
+            continue;
+        };
+        let package_name = name_scalar.as_str().to_string();
+
+        let Some(inherit_node) = package_mapping
+            .get("inherit")
+            .or_else(|| mapping.get("inherit"))
+        else {
+            continue;
+        };
+
+        let cache_name = if let Some(inherit_scalar) = inherit_node.as_scalar() {
+            inherit_scalar.as_str().to_string()
+        } else if let Some(inherit_mapping) = inherit_node.as_mapping() {
+            if let Some(from_node) = inherit_mapping.get("from") {
+                if let Some(from_scalar) = from_node.as_scalar() {
+                    from_scalar.as_str().to_string()
+                } else {
+                    continue;
                 }
+            } else {
+                continue;
             }
-        }
+        } else {
+            continue;
+        };
+
+        relationships
+            .entry(package_name)
+            .or_insert_with(Vec::new)
+            .push(cache_name);
     }
 
     Ok(relationships)
@@ -695,35 +700,43 @@ fn parse_cache_to_cache_inheritance(
     let mut relationships: HashMap<String, Vec<String>> = HashMap::new();
 
     for output in outputs {
-        if let Some(mapping) = output
-            .as_mapping()
-            .and_then(|m| m.get("cache"))
-            .and_then(|c| c.as_mapping())
-        {
-            let cache_name = mapping
-                .get("name")
-                .and_then(|n| n.as_scalar())
-                .map(|s| s.as_str().to_string());
+        let Some(mapping) = output.as_mapping() else {
+            continue;
+        };
+        let Some(cache_node) = mapping.get("cache") else {
+            continue;
+        };
+        let Some(cache_mapping) = cache_node.as_mapping() else {
+            continue;
+        };
 
-            let inherited_name = mapping.get("inherit").and_then(|inherit| {
-                inherit
-                    .as_scalar()
-                    .map(|s| s.as_str().to_string())
-                    .or_else(|| {
-                        inherit
-                            .as_mapping()
-                            .and_then(|m| m.get("from"))
-                            .and_then(|f| f.as_scalar())
-                            .map(|s| s.as_str().to_string())
-                    })
-            });
+        let cache_name = cache_mapping
+            .get("name")
+            .and_then(|n| n.as_scalar())
+            .map(|s| s.as_str().to_string());
 
-            if let (Some(cache_name), Some(inherited_name)) = (cache_name, inherited_name) {
-                relationships
-                    .entry(cache_name)
-                    .or_default()
-                    .push(inherited_name);
-            }
+        let inherit_node = mapping
+            .get("inherit")
+            .or_else(|| cache_mapping.get("inherit"));
+
+        let inherited_name = inherit_node.and_then(|inherit| {
+            inherit
+                .as_scalar()
+                .map(|s| s.as_str().to_string())
+                .or_else(|| {
+                    inherit
+                        .as_mapping()
+                        .and_then(|m| m.get("from"))
+                        .and_then(|f| f.as_scalar())
+                        .map(|s| s.as_str().to_string())
+                })
+        });
+
+        if let (Some(cache_name), Some(inherited_name)) = (cache_name, inherited_name) {
+            relationships
+                .entry(cache_name)
+                .or_default()
+                .push(inherited_name);
         }
     }
 
@@ -921,12 +934,29 @@ pub fn resolve_cache_inheritance_with_caches(
     let cache_to_cache_inheritance_relationships = parse_cache_to_cache_inheritance(&outputs)?;
     let inherited_cache_outputs = apply_cache_to_cache_inheritance(
         all_cache_outputs,
-        cache_to_cache_inheritance_relationships,
+        cache_to_cache_inheritance_relationships.clone(),
     );
 
-    let inheritance_relationships = parse_inheritance_relationships(&outputs)?;
+    let package_outputs: Vec<Node> = outputs
+        .into_iter()
+        .filter(|output| output.as_mapping().and_then(|m| m.get("package")).is_some())
+        .collect();
 
-    Ok((outputs, inherited_cache_outputs, inheritance_relationships))
+    let mut inheritance_relationships = parse_inheritance_relationships(&package_outputs)?;
+
+    // Merge cache-to-cache relationships into the main inheritance map
+    for (cache_name, parent_caches) in cache_to_cache_inheritance_relationships {
+        inheritance_relationships
+            .entry(cache_name)
+            .or_default()
+            .extend(parent_caches);
+    }
+
+    Ok((
+        package_outputs,
+        inherited_cache_outputs,
+        inheritance_relationships,
+    ))
 }
 
 #[cfg(test)]

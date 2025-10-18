@@ -24,6 +24,34 @@ use crate::{
     },
 };
 
+fn inherit_flags_from_output(output: &Node) -> (bool, bool) {
+    let inherit_node = output.as_mapping().and_then(|m| {
+        m.get("package")
+            .and_then(|p| p.as_mapping().and_then(|pm| pm.get("inherit")))
+            .or_else(|| m.get("inherit"))
+    });
+
+    match inherit_node {
+        Some(node) if node.as_scalar().is_some() => (true, false),
+        Some(node) => {
+            if let Some(mapping) = node.as_mapping() {
+                let run_exports = mapping
+                    .get("run_exports")
+                    .and_then(|n| n.as_scalar()?.as_bool())
+                    .unwrap_or(true);
+                let requirements = mapping
+                    .get("requirements")
+                    .and_then(|n| n.as_scalar()?.as_bool())
+                    .unwrap_or(false);
+                (run_exports, requirements)
+            } else {
+                (true, false)
+            }
+        }
+        _ => (true, false),
+    }
+}
+
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
 pub struct RawOutputVec {
@@ -112,6 +140,8 @@ pub(crate) fn stage_0_render<S: SourceCode>(
                 .map_err(VariantConfigError::from)?;
 
             let package_name = parsed_recipe.package.name.as_normalized().to_string();
+            let (inherit_run_exports, inherit_requirements) = inherit_flags_from_output(output);
+
             if let Some(caches) = inheritance_relationships.get(&package_name) {
                 let mut cache_list = Vec::new();
                 for cache_name in caches {
@@ -120,6 +150,29 @@ pub(crate) fn stage_0_render<S: SourceCode>(
                         .find(|c| c.name.as_normalized() == cache_name.as_str())
                     {
                         cache_list.push(cache_output.clone());
+
+                        if inherit_requirements {
+                            parsed_recipe
+                                .requirements
+                                .build
+                                .extend(cache_output.requirements.build.iter().cloned());
+                            parsed_recipe
+                                .requirements
+                                .host
+                                .extend(cache_output.requirements.host.iter().cloned());
+                        }
+
+                        if inherit_run_exports {
+                            parsed_recipe
+                                .requirements
+                                .run_exports
+                                .extend_from(&cache_output.run_exports);
+                            if let Some(cache_ignore) = &cache_output.ignore_run_exports {
+                                parsed_recipe.requirements.ignore_run_exports = parsed_recipe
+                                    .requirements
+                                    .ignore_run_exports(Some(cache_ignore));
+                            }
+                        }
                     }
                 }
                 parsed_recipe.cache_outputs = cache_list;
@@ -498,7 +551,7 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
 
-                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
+                let mut parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
                     .map_err(|err| {
                         let errs: ParseErrors<_> = err
                             .into_iter()
@@ -508,6 +561,38 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                         errs
                     })
                     .map_err(VariantConfigError::from)?;
+
+                // Preserve cache_outputs and inherited requirements from stage 0
+                let stage0_output = &r.rendered_outputs[idx];
+                parsed_recipe.cache_outputs = stage0_output.cache_outputs.clone();
+
+                // Re-apply inheritance from cache outputs (run_exports, requirements, ignore)
+                // This is needed because we re-parsed from the raw node
+                let (inherit_run_exports, inherit_requirements) = inherit_flags_from_output(output);
+                for cache_output in &parsed_recipe.cache_outputs {
+                    if inherit_requirements {
+                        parsed_recipe
+                            .requirements
+                            .build
+                            .extend(cache_output.requirements.build.iter().cloned());
+                        parsed_recipe
+                            .requirements
+                            .host
+                            .extend(cache_output.requirements.host.iter().cloned());
+                    }
+
+                    if inherit_run_exports {
+                        parsed_recipe
+                            .requirements
+                            .run_exports
+                            .extend_from(&cache_output.run_exports);
+                        if let Some(cache_ignore) = &cache_output.ignore_run_exports {
+                            parsed_recipe.requirements.ignore_run_exports = parsed_recipe
+                                .requirements
+                                .ignore_run_exports(Some(cache_ignore));
+                        }
+                    }
+                }
 
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),

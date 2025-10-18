@@ -2164,3 +2164,69 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "cmake/test_file.txt" in paths
         assert "TEST.txt" in paths
         assert "test.txt" in paths
+
+
+def test_cache_multiple_outputs(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test multiple cache outputs with cache-to-cache and package-to-cache inheritance"""
+    rattler_build.build(
+        recipes / "cache_multiple_outputs",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg_base = get_extracted_package(tmp_path, "pkg-from-base")
+    pkg_extended = get_extracted_package(tmp_path, "pkg-from-extended")
+
+    assert (pkg_base / "lib/base.txt").exists()
+    assert (pkg_extended / "include/extended.h").exists()
+
+    paths_json = json.loads((pkg_extended / "info/paths.json").read_text())
+    paths = [p["_path"] for p in paths_json["paths"]]
+    assert "include/extended.h" in paths
+
+
+def test_cache_run_exports_inheritance(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test run_exports inheritance from cache outputs"""
+    rattler_build.build(
+        recipes / "cache_run_exports",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    lib_pkg = get_extracted_package(tmp_path, "lib-package")
+    dev_pkg = get_extracted_package(tmp_path, "dev-package")
+
+    assert (lib_pkg / "info/run_exports.json").exists()
+    run_exports = json.loads((lib_pkg / "info/run_exports.json").read_text())
+    assert "weak" in run_exports
+    assert not (dev_pkg / "info/run_exports.json").exists()
+
+
+def test_cache_requirements_inheritance(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test requirements inheritance control via inherit spec"""
+    rendered = rattler_build.render(
+        recipes / "cache_inherit_requirements",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    with_reqs = next(
+        o for o in rendered if o["recipe"]["package"]["name"] == "with-reqs-inherited"
+    )
+    without_reqs = next(
+        o
+        for o in rendered
+        if o["recipe"]["package"]["name"] == "without-reqs-inherited"
+    )
+
+    with_build_reqs = with_reqs["recipe"]["requirements"]["build"]
+    without_build_reqs = without_reqs["recipe"]["requirements"]["build"]
+
+    assert any("cmake" in str(req) for req in with_build_reqs)
+    assert not any("cmake" in str(req) for req in without_build_reqs)

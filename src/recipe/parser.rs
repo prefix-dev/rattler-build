@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 use crate::{
@@ -102,7 +103,7 @@ pub struct Recipe {
     pub cache_outputs: Vec<CacheOutput>,
     /// Cache inheritance relationships (package name -> cache names)
     #[serde(skip)]
-    pub cache_inheritance: std::collections::HashMap<String, Vec<String>>,
+    pub cache_inheritance: HashMap<String, Vec<String>>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -273,7 +274,7 @@ impl Recipe {
         let mut cache = None;
         let mut extra = IndexMap::default();
         let cache_outputs_result = Vec::new();
-        let cache_inheritance = std::collections::HashMap::new();
+        let cache_inheritance = HashMap::new();
 
         rendered_node
             .iter()
@@ -281,7 +282,9 @@ impl Recipe {
                 let key_str = key.as_str();
                 match key_str {
                     "schema_version" => schema_version = value.try_convert(key_str)?,
-                    "package" => package = Some(value.try_convert(key_str)?),
+                    "package" => {
+                        package = Some(value.try_convert(key_str)?);
+                    }
                     "recipe" => {
                         return Err(vec![_partialerror!(
                         *key.span(),
@@ -306,6 +309,8 @@ impl Recipe {
                     "requirements" => requirements = value.try_convert(key_str)?,
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
+                    "inherit" => {
+                    }
                     "context" => {}
                     "extra" => extra = value.as_mapping().ok_or_else(|| {
                                             vec![_partialerror!(
@@ -430,26 +435,58 @@ impl Recipe {
 
     /// Get cache outputs that this package depends on based on inheritance
     /// This is called during Output creation to populate cache_outputs_to_build
+    /// Includes transitive dependencies (e.g., if A inherits from B and B inherits from C,
+    /// then A depends on both C and B, in that order)
     pub fn get_cache_outputs_for_package(
         &self,
         package_name: &str,
         all_cache_outputs: &[CacheOutput],
-        inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
+        inheritance_relationships: &HashMap<String, Vec<String>>,
     ) -> Vec<CacheOutput> {
-        if let Some(cache_names) = inheritance_relationships.get(package_name) {
-            let mut result = Vec::new();
-            for cache_name in cache_names {
-                if let Some(cache_output) = all_cache_outputs
-                    .iter()
-                    .find(|c| c.name.as_normalized() == cache_name.as_str())
-                {
-                    result.push(cache_output.clone());
+        let mut result = Vec::new();
+        let mut seen = HashSet::new();
+
+        // Function to collect all transitive dependencies
+        fn collect_dependencies(
+            name: &str,
+            all_cache_outputs: &[CacheOutput],
+            inheritance_relationships: &HashMap<String, Vec<String>>,
+            result: &mut Vec<CacheOutput>,
+            seen: &mut HashSet<String>,
+        ) {
+            if let Some(cache_names) = inheritance_relationships.get(name) {
+                for cache_name in cache_names {
+                    // First, recursively collect dependencies of this cache
+                    collect_dependencies(
+                        cache_name,
+                        all_cache_outputs,
+                        inheritance_relationships,
+                        result,
+                        seen,
+                    );
+
+                    // Then add the cache itself if we haven't seen it yet
+                    if !seen.contains(cache_name) {
+                        if let Some(cache_output) = all_cache_outputs
+                            .iter()
+                            .find(|c| c.name.as_normalized() == cache_name)
+                        {
+                            result.push(cache_output.clone());
+                            seen.insert(cache_name.to_string());
+                        }
+                    }
                 }
             }
-            result
-        } else {
-            Vec::new()
         }
+
+        collect_dependencies(
+            package_name,
+            all_cache_outputs,
+            inheritance_relationships,
+            &mut result,
+            &mut seen,
+        );
+        result
     }
 }
 

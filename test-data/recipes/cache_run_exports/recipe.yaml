@@ -1,0 +1,36 @@
+outputs:
+  - cache:
+      name: lib-cache
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+    run_exports:
+      weak:
+        - libfoo
+      strong:
+        - libbar
+    build:
+      script:
+        - mkdir -p $PREFIX/lib
+        - echo "library content" > $PREFIX/lib/libfoo.so
+        - echo "library content" > $PREFIX/lib/libbar.so
+
+  - package:
+      name: lib-package
+      version: 0.1.0
+    inherit: lib-cache
+    build:
+      files:
+        - lib/*
+    # inherits run_exports by default
+  
+  - package:
+      name: dev-package
+      version: 0.1.0
+    inherit:
+      from: lib-cache
+      run_exports: false
+    build:
+      files:
+        - lib/*
+    # does not inherit run_exports

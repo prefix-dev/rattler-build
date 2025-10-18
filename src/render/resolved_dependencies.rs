@@ -22,7 +22,7 @@ use super::pin::PinError;
 use crate::{
     metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
-    recipe::parser::{Dependency, Requirements},
+    recipe::parser::{Dependency, IgnoreRunExports, Requirements},
     render::{
         pin::PinArgs,
         solver::{install_packages, solve_environment},
@@ -31,6 +31,30 @@ use crate::{
     tool_configuration,
     tool_configuration::Configuration,
 };
+
+/// Helper function to get cache ignore_run_exports from either legacy cache or new cache outputs
+fn get_cache_ignore_run_exports(
+    output: &Output,
+    output_ignore_run_exports: &IgnoreRunExports,
+) -> IgnoreRunExports {
+    if let Some(legacy_cache) = &output.recipe.cache {
+        legacy_cache
+            .requirements
+            .ignore_run_exports(Some(output_ignore_run_exports))
+    } else if let Some(cache_ignore) = output
+        .cache_outputs_to_build
+        .last()
+        .and_then(|c| c.ignore_run_exports.as_ref())
+    {
+        Requirements {
+            ignore_run_exports: cache_ignore.clone(),
+            ..Default::default()
+        }
+        .ignore_run_exports(Some(output_ignore_run_exports))
+    } else {
+        output_ignore_run_exports.clone()
+    }
+}
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -785,16 +809,14 @@ pub(crate) async fn resolve_dependencies(
     let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
 
     if let Some(cache) = &output.finalized_cache_dependencies {
+        // Process build environment cache
         if let Some(cache_build_env) = &cache.build {
             let cache_build_run_exports = cache_build_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_build_run_exports, "cache-build")?;
+            let cache_ignore_run_exports =
+                get_cache_ignore_run_exports(output, &output_ignore_run_exports);
+
+            let filtered =
+                cache_ignore_run_exports.filter(&cache_build_run_exports, "cache-build")?;
             build_run_exports.extend(&filtered);
         }
     }
@@ -900,17 +922,15 @@ pub(crate) async fn resolve_dependencies(
         .unwrap_or_else(|| output_ignore_run_exports.clone());
     let mut host_run_exports = host_ignore_run_exports.filter(&host_run_exports, "host")?;
 
+    // Process host environment cache
     if let Some(cache) = &output.finalized_cache_dependencies {
         if let Some(cache_host_env) = &cache.host {
             let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
+            let cache_ignore_run_exports =
+                get_cache_ignore_run_exports(output, &output_ignore_run_exports);
+
+            let filtered =
+                cache_ignore_run_exports.filter(&cache_host_run_exports, "cache-host")?;
             host_run_exports.extend(&filtered);
         }
     }

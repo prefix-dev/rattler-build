@@ -16,6 +16,7 @@ use crate::{
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
+use tracing::warn;
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -204,14 +205,20 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             .directories
             .build_prefix
             .join(prefix_record_name);
-        let record = PrefixRecord::from_path(sysroot_path).unwrap();
-        let so_glob = Glob::new("*.so*")?.compile_matcher();
-        for file in record.files {
-            if let Some(file_name) = file.file_name() {
-                if so_glob.is_match(file_name) {
-                    system_libs.add(Glob::new(&file_name.to_string_lossy())?);
+        if let Ok(record) = PrefixRecord::from_path(sysroot_path.clone()) {
+            let so_glob = Glob::new("*.so*")?.compile_matcher();
+            for file in record.files {
+                if let Some(file_name) = file.file_name() {
+                    if so_glob.is_match(file_name) {
+                        system_libs.add(Glob::new(&file_name.to_string_lossy())?);
+                    }
                 }
             }
+        } else {
+            warn!(
+                "Skipping sysroot linking check; prefix record missing at {}",
+                sysroot_path.display()
+            );
         }
     }
     system_libs.build()

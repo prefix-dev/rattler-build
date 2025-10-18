@@ -3,18 +3,22 @@
     "build": [
       "python"
     ],
+    "host": [],
     "run": [
       "python",
       "__unix"
-    ]
+    ],
+    "run_constraints": []
   },
   {
     "build": [
       "python"
     ],
+    "host": [],
     "run": [
       "python",
       "__unix"
-    ]
+    ],
+    "run_constraints": []
   }
 ]

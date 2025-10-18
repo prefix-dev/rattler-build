@@ -65,13 +65,7 @@ impl TryConvertNode<OutputType> for RenderedNode {
             .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])?;
 
         if mapping.contains_key("cache") {
-            let cache_node = mapping.get("cache").ok_or_else(|| {
-                vec![_partialerror!(
-                    *self.span(),
-                    ErrorKind::MissingField("cache".into())
-                )]
-            })?;
-            let cache_output = cache_node.try_convert("outputs.cache")?;
+            let cache_output = self.try_convert("outputs.cache")?;
             return Ok(OutputType::Cache(Box::new(cache_output)));
         }
 

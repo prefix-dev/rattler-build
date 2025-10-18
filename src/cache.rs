@@ -528,14 +528,23 @@ impl Output {
         )
         .into_diagnostic()?;
 
-        fs::remove_dir_all(self.prefix()).into_diagnostic()?;
-        CopyDir::new(&prefix_cache_dir, self.prefix())
-            .run()
-            .into_diagnostic()?;
+        // The files are already in PREFIX from the build script, so we don't need to restore them.
+        // However, we need to track them so subsequent cache builds that inherit from this one
+        // know which files are available (e.g., extended-cache inheriting from base-cache).
+        // The files will remain in PREFIX for the next cache build in the sequence.
+
+        let mut all_restored_prefix_files = self.restored_cache_prefix_files.unwrap_or_default();
+        all_restored_prefix_files.extend(cache.prefix_files.clone());
+
+        let mut all_restored_work_dir_files =
+            self.restored_cache_work_dir_files.unwrap_or_default();
+        all_restored_work_dir_files.extend(cache.work_dir_files.clone());
 
         Ok(Output {
             finalized_cache_dependencies: Some(finalized_dependencies),
             finalized_cache_sources: Some(rendered_sources),
+            restored_cache_prefix_files: Some(all_restored_prefix_files),
+            restored_cache_work_dir_files: Some(all_restored_work_dir_files),
             ..self
         })
     }

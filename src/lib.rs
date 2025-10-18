@@ -74,6 +74,7 @@ use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
+use serde_json::{Value, to_string_pretty, to_value};
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
@@ -1025,10 +1026,25 @@ pub async fn build_recipes(
             outputs
         };
 
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&outputs).into_diagnostic()?
-        );
+        let mut json_value = to_value(&outputs).into_diagnostic()?;
+        if let Value::Array(outputs_array) = &mut json_value {
+            for output in outputs_array {
+                if let Some(Value::Object(recipe)) = output.get_mut("recipe") {
+                    let requirements = recipe
+                        .entry("requirements".to_string())
+                        .or_insert_with(|| Value::Object(Default::default()));
+                    if let Value::Object(requirements) = requirements {
+                        for key in ["build", "host", "run", "run_constraints"] {
+                            requirements
+                                .entry(key.to_string())
+                                .or_insert_with(|| Value::Array(Vec::new()));
+                        }
+                    }
+                }
+            }
+        }
+
+        println!("{}", to_string_pretty(&json_value).into_diagnostic()?);
         return Ok(());
     }
 

@@ -230,38 +230,8 @@ impl Files {
                 prefix: prefix.to_owned(),
             });
         }
-
+        let fs_is_case_sensitive = check_is_case_sensitive()?;
         let current_files = record_files(prefix)?;
-        let mut selected_files = HashSet::new();
-        for file in &current_files {
-            if let Ok(file_without_prefix) = file.strip_prefix(prefix) {
-                if files.is_empty()
-                    || files.is_match(file_without_prefix)
-                    || always_include.is_match(file_without_prefix)
-                {
-                    if always_include.is_match(file_without_prefix) {
-                        tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
-                    }
-                    selected_files.insert(file.clone());
-                }
-            }
-        }
-
-        if let Some(cache_files) = restored_cache_prefix_files {
-            for cache_file in cache_files {
-                let full_path = prefix.join(cache_file);
-                if let Ok(file_without_prefix) = full_path.strip_prefix(prefix) {
-                    if (files.is_empty()
-                        || files.is_match(file_without_prefix)
-                        || always_include.is_match(file_without_prefix))
-                        && current_files.contains(&full_path)
-                    {
-                        selected_files.insert(full_path);
-                    }
-                }
-            }
-        }
-
         let previous_files = if prefix.join("conda-meta").exists() {
             let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
             let mut previous_files = prefix_records
@@ -273,6 +243,48 @@ impl Files {
         } else {
             HashSet::new()
         };
+
+        let mut selected_files = find_new_files(
+            &current_files,
+            &previous_files,
+            prefix,
+            fs_is_case_sensitive,
+        );
+
+        if !files.is_empty() {
+            selected_files.retain(|f| {
+                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            });
+        }
+
+        if !always_include.is_empty() {
+            for file in &current_files {
+                let file_without_prefix =
+                    file.strip_prefix(prefix).expect("File should be in prefix");
+                if always_include.is_match(file_without_prefix) {
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
+                    selected_files.insert(file.clone());
+                }
+            }
+        }
+
+        if let Some(cache_files) = restored_cache_prefix_files {
+            for cache_file in cache_files {
+                let full_path = prefix.join(cache_file);
+                if !current_files.contains(&full_path) {
+                    continue;
+                }
+                let file_without_prefix = full_path
+                    .strip_prefix(prefix)
+                    .expect("File should be in prefix");
+                if files.is_empty()
+                    || files.is_match(file_without_prefix)
+                    || always_include.is_match(file_without_prefix)
+                {
+                    selected_files.insert(full_path);
+                }
+            }
+        }
 
         Ok(Files {
             new_files: selected_files,

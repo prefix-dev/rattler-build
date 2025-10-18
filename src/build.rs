@@ -129,7 +129,7 @@ pub async fn run_build(
         // Cache outputs from outputs array
         let mut current_output = output;
         let cache_outputs = current_output.cache_outputs_to_build.clone();
-        for cache_output in &cache_outputs {
+        for cache_output in cache_outputs.iter() {
             current_output = current_output
                 .build_or_fetch_cache_output(cache_output, tool_configuration)
                 .await?;

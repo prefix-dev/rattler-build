@@ -1,0 +1,33 @@
+outputs:
+  - cache:
+      name: build-cache
+    requirements:
+      build:
+        - cmake
+        - ninja
+      host:
+        - zlib
+    build:
+      script:
+        - mkdir -p $PREFIX/lib
+        - echo "build environment setup" > $PREFIX/lib/setup.txt
+
+  - package:
+      name: with-reqs-inherited
+      version: 0.1.0
+    inherit:
+      from: build-cache
+      requirements: true
+    build:
+      files:
+        - lib/*
+    # should have cmake, ninja in build and zlib in host
+  
+  - package:
+      name: without-reqs-inherited
+      version: 0.1.0
+    inherit: build-cache
+    build:
+      files:
+        - lib/*
+    # should NOT have requirements (default behavior)

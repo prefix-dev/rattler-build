@@ -1,0 +1,41 @@
+outputs:
+  - cache:
+      name: base-cache
+    build:
+      script:
+        - mkdir -p $PREFIX/lib
+        - mkdir -p $PREFIX/include
+        - echo "This is the base library" > $PREFIX/lib/base.txt
+        - echo "// Base header" > $PREFIX/include/base.h
+    requirements:
+      build:
+        - cmake
+    
+  - cache:
+      name: extended-cache
+    inherit: base-cache
+    build:
+      script:
+        - echo "This is the extended library" > $PREFIX/lib/extended.txt
+        - echo "// Extended header" > $PREFIX/include/extended.h
+    requirements:
+      build:
+        - ninja
+
+  - package:
+      name: pkg-from-base
+      version: 0.1.0
+    inherit: base-cache
+    build:
+      files:
+        - lib/base.txt
+        - include/base.h
+  
+  - package:
+      name: pkg-from-extended
+      version: 0.1.0
+    inherit: extended-cache
+    build:
+      files:
+        - lib/*
+        - include/*
