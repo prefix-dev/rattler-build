@@ -330,6 +330,7 @@ impl TempFiles {
 mod test {
     use std::{collections::HashSet, path::PathBuf};
 
+    use super::*;
     use crate::packaging::file_finder::{check_is_case_sensitive, find_new_files};
 
     #[test]
@@ -395,5 +396,59 @@ mod test {
         // We can't assert the specific value since it depends on the filesystem,
         // but we can verify the function doesn't panic and returns a boolean
         let _is_case_sensitive = result.unwrap();
+    }
+
+    #[test]
+    fn test_from_prefix_with_filters() {
+        let temp_dir = TempDir::new().unwrap();
+        let prefix = temp_dir.path();
+        let test_files = [
+            ("bin/executable", "test"),
+            ("lib/library.so", "test"),
+            ("README.md", "test"),
+            ("config.txt", "test"),
+            ("bin/cached_executable", "cached"),
+            ("lib/cached_library.so", "cached"),
+            ("README.cached", "cached"),
+        ];
+
+        for (path, content) in &test_files {
+            if path.contains('/') {
+                fs::create_dir_all(prefix.join(path).parent().unwrap()).unwrap();
+            }
+            fs::write(prefix.join(path), content).unwrap();
+        }
+
+        let files_glob = GlobVec::from_vec(["bin/*", "lib/*"].to_vec(), None);
+        let always_include_glob = GlobVec::from_vec(["README.*"].to_vec(), None);
+        let cache_files = vec![
+            "bin/cached_executable".into(),
+            "lib/cached_library.so".into(),
+            "README.cached".into(),
+        ];
+
+        let result = Files::from_prefix_with_filters(
+            prefix,
+            &always_include_glob,
+            &files_glob,
+            Some(&cache_files),
+            None,
+        )
+        .unwrap();
+
+        let expected_files = [
+            "bin/executable",
+            "lib/library.so",
+            "README.md",
+            "bin/cached_executable",
+            "lib/cached_library.so",
+            "README.cached",
+        ];
+
+        for file in &expected_files {
+            assert!(result.new_files.contains(&prefix.join(file)));
+        }
+        assert!(!result.new_files.contains(&prefix.join("config.txt")));
+        assert_eq!(result.new_files.len(), 6);
     }
 }

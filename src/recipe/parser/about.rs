@@ -170,11 +170,13 @@ impl TryConvertNode<License> for RenderedScalarNode {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         assert_miette_snapshot,
         recipe::{Recipe, jinja::SelectorConfig},
         variant_config::ParseErrors,
     };
+    use std::path::Path;
 
     #[test]
     fn invalid_url() {
@@ -210,5 +212,41 @@ mod test {
             .into();
 
         assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn test_merge_from() {
+        let mut about1 = About {
+            homepage: Some(Url::parse("https://example.com").unwrap()),
+            repository: Some(Url::parse("https://github.com/example/repo").unwrap()),
+            summary: Some("Original summary".to_string()),
+            description: None,
+            license_family: None,
+            license_file: GlobVec::from_vec(vec!["LICENSE"], None),
+            ..Default::default()
+        };
+
+        let about2 = About {
+            homepage: Some(Url::parse("https://other.com").unwrap()),
+            description: Some("Other description".to_string()),
+            license_family: Some("MIT".to_string()),
+            license_file: GlobVec::from_vec(vec!["COPYING"], None),
+            ..Default::default()
+        };
+
+        about1.merge_from(&about2);
+
+        assert_eq!(
+            about1.homepage.as_ref().unwrap().as_str(),
+            "https://example.com/"
+        );
+        assert_eq!(
+            about1.repository.as_ref().unwrap().as_str(),
+            "https://github.com/example/repo"
+        );
+        assert_eq!(about1.summary.as_ref().unwrap(), "Original summary");
+        assert!(about1.license_file.is_match(Path::new("LICENSE")));
+        assert_eq!(about1.description.as_ref().unwrap(), "Other description");
+        assert_eq!(about1.license_family.as_ref().unwrap(), "MIT");
     }
 }
