@@ -165,15 +165,6 @@ pub async fn run_build(
     let use_fast_path = output.finalized_cache_dependencies.is_some()
         && output.recipe.build().script().is_default();
 
-    // Verify that requirements inheritance is properly handled in fast path
-    // If there are inherited requirements but no build script, we still need to check if
-    // environment setup is needed for other purposes beyond script execution
-    if use_fast_path {
-        tracing::info!(
-            "Using fast-path optimization: output inherited cache and has no build.script; skipping environment setup and script execution for improved performance."
-        );
-    }
-
     if !use_fast_path {
         output
             .install_environments(tool_configuration)

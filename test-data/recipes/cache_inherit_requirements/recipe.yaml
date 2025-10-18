@@ -22,7 +22,7 @@ outputs:
       files:
         - lib/*
     # should have cmake, ninja in build and zlib in host
-  
+
   - package:
       name: without-reqs-inherited
       version: 0.1.0

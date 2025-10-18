@@ -23,7 +23,7 @@ outputs:
       files:
         - lib/*
     # inherits run_exports by default
-  
+
   - package:
       name: dev-package
       version: 0.1.0

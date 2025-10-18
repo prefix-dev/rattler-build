@@ -743,6 +743,40 @@ fn parse_cache_to_cache_inheritance(
     Ok(relationships)
 }
 
+/// Topological sort to process caches in dependency order (ancestors before descendants)
+fn topological_sort(inheritance: &HashMap<String, Vec<String>>) -> Vec<String> {
+    let mut in_degree: HashMap<String, usize> = inheritance
+        .iter()
+        .map(|(node, ancestors)| (node.clone(), ancestors.len()))
+        .collect();
+
+    let all_nodes: HashSet<_> = inheritance
+        .keys()
+        .chain(inheritance.values().flat_map(|v| v.iter()))
+        .cloned()
+        .collect();
+
+    let mut queue: Vec<_> = all_nodes
+        .iter()
+        .filter(|node| in_degree.get(*node).copied().unwrap_or(0) == 0)
+        .cloned()
+        .collect();
+
+    let mut result = Vec::new();
+    while let Some(node) = queue.pop() {
+        result.push(node.clone());
+        // Decrease in-degree for dependents of this node
+        for (dependent, _) in inheritance.iter().filter(|(_, and)| and.contains(&node)) {
+            let degree = in_degree.get_mut(dependent).unwrap();
+            *degree -= 1;
+            if *degree == 0 {
+                queue.push(dependent.clone());
+            }
+        }
+    }
+    result
+}
+
 /// Apply cache-to-cache inheritance to the cache outputs
 fn apply_cache_to_cache_inheritance(
     cache_outputs: Vec<crate::recipe::parser::CacheOutput>,
@@ -753,7 +787,13 @@ fn apply_cache_to_cache_inheritance(
         .map(|cache| (cache.name.as_normalized().to_string(), cache))
         .collect();
 
-    for (cache_name, ancestors) in cache_inheritance_relationships {
+    // Compute topological order to process dependencies first
+    let processing_order = topological_sort(&cache_inheritance_relationships);
+
+    for cache_name in processing_order {
+        let Some(ancestors) = cache_inheritance_relationships.get(&cache_name) else {
+            continue;
+        };
         let ancestor_data: Vec<_> = ancestors
             .iter()
             .filter_map(|ancestor_name| {

@@ -208,8 +208,15 @@ pub struct PostProcess {
 }
 
 impl Build {
-    /// Deep merge another Build into this one
-    /// Values in self take precedence over values in other
+    /// Deep merge another Build into this one.
+    /// Values in self take precedence over values in other.
+    ///
+    /// Merged fields: python, dynamic_linking, prefix_detection, variant,
+    /// post_process, merge_build_and_host_envs, noarch, files,
+    /// always_include_files, always_copy_files
+    ///
+    /// Excluded fields (preserved from self): number, string, skip, script
+    /// These fields are treated as identity fields specific to each output.
     pub fn merge_from(&mut self, other: &Build) {
         if self.python.is_default() && !other.python.is_default() {
             self.python = other.python.clone();

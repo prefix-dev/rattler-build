@@ -10,7 +10,7 @@ outputs:
     requirements:
       build:
         - cmake
-    
+
   - cache:
       name: extended-cache
     inherit: base-cache
@@ -30,7 +30,7 @@ outputs:
       files:
         - lib/base.txt
         - include/base.h
-  
+
   - package:
       name: pkg-from-extended
       version: 0.1.0

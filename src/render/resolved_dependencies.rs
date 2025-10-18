@@ -730,11 +730,6 @@ pub(crate) async fn resolve_dependencies(
             }
         }
 
-        if build_env_specs.is_empty() || merge_build_host {
-            // If there are no specs (and we are not merging separately), skip creating a separate build env
-            // unless merge_build_host is false and we really have specs to solve.
-        }
-
         let match_specs = build_env_specs
             .iter()
             .map(|s| s.spec().clone())
@@ -910,16 +905,7 @@ pub(crate) async fn resolve_dependencies(
 
     // And filter the run exports
     // Use cache ignore_run_exports if available, otherwise use output ignore_run_exports
-    let host_ignore_run_exports = output
-        .recipe
-        .cache
-        .as_ref()
-        .map(|cache_section| {
-            cache_section
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-        })
-        .unwrap_or_else(|| output_ignore_run_exports.clone());
+    let host_ignore_run_exports = get_cache_ignore_run_exports(output, &output_ignore_run_exports);
     let mut host_run_exports = host_ignore_run_exports.filter(&host_run_exports, "host")?;
 
     // Process host environment cache

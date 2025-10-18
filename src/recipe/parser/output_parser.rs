@@ -186,9 +186,26 @@ impl Output {
                 self.requirements.ignore_run_exports(Some(cache_ignore));
         }
 
-        // Deep merge the build section from cache, excluding the script
-        let cache_build_for_merge = Build::default();
-        self.build.merge_from(&cache_build_for_merge);
+        // Deep merge compatible build fields from cache (script is intentionally excluded)
+        let variant_is_default = |v: &super::build::VariantKeyUsage| {
+            v.use_keys.is_empty() && v.ignore_keys.is_empty() && v.down_prioritize_variant.is_none()
+        };
+        if variant_is_default(&self.build.variant) && !variant_is_default(&cache.build.variant) {
+            self.build.variant = cache.build.variant.clone();
+        }
+        [
+            (&mut self.build.files, &cache.build.files),
+            (
+                &mut self.build.always_include_files,
+                &cache.build.always_include_files,
+            ),
+        ]
+        .iter_mut()
+        .for_each(|(self_field, cache_field)| {
+            if self_field.is_empty() && !cache_field.is_empty() {
+                **self_field = (*cache_field).clone();
+            }
+        });
         if let Some(cache_about) = &cache.about {
             if self.about.is_none() {
                 self.about = Some(cache_about.clone());
