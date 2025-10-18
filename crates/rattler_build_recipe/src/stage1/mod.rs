@@ -67,13 +67,24 @@ impl EvaluationContext {
         Self::default()
     }
 
-    /// Create an evaluation context from a map of variables
+    /// Create an evaluation context from a map of string variables
+    #[cfg(test)]
     pub fn from_map(variables: IndexMap<String, String>) -> Self {
         Self {
             variables: variables
                 .into_iter()
                 .map(|(k, v)| (k, Variable::from(v)))
                 .collect(),
+            jinja_config: JinjaConfig::default(),
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Create an evaluation context from a map of Variable values
+    pub fn from_variables(variables: IndexMap<String, Variable>) -> Self {
+        Self {
+            variables,
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),

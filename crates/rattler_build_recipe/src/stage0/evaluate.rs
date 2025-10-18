@@ -218,6 +218,10 @@ where
 }
 
 /// Evaluate a ConditionalList<String> into Vec<String>
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
 pub fn evaluate_string_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
@@ -228,7 +232,10 @@ pub fn evaluate_string_list(
         match item {
             Item::Value(value) => {
                 let s = evaluate_string_value(value, context)?;
-                results.push(s);
+                // Filter out empty strings from templates like `${{ "value" if condition }}`
+                if !s.is_empty() {
+                    results.push(s);
+                }
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
@@ -237,14 +244,18 @@ pub fn evaluate_string_list(
                     // Evaluate the "then" items
                     for val in cond.then.iter() {
                         let s = evaluate_string_value(val, context)?;
-                        results.push(s);
+                        if !s.is_empty() {
+                            results.push(s);
+                        }
                     }
                 } else {
                     // Evaluate the "else" items
                     if let Some(else_value) = &cond.else_value {
                         for val in else_value.iter() {
                             let s = evaluate_string_value(val, context)?;
-                            results.push(s);
+                            if !s.is_empty() {
+                                results.push(s);
+                            }
                         }
                     }
                 }
@@ -519,6 +530,11 @@ pub fn evaluate_dependency_list(
                         // Template - need to render and parse
                         let s = render_template(template.source(), context, span)?;
 
+                        // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+                        if s.is_empty() {
+                            continue;
+                        }
+
                         // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
                         if s.trim().starts_with('{') {
                             // Try to deserialize as Dependency (which handles pin types)
@@ -565,6 +581,12 @@ pub fn evaluate_dependency_list(
                             Value::Template { template, span } => {
                                 // Render the template and parse as matchspec
                                 let s = render_template(template.source(), context, span)?;
+
+                                // Filter out empty strings
+                                if s.is_empty() {
+                                    continue;
+                                }
+
                                 let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
                                     .map_err(|e| ParseError {
                                         kind: ErrorKind::InvalidValue,
@@ -622,9 +644,12 @@ pub fn evaluate_script_list(
                                 }
 
                                 // Extract environment variables
+                                // Filter out keys whose values evaluate to empty strings
                                 for (key, val) in &inline.env {
                                     let evaluated_val = evaluate_string_value(val, context)?;
-                                    env.insert(key.clone(), evaluated_val);
+                                    if !evaluated_val.is_empty() {
+                                        env.insert(key.clone(), evaluated_val);
+                                    }
                                 }
 
                                 // Extract secrets
@@ -680,9 +705,12 @@ pub fn evaluate_script_list(
                                     }
 
                                     // Extract environment variables
+                                    // Filter out keys whose values evaluate to empty strings
                                     for (key, val) in &inline.env {
                                         let evaluated_val = evaluate_string_value(val, context)?;
-                                        env.insert(key.clone(), evaluated_val);
+                                        if !evaluated_val.is_empty() {
+                                            env.insert(key.clone(), evaluated_val);
+                                        }
                                     }
 
                                     // Extract secrets

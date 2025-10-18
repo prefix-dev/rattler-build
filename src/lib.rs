@@ -147,10 +147,18 @@ fn find_variants(
     };
 
     // Build render config with platform information
-    let render_config = RenderConfig::new()
+    let mut render_config = RenderConfig::new()
         .with_context("target_platform", target_platform.to_string())
         .with_context("build_platform", _build_platform.to_string())
         .with_context("host_platform", _host_platform.to_string());
+
+    // Add platform selectors for conditionals as boolean values (unix, win, osx, linux)
+    // These are derived from target_platform and should be proper booleans in Jinja
+    render_config = render_config
+        .with_context("unix", target_platform.is_unix())
+        .with_context("win", target_platform.is_windows())
+        .with_context("linux", target_platform.is_linux())
+        .with_context("osx", target_platform.is_osx());
 
     // Render with variant config
     let rendered_variants = render_recipe_with_variant_config(
