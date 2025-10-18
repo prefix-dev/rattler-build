@@ -76,22 +76,20 @@ impl BuildOutput {
     /// The build string is either the build string from the recipe or computed
     /// from the hash and build number.
     pub fn build_string(&self) -> Cow<'_, str> {
-        // TODO: properly compute the hash
         self.recipe
             .build()
             .string
             .clone()
             .unwrap_or_else(|| {
                 // compute build string from hash and build number
-                format!("abcdefg_{}", self.recipe.build().number).into()
+                format!(
+                    "{}_{}",
+                    self.build_configuration.hash,
+                    self.recipe.build().number
+                )
+                .into()
             })
             .into()
-        // self.recipe
-        //     .build()
-        //     .string
-        //     .as_resolved()
-        //     .expect("Build string is not resolved")
-        //     .into()
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})

@@ -1,51 +1,50 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use rattler_build_recipe::stage1::TestType;
+use rattler_build_recipe::stage1::{TestType, tests::CommandsTest};
+use rattler_build_script::{ResolvedScriptContents, ScriptContent};
 
 use crate::{metadata::Output, packaging::PackagingError};
 
-// impl CommandsTest {
-//     fn write_to_folder(
-//         &self,
-//         folder: &Path,
-//         output: &Output,
-//     ) -> Result<Vec<PathBuf>, PackagingError> {
-//         let mut test_files = Vec::new();
+pub fn write_command_test_files(
+    command_test: &CommandsTest,
+    folder: &Path,
+    output: &Output,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let mut test_files = Vec::new();
 
-//         if !self.files.recipe.is_empty() || !self.files.source.is_empty() {
-//             fs::create_dir_all(folder)?;
-//         }
+    if !command_test.files.recipe.is_empty() || !command_test.files.source.is_empty() {
+        fs::create_dir_all(folder)?;
+    }
 
-//         if !self.files.recipe.is_empty() {
-//             let globs = &self.files.recipe;
-//             let copy_dir = crate::source::copy_dir::CopyDir::new(
-//                 &output.build_configuration.directories.recipe_dir,
-//                 folder,
-//             )
-//             .with_globvec(globs)
-//             .use_gitignore(false)
-//             .run()?;
+    if !command_test.files.recipe.is_empty() {
+        let globs = &command_test.files.recipe;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.recipe_dir,
+            folder,
+        )
+        .with_globvec(globs)
+        .use_gitignore(false)
+        .run()?;
 
-//             test_files.extend(copy_dir.copied_paths().iter().cloned());
-//         }
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
 
-//         if !self.files.source.is_empty() {
-//             let globs = &self.files.source;
-//             let copy_dir = crate::source::copy_dir::CopyDir::new(
-//                 &output.build_configuration.directories.work_dir,
-//                 folder,
-//             )
-//             .with_globvec(globs)
-//             .use_gitignore(false)
-//             .run()?;
+    if !command_test.files.source.is_empty() {
+        let globs = &command_test.files.source;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.work_dir,
+            folder,
+        )
+        .with_globvec(globs)
+        .use_gitignore(false)
+        .run()?;
 
-//             test_files.extend(copy_dir.copied_paths().iter().cloned());
-//         }
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
 
-//         Ok(test_files)
-//     }
-// }
+    Ok(test_files)
+}
 
 /// Write out the test files for the final package
 pub(crate) fn write_test_files(
@@ -63,37 +62,38 @@ pub(crate) fn write_test_files(
     tests.retain(|test| !matches!(test, TestType::PackageContents { .. }));
 
     // For each `Command` test, we need to copy the test files to the package
-    for (_idx, test) in tests.iter_mut().enumerate() {
-        if let TestType::Commands(_command_test) = test {
-            // let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
-            // let folder = tmp_dir_path.join(&cwd);
-            // let files = command_test.write_to_folder(&folder, output)?;
-            // if !files.is_empty() {
-            //     test_files.extend(files);
-            //     // store the cwd in the rendered test
-            //     command_test.script.cwd = Some(cwd);
-            // }
+    for (idx, test) in tests.iter_mut().enumerate() {
+        if let TestType::Commands(command_test) = test {
+            let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
+            let folder = tmp_dir_path.join(&cwd);
+            let files = write_command_test_files(command_test, &folder, output)?;
+            if !files.is_empty() {
+                test_files.extend(files);
+                // store the cwd in the rendered test
+                command_test.script.cwd = Some(cwd);
+            }
 
-            // // Try to render the script contents here
-            // // Note: we want to improve this with better rendering in the future
-            // let contents = command_test.script.resolve_content(
-            //     &output.build_configuration.directories.recipe_dir,
-            //     Some(default_jinja_context(output)),
-            //     &["sh", "bat"],
-            // )?;
+            // Try to render the script contents here
+            // TODO(refactor): properly render script here.
+            let jinja_renderer = output.jinja_renderer();
+            let contents = command_test.script.resolve_content(
+                &output.build_configuration.directories.recipe_dir,
+                Some(jinja_renderer),
+                &["sh", "bat"],
+            )?;
 
-            // // Replace with rendered contents
-            // match contents {
-            //     ResolvedScriptContents::Inline(contents) => {
-            //         command_test.script.content = ScriptContent::Command(contents)
-            //     }
-            //     ResolvedScriptContents::Path(_path, contents) => {
-            //         command_test.script.content = ScriptContent::Command(contents);
-            //     }
-            //     ResolvedScriptContents::Missing => {
-            //         command_test.script.content = ScriptContent::Command("".to_string());
-            //     }
-            // }
+            // Replace with rendered contents
+            match contents {
+                ResolvedScriptContents::Inline(contents) => {
+                    command_test.script.content = ScriptContent::Command(contents)
+                }
+                ResolvedScriptContents::Path(_path, contents) => {
+                    command_test.script.content = ScriptContent::Command(contents);
+                }
+                ResolvedScriptContents::Missing => {
+                    command_test.script.content = ScriptContent::Command("".to_string());
+                }
+            }
         }
     }
 

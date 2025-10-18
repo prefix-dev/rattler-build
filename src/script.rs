@@ -38,6 +38,13 @@ impl Output {
             .collect()
     }
 
+    /// Helper function to get a jinja renderer for the output's recipe context.
+    pub(crate) fn jinja_renderer(&self) -> impl Fn(&str) -> Result<String, String> {
+        let selector_config = self.build_configuration.selector_config();
+        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
+        move |template: &str| jinja.render_str(template).map_err(|e| e.to_string())
+    }
+
     /// Helper method to prepare build script execution arguments
     async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
@@ -46,8 +53,7 @@ impl Output {
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
         env_vars.extend(self.env_vars_from_variant());
 
-        let selector_config = self.build_configuration.selector_config();
-        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
+        let jinja_renderer = self.jinja_renderer();
 
         let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
@@ -56,7 +62,6 @@ impl Output {
         };
 
         let work_dir = &self.build_configuration.directories.work_dir;
-        let jinja_renderer = |template: &str| jinja.render_str(template).map_err(|e| e.to_string());
         Ok(ExecutionArgs {
             script: self.recipe.build().script.resolve_content(
                 &self.build_configuration.directories.recipe_dir,
