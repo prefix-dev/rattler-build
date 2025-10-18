@@ -471,4 +471,6 @@ Recipe {
             String("some-maintainer"),
         ],
     },
+    cache_outputs: [],
+    cache_inheritance: {},
 }

@@ -147,40 +147,6 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
                 ));
             }
         }
-
-        // Require explicit build scripts for multi-output recipes
-        if !root_map.contains_key("build") {
-            if let Some(outputs_value) = root_map.get("outputs") {
-                if let Some(outputs_seq) = outputs_value.as_sequence() {
-                    let missing_script = outputs_seq.iter().any(|output| {
-                        output
-                            .as_mapping()
-                            .and_then(|mapping| {
-                                mapping.get("cache").or_else(|| mapping.get("package"))
-                            })
-                            .map(|subnode| {
-                                subnode
-                                    .as_mapping()
-                                    .and_then(|mapping| mapping.get("build"))
-                                    .is_none()
-                            })
-                            .unwrap_or(true)
-                    });
-
-                    if missing_script {
-                        let key = outputs_value.span();
-                        return Err(ParsingError::from_partial(
-                            src,
-                            _partialerror!(
-                                *key,
-                                ErrorKind::MissingField("build.script".into()),
-                                help = "Multi-output recipes must specify `build.script` for each output; implicit build/script.sh is not supported. This is a breaking change from single-output recipes that default to script.sh."
-                            ),
-                        ));
-                    }
-                }
-            }
-        }
     }
 
     let Some(outputs) = root_map.get("outputs") else {
