@@ -162,7 +162,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
             let config_with_variant =
                 selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
-            let mut parsed_recipe = Recipe::from_node(output, config_with_variant)
+            let mut parsed_recipe = Recipe::from_output_node(output, config_with_variant)
                 .map_err(|err| {
                     let errs: ParseErrors<_> = err
                         .into_iter()
@@ -523,16 +523,17 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
 
-                let mut parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
-                    .map_err(|err| {
-                        let errs: ParseErrors<_> = err
-                            .into_iter()
-                            .map(|err| ParsingError::from_partial(r.source.clone(), err))
-                            .collect::<Vec<_>>()
-                            .into();
-                        errs
-                    })
-                    .map_err(VariantConfigError::from)?;
+                let mut parsed_recipe =
+                    Recipe::from_output_node(output, config_with_variant.clone())
+                        .map_err(|err| {
+                            let errs: ParseErrors<_> = err
+                                .into_iter()
+                                .map(|err| ParsingError::from_partial(r.source.clone(), err))
+                                .collect::<Vec<_>>()
+                                .into();
+                            errs
+                        })
+                        .map_err(VariantConfigError::from)?;
 
                 // Preserve cache_outputs and inherited requirements from stage 0
                 let stage0_output = &r.rendered_outputs[idx];

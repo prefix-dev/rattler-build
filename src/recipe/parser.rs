@@ -189,6 +189,22 @@ impl Recipe {
         root_node: &Node,
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
+        Self::from_node_with_options(root_node, jinja_opt, false)
+    }
+
+    /// Create recipes from an output [`Node`] that may contain inheritance metadata.
+    pub fn from_output_node(
+        root_node: &Node,
+        jinja_opt: SelectorConfig,
+    ) -> Result<Self, Vec<PartialParsingError>> {
+        Self::from_node_with_options(root_node, jinja_opt, true)
+    }
+
+    fn from_node_with_options(
+        root_node: &Node,
+        jinja_opt: SelectorConfig,
+        allow_inherit: bool,
+    ) -> Result<Self, Vec<PartialParsingError>> {
         let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
@@ -310,12 +326,24 @@ impl Recipe {
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "inherit" => {
-                        return Err(vec![_partialerror!(
-                            *key.span(),
-                            ErrorKind::InvalidField("inherit".to_string().into()),
-                            help = "The 'inherit' key is only valid in outputs, not at the recipe level. \
-                                    To use top-level cache, use the 'cache' key instead and omit 'inherit' in outputs."
-                        )]);
+                        if allow_inherit {
+                            if experimental {
+                                value.try_convert::<InheritSpec>("output.inherit")?;
+                            } else {
+                                return Err(vec![_partialerror!(
+                                    *value.span(),
+                                    ErrorKind::ExperimentalOnly("inherit".to_string()),
+                                    help = "The `inherit` key requires enabling experimental mode (`--experimental`)"
+                                )]);
+                            }
+                        } else {
+                            return Err(vec![_partialerror!(
+                                *key.span(),
+                                ErrorKind::InvalidField("inherit".to_string().into()),
+                                help = "The 'inherit' key is only valid in outputs, not at the recipe level. \
+                                        To use top-level cache, use the 'cache' key instead and omit 'inherit' in outputs."
+                            )]);
+                        }
                     }
                     "context" => {}
                     "extra" => extra = value.as_mapping().ok_or_else(|| {
@@ -574,7 +602,7 @@ mod tests {
             include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip_multi.yaml");
         let recipes = find_outputs_from_src(raw_recipe).unwrap();
         for recipe in recipes {
-            let recipe = Recipe::from_node(&recipe, SelectorConfig::default());
+            let recipe = Recipe::from_output_node(&recipe, SelectorConfig::default());
             if recipe.is_ok() {
                 assert_eq!(recipe.unwrap().package().name().as_normalized(), "zlib-dev");
                 continue;

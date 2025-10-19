@@ -232,7 +232,7 @@ pub async fn get_build_output(
 
     if has_cache_or_inheritance {
         let has_toplevel_cache = outputs.iter().any(|output| {
-            if let Ok(recipe) = Recipe::from_node(output, selector_config.clone()) {
+            if let Ok(recipe) = Recipe::from_output_node(output, selector_config.clone()) {
                 recipe.cache.is_some()
             } else {
                 false

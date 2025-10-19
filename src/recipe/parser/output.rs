@@ -1025,7 +1025,7 @@ mod tests {
         let src = fs::read_to_string(yaml_file).unwrap();
         let nodes = find_outputs_from_src(src.as_str()).unwrap();
         let parsed_recipe =
-            Recipe::from_node(&nodes[0], SelectorConfig::default()).map_err(|err| {
+            Recipe::from_output_node(&nodes[0], SelectorConfig::default()).map_err(|err| {
                 err.into_iter()
                     .map(|err| ParsingError::from_partial(src.as_str(), err))
                     .collect::<Vec<_>>()
