@@ -1014,6 +1014,9 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         // add in the run exports from the cache
         // filter run dependencies that came from run exports
+        let cache_ignore_run_exports =
+            get_cache_ignore_run_exports(output, &output_ignore_run_exports);
+
         let cache_run_exports: Vec<_> = cache
             .run
             .depends
@@ -1026,10 +1029,10 @@ pub(crate) async fn resolve_dependencies(
 
                     let by_name = spec_name
                         .as_ref()
-                        .map(|n| output_ignore_run_exports.by_name().contains(n))
+                        .map(|n| cache_ignore_run_exports.by_name().contains(n))
                         .unwrap_or(false);
                     let by_package = source_package
-                        .map(|s| output_ignore_run_exports.from_package().contains(&s))
+                        .map(|s| cache_ignore_run_exports.from_package().contains(&s))
                         .unwrap_or(false);
 
                     !by_name && !by_package

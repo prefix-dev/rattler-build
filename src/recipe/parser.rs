@@ -445,6 +445,7 @@ impl Recipe {
     ) -> Vec<CacheOutput> {
         let mut result = Vec::new();
         let mut seen = HashSet::new();
+        let mut visiting = HashSet::new();
 
         // Function to collect all transitive dependencies
         fn collect_dependencies(
@@ -453,7 +454,16 @@ impl Recipe {
             inheritance_relationships: &HashMap<String, Vec<String>>,
             result: &mut Vec<CacheOutput>,
             seen: &mut HashSet<String>,
+            visiting: &mut HashSet<String>,
         ) {
+            // Detect circular dependencies
+            if visiting.contains(name) {
+                // Circular dependency detected, skip to prevent infinite recursion
+                return;
+            }
+
+            visiting.insert(name.to_string());
+
             if let Some(cache_names) = inheritance_relationships.get(name) {
                 for cache_name in cache_names {
                     // First, recursively collect dependencies of this cache
@@ -463,6 +473,7 @@ impl Recipe {
                         inheritance_relationships,
                         result,
                         seen,
+                        visiting,
                     );
 
                     // Then add the cache itself if we haven't seen it yet
@@ -477,6 +488,8 @@ impl Recipe {
                     }
                 }
             }
+
+            visiting.remove(name);
         }
 
         collect_dependencies(
@@ -485,6 +498,7 @@ impl Recipe {
             inheritance_relationships,
             &mut result,
             &mut seen,
+            &mut visiting,
         );
         result
     }
