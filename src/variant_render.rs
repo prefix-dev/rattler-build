@@ -118,7 +118,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
     cache_outputs: &[crate::recipe::parser::CacheOutput],
-    inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
+    inheritance_relationships: &HashMap<String, Vec<String>>,
 ) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
     let used_vars = outputs
         .iter()

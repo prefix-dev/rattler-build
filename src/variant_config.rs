@@ -510,7 +510,7 @@ impl VariantConfig {
         recipe: S,
         selector_config: &SelectorConfig,
         cache_outputs: &[crate::recipe::parser::CacheOutput],
-        inheritance_relationships: &std::collections::HashMap<String, Vec<String>>,
+        inheritance_relationships: &HashMap<String, Vec<String>>,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError<S>> {
         // find all jinja variables
         let stage_0 = stage_0_render(
@@ -786,7 +786,7 @@ mod tests {
                 recipe_text.as_str(),
                 &selector_config,
                 &[],
-                &std::collections::HashMap::new(),
+                &HashMap::new(),
             )
             .unwrap();
 
@@ -934,7 +934,7 @@ compiler:
                     recipe_text.as_str(),
                     &selector_config,
                     &[],
-                    &std::collections::HashMap::new(),
+                    &HashMap::new(),
                 )
                 .unwrap();
 
@@ -970,7 +970,7 @@ compiler:
                 recipe_text.as_str(),
                 &selector_config,
                 &[],
-                &std::collections::HashMap::new(),
+                &HashMap::new(),
             )
             .unwrap();
 

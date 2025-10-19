@@ -228,7 +228,7 @@ pub async fn get_build_output(
     });
 
     let mut global_cache_outputs = Vec::new();
-    let mut inheritance_relationships = std::collections::HashMap::new();
+    let mut inheritance_relationships = HashMap::new();
 
     if has_cache_or_inheritance {
         let has_toplevel_cache = outputs.iter().any(|output| {
