@@ -1,9 +1,11 @@
 //! Functions to deal with the build cache
 use std::{
     collections::{BTreeMap, HashSet},
-    path::PathBuf,
+    io,
+    path::Path,
 };
 
+use content_inspector::ContentType;
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
 use serde::{Deserialize, Serialize};
@@ -11,9 +13,14 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     env_vars,
-    metadata::Output,
-    metadata::build_reindexed_channels,
-    packaging::Files,
+    metadata::{Output, build_reindexed_channels},
+    packaging::{
+        Files,
+        metadata::{
+            contains_prefix_binary, contains_prefix_text,
+            rewrite_prefix_in_file,
+        },
+    },
     recipe::{
         Jinja,
         parser::{Dependency, Requirements, Source},
@@ -27,6 +34,40 @@ use crate::{
         patch::apply_patch_custom,
     },
 };
+
+/// Check if a file contains the prefix and determine if it's binary or text
+/// Returns (has_prefix, is_text)
+fn check_file_for_prefix(file_path: &Path, prefix: &Path, prefix_str: &str) -> (bool, bool) {
+    let content_type = content_inspector::inspect_path(file_path);
+    let is_text = content_type.is_text()
+        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
+    
+    if is_text {
+        match contains_prefix_text(file_path, prefix) {
+            Ok(Some(_)) => (true, true),
+            Ok(None) => (false, true),
+            Err(_) => (false, true),
+        }
+    } else {
+        #[cfg(target_family = "unix")]
+        {
+            match contains_prefix_binary(file_path, prefix) {
+                Ok(has_prefix) => (has_prefix, false),
+                Err(_) => (false, false),
+            }
+        }
+        #[cfg(target_family = "windows")]
+        {
+            if let Ok(contents) = fs::read(file_path) {
+                let prefix_bytes = prefix.to_string_lossy().as_bytes();
+                (contents.windows(prefix_bytes.len()).any(|window| window == prefix_bytes), false)
+            } else {
+                (false, false)
+            }
+        }
+    }
+}
+
 
 /// Error type for cache key generation
 #[derive(Debug, thiserror::Error)]
@@ -75,6 +116,11 @@ pub struct Cache {
     /// should be rewritten when restoring to a different location.
     #[serde(default)]
     pub files_with_prefix: Vec<PathBuf>,
+
+    /// Files (relative to prefix/work_dir) that contain the old prefix string and
+    /// are binary files. These need to be handled during prefix replacement.
+    #[serde(default)]
+    pub binary_files_with_prefix: Vec<PathBuf>,
 
     /// Files (relative to work_dir) that contain the old work_dir path and
     /// should be rewritten when restoring to a different location.
@@ -266,11 +312,9 @@ impl Output {
         );
 
         // If the cache was built under a different prefix, rewrite occurrences of
-        // the old prefix in restored text files.
+        // the old prefix in restored text and binary files.
         if cache.prefix != *self.prefix() {
-            let old = cache.prefix.to_string_lossy().to_string();
-            let new = self.prefix().to_string_lossy().to_string();
-            for rel in cache.files_with_prefix.iter() {
+            for rel in cache.files_with_prefix.iter().chain(cache.binary_files_with_prefix.iter()) {
                 for base in [
                     self.prefix(),
                     &self.build_configuration.directories.work_dir,
@@ -279,17 +323,13 @@ impl Output {
                     if !path.exists() {
                         continue;
                     }
-                    if let Ok(contents) = fs::read_to_string(&path) {
-                        if contents.contains(&old) {
-                            let replaced = contents.replace(&old, &new);
-                            if let Err(e) = fs::write(&path, replaced) {
-                                tracing::warn!(
-                                    "Failed to rewrite restored file {}: {}",
-                                    path.display(),
-                                    e
-                                );
-                            }
-                        }
+                    
+                    if let Err(e) = rewrite_prefix_in_file(&path, &cache.prefix, self.prefix()) {
+                        tracing::warn!(
+                            "Failed to rewrite restored file {}: {}",
+                            path.display(),
+                            e
+                        );
                     }
                 }
             }
@@ -300,29 +340,17 @@ impl Output {
         if !cache.work_dir.as_os_str().is_empty()
             && cache.work_dir != self.build_configuration.directories.work_dir
         {
-            let old = cache.work_dir.to_string_lossy().to_string();
-            let new = self
-                .build_configuration
-                .directories
-                .work_dir
-                .to_string_lossy()
-                .to_string();
             for rel in cache.files_with_work_dir.iter() {
                 let path = self.build_configuration.directories.work_dir.join(rel);
                 if !path.exists() {
                     continue;
                 }
-                if let Ok(contents) = fs::read_to_string(&path) {
-                    if contents.contains(&old) {
-                        let replaced = contents.replace(&old, &new);
-                        if let Err(e) = fs::write(&path, replaced) {
-                            tracing::warn!(
-                                "Failed to rewrite restored work_dir file {}: {}",
-                                path.display(),
-                                e
-                            );
-                        }
-                    }
+                if let Err(e) = rewrite_prefix_in_file(&path, &cache.work_dir, &self.build_configuration.directories.work_dir) {
+                    tracing::warn!(
+                        "Failed to rewrite restored work_dir file {}: {}",
+                        path.display(),
+                        e
+                    );
                 }
             }
         }
@@ -472,6 +500,7 @@ impl Output {
 
         // Track files that contain the old prefix for later path rewriting
         let mut files_with_prefix: Vec<PathBuf> = Vec::new();
+        let mut binary_files_with_prefix: Vec<PathBuf> = Vec::new();
         let old_prefix_str = self.prefix().to_string_lossy().to_string();
 
         for file in &new_files.new_files {
@@ -482,9 +511,12 @@ impl Output {
             let dest = prefix_cache_dir.join(stripped);
             copy_file(file, &dest, &mut creation_cache, &copy_options).into_diagnostic()?;
             copied_files.push(stripped.to_path_buf());
-            if let Ok(contents) = fs::read_to_string(file) {
-                if contents.contains(&old_prefix_str) {
-                    files_with_prefix.push(stripped.to_path_buf());
+            let (has_prefix, is_text) = check_file_for_prefix(file, self.prefix(), &old_prefix_str);
+            
+            if has_prefix {
+                match is_text {
+                    true => files_with_prefix.push(stripped.to_path_buf()),
+                    false => binary_files_with_prefix.push(stripped.to_path_buf()),
                 }
             }
         }
@@ -506,6 +538,7 @@ impl Output {
             work_dir: self.build_configuration.directories.work_dir.clone(),
             run_exports: cache_output.run_exports.clone(),
             files_with_prefix,
+            binary_files_with_prefix,
             files_with_work_dir: {
                 let mut files = Vec::new();
                 let old_work_dir_str = self
@@ -519,10 +552,10 @@ impl Output {
                     if abs.is_dir() {
                         continue;
                     }
-                    if let Ok(contents) = fs::read_to_string(&abs) {
-                        if contents.contains(&old_work_dir_str) {
-                            files.push(rel.to_path_buf());
-                        }
+                    match contains_prefix_text(&abs, &self.build_configuration.directories.work_dir) {
+                        Ok(Some(_)) => files.push(rel.to_path_buf()),
+                        Ok(None) => {},
+                        Err(_) => {},
                     }
                 }
                 files
@@ -694,6 +727,9 @@ impl Output {
             let mut creation_cache = HashSet::new();
             let mut copied_files = Vec::new();
             let copy_options = CopyOptions::default();
+            let mut files_with_prefix: Vec<PathBuf> = Vec::new();
+            let mut binary_files_with_prefix: Vec<PathBuf> = Vec::new();
+            let old_prefix_str = self.prefix().to_string_lossy().to_string();
 
             for file in &new_files.new_files {
                 // skip directories (if they are not a symlink)
@@ -707,6 +743,13 @@ impl Output {
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
                 copied_files.push(stripped.to_path_buf());
+                let (has_prefix, is_text) = check_file_for_prefix(file, self.prefix(), &old_prefix_str);
+                if has_prefix {
+                    match is_text {
+                        true => files_with_prefix.push(stripped.to_path_buf()),
+                        false => binary_files_with_prefix.push(stripped.to_path_buf()),
+                    }
+                }
             }
 
             // We also need to copy the work dir files to the cache
@@ -727,7 +770,8 @@ impl Output {
                 prefix: self.prefix().to_path_buf(),
                 work_dir: self.build_configuration.directories.work_dir.clone(),
                 run_exports: crate::recipe::parser::RunExports::default(),
-                files_with_prefix: Vec::new(),
+                files_with_prefix,
+                binary_files_with_prefix,
                 files_with_work_dir: Vec::new(),
                 source_files: work_dir_files.copied_paths().to_vec(),
             };
