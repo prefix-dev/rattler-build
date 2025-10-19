@@ -310,6 +310,12 @@ impl Recipe {
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "inherit" => {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField("inherit".to_string().into()),
+                            help = "The 'inherit' key is only valid in outputs, not at the recipe level. \
+                                    To use top-level cache, use the 'cache' key instead and omit 'inherit' in outputs."
+                        )]);
                     }
                     "context" => {}
                     "extra" => extra = value.as_mapping().ok_or_else(|| {
