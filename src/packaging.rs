@@ -126,14 +126,15 @@ fn copy_license_files(
 
             if abs_path.exists() {
                 // Get the file name to use as destination
-                let file_name = abs_path
-                    .file_name()
-                    .ok_or_else(|| {
-                        PackagingError::IoError(std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            format!("Invalid absolute path for license file: {}", abs_path.display()),
-                        ))
-                    })?;
+                let file_name = abs_path.file_name().ok_or_else(|| {
+                    PackagingError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Invalid absolute path for license file: {}",
+                            abs_path.display()
+                        ),
+                    ))
+                })?;
 
                 let dest_path = licenses_folder.join(file_name);
                 fs::copy(abs_path, &dest_path)?;
