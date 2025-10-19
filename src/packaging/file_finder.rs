@@ -230,43 +230,9 @@ impl Files {
                 prefix: prefix.to_owned(),
             });
         }
-        let fs_is_case_sensitive = check_is_case_sensitive()?;
+
+        let mut result = Self::from_prefix(prefix, always_include, files)?;
         let current_files = record_files(prefix)?;
-        let previous_files = if prefix.join("conda-meta").exists() {
-            let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
-            let mut previous_files = prefix_records
-                .into_iter()
-                .flat_map(|record| record.files.into_iter().map(|f| prefix.join(f)))
-                .collect::<HashSet<_>>();
-            previous_files.extend(record_files(&prefix.join("conda-meta"))?);
-            previous_files
-        } else {
-            HashSet::new()
-        };
-
-        let mut selected_files = find_new_files(
-            &current_files,
-            &previous_files,
-            prefix,
-            fs_is_case_sensitive,
-        );
-
-        if !files.is_empty() {
-            selected_files.retain(|f| {
-                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
-            });
-        }
-
-        if !always_include.is_empty() {
-            for file in &current_files {
-                let file_without_prefix =
-                    file.strip_prefix(prefix).expect("File should be in prefix");
-                if always_include.is_match(file_without_prefix) {
-                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
-                    selected_files.insert(file.clone());
-                }
-            }
-        }
 
         if let Some(cache_files) = restored_cache_prefix_files {
             for cache_file in cache_files {
@@ -281,16 +247,12 @@ impl Files {
                     || files.is_match(file_without_prefix)
                     || always_include.is_match(file_without_prefix)
                 {
-                    selected_files.insert(full_path);
+                    result.new_files.insert(full_path);
                 }
             }
         }
 
-        Ok(Files {
-            new_files: selected_files,
-            old_files: previous_files,
-            prefix: prefix.to_owned(),
-        })
+        Ok(result)
     }
 
     /// Copy the new files to a temporary directory and return the temporary directory and the files that were copied.
