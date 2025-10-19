@@ -5,27 +5,48 @@ authors = ["Wolf Vollprecht <wolf@prefix.dev>"]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
+preview = ["pixi-build"]
+# We are using the oldest supported python version as the build variant here
+build-variants = { python = ["3.8"] }
 
-[tasks]
+[package.build]
+backend = { name = "pixi-build-python", version = "*" }
 
-[feature.build.dependencies]
+[package.build.config]
+compilers = ["rust"]
+
+[package.host-dependencies]
+python = "*"
 maturin = "~=1.2.2"
-pip = "~=23.2.1"
-rust = ">=1.86.0,<1.87"
 
-[feature.build.tasks]
-build = "PIP_REQUIRE_VIRTUALENV=false maturin develop"
-build-release = "PIP_REQUIRE_VIRTUALENV=false maturin develop --release"
-
-[feature.build.target.linux-64.dependencies]
+[package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
 
+[feature.lint.dependencies]
+# we need rust for cargo-fmt and clippy
+rust = ">=1.86.0,<1.87"
+ruff = ">=0.3.3,<0.4"
+
+[feature.lint.tasks]
+fmt = { depends-on = ["fmt-python", "fmt-rust"] }
+fmt-python = "ruff format rattler_build examples tests"
+fmt-rust = "cargo fmt --all"
+# checks for the CI
+fmt-rust-check = "cargo fmt --all --check"
+fmt-python-check = "ruff format rattler_build examples tests --diff"
+fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
+
+lint = { depends-on = ["lint-python", "lint-rust"] }
+lint-python = "ruff check ."
+lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
+
 [feature.test.dependencies]
+py-rattler-build = { path = "." }
+
 lua = "*"
 # Python 3.8 is the minimum supported version, so we use that for testing
 python = "3.8.*"
 
-ruff = ">=0.3.3,<0.4"
 mypy = "~=1.5.1"
 
 pytest = "~=7.4.0"
@@ -40,19 +61,8 @@ types-networkx = "*"
 
 [feature.test.tasks]
 check-cargo-lock = "cargo check --locked"
-fmt = { depends-on = ["fmt-python", "fmt-rust"] }
-fmt-python = "ruff format rattler_build examples tests"
-fmt-rust = "cargo fmt --all"
-lint = { depends-on = ["type-check", "lint-python", "lint-rust"] }
-lint-python = "ruff check ."
-lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
-test = { cmd = "pytest --doctest-modules", depends-on = ["build"] }
-type-check = { cmd = "mypy", depends-on = ["build"] }
-
-# checks for the CI
-fmt-rust-check = "cargo fmt --all --check"
-fmt-python-check = "ruff format rattler_build examples tests --diff"
-fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
+test = { cmd = "pytest --doctest-modules", depends-on = ["type-check"] }
+type-check = { cmd = "mypy" }
 
 [feature.docs.dependencies]
 mkdocs = ">=1.5.3,<2"
@@ -68,7 +78,8 @@ docs = { cmd = "mkdocs serve" }
 build-docs = { cmd = "mkdocs build" }
 
 [environments]
-test = { features = ["build", "test"], solve-group = "default" }
+lint = { features = ["lint"] }
+test = { features = ["test"], solve-group = "default" }
 docs = ["docs"]
 
 [dependencies]

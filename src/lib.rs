@@ -20,7 +20,7 @@ pub mod system_tools;
 pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
-mod url_with_trailing_slash;
+pub mod types;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
@@ -41,7 +41,6 @@ mod windows;
 mod package_cache_reporter;
 pub mod source_code;
 
-use crate::render::resolved_dependencies::RunExportsDownload;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
@@ -56,34 +55,35 @@ use dialoguer::Confirm;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
-use metadata::{
-    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
-    build_reindexed_channels,
-};
 use miette::{Context, IntoDiagnostic};
 pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{
-    GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-    compression_level::CompressionLevel, package::ArchiveType,
+    MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
+    package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
-use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
+use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
+use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
 use serde_json::{Value, to_string_pretty, to_value};
 use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
+use types::Directories;
+use types::{
+    BuildConfiguration, BuildSummary, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels,
+};
 use variant_config::VariantConfig;
 
-use crate::metadata::Debug;
-use crate::metadata::PlatformWithVirtualPackages;
+use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -186,21 +186,6 @@ pub async fn get_build_output(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
         ));
     }
-
-    // Determine virtual packages of the system. These packages define the
-    // capabilities of the system. Some packages depend on these virtual
-    // packages to indicate compatibility with the hardware of the system.
-    let virtual_packages = tool_config
-        .fancy_log_handler
-        .wrap_in_progress("determining virtual packages", move || {
-            VirtualPackage::detect(&VirtualPackageOverrides::from_env()).map(|vpkgs| {
-                vpkgs
-                    .iter()
-                    .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
-                    .collect::<Vec<_>>()
-            })
-        })
-        .into_diagnostic()?;
 
     tracing::debug!(
         "Platforms: build: {}, host: {}, target: {}",
@@ -413,19 +398,21 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
-
-        let output = metadata::Output {
+        let virtual_package_override = VirtualPackageOverrides::from_env();
+        let output = Output {
             recipe: recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: PlatformWithVirtualPackages {
-                    platform: build_data.host_platform,
-                    virtual_packages: virtual_packages.clone(),
-                },
-                build_platform: PlatformWithVirtualPackages {
-                    platform: build_data.build_platform,
-                    virtual_packages: virtual_packages.clone(),
-                },
+                host_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    build_data.host_platform,
+                    &virtual_package_override,
+                )
+                .into_diagnostic()?,
+                build_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    build_data.build_platform,
+                    &virtual_package_override,
+                )
+                .into_diagnostic()?,
                 hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
@@ -886,7 +873,7 @@ pub async fn rebuild(
     let rendered_recipe =
         fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
-    let mut output: metadata::Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
+    let mut output: Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;

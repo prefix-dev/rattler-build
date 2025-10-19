@@ -1,10 +1,10 @@
 use fs_err as fs;
 
-use crate::metadata::Output;
 use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
+use crate::metadata::Output;
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, ToolError};
 use crate::windows::link::Dll;
