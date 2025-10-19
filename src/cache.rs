@@ -530,11 +530,8 @@ impl Output {
             source_files: work_dir_files.copied_paths().to_vec(),
         };
 
-        fs::write(
-            cache_dir.join("cache.json"),
-            serde_json::to_string(&cache).unwrap(),
-        )
-        .into_diagnostic()?;
+        let cache_json = serde_json::to_string(&cache).into_diagnostic()?;
+        fs::write(cache_dir.join("cache.json"), cache_json).into_diagnostic()?;
 
         // The files are already in PREFIX from the build script, so we don't need to restore them.
         // However, we need to track them so subsequent cache builds that inherit from this one
@@ -736,7 +733,8 @@ impl Output {
             };
 
             let cache_file = cache_dir.join("cache.json");
-            fs::write(cache_file, serde_json::to_string(&cache).unwrap()).into_diagnostic()?;
+            let cache_json = serde_json::to_string(&cache).into_diagnostic()?;
+            fs::write(cache_file, cache_json).into_diagnostic()?;
 
             // remove prefix to get it in pristine state and restore the cache
             fs::remove_dir_all(self.prefix()).into_diagnostic()?;
