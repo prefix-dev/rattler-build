@@ -20,9 +20,9 @@ build:
     # make sure that PY_VER is set even for noarch packages
     - if: unix
       then:
-      - test ! -z "$PY_VER"
+        - test ! -z "$PY_VER"
       else:
-      - if not defined PY_VER exit 1
+        - if not defined PY_VER exit 1
 
   python:
     entry_points:

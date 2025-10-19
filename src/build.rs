@@ -6,12 +6,23 @@ use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
+    apply_patch_custom,
     metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
+    render::resolved_dependencies::RunExportsDownload,
     render::solver::load_repodatas,
     script::InterpreterError,
     tool_configuration,
 };
+
+/// Behavior for handling the working directory during the build process
+#[derive(Debug, Clone, Copy)]
+pub enum WorkingDirectoryBehavior {
+    /// Preserve the working directory (don't clean up)
+    Preserve,
+    /// Clean up the working directory after build
+    Cleanup,
+}
 
 /// Check if the build should be skipped because it already exists in any of the
 /// channels
@@ -99,11 +110,16 @@ pub async fn skip_existing(
 pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
+    working_directory_behavior: WorkingDirectoryBehavior,
 ) -> miette::Result<(Output, PathBuf)> {
+    let cleanup = matches!(
+        working_directory_behavior,
+        WorkingDirectoryBehavior::Cleanup
+    );
     output
         .build_configuration
         .directories
-        .create_build_dir(true)
+        .create_build_dir(cleanup)
         .into_diagnostic()?;
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
@@ -148,13 +164,13 @@ pub async fn run_build(
         current_output
     } else {
         output
-            .fetch_sources(tool_configuration)
+            .fetch_sources(tool_configuration, apply_patch_custom)
             .await
             .into_diagnostic()?
     };
 
     let output = output
-        .resolve_dependencies(tool_configuration)
+        .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
         .await
         .into_diagnostic()?;
 

@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +15,12 @@ import requests
 import yaml
 import subprocess
 import shutil
-from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
+from helpers import (
+    RattlerBuild,
+    check_build_output,
+    get_extracted_package,
+    get_package,
+)
 
 
 def test_functionality(rattler_build: RattlerBuild):
@@ -36,6 +42,30 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     # Check that the total number of files under the license folder is correct
     # 5 files + 3 folders = 8
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
+
+
+def test_missing_license_file(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a specified license file is missing."""
+    try:
+        rattler_build.build(recipes / "missing_license_file", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
+
+
+def test_missing_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that building fails when a license glob pattern matches no files."""
+    try:
+        rattler_build.build(recipes / "missing_license_glob", tmp_path)
+        assert False, "Build should have failed"
+    except CalledProcessError:
+        # The build correctly failed as expected
+        pass
 
 
 def test_spaces_in_paths(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -108,6 +138,39 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert installer.read_text().strip() == "conda"
 
     check_info(pkg, expected=recipes / "toml" / "expected")
+
+
+def test_render_only_with_solve_does_not_download_packages(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    result = rattler_build.render(
+        recipes / "toml",
+        tmp_path,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        raw=True,
+    )
+
+    assert result.returncode == 0
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+
+    # Verify we did not trigger steps that download packages
+    assert "Collecting run exports" not in combined
+    assert "Installing host environment" not in combined
+    assert "Installing build environment" not in combined
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
+    deps = outputs[0].get("finalized_dependencies", {})
+    resolved_len = 0
+    host = deps.get("host")
+    if isinstance(host, dict):
+        resolved_len = len(host.get("resolved", []))
+    if resolved_len == 0:
+        build = deps.get("build")
+        if isinstance(build, dict):
+            resolved_len = len(build.get("resolved", []))
+    assert resolved_len >= 1
 
 
 def test_run_exports(
@@ -421,7 +484,8 @@ def test_s3_minio_upload(
         s3_config.region,
         "--endpoint-url",
         s3_config.endpoint_url,
-        "--force-path-style",
+        "--addressing-style",
+        "path",
         str(get_package(tmp_path, "globtest")),
     ]
     rattler_build(*cmd)
@@ -1007,11 +1071,11 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
-def test_nushell_implicit_recipe(
+def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     rattler_build.build(
-        recipes / "nushell-implicit/recipe.yaml",
+        recipes / "nushell-script-detection/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "nushell")
@@ -1101,9 +1165,12 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches
+    # check that the snapshot matches (different on windows vs. unix)
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    assert test_yaml == snapshot
+    if os.name == "nt":
+        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
+    else:
+        assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -1540,11 +1607,14 @@ about:
         "regular-file.txt" in extracted_files_list
     ), "regular-file.txt not found in package"
 
-    collision_warning_pattern1 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/CASE-FILE.txt, case_test/case-file.txt"
-    collision_warning_pattern2 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/case-file.txt, case_test/CASE-FILE.txt"
+    collision_warning_pattern = (
+        r"Mixed-case filenames detected, case-insensitive filesystems may break:"
+        r"\n  - case_test/CASE-FILE.txt"
+        r"\n  - case_test/case-file.txt"
+    )
 
-    assert (
-        collision_warning_pattern1 in output or collision_warning_pattern2 in output
+    assert re.search(
+        collision_warning_pattern, output, flags=re.IGNORECASE
     ), f"Case collision warning not found in build output. Output contains:\n{output}"
 
 
@@ -2230,3 +2300,89 @@ def test_cache_requirements_inheritance(
 
     assert any("cmake" in str(req) for req in with_build_reqs)
     assert not any("cmake" in str(req) for req in without_build_reqs)
+
+
+def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+
+def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-ruby-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-ruby-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_extension_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "ruby-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "ruby-imports-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "ruby-imports-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-nodejs-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nodejs-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="PE header test only relevant on Windows"
+)
+def test_pe_header_signature_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Malformed PE in Library/bin should be skipped by relinker; build succeeds."""
+    recipe = recipes / "pe-malformed-windows/recipe.yaml"
+    rattler_build.build(recipe, tmp_path)
+    pkg = get_extracted_package(tmp_path, "pe-test")
+    assert (pkg / "info/index.json").exists()

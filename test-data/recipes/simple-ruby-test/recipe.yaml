@@ -1,0 +1,18 @@
+package:
+  name: simple-ruby-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: ruby
+    content: |
+      puts "Ruby interpreter working!"
+
+requirements:
+  build:
+    - ruby
+
+about:
+  summary: Simple test for Ruby interpreter
+  license: MIT

@@ -18,11 +18,12 @@ use crate::{
         parser::{Dependency, Requirements, Source},
     },
     render::resolved_dependencies::{
-        FinalizedDependencies, install_environments, resolve_dependencies,
+        FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{
         copy_dir::{CopyDir, CopyOptions, copy_file},
         fetch_sources,
+        patch::apply_patch_custom,
     },
 };
 
@@ -592,7 +593,7 @@ impl Output {
                     Ok(cache) => {
                         tracing::info!("Restoring cache from {:?}", cache_dir);
                         self = self
-                            .fetch_sources(tool_configuration)
+                            .fetch_sources(tool_configuration, apply_patch_custom)
                             .await
                             .into_diagnostic()?;
                         return self.restore_cache(cache, cache_dir).await;
@@ -617,6 +618,7 @@ impl Output {
                 &self.build_configuration.directories,
                 &self.system_tools,
                 tool_configuration,
+                apply_patch_custom,
             )
             .await
             .into_diagnostic()?;
@@ -631,10 +633,15 @@ impl Output {
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
 
-            let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
-                    .await
-                    .unwrap();
+            let finalized_dependencies = resolve_dependencies(
+                &cache.requirements,
+                &self,
+                &channels,
+                tool_configuration,
+                RunExportsDownload::DownloadMissing,
+            )
+            .await
+            .into_diagnostic()?;
 
             install_environments(&self, &finalized_dependencies, tool_configuration)
                 .await

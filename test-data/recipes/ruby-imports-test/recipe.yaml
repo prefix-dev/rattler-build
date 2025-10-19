@@ -1,0 +1,57 @@
+package:
+  name: ruby-imports-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: ruby
+    content: |
+      # Create a simple Ruby module that can be required
+      require 'fileutils'
+
+      # Create a lib directory in the PREFIX
+      lib_dir = File.join(ENV['PREFIX'], 'lib', 'ruby')
+      FileUtils.mkdir_p(lib_dir)
+
+      # Write a simple module file
+      module_content = <<~RUBY
+        module MyTestModule
+          def self.hello
+            puts "Hello from MyTestModule!"
+          end
+        end
+      RUBY
+
+      File.write(File.join(lib_dir, 'my_test_module.rb'), module_content)
+
+      # Also install a gem-like structure
+      site_ruby_dir = File.join(ENV['PREFIX'], 'lib', 'ruby', 'site_ruby')
+      FileUtils.mkdir_p(site_ruby_dir)
+
+      gem_content = <<~RUBY
+        module TestGem
+          VERSION = "1.0.0"
+
+          def self.version
+            VERSION
+          end
+        end
+      RUBY
+
+      File.write(File.join(site_ruby_dir, 'test_gem.rb'), gem_content)
+
+requirements:
+  build:
+    - ruby
+
+tests:
+  - ruby:
+      requires:
+        - fileutils
+        - json
+        - pathname
+
+about:
+  summary: Test package for Ruby require testing
+  license: MIT

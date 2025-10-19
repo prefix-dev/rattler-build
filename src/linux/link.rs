@@ -1,7 +1,7 @@
 //! Relink shared objects to use an relative path prefix
 
+use goblin::elf::header::{ELFCLASS32, ELFCLASS64, ET_DYN, ET_EXEC, et_to_str, header32, header64};
 use goblin::elf::{Dyn, Elf};
-use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
 use itertools::Itertools;
 use memmap2::MmapMut;
@@ -37,13 +37,49 @@ impl Relinker for SharedObject {
     /// Check if the file is an ELF file by reading the first 4 bytes
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
-        let mut signature: [u8; 4] = [0; 4];
-        match file.read_exact(&mut signature) {
+
+        // Read enough bytes for the largest possible header (64-bit)
+        let mut header_buf = [0u8; header64::SIZEOF_EHDR];
+        match file.read_exact(&mut header_buf) {
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
             Err(e) => return Err(e.into()),
         }
-        Ok(ELFMAG.iter().eq(signature.iter()))
+
+        // Check ELF magic
+        if &header_buf[0..4] != goblin::elf64::header::ELFMAG {
+            return Ok(false);
+        }
+
+        // Determine if it's 32 or 64 bit and parse accordingly
+        let e_type = match header_buf[4] {
+            // EI_CLASS
+            ELFCLASS32 => {
+                let header_bytes: &[u8; header32::SIZEOF_EHDR] = header_buf
+                    [..header32::SIZEOF_EHDR]
+                    .try_into()
+                    .expect("Invalid header size for ELFCLASS32");
+                header32::Header::from_bytes(header_bytes).e_type
+            }
+            ELFCLASS64 => {
+                let header_bytes: &[u8; header64::SIZEOF_EHDR] = &header_buf; // Already the right size
+                header64::Header::from_bytes(header_bytes).e_type
+            }
+            _ => return Ok(false), // Invalid ELF class
+        };
+
+        // Only process executables and shared libraries
+        let should_relink = matches!(e_type, ET_EXEC | ET_DYN);
+
+        if !should_relink {
+            tracing::debug!(
+                "Skipping ELF file with type {}: {}",
+                et_to_str(e_type),
+                path.display()
+            );
+        }
+
+        Ok(should_relink)
     }
 
     /// Create a new shared object from a path
@@ -410,13 +446,35 @@ mod test {
     use std::path::Path;
     use tempfile::tempdir_in;
 
-    // Assert the following case:
-    //
-    // rpath: "/rattler-build_zlink/host_env_placehold/lib"
-    // encoded prefix: "/rattler-build_zlink/host_env_placehold"
-    // binary path: test-data/binary_files/tmp/zlink
-    // prefix: "test-data/binary_files"
-    // new rpath: $ORIGIN/../lib
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_file_type_detection() -> Result<(), RelinkError> {
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+
+        // Test that object files are not recognized as valid for relinking
+        let object_file = test_data.join("simple-elf.o");
+        assert!(
+            !SharedObject::test_file(&object_file)?,
+            "Object files should not be valid for relinking"
+        );
+
+        // Test that shared libraries are recognized as valid
+        let so_file = test_data.join("simple.so");
+        assert!(
+            SharedObject::test_file(&so_file)?,
+            "Shared libraries should be valid for relinking"
+        );
+
+        // Test existing binary that we know is valid
+        let binary_file = test_data.join("zlink");
+        assert!(
+            SharedObject::test_file(&binary_file)?,
+            "Executables should be valid for relinking"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn relink_patchelf() -> Result<(), RelinkError> {
         if which::which("patchelf").is_err() {
@@ -426,7 +484,7 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
@@ -477,7 +535,7 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink-no-rpath");
         fs::copy(prefix.join("zlink-no-rpath"), &binary_path)?;
 

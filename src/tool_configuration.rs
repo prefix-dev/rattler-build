@@ -109,14 +109,14 @@ impl BaseClient {
                 .build()
                 .expect("failed to create client"),
         )
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ))
+        .with(mirror_middleware)
+        .with(s3_middleware)
         .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
             auth_storage.clone(),
         )))
-        .with(mirror_middleware)
-        .with(s3_middleware)
+        .with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
         .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
@@ -187,6 +187,12 @@ pub struct Configuration {
     /// Whether to use bzip2
     pub use_bz2: bool,
 
+    /// Whether to use sharded repodata
+    pub use_sharded: bool,
+
+    /// Whether to use JLAP (JSON Lines Append Protocol)
+    pub use_jlap: bool,
+
     /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
 
@@ -224,6 +230,11 @@ pub struct Configuration {
 
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
+
+    /// Whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler-build
+    /// to execute scripts / bundle up files.
+    pub environments_externally_managed: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -270,6 +281,8 @@ pub struct ConfigurationBuilder {
     test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
+    use_sharded: bool,
+    use_jlap: bool,
     skip_existing: SkipExisting,
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
@@ -280,6 +293,7 @@ pub struct ConfigurationBuilder {
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    environments_externally_managed: bool,
 }
 
 impl Configuration {
@@ -301,6 +315,8 @@ impl ConfigurationBuilder {
             test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: true,
+            use_sharded: true,
+            use_jlap: false,
             skip_existing: SkipExisting::None,
             noarch_build_platform: None,
             channel_config: None,
@@ -311,6 +327,7 @@ impl ConfigurationBuilder {
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
             allow_symlinks_on_windows: false,
+            environments_externally_managed: false,
         }
     }
 
@@ -444,6 +461,22 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Whether downloading sharded repodata is enabled.
+    pub fn with_sharded_repodata_enabled(self, sharded_repodata_enabled: bool) -> Self {
+        Self {
+            use_sharded: sharded_repodata_enabled,
+            ..self
+        }
+    }
+
+    /// Whether using JLAP (JSON Lines Append Protocol) is enabled.
+    pub fn with_jlap_enabled(self, jlap_enabled: bool) -> Self {
+        Self {
+            use_jlap: jlap_enabled,
+            ..self
+        }
+    }
+
     /// Define the noarch platform
     pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
         Self {
@@ -468,6 +501,19 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler
+    /// to execute scripts / bundle up files.
+    pub fn with_environments_externally_managed(
+        self,
+        environments_externally_managed: bool,
+    ) -> Self {
+        Self {
+            environments_externally_managed,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
@@ -486,10 +532,10 @@ impl ConfigurationBuilder {
             .with_client(client.client.clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
-                    jlap_enabled: true,
+                    jlap_enabled: self.use_jlap,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
-                    sharded_enabled: true,
+                    sharded_enabled: self.use_sharded,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),
@@ -508,6 +554,8 @@ impl ConfigurationBuilder {
             test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
+            use_sharded: self.use_sharded,
+            use_jlap: self.use_jlap,
             skip_existing: self.skip_existing,
             noarch_build_platform: self.noarch_build_platform,
             channel_config,
@@ -520,6 +568,7 @@ impl ConfigurationBuilder {
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            environments_externally_managed: self.environments_externally_managed,
         }
     }
 }

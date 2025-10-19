@@ -1,8 +1,6 @@
-
-
 context:
   name: mssql-tools
-  version: '18.2.1.1'
+  version: "18.2.1.1"
 
 package:
   name: ${{ name }}

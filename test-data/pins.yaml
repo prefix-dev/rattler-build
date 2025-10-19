@@ -87,7 +87,7 @@
   expected: "bounds >=1,<1.2.9"
 - pin:
     name: "bounds"
-    lower_bound: '1.0.1'
+    lower_bound: "1.0.1"
     upper_bound: x.x
   spec: 1.2.3 hash
   expected: "bounds >=1.0.1,<1.3.0a0"

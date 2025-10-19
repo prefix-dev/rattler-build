@@ -1,5 +1,3 @@
-
-
 package:
   name: ros-humble-turtlebot4-msgs
   version: 1.0.3

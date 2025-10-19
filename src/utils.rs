@@ -260,7 +260,7 @@ mod tests {
         #[test]
         fn test_locked_file_retry() -> std::io::Result<()> {
             let temp_dir = TempDir::new()?;
-            let dir_path = temp_dir.into_path();
+            let dir_path = temp_dir.keep();
             let file_path = dir_path.join("locked.txt");
 
             // Create the file with exclusive sharing mode (locked)

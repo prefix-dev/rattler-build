@@ -35,23 +35,24 @@ mod post_process;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
-mod run_exports;
 mod unix;
-pub mod upload;
 mod windows;
 
 mod package_cache_reporter;
 pub mod source_code;
 
+use crate::render::resolved_dependencies::RunExportsDownload;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
+    process::Command,
     str::FromStr,
     sync::{Arc, Mutex},
 };
 
-use build::{run_build, skip_existing};
+use build::{WorkingDirectoryBehavior, run_build, skip_existing};
 use console_utils::LoggingOutputHandler;
+use dialoguer::Confirm;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
@@ -64,17 +65,18 @@ pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
     GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-    package::ArchiveType,
+    compression_level::CompressionLevel, package::ArchiveType,
 };
-use rattler_package_streaming::write::CompressionLevel;
+use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
+use recipe::variable::Variable;
 use selectors::SelectorConfig;
 use serde_json::{Value, to_string_pretty, to_value};
+use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
@@ -151,7 +153,11 @@ pub fn get_tool_config(
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
-        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows);
+        .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_zstd_repodata_enabled(build_data.common.use_zstd)
+        .with_bz2_repodata_enabled(build_data.common.use_bz2)
+        .with_sharded_repodata_enabled(build_data.common.use_sharded)
+        .with_jlap_enabled(build_data.common.use_jlap);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -292,7 +298,14 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+    let mut variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+
+    // Apply variant overrides from command line
+    for (key, values) in &build_data.variant_overrides {
+        let normalized_key = NormalizedKey::from(key.as_str());
+        let variables: Vec<Variable> = values.iter().map(|v| Variable::from_string(v)).collect();
+        variant_config.variants.insert(normalized_key, variables);
+    }
 
     let outputs_and_variants = variant_config.find_variants(
         &outputs,
@@ -437,6 +450,7 @@ pub async fn get_build_output(
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
+                exclude_newer: build_data.exclude_newer,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -533,7 +547,6 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
-
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
     let all_output_names = outputs_to_build
@@ -542,9 +555,13 @@ pub async fn run_build_from_args(
         .collect::<Vec<_>>();
 
     for (index, output) in outputs_to_build.iter().enumerate() {
-        let (output, archive) = match run_build(output.clone(), &tool_configuration)
-            .boxed_local()
-            .await
+        let (output, archive) = match run_build(
+            output.clone(),
+            &tool_configuration,
+            WorkingDirectoryBehavior::Cleanup,
+        )
+        .boxed_local()
+        .await
         {
             Ok((output, archive)) => {
                 output.record_build_end();
@@ -636,6 +653,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
+                        exclude_newer: output.build_configuration.exclude_newer,
                     },
                     None,
                 )
@@ -773,6 +791,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         debug: test_data.debug,
+        exclude_newer: None,
     };
 
     let package_name = package_file
@@ -795,15 +814,72 @@ pub async fn rebuild(
     rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    tracing::info!("Rebuilding {}", rebuild_data.package_file.to_string_lossy());
+    let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
+        rebuild_data.common.auth_file,
+        rebuild_data.common.s3_config.clone(),
+        rebuild_data.common.mirror_config.clone(),
+        rebuild_data.common.allow_insecure_host.clone(),
+    )
+    .into_diagnostic()?;
+
+    // Check if the input is a URL or local path
+    let (_temp_dir_guard, package_path) = match rebuild_data.package_file {
+        PackageSource::Url(ref url) => {
+            // Download the package to a temporary location
+            tracing::info!("Downloading package from {}", url);
+
+            let response = reqwest_client
+                .get_client()
+                .get(url.as_str())
+                .send()
+                .await
+                .into_diagnostic()?;
+
+            if !response.status().is_success() {
+                miette::bail!("Failed to download package: HTTP {}", response.status());
+            }
+
+            // Extract filename from URL or use a default
+            let Some(filename) = url
+                .path_segments()
+                .and_then(|mut segments| segments.next_back())
+                .map(|s| s.to_string())
+            else {
+                miette::bail!("Failed to extract filename from URL: {}", url);
+            };
+
+            let temp_dir = tempfile::tempdir().into_diagnostic()?;
+            let package_path = temp_dir.path().join(filename);
+
+            let bytes = response.bytes().await.into_diagnostic()?;
+            fs::write(&package_path, &bytes).into_diagnostic()?;
+
+            tracing::info!("Downloaded package to: {:?}", package_path);
+
+            // Keep the temp directory alive for the duration
+            (Some(temp_dir), package_path)
+        }
+        PackageSource::Path(ref path) => {
+            // Use the local path directly
+            (None, path.clone())
+        }
+    };
+
+    // Calculate SHA256 of the original package
+    let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
+        .into_diagnostic()?;
+
+    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Rebuilding \"{}\"", package_path.display());
+
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
     // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
+    rebuild::extract_recipe(&package_path, temp_folder.path()).into_diagnostic()?;
 
-    let temp_dir = temp_folder.into_path();
+    let temp_dir = temp_folder.keep();
 
     tracing::info!("Extracted recipe to: {:?}", temp_dir);
 
@@ -815,26 +891,18 @@ pub async fn rebuild(
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
 
-    // create output dir and set it in the config
-    let output_dir = rebuild_data.common.output_dir;
+    // Use a temporary directory for the build output to avoid overwriting the original
+    let temp_output_dir = tempfile::tempdir().into_diagnostic()?;
+    let temp_output_path = temp_output_dir.path().to_path_buf();
 
-    fs::create_dir_all(&output_dir).into_diagnostic()?;
-    output.build_configuration.directories.output_dir =
-        canonicalize(output_dir).into_diagnostic()?;
+    fs::create_dir_all(&temp_output_path).into_diagnostic()?;
+    output.build_configuration.directories.output_dir = temp_output_path.clone();
 
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
         .with_compression_threads(rebuild_data.compression_threads)
-        .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(
-                rebuild_data.common.auth_file,
-                rebuild_data.common.s3_config.clone(),
-                rebuild_data.common.mirror_config.clone(),
-                rebuild_data.common.allow_insecure_host.clone(),
-            )
-            .into_diagnostic()?,
-        )
+        .with_reqwest_client(reqwest_client)
         .with_test_strategy(rebuild_data.test)
         .finish();
 
@@ -844,70 +912,89 @@ pub async fn rebuild(
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(output, &tool_config).await?;
+    let (rebuilt_output, temp_rebuilt_path) =
+        run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+
+    // Generate timestamp for the rebuilt package
+    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+
+    // Create final output directory
+    let final_output_dir = rebuild_data.common.output_dir.clone();
+    fs::create_dir_all(&final_output_dir).into_diagnostic()?;
+
+    // Insert timestamp before the extension
+    let new_filename = format!(
+        "{}-{}-{}-rebuilt-{timestamp}{}",
+        rebuilt_output.name().as_normalized(),
+        rebuilt_output.version(),
+        rebuilt_output.build_string(),
+        rebuilt_output
+            .build_configuration
+            .packaging_settings
+            .archive_type
+            .extension()
+    );
+
+    let rebuilt_path = final_output_dir.join(&new_filename);
+
+    // Move the rebuilt package to final location with new name
+    fs::rename(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+
+    // Now we can drop the temp directory
+    drop(temp_output_dir);
+
+    // Calculate SHA256 of the rebuilt package
+    let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
+        .into_diagnostic()?;
+
+    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
+
+    // Compare the SHA hashes
+    if original_sha == rebuilt_sha {
+        tracing::info!(
+            "✅ Rebuild successful! SHA256 hashes match. Packages are bit-for-bit identical!"
+        );
+    } else {
+        tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
+        tracing::info!("❌ Rebuild produced different output!");
+        tracing::info!("  Original SHA256: {:x}", original_sha);
+        tracing::info!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
+        tracing::info!("  Rebuilt package: {}", rebuilt_path.display());
+
+        // Check if diffoscope is available
+        let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
+
+        if diffoscope_available {
+            let confirmation = Confirm::new()
+                .with_prompt("Do you want to run diffoscope?")
+                .interact()
+                .unwrap();
+
+            if confirmation {
+                let mut command = Command::new("diffoscope");
+                command
+                    .arg(&package_path)
+                    .arg(&rebuilt_path)
+                    .arg("--text-color")
+                    .arg("always");
+
+                tracing::info!("Running diffoscope: {:?}", command);
+
+                let output = command.output().into_diagnostic()?;
+
+                tracing::info!("{}", String::from_utf8_lossy(&output.stdout));
+                if !output.stderr.is_empty() {
+                    tracing::info!("{}", String::from_utf8_lossy(&output.stderr));
+                }
+            }
+        } else {
+            tracing::info!("\nHint: Install diffoscope to see detailed differences:");
+            tracing::info!("  pixi global install diffoscope");
+        }
+    }
 
     Ok(())
-}
-
-/// Upload.
-pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
-    if args.package_files.is_empty() {
-        return Err(miette::miette!("No package files were provided."));
-    }
-
-    for package_file in &args.package_files {
-        if ArchiveType::try_from(package_file).is_none() {
-            return Err(miette::miette!(
-                "The file {} does not appear to be a conda package.",
-                package_file.to_string_lossy()
-            ));
-        }
-    }
-
-    let store = tool_configuration::get_auth_store(args.common.auth_file).into_diagnostic()?;
-
-    match args.server_type {
-        ServerType::Quetz(quetz_opts) => {
-            let quetz_data = QuetzData::from(quetz_opts);
-            upload::upload_package_to_quetz(&store, &args.package_files, quetz_data).await
-        }
-        ServerType::Artifactory(artifactory_opts) => {
-            let artifactory_data = ArtifactoryData::try_from(artifactory_opts)?;
-
-            upload::upload_package_to_artifactory(&store, &args.package_files, artifactory_data)
-                .await
-        }
-        ServerType::Prefix(prefix_opts) => {
-            let prefix_data = PrefixData::from(prefix_opts);
-            upload::upload_package_to_prefix(&store, &args.package_files, prefix_data).await
-        }
-        ServerType::Anaconda(anaconda_opts) => {
-            let anaconda_data = AnacondaData::from(anaconda_opts);
-            upload::upload_package_to_anaconda(&store, &args.package_files, anaconda_data).await
-        }
-        ServerType::S3(s3_opts) => {
-            upload::upload_package_to_s3(
-                &store,
-                s3_opts.channel,
-                s3_opts.endpoint_url,
-                s3_opts.region,
-                s3_opts.force_path_style,
-                s3_opts.access_key_id,
-                s3_opts.secret_access_key,
-                s3_opts.session_token,
-                &args.package_files,
-            )
-            .await
-        }
-        ServerType::CondaForge(conda_forge_opts) => {
-            let conda_forge_data = CondaForgeData::from(conda_forge_opts);
-            upload::conda_forge::upload_packages_to_conda_forge(
-                &args.package_files,
-                conda_forge_data,
-            )
-            .await
-        }
-    }
 }
 
 /// Sort the build outputs (recipes) topologically based on their dependencies.
@@ -1016,7 +1103,7 @@ pub async fn build_recipes(
             for output in outputs {
                 updated_outputs.push(
                     output
-                        .resolve_dependencies(&tool_config)
+                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
                         .await
                         .into_diagnostic()?,
                 );
@@ -1075,6 +1162,7 @@ pub async fn debug_recipe(
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: Vec::new(),
+        variant_overrides: HashMap::new(),
         ignore_recipe_variants: false,
         render_only: false,
         with_solve: true,
@@ -1095,6 +1183,7 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        exclude_newer: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
@@ -1133,9 +1222,12 @@ pub async fn debug_recipe(
             .directories
             .recreate_directories()
             .into_diagnostic()?;
-        let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
         let output = output
-            .resolve_dependencies(&tool_config)
+            .fetch_sources(&tool_config, apply_patch_custom)
+            .await
+            .into_diagnostic()?;
+        let output = output
+            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
             .await
             .into_diagnostic()?;
         output

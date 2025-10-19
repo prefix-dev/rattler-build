@@ -147,6 +147,13 @@ pub struct RTest {
     pub libraries: Vec<String>,
 }
 
+/// A test that checks if Ruby gems/modules can be required
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RubyTest {
+    /// List of Ruby modules to test with require
+    pub requires: Vec<String>,
+}
+
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -165,6 +172,11 @@ pub enum TestType {
     R {
         /// The R libraries to load and test
         r: RTest,
+    },
+    /// A Ruby test that will test if the modules can be required
+    Ruby {
+        /// The modules to test
+        ruby: RubyTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
@@ -294,10 +306,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::R { r: rscript };
                 }
+                "ruby" => {
+                    let ruby = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Ruby { ruby };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `ruby`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -458,6 +474,24 @@ impl TryConvertNode<RTest> for RenderedMappingNode {
             )])?;
         }
         Ok(rtest)
+    }
+}
+
+///////////////////////////
+/// Ruby Test           ///
+///////////////////////////
+impl TryConvertNode<RubyTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RubyTest, Vec<PartialParsingError>> {
+        let mut ruby_test = RubyTest::default();
+        validate_keys!(ruby_test, self.iter(), requires);
+        if ruby_test.requires.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("requires".into()),
+                help = "expected field `requires` in ruby test to be a list of strings."
+            )])?;
+        }
+        Ok(ruby_test)
     }
 }
 

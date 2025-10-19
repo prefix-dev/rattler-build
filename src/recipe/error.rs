@@ -268,7 +268,11 @@ impl fmt::Display for ErrorKind {
             ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
             ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
-                writeln!(f, "failed to parse SPDX license: {}", err.reason)?;
+                writeln!(
+                    f,
+                    "failed to parse SPDX license: '{}', because: {}",
+                    err.original, err.reason
+                )?;
                 writeln!(
                     f,
                     "See <https://spdx.org/licenses> for the list of valid licenses."
@@ -433,17 +437,16 @@ pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
             .span()
             .start()
             .cloned()
-            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
-        _ => marked_yaml::Marker::new(0, 0, 0),
+            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0, 0)),
+        _ => marked_yaml::Marker::new(0, 0, 0, 0),
     }
 }
 
 /// Convert a [`marked_yaml::Span`] to a [`SourceSpan`].
 pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceSpan {
-    let marked_start = span
-        .start()
-        .copied()
-        .unwrap_or_else(|| marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX));
+    let marked_start = span.start().copied().unwrap_or_else(|| {
+        marked_yaml::Marker::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX)
+    });
     let marked_end = span.end().copied();
 
     let start = SourceOffset::from_location(src, marked_start.line(), marked_start.column());

@@ -43,6 +43,13 @@ tests:
       recipe:
         - tests/
 
+  # run test scripts with environment variables. Note that the interpreter is
+  # inferred automatically and the test file is copied from recipe or source directory
+  - script:
+      env:
+        HELLO: "Hello World!"
+      file: run_my_test_script.py
+
   # python specific tests
   - python:
       # this test section tries to import the python modules and errors if it can't
@@ -94,6 +101,7 @@ It has multiple sub-keys that help when building cross-platform packages:
   >   not_exists:
   >     - lib/python*/site-packages/mypackage/deprecated_module.py
   > ```
+
 - **`lib`**: matches libraries in the package (`.so`, `.dll`, `.dylib` files). The test fails if any of the libraries are not found. It's enough to specify the library name without any extension (e.g. `foo` will match `libfoo.so`, `libfoo.dylib`, and `foo.dll`).
 - **`include`**: matches files under the `include` directory in the package. You can specify the file name like `foo.h`.
 - **`bin`**: matches files under the `bin` directory in the package. You can specify executable names like `foo` which will match `foo.exe` on Windows and `foo` on Linux and macOS.

@@ -9,7 +9,7 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 /// CLI argument parser for the sandbox
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Parser, Clone, Default)]
 pub struct SandboxArguments {
     /// Enable the sandbox
     #[clap(long, action, help_heading = "Sandbox arguments")]

@@ -13,9 +13,10 @@ This document contains the help content for the `rattler-build` command-line pro
 * `rebuild` — Rebuild a package from a package file instead of a recipe
 * `upload` — Upload a package
 * `completion` — Generate shell completion script
-* `generate-recipe` — Generate a recipe from PyPI or CRAN
+* `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
+* `create-patch` — Create a patch for a directory
 
 ##### **Options:**
 
@@ -119,6 +120,11 @@ Build a package from a recipe
 - `-m`, `--variant-config <VARIANT_CONFIG>`
 
 	Variant configuration files for the build
+
+
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
 
 
 - `--ignore-recipe-variants`
@@ -242,6 +248,21 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Enable debug output in build scripts
 
 
+- `--error-prefix-in-binary`
+
+	Error if the host prefix is detected in any binary files
+
+
+- `--allow-symlinks-on-windows`
+
+	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+
+
+- `--exclude-newer <EXCLUDE_NEWER>`
+
+	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+
+
 ###### **Sandbox arguments**
 
 - `--sandbox`
@@ -353,7 +374,7 @@ Rebuild a package from a package file instead of a recipe
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
-	The package file to rebuild
+	The package file to rebuild (can be a local path or URL)
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
@@ -588,24 +609,24 @@ Options for uploading to S3
 
 - `-c`, `--channel <CHANNEL>`
 
-	The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
+	The channel URL in the S3 bucket to upload the package to, e.g., `s3://my-bucket/my-channel`
 
+
+- `--force`
+
+	Replace files if it already exists
+
+
+###### **S3 Credentials**
 
 - `--endpoint-url <ENDPOINT_URL>`
 
 	The endpoint URL of the S3 backend
 
-	- Default value: `https://s3.amazonaws.com`
 
 - `--region <REGION>`
 
 	The region of the S3 backend
-
-	- Default value: `eu-central-1`
-
-- `--force-path-style`
-
-	Whether to use path-style S3 URLs
 
 
 - `--access-key-id <ACCESS_KEY_ID>`
@@ -621,6 +642,14 @@ Options for uploading to S3
 - `--session-token <SESSION_TOKEN>`
 
 	The session token for the S3 bucket
+
+
+- `--addressing-style <ADDRESSING_STYLE>`
+
+	How to address the bucket
+
+	- Default value: `virtual-host`
+	- Possible values: `virtual-host`, `path`
 
 
 
@@ -658,7 +687,7 @@ Generate shell completion script
 
 ### `generate-recipe`
 
-Generate a recipe from PyPI or CRAN
+Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 
 **Usage:** `rattler-build generate-recipe <COMMAND>`
 
@@ -666,6 +695,8 @@ Generate a recipe from PyPI or CRAN
 
 * `pypi` — Generate a recipe for a Python package from PyPI
 * `cran` — Generate a recipe for an R package from CRAN
+* `cpan` — Generate a recipe for a Perl package from CPAN
+* `luarocks` — Generate a recipe for a Lua package from LuaRocks
 
 
 
@@ -742,6 +773,65 @@ Generate a recipe for an R package from CRAN
 
 
 
+#### `cpan`
+
+Generate a recipe for a Perl package from CPAN
+
+**Usage:** `rattler-build generate-recipe cpan [OPTIONS] <PACKAGE>`
+
+##### **Arguments:**
+
+- `<PACKAGE>`
+
+	Name of the package to generate
+
+
+
+##### **Options:**
+
+- `--version <VERSION>`
+
+	Select a version of the package to generate (defaults to latest)
+
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a folder
+
+
+- `-t`, `--tree`
+
+	Whether to generate recipes for all dependencies
+
+
+
+
+
+#### `luarocks`
+
+Generate a recipe for a Lua package from LuaRocks
+
+**Usage:** `rattler-build generate-recipe luarocks [OPTIONS] <ROCK>`
+
+##### **Arguments:**
+
+- `<ROCK>`
+
+	Luarocks package to generate recipe for. Can be specified as: - module (fetches latest version) - module/version - author/module/version - Direct rockspec URL
+
+
+
+##### **Options:**
+
+- `-w`, `--write-to <WRITE_TO>`
+
+	Where to write the recipe to
+
+	- Default value: `.`
+
+
+
+
 ### `auth`
 
 Handle authentication to external channels
@@ -765,7 +855,7 @@ Store authentication information for a given host
 
 - `<HOST>`
 
-	The host to authenticate with (e.g. repo.prefix.dev)
+	The host to authenticate with (e.g. prefix.dev)
 
 
 
@@ -888,6 +978,48 @@ Debug a recipe by setting up the environment without running the build script
 - `--output-dir <OUTPUT_DIR>`
 
 	Output directory for build artifacts.
+
+
+
+
+
+### `create-patch`
+
+Create a patch for a directory
+
+**Usage:** `rattler-build create-patch [OPTIONS] --directory <DIRECTORY>`
+
+##### **Options:**
+
+- `-d`, `--directory <DIRECTORY>`
+
+	Directory where we want to create the patch
+
+
+- `--name <NAME>`
+
+	The name for the patch file to create
+
+	- Default value: `changes`
+
+- `--overwrite`
+
+	Whether to overwrite the patch file if it already exists
+
+
+- `--patch-dir <DIR>`
+
+	Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided
+
+
+- `--exclude <EXCLUDE>`
+
+	Comma-separated list of file names (or glob patterns) that should be excluded from the diff
+
+
+- `--dry-run`
+
+	Perform a dry-run: analyse changes and log the diff, but don't write the patch file
 
 
 
