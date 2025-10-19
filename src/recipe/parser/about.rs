@@ -75,7 +75,6 @@ impl About {
         merge_field!(documentation);
         merge_field!(license);
         merge_field!(license_family);
-        merge_field!(license_url);
         merge_field!(summary);
         merge_field!(description);
         merge_field!(prelink_message);

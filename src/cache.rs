@@ -365,7 +365,7 @@ impl Output {
                     Ok(cache) => {
                         tracing::info!("Restoring cache from {:?}", cache_dir);
                         self = self
-                            .fetch_sources(tool_configuration)
+                            .fetch_sources(tool_configuration, apply_patch_custom)
                             .await
                             .into_diagnostic()?;
                         return self.restore_cache(cache, cache_dir).await;
@@ -388,6 +388,7 @@ impl Output {
             &self.build_configuration.directories,
             &self.system_tools,
             tool_configuration,
+            apply_patch_custom,
         )
         .await
         .into_diagnostic()?;
@@ -410,10 +411,15 @@ impl Output {
             ignore_run_exports: cache_output.ignore_run_exports.clone().unwrap_or_default(),
         };
 
-        let finalized_dependencies =
-            resolve_dependencies(&requirements, &self, &channels, tool_configuration)
-                .await
-                .unwrap();
+        let finalized_dependencies = resolve_dependencies(
+            &requirements,
+            &self,
+            &channels,
+            tool_configuration,
+            RunExportsDownload::DownloadMissing,
+        )
+        .await
+        .unwrap();
 
         install_environments(&self, &finalized_dependencies, tool_configuration)
             .await
