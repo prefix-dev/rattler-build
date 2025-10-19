@@ -3,10 +3,17 @@ outputs:
       name: base-cache
     build:
       script:
-        - mkdir -p $PREFIX/lib
-        - mkdir -p $PREFIX/include
-        - echo "This is the base library" > $PREFIX/lib/base.txt
-        - echo "// Base header" > $PREFIX/include/base.h
+        - if: unix
+          then:
+            - mkdir -p $PREFIX/lib
+            - mkdir -p $PREFIX/include
+            - echo "This is the base library" > $PREFIX/lib/base.txt
+            - echo "// Base header" > $PREFIX/include/base.h
+          else:
+            - mkdir %PREFIX%\lib
+            - mkdir %PREFIX%\include
+            - (echo This is the base library) > %PREFIX%\lib\base.txt
+            - (echo // Base header) > %PREFIX%\include\base.h
     requirements:
       build:
         - cmake
@@ -16,8 +23,13 @@ outputs:
     inherit: base-cache
     build:
       script:
-        - echo "This is the extended library" > $PREFIX/lib/extended.txt
-        - echo "// Extended header" > $PREFIX/include/extended.h
+        - if: unix
+          then:
+            - echo "This is the extended library" > $PREFIX/lib/extended.txt
+            - echo "// Extended header" > $PREFIX/include/extended.h
+          else:
+            - (echo This is the extended library) > %PREFIX%\lib\extended.txt
+            - (echo // Extended header) > %PREFIX%\include\extended.h
     requirements:
       build:
         - ninja
