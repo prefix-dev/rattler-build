@@ -54,6 +54,14 @@ pub struct About {
 }
 
 impl About {
+    fn merge_if_absent<T: Clone>(target: &mut Option<T>, source: &Option<T>) {
+        if target.is_none() {
+            if let Some(value) = source {
+                *target = Some(value.clone());
+            }
+        }
+    }
+
     /// Returns true if the about has its default configuration.
     pub fn is_default(&self) -> bool {
         self == &Self::default()
@@ -62,22 +70,14 @@ impl About {
     /// Deep merge another About into this one
     /// Values in self take precedence over values in other
     pub fn merge_from(&mut self, other: &About) {
-        macro_rules! merge_field {
-            ($field:ident) => {
-                if self.$field.is_none() && other.$field.is_some() {
-                    self.$field = other.$field.clone();
-                }
-            };
-        }
-
-        merge_field!(homepage);
-        merge_field!(repository);
-        merge_field!(documentation);
-        merge_field!(license);
-        merge_field!(license_family);
-        merge_field!(summary);
-        merge_field!(description);
-        merge_field!(prelink_message);
+        Self::merge_if_absent(&mut self.homepage, &other.homepage);
+        Self::merge_if_absent(&mut self.repository, &other.repository);
+        Self::merge_if_absent(&mut self.documentation, &other.documentation);
+        Self::merge_if_absent(&mut self.license, &other.license);
+        Self::merge_if_absent(&mut self.license_family, &other.license_family);
+        Self::merge_if_absent(&mut self.summary, &other.summary);
+        Self::merge_if_absent(&mut self.description, &other.description);
+        Self::merge_if_absent(&mut self.prelink_message, &other.prelink_message);
 
         if self.license_file.is_empty() && !other.license_file.is_empty() {
             self.license_file = other.license_file.clone();

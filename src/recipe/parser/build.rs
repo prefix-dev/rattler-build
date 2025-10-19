@@ -208,6 +208,16 @@ pub struct PostProcess {
 }
 
 impl Build {
+    fn merge_when<T, P>(target: &mut T, source: &T, should_replace: P)
+    where
+        T: Clone,
+        P: Fn(&T) -> bool,
+    {
+        if should_replace(target) && !should_replace(source) {
+            *target = source.clone();
+        }
+    }
+
     /// Deep merge another Build into this one.
     /// Values in self take precedence over values in other.
     ///
@@ -218,43 +228,42 @@ impl Build {
     /// Excluded fields (preserved from self): number, string, skip, script
     /// These fields are treated as identity fields specific to each output.
     pub fn merge_from(&mut self, other: &Build) {
-        if self.python.is_default() && !other.python.is_default() {
-            self.python = other.python.clone();
-        }
+        Self::merge_when(&mut self.python, &other.python, Python::is_default);
+        Self::merge_when(
+            &mut self.dynamic_linking,
+            &other.dynamic_linking,
+            DynamicLinking::is_default,
+        );
+        Self::merge_when(
+            &mut self.prefix_detection,
+            &other.prefix_detection,
+            PrefixDetection::is_default,
+        );
+        Self::merge_when(
+            &mut self.variant,
+            &other.variant,
+            VariantKeyUsage::is_default,
+        );
+        Self::merge_when(
+            &mut self.post_process,
+            &other.post_process,
+            |v: &Vec<PostProcess>| v.is_empty(),
+        );
 
-        if self.dynamic_linking.is_default() && !other.dynamic_linking.is_default() {
-            self.dynamic_linking = other.dynamic_linking.clone();
-        }
+        self.merge_build_and_host_envs |= other.merge_build_and_host_envs;
 
-        if self.prefix_detection.is_default() && !other.prefix_detection.is_default() {
-            self.prefix_detection = other.prefix_detection.clone();
-        }
-
-        if self.variant.is_default() && !other.variant.is_default() {
-            self.variant = other.variant.clone();
-        }
-
-        if self.post_process.is_empty() && !other.post_process.is_empty() {
-            self.post_process = other.post_process.clone();
-        }
-
-        if !self.merge_build_and_host_envs && other.merge_build_and_host_envs {
-            self.merge_build_and_host_envs = other.merge_build_and_host_envs;
-        }
-
-        if self.noarch.is_none() && !other.noarch.is_none() {
-            self.noarch = other.noarch;
-        }
-
-        if self.files.is_empty() && !other.files.is_empty() {
-            self.files = other.files.clone();
-        }
-        if self.always_include_files.is_empty() && !other.always_include_files.is_empty() {
-            self.always_include_files = other.always_include_files.clone();
-        }
-        if self.always_copy_files.is_empty() && !other.always_copy_files.is_empty() {
-            self.always_copy_files = other.always_copy_files.clone();
-        }
+        Self::merge_when(&mut self.noarch, &other.noarch, NoArchType::is_none);
+        Self::merge_when(&mut self.files, &other.files, GlobVec::is_empty);
+        Self::merge_when(
+            &mut self.always_include_files,
+            &other.always_include_files,
+            GlobVec::is_empty,
+        );
+        Self::merge_when(
+            &mut self.always_copy_files,
+            &other.always_copy_files,
+            GlobVec::is_empty,
+        );
     }
 
     /// Get the merge build host flag.

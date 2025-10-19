@@ -31,25 +31,30 @@ fn inherit_flags_from_output(output: &Node) -> (bool, bool) {
             .or_else(|| m.get("inherit"))
     });
 
-    match inherit_node {
-        Some(node) if node.as_scalar().is_some() => (true, false),
-        Some(node) => {
-            if let Some(mapping) = node.as_mapping() {
-                let run_exports = mapping
-                    .get("run_exports")
-                    .and_then(|n| n.as_scalar()?.as_bool())
-                    .unwrap_or(true);
-                let requirements = mapping
-                    .get("requirements")
-                    .and_then(|n| n.as_scalar()?.as_bool())
-                    .unwrap_or(false);
-                (run_exports, requirements)
-            } else {
-                (true, false)
-            }
-        }
-        _ => (true, false),
+    let Some(node) = inherit_node else {
+        return (true, false);
+    };
+
+    if node.as_scalar().is_some() {
+        return (true, false);
     }
+
+    let Some(mapping) = node.as_mapping() else {
+        return (true, false);
+    };
+
+    let parse_flag = |key: &str, default| {
+        mapping
+            .get(key)
+            .and_then(|node| node.as_scalar())
+            .and_then(|scalar| scalar.as_bool())
+            .unwrap_or(default)
+    };
+
+    let run_exports = parse_flag("run_exports", true);
+    let requirements = parse_flag("requirements", false);
+
+    (run_exports, requirements)
 }
 
 /// Extract normalized names from unversioned dependency specs (specs without version or build constraints)

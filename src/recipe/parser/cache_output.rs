@@ -70,6 +70,24 @@ enum Field {
     About,
 }
 
+fn set_once<T, E: de::Error>(slot: &mut Option<T>, value: T, field: &'static str) -> Result<(), E> {
+    if slot.replace(value).is_some() {
+        Err(de::Error::duplicate_field(field))
+    } else {
+        Ok(())
+    }
+}
+
+fn ensure_cache_build_script<E: de::Error>(build: &CacheBuild) -> Result<(), E> {
+    if build.script.is_none() {
+        Err(E::custom(
+            "cache outputs require an explicit build script (build.script field is required)",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 // Manual implementation of Deserialize for CacheOutput
 impl<'de> DeserializeTrait<'de> for CacheOutput {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -100,63 +118,39 @@ impl<'de> DeserializeTrait<'de> for CacheOutput {
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Name => {
-                            if name.is_some() {
-                                return Err(de::Error::duplicate_field("name"));
-                            }
-                            name = Some(map.next_value()?);
+                            set_once(&mut name, map.next_value()?, "name")?;
                         }
                         Field::Source => {
-                            if source.is_some() {
-                                return Err(de::Error::duplicate_field("source"));
-                            }
-                            source = Some(map.next_value()?);
+                            set_once(&mut source, map.next_value()?, "source")?;
                         }
                         Field::Build => {
-                            if build.is_some() {
-                                return Err(de::Error::duplicate_field("build"));
-                            }
-                            build = Some(map.next_value()?);
+                            set_once(&mut build, map.next_value()?, "build")?;
                         }
                         Field::Requirements => {
-                            if requirements.is_some() {
-                                return Err(de::Error::duplicate_field("requirements"));
-                            }
-                            requirements = Some(map.next_value()?);
+                            set_once(&mut requirements, map.next_value()?, "requirements")?;
                         }
                         Field::RunExports => {
-                            if run_exports.is_some() {
-                                return Err(de::Error::duplicate_field("run_exports"));
-                            }
-                            run_exports = Some(map.next_value()?);
+                            set_once(&mut run_exports, map.next_value()?, "run_exports")?;
                         }
                         Field::IgnoreRunExports => {
-                            if ignore_run_exports.is_some() {
-                                return Err(de::Error::duplicate_field("ignore_run_exports"));
-                            }
-                            ignore_run_exports = Some(map.next_value()?);
+                            set_once(
+                                &mut ignore_run_exports,
+                                map.next_value()?,
+                                "ignore_run_exports",
+                            )?;
                         }
                         Field::About => {
-                            if about.is_some() {
-                                return Err(de::Error::duplicate_field("about"));
-                            }
-                            about = Some(map.next_value()?);
+                            set_once(&mut about, map.next_value()?, "about")?;
                         }
                     }
                 }
 
                 let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
-                let source = source.unwrap_or_else(Vec::new);
+                let source = source.unwrap_or_default();
                 let build = build.ok_or_else(|| de::Error::missing_field("build"))?;
-                if build.script.is_none() {
-                    return Err(de::Error::custom(
-                        "cache outputs require an explicit build script (build.script field is required)",
-                    ));
-                }
-
-                let requirements = requirements.unwrap_or_else(CacheRequirements::default);
-                let run_exports = run_exports.unwrap_or_else(RunExports::default);
-                let ignore_run_exports = ignore_run_exports;
-                let about = about;
+                ensure_cache_build_script(&build)?;
+                let requirements = requirements.unwrap_or_default();
+                let run_exports = run_exports.unwrap_or_default();
 
                 Ok(CacheOutput {
                     name,

@@ -5,6 +5,7 @@ use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
+    io::{self, ErrorKind},
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -129,55 +130,79 @@ pub fn rewrite_prefix_in_file(
     let is_text = content_type.is_text()
         && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
 
-    match is_text {
-        true => {
-            let old_prefix_str = old_prefix.to_string_lossy();
-            let new_prefix_str = new_prefix.to_string_lossy();
-            let contents = fs::read_to_string(file_path)?;
-            let replaced = contents.replace(&*old_prefix_str, &new_prefix_str);
-            fs::write(file_path, replaced)?;
-            Ok(())
+    if is_text {
+        return rewrite_text_prefix(file_path, content, old_prefix, new_prefix);
+    }
+
+    rewrite_binary_prefix(file_path, old_prefix, new_prefix)
+}
+
+fn rewrite_text_prefix(
+    file_path: &Path,
+    content: Vec<u8>,
+    old_prefix: &Path,
+    new_prefix: &Path,
+) -> Result<(), PackagingError> {
+    let contents = String::from_utf8(content).map_err(|err| {
+        PackagingError::IoError(io::Error::new(ErrorKind::InvalidData, err.utf8_error()))
+    })?;
+
+    let old_prefix_str = old_prefix.to_string_lossy().into_owned();
+
+    if !contents.contains(old_prefix_str.as_str()) {
+        return Ok(());
+    }
+
+    let new_prefix_str = new_prefix.to_string_lossy();
+    let updated = contents.replace(old_prefix_str.as_str(), new_prefix_str.as_ref());
+    fs::write(file_path, updated)?;
+    Ok(())
+}
+
+fn rewrite_binary_prefix(
+    file_path: &Path,
+    old_prefix: &Path,
+    new_prefix: &Path,
+) -> Result<(), PackagingError> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::prelude::OsStrExt;
+
+        let old_prefix_bytes = old_prefix.as_os_str().as_bytes();
+        let new_prefix_bytes = new_prefix.as_os_str().as_bytes();
+
+        if old_prefix_bytes.is_empty() {
+            return Ok(());
         }
-        false => {
-            #[cfg(target_family = "unix")]
-            {
-                use std::os::unix::prelude::OsStrExt;
 
-                let old_prefix_bytes = old_prefix.as_os_str().as_bytes();
-                let new_prefix_bytes = new_prefix.as_os_str().as_bytes();
-
-                if new_prefix_bytes.len() > old_prefix_bytes.len() {
-                    return Err(PackagingError::IoError(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "New prefix is longer than old prefix, cannot replace in binary file",
-                    )));
-                }
-
-                let file = File::options().read(true).write(true).open(file_path)?;
-
-                let mut mmap = unsafe { memmap2::MmapOptions::new().map_mut(&file) }?;
-                let mut pos = 0;
-                while pos <= mmap.len().saturating_sub(old_prefix_bytes.len()) {
-                    if &mmap[pos..pos + old_prefix_bytes.len()] == old_prefix_bytes {
-                        mmap[pos..pos + new_prefix_bytes.len()].copy_from_slice(new_prefix_bytes);
-                        let padding_len = old_prefix_bytes.len() - new_prefix_bytes.len();
-                        for i in 0..padding_len {
-                            mmap[pos + new_prefix_bytes.len() + i] = 0;
-                        }
-                    }
-                    pos += 1;
-                }
-
-                Ok(())
-            }
-            #[cfg(target_family = "windows")]
-            {
-                Err(PackagingError::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Unsupported,
-                    "Binary prefix replacement is not supported on Windows",
-                )))
-            }
+        if new_prefix_bytes.len() > old_prefix_bytes.len() {
+            return Err(PackagingError::IoError(io::Error::new(
+                ErrorKind::InvalidInput,
+                "New prefix is longer than old prefix, cannot replace in binary file",
+            )));
         }
+
+        let file = File::options().read(true).write(true).open(file_path)?;
+        let mut mmap = unsafe { memmap2::MmapOptions::new().map_mut(&file) }?;
+
+        let mut search_start = 0;
+        while let Some(found) = memchr::memmem::find(&mmap[search_start..], old_prefix_bytes) {
+            let pos = search_start + found;
+            mmap[pos..pos + new_prefix_bytes.len()].copy_from_slice(new_prefix_bytes);
+            let padding_range = pos + new_prefix_bytes.len()..pos + old_prefix_bytes.len();
+            mmap[padding_range].fill(0);
+            search_start = pos + 1;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(target_family = "windows")]
+    {
+        Err(PackagingError::IoError(io::Error::new(
+            ErrorKind::Unsupported,
+            "Binary prefix replacement is not supported on Windows",
+        )))
     }
 }
 

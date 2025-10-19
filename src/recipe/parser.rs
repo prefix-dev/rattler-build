@@ -32,7 +32,7 @@ mod helper;
 pub mod output;
 mod output_parser;
 mod package;
-mod parsing_utils;
+pub(crate) mod parsing_utils;
 mod regex;
 mod requirements;
 mod script;
@@ -478,21 +478,21 @@ impl Recipe {
         all_cache_outputs: &[CacheOutput],
         inheritance_relationships: &HashMap<String, Vec<String>>,
     ) -> Vec<CacheOutput> {
-        let mut result = Vec::new();
-        let mut seen = HashSet::new();
-        let mut visiting = HashSet::new();
+        fn find_cache<'a>(caches: &'a [CacheOutput], name: &str) -> Option<&'a CacheOutput> {
+            caches
+                .iter()
+                .find(|cache| cache.name.as_normalized() == name)
+        }
 
-        // Function to collect all transitive dependencies
-        fn collect_dependencies(
+        fn collect(
             name: &str,
-            all_cache_outputs: &[CacheOutput],
-            inheritance_relationships: &HashMap<String, Vec<String>>,
-            result: &mut Vec<CacheOutput>,
-            seen: &mut HashSet<String>,
+            relationships: &HashMap<String, Vec<String>>,
+            caches: &[CacheOutput],
             visiting: &mut HashSet<String>,
+            seen: &mut HashSet<String>,
+            acc: &mut Vec<CacheOutput>,
         ) {
-            // Detect circular dependencies
-            if visiting.contains(name) {
+            if !visiting.insert(name.to_owned()) {
                 tracing::warn!(
                     "Circular cache dependency detected involving '{}' - this likely indicates a configuration error",
                     name
@@ -500,28 +500,13 @@ impl Recipe {
                 return;
             }
 
-            visiting.insert(name.to_string());
+            if let Some(children) = relationships.get(name) {
+                for child in children {
+                    collect(child, relationships, caches, visiting, seen, acc);
 
-            if let Some(cache_names) = inheritance_relationships.get(name) {
-                for cache_name in cache_names {
-                    // First, recursively collect dependencies of this cache
-                    collect_dependencies(
-                        cache_name,
-                        all_cache_outputs,
-                        inheritance_relationships,
-                        result,
-                        seen,
-                        visiting,
-                    );
-
-                    // Then add the cache itself if we haven't seen it yet
-                    if !seen.contains(cache_name) {
-                        if let Some(cache_output) = all_cache_outputs
-                            .iter()
-                            .find(|c| c.name.as_normalized() == cache_name)
-                        {
-                            result.push(cache_output.clone());
-                            seen.insert(cache_name.to_string());
+                    if seen.insert(child.clone()) {
+                        if let Some(cache_output) = find_cache(caches, child) {
+                            acc.push(cache_output.clone());
                         }
                     }
                 }
@@ -530,13 +515,16 @@ impl Recipe {
             visiting.remove(name);
         }
 
-        collect_dependencies(
+        let mut result = Vec::new();
+        let mut seen = HashSet::new();
+        let mut visiting = HashSet::new();
+        collect(
             package_name,
-            all_cache_outputs,
             inheritance_relationships,
-            &mut result,
-            &mut seen,
+            all_cache_outputs,
             &mut visiting,
+            &mut seen,
+            &mut result,
         );
         result
     }

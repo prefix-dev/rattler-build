@@ -7,11 +7,34 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
+use marked_yaml::Span;
 use serde::{Deserialize, Serialize};
 
 use super::cache_output::CacheOutput;
 use super::common_output::InheritSpec;
 use super::{About, Build, OutputPackage, Requirements, Source, TestType};
+
+fn duplicate_field_error(field: &str, span: Span) -> PartialParsingError {
+    _partialerror!(
+        span,
+        ErrorKind::InvalidField(field.to_string().into()),
+        help = "field defined multiple times"
+    )
+}
+
+fn set_option_field<T>(
+    slot: &mut Option<T>,
+    value: T,
+    field: &str,
+    span: Span,
+) -> Result<(), Vec<PartialParsingError>> {
+    if slot.is_some() {
+        Err(vec![duplicate_field_error(field, span)])
+    } else {
+        *slot = Some(value);
+        Ok(())
+    }
+}
 
 /// An output that can inherit from a cache
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,12 +124,17 @@ impl TryConvertNode<Output> for RenderedMappingNode {
         let mut about = None;
 
         for (key, value) in self.iter() {
-            match key.as_str() {
+            let field_name = key.as_str();
+            let span = *key.span();
+
+            match field_name {
                 "package" => {
-                    package = Some(value.try_convert("output.package")?);
+                    let parsed = value.try_convert("output.package")?;
+                    set_option_field(&mut package, parsed, field_name, span)?;
                 }
                 "inherit" => {
-                    inherit = Some(value.try_convert("output.inherit")?);
+                    let parsed = value.try_convert("output.inherit")?;
+                    set_option_field(&mut inherit, parsed, field_name, span)?;
                 }
                 "source" => {
                     source = value.try_convert("output.source")?;
@@ -121,12 +149,13 @@ impl TryConvertNode<Output> for RenderedMappingNode {
                     tests = value.try_convert("output.tests")?;
                 }
                 "about" => {
-                    about = Some(value.try_convert("output.about")?);
+                    let parsed = value.try_convert("output.about")?;
+                    set_option_field(&mut about, parsed, field_name, span)?;
                 }
                 _ => {
                     return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(key.as_str().to_string().into())
+                        span,
+                        ErrorKind::InvalidField(field_name.to_string().into())
                     )]);
                 }
             }

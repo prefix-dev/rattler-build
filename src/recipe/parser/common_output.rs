@@ -4,7 +4,7 @@ use crate::{
     _partialerror,
     recipe::{
         ParsingError,
-        custom_yaml::{HasSpan, RenderedNode, TryConvertNode},
+        custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
     },
     source_code::SourceCode,
@@ -30,11 +30,44 @@ pub enum InheritSpec {
     },
 }
 
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 
 impl InheritSpec {
+    const EXPECTED_STRING: &'static str = "expected a string";
+    const EXPECTED_BOOLEAN: &'static str = "expected a boolean";
+
+    fn expect_scalar<'a>(
+        node: &'a RenderedNode,
+        help: &'static str,
+    ) -> Result<&'a RenderedScalarNode, Vec<PartialParsingError>> {
+        node.as_scalar().ok_or_else(|| {
+            vec![_partialerror!(
+                *node.span(),
+                ErrorKind::ExpectedScalar,
+                help = help
+            )]
+        })
+    }
+
+    fn parse_string(node: &RenderedNode) -> Result<String, Vec<PartialParsingError>> {
+        Ok(Self::expect_scalar(node, Self::EXPECTED_STRING)?
+            .as_str()
+            .to_string())
+    }
+
+    fn parse_bool(node: &RenderedNode) -> Result<bool, Vec<PartialParsingError>> {
+        let scalar = Self::expect_scalar(node, Self::EXPECTED_BOOLEAN)?;
+        scalar.as_bool().ok_or_else(|| {
+            vec![_partialerror!(
+                *scalar.span(),
+                ErrorKind::ExpectedScalar,
+                help = Self::EXPECTED_BOOLEAN
+            )]
+        })
+    }
+
     /// Get the cache name to inherit from
     pub fn cache_name(&self) -> &str {
         match self {
@@ -75,53 +108,9 @@ impl TryConvertNode<InheritSpec> for RenderedNode {
 
             for (key, value) in mapping.iter() {
                 match key.as_str() {
-                    "from" => {
-                        from = Some(
-                            value
-                                .as_scalar()
-                                .ok_or_else(|| {
-                                    vec![_partialerror!(
-                                        *value.span(),
-                                        ErrorKind::ExpectedScalar,
-                                        help = "expected a string"
-                                    )]
-                                })?
-                                .as_str()
-                                .to_string(),
-                        );
-                    }
-                    "run_exports" => {
-                        let scalar = value.as_scalar().ok_or_else(|| {
-                            vec![_partialerror!(
-                                *value.span(),
-                                ErrorKind::ExpectedScalar,
-                                help = "expected a boolean"
-                            )]
-                        })?;
-                        run_exports = scalar.as_bool().ok_or_else(|| {
-                            vec![_partialerror!(
-                                *value.span(),
-                                ErrorKind::ExpectedScalar,
-                                help = "expected a boolean"
-                            )]
-                        })?;
-                    }
-                    "requirements" => {
-                        let scalar = value.as_scalar().ok_or_else(|| {
-                            vec![_partialerror!(
-                                *value.span(),
-                                ErrorKind::ExpectedScalar,
-                                help = "expected a boolean"
-                            )]
-                        })?;
-                        requirements = scalar.as_bool().ok_or_else(|| {
-                            vec![_partialerror!(
-                                *value.span(),
-                                ErrorKind::ExpectedScalar,
-                                help = "expected a boolean"
-                            )]
-                        })?;
-                    }
+                    "from" => from = Some(InheritSpec::parse_string(value)?),
+                    "run_exports" => run_exports = InheritSpec::parse_bool(value)?,
+                    "requirements" => requirements = InheritSpec::parse_bool(value)?,
                     _ => {
                         return Err(vec![_partialerror!(
                             *key.span(),

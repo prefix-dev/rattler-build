@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use content_inspector::ContentType;
+use content_inspector::{ContentType, inspect};
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
 use serde::{Deserialize, Serialize};
@@ -31,42 +31,34 @@ use crate::{
 /// Check if a file contains the prefix and determine if it's binary or text
 /// Returns (has_prefix, is_text)
 fn check_file_for_prefix(file_path: &Path, prefix: &Path) -> (bool, bool) {
-    let content = match fs::read(file_path) {
-        Ok(content) => content,
-        Err(_) => return (false, false),
+    let Ok(content) = fs::read(file_path) else {
+        return (false, false);
     };
-    let content_type = content_inspector::inspect(&content);
-    let is_text = content_type.is_text()
-        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
 
-    if is_text {
-        match contains_prefix_text(file_path, prefix) {
-            Ok(Some(_)) => (true, true),
-            Ok(None) => (false, true),
-            Err(_) => (false, true),
-        }
-    } else {
-        #[cfg(target_family = "unix")]
-        {
-            match contains_prefix_binary(file_path, prefix) {
-                Ok(has_prefix) => (has_prefix, false),
-                Err(_) => (false, false),
-            }
-        }
-        #[cfg(target_family = "windows")]
-        {
-            if let Ok(contents) = fs::read(file_path) {
-                let prefix_bytes = prefix.to_string_lossy().as_bytes();
-                (
-                    contents
-                        .windows(prefix_bytes.len())
-                        .any(|window| window == prefix_bytes),
-                    false,
-                )
-            } else {
-                (false, false)
-            }
-        }
+    let inspected = inspect(&content);
+    let looks_like_text =
+        inspected.is_text() && matches!(inspected, ContentType::UTF_8 | ContentType::UTF_8_BOM);
+
+    if looks_like_text {
+        return contains_prefix_text(file_path, prefix)
+            .map(|found| (found.is_some(), true))
+            .unwrap_or((false, true));
+    }
+
+    #[cfg(target_family = "unix")]
+    {
+        contains_prefix_binary(file_path, prefix)
+            .map(|has| (has, false))
+            .unwrap_or((false, false))
+    }
+
+    #[cfg(target_family = "windows")]
+    {
+        let prefix_bytes = prefix.to_string_lossy();
+        let has_prefix = content
+            .windows(prefix_bytes.len())
+            .any(|window| window == prefix_bytes.as_bytes());
+        (has_prefix, false)
     }
 }
 
@@ -141,29 +133,27 @@ impl Output {
         cache_name: &str,
         cache_reqs: &crate::recipe::parser::CacheRequirements,
     ) -> Result<String, CacheKeyError> {
-        let mut requirement_names: HashSet<_> = cache_reqs
+        let requirement_names: HashSet<_> = cache_reqs
             .build
             .iter()
             .chain(cache_reqs.host.iter())
-            .filter_map(|x| {
-                if let crate::recipe::parser::Dependency::Spec(spec) = x {
-                    if spec.version.is_none() && spec.build.is_none() {
-                        spec.name.as_ref().map(|n| n.as_normalized().to_string())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+            .filter_map(|dep| match dep {
+                crate::recipe::parser::Dependency::Spec(spec)
+                    if spec.version.is_none() && spec.build.is_none() =>
+                {
+                    spec.name
+                        .as_ref()
+                        .map(|name| name.as_normalized().to_string())
                 }
+                _ => None,
             })
+            .chain(
+                self.recipe
+                    .cache
+                    .iter()
+                    .flat_map(|cache| cache.build.variant.use_keys.iter().cloned()),
+            )
             .collect();
-
-        // Also include explicit variant.use keys from the cache build (if any)
-        if let Some(cache) = &self.recipe.cache {
-            for key in cache.build.variant.use_keys.iter() {
-                requirement_names.insert(key.clone());
-            }
-        }
 
         let mut selected_variant = BTreeMap::new();
         for key in &requirement_names {
@@ -185,8 +175,6 @@ impl Output {
                 .into(),
         );
 
-        // Include cache name for uniqueness. Do NOT include absolute paths to keep
-        // the cache key stable across different build roots.
         let rebuild_key = (cache_name, cache_reqs, selected_variant);
         let mut hasher = Sha256::new();
         rebuild_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
@@ -260,12 +248,6 @@ impl Output {
         let cache_prefix_dir = cache_dir.join("prefix");
         let copied_prefix = CopyDir::new(&cache_prefix_dir, self.prefix())
             .overwrite(true)
-            .on_overwrite(|path| {
-                tracing::warn!(
-                    "File {} restored from cache will be overwritten during output build",
-                    path.display()
-                );
-            })
             .run()
             .into_diagnostic()?;
 
@@ -276,12 +258,6 @@ impl Output {
             &self.build_configuration.directories.work_dir,
         )
         .overwrite(true)
-        .on_overwrite(|path| {
-            tracing::warn!(
-                "File {} restored from cache will be overwritten during output build",
-                path.display()
-            );
-        })
         .run()
         .into_diagnostic()?;
 
@@ -295,14 +271,12 @@ impl Output {
             for rel in &cached_work_files {
                 let target = self.build_configuration.directories.work_dir.join(rel);
                 if target.exists() {
-                    tracing::warn!(
+                    let message = format!(
                         "Source extraction may overwrite restored cache work file: {}",
                         target.display()
                     );
-                    self.record_warning(&format!(
-                        "Source extraction may overwrite restored cache work file: {}",
-                        target.display()
-                    ));
+                    tracing::warn!(message);
+                    self.record_warning(&message);
                 }
             }
         }
@@ -325,12 +299,13 @@ impl Output {
                     &self.build_configuration.directories.work_dir,
                 ] {
                     let path = base.join(rel);
-                    if !path.exists() {
-                        continue;
-                    }
-
-                    if let Err(e) = rewrite_prefix_in_file(&path, &cache.prefix, self.prefix()) {
-                        tracing::warn!("Failed to rewrite restored file {}: {}", path.display(), e);
+                    if path.exists()
+                        && rewrite_prefix_in_file(&path, &cache.prefix, self.prefix()).is_err()
+                    {
+                        tracing::warn!(
+                            "Failed to rewrite restored file {} with new prefix",
+                            path.display()
+                        );
                     }
                 }
             }
@@ -343,18 +318,17 @@ impl Output {
         {
             for rel in cache.files_with_work_dir.iter() {
                 let path = self.build_configuration.directories.work_dir.join(rel);
-                if !path.exists() {
-                    continue;
-                }
-                if let Err(e) = rewrite_prefix_in_file(
-                    &path,
-                    &cache.work_dir,
-                    &self.build_configuration.directories.work_dir,
-                ) {
+                if path.exists()
+                    && rewrite_prefix_in_file(
+                        &path,
+                        &cache.work_dir,
+                        &self.build_configuration.directories.work_dir,
+                    )
+                    .is_err()
+                {
                     tracing::warn!(
-                        "Failed to rewrite restored work_dir file {}: {}",
-                        path.display(),
-                        e
+                        "Failed to rewrite restored work_dir file {} with new work path",
+                        path.display()
                     );
                 }
             }

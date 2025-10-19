@@ -7,7 +7,9 @@
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
     },
 };
@@ -33,21 +35,28 @@ impl<T: StandardTryConvert> TryConvertNode<T> for RenderedNode {
     }
 }
 
+fn expect_scalar<'a>(
+    value: &'a RenderedNode,
+    field_name: &str,
+    expected: &str,
+    context: &str,
+) -> Result<&'a RenderedScalarNode, Vec<PartialParsingError>> {
+    value.as_scalar().ok_or_else(|| {
+        vec![_partialerror!(
+            *value.span(),
+            ErrorKind::ExpectedScalar,
+            help = format!("expected {} for {} in {}", expected, field_name, context)
+        )]
+    })
+}
+
 /// Helper to parse a required string field
 pub fn parse_required_string(
     value: &RenderedNode,
     field_name: &str,
     context: &str,
 ) -> Result<String, Vec<PartialParsingError>> {
-    Ok(value
-        .as_scalar()
-        .ok_or_else(|| {
-            vec![_partialerror!(
-                *value.span(),
-                ErrorKind::ExpectedScalar,
-                help = format!("expected a string for {} in {}", field_name, context)
-            )]
-        })?
+    Ok(expect_scalar(value, field_name, "a string", context)?
         .as_str()
         .to_string())
 }
@@ -58,13 +67,7 @@ pub fn parse_bool(
     field_name: &str,
     context: &str,
 ) -> Result<bool, Vec<PartialParsingError>> {
-    let scalar = value.as_scalar().ok_or_else(|| {
-        vec![_partialerror!(
-            *value.span(),
-            ErrorKind::ExpectedScalar,
-            help = format!("expected a boolean for {} in {}", field_name, context)
-        )]
-    })?;
+    let scalar = expect_scalar(value, field_name, "a boolean", context)?;
 
     scalar.as_bool().ok_or_else(|| {
         vec![_partialerror!(

@@ -574,20 +574,19 @@ impl Output {
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         // When cache files are present, the output's build.files should apply to all
         // relevant files, not just "new" ones compared to conda-meta
-        let files_after = if self.has_restored_cache_files() {
-            Files::from_prefix_with_filters(
+        let files_after = match self.has_restored_cache_files() {
+            true => Files::from_prefix_with_filters(
                 &self.build_configuration.directories.host_prefix,
                 self.recipe.build().always_include_files(),
                 self.recipe.build().files(),
                 self.restored_cache_prefix_files.as_ref(),
                 self.restored_cache_work_dir_files.as_ref(),
-            )?
-        } else {
-            Files::from_prefix(
+            )?,
+            false => Files::from_prefix(
                 &self.build_configuration.directories.host_prefix,
                 self.recipe.build().always_include_files(),
                 self.recipe.build().files(),
-            )?
+            )?,
         };
 
         package_conda(self, tool_configuration, &files_after)

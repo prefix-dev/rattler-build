@@ -212,45 +212,36 @@ pub async fn get_build_output(
 
     // First find all outputs from the recipe
     let named_source = Source::from_path(recipe_path).into_diagnostic()?;
-    let mut outputs = find_outputs_from_src(named_source.clone())?;
+    let outputs = find_outputs_from_src(named_source.clone())?;
     let has_cache_or_inheritance = outputs.iter().any(|output| {
-        if let Some(mapping) = output.as_mapping() {
+        output.as_mapping().is_some_and(|mapping| {
             mapping.contains_key("cache")
-                || (mapping.contains_key("package")
-                    && mapping
-                        .get("package")
-                        .and_then(|p| p.as_mapping())
-                        .and_then(|pm| pm.get("inherit"))
-                        .is_some())
-        } else {
-            false
-        }
+                || mapping
+                    .get("package")
+                    .and_then(|p| p.as_mapping())
+                    .and_then(|pm| pm.get("inherit"))
+                    .is_some()
+        })
     });
 
-    let mut global_cache_outputs = Vec::new();
-    let mut inheritance_relationships = HashMap::new();
-
-    if has_cache_or_inheritance {
+    let (outputs, global_cache_outputs, inheritance_relationships) = if has_cache_or_inheritance {
         let has_toplevel_cache = outputs.iter().any(|output| {
-            if let Ok(recipe) = Recipe::from_output_node(output, selector_config.clone()) {
-                recipe.cache.is_some()
-            } else {
-                false
-            }
+            matches!(
+                Recipe::from_output_node(output, selector_config.clone()),
+                Ok(recipe) if recipe.cache.is_some()
+            )
         });
 
         let jinja = recipe::Jinja::new(selector_config.clone());
-        let (resolved_outputs, cache_outputs, relationships) =
-            recipe::parser::output::resolve_cache_inheritance_with_caches(
-                outputs,
-                has_toplevel_cache,
-                selector_config.experimental,
-                &jinja,
-            )?;
-        outputs = resolved_outputs;
-        global_cache_outputs = cache_outputs;
-        inheritance_relationships = relationships;
-    }
+        recipe::parser::output::resolve_cache_inheritance_with_caches(
+            outputs,
+            has_toplevel_cache,
+            selector_config.experimental,
+            &jinja,
+        )?
+    } else {
+        (outputs, Vec::new(), HashMap::new())
+    };
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -1102,20 +1093,21 @@ pub async fn build_recipes(
 
         let mut json_value = to_value(&outputs).into_diagnostic()?;
         if let Value::Array(outputs_array) = &mut json_value {
-            for output in outputs_array {
+            outputs_array.iter_mut().for_each(|output| {
                 if let Some(Value::Object(recipe)) = output.get_mut("recipe") {
                     let requirements = recipe
                         .entry("requirements".to_string())
                         .or_insert_with(|| Value::Object(Default::default()));
-                    if let Value::Object(requirements) = requirements {
+
+                    if let Value::Object(requirements_map) = requirements {
                         for key in ["build", "host", "run", "run_constraints"] {
-                            requirements
+                            requirements_map
                                 .entry(key.to_string())
                                 .or_insert_with(|| Value::Array(Vec::new()));
                         }
                     }
                 }
-            }
+            });
         }
 
         println!("{}", to_string_pretty(&json_value).into_diagnostic()?);
