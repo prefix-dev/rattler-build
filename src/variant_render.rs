@@ -13,7 +13,7 @@ use crate::{
     recipe::{
         Jinja, ParsingError, Recipe,
         custom_yaml::Node,
-        parser::{BuildString, Dependency},
+        parser::{BuildString, CacheOutput, Dependency},
         variable::Variable,
     },
     selectors::SelectorConfig,
@@ -72,7 +72,7 @@ fn collect_unversioned_deps<'a>(
 /// Apply cache inheritance to a parsed recipe from a cache output
 fn apply_cache_inheritance(
     recipe: &mut Recipe,
-    cache: &crate::recipe::parser::CacheOutput,
+    cache: &CacheOutput,
     inherit_run_exports: bool,
     inherit_requirements: bool,
 ) {
@@ -122,7 +122,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     source: S,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
-    cache_outputs: &[crate::recipe::parser::CacheOutput],
+    cache_outputs: &[CacheOutput],
     inheritance_relationships: &HashMap<String, Vec<String>>,
 ) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
     let used_vars = outputs
