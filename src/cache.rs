@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
-    packaging::{Files, contains_prefix_binary, contains_prefix_text, rewrite_prefix_in_file},
+    packaging::{Files, contains_prefix_text, rewrite_prefix_in_file},
     recipe::{
         Jinja,
         parser::{CacheOutput, CacheRequirements, Dependency, Requirements, RunExports, Source},
@@ -28,6 +28,9 @@ use crate::{
     },
     tool_configuration::Configuration,
 };
+
+#[cfg(target_family = "unix")]
+use crate::packaging::contains_prefix_binary;
 
 /// Check if a file contains the prefix and determine if it's binary or text
 /// Returns (has_prefix, is_text)
