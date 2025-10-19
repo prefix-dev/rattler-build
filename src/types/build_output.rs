@@ -24,7 +24,7 @@ use crate::{
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
 };
 
-/// A output. This is the central element that is passed to the `run_build`
+/// An output. This is the central element that is passed to the `run_build`
 /// function and fully specifies all the options and settings to run the build.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildOutput {

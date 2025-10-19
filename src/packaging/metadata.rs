@@ -194,11 +194,13 @@ fn rewrite_binary_prefix(
             search_start = pos + 1;
         }
 
+        mmap.flush()?;
         Ok(())
     }
 
     #[cfg(target_family = "windows")]
     {
+        let _ = (file_path, old_prefix, new_prefix);
         Err(PackagingError::IoError(io::Error::new(
             ErrorKind::Unsupported,
             "Binary prefix replacement is not supported on Windows",
