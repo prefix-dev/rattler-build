@@ -328,7 +328,8 @@ impl Recipe {
                     "inherit" => {
                         if allow_inherit {
                             if experimental {
-                                value.try_convert::<InheritSpec>("output.inherit")?;
+                                let _: InheritSpec =
+                                    value.try_convert("output.inherit")?;
                             } else {
                                 return Err(vec![_partialerror!(
                                     *value.span(),
