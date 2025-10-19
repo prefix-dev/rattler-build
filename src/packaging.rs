@@ -21,7 +21,9 @@ mod file_finder;
 mod file_mapper;
 mod metadata;
 pub use file_finder::{Files, TempFiles, content_type};
-pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
+pub use metadata::{
+    contains_prefix_binary, contains_prefix_text, create_prefix_placeholder, rewrite_prefix_in_file,
+};
 use tempfile::NamedTempFile;
 
 use crate::{

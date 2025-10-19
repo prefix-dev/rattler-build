@@ -124,16 +124,17 @@ pub fn rewrite_prefix_in_file(
     old_prefix: &Path,
     new_prefix: &Path,
 ) -> Result<(), PackagingError> {
-    let content_type = content_inspector::inspect_path(file_path);
+    let content = fs::read(file_path)?;
+    let content_type = content_inspector::inspect(&content);
     let is_text = content_type.is_text()
         && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
-    
+
     match is_text {
         true => {
             let old_prefix_str = old_prefix.to_string_lossy();
             let new_prefix_str = new_prefix.to_string_lossy();
             let contents = fs::read_to_string(file_path)?;
-            let replaced = contents.replace(&old_prefix_str, &new_prefix_str);
+            let replaced = contents.replace(&*old_prefix_str, &new_prefix_str);
             fs::write(file_path, replaced)?;
             Ok(())
         }
@@ -141,23 +142,20 @@ pub fn rewrite_prefix_in_file(
             #[cfg(target_family = "unix")]
             {
                 use std::os::unix::prelude::OsStrExt;
-                
+
                 let old_prefix_bytes = old_prefix.as_os_str().as_bytes();
                 let new_prefix_bytes = new_prefix.as_os_str().as_bytes();
-                
+
                 if new_prefix_bytes.len() > old_prefix_bytes.len() {
                     return Err(PackagingError::IoError(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "New prefix is longer than old prefix, cannot replace in binary file",
                     )));
                 }
-                
-                let mut file = File::options()
-                    .read(true)
-                    .write(true)
-                    .open(file_path)?;
-                
-                let mmap = unsafe { memmap2::MmapOptions::new().map_mut(&file) }?;
+
+                let file = File::options().read(true).write(true).open(file_path)?;
+
+                let mut mmap = unsafe { memmap2::MmapOptions::new().map_mut(&file) }?;
                 let mut pos = 0;
                 while pos <= mmap.len().saturating_sub(old_prefix_bytes.len()) {
                     if &mmap[pos..pos + old_prefix_bytes.len()] == old_prefix_bytes {
@@ -169,7 +167,7 @@ pub fn rewrite_prefix_in_file(
                     }
                     pos += 1;
                 }
-                
+
                 Ok(())
             }
             #[cfg(target_family = "windows")]
