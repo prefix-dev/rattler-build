@@ -91,7 +91,7 @@ impl<'de> DeserializeTrait<'de> for CacheOutput {
             {
                 let mut name = None;
                 let mut source = None;
-                let mut build = None;
+                let mut build: Option<CacheBuild> = None;
                 let mut requirements = None;
                 let mut run_exports = None;
                 let mut ignore_run_exports = None;
@@ -147,6 +147,12 @@ impl<'de> DeserializeTrait<'de> for CacheOutput {
                 let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
                 let source = source.unwrap_or_else(Vec::new);
                 let build = build.ok_or_else(|| de::Error::missing_field("build"))?;
+                if build.script.is_none() {
+                    return Err(de::Error::custom(
+                        "cache outputs require an explicit build script (build.script field is required)",
+                    ));
+                }
+
                 let requirements = requirements.unwrap_or_else(CacheRequirements::default);
                 let run_exports = run_exports.unwrap_or_else(RunExports::default);
                 let ignore_run_exports = ignore_run_exports;

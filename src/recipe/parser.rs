@@ -458,7 +458,10 @@ impl Recipe {
         ) {
             // Detect circular dependencies
             if visiting.contains(name) {
-                // Circular dependency detected, skip to prevent infinite recursion
+                tracing::warn!(
+                    "Circular cache dependency detected involving '{}' - this likely indicates a configuration error",
+                    name
+                );
                 return;
             }
 
