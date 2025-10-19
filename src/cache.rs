@@ -16,7 +16,7 @@ use crate::{
     packaging::{Files, contains_prefix_binary, contains_prefix_text, rewrite_prefix_in_file},
     recipe::{
         Jinja,
-        parser::{Dependency, Requirements, Source},
+        parser::{CacheOutput, CacheRequirements, Dependency, Requirements, RunExports, Source},
     },
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
@@ -26,6 +26,7 @@ use crate::{
         fetch_sources,
         patch::apply_patch_custom,
     },
+    tool_configuration::Configuration,
 };
 
 /// Check if a file contains the prefix and determine if it's binary or text
@@ -103,7 +104,7 @@ pub struct Cache {
 
     /// The run exports declared by the cache at build time (rendered form is computed later)
     #[serde(default)]
-    pub run_exports: crate::recipe::parser::RunExports,
+    pub run_exports: RunExports,
 
     /// Files (relative to prefix/work_dir) that contain the old prefix string and
     /// should be rewritten when restoring to a different location.
@@ -131,20 +132,17 @@ impl Output {
     pub fn cache_key_for(
         &self,
         cache_name: &str,
-        cache_reqs: &crate::recipe::parser::CacheRequirements,
+        cache_reqs: &CacheRequirements,
     ) -> Result<String, CacheKeyError> {
         let requirement_names: HashSet<_> = cache_reqs
             .build
             .iter()
             .chain(cache_reqs.host.iter())
             .filter_map(|dep| match dep {
-                crate::recipe::parser::Dependency::Spec(spec)
-                    if spec.version.is_none() && spec.build.is_none() =>
-                {
-                    spec.name
-                        .as_ref()
-                        .map(|name| name.as_normalized().to_string())
-                }
+                Dependency::Spec(spec) if spec.version.is_none() && spec.build.is_none() => spec
+                    .name
+                    .as_ref()
+                    .map(|name| name.as_normalized().to_string()),
                 _ => None,
             })
             .chain(
@@ -349,8 +347,8 @@ impl Output {
     /// Build or fetch a specific cache output
     pub async fn build_or_fetch_cache_output(
         mut self,
-        cache_output: &crate::recipe::parser::CacheOutput,
-        tool_configuration: &crate::tool_configuration::Configuration,
+        cache_output: &CacheOutput,
+        tool_configuration: &Configuration,
     ) -> Result<Self, miette::Error> {
         let cache_name = cache_output.name.as_normalized();
         let cache_key = self
@@ -410,12 +408,12 @@ impl Output {
             .into_diagnostic()?;
 
         // Convert CacheRequirements to Requirements
-        let requirements = crate::recipe::parser::Requirements {
+        let requirements = Requirements {
             build: cache_output.requirements.build.clone(),
             host: cache_output.requirements.host.clone(),
             run: Vec::new(),
             run_constraints: Vec::new(),
-            run_exports: crate::recipe::parser::RunExports::default(),
+            run_exports: RunExports::default(),
             ignore_run_exports: cache_output.ignore_run_exports.clone().unwrap_or_default(),
         };
 
@@ -564,7 +562,7 @@ impl Output {
     /// Note: this modifies the output in place
     pub(crate) async fn build_or_fetch_cache(
         self,
-        tool_configuration: &crate::tool_configuration::Configuration,
+        tool_configuration: &Configuration,
     ) -> Result<Self, miette::Error> {
         if let Some(synthetic_cache) = self.recipe.synthetic_cache_output() {
             // Convert to synthetic cache output
@@ -579,7 +577,7 @@ impl Output {
     #[allow(dead_code)]
     async fn build_or_fetch_cache_legacy(
         mut self,
-        tool_configuration: &crate::tool_configuration::Configuration,
+        tool_configuration: &Configuration,
     ) -> Result<Self, miette::Error> {
         if let Some(cache) = self.recipe.cache.clone() {
             // if we don't have a cache, we need to run the cache build with our current
@@ -741,7 +739,7 @@ impl Output {
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),
                 work_dir: self.build_configuration.directories.work_dir.clone(),
-                run_exports: crate::recipe::parser::RunExports::default(),
+                run_exports: RunExports::default(),
                 files_with_prefix,
                 binary_files_with_prefix,
                 files_with_work_dir: Vec::new(),

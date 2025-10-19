@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     _partialerror,
     recipe::{
-        ParsingError, Render,
+        Jinja, ParsingError, Render,
         custom_yaml::{HasSpan, Node, RenderedNode, TryConvertNode, parse_yaml},
         error::{ErrorKind, PartialParsingError},
     },
@@ -29,14 +29,8 @@ use super::{
 };
 
 /// Result type for resolve_cache_inheritance_with_caches function
-type CacheInheritanceResult = Result<
-    (
-        Vec<Node>,
-        Vec<crate::recipe::parser::CacheOutput>,
-        std::collections::HashMap<String, Vec<String>>,
-    ),
-    ParsingError<&'static str>,
->;
+type CacheInheritanceResult =
+    Result<(Vec<Node>, Vec<CacheOutput>, HashMap<String, Vec<String>>), ParsingError<&'static str>>;
 
 // Extract inherit information
 fn inherit_name_from(node: &Node) -> Option<String> {
@@ -517,7 +511,7 @@ fn detect_cache_inheritance_cycles(
 /// Parse a cache output from a Node using proper TryConvertNode
 fn parse_cache_output_from_node(
     output: &Node,
-) -> Result<Option<crate::recipe::parser::CacheOutput>, ParsingError<&'static str>> {
+) -> Result<Option<CacheOutput>, ParsingError<&'static str>> {
     // Convert Node to RenderedNode to use TryConvertNode
     // For now, we'll use a simplified approach since we don't have jinja context here
     // In a full implementation, we would need to render the node first
@@ -565,8 +559,8 @@ fn parse_cache_output_from_node(
 /// Parse inheritance relationships from outputs
 fn parse_inheritance_relationships(
     outputs: &[Node],
-) -> Result<std::collections::HashMap<String, Vec<String>>, ParsingError<&'static str>> {
-    let mut relationships = std::collections::HashMap::new();
+) -> Result<HashMap<String, Vec<String>>, ParsingError<&'static str>> {
+    let mut relationships = HashMap::new();
 
     for output in outputs {
         let Some(mapping) = output.as_mapping() else {
@@ -623,8 +617,8 @@ fn parse_inheritance_relationships(
 /// Parse cache outputs using proper TryConvertNode with jinja context
 fn parse_cache_outputs_with_context(
     outputs: &[Node],
-    jinja: &crate::recipe::Jinja,
-) -> Result<Vec<crate::recipe::parser::CacheOutput>, ParsingError<&'static str>> {
+    jinja: &Jinja,
+) -> Result<Vec<CacheOutput>, ParsingError<&'static str>> {
     use super::output_parser::OutputType;
     let mut cache_outputs = Vec::new();
 
@@ -747,10 +741,10 @@ fn topological_sort(inheritance: &HashMap<String, Vec<String>>) -> Vec<String> {
 
 /// Apply cache-to-cache inheritance to the cache outputs
 fn apply_cache_to_cache_inheritance(
-    cache_outputs: Vec<crate::recipe::parser::CacheOutput>,
+    cache_outputs: Vec<CacheOutput>,
     cache_inheritance_relationships: HashMap<String, Vec<String>>,
-) -> Vec<crate::recipe::parser::CacheOutput> {
-    let mut cache_map: HashMap<String, crate::recipe::parser::CacheOutput> = cache_outputs
+) -> Vec<CacheOutput> {
+    let mut cache_map: HashMap<String, CacheOutput> = cache_outputs
         .into_iter()
         .map(|cache| (cache.name.as_normalized().to_string(), cache))
         .collect();
@@ -816,7 +810,7 @@ pub fn resolve_cache_inheritance_with_caches(
     outputs: Vec<Node>,
     has_toplevel_cache: bool,
     experimental_enabled: bool,
-    jinja: &crate::recipe::Jinja,
+    jinja: &Jinja,
 ) -> CacheInheritanceResult {
     if !experimental_enabled {
         for output in &outputs {

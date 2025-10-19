@@ -67,6 +67,7 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
+use recipe::parser::output::resolve_cache_inheritance_with_caches;
 use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
@@ -233,7 +234,7 @@ pub async fn get_build_output(
         });
 
         let jinja = recipe::Jinja::new(selector_config.clone());
-        recipe::parser::output::resolve_cache_inheritance_with_caches(
+        resolve_cache_inheritance_with_caches(
             outputs,
             has_toplevel_cache,
             selector_config.experimental,

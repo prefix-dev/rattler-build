@@ -10,7 +10,9 @@
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         parser::{
             StandardTryConvert, build::VariantKeyUsage, invalid_field_error, missing_field_error,
@@ -377,7 +379,7 @@ fn parse_cache_requirements(
 }
 
 // For compatibility with Vec<CacheOutput> parsing
-impl TryConvertNode<CacheOutput> for crate::recipe::custom_yaml::RenderedScalarNode {
+impl TryConvertNode<CacheOutput> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<CacheOutput, Vec<PartialParsingError>> {
         Err(vec![_partialerror!(
             *self.span(),

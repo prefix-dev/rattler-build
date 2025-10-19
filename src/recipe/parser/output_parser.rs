@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::cache_output::CacheOutput;
 use super::common_output::InheritSpec;
-use super::{About, Build, OutputPackage, Requirements, Source, TestType};
+use super::{About, Build, OutputPackage, Requirements, Source, TestType, build::VariantKeyUsage};
 
 fn duplicate_field_error(field: &str, span: Span) -> PartialParsingError {
     _partialerror!(
@@ -216,7 +216,7 @@ impl Output {
         }
 
         // Deep merge compatible build fields from cache (script is intentionally excluded)
-        let variant_is_default = |v: &super::build::VariantKeyUsage| {
+        let variant_is_default = |v: &VariantKeyUsage| {
             v.use_keys.is_empty() && v.ignore_keys.is_empty() && v.down_prioritize_variant.is_none()
         };
         if variant_is_default(&self.build.variant) && !variant_is_default(&cache.build.variant) {

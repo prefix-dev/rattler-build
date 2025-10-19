@@ -14,6 +14,7 @@ use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
+use memchr::memmem;
 use rattler_conda_types::{
     ChannelUrl, NoArchType, Platform,
     package::{
@@ -60,7 +61,7 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
         let data = unsafe { memmap2::Mmap::map(&file) }?;
 
         // Check if the content contains the prefix bytes with memchr
-        let contains_prefix = memchr::memmem::find_iter(data.as_ref(), &prefix_bytes)
+        let contains_prefix = memmem::find_iter(data.as_ref(), &prefix_bytes)
             .next()
             .is_some();
 
@@ -83,7 +84,7 @@ pub fn contains_prefix_text(
     // Check if the content contains the prefix with memchr
     let prefix_string = prefix.to_string_lossy().to_string();
     let mut detected_prefix = None;
-    if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
+    if memmem::find_iter(mmap.as_ref(), &prefix_string)
         .next()
         .is_some()
     {
@@ -99,7 +100,7 @@ pub fn contains_prefix_text(
         // to something meaningful in unix either way
         let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
 
-        if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
+        if memmem::find_iter(mmap.as_ref(), forward_slash.deref())
             .next()
             .is_some()
         {
@@ -186,7 +187,7 @@ fn rewrite_binary_prefix(
         let mut mmap = unsafe { memmap2::MmapOptions::new().map_mut(&file) }?;
 
         let mut search_start = 0;
-        while let Some(found) = memchr::memmem::find(&mmap[search_start..], old_prefix_bytes) {
+        while let Some(found) = memmem::find(&mmap[search_start..], old_prefix_bytes) {
             let pos = search_start + found;
             mmap[pos..pos + new_prefix_bytes.len()].copy_from_slice(new_prefix_bytes);
             let padding_range = pos + new_prefix_bytes.len()..pos + old_prefix_bytes.len();

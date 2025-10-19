@@ -18,7 +18,11 @@ use std::{
 use crate::{
     NormalizedKey,
     console_utils::github_integration_enabled,
-    recipe::{Recipe, parser::Source, variable::Variable},
+    recipe::{
+        Recipe,
+        parser::{CacheOutput, Source},
+        variable::Variable,
+    },
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
@@ -58,7 +62,7 @@ pub struct BuildOutput {
 
     /// Cache outputs that need to be built before this package output
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub cache_outputs_to_build: Vec<crate::recipe::parser::CacheOutput>,
+    pub cache_outputs_to_build: Vec<CacheOutput>,
 
     /// Summary of the build
     #[serde(skip)]
