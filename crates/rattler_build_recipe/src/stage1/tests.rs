@@ -134,7 +134,7 @@ pub struct DownstreamTest {
 }
 
 /// Files to check for existence or non-existence (evaluated)
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PackageContentsCheckFiles {
     /// Files that must exist (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -143,6 +143,37 @@ pub struct PackageContentsCheckFiles {
     /// Files that must not exist (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub not_exists: GlobVec,
+}
+
+impl<'de> Deserialize<'de> for PackageContentsCheckFiles {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum PackageContentsCheckFilesInput {
+            Map {
+                #[serde(default)]
+                exists: GlobVec,
+                #[serde(default)]
+                not_exists: GlobVec,
+            },
+            // Backward compatibility: a simple list is treated as 'exists' patterns
+            List(GlobVec),
+        }
+
+        let input = PackageContentsCheckFilesInput::deserialize(deserializer)?;
+        match input {
+            PackageContentsCheckFilesInput::Map { exists, not_exists } => {
+                Ok(PackageContentsCheckFiles { exists, not_exists })
+            }
+            PackageContentsCheckFilesInput::List(exists) => Ok(PackageContentsCheckFiles {
+                exists,
+                not_exists: GlobVec::default(),
+            }),
+        }
+    }
 }
 
 impl PackageContentsCheckFiles {
