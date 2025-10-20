@@ -150,7 +150,9 @@ pub struct Jinja {
 impl Jinja {
     /// Create a new Jinja instance with the given configuration
     pub fn new(config: JinjaConfig) -> Self {
-        let env = set_jinja(&config);
+        let accessed_variables = Arc::new(Mutex::new(HashSet::new()));
+        let undefined_variables = Arc::new(Mutex::new(HashSet::new()));
+        let env = set_jinja(&config, accessed_variables.clone());
         let mut context = BTreeMap::new();
 
         // Add platform variables to context
@@ -198,8 +200,8 @@ impl Jinja {
         Self {
             env,
             context,
-            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            accessed_variables,
+            undefined_variables,
         }
     }
 
@@ -422,9 +424,16 @@ fn compiler_stdlib_eval(
     platform: Platform,
     variant: &Arc<BTreeMap<NormalizedKey, Variable>>,
     prefix: &str,
+    accessed_variables: &Arc<Mutex<HashSet<String>>>,
 ) -> Result<String, minijinja::Error> {
     let variant_key = format!("{lang}_{prefix}");
     let variant_key_version = format!("{lang}_{prefix}_version");
+
+    // Track that we're accessing these variant keys
+    if let Ok(mut accessed) = accessed_variables.lock() {
+        accessed.insert(variant_key.clone());
+        accessed.insert(variant_key_version.clone());
+    }
 
     let default_fn = if prefix == "compiler" {
         default_compiler
@@ -558,7 +567,10 @@ lazy_static::lazy_static! {
         .unwrap();
 }
 
-fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
+fn set_jinja(
+    config: &JinjaConfig,
+    accessed_variables: Arc<Mutex<HashSet<String>>>,
+) -> minijinja::Environment<'static> {
     let JinjaConfig {
         target_platform,
         host_platform,
@@ -661,17 +673,31 @@ fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
 
     // "${{ PREFIX }}" delay the expansion. -> $PREFIX on unix and %PREFIX% on windows?
     let variant_clone = variant.clone();
+    let accessed_clone = accessed_variables.clone();
     env.add_function("compiler", move |lang: String| {
-        compiler_stdlib_eval(&lang, target_platform, &variant_clone, "compiler")
+        compiler_stdlib_eval(
+            &lang,
+            target_platform,
+            &variant_clone,
+            "compiler",
+            &accessed_clone,
+        )
     });
 
     let variant_clone = variant.clone();
+    let accessed_clone = accessed_variables.clone();
     let allow_undefined = !matches!(
         config.undefined_behavior,
         UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict
     );
     env.add_function("stdlib", move |lang: String| {
-        let res = compiler_stdlib_eval(&lang, target_platform, &variant_clone, "stdlib");
+        let res = compiler_stdlib_eval(
+            &lang,
+            target_platform,
+            &variant_clone,
+            "stdlib",
+            &accessed_clone,
+        );
         if allow_undefined {
             Ok(res.unwrap_or_else(|_| "undefined".to_string()))
         } else {

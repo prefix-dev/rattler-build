@@ -557,6 +557,10 @@ fn evaluate_package_output(
     // Get the evaluated context variables
     let resolved_context = context.variables().clone();
 
+    // For variant_render.rs, we don't have the used variant computed yet
+    // (that happens in the normal evaluate path). Pass an empty one for now.
+    let used_variant = std::collections::BTreeMap::new();
+
     Ok(Stage1Recipe::new(
         package,
         build,
@@ -566,6 +570,7 @@ fn evaluate_package_output(
         source,
         tests,
         resolved_context,
+        used_variant,
     ))
 }
 

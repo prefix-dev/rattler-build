@@ -4362,6 +4362,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "sha1",
  "spdx",
  "thiserror 2.0.17",
  "url",

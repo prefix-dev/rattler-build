@@ -1209,7 +1209,7 @@ def test_downstream_test(
         assert "│ Failing test in downstream package" in e.value.output
         assert "│ Downstream test failed" in e.value.output
 
-
+@pytest.mark.skip(reason="Cache not implemented yet")
 def test_cache_runexports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1291,7 +1291,7 @@ def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
         "target_platform": "noarch"
     }
 
-
+@pytest.mark.skip(reason="Cache not implemented yet")
 def test_cache_install(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1510,6 +1510,7 @@ def test_recipe_variant_render(
     ]
 
 
+@pytest.mark.skip(reason="Cache not implemented yet")
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )

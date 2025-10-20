@@ -39,6 +39,11 @@ pub struct Recipe {
     /// Resolved context variables (the evaluated context after template rendering)
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub context: IndexMap<String, Variable>,
+
+    /// Used variant - the subset of variant variables that were actually accessed
+    /// during recipe evaluation (plus always-included variables like target_platform)
+    #[serde(skip)]
+    pub used_variant: std::collections::BTreeMap<rattler_build_types::NormalizedKey, Variable>,
 }
 
 impl Recipe {
@@ -53,6 +58,7 @@ impl Recipe {
         source: Vec<Source>,
         tests: Vec<TestType>,
         context: IndexMap<String, Variable>,
+        used_variant: std::collections::BTreeMap<rattler_build_types::NormalizedKey, Variable>,
     ) -> Self {
         Self {
             package,
@@ -63,6 +69,7 @@ impl Recipe {
             source,
             tests,
             context,
+            used_variant,
         }
     }
 
@@ -133,6 +140,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             IndexMap::new(),
+            std::collections::BTreeMap::new(),
         );
 
         assert_eq!(recipe.package(), &pkg);
@@ -174,6 +182,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             IndexMap::new(),
+            std::collections::BTreeMap::new(),
         );
 
         assert_eq!(recipe.package(), &pkg);

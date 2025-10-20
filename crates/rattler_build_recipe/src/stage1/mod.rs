@@ -18,15 +18,20 @@ use rattler_build_jinja::{JinjaConfig, Variable};
 pub mod about;
 pub mod build;
 pub mod extra;
+pub mod hash;
 pub mod package;
 pub mod recipe;
 pub mod requirements;
 pub mod source;
 pub mod tests;
 
+#[cfg(test)]
+mod variant_tests;
+
 pub use about::About;
 pub use build::Build;
 pub use extra::Extra;
+pub(crate) use hash::compute_hash;
 use indexmap::IndexMap;
 pub use package::Package;
 pub use recipe::Recipe;

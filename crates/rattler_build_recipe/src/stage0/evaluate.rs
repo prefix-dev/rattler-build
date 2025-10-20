@@ -5,6 +5,19 @@
 //! - Rendering Jinja templates
 //! - Flattening conditionals based on the evaluation context
 //! - Validating the results
+//!
+//! ## Build String Deferred Evaluation
+//!
+//! The build string is NOT evaluated during stage0 → stage1 conversion because it may
+//! depend on a special `hash` variable that must be computed from the actual variant
+//! (the subset of variant variables that were actually used during evaluation).
+//!
+//! The evaluation flow is:
+//! 1. Extract the build.string template source without evaluating it
+//! 2. Track all accessed variables during recipe evaluation
+//! 3. Determine the actual variant from accessed variables
+//! 4. Compute the hash from the actual variant
+//! 5. Call `Build::render_build_string_with_hash()` to finalize the build string
 
 use std::{path::PathBuf, str::FromStr};
 
@@ -232,6 +245,15 @@ pub fn evaluate_optional_string_value(
     match value {
         None => Ok(None),
         Some(v) => evaluate_string_value(v, context).map(Some),
+    }
+}
+
+/// Extract the template source from a Value<String> without evaluating it
+/// This is used for deferred evaluation (e.g., build.string with hash variable)
+fn extract_template_source(value: &Value<String>) -> Option<String> {
+    match value {
+        Value::Concrete { value: v, .. } => Some(v.clone()),
+        Value::Template { template, .. } => Some(template.source().to_string()),
     }
 }
 
@@ -539,6 +561,60 @@ pub fn evaluate_entry_point_list(
     Ok(results)
 }
 
+/// Check if a MatchSpec is a "free spec" (no version constraints).
+///
+/// A free spec is one that doesn't have any version constraints, build constraints,
+/// or other specifications beyond the package name. These are used to determine
+/// which variant variables should be included in the hash.
+///
+/// Examples of free specs:
+/// - `python` (free)
+/// - `numpy` (free)
+///
+/// Examples of NON-free specs:
+/// - `python >=3.8` (has version constraint)
+/// - `numpy 1.20.*` (has version constraint)
+/// - `gcc_linux-64` (has build constraint via name)
+fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
+    // Must have a name
+    if spec.name.is_none() {
+        return false;
+    }
+
+    // Check if there's any version specification
+    if spec.version.is_some() {
+        return false;
+    }
+
+    // Check if there's a build specification
+    if spec.build.is_some() || spec.build_number.is_some() {
+        return false;
+    }
+
+    // Check if there's a channel specification
+    if spec.channel.is_some() {
+        return false;
+    }
+
+    // Check if there's a subdir specification
+    if spec.subdir.is_some() {
+        return false;
+    }
+
+    // Check if there's a namespace specification
+    if spec.namespace.is_some() {
+        return false;
+    }
+
+    // Check if there's a hash specification (md5, sha256)
+    if spec.md5.is_some() || spec.sha256.is_some() {
+        return false;
+    }
+
+    // If we get here, it's a free spec (just the package name)
+    true
+}
+
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
 /// This handles dependencies which may be:
@@ -550,6 +626,9 @@ pub fn evaluate_entry_point_list(
 /// - Regular match specs (e.g., "python >=3.8")
 /// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
 /// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
+///
+/// Free specs (dependencies with no version constraints) are tracked as variant variables
+/// during evaluation, as they influence the build variant.
 pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
@@ -565,6 +644,13 @@ pub fn evaluate_dependency_list(
                         value: match_spec, ..
                     } => {
                         // Concrete MatchSpec - already validated at parse time!
+                        // Check if this is a "free spec" (no version constraints) and track as variant
+                        if is_free_matchspec(&match_spec.0) {
+                            let name = match_spec.0.name.as_ref().map(|n| n.as_normalized());
+                            if let Some(name) = name {
+                                context.track_access(name);
+                            }
+                        }
                         results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
                     }
                     Value::Template { template, span } => {
@@ -598,6 +684,13 @@ pub fn evaluate_dependency_list(
                                         suggestion: None,
                                     }
                                 })?;
+                            // Check if this is a free spec and track as variant
+                            if is_free_matchspec(&spec) {
+                                let name = spec.name.as_ref().map(|n| n.as_normalized());
+                                if let Some(name) = name {
+                                    context.track_access(name);
+                                }
+                            }
                             results.push(Dependency::Spec(Box::new(spec)));
                         }
                     }
@@ -617,6 +710,14 @@ pub fn evaluate_dependency_list(
                             Value::Concrete {
                                 value: match_spec, ..
                             } => {
+                                // Check if this is a free spec and track as variant
+                                if is_free_matchspec(&match_spec.0) {
+                                    let name =
+                                        match_spec.0.name.as_ref().map(|n| n.as_normalized());
+                                    if let Some(name) = name {
+                                        context.track_access(name);
+                                    }
+                                }
                                 results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
                             }
                             Value::Template { template, span } => {
@@ -635,6 +736,13 @@ pub fn evaluate_dependency_list(
                                         message: Some(format!("Invalid match spec '{}': {}", s, e)),
                                         suggestion: None,
                                     })?;
+                                // Check if this is a free spec and track as variant
+                                if is_free_matchspec(&spec) {
+                                    let name = spec.name.as_ref().map(|n| n.as_normalized());
+                                    if let Some(name) = name {
+                                        context.track_access(name);
+                                    }
+                                }
                                 results.push(Dependency::Spec(Box::new(spec)));
                             }
                         }
@@ -1374,8 +1482,13 @@ impl Evaluate for Stage0Build {
     type Output = Stage1Build;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate build string
-        let string = evaluate_optional_string_value(&self.string, context)?;
+        // IMPORTANT: Do NOT fully evaluate build.string here - it may contain a "hash" variable
+        // that needs to be deferred until after we know the actual variant and can compute the hash.
+        // Store it as BuildString::Unresolved if it contains templates.
+        let string = self.string.as_ref().map(|s| {
+            let template = extract_template_source(s).unwrap();
+            crate::stage1::build::BuildString::unresolved(template)
+        });
 
         // Evaluate script
         let script = evaluate_script_list(&self.script, context)?;
@@ -1820,7 +1933,7 @@ impl Evaluate for Stage0Recipe {
         };
 
         let package = self.package.evaluate(&context_with_vars)?;
-        let build = self.build.evaluate(&context_with_vars)?;
+        let mut build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
         let requirements = self.requirements.evaluate(&context_with_vars)?;
         let extra = self.extra.evaluate(&context_with_vars)?;
@@ -1840,6 +1953,47 @@ impl Evaluate for Stage0Recipe {
         // Extract the resolved context variables (all variables from the evaluation context)
         let resolved_context = context_with_vars.variables().clone();
 
+        // IMPORTANT: Finalize the build string with the hash
+        // Now that evaluation is complete, we know which variables were actually accessed.
+        // Compute the hash from the actual variant (accessed variables) and render the build string.
+        use rattler_build_types::NormalizedKey;
+        use std::collections::BTreeMap;
+
+        // Variables that should ALWAYS be included in the hash, even if not accessed
+        const ALWAYS_INCLUDE: &[&str] = &["target_platform"];
+
+        let accessed_vars = context_with_vars.accessed_variables();
+        let actual_variant: BTreeMap<NormalizedKey, rattler_build_jinja::Variable> =
+            context_with_vars
+                .variables()
+                .iter()
+                .filter(|(k, _)| {
+                    // Include if accessed OR if it's an always-include variable
+                    accessed_vars.contains(k.as_str()) || ALWAYS_INCLUDE.contains(&k.as_str())
+                })
+                .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+                .collect();
+
+        // Compute hash from the actual variant (includes prefix like "py312h...")
+        let noarch_default = rattler_conda_types::NoArchType::none();
+        let noarch = build.noarch.as_ref().unwrap_or(&noarch_default);
+        let hash = crate::stage1::compute_hash(&actual_variant, noarch);
+
+        // If no build string was specified, use the default: {hash}_{build_number}
+        // Note: hash already includes prefix and "h", so it's like "py312h507f6e9_0"
+        if build.string.is_none() {
+            build.string = Some(crate::stage1::build::BuildString::resolved(format!(
+                "{}_{}",
+                hash, build.number
+            )));
+        } else {
+            // For custom build strings, we need to extract just the hash part (without prefix)
+            // The template will add its own formatting
+            // Extract the part after the last 'h' which is the actual hash
+            let hash_only = hash.rsplit('h').next().unwrap_or(&hash);
+            build.resolve_build_string(hash_only, &context_with_vars)?;
+        }
+
         Ok(Stage1Recipe::new(
             package,
             build,
@@ -1849,6 +2003,7 @@ impl Evaluate for Stage0Recipe {
             source,
             tests,
             resolved_context,
+            actual_variant,
         ))
     }
 }

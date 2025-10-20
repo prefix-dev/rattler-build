@@ -5,6 +5,106 @@ use serde::{Deserialize, Serialize};
 
 use super::{AllOrGlobVec, GlobVec};
 
+/// Represents the state of the build string during evaluation
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum BuildString {
+    /// Unresolved template that needs hash substitution
+    /// This state exists during evaluation before the hash is computed
+    #[serde(skip)]
+    Unresolved(String),
+
+    /// Fully resolved build string with hash computed and substituted
+    Resolved(String),
+}
+
+impl BuildString {
+    /// Create an unresolved build string from a template
+    pub fn unresolved(template: String) -> Self {
+        BuildString::Unresolved(template)
+    }
+
+    /// Create a resolved build string
+    pub fn resolved(value: String) -> Self {
+        BuildString::Resolved(value)
+    }
+
+    /// Check if the build string is resolved
+    pub fn is_resolved(&self) -> bool {
+        matches!(self, BuildString::Resolved(_))
+    }
+
+    /// Get the resolved string value, if available
+    pub fn as_resolved(&self) -> Option<&str> {
+        match self {
+            BuildString::Resolved(s) => Some(s),
+            BuildString::Unresolved(_) => None,
+        }
+    }
+
+    /// Get the string value (resolved or unresolved)
+    pub fn as_str(&self) -> &str {
+        match self {
+            BuildString::Resolved(s) | BuildString::Unresolved(s) => s,
+        }
+    }
+
+    /// Resolve the build string by rendering the template with the hash value
+    pub fn resolve(
+        &mut self,
+        hash_value: &str,
+        context: &super::EvaluationContext,
+    ) -> Result<(), crate::ParseError> {
+        if let BuildString::Unresolved(template) = self {
+            use rattler_build_jinja::{Jinja, Variable};
+
+            // Create a Jinja instance
+            let mut jinja = Jinja::new(context.jinja_config().clone());
+
+            // Add all context variables
+            jinja = jinja.with_context(context.variables());
+
+            // Add the hash variable to the context
+            jinja.context_mut().insert(
+                "hash".to_string(),
+                Variable::from(hash_value.to_string()).into(),
+            );
+
+            // Render the template
+            let rendered = jinja.render_str(template).map_err(|e| crate::ParseError {
+                kind: crate::ErrorKind::JinjaError,
+                span: crate::Span::unknown(),
+                message: Some(format!("Failed to render build string template: {}", e)),
+                suggestion: None,
+            })?;
+
+            *self = BuildString::Resolved(rendered);
+        }
+
+        Ok(())
+    }
+}
+
+impl From<String> for BuildString {
+    fn from(s: String) -> Self {
+        BuildString::Resolved(s)
+    }
+}
+
+impl From<BuildString> for String {
+    fn from(bs: BuildString) -> Self {
+        match bs {
+            BuildString::Resolved(s) | BuildString::Unresolved(s) => s,
+        }
+    }
+}
+
+impl AsRef<str> for BuildString {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 /// Helper function to check if a u64 is zero (for skip_serializing_if)
 fn is_zero(value: &u64) -> bool {
     *value == 0
@@ -140,15 +240,16 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 }
 
 /// Evaluated build configuration with all templates and conditionals resolved
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
     #[serde(default, skip_serializing_if = "is_zero")]
     pub number: u64,
 
-    /// Build string (usually auto-generated from variant hash)
+    /// Build string - can be unresolved (template) or resolved (with hash)
+    /// Serializes only the resolved string value
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub string: Option<String>,
+    pub string: Option<BuildString>,
 
     /// Build script - contains script content, interpreter, environment variables, etc.
     #[serde(default, skip_serializing_if = "Script::is_default")]
@@ -198,6 +299,27 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+}
+
+impl Default for Build {
+    fn default() -> Self {
+        Self {
+            number: 0,
+            string: None,
+            script: Script::default(),
+            noarch: None,
+            python: PythonBuild::default(),
+            skip: Vec::new(),
+            always_copy_files: GlobVec::default(),
+            always_include_files: GlobVec::default(),
+            merge_build_and_host_envs: false,
+            files: GlobVec::default(),
+            dynamic_linking: DynamicLinking::default(),
+            variant: VariantKeyUsage::default(),
+            prefix_detection: PrefixDetection::default(),
+            post_process: Vec::new(),
+        }
+    }
 }
 
 /// Dynamic linking configuration
@@ -337,6 +459,31 @@ impl Build {
             number,
             ..Default::default()
         }
+    }
+
+    /// Resolve the build string with the computed hash value
+    ///
+    /// This method should be called after the full recipe evaluation is complete and
+    /// the actual variant (subset of used variables) is known.
+    ///
+    /// # Arguments
+    ///
+    /// * `hash_value` - The computed hash value to substitute in the template
+    /// * `context` - Evaluation context with all variables
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) on success, or an error if template rendering fails
+    pub fn resolve_build_string(
+        &mut self,
+        hash_value: &str,
+        context: &super::EvaluationContext,
+    ) -> Result<(), crate::ParseError> {
+        if let Some(build_string) = &mut self.string {
+            build_string.resolve(hash_value, context)?;
+        }
+
+        Ok(())
     }
 
     /// Check if the build section is empty (all default values)
