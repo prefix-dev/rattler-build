@@ -11,6 +11,7 @@ members = [
   "crates/rattler_build_jinja",
   "crates/rattler_build_script",
   "crates/rattler_build_diffy",
+  "crates/rattler_build_package",
 ]
 
 [workspace.package]
@@ -53,6 +54,8 @@ rattler_digest = { version = "1.1.5", default-features = false, features = [
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe" }
+rattler_build_package = { path = "crates/rattler_build_package" }
 rattler_shell = { version = "0.25.2", default-features = false, features = [
   "sysinfo",
 ] }
@@ -273,6 +276,7 @@ rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
 rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
   "variant-config",
+  "miette",
 ] }
 rattler_git = { path = "crates/rattler_git" }
 rattler_build_diffy = { path = "crates/rattler_build_diffy" }
@@ -281,6 +285,9 @@ rattler_build_networking = { path = "crates/rattler_build_networking", features 
 ] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache" }
 rattler_build_script = { path = "crates/rattler_build_script" }
+rattler_build_package = { path = "crates/rattler_build_package", features = [
+  "recipe",
+] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }
