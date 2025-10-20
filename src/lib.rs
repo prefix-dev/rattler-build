@@ -1072,6 +1072,9 @@ pub async fn debug_recipe(
 ) -> miette::Result<()> {
     let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
 
+    let is_test_mode = debug_data.test_mode;
+    let test_index = debug_data.test_index; // None means run all tests, Some(n) means run test n
+
     let build_data = BuildData {
         build_platform: debug_data.build_platform,
         target_platform: debug_data.target_platform,
@@ -1177,22 +1180,147 @@ pub async fn debug_recipe(
             }
         }
 
-        tracing::info!("\nTo run the actual build, use:");
-        tracing::info!(
-            "rattler-build build --recipe {}",
-            output.build_configuration.directories.recipe_path.display()
-        );
-        tracing::info!("Or run the build script directly with:");
-        if cfg!(windows) {
-            tracing::info!(
-                "cd {} && ./conda_build.bat",
-                output.build_configuration.directories.work_dir.display()
-            );
+        if is_test_mode {
+            // Test mode: setup test environment and run test(s)
+            let tests = &output.recipe.tests;
+
+            if tests.is_empty() {
+                return Err(miette::miette!("No tests found in recipe."));
+            }
+
+            // Determine which tests to run
+            let tests_to_run: Vec<usize> = match test_index {
+                Some(idx) => {
+                    if idx >= tests.len() {
+                        return Err(miette::miette!(
+                            "Test index {} out of range. Recipe has {} test(s).",
+                            idx,
+                            tests.len()
+                        ));
+                    }
+                    vec![idx]
+                }
+                None => (0..tests.len()).collect(),
+            };
+
+            tracing::info!("\n=== Test Debug Mode ===");
+            if test_index.is_some() {
+                tracing::info!("Running test {} of {}", tests_to_run[0], tests.len());
+            } else {
+                tracing::info!("Running all {} tests", tests.len());
+            }
+            tracing::info!("Available tests:");
+            for (idx, test) in tests.iter().enumerate() {
+                let test_type = match test {
+                    crate::recipe::parser::TestType::Python { .. } => "Python",
+                    crate::recipe::parser::TestType::Perl { .. } => "Perl",
+                    crate::recipe::parser::TestType::R { .. } => "R",
+                    crate::recipe::parser::TestType::Ruby { .. } => "Ruby",
+                    crate::recipe::parser::TestType::Command(_) => "Command",
+                    crate::recipe::parser::TestType::Downstream(_) => "Downstream",
+                    crate::recipe::parser::TestType::PackageContents { .. } => "PackageContents",
+                };
+                let marker = if tests_to_run.contains(&idx) {
+                    ">>>"
+                } else {
+                    "   "
+                };
+                tracing::info!("{} Test {}: {}", marker, idx, test_type);
+            }
+
+            // Build the package first to be able to run tests
+            tracing::info!("\nNote: Tests require a built package. Building package first...");
+
+            // Create a modified output with debug mode disabled for the actual build
+            let mut build_output = output.clone();
+            build_output.build_configuration.debug = crate::types::Debug::new(false);
+
+            let (built_output, archive_path) = run_build(
+                build_output,
+                &tool_config,
+                WorkingDirectoryBehavior::Cleanup,
+            )
+            .await?;
+
+            tracing::info!("Package built successfully: {}", archive_path.display());
+
+            // Run the test(s) with environment preservation for debugging
+            let config = &built_output.build_configuration;
+
+            for current_test_index in tests_to_run {
+                // Skip PackageContents tests as they run at build time
+                if matches!(
+                    tests[current_test_index],
+                    crate::recipe::parser::TestType::PackageContents { .. }
+                ) {
+                    tracing::info!(
+                        "\nSkipping test {} (PackageContents tests run at build time)",
+                        current_test_index
+                    );
+                    continue;
+                }
+
+                // Calculate the package test index (excluding PackageContents tests before this one)
+                let package_test_index = tests[..=current_test_index]
+                    .iter()
+                    .filter(|t| {
+                        !matches!(t, crate::recipe::parser::TestType::PackageContents { .. })
+                    })
+                    .count()
+                    - 1;
+
+                let test_config = TestConfiguration {
+                    test_prefix: config
+                        .directories
+                        .output_dir
+                        .join(format!("test_debug_{}", current_test_index)),
+                    target_platform: Some(config.target_platform),
+                    host_platform: Some(config.host_platform.clone()),
+                    current_platform: config.build_platform.clone(),
+                    keep_test_prefix: true,
+                    test_index: Some(package_test_index),
+                    channels: config.channels.clone(),
+                    channel_priority: tool_config.channel_priority,
+                    solve_strategy: SolveStrategy::Highest,
+                    tool_configuration: tool_config.clone(),
+                    output_dir: config.directories.output_dir.clone(),
+                    debug: crate::types::Debug::new(false),
+                    exclude_newer: config.exclude_newer,
+                };
+
+                tracing::info!(
+                    "\nRunning test {} with environment preservation...\n",
+                    current_test_index
+                );
+
+                match package_test::run_test(&archive_path, &test_config, None).await {
+                    Ok(_) => {
+                        tracing::info!("\nTest {} passed!", current_test_index);
+                    }
+                    Err(e) => {
+                        return Err(miette::miette!("Test {} failed: {}", current_test_index, e));
+                    }
+                }
+            }
         } else {
+            // Build mode: provide instructions to run the build script
+            tracing::info!("\nTo run the actual build, use:");
             tracing::info!(
-                "cd {} && ./conda_build.sh",
-                output.build_configuration.directories.work_dir.display()
+                "rattler-build build --recipe {}",
+                output.build_configuration.directories.recipe_path.display()
             );
+            tracing::info!("Or run the build script directly with:");
+            if cfg!(windows) {
+                tracing::info!(
+                    "cd {} && ./conda_build.bat",
+                    output.build_configuration.directories.work_dir.display()
+                );
+            } else {
+                tracing::info!(
+                    "cd {} && ./conda_build.sh",
+                    output.build_configuration.directories.work_dir.display()
+                );
+            }
         }
     }
 

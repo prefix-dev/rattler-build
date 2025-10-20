@@ -895,6 +895,13 @@ pub struct DebugOpts {
     /// Name of the specific output to debug (only required when a recipe has multiple outputs)
     #[arg(long, help = "Name of the specific output to debug")]
     pub output_name: Option<String>,
+
+    /// Run tests in debug mode.
+    #[arg(
+        long,
+        help = "Run tests in debug mode. Optionally specify test index to run a specific test (default: run all tests)"
+    )]
+    pub test: Option<Option<usize>>,
 }
 
 #[derive(Debug, Clone)]
@@ -916,6 +923,10 @@ pub struct DebugData {
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
     pub output_name: Option<String>,
+    /// Whether test mode is enabled
+    pub test_mode: bool,
+    /// Test index to run in debug mode. None means run all tests, Some(n) means run test n.
+    pub test_index: Option<usize>,
 }
 
 impl DebugData {
@@ -933,6 +944,8 @@ impl DebugData {
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
+            test_mode: opts.test.is_some(), // true if --test flag was provided
+            test_index: opts.test.flatten(), // None = all tests, Some(n) = specific test
         }
     }
 }
