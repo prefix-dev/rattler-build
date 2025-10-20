@@ -27,10 +27,7 @@ pub enum GitRev {
 
 impl Default for GitRev {
     fn default() -> Self {
-        Self::Value(Value::new_concrete(
-            "HEAD".to_string(),
-            crate::span::Span::unknown(),
-        ))
+        Self::Value(Value::new_concrete("HEAD".to_string(), None))
     }
 }
 
@@ -216,30 +213,41 @@ impl Source {
 impl GitSource {
     /// Collect all variables used in the git source
     pub fn used_variables(&self) -> Vec<String> {
+        let GitSource {
+            url,
+            rev,
+            tag,
+            branch,
+            depth,
+            patches,
+            target_directory,
+            lfs,
+        } = self;
+
         let mut vars = Vec::new();
-        vars.extend(self.url.0.used_variables());
-        if let Some(GitRev::Value(v)) = &self.rev {
+        vars.extend(url.0.used_variables());
+        if let Some(GitRev::Value(v)) = rev {
             vars.extend(v.used_variables());
         }
-        if let Some(GitRev::Value(v)) = &self.tag {
+        if let Some(GitRev::Value(v)) = tag {
             vars.extend(v.used_variables());
         }
-        if let Some(GitRev::Value(v)) = &self.branch {
+        if let Some(GitRev::Value(v)) = branch {
             vars.extend(v.used_variables());
         }
-        if let Some(depth) = &self.depth {
+        if let Some(depth) = depth {
             vars.extend(depth.used_variables());
         }
         // Extract variables from patches
-        for item in &self.patches {
+        for item in patches {
             if let crate::stage0::types::Item::Value(v) = item {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(lfs) = &self.lfs {
+        if let Some(lfs) = lfs {
             vars.extend(lfs.used_variables());
         }
         vars.sort();
@@ -251,26 +259,35 @@ impl GitSource {
 impl UrlSource {
     /// Collect all variables used in the url source
     pub fn used_variables(&self) -> Vec<String> {
+        let UrlSource {
+            url,
+            sha256,
+            md5,
+            file_name,
+            patches,
+            target_directory,
+        } = self;
+
         let mut vars = Vec::new();
-        for url in &self.url {
+        for url in url {
             vars.extend(url.used_variables());
         }
-        if let Some(sha256) = &self.sha256 {
+        if let Some(sha256) = sha256 {
             vars.extend(sha256.used_variables());
         }
-        if let Some(md5) = &self.md5 {
+        if let Some(md5) = md5 {
             vars.extend(md5.used_variables());
         }
-        if let Some(file_name) = &self.file_name {
+        if let Some(file_name) = file_name {
             vars.extend(file_name.used_variables());
         }
         // Extract variables from patches
-        for item in &self.patches {
+        for item in patches {
             if let crate::stage0::types::Item::Value(v) = item {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
         vars.sort();
@@ -282,24 +299,35 @@ impl UrlSource {
 impl PathSource {
     /// Collect all variables used in the path source
     pub fn used_variables(&self) -> Vec<String> {
+        let PathSource {
+            path,
+            sha256,
+            md5,
+            patches: _,
+            target_directory,
+            file_name,
+            use_gitignore: _,
+            filter,
+        } = self;
+
         let mut vars = Vec::new();
-        if let Value::Template { template: t, .. } = &self.path {
+        if let Value::Template { template: t, .. } = path {
             vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(sha256) = &self.sha256 {
+        if let Some(sha256) = sha256 {
             vars.extend(sha256.used_variables());
         }
-        if let Some(md5) = &self.md5 {
+        if let Some(md5) = md5 {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(Value::Template { template: t, .. }) = &self.target_directory {
+        if let Some(Value::Template { template: t, .. }) = target_directory {
             vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(Value::Template { template: t, .. }) = &self.file_name {
+        if let Some(Value::Template { template: t, .. }) = file_name {
             vars.extend(t.used_variables().iter().cloned());
         }
-        vars.extend(self.filter.used_variables());
+        vars.extend(filter.used_variables());
         vars.sort();
         vars.dedup();
         vars

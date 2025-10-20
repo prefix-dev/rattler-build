@@ -340,7 +340,7 @@ fn parse_context_value(
         let list_variable = Variable::from(variables);
         Ok(crate::stage0::types::Value::new_concrete(
             list_variable,
-            helpers::get_span(yaml),
+            Some(helpers::get_span(yaml)),
         ))
     } else if let Some(scalar) = yaml.as_scalar() {
         // Parse scalar value
@@ -354,7 +354,10 @@ fn parse_context_value(
             // The actual Variable will be created during evaluation
             let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::jinja_error(e, span))?;
-            Ok(crate::stage0::types::Value::new_template(template, span))
+            Ok(crate::stage0::types::Value::new_template(
+                template,
+                Some(span),
+            ))
         } else {
             // Parse the scalar value based on its type:
             // - Booleans: true/false remain as booleans
@@ -374,7 +377,10 @@ fn parse_context_value(
                 Variable::from(s.to_string())
             };
 
-            Ok(crate::stage0::types::Value::new_concrete(variable, span))
+            Ok(crate::stage0::types::Value::new_concrete(
+                variable,
+                Some(span),
+            ))
         }
     } else {
         Err(ParseError::expected_type(

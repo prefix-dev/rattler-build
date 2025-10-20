@@ -28,14 +28,17 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
         if s.contains("${{") && s.contains("}}") {
             let template = JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
+            let items = vec![Item::Value(Value::new_template(
+                template,
+                Some(spanned.span()),
+            ))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string
         let items = vec![Item::Value(Value::new_concrete(
             s.to_string(),
-            spanned.span(),
+            Some(spanned.span()),
         ))];
         return Ok(ConditionalList::new(items));
     }

@@ -59,7 +59,7 @@ where
             .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
         Ok(crate::stage0::types::Value::new_template(
             template,
-            spanned.span(),
+            Some(spanned.span()),
         ))
     } else {
         let value = s
@@ -67,7 +67,7 @@ where
             .map_err(|e| ParseError::invalid_value("value", &e.to_string(), spanned.span()))?;
         Ok(crate::stage0::types::Value::new_concrete(
             value,
-            spanned.span(),
+            Some(spanned.span()),
         ))
     }
 }

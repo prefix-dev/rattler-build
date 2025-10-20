@@ -23,8 +23,10 @@ impl Display for Extra {
 
 impl Extra {
     pub fn used_variables(&self) -> Vec<String> {
+        let Extra { recipe_maintainers } = self;
+
         let mut vars = Vec::new();
-        for maintainer in &self.recipe_maintainers {
+        for maintainer in recipe_maintainers {
             vars.extend(maintainer.used_variables());
         }
         vars.sort();

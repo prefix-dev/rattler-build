@@ -50,14 +50,23 @@ impl Requirements {
 
     /// Collect all variables used in requirements
     pub fn used_variables(&self) -> Vec<String> {
+        let Requirements {
+            build,
+            host,
+            run,
+            run_constraints,
+            run_exports,
+            ignore_run_exports,
+        } = self;
+
         let mut vars = Vec::new();
 
-        vars.extend(self.build.used_variables());
-        vars.extend(self.host.used_variables());
-        vars.extend(self.run.used_variables());
-        vars.extend(self.run_constraints.used_variables());
-        vars.extend(self.run_exports.used_variables());
-        vars.extend(self.ignore_run_exports.used_variables());
+        vars.extend(build.used_variables());
+        vars.extend(host.used_variables());
+        vars.extend(run.used_variables());
+        vars.extend(run_constraints.used_variables());
+        vars.extend(run_exports.used_variables());
+        vars.extend(ignore_run_exports.used_variables());
 
         vars.sort();
         vars.dedup();
@@ -159,13 +168,21 @@ impl RunExports {
 
     /// Collect all variables used in run exports
     pub fn used_variables(&self) -> Vec<String> {
+        let RunExports {
+            noarch,
+            strong,
+            strong_constraints,
+            weak,
+            weak_constraints,
+        } = self;
+
         let mut vars = Vec::new();
 
-        vars.extend(self.noarch.used_variables());
-        vars.extend(self.strong.used_variables());
-        vars.extend(self.strong_constraints.used_variables());
-        vars.extend(self.weak.used_variables());
-        vars.extend(self.weak_constraints.used_variables());
+        vars.extend(noarch.used_variables());
+        vars.extend(strong.used_variables());
+        vars.extend(strong_constraints.used_variables());
+        vars.extend(weak.used_variables());
+        vars.extend(weak_constraints.used_variables());
 
         vars.sort();
         vars.dedup();
@@ -193,10 +210,15 @@ impl IgnoreRunExports {
 
     /// Collect all variables used in ignore configuration
     pub fn used_variables(&self) -> Vec<String> {
+        let IgnoreRunExports {
+            by_name,
+            from_package,
+        } = self;
+
         let mut vars = Vec::new();
 
-        vars.extend(self.by_name.used_variables());
-        vars.extend(self.from_package.used_variables());
+        vars.extend(by_name.used_variables());
+        vars.extend(from_package.used_variables());
 
         vars.sort();
         vars.dedup();
@@ -207,10 +229,7 @@ impl IgnoreRunExports {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        Span,
-        stage0::types::{Item, JinjaTemplate, Value},
-    };
+    use crate::stage0::types::{Item, JinjaTemplate, Value};
 
     #[test]
     fn test_requirements_empty() {
@@ -224,11 +243,11 @@ mod tests {
         let items = vec![
             Item::Value(Value::new_concrete(
                 SerializableMatchSpec::from("gcc"),
-                crate::span::Span::unknown(),
+                None,
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             )),
         ];
 
@@ -246,12 +265,12 @@ mod tests {
     fn test_requirements_collect_all_variables() {
         let build_items = vec![Item::Value(Value::new_template(
             JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         ))];
 
         let run_items = vec![Item::Value(Value::new_template(
             JinjaTemplate::new("${{ python }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         ))];
 
         let req = Requirements {
@@ -285,15 +304,15 @@ mod tests {
         let items = vec![
             Item::Value(Value::new_concrete(
                 SerializableMatchSpec::from("python >=3.8"),
-                Span::unknown(),
+                None,
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("cuda-toolkit ${{ cuda_version }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
         ];
 

@@ -20,27 +20,27 @@ pub trait UsedVariables {
 pub enum Value<T> {
     Concrete {
         value: T,
-        span: crate::span::Span,
+        span: Option<crate::span::Span>,
     },
     Template {
         template: JinjaTemplate,
-        span: crate::span::Span,
+        span: Option<crate::span::Span>,
     },
 }
 
 impl<T> Value<T> {
     /// Create a new concrete value with span information
-    pub fn new_concrete(value: T, span: crate::span::Span) -> Self {
+    pub fn new_concrete(value: T, span: Option<crate::span::Span>) -> Self {
         Value::Concrete { value, span }
     }
 
     /// Create a new template value with span information
-    pub fn new_template(template: JinjaTemplate, span: crate::span::Span) -> Self {
+    pub fn new_template(template: JinjaTemplate, span: Option<crate::span::Span>) -> Self {
         Value::Template { template, span }
     }
 
     /// Get the span information for this value
-    pub fn span(&self) -> crate::span::Span {
+    pub fn span(&self) -> Option<crate::span::Span> {
         match self {
             Value::Concrete { span, .. } => *span,
             Value::Template { span, .. } => *span,
@@ -87,7 +87,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Value<T> {
                 let template = JinjaTemplate::new(s.to_string()).map_err(D::Error::custom)?;
                 return Ok(Value::Template {
                     template,
-                    span: crate::span::Span::unknown(),
+                    span: None,
                 });
             }
         }
@@ -96,7 +96,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Value<T> {
         let concrete = T::deserialize(value).map_err(D::Error::custom)?;
         Ok(Value::Concrete {
             value: concrete,
-            span: crate::span::Span::unknown(),
+            span: None,
         })
     }
 }
@@ -132,15 +132,12 @@ where
             let template = JinjaTemplate::new(s.to_string())?;
             return Ok(Value::Template {
                 template,
-                span: crate::span::Span::unknown(),
+                span: None,
             });
         }
 
         T::from_str(s)
-            .map(|value| Value::Concrete {
-                value,
-                span: crate::span::Span::unknown(),
-            })
+            .map(|value| Value::Concrete { value, span: None })
             .map_err(|e| format!("Failed to parse concrete value: {}", e))
     }
 }
@@ -219,15 +216,12 @@ where
             let template = JinjaTemplate::new(s.to_string())?;
             return Ok(Item::Value(Value::Template {
                 template,
-                span: crate::span::Span::unknown(),
+                span: None,
             }));
         }
 
         let value = T::from_str(s).map_err(|e| format!("Failed to parse: {}", e))?;
-        Ok(Item::Value(Value::Concrete {
-            value,
-            span: crate::span::Span::unknown(),
-        }))
+        Ok(Item::Value(Value::Concrete { value, span: None }))
     }
 }
 
@@ -645,21 +639,29 @@ pub struct InlineScript {
 impl InlineScript {
     /// Collect all variables used in this inline script
     pub fn used_variables(&self) -> Vec<String> {
+        let InlineScript {
+            interpreter,
+            env,
+            secrets: _,
+            content,
+            file,
+        } = self;
+
         let mut vars = Vec::new();
 
-        if let Some(interpreter) = &self.interpreter {
+        if let Some(interpreter) = interpreter {
             vars.extend(interpreter.used_variables());
         }
 
-        for value in self.env.values() {
+        for value in env.values() {
             vars.extend(value.used_variables());
         }
 
-        if let Some(content) = &self.content {
+        if let Some(content) = content {
             vars.extend(content.used_variables());
         }
 
-        if let Some(file) = &self.file {
+        if let Some(file) = file {
             vars.extend(file.used_variables());
         }
 
@@ -675,17 +677,14 @@ mod tests {
 
     #[test]
     fn test_value_concrete_no_variables() {
-        let value: Value<String> =
-            Value::new_concrete("hello".to_string(), crate::span::Span::unknown());
+        let value: Value<String> = Value::new_concrete("hello".to_string(), None);
         assert_eq!(value.used_variables(), Vec::<String>::new());
     }
 
     #[test]
     fn test_value_template_simple_variable() {
-        let value: Value<String> = Value::new_template(
-            JinjaTemplate::new("${{ name }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
-        );
+        let value: Value<String> =
+            Value::new_template(JinjaTemplate::new("${{ name }}".to_string()).unwrap(), None);
         let vars = value.used_variables();
         assert_eq!(vars, vec!["name"]);
     }
@@ -694,7 +693,7 @@ mod tests {
     fn test_value_template_multiple_variables() {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -705,7 +704,7 @@ mod tests {
     fn test_value_template_with_filter() {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ name | lower }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let vars = value.used_variables();
         assert_eq!(vars, vec!["name"]);
@@ -716,7 +715,7 @@ mod tests {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ name ~ '-' ~ version if linux else name }}".to_string())
                 .unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -727,15 +726,12 @@ mod tests {
     fn test_conditional_simple() {
         let cond = Conditional::new(
             "linux".to_string(),
-            ListOrItem::single(Value::new_concrete(
-                "gcc".to_string(),
-                crate::span::Span::unknown(),
-            )),
+            ListOrItem::single(Value::new_concrete("gcc".to_string(), None)),
         )
         .unwrap()
         .with_else(ListOrItem::single(Value::new_concrete(
             "clang".to_string(),
-            crate::span::Span::unknown(),
+            None,
         )));
         let vars = cond.used_variables();
         assert_eq!(vars, vec!["linux"]);
@@ -745,10 +741,7 @@ mod tests {
     fn test_conditional_complex_expression() {
         let cond = Conditional::new(
             "target_platform == 'linux' and version >= '3.0'".to_string(),
-            ListOrItem::single(Value::new_concrete(
-                "gcc".to_string(),
-                crate::span::Span::unknown(),
-            )),
+            ListOrItem::single(Value::new_concrete("gcc".to_string(), None)),
         )
         .unwrap();
         let mut vars = cond.used_variables();
@@ -760,7 +753,7 @@ mod tests {
     fn test_item_value_variant() {
         let item: Item<String> = Item::Value(Value::new_template(
             JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         ));
         let vars = item.used_variables();
         assert_eq!(vars, vec!["compiler"]);
@@ -770,15 +763,12 @@ mod tests {
     fn test_item_conditional_variant() {
         let cond = Conditional::new(
             "unix".to_string(),
-            ListOrItem::single(Value::new_concrete(
-                "bash".to_string(),
-                crate::span::Span::unknown(),
-            )),
+            ListOrItem::single(Value::new_concrete("bash".to_string(), None)),
         )
         .unwrap()
         .with_else(ListOrItem::single(Value::new_concrete(
             "cmd".to_string(),
-            crate::span::Span::unknown(),
+            None,
         )));
         let item: Item<String> = Item::Conditional(cond);
         let vars = item.used_variables();
@@ -788,31 +778,25 @@ mod tests {
     #[test]
     fn test_conditional_list_mixed_items() {
         let items = vec![
-            Item::Value(Value::new_concrete(
-                "static-dep".to_string(),
-                crate::span::Span::unknown(),
-            )),
+            Item::Value(Value::new_concrete("static-dep".to_string(), None)),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             )),
             Item::Conditional(
                 Conditional::new(
                     "linux".to_string(),
-                    ListOrItem::single(Value::new_concrete(
-                        "linux-gcc".to_string(),
-                        crate::span::Span::unknown(),
-                    )),
+                    ListOrItem::single(Value::new_concrete("linux-gcc".to_string(), None)),
                 )
                 .unwrap()
                 .with_else(ListOrItem::single(Value::new_concrete(
                     "other-compiler".to_string(),
-                    crate::span::Span::unknown(),
+                    None,
                 ))),
             ),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ python }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             )),
         ];
 
@@ -831,19 +815,16 @@ mod tests {
         let items = vec![
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ name }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             )),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             )),
             Item::Conditional(
                 Conditional::new(
                     "name == 'foo'".to_string(),
-                    ListOrItem::single(Value::new_concrete(
-                        "bar".to_string(),
-                        crate::span::Span::unknown(),
-                    )),
+                    ListOrItem::single(Value::new_concrete("bar".to_string(), None)),
                 )
                 .unwrap(),
             ),
@@ -879,7 +860,7 @@ mod tests {
     fn test_template_with_binary_operators() {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ x + y * z }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -893,7 +874,7 @@ mod tests {
                 "${{ version >= min_version and version < max_version }}".to_string(),
             )
             .unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let mut vars = value.used_variables();
         vars.sort();
@@ -904,7 +885,7 @@ mod tests {
     fn test_template_with_attribute_access() {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ build.number }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let vars = value.used_variables();
         assert_eq!(vars, vec!["build"]);
@@ -914,7 +895,7 @@ mod tests {
     fn test_template_with_list() {
         let value: Value<String> = Value::new_template(
             JinjaTemplate::new("${{ [a, b, c] }}".to_string()).unwrap(),
-            crate::span::Span::unknown(),
+            None,
         );
         let mut vars = value.used_variables();
         vars.sort();

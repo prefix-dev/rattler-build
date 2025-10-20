@@ -1,15 +1,18 @@
 use marked_yaml::Node;
+use rattler_build_jinja::JinjaTemplate;
 
 use crate::{
     ParseError,
     span::SpannedString,
     stage0::{
+        ConditionalList, Item, Value,
         parser::helpers::get_span,
         tests::{
             CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
             PackageContentsCheckFiles, PackageContentsTest, PerlTest, PythonTest, PythonVersion,
             RTest, RubyTest, TestType,
         },
+        types::{InlineScript, ScriptContent},
     },
 };
 
@@ -83,7 +86,7 @@ fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
 fn parse_python_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PythonTest, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     let mut imports = ConditionalList::default();
     let mut pip_check = None;
@@ -136,7 +139,7 @@ fn parse_python_version(node: &Node) -> Result<PythonVersion, ParseError> {
 fn parse_perl_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PerlTest, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     // Validate that all fields are known
     validate_mapping_fields(mapping, "perl test", &["uses"])?;
@@ -157,7 +160,7 @@ fn parse_perl_test(
 }
 
 fn parse_r_test(mapping: &marked_yaml::types::MarkedMappingNode) -> Result<RTest, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     // Validate that all fields are known
     validate_mapping_fields(mapping, "r test", &["libraries"])?;
@@ -180,7 +183,7 @@ fn parse_r_test(mapping: &marked_yaml::types::MarkedMappingNode) -> Result<RTest
 fn parse_ruby_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<RubyTest, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     // Validate that all fields are known
     validate_mapping_fields(mapping, "ruby test", &["requires"])?;
@@ -202,7 +205,7 @@ fn parse_ruby_test(
 
 fn parse_inline_script(
     mapping: &marked_yaml::types::MarkedMappingNode,
-) -> Result<crate::stage0::types::InlineScript, ParseError> {
+) -> Result<InlineScript, ParseError> {
     let mut interpreter = None;
     let mut env = indexmap::IndexMap::new();
     let mut secrets = Vec::new();
@@ -250,14 +253,11 @@ fn parse_inline_script(
 
                     // Check if it's a template
                     if content_str.contains("${{") && content_str.contains("}}") {
-                        let template =
-                            crate::stage0::types::JinjaTemplate::new(content_str.to_string())
-                                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-                        content = Some(crate::stage0::types::ConditionalList::new(vec![
-                            crate::stage0::types::Item::Value(
-                                crate::stage0::types::Value::new_template(template, spanned.span()),
-                            ),
-                        ]));
+                        let template = JinjaTemplate::new(content_str.to_string())
+                            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+                        content = Some(ConditionalList::new(vec![Item::Value(
+                            Value::new_template(template, Some(spanned.span())),
+                        )]));
                     } else {
                         // Plain string - split by newlines if multiline
                         let lines: Vec<String> = content_str
@@ -266,16 +266,14 @@ fn parse_inline_script(
                             .filter(|s| !s.trim().is_empty())
                             .collect();
 
-                        let items: Vec<crate::stage0::types::Item<String>> = lines
+                        let items: Vec<Item<String>> = lines
                             .into_iter()
                             .map(|line| {
-                                crate::stage0::types::Item::Value(
-                                    crate::stage0::types::Value::new_concrete(line, spanned.span()),
-                                )
+                                Item::Value(Value::new_concrete(line, Some(spanned.span())))
                             })
                             .collect();
 
-                        content = Some(crate::stage0::types::ConditionalList::new(items));
+                        content = Some(ConditionalList::new(items));
                     }
                 } else {
                     // Parse as a list (with possible conditionals)
@@ -296,7 +294,7 @@ fn parse_inline_script(
         }
     }
 
-    Ok(crate::stage0::types::InlineScript {
+    Ok(InlineScript {
         interpreter,
         env,
         secrets,
@@ -305,12 +303,7 @@ fn parse_inline_script(
     })
 }
 
-fn parse_script_field(
-    node: &Node,
-) -> Result<crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>, ParseError>
-{
-    use crate::stage0::types::{ConditionalList, Item, ScriptContent, Value};
-
+fn parse_script_field(node: &Node) -> Result<ConditionalList<ScriptContent>, ParseError> {
     // Try parsing as a sequence first (the standard way for multiple items)
     if node.as_sequence().is_some() {
         return parse_conditional_list(node);
@@ -323,16 +316,19 @@ fn parse_script_field(
 
         // Check if it's a template
         if script_str.contains("${{") && script_str.contains("}}") {
-            let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
+            let template = JinjaTemplate::new(script_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
+            let items = vec![Item::Value(Value::new_template(
+                template,
+                Some(spanned.span()),
+            ))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string command
         let items = vec![Item::Value(Value::new_concrete(
             ScriptContent::Command(script_str.to_string()),
-            spanned.span(),
+            Some(spanned.span()),
         ))];
         return Ok(ConditionalList::new(items));
     }
@@ -344,7 +340,7 @@ fn parse_script_field(
         let span = get_span(node);
         let items = vec![Item::Value(Value::new_concrete(
             ScriptContent::Inline(Box::new(inline_script)),
-            span,
+            Some(span),
         ))];
         return Ok(ConditionalList::new(items));
     }
@@ -360,7 +356,7 @@ fn parse_script_field(
 fn parse_commands_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTest, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     let mut script = ConditionalList::default();
     let mut requirements = None;
@@ -407,7 +403,7 @@ fn parse_commands_test(
 fn parse_commands_test_requirements(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTestRequirements, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     let mut run = ConditionalList::default();
     let mut build = ConditionalList::default();
@@ -438,7 +434,7 @@ fn parse_commands_test_requirements(
 fn parse_commands_test_files(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTestFiles, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     let mut source = ConditionalList::default();
     let mut recipe = ConditionalList::default();
@@ -571,7 +567,7 @@ fn parse_package_contents_test(
 fn parse_package_contents_check_files_flexible(
     node: &Node,
 ) -> Result<PackageContentsCheckFiles, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     // Try to parse as a mapping first (explicit format with exists/not_exists)
     if let Some(mapping) = node.as_mapping() {
@@ -600,7 +596,7 @@ fn parse_package_contents_check_files_flexible(
 fn parse_package_contents_check_files(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PackageContentsCheckFiles, ParseError> {
-    use crate::stage0::types::ConditionalList;
+    use ConditionalList;
 
     let mut exists = ConditionalList::default();
     let mut not_exists = ConditionalList::default();

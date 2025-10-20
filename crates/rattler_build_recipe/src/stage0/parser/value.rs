@@ -51,12 +51,15 @@ where
         // It's a template
         let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
             .map_err(|e| ParseError::jinja_error(e, span))?;
-        Ok(crate::stage0::types::Value::new_template(template, span))
+        Ok(crate::stage0::types::Value::new_template(
+            template,
+            Some(span),
+        ))
     } else {
         // Try to parse as concrete value
         let value = s
             .parse::<T>()
             .map_err(|e| ParseError::invalid_value(field_name, &e.to_string(), span))?;
-        Ok(crate::stage0::types::Value::new_concrete(value, span))
+        Ok(crate::stage0::types::Value::new_concrete(value, Some(span)))
     }
 }

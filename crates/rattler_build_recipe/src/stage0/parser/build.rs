@@ -65,10 +65,16 @@ fn parse_bool_or_patterns<T>(
         // Check if it's a boolean-like value
         match str_val {
             "true" | "True" | "yes" | "Yes" => {
-                return Ok(bool_variant(Value::new_concrete(true, spanned.span())));
+                return Ok(bool_variant(Value::new_concrete(
+                    true,
+                    Some(spanned.span()),
+                )));
             }
             "false" | "False" | "no" | "No" => {
-                return Ok(bool_variant(Value::new_concrete(false, spanned.span())));
+                return Ok(bool_variant(Value::new_concrete(
+                    false,
+                    Some(spanned.span()),
+                )));
             }
             _ => {
                 // If it contains ${{ }}, treat it as a template
@@ -130,7 +136,10 @@ pub(crate) fn parse_script(
             // It's a templated script - keep as is
             let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
+            let items = vec![Item::Value(Value::new_template(
+                template,
+                Some(spanned.span()),
+            ))];
             return Ok(ConditionalList::new(items));
         }
 
@@ -146,7 +155,7 @@ pub(crate) fn parse_script(
             .map(|line| {
                 Item::Value(Value::new_concrete(
                     ScriptContent::Command(line),
-                    spanned.span(),
+                    Some(spanned.span()),
                 ))
             })
             .collect();
@@ -211,7 +220,7 @@ pub(crate) fn parse_script(
                             content = Some(crate::stage0::types::ConditionalList::new(vec![
                                 crate::stage0::types::Item::Value(Value::new_template(
                                     template,
-                                    spanned.span(),
+                                    Some(spanned.span()),
                                 )),
                             ]));
                         } else {
@@ -227,7 +236,7 @@ pub(crate) fn parse_script(
                                 .map(|line| {
                                     crate::stage0::types::Item::Value(Value::new_concrete(
                                         line,
-                                        spanned.span(),
+                                        Some(spanned.span()),
                                     ))
                                 })
                                 .collect();
@@ -266,7 +275,7 @@ pub(crate) fn parse_script(
         let span = get_span(node);
         let items = vec![Item::Value(Value::new_concrete(
             ScriptContent::Inline(Box::new(inline_script)),
-            span,
+            Some(span),
         ))];
         return Ok(ConditionalList::new(items));
     }

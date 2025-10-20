@@ -24,7 +24,7 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
         if s.contains("${{") {
             let template = JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::invalid_value("sha256", &e, spanned.span()))?;
-            return Ok(Value::new_template(template, spanned.span()));
+            return Ok(Value::new_template(template, Some(spanned.span())));
         }
 
         // Otherwise parse as concrete SHA256 hash
@@ -35,7 +35,7 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
                 spanned.span(),
             )
         })?;
-        Ok(Value::new_concrete(hash, spanned.span()))
+        Ok(Value::new_concrete(hash, Some(spanned.span())))
     } else {
         Err(ParseError::expected_type(
             "scalar",
@@ -56,7 +56,7 @@ fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
         if s.contains("${{") {
             let template = JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::invalid_value("md5", &e, spanned.span()))?;
-            return Ok(Value::new_template(template, spanned.span()));
+            return Ok(Value::new_template(template, Some(spanned.span())));
         }
 
         // Otherwise parse as concrete MD5 hash
@@ -67,7 +67,7 @@ fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
                 spanned.span(),
             )
         })?;
-        Ok(Value::new_concrete(hash, spanned.span()))
+        Ok(Value::new_concrete(hash, Some(spanned.span())))
     } else {
         Err(ParseError::expected_type(
             "scalar",

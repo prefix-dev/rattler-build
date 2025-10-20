@@ -1,12 +1,13 @@
 //! Parser for multi-output recipes with staging support
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_jinja::JinjaTemplate;
 
 use crate::{
     error::{ParseError, ParseResult},
     span::SpannedString,
     stage0::{
-        Requirements,
+        Requirements, Value,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
             StagingBuild, StagingMetadata, StagingOutput,
@@ -173,19 +174,16 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
 
         // Check if it's a template
         if name_str.contains("${{") && name_str.contains("}}") {
-            let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
+            let template = JinjaTemplate::new(name_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            Some(crate::stage0::types::Value::new_template(
-                template,
-                spanned.span(),
-            ))
+            Some(Value::new_template(template, Some(spanned.span())))
         } else {
             // Parse as PackageName
             let package_name = rattler_conda_types::PackageName::try_from(name_str)
                 .map_err(|e| ParseError::invalid_value("name", &e.to_string(), spanned.span()))?;
-            Some(crate::stage0::types::Value::new_concrete(
+            Some(Value::new_concrete(
                 crate::stage0::package::PackageName(package_name),
-                spanned.span(),
+                Some(spanned.span()),
             ))
         }
     } else {
@@ -441,16 +439,16 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
 
     // Check if it's a template
     let name = if name_str.contains("${{") && name_str.contains("}}") {
-        let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
+        let template = JinjaTemplate::new(name_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-        crate::stage0::types::Value::new_template(template, spanned.span())
+        Value::new_template(template, Some(spanned.span()))
     } else {
         // Parse as PackageName
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
             .map_err(|e| ParseError::invalid_value("name", &e.to_string(), spanned.span()))?;
-        crate::stage0::types::Value::new_concrete(
+        Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
-            spanned.span(),
+            Some(spanned.span()),
         )
     };
 
@@ -572,17 +570,19 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
 
         // Check if it's a template
         if s.contains("${{") && s.contains("}}") {
-            let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
+            let template = JinjaTemplate::new(s.to_string())
                 .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            return Ok(Inherit::CacheName(
-                crate::stage0::types::Value::new_template(template, spanned.span()),
-            ));
+            return Ok(Inherit::CacheName(Value::new_template(
+                template,
+                Some(spanned.span()),
+            )));
         }
 
         // Plain string
-        return Ok(Inherit::CacheName(
-            crate::stage0::types::Value::new_concrete(s.to_string(), spanned.span()),
-        ));
+        return Ok(Inherit::CacheName(Value::new_concrete(
+            s.to_string(),
+            Some(spanned.span()),
+        )));
     }
 
     // Check for mapping (long form with options)

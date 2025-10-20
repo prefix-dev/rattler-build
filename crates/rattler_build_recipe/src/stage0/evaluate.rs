@@ -9,6 +9,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
+use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::{
     ErrorKind, ParseError, Span,
@@ -74,7 +75,7 @@ use rattler_build_jinja::Jinja;
 fn render_template(
     template: &str,
     context: &EvaluationContext,
-    span: &Span,
+    span: Option<&Span>,
 ) -> Result<String, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
@@ -132,7 +133,7 @@ fn render_template(
 
             Err(ParseError {
                 kind: ErrorKind::JinjaError,
-                span: *span,
+                span: span.map_or_else(|| Span::unknown(), |s| *s),
                 message: Some(format!(
                     "Template rendering failed: {} (template: {})",
                     e, template
@@ -204,7 +205,9 @@ pub fn evaluate_string_value(
 ) -> Result<String, ParseError> {
     match value {
         Value::Concrete { value: s, .. } => Ok(s.clone()),
-        Value::Template { template, span } => render_template(template.source(), context, span),
+        Value::Template { template, span } => {
+            render_template(template.source(), context, span.as_ref())
+        }
     }
 }
 
@@ -215,7 +218,9 @@ pub fn evaluate_value_to_string<T: ToString>(
 ) -> Result<String, ParseError> {
     match value {
         Value::Concrete { value: v, .. } => Ok(v.to_string()),
-        Value::Template { template, span } => render_template(template.source(), context, span),
+        Value::Template { template, span } => {
+            render_template(template.source(), context, span.as_ref())
+        }
     }
 }
 
@@ -319,7 +324,7 @@ pub fn evaluate_glob_vec_simple(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span(),
+                            span: value.span().unwrap_or_else(Span::unknown),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
                         });
@@ -342,7 +347,7 @@ pub fn evaluate_glob_vec_simple(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span(),
+                                    span: val.span().unwrap_or_else(Span::unknown),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -388,7 +393,7 @@ pub fn evaluate_glob_vec(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span(),
+                            span: value.span().unwrap_or_else(Span::unknown),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
                         });
@@ -411,7 +416,7 @@ pub fn evaluate_glob_vec(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span(),
+                                    span: val.span().unwrap_or_else(Span::unknown),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -437,7 +442,7 @@ pub fn evaluate_glob_vec(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span(),
+                            span: value.span().unwrap_or_else(Span::unknown),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax.".to_string()),
                         });
@@ -460,7 +465,7 @@ pub fn evaluate_glob_vec(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span(),
+                                    span: val.span().unwrap_or_else(Span::unknown),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -497,11 +502,11 @@ pub fn evaluate_entry_point_list(
         match val {
             Value::Concrete { value: ep, .. } => Ok(ep.clone()),
             Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
+                let s = render_template(template.source(), context, span.as_ref())?;
                 s.parse::<rattler_conda_types::package::EntryPoint>()
                     .map_err(|e| ParseError {
                         kind: ErrorKind::InvalidValue,
-                        span: *span,
+                        span: span.unwrap_or_else(Span::unknown),
                         message: Some(format!("Invalid entry point '{}': {}", s, e)),
                         suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
                     })
@@ -564,7 +569,7 @@ pub fn evaluate_dependency_list(
                     }
                     Value::Template { template, span } => {
                         // Template - need to render and parse
-                        let s = render_template(template.source(), context, span)?;
+                        let s = render_template(template.source(), context, span.as_ref())?;
 
                         // Filter out empty strings from templates like `${{ "numpy" if unix }}`
                         if s.is_empty() {
@@ -577,7 +582,7 @@ pub fn evaluate_dependency_list(
                             let dep: Dependency =
                                 serde_yaml::from_str(&s).map_err(|e| ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: *span,
+                                    span: span.unwrap_or_else(Span::unknown),
                                     message: Some(format!("Failed to parse pin dependency: {}", e)),
                                     suggestion: None,
                                 })?;
@@ -588,7 +593,7 @@ pub fn evaluate_dependency_list(
                                 MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
                                     ParseError {
                                         kind: ErrorKind::InvalidValue,
-                                        span: *span,
+                                        span: span.unwrap_or_else(Span::unknown),
                                         message: Some(format!("Invalid match spec '{}': {}", s, e)),
                                         suggestion: None,
                                     }
@@ -616,7 +621,7 @@ pub fn evaluate_dependency_list(
                             }
                             Value::Template { template, span } => {
                                 // Render the template and parse as matchspec
-                                let s = render_template(template.source(), context, span)?;
+                                let s = render_template(template.source(), context, span.as_ref())?;
 
                                 // Filter out empty strings
                                 if s.is_empty() {
@@ -626,7 +631,7 @@ pub fn evaluate_dependency_list(
                                 let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
                                     .map_err(|e| ParseError {
                                         kind: ErrorKind::InvalidValue,
-                                        span: *span,
+                                        span: span.unwrap_or_else(Span::unknown),
                                         message: Some(format!("Invalid match spec '{}': {}", s, e)),
                                         suggestion: None,
                                     })?;
@@ -825,7 +830,7 @@ pub fn evaluate_bool_value(
     match value {
         Value::Concrete { value: b, .. } => Ok(*b),
         Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span)?;
+            let s = render_template(template.source(), context, span.as_ref())?;
             parse_bool_from_str(&s, field_name)
         }
     }
@@ -844,6 +849,153 @@ where
     match opt {
         None => Ok(T::default()),
         Some(v) => v.evaluate(context),
+    }
+}
+
+/// Generic helper to evaluate a Value<T> where T implements FromStr
+/// This handles both concrete values and templates
+pub fn evaluate_value<T>(
+    value: &Value<T>,
+    context: &EvaluationContext,
+    type_name: &str,
+) -> Result<T, ParseError>
+where
+    T: ToString + FromStr,
+    T::Err: std::fmt::Display,
+{
+    match value {
+        Value::Concrete { value: v, .. } => Ok(v.to_string().parse().map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: Span::unknown(),
+            message: Some(format!("Failed to parse {}: {}", type_name, e)),
+            suggestion: None,
+        })?),
+        Value::Template { template, span } => {
+            let s = render_template(template.source(), context, span.as_ref())?;
+            s.parse().map_err(|e| ParseError {
+                kind: ErrorKind::InvalidValue,
+                span: span.unwrap_or_else(Span::unknown),
+                message: Some(format!("Invalid {} '{}': {}", type_name, s, e)),
+                suggestion: None,
+            })
+        }
+    }
+}
+
+/// Generic helper to evaluate an Option<Value<T>> where T implements FromStr
+pub fn evaluate_optional_value<T>(
+    value: &Option<Value<T>>,
+    context: &EvaluationContext,
+    type_name: &str,
+) -> Result<Option<T>, ParseError>
+where
+    T: ToString + FromStr,
+    T::Err: std::fmt::Display,
+{
+    match value {
+        None => Ok(None),
+        Some(v) => evaluate_value(v, context, type_name).map(Some),
+    }
+}
+
+// Implement Evaluate for Value<T> where T is a foreign type
+// This is allowed because Value is our local type (orphan rule doesn't apply)
+
+impl Evaluate for Value<url::Url> {
+    type Output = url::Url;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        match self {
+            Value::Concrete { value: u, .. } => Ok(u.clone()),
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span.as_ref())?;
+                url::Url::parse(&s).map_err(|e| ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: span.unwrap_or_else(Span::unknown),
+                    message: Some(format!("Invalid URL '{}': {}", s, e)),
+                    suggestion: None,
+                })
+            }
+        }
+    }
+}
+
+impl Evaluate for Value<License> {
+    type Output = License;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        match self {
+            Value::Concrete { value: license, .. } => Ok(license.clone()),
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span.as_ref())?;
+                s.parse::<License>().map_err(|e| ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: span.unwrap_or_else(Span::unknown),
+                    message: Some(format!("Invalid SPDX license expression: {}", e)),
+                    suggestion: None,
+                })
+            }
+        }
+    }
+}
+
+impl Evaluate for Value<PathBuf> {
+    type Output = PathBuf;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        match self {
+            Value::Concrete { value: p, .. } => Ok(p.clone()),
+            Value::Template { template, span } => {
+                let s = render_template(template.source(), context, span.as_ref())?;
+                Ok(PathBuf::from(s))
+            }
+        }
+    }
+}
+
+// Note: We can't implement Evaluate for Value<Sha256Hash> and Value<Md5Hash>
+// because they are both type aliases to GenericArray<u8, N>, which would create
+// conflicting implementations. We use helper functions instead.
+
+/// Evaluate a Sha256Hash from a Value
+fn evaluate_sha256(
+    value: &Value<Sha256Hash>,
+    context: &EvaluationContext,
+) -> Result<Sha256Hash, ParseError> {
+    match value {
+        Value::Concrete { value: hash, .. } => Ok(*hash),
+        Value::Template { template, span } => {
+            let s = render_template(template.source(), context, span.as_ref())?;
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+                ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: span.unwrap_or_else(Span::unknown),
+                    message: Some(format!("Invalid SHA256 checksum: {}", s)),
+                    suggestion: None,
+                }
+            })
+        }
+    }
+}
+
+/// Evaluate an Md5Hash from a Value
+fn evaluate_md5(
+    value: &Value<Md5Hash>,
+    context: &EvaluationContext,
+) -> Result<Md5Hash, ParseError> {
+    match value {
+        Value::Concrete { value: hash, .. } => Ok(*hash),
+        Value::Template { template, span } => {
+            let s = render_template(template.source(), context, span.as_ref())?;
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
+                ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: span.unwrap_or_else(Span::unknown),
+                    message: Some(format!("Invalid MD5 checksum: {}", s)),
+                    suggestion: None,
+                }
+            })
+        }
     }
 }
 
@@ -936,52 +1088,27 @@ impl Evaluate for Stage0About {
     type Output = Stage1About;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Helper to evaluate a URL field
-        let evaluate_url = |field_name: &str,
-                            value: &Option<Value<url::Url>>|
-         -> Result<Option<url::Url>, ParseError> {
-            match value {
-                None => Ok(None),
-                Some(v) => {
-                    let s = evaluate_value_to_string(v, context)?;
-                    Some(url::Url::parse(&s).map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
-                        message: Some(format!("Invalid URL for {}: {}", field_name, e)),
-                        suggestion: None,
-                    }))
-                    .transpose()
-                }
-            }
-        };
-
-        // Evaluate URL fields
-        let homepage = evaluate_url("homepage", &self.homepage)?;
-        let repository = evaluate_url("repository", &self.repository)?;
-        let documentation = evaluate_url("documentation", &self.documentation)?;
-
-        // Evaluate license as spdx::Expression (unwrap from License wrapper)
-        let license = match &self.license {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: license, .. } => Some(license.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(s.parse::<License>().map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: *span,
-                        message: Some(format!("Invalid SPDX license expression: {}", e)),
-                        suggestion: None,
-                    })?)
-                }
-            },
-        };
-
         Ok(Stage1About {
-            homepage,
-            repository,
-            documentation,
-            license,
+            homepage: self
+                .homepage
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            repository: self
+                .repository
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            documentation: self
+                .documentation
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            license: self
+                .license
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
             license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
@@ -1092,14 +1219,14 @@ impl Evaluate for Stage0PrefixDetection {
                 let bool_val = match val {
                     Value::Concrete { value: b, .. } => *b,
                     Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span)?;
+                        let s = render_template(template.source(), context, span.as_ref())?;
                         match s.as_str() {
                             "true" | "True" | "yes" | "Yes" => true,
                             "false" | "False" | "no" | "No" => false,
                             _ => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: *span,
+                                    span: span.unwrap_or_else(Span::unknown),
                                     message: Some(format!(
                                         "Invalid boolean value for prefix_detection.ignore: '{}'",
                                         s
@@ -1157,14 +1284,14 @@ impl Evaluate for Stage0DynamicLinking {
                 let bool_val = match val {
                     Value::Concrete { value: b, .. } => *b,
                     Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span)?;
+                        let s = render_template(template.source(), context, span.as_ref())?;
                         match s.as_str() {
                             "true" | "True" | "yes" | "Yes" => true,
                             "false" | "False" | "no" | "No" => false,
                             _ => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: *span,
+                                    span: span.unwrap_or_else(Span::unknown),
                                     message: Some(format!(
                                         "Invalid boolean value for binary_relocation: '{}'",
                                         s
@@ -1308,10 +1435,10 @@ impl Evaluate for Stage0Build {
         let number = match &self.number {
             Value::Concrete { value: n, .. } => *n,
             Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
+                let s = render_template(template.source(), context, span.as_ref())?;
                 s.parse::<u64>().map_err(|_| ParseError {
                     kind: ErrorKind::InvalidValue,
-                    span: *span,
+                    span: span.unwrap_or_else(Span::unknown),
                     message: Some(format!(
                         "Invalid build number: '{}' is not a valid positive integer",
                         s
@@ -1389,40 +1516,25 @@ impl Evaluate for Stage0GitSource {
             Stage1GitRev::default()
         };
 
-        // Evaluate depth
-        let depth = evaluate_optional_value_to_type(&self.depth, context)?;
-
-        // Evaluate patches (flatten conditionals and convert to PathBuf)
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate lfs flag
-        let lfs = match &self.lfs {
-            None => false,
-            Some(v) => evaluate_bool_value(v, context, "lfs")?,
-        };
-
         Ok(Stage1GitSource {
             url,
             rev,
-            depth,
-            patches,
-            target_directory,
-            lfs,
+            depth: evaluate_optional_value_to_type(&self.depth, context)?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            lfs: self
+                .lfs
+                .as_ref()
+                .map(|v| evaluate_bool_value(v, context, "lfs"))
+                .transpose()?
+                .unwrap_or(false),
         })
     }
 }
@@ -1431,7 +1543,7 @@ impl Evaluate for Stage0UrlSource {
     type Output = Stage1UrlSource;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate URLs and parse into url::Url
+        // Evaluate URLs (they are Value<String>) and parse into url::Url
         let mut urls = Vec::new();
         for url_value in &self.url {
             let url_str = evaluate_string_value(url_value, context)?;
@@ -1444,70 +1556,28 @@ impl Evaluate for Stage0UrlSource {
             urls.push(url);
         }
 
-        // Evaluate checksum fields separately (both can be set)
-        // For hash types, we can just extract the concrete value or evaluate templates
-        let sha256 = match &self.sha256 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let sha256_str = render_template(template.source(), context, span)?;
-                let sha256_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
-                            suggestion: None,
-                        })?;
-                Some(sha256_hash)
-            }
-        };
-
-        let md5 = match &self.md5 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let md5_str = render_template(template.source(), context, span)?;
-                let md5_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
-                            suggestion: None,
-                        })?;
-                Some(md5_hash)
-            }
-        };
-
-        // Evaluate file_name
-        let file_name = evaluate_optional_string_value(&self.file_name, context)?;
-
-        // Evaluate patches
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
         Ok(Stage1UrlSource {
             url: urls,
-            sha256,
-            md5,
-            file_name,
-            patches,
-            target_directory,
+            sha256: self
+                .sha256
+                .as_ref()
+                .map(|v| evaluate_sha256(v, context))
+                .transpose()?,
+            md5: self
+                .md5
+                .as_ref()
+                .map(|v| evaluate_md5(v, context))
+                .transpose()?,
+            file_name: evaluate_optional_string_value(&self.file_name, context)?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
         })
     }
 }
@@ -1516,93 +1586,34 @@ impl Evaluate for Stage0PathSource {
     type Output = Stage1PathSource;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate path
-        let path = match &self.path {
-            Value::Concrete { value: p, .. } => p.clone(),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
-                PathBuf::from(s)
-            }
-        };
-
-        // Evaluate checksum fields separately (both can be set)
-        // For hash types, we can just extract the concrete value or evaluate templates
-        let sha256 = match &self.sha256 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let sha256_str = render_template(template.source(), context, span)?;
-                let sha256_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
-                            suggestion: None,
-                        })?;
-                Some(sha256_hash)
-            }
-        };
-
-        let md5 = match &self.md5 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let md5_str = render_template(template.source(), context, span)?;
-                let md5_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
-                            suggestion: None,
-                        })?;
-                Some(md5_hash)
-            }
-        };
-
-        // Evaluate patches
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate file_name
-        let file_name = match &self.file_name {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate filter and convert to GlobVec (handle both list and include/exclude variants)
-        let filter = evaluate_glob_vec(&self.filter, context)?;
-
         Ok(Stage1PathSource {
-            path,
-            sha256,
-            md5,
-            patches,
-            target_directory,
-            file_name,
+            path: self.path.evaluate(context)?,
+            sha256: self
+                .sha256
+                .as_ref()
+                .map(|v| evaluate_sha256(v, context))
+                .transpose()?,
+            md5: self
+                .md5
+                .as_ref()
+                .map(|v| evaluate_md5(v, context))
+                .transpose()?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            file_name: self
+                .file_name
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
             use_gitignore: self.use_gitignore,
-            filter,
+            filter: evaluate_glob_vec(&self.filter, context)?,
         })
     }
 }
@@ -1626,12 +1637,12 @@ impl Evaluate for Stage0PythonVersion {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         // Helper to validate a python version spec by attempting to create a MatchSpec
-        let validate_version = |version_str: &str, span: &Span| -> Result<(), ParseError> {
+        let validate_version = |version_str: &str, span: Option<&Span>| -> Result<(), ParseError> {
             let spec_str = format!("python={}", version_str);
             MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
                 ParseError {
                     kind: ErrorKind::InvalidValue,
-                    span: *span,
+                    span: span.cloned().unwrap_or(Span::unknown()),
                     message: Some(format!(
                         "Invalid python version spec '{}': {}",
                         version_str, e
@@ -1648,14 +1659,14 @@ impl Evaluate for Stage0PythonVersion {
         match self {
             Stage0PythonVersion::Single(v) => {
                 let evaluated = evaluate_string_value(v, context)?;
-                validate_version(&evaluated, &v.span())?;
+                validate_version(&evaluated, v.span().as_ref())?;
                 Ok(Stage1PythonVersion::Single(evaluated))
             }
             Stage0PythonVersion::Multiple(versions) => {
                 let mut evaluated = Vec::new();
                 for v in versions {
                     let version_str = evaluate_string_value(v, context)?;
-                    validate_version(&version_str, &v.span())?;
+                    validate_version(&version_str, v.span().as_ref())?;
                     evaluated.push(version_str);
                 }
                 Ok(Stage1PythonVersion::Multiple(evaluated))
@@ -1883,13 +1894,13 @@ mod tests {
         ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let result = render_template(template, &ctx, None).unwrap();
         assert_eq!(result, "foo-1.0.0");
     }
 
     #[test]
     fn test_evaluate_string_value_concrete() {
-        let value = Value::new_concrete("hello".to_string(), Span::unknown());
+        let value = Value::new_concrete("hello".to_string(), None);
         let ctx = EvaluationContext::new();
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
@@ -1900,7 +1911,7 @@ mod tests {
     fn test_evaluate_string_value_template() {
         let value = Value::new_template(
             JinjaTemplate::new("${{ greeting }}, ${{ name }}!".to_string()).unwrap(),
-            Span::unknown(),
+            None,
         );
 
         let mut ctx = EvaluationContext::new();
@@ -1914,8 +1925,8 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_simple() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::new_concrete("gcc".to_string(), Span::unknown())),
-            Item::Value(Value::new_concrete("make".to_string(), Span::unknown())),
+            Item::Value(Value::new_concrete("gcc".to_string(), None)),
+            Item::Value(Value::new_concrete("make".to_string(), None)),
         ]);
 
         let ctx = EvaluationContext::new();
@@ -1926,16 +1937,13 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_with_conditional() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::new_concrete("python".to_string(), Span::unknown())),
+            Item::Value(Value::new_concrete("python".to_string(), None)),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
-                then: ListOrItem::new(vec![Value::new_concrete(
-                    "gcc".to_string(),
-                    Span::unknown(),
-                )]),
+                then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
                 else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                     "msvc".to_string(),
-                    Span::unknown(),
+                    None,
                 )])),
             }),
         ]);
@@ -1965,7 +1973,7 @@ mod tests {
 
         // Render a template that uses name and version
         let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let result = render_template(template, &ctx, None).unwrap();
         assert_eq!(result, "foo-1.0.0");
 
         // After rendering, name and version should be tracked, but not unused
@@ -1985,13 +1993,10 @@ mod tests {
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
-            then: ListOrItem::new(vec![Value::new_concrete(
-                "gcc".to_string(),
-                Span::unknown(),
-            )]),
+            then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
             else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                 "msvc".to_string(),
-                Span::unknown(),
+                None,
             )])),
         })]);
 
@@ -2016,15 +2021,12 @@ mod tests {
         let list = ConditionalList::new(vec![
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
-            Item::Value(Value::new_concrete(
-                "static-dep".to_string(),
-                Span::unknown(),
-            )),
+            Item::Value(Value::new_concrete("static-dep".to_string(), None)),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ version }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
         ]);
 
@@ -2044,7 +2046,7 @@ mod tests {
 
         // Render a template
         let template = "${{ name }}";
-        let _result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let _result = render_template(template, &ctx, None).unwrap();
 
         // Variable should be tracked
         assert!(ctx.accessed_variables().contains("name"));
@@ -2062,7 +2064,7 @@ mod tests {
         // No variables set
 
         let template = "${{ platform }} for ${{ arch }}";
-        let result = render_template(template, &ctx, &Span::unknown());
+        let result = render_template(template, &ctx, None);
 
         assert!(result.is_err());
 
@@ -2087,7 +2089,7 @@ mod tests {
         // No variables set
 
         let template = "${{ platform }} for ${{ arch }}";
-        let result = render_template(template, &ctx, &Span::unknown());
+        let result = render_template(template, &ctx, None);
 
         assert!(result.is_ok());
         assert!(result.unwrap() == " for ");

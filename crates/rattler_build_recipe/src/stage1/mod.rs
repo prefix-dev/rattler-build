@@ -299,11 +299,11 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), None),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete(Variable::from("1.0.0"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("1.0.0"), None),
         );
 
         let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
@@ -326,13 +326,13 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), None),
         );
         context_vars.insert(
             "full_name".to_string(),
             Value::new_template(
                 JinjaTemplate::new("${{ base }}/${{ name }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             ),
         );
 
@@ -358,24 +358,24 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), None),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete(Variable::from("1.0.0"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("1.0.0"), None),
         );
         context_vars.insert(
             "package_version".to_string(),
             Value::new_template(
                 JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             ),
         );
         context_vars.insert(
             "full_id".to_string(),
             Value::new_template(
                 JinjaTemplate::new("pkg:${{ package_version }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             ),
         );
 
@@ -402,17 +402,17 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), None),
         );
         context_vars.insert(
             "version".to_string(),
-            Value::new_concrete(Variable::from("2.0.0"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("2.0.0"), None),
         );
         context_vars.insert(
             "package_version".to_string(),
             Value::new_template(
                 JinjaTemplate::new("${{ name }}-${{ version }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             ),
         );
 
@@ -435,13 +435,13 @@ mod unit_tests {
         let mut context_vars = indexmap::IndexMap::new();
         context_vars.insert(
             "name".to_string(),
-            Value::new_concrete(Variable::from("mypackage"), crate::span::Span::unknown()),
+            Value::new_concrete(Variable::from("mypackage"), None),
         );
         context_vars.insert(
             "full_name".to_string(),
             Value::new_template(
                 JinjaTemplate::new("${{ name }}-${{ platform }}".to_string()).unwrap(),
-                crate::span::Span::unknown(),
+                None,
             ),
         );
 

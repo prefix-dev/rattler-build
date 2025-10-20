@@ -235,18 +235,30 @@ impl Recipe {
 impl SingleOutputRecipe {
     /// Get all used variables in this single-output recipe
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.package.used_variables();
-        vars.extend(self.build.used_variables());
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.about.used_variables());
-        vars.extend(self.extra.used_variables());
-        for src in &self.source {
+        let SingleOutputRecipe {
+            schema_version: _,
+            context,
+            package,
+            build,
+            requirements,
+            about,
+            extra,
+            source,
+            tests,
+        } = self;
+
+        let mut vars = package.used_variables();
+        vars.extend(build.used_variables());
+        vars.extend(requirements.used_variables());
+        vars.extend(about.used_variables());
+        vars.extend(extra.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
         }
-        for test in &self.tests {
+        for test in tests {
             vars.extend(test.used_variables());
         }
-        for value in self.context.values() {
+        for value in context.values() {
             vars.extend(value.used_variables());
         }
         vars.sort();
@@ -263,29 +275,42 @@ impl SingleOutputRecipe {
 impl MultiOutputRecipe {
     /// Get all used variables across recipe and all outputs
     pub fn used_variables(&self) -> Vec<String> {
+        let MultiOutputRecipe {
+            schema_version: _,
+            context,
+            recipe,
+            source,
+            build,
+            about,
+            extra,
+            outputs,
+        } = self;
+
         let mut vars = Vec::new();
 
         // Top-level variables
-        if let Some(name) = &self.recipe.name {
+        let RecipeMetadata { name, version } = recipe;
+
+        if let Some(name) = name {
             vars.extend(name.used_variables());
         }
-        if let Some(version) = &self.recipe.version {
+        if let Some(version) = version {
             vars.extend(version.used_variables());
         }
-        vars.extend(self.build.used_variables());
-        vars.extend(self.about.used_variables());
-        vars.extend(self.extra.used_variables());
-        for src in &self.source {
+        vars.extend(build.used_variables());
+        vars.extend(about.used_variables());
+        vars.extend(extra.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
         }
 
         // Context variables
-        for value in self.context.values() {
+        for value in context.values() {
             vars.extend(value.used_variables());
         }
 
         // Output variables
-        for output in &self.outputs {
+        for output in outputs {
             vars.extend(output.used_variables());
         }
 
@@ -330,12 +355,21 @@ impl Output {
 impl StagingOutput {
     /// Get all used variables in this staging output
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.staging.name.used_variables();
-        for src in &self.source {
+        let StagingOutput {
+            staging,
+            source,
+            requirements,
+            build,
+        } = self;
+
+        let StagingMetadata { name } = staging;
+
+        let mut vars = name.used_variables();
+        for src in source {
             vars.extend(src.used_variables());
         }
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.build.used_variables());
+        vars.extend(requirements.used_variables());
+        vars.extend(build.used_variables());
         vars.sort();
         vars.dedup();
         vars
@@ -350,15 +384,25 @@ impl StagingOutput {
 impl PackageOutput {
     /// Get all used variables in this package output
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.package.used_variables();
-        vars.extend(self.inherit.used_variables());
-        for src in &self.source {
+        let PackageOutput {
+            package,
+            inherit,
+            source,
+            requirements,
+            build,
+            about,
+            tests,
+        } = self;
+
+        let mut vars = package.used_variables();
+        vars.extend(inherit.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
         }
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.build.used_variables());
-        vars.extend(self.about.used_variables());
-        for test in &self.tests {
+        vars.extend(requirements.used_variables());
+        vars.extend(build.used_variables());
+        vars.extend(about.used_variables());
+        for test in tests {
             vars.extend(test.used_variables());
         }
         vars.sort();
