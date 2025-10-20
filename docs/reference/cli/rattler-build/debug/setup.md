@@ -26,6 +26,8 @@ rattler-build debug setup [OPTIONS]
 <br>May be provided more than once.
 - <a id="arg---output-name" href="#arg---output-name">`--output-name <OUTPUT_NAME>`</a>
 :  Name of the specific output to debug (only required when a recipe has multiple outputs)
+- <a id="arg---test" href="#arg---test">`--test <TEST>`</a>
+:  Run tests in debug mode. Optionally specify test index to run a specific test (default: run all tests)
 - <a id="arg---variant-config" href="#arg---variant-config">`--variant-config (-m) <VARIANT_CONFIG>`</a>
 :  Variant configuration files for the build
 <br>May be provided more than once.

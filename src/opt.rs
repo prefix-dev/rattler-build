@@ -200,6 +200,13 @@ pub struct DebugSetupOpts {
     #[arg(long)]
     pub output_name: Option<String>,
 
+    /// Run tests in debug mode, optionally selecting a test index.
+    #[arg(
+        long,
+        help = "Run tests in debug mode. Optionally specify test index to run a specific test (default: run all tests)"
+    )]
+    pub test: Option<Option<usize>>,
+
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     pub variant_config: Option<Vec<PathBuf>>,
@@ -1283,6 +1290,10 @@ pub struct DebugData {
     pub variant_overrides: HashMap<String, Vec<String>>,
     /// Whether to ignore recipe variants
     pub ignore_recipe_variants: bool,
+    /// Whether test mode is enabled
+    pub test_mode: bool,
+    /// Test index to run in debug mode. None means run all tests, Some(n) means run test n.
+    pub test_index: Option<usize>,
 }
 
 impl DebugData {
@@ -1307,6 +1318,8 @@ impl DebugData {
             variant_config: opts.variant_config.unwrap_or_default(),
             variant_overrides: opts.variant_overrides.into_iter().collect(),
             ignore_recipe_variants: opts.ignore_recipe_variants,
+            test_mode: opts.test.is_some(), // true if --test flag was provided
+            test_index: opts.test.flatten(), // None = all tests, Some(n) = specific test
         }
     }
 }
