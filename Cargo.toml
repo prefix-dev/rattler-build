@@ -51,7 +51,7 @@ default-run = "rattler-build"
 rust-version = "1.86.0"
 
 [features]
-default = ['rustls-tls', 'recipe-generation']
+default = ['rustls-tls', 'recipe-generation', 's3']
 native-tls = [
   'reqwest/native-tls',
   'rattler/native-tls',
@@ -74,6 +74,10 @@ tui = [
   'ansi-to-tui',
   'throbber-widgets-tui',
   'tui-input',
+]
+s3 = [
+  'rattler_networking/s3',
+  'rattler_upload/s3',
 ]
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
@@ -171,9 +175,6 @@ reflink-copy = "0.1.26"
 rayon = "1.11.0"
 regex = { workspace = true }
 async-recursion = { workspace = true }
-opendal = { version = "0.54.0", default-features = false, features = [
-  "services-s3",
-] }
 
 # Rattler crates
 rattler_config = { version = "0.2.11" }
@@ -186,12 +187,9 @@ rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
 rattler_index = { version = "0.25.5", default-features = false }
 rattler_networking = { version = "0.25.16", default-features = false, features = [
-  "s3",
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.4", default-features = false, features = [
-  "s3",
-] }
+rattler_upload = { version = "0.3.4", default-features = false }
 rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
