@@ -56,8 +56,7 @@ use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_build_recipe::{
     stage0,
-    stage1::Dependency,
-    stage1::Recipe,
+    stage1::{Dependency, Recipe, TestType},
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
 use rattler_build_variant_config::VariantConfig;
@@ -584,26 +583,25 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 
     // Also check that for all script tests
     for test in output.recipe.tests() {
-        // TODO: implement this properly
-        // if let TestType::Command(command) = test {
-        //     for dep in command
-        //         .requirements
-        //         .build
-        //         .iter()
-        //         .chain(command.requirements.run.iter())
-        //     {
-        //         let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-        //         if all_output_names
-        //             .iter()
-        //             .any(|o| Some(*o) == dep_spec.name.as_ref())
-        //         {
-        //             // this dependency might not be built yet
-        //             if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
-        //                 return false;
-        //             }
-        //         }
-        //     }
-        // }
+        if let TestType::Commands(command) = test {
+            for dep in command
+                .requirements
+                .build
+                .iter()
+                .chain(command.requirements.run.iter())
+            {
+                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
+                if all_output_names
+                    .iter()
+                    .any(|o| Some(*o) == dep_spec.name.as_ref())
+                {
+                    // this dependency might not be built yet
+                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+                        return false;
+                    }
+                }
+            }
+        }
     }
 
     true

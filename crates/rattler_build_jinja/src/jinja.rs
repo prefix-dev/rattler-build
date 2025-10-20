@@ -22,6 +22,7 @@ use crate::variable::Variable;
 pub use minijinja::UndefinedBehavior;
 
 /// Configuration for Jinja template rendering in rattler-build
+/// TODO(refactor): think about splitting this type?
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
     /// The target platform for the build
@@ -803,6 +804,9 @@ fn set_jinja(config: &JinjaConfig) -> minijinja::Environment<'static> {
 
     if let Some(hash) = hash {
         env.add_global("hash", Value::from(hash));
+    } else {
+        // TODO(refactor): fix when we use `hash` in build string
+        env.add_global("hash", Value::from("undefined"));
     }
 
     env
