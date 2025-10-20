@@ -148,17 +148,53 @@ fn evaluate_condition(
     expr: &JinjaExpression,
     context: &EvaluationContext,
 ) -> Result<bool, ParseError> {
-    // For now, simple variable existence check
-    // This should be expanded to support full boolean expressions
-    let expr_str = expr.source().trim();
+    // Create a Jinja instance with the configuration from the evaluation context
+    let jinja_config = context.jinja_config().clone();
+    let mut jinja = Jinja::new(jinja_config);
 
-    // Check for "not" prefix
-    if let Some(rest) = expr_str.strip_prefix("not ") {
-        return Ok(!context.contains(rest.trim()));
+    // Use with_context to add all variables from the evaluation context
+    jinja = jinja.with_context(context.variables());
+
+    // Evaluate the expression to get its value
+    let value = jinja.eval(expr.source()).map_err(|e| ParseError {
+        kind: ErrorKind::JinjaError,
+        span: Span::unknown(),
+        message: Some(format!(
+            "Failed to evaluate condition '{}': {}",
+            expr.source(),
+            e
+        )),
+        suggestion: None,
+    })?;
+
+    // Transfer the tracked variables from Jinja to EvaluationContext
+    for var in jinja.accessed_variables() {
+        context.track_access(&var);
     }
 
-    // Simple variable existence
-    Ok(context.contains(expr_str))
+    // Check for undefined variables and error out
+    let undefined_vars = jinja.undefined_variables();
+    for var in &undefined_vars {
+        context.track_undefined(var);
+    }
+
+    if !undefined_vars.is_empty() {
+        return Err(ParseError {
+            kind: ErrorKind::JinjaError,
+            span: Span::unknown(),
+            message: Some(format!(
+                "Undefined variable(s) in condition '{}': {}",
+                expr.source(),
+                undefined_vars.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
+            )),
+            suggestion: Some(
+                "Make sure all variables used in conditions are defined in the variant config or context".to_string()
+            ),
+        });
+    }
+
+    // Convert the minijinja Value to a boolean using Jinja's truthiness rules
+    Ok(value.is_true())
 }
 
 /// Evaluate a Value<String> into a String
@@ -1589,14 +1625,38 @@ impl Evaluate for Stage0PythonVersion {
     type Output = Stage1PythonVersion;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Helper to validate a python version spec by attempting to create a MatchSpec
+        let validate_version = |version_str: &str, span: &Span| -> Result<(), ParseError> {
+            let spec_str = format!("python={}", version_str);
+            MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
+                ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: *span,
+                    message: Some(format!(
+                        "Invalid python version spec '{}': {}",
+                        version_str, e
+                    )),
+                    suggestion: Some(
+                        "Python version must be a valid version constraint (e.g., '3.8', '>=3.7', '3.8.*')"
+                            .to_string(),
+                    ),
+                }
+            })?;
+            Ok(())
+        };
+
         match self {
-            Stage0PythonVersion::Single(v) => Ok(Stage1PythonVersion::Single(
-                evaluate_string_value(v, context)?,
-            )),
+            Stage0PythonVersion::Single(v) => {
+                let evaluated = evaluate_string_value(v, context)?;
+                validate_version(&evaluated, &v.span())?;
+                Ok(Stage1PythonVersion::Single(evaluated))
+            }
             Stage0PythonVersion::Multiple(versions) => {
                 let mut evaluated = Vec::new();
                 for v in versions {
-                    evaluated.push(evaluate_string_value(v, context)?);
+                    let version_str = evaluate_string_value(v, context)?;
+                    validate_version(&version_str, &v.span())?;
+                    evaluated.push(version_str);
                 }
                 Ok(Stage1PythonVersion::Multiple(evaluated))
             }
@@ -1886,8 +1946,9 @@ mod tests {
         let result = evaluate_string_list(&list, &ctx).unwrap();
         assert_eq!(result, vec!["python", "gcc"]);
 
-        // Test with unix not set
-        let ctx2 = EvaluationContext::new();
+        // Test with unix set to false
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(false));
         let result2 = evaluate_string_list(&list, &ctx2).unwrap();
         assert_eq!(result2, vec!["python", "msvc"]);
     }

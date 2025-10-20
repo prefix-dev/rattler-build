@@ -126,6 +126,7 @@ impl std::hash::Hash for DiscoveredOutput {
 /// Find all variants from the recipe and variant config
 fn find_variants(
     variant_config: &VariantConfig,
+    recipe_path: &std::path::Path,
     recipe_content: &str,
     target_platform: Platform,
     _build_platform: Platform,
@@ -166,7 +167,14 @@ fn find_variants(
         variant_config,
         render_config,
     )
-    .map_err(|e| miette::miette!("Failed to render recipe with variants: {}", e))?;
+    .map_err(|e| {
+        let source = miette::NamedSource::new(
+            recipe_path.display().to_string(),
+            recipe_content.to_string(),
+        );
+        miette::Report::new(e).with_source_code(source)
+    })
+    .wrap_err("Failed to render recipe with variants")?;
 
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();
@@ -370,6 +378,7 @@ pub async fn get_build_output(
 
     let outputs_and_variants = find_variants(
         &variant_config,
+        &recipe_path,
         &recipe_content,
         build_data.target_platform,
         build_data.build_platform,

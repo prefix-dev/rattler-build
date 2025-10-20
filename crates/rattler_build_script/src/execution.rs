@@ -108,6 +108,12 @@ impl ResolvedScriptContents {
             _ => None,
         }
     }
+
+    /// Determine interpreter based on file extension from the path
+    pub fn infer_interpreter(&self) -> Option<String> {
+        self.path()
+            .and_then(crate::script::determine_interpreter_from_path)
+    }
 }
 
 /// Debug mode for script execution
@@ -196,6 +202,20 @@ impl Script {
 
         tracing::debug!("Running script in {}", work_dir.display());
 
+        // Determine the interpreter to use:
+        // 1. Use explicitly specified interpreter if set
+        // 2. Try to infer from the resolved script path (if it's a file)
+        // 3. Finally fall back to platform default (bash/cmd)
+        let inferred_interpreter = contents.infer_interpreter();
+        let interpreter = if self.interpreter.is_some() {
+            self.interpreter()
+        } else if let Some(ref inferred) = inferred_interpreter {
+            tracing::debug!("Inferred interpreter '{}' from script file path", inferred);
+            inferred.as_str()
+        } else {
+            self.interpreter()
+        };
+
         let exec_args = ExecutionArgs {
             script: contents,
             env_vars,
@@ -208,7 +228,7 @@ impl Script {
             debug,
         };
 
-        crate::execution::run_script(exec_args, self.interpreter()).await?;
+        crate::execution::run_script(exec_args, interpreter).await?;
 
         Ok(())
     }
@@ -722,5 +742,23 @@ mod tests {
 
         let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
         assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_infer_interpreter_from_resolved_contents() {
+        use std::path::PathBuf;
+
+        let resolved_path =
+            ResolvedScriptContents::Path(PathBuf::from("build.py"), "print('hello')".to_string());
+        assert_eq!(
+            resolved_path.infer_interpreter(),
+            Some("python".to_string())
+        );
+
+        let resolved_inline = ResolvedScriptContents::Inline("echo 'hello'".to_string());
+        assert_eq!(resolved_inline.infer_interpreter(), None);
+
+        let resolved_missing = ResolvedScriptContents::Missing;
+        assert_eq!(resolved_missing.infer_interpreter(), None);
     }
 }

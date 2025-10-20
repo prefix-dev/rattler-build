@@ -9,7 +9,7 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 /// Error during recipe parsing with span information for excellent error messages
 #[cfg_attr(feature = "miette", derive(thiserror::Error, miette::Diagnostic))]
-#[cfg_attr(feature = "miette", error("{kind}"))]
+#[cfg_attr(feature = "miette", error("{kind}{}", message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default()))]
 #[derive(Debug, Clone)]
 pub struct ParseError {
     /// The kind of error that occurred

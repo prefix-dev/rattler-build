@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use rattler_build_recipe::stage1::{TestType, tests::CommandsTest};
-use rattler_build_script::{ResolvedScriptContents, ScriptContent};
+use rattler_build_script::{
+    ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
+};
 
 use crate::{metadata::Output, packaging::PackagingError};
 
@@ -87,7 +89,10 @@ pub(crate) fn write_test_files(
                 ResolvedScriptContents::Inline(contents) => {
                     command_test.script.content = ScriptContent::Command(contents)
                 }
-                ResolvedScriptContents::Path(_path, contents) => {
+                ResolvedScriptContents::Path(path, contents) => {
+                    if command_test.script.interpreter.is_none() {
+                        command_test.script.interpreter = determine_interpreter_from_path(&path);
+                    }
                     command_test.script.content = ScriptContent::Command(contents);
                 }
                 ResolvedScriptContents::Missing => {
