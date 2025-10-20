@@ -11,7 +11,9 @@ use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_networking::{mirror_middleware, s3_middleware};
+use rattler_networking::mirror_middleware;
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_solve::ChannelPriority;
 use rattler_upload::upload::opt::{Config, UploadOpts};
 use serde_json::{Value, json};
@@ -231,6 +233,7 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    #[cfg(feature = "s3")]
     pub s3_config: HashMap<String, s3_middleware::S3Config>,
     pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
@@ -285,11 +288,14 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
+        #[cfg(feature = "s3")]
         let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
+
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
+            #[cfg(feature = "s3")]
             s3_config,
             mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),

@@ -6,10 +6,12 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_networking::{
     AuthenticationMiddleware, AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
-    mirror_middleware, s3_middleware,
+    mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
@@ -85,12 +87,13 @@ impl BaseClient {
     pub fn new(
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
-        s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+        #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
         mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     ) -> Result<Self, AuthenticationStorageError> {
         let auth_storage = get_auth_store(auth_file)?;
         let timeout = 5 * 60;
 
+        #[cfg(feature = "s3")]
         let s3_middleware =
             s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
         let mirror_middleware =
@@ -104,20 +107,24 @@ impl BaseClient {
                 .read_timeout(std::time::Duration::from_secs(timeout))
         };
 
-        let client = reqwest_middleware::ClientBuilder::new(
+        let mut client_builder = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
                 .build()
                 .expect("failed to create client"),
         )
-        .with(mirror_middleware)
-        .with(s3_middleware)
-        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-            auth_storage.clone(),
-        )))
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ))
-        .build();
+        .with(mirror_middleware);
+
+        #[cfg(feature = "s3")]
+        let client_builder = client_builder.with(s3_middleware);
+
+        let client = client_builder
+            .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+                auth_storage.clone(),
+            )))
+            .with(RetryTransientMiddleware::new_with_policy(
+                ExponentialBackoff::builder().build_with_max_retries(3),
+            ))
+            .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
@@ -259,13 +266,14 @@ pub fn get_auth_store(
 /// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-    s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<BaseClient, AuthenticationStorageError> {
     BaseClient::new(
         auth_file,
         allow_insecure_host,
+        #[cfg(feature = "s3")]
         s3_middleware_config,
         mirror_middleware_config,
     )

@@ -135,6 +135,7 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
+        #[cfg(feature = "s3")]
         build_data.common.s3_config.clone(),
         build_data.common.mirror_config.clone(),
         build_data.common.allow_insecure_host.clone(),
@@ -694,6 +695,7 @@ pub async fn run_test(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 test_data.common.auth_file,
+                #[cfg(feature = "s3")]
                 test_data.common.s3_config,
                 test_data.common.mirror_config,
                 test_data.common.allow_insecure_host.clone(),
@@ -752,6 +754,7 @@ pub async fn rebuild(
 ) -> miette::Result<()> {
     let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
         rebuild_data.common.auth_file,
+        #[cfg(feature = "s3")]
         rebuild_data.common.s3_config.clone(),
         rebuild_data.common.mirror_config.clone(),
         rebuild_data.common.allow_insecure_host.clone(),

@@ -4226,7 +4226,6 @@ dependencies = [
  "miette",
  "minijinja",
  "num_cpus",
- "opendal",
  "pathdiff",
  "petgraph",
  "pretty_assertions",
