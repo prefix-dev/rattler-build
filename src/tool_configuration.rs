@@ -107,7 +107,7 @@ impl BaseClient {
                 .read_timeout(std::time::Duration::from_secs(timeout))
         };
 
-        let mut client_builder = reqwest_middleware::ClientBuilder::new(
+        let client_builder = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
                 .build()
                 .expect("failed to create client"),
