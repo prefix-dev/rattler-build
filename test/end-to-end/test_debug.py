@@ -25,7 +25,6 @@ def test_debug_basic(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path,
         assert (work_dir / "conda_build.sh").exists()
 
 
-@pytest.mark.skip(reason="Need to support multi-output recipes")
 def test_debug_multiple_outputs(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd
 ):

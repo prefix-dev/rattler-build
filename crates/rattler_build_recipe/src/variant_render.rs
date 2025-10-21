@@ -15,14 +15,11 @@ use indexmap::IndexMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
-use rattler_conda_types::{NoArchType, PackageName};
 
 use crate::{
     error::ParseError,
-    stage0::{
-        self, MultiOutputRecipe, Output, PackageOutput, Recipe as Stage0Recipe, SingleOutputRecipe,
-    },
-    stage1::{Dependency, Evaluate, EvaluationContext, Recipe as Stage1Recipe},
+    stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
+    stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
 
 /// Configuration for rendering recipes with variants
@@ -73,9 +70,38 @@ pub struct RenderedVariant {
 
 /// Helper function to create a JinjaConfig from RenderConfig
 fn create_jinja_config(config: &RenderConfig) -> JinjaConfig {
+    use rattler_conda_types::Platform;
+    use std::str::FromStr;
+
     let mut jinja_config = JinjaConfig::default();
     jinja_config.experimental = config.experimental;
     jinja_config.recipe_path = config.recipe_path.clone();
+
+    // Extract platform information from extra_context
+    if let Some(target_platform_var) = config.extra_context.get("target_platform") {
+        if let Some(platform_str) = target_platform_var.as_ref().as_str() {
+            if let Ok(platform) = Platform::from_str(platform_str) {
+                jinja_config.target_platform = platform;
+            }
+        }
+    }
+
+    if let Some(build_platform_var) = config.extra_context.get("build_platform") {
+        if let Some(platform_str) = build_platform_var.as_ref().as_str() {
+            if let Ok(platform) = Platform::from_str(platform_str) {
+                jinja_config.build_platform = platform;
+            }
+        }
+    }
+
+    if let Some(host_platform_var) = config.extra_context.get("host_platform") {
+        if let Some(platform_str) = host_platform_var.as_ref().as_str() {
+            if let Ok(platform) = Platform::from_str(platform_str) {
+                jinja_config.host_platform = platform;
+            }
+        }
+    }
+
     jinja_config
 }
 
@@ -260,59 +286,26 @@ fn render_single_output_with_variants(
     Ok(results)
 }
 
-/// Intermediate structure for Stage 0 multi-output rendering
-#[derive(Debug, Clone)]
-struct Stage0MultiOutput {
-    /// The variant combination used for this stage0 render
-    variant: BTreeMap<NormalizedKey, Variable>,
-    /// Stage0 recipe with this variant applied to context
-    recipe: MultiOutputRecipe,
-    /// Used variables per output (from Jinja templates)
-    used_vars_per_output: Vec<HashSet<NormalizedKey>>,
-}
-
-/// A fully rendered multi-output variant with all outputs and their variants
-#[derive(Debug)]
-pub struct MultiOutputVariant {
-    /// The base variant combination
-    pub base_variant: BTreeMap<NormalizedKey, Variable>,
-    /// Rendered outputs with their specific variants
-    pub outputs: Vec<(Stage1Recipe, BTreeMap<NormalizedKey, Variable>)>,
-}
-
 fn render_multi_output_with_variants(
     stage0_recipe: &MultiOutputRecipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    // Multi-output recipes require a sophisticated two-stage rendering process:
-    // Stage 0: Expand by basic variants from templates
-    let stage0_renders = stage0_render_multi_output(stage0_recipe, variant_config, &config)?;
-
-    // Stage 1: Add variants from dependencies
-    let stage1_renders = stage1_render_multi_output(stage0_renders, variant_config, &config)?;
-
-    // Flatten the results into individual RenderedVariant entries
-    let mut results = Vec::new();
-    for stage1 in stage1_renders {
-        for (recipe, variant) in stage1.outputs {
-            results.push(RenderedVariant { variant, recipe });
-        }
-    }
-
-    Ok(results)
-}
-
-/// Stage 0: Expand multi-output recipe by basic variants from templates
-fn stage0_render_multi_output(
-    recipe: &MultiOutputRecipe,
-    variant_config: &VariantConfig,
-    _config: &RenderConfig,
-) -> Result<Vec<Stage0MultiOutput>, ParseError> {
     // Collect all used variables from Jinja templates across all outputs
     let mut used_vars = HashSet::new();
-    for var in recipe.used_variables() {
+    for var in stage0_recipe.used_variables() {
         used_vars.insert(NormalizedKey::from(var));
+    }
+
+    // Get free specs (packages without version constraints) as potential variants
+    for spec in stage0_recipe.free_specs() {
+        used_vars.insert(NormalizedKey::from(spec.as_normalized()));
+    }
+
+    // Insert always-included variables
+    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+    for key in ALWAYS_INCLUDE {
+        used_vars.insert(NormalizedKey::from(*key));
     }
 
     // Filter to only variants that exist in the config
@@ -321,399 +314,60 @@ fn stage0_render_multi_output(
         .filter(|v| variant_config.get(v).is_some())
         .collect();
 
-    // Compute all variant combinations for stage 0
+    // Compute all variant combinations
     let combinations = variant_config
         .combinations(&used_vars, None)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
-    let mut stage0_renders = Vec::new();
+    // If no combinations, render once with just the extra context
+    if combinations.is_empty() {
+        let mut context = EvaluationContext::from_variables(config.extra_context.clone())
+            .with_context(&stage0_recipe.context)?;
 
-    // If no combinations, create one render with just the extra context
-    let combinations: Vec<BTreeMap<NormalizedKey, Variable>> = if combinations.is_empty() {
-        vec![BTreeMap::new()]
-    } else {
-        combinations
-    };
+        context.set_jinja_config(create_jinja_config(&config));
+
+        // Evaluate the multi-output recipe - this returns Vec<Stage1Recipe>
+        let outputs = stage0_recipe.evaluate(&context)?;
+
+        // Convert each output to a RenderedVariant
+        let mut results = Vec::new();
+        for recipe in outputs {
+            // Use the used_variant from the evaluated recipe
+            let variant = recipe.used_variant.clone();
+            results.push(RenderedVariant { variant, recipe });
+        }
+
+        return Ok(results);
+    }
+
+    // Render recipe for each variant combination
+    let mut results = Vec::new();
 
     for variant in combinations {
-        // Collect used variables per output for later use
-        let mut used_vars_per_output = Vec::new();
-
-        for output in &recipe.outputs {
-            let output_vars: HashSet<NormalizedKey> = output
-                .used_variables()
-                .into_iter()
-                .map(NormalizedKey::from)
-                .collect();
-            used_vars_per_output.push(output_vars);
+        // Build evaluation context from variant values and extra context
+        let mut context_map = config.extra_context.clone();
+        for (key, value) in &variant {
+            context_map.insert(key.normalize(), value.clone());
         }
 
-        stage0_renders.push(Stage0MultiOutput {
-            variant: variant.clone(),
-            recipe: recipe.clone(),
-            used_vars_per_output,
-        });
-    }
+        let mut context =
+            EvaluationContext::from_variables(context_map).with_context(&stage0_recipe.context)?;
 
-    Ok(stage0_renders)
-}
+        context.set_jinja_config(create_jinja_config(&config));
 
-/// Stage 1: Add variants from dependencies for each output
-fn stage1_render_multi_output(
-    stage0_renders: Vec<Stage0MultiOutput>,
-    variant_config: &VariantConfig,
-    config: &RenderConfig,
-) -> Result<Vec<MultiOutputVariant>, ParseError> {
-    let mut stage1_renders = Vec::new();
+        // Evaluate the multi-output recipe - this returns Vec<Stage1Recipe>
+        // Each output already has its hash and variant computed correctly
+        let outputs = stage0_recipe.evaluate(&context)?;
 
-    for stage0 in stage0_renders {
-        // For each output, collect additional variant keys from dependencies
-        let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
-        let mut exact_pins_per_output: Vec<HashSet<PackageName>> = Vec::new();
-
-        // First pass: evaluate each output to discover dependencies
-        for output in &stage0.recipe.outputs {
-            // Build evaluation context from variant + extra context
-            // Preserve Variable types (e.g., booleans for platform selectors)
-            let mut context_map = config.extra_context.clone();
-            for (key, value) in &stage0.variant {
-                context_map.insert(key.normalize(), value.clone());
-            }
-
-            let mut context = EvaluationContext::from_variables(context_map)
-                .with_context(&stage0.recipe.context)?;
-
-            // Set the JinjaConfig with experimental and recipe_path
-            context.set_jinja_config(create_jinja_config(config));
-
-            // Collect additional variant keys from dependencies
-            let (additional_vars, exact_pins) = match output {
-                Output::Package(pkg_output) => {
-                    extract_dependency_variants(pkg_output.as_ref(), &context)?
-                }
-                Output::Staging(_) => {
-                    // Staging outputs are simpler - no package dependencies
-                    (HashSet::new(), HashSet::new())
-                }
-            };
-
-            extra_vars_per_output.push(additional_vars);
-            exact_pins_per_output.push(exact_pins);
-        }
-
-        // Combine all additional variant keys
-        let mut all_extra_vars = HashSet::new();
-        for vars in &extra_vars_per_output {
-            all_extra_vars.extend(vars.iter().cloned());
-        }
-
-        // Add the original stage0 variant keys
-        all_extra_vars.extend(stage0.variant.keys().cloned());
-
-        // Compute new combinations with additional variant keys
-        let all_combinations = variant_config
-            .combinations(&all_extra_vars, Some(&stage0.variant))
-            .map_err(|e| ParseError::from_message(e.to_string()))?;
-
-        // If no new combinations, use the original variant
-        let all_combinations: Vec<BTreeMap<NormalizedKey, Variable>> =
-            if all_combinations.is_empty() {
-                vec![stage0.variant.clone()]
-            } else {
-                all_combinations
-            };
-
-        // For each combination, re-evaluate all outputs
-        for combination in all_combinations {
-            let mut final_outputs = Vec::new();
-
-            for (idx, output) in stage0.recipe.outputs.iter().enumerate() {
-                // Build evaluation context with full variant
-                // Preserve Variable types (e.g., booleans for platform selectors)
-                let mut context_map = config.extra_context.clone();
-                for (key, value) in &combination {
-                    context_map.insert(key.normalize(), value.clone());
-                }
-
-                let mut context = EvaluationContext::from_variables(context_map)
-                    .with_context(&stage0.recipe.context)?;
-
-                // Set the JinjaConfig with experimental and recipe_path
-                context.set_jinja_config(create_jinja_config(config));
-
-                match output {
-                    Output::Package(pkg_output) => {
-                        let evaluated =
-                            evaluate_package_output(pkg_output.as_ref(), &context, &stage0.recipe)?;
-
-                        // Compute the variant for this specific output
-                        let output_variant = compute_output_variant(
-                            &combination,
-                            &stage0.used_vars_per_output[idx],
-                            &extra_vars_per_output[idx],
-                            &exact_pins_per_output[idx],
-                            &evaluated,
-                            &final_outputs,
-                        )?;
-
-                        final_outputs.push((evaluated, output_variant));
-                    }
-                    Output::Staging(_) => {
-                        // TODO: Handle staging outputs properly
-                        // For now, skip them
-                        continue;
-                    }
-                }
-            }
-
-            stage1_renders.push(MultiOutputVariant {
-                base_variant: combination,
-                outputs: final_outputs,
-            });
+        // Convert each output to a RenderedVariant
+        for recipe in outputs {
+            // Use the used_variant from the evaluated recipe
+            let variant = recipe.used_variant.clone();
+            results.push(RenderedVariant { variant, recipe });
         }
     }
 
-    Ok(stage1_renders)
-}
-
-/// Extract additional variant keys from a package output's dependencies
-fn extract_dependency_variants(
-    output: &PackageOutput,
-    context: &EvaluationContext,
-) -> Result<(HashSet<NormalizedKey>, HashSet<PackageName>), ParseError> {
-    let mut additional_vars = HashSet::new();
-    let mut exact_pins = HashSet::new();
-
-    // Evaluate requirements to get dependencies
-    let requirements = output.requirements.evaluate(context)?;
-
-    // Add variants from build/host dependencies without version specifiers (free specs)
-    for dep in requirements.build.iter().chain(requirements.host.iter()) {
-        match dep {
-            Dependency::Spec(spec) => {
-                // If no version/build constraints, this is a variant key candidate
-                if spec.version.is_none() && spec.build.is_none() {
-                    if let Some(ref name) = spec.name {
-                        additional_vars.insert(NormalizedKey::from(name.as_normalized()));
-                    }
-                }
-            }
-            Dependency::PinSubpackage(pin) => {
-                // pin_subpackage with exact=true creates additional variants
-                if pin.pin_subpackage.args.exact {
-                    let name = pin.pin_subpackage.name.as_normalized();
-                    additional_vars.insert(NormalizedKey::from(name));
-                    exact_pins.insert(pin.pin_subpackage.name.clone());
-                }
-            }
-            Dependency::PinCompatible(_) => {
-                // pin_compatible doesn't create new variant keys
-            }
-        }
-    }
-
-    // TODO: Add handling for:
-    // - build.variant.use_keys
-    // - Compiler detection (c_compiler, etc.)
-    // - CONDA_BUILD_SYSROOT for compilers
-
-    Ok((additional_vars, exact_pins))
-}
-
-/// Evaluate a package output to a stage1 recipe
-fn evaluate_package_output(
-    output: &PackageOutput,
-    context: &EvaluationContext,
-    recipe: &MultiOutputRecipe,
-) -> Result<Stage1Recipe, ParseError> {
-    use crate::stage0::evaluate::evaluate_value_to_string;
-    use rattler_conda_types::{PackageName, VersionWithSource};
-    use std::str::FromStr;
-
-    // Merge top-level sections with output sections based on inheritance
-    // For now, just evaluate the output directly
-
-    // Package metadata might have optional version - inherit from recipe if needed
-    let name_str = evaluate_value_to_string(&output.package.name, context)?;
-    let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
-        kind: crate::ErrorKind::InvalidValue,
-        span: crate::Span::unknown(),
-        message: Some(format!(
-            "invalid value for name: '{}' is not a valid package name: {}",
-            name_str, e
-        )),
-        suggestion: None,
-    })?;
-
-    // Get version from output or fallback to recipe-level version
-    let version_str = if let Some(ref version_value) = output.package.version {
-        evaluate_value_to_string(version_value, context)?
-    } else if let Some(ref version_value) = recipe.recipe.version {
-        evaluate_value_to_string(version_value, context)?
-    } else {
-        return Err(ParseError {
-            kind: crate::ErrorKind::MissingField,
-            span: crate::Span::unknown(),
-            message: Some("version is required for package output".to_string()),
-            suggestion: None,
-        });
-    };
-
-    let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
-        kind: crate::ErrorKind::InvalidValue,
-        span: crate::Span::unknown(),
-        message: Some(format!(
-            "invalid value for version: '{}' is not a valid version: {}",
-            version_str, e
-        )),
-        suggestion: None,
-    })?;
-
-    let package = crate::stage1::Package::new(name, version);
-
-    let build = output.build.evaluate(context)?;
-    let about = output.about.evaluate(context)?;
-    let requirements = output.requirements.evaluate(context)?;
-    let extra = crate::stage1::Extra::default(); // TODO: evaluate extra
-
-    let mut source = Vec::new();
-    for src in &output.source {
-        source.push(src.evaluate(context)?);
-    }
-
-    let mut tests = Vec::new();
-    for test in &output.tests {
-        tests.push(test.evaluate(context)?);
-    }
-
-    // Get the evaluated context variables
-    let resolved_context = context.variables().clone();
-
-    // For variant_render.rs, we don't have the used variant computed yet
-    // (that happens in the normal evaluate path). Pass an empty one for now.
-    let used_variant = std::collections::BTreeMap::new();
-
-    Ok(Stage1Recipe::new(
-        package,
-        build,
-        about,
-        requirements,
-        extra,
-        source,
-        tests,
-        resolved_context,
-        used_variant,
-    ))
-}
-
-/// Compute the variant for a specific output
-fn compute_output_variant(
-    full_variant: &BTreeMap<NormalizedKey, Variable>,
-    jinja_vars: &HashSet<NormalizedKey>,
-    dep_vars: &HashSet<NormalizedKey>,
-    exact_pins: &HashSet<PackageName>,
-    output: &Stage1Recipe,
-    previous_outputs: &[(Stage1Recipe, BTreeMap<NormalizedKey, Variable>)],
-) -> Result<BTreeMap<NormalizedKey, Variable>, ParseError> {
-    // Start with all the variables that should be included
-    let mut variables_to_include = HashSet::new();
-
-    // Add all variables used in Jinja templates
-    variables_to_include.extend(jinja_vars.iter().cloned());
-
-    // Add all variables from dependencies
-    variables_to_include.extend(dep_vars.iter().cloned());
-
-    // Add extra `use_keys` from the build.variant section
-    let use_keys: HashSet<NormalizedKey> = output
-        .build
-        .variant
-        .use_keys
-        .iter()
-        .map(|k| NormalizedKey::from(k.as_str()))
-        .collect();
-    variables_to_include.extend(use_keys);
-
-    // If the recipe is `noarch: python`, remove the python key that may come from dependencies
-    let noarch = output.build.noarch.unwrap_or(NoArchType::none());
-    if noarch.is_python() {
-        variables_to_include.remove(&NormalizedKey::from("python"));
-    }
-
-    // Special handling of CONDA_BUILD_SYSROOT
-    // If c_compiler or cxx_compiler are used in jinja, add CONDA_BUILD_SYSROOT
-    if jinja_vars.contains(&NormalizedKey::from("c_compiler"))
-        || jinja_vars.contains(&NormalizedKey::from("cxx_compiler"))
-    {
-        variables_to_include.insert(NormalizedKey::from("CONDA_BUILD_SYSROOT"));
-    }
-
-    // Always add target_platform, channel_sources, and channel_targets
-    // (These are typically needed for hash computation and build metadata)
-    variables_to_include.insert(NormalizedKey::from("target_platform"));
-    variables_to_include.insert(NormalizedKey::from("channel_sources"));
-    variables_to_include.insert(NormalizedKey::from("channel_targets"));
-
-    // Apply ignore_keys filter - remove any keys specified in build.variant.ignore_keys
-    let ignore_keys: HashSet<NormalizedKey> = output
-        .build
-        .variant
-        .ignore_keys
-        .iter()
-        .map(|k| NormalizedKey::from(k.as_str()))
-        .collect();
-    variables_to_include.retain(|k| !ignore_keys.contains(k));
-
-    // Now build the actual variant map with the filtered variables
-    let mut output_variant = BTreeMap::new();
-    for var in variables_to_include {
-        if let Some(value) = full_variant.get(&var) {
-            output_variant.insert(var, value.clone());
-        }
-    }
-
-    // Add virtual packages from run requirements
-    for req in &output.requirements.run {
-        if let Dependency::Spec(spec) = req {
-            if let Some(ref name) = spec.name {
-                if name.as_normalized().starts_with("__") {
-                    output_variant.insert(
-                        NormalizedKey::from(name.as_normalized()),
-                        Variable::from(spec.to_string()),
-                    );
-                }
-            }
-        }
-    }
-
-    // Handle exact pin_subpackage dependencies
-    for pin_name in exact_pins {
-        // Find the pinned output in previous_outputs
-        if let Some((pinned_output, _pinned_variant)) = previous_outputs
-            .iter()
-            .find(|(recipe, _)| &recipe.package.name == pin_name)
-        {
-            // Add the version and build string of the pinned package
-            let version = &pinned_output.package.version;
-            // TODO: Compute actual build string from pinned_variant (lazy hash)
-            // For now, use a placeholder that will be replaced later
-            let build_string = "h0000000"; // This should come from hash computation
-            output_variant.insert(
-                NormalizedKey::from(pin_name.as_normalized()),
-                Variable::from(format!("{} {}", version, build_string)),
-            );
-        }
-    }
-
-    // Handle noarch - if noarch, override target_platform to "noarch"
-    if !noarch.is_none() {
-        output_variant.insert(
-            NormalizedKey::from("target_platform"),
-            Variable::from("noarch"),
-        );
-    }
-
-    Ok(output_variant)
+    Ok(results)
 }
 
 #[cfg(test)]

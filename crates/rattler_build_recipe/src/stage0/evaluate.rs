@@ -2294,6 +2294,21 @@ impl Evaluate for Stage0Recipe {
             actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
         }
 
+        // Add virtual packages from run requirements to the variant
+        // Virtual packages (starting with '__') should be included in the hash
+        for dep in &requirements.run {
+            if let crate::stage1::Dependency::Spec(spec) = dep {
+                if let Some(ref name) = spec.name {
+                    if name.as_normalized().starts_with("__") {
+                        actual_variant.insert(
+                            NormalizedKey::from(name.as_normalized()),
+                            Variable::from(spec.to_string()),
+                        );
+                    }
+                }
+            }
+        }
+
         // Compute hash from the actual variant (includes prefix like "py312h...")
         let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
 
@@ -2321,6 +2336,319 @@ impl Evaluate for Stage0Recipe {
             resolved_context,
             actual_variant,
         ))
+    }
+}
+
+/// Helper to evaluate a package output into a Stage1Recipe
+/// This handles merging top-level recipe sections with output-specific sections
+fn evaluate_package_output_to_recipe(
+    output: &crate::stage0::PackageOutput,
+    recipe: &crate::stage0::MultiOutputRecipe,
+    context: &EvaluationContext,
+) -> Result<Stage1Recipe, ParseError> {
+    use rattler_conda_types::{PackageName, VersionWithSource};
+    use std::str::FromStr;
+
+    // Evaluate package name
+    let name_str = evaluate_value_to_string(&output.package.name, context)?;
+    let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!(
+            "invalid value for name: '{}' is not a valid package name: {}",
+            name_str, e
+        )),
+        suggestion: None,
+    })?;
+
+    // Get version from output or fallback to recipe-level version
+    let version_str = if let Some(ref version_value) = output.package.version {
+        evaluate_value_to_string(version_value, context)?
+    } else if let Some(ref version_value) = recipe.recipe.version {
+        evaluate_value_to_string(version_value, context)?
+    } else {
+        return Err(ParseError {
+            kind: ErrorKind::MissingField,
+            span: Span::unknown(),
+            message: Some("version is required for package output".to_string()),
+            suggestion: None,
+        });
+    };
+
+    let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
+        kind: ErrorKind::InvalidValue,
+        span: Span::unknown(),
+        message: Some(format!(
+            "invalid value for version: '{}' is not a valid version: {}",
+            version_str, e
+        )),
+        suggestion: None,
+    })?;
+
+    let package = Stage1Package::new(name, version);
+
+    // Evaluate build section (output-specific, no inheritance from top-level currently)
+    let mut build = output.build.evaluate(context)?;
+
+    // Evaluate about section (output-specific, or could inherit from top-level)
+    let about = output.about.evaluate(context)?;
+
+    // Evaluate requirements
+    let requirements = output.requirements.evaluate(context)?;
+
+    // Use recipe-level extra (outputs don't have their own extra)
+    let extra = recipe.extra.evaluate(context)?;
+
+    // Evaluate source list (output-specific sources)
+    let mut source = Vec::new();
+    for src in &output.source {
+        source.push(src.evaluate(context)?);
+    }
+
+    // Evaluate tests list
+    let mut tests = Vec::new();
+    for test in &output.tests {
+        tests.push(test.evaluate(context)?);
+    }
+
+    // Extract the resolved context variables
+    let resolved_context = context.variables().clone();
+
+    // Compute the actual variant for this output (subset of accessed variables)
+    // This is the same logic as SingleOutputRecipe
+    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+
+    let accessed_vars = context.accessed_variables();
+    let free_specs = requirements
+        .free_specs()
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
+
+    // Get the noarch type to determine which variant keys to exclude
+    let noarch = build.noarch.unwrap_or(NoArchType::none());
+
+    // For noarch packages, certain variant keys should be excluded from the hash
+    let should_exclude_from_variant = |key: &str| -> bool {
+        if noarch.is_python() {
+            key == "python"
+        } else {
+            false
+        }
+    };
+
+    let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context
+        .variables()
+        .iter()
+        .filter(|(k, _)| {
+            let key_str = k.as_str();
+
+            // Exclude recipe context variables
+            if recipe.context.contains_key(key_str) {
+                return false;
+            }
+            // Exclude if it's a noarch-excluded key
+            if should_exclude_from_variant(key_str) {
+                return false;
+            }
+
+            // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+            accessed_vars.contains(key_str)
+                || free_specs.contains(&NormalizedKey::from(key_str))
+                || ALWAYS_INCLUDE.contains(&key_str)
+        })
+        .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+        .collect();
+
+    // Ensure that `target_platform` is set to "noarch" for noarch packages
+    if !noarch.is_none() {
+        actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
+    }
+
+    // Add virtual packages from run requirements to the variant
+    // Virtual packages (starting with '__') should be included in the hash
+    for dep in &requirements.run {
+        if let crate::stage1::Dependency::Spec(spec) = dep {
+            if let Some(ref name) = spec.name {
+                if name.as_normalized().starts_with("__") {
+                    actual_variant.insert(
+                        NormalizedKey::from(name.as_normalized()),
+                        Variable::from(spec.to_string()),
+                    );
+                }
+            }
+        }
+    }
+
+    // Compute hash from the actual variant
+    let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
+
+    // Resolve build string with hash
+    if build.string.is_none() {
+        build.string = Some(crate::stage1::build::BuildString::resolved(format!(
+            "{}h{}_{}",
+            prefix, hash, build.number
+        )));
+    } else {
+        build.resolve_build_string(&hash, context)?;
+    }
+
+    Ok(Stage1Recipe::new(
+        package,
+        build,
+        about,
+        requirements,
+        extra,
+        source,
+        tests,
+        resolved_context,
+        actual_variant,
+    ))
+}
+
+/// Helper to evaluate a staging output into a Stage1Recipe
+/// Staging outputs are simpler - they don't produce packages but cache build results
+fn evaluate_staging_output_to_recipe(
+    output: &crate::stage0::StagingOutput,
+    recipe: &crate::stage0::MultiOutputRecipe,
+    context: &EvaluationContext,
+) -> Result<Stage1Recipe, ParseError> {
+    use rattler_conda_types::{PackageName, VersionWithSource};
+    use std::str::FromStr;
+
+    // For staging outputs, we create a special package name based on the staging name
+    let staging_name_str = evaluate_string_value(&output.staging.name, context)?;
+    let name = PackageName::from_str(&format!("_staging_{}", staging_name_str)).map_err(|e| {
+        ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: Span::unknown(),
+            message: Some(format!(
+                "invalid staging name: '{}' cannot be converted to package name: {}",
+                staging_name_str, e
+            )),
+            suggestion: None,
+        }
+    })?;
+
+    // Use recipe-level version or a default
+    let version = if let Some(ref version_value) = recipe.recipe.version {
+        let version_str = evaluate_value_to_string(version_value, context)?;
+        VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: Span::unknown(),
+            message: Some(format!("invalid version '{}': {}", version_str, e)),
+            suggestion: None,
+        })?
+    } else {
+        VersionWithSource::from_str("0.0.0").unwrap()
+    };
+
+    let package = Stage1Package::new(name, version);
+
+    // Evaluate staging build (only has script field)
+    let script = evaluate_script(&output.build.script, context)?;
+    let build = Stage1Build {
+        script,
+        ..Stage1Build::default()
+    };
+
+    // Staging outputs don't have about/tests
+    let about = Stage1About::default();
+    let extra = recipe.extra.evaluate(context)?;
+
+    // Evaluate requirements (only build/host/ignore_run_exports allowed for staging)
+    let requirements = output.requirements.evaluate(context)?;
+
+    // Evaluate source
+    let mut source = Vec::new();
+    for src in &output.source {
+        source.push(src.evaluate(context)?);
+    }
+
+    let tests = Vec::new(); // No tests for staging outputs
+
+    let resolved_context = context.variables().clone();
+
+    // Staging outputs still need a variant for caching purposes
+    // Use similar logic to package outputs
+    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+
+    let accessed_vars = context.accessed_variables();
+    let free_specs = requirements
+        .free_specs()
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
+
+    let actual_variant: BTreeMap<NormalizedKey, Variable> = context
+        .variables()
+        .iter()
+        .filter(|(k, _)| {
+            let key_str = k.as_str();
+            if recipe.context.contains_key(key_str) {
+                return false;
+            }
+            accessed_vars.contains(key_str)
+                || free_specs.contains(&NormalizedKey::from(key_str))
+                || ALWAYS_INCLUDE.contains(&key_str)
+        })
+        .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+        .collect();
+
+    Ok(Stage1Recipe::new(
+        package,
+        build,
+        about,
+        requirements,
+        extra,
+        source,
+        tests,
+        resolved_context,
+        actual_variant,
+    ))
+}
+
+/// Implement Evaluate for MultiOutputRecipe
+/// Returns a Vec of Stage1Recipe, one for each output
+impl Evaluate for crate::stage0::MultiOutputRecipe {
+    type Output = Vec<Stage1Recipe>;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // First, evaluate the context variables and merge them into a new context
+        let context_with_vars = if !self.context.is_empty() {
+            context.with_context(&self.context)?
+        } else {
+            context.clone()
+        };
+
+        let mut evaluated_outputs = Vec::with_capacity(self.outputs.len());
+
+        // Evaluate each output
+        for output in &self.outputs {
+            // Clear accessed variables for each output to track them independently
+            context_with_vars.clear_accessed();
+
+            match output {
+                crate::stage0::Output::Package(pkg_output) => {
+                    let recipe = evaluate_package_output_to_recipe(
+                        pkg_output.as_ref(),
+                        self,
+                        &context_with_vars,
+                    )?;
+                    evaluated_outputs.push(recipe);
+                }
+                crate::stage0::Output::Staging(staging_output) => {
+                    let recipe = evaluate_staging_output_to_recipe(
+                        staging_output.as_ref(),
+                        self,
+                        &context_with_vars,
+                    )?;
+                    evaluated_outputs.push(recipe);
+                }
+            }
+        }
+
+        Ok(evaluated_outputs)
     }
 }
 

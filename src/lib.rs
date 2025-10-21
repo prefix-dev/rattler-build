@@ -136,16 +136,6 @@ fn find_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| miette::miette!("Failed to parse recipe: {}", e))?;
 
-    // For now, only handle single output recipes
-    let single_output = match stage0_recipe {
-        stage0::Recipe::SingleOutput(single) => single,
-        stage0::Recipe::MultiOutput(_) => {
-            return Err(miette::miette!(
-                "Multi-output recipes are not yet supported in the refactored code path"
-            ));
-        }
-    };
-
     // Build render config with platform information, experimental flag, and recipe path
     let render_config = RenderConfig::new()
         .with_context("target_platform", target_platform.to_string())
@@ -154,20 +144,17 @@ fn find_variants(
         .with_experimental(experimental)
         .with_recipe_path(recipe_path);
 
-    // Render with variant config
-    let rendered_variants = render_recipe_with_variant_config(
-        &stage0::Recipe::SingleOutput(single_output),
-        variant_config,
-        render_config,
-    )
-    .map_err(|e| {
-        let source = miette::NamedSource::new(
-            recipe_path.display().to_string(),
-            recipe_content.to_string(),
-        );
-        miette::Report::new(e).with_source_code(source)
-    })
-    .wrap_err("Failed to render recipe with variants")?;
+    // Render with variant config (handles both single and multi-output recipes)
+    let rendered_variants =
+        render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)
+            .map_err(|e| {
+                let source = miette::NamedSource::new(
+                    recipe_path.display().to_string(),
+                    recipe_content.to_string(),
+                );
+                miette::Report::new(e).with_source_code(source)
+            })
+            .wrap_err("Failed to render recipe with variants")?;
 
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();
