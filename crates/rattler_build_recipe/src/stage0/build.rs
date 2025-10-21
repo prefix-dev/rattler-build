@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
-use rattler_conda_types::package::EntryPoint;
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, ScriptContent, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, Script, Value};
 
 /// Default build number is 0
 fn default_build_number() -> Value<u64> {
@@ -36,14 +36,13 @@ pub struct Build {
     /// Build string (usually auto-generated from variant hash)
     pub string: Option<Value<String>>,
 
-    /// Build script - either inline commands or a file path
+    /// Build script - contains script content, interpreter, environment variables, etc.
     /// Default is `build.sh` on Unix, `build.bat` on Windows
     #[serde(default)]
-    pub script: ConditionalList<ScriptContent>,
+    pub script: Script,
 
-    /// Noarch type - "python" or "generic"
-    /// TODO(refactor): possibly parse this into enum directly
-    pub noarch: Option<Value<String>>,
+    /// Noarch type - python or generic
+    pub noarch: Option<Value<NoArchType>>,
 
     /// Python-specific configuration
     #[serde(default)]
@@ -91,7 +90,7 @@ impl Default for Build {
         Self {
             number: default_build_number(),
             string: None,
-            script: ConditionalList::default(),
+            script: Script::default(),
             noarch: None,
             python: PythonBuild::default(),
             skip: ConditionalList::default(),
@@ -248,11 +247,14 @@ impl Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Build {{ number: {}, string: {}, script: [{}], noarch: {}, skip: [{}] }}",
+            "Build {{ number: {}, string: {}, script: {}, noarch: {}, skip: [{}] }}",
             self.number,
             self.string.as_ref().into_iter().format(", "),
-            self.script.iter().format(", "),
-            self.noarch.as_ref().into_iter().format(", "),
+            self.script,
+            self.noarch
+                .as_ref()
+                .map(|v| format!("{:?}", v))
+                .unwrap_or_default(),
             self.skip.iter().format(", "),
         )
     }
@@ -286,9 +288,7 @@ impl Build {
             vars.extend(string.used_variables());
         }
 
-        for item in script {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(script.used_variables());
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());

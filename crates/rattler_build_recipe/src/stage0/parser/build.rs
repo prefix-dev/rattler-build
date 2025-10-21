@@ -1,4 +1,5 @@
 use marked_yaml::{Node, types::MarkedMappingNode};
+use rattler_conda_types::NoArchType;
 
 use crate::{
     ParseError,
@@ -103,30 +104,60 @@ fn parse_bool_or_patterns<T>(
     ))
 }
 
+/// Parse a noarch field from YAML
+///
+/// Noarch can be either:
+/// - A scalar string: "python" or "generic"
+/// - A template: "${{ noarch_type }}"
+fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
+    let scalar = node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(node))
+            .with_message("Expected 'noarch' to be a string (\"python\" or \"generic\")")
+    })?;
+
+    let spanned = SpannedString::from(scalar);
+    let str_val = spanned.as_str();
+
+    // Check if it's a template
+    if str_val.contains("${{") {
+        let template = crate::stage0::types::JinjaTemplate::new(str_val.to_string())
+            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+        return Ok(Value::new_template(template, Some(spanned.span())));
+    }
+
+    // Parse as concrete NoArchType
+    let noarch = match str_val {
+        "python" => NoArchType::python(),
+        "generic" => NoArchType::generic(),
+        _ => {
+            return Err(ParseError::invalid_value(
+                "noarch",
+                &format!(
+                    "invalid noarch type '{}'. Expected 'python' or 'generic'",
+                    str_val
+                ),
+                spanned.span(),
+            ));
+        }
+    };
+
+    Ok(Value::new_concrete(noarch, Some(spanned.span())))
+}
+
 /// Parse a script field from YAML
 ///
 /// Script can be either:
 /// - A sequence of strings: `["echo hello", "make install"]`
-/// - A sequence of script objects with content/file/interpreter/env
 /// - A scalar multiline string: `|`
 ///   `echo hello`
 ///   `make install`
 /// - A single script object mapping: `{env: {...}, content: [...]}`
 ///
 /// For scalar strings, we split by newlines and filter out empty lines
-pub(crate) fn parse_script(
-    node: &Node,
-) -> Result<crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>, ParseError>
-{
-    use crate::stage0::types::{ConditionalList, Item, ScriptContent, Value};
+pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, ParseError> {
+    use crate::stage0::types::{ConditionalList, Item, Script, Value};
 
-    // Try parsing as a sequence first (the standard way)
-    // parse_conditional_list will handle both strings and script objects thanks to serde(untagged)
-    if node.as_sequence().is_some() {
-        return parse_conditional_list(node);
-    }
-
-    // Try parsing as a scalar string (multiline or single line)
+    // Try parsing as a scalar string (multiline or single line) - simple case
     if let Some(scalar) = node.as_scalar() {
         let spanned = SpannedString::from(scalar);
         let script_str = spanned.as_str();
@@ -140,7 +171,10 @@ pub(crate) fn parse_script(
                 template,
                 Some(spanned.span()),
             ))];
-            return Ok(ConditionalList::new(items));
+            return Ok(Script {
+                content: Some(ConditionalList::new(items)),
+                ..Default::default()
+            });
         }
 
         // Split multiline string by newlines and filter empty lines
@@ -150,27 +184,35 @@ pub(crate) fn parse_script(
             .filter(|s| !s.trim().is_empty())
             .collect();
 
-        let items: Vec<Item<ScriptContent>> = lines
+        let items: Vec<Item<String>> = lines
             .into_iter()
-            .map(|line| {
-                Item::Value(Value::new_concrete(
-                    ScriptContent::Command(line),
-                    Some(spanned.span()),
-                ))
-            })
+            .map(|line| Item::Value(Value::new_concrete(line, Some(spanned.span()))))
             .collect();
 
-        return Ok(ConditionalList::new(items));
+        return Ok(Script {
+            content: Some(ConditionalList::new(items)),
+            ..Default::default()
+        });
     }
 
-    // Try parsing as a single InlineScript mapping
+    // Try parsing as a sequence - simple list of commands
+    if node.as_sequence().is_some() {
+        let content = parse_conditional_list(node)?;
+        return Ok(Script {
+            content: Some(content),
+            ..Default::default()
+        });
+    }
+
+    // Try parsing as a full Script mapping with interpreter, env, content, etc.
     if let Some(mapping) = node.as_mapping() {
-        // Parse as a single InlineScript object manually
+        // Parse as a Script object
         let mut interpreter = None;
         let mut env = indexmap::IndexMap::new();
         let mut secrets = Vec::new();
         let mut content = None;
         let mut file = None;
+        let mut cwd = None;
 
         for (key_node, value_node) in mapping.iter() {
             let key = key_node.as_str();
@@ -251,6 +293,9 @@ pub(crate) fn parse_script(
                 "file" => {
                     file = Some(parse_field!("script.file", value_node));
                 }
+                "cwd" => {
+                    cwd = Some(parse_field!("script.cwd", value_node));
+                }
                 _ => {
                     return Err(ParseError::invalid_value(
                         "script",
@@ -258,26 +303,20 @@ pub(crate) fn parse_script(
                         (*key_node.span()).into(),
                     )
                     .with_suggestion(
-                        "Valid fields are: interpreter, env, secrets, content, file",
+                        "Valid fields are: interpreter, env, secrets, content, file, cwd",
                     ));
                 }
             }
         }
 
-        let inline_script = crate::stage0::types::InlineScript {
+        return Ok(Script {
             interpreter,
             env,
             secrets,
             content,
             file,
-        };
-
-        let span = get_span(node);
-        let items = vec![Item::Value(Value::new_concrete(
-            ScriptContent::Inline(Box::new(inline_script)),
-            Some(span),
-        ))];
-        return Ok(ConditionalList::new(items));
+            cwd,
+        });
     }
 
     Err(ParseError::expected_type(
@@ -366,7 +405,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 build.script = parse_script(value_node)?;
             }
             "noarch" => {
-                build.noarch = Some(parse_field!("build.noarch", value_node));
+                build.noarch = Some(parse_noarch(value_node)?);
             }
             "python" => {
                 build.python = parse_python_build(value_node)?;
@@ -702,7 +741,7 @@ mod tests {
             _ => panic!("Expected concrete value"),
         }
         assert!(build.string.is_none());
-        assert!(build.script.is_empty());
+        assert!(build.script.is_default());
     }
 
     #[test]
@@ -725,7 +764,8 @@ script:
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert_eq!(build.script.len(), 2);
+        assert!(build.script.content.is_some());
+        assert_eq!(build.script.content.as_ref().unwrap().len(), 2);
     }
 
     #[test]

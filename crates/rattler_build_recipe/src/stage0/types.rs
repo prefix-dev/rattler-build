@@ -634,6 +634,10 @@ pub struct InlineScript {
     /// File path to script
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<Value<String>>,
+
+    /// Working directory for the script
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<Value<String>>,
 }
 
 impl InlineScript {
@@ -645,6 +649,7 @@ impl InlineScript {
             secrets: _,
             content,
             file,
+            cwd,
         } = self;
 
         let mut vars = Vec::new();
@@ -665,9 +670,104 @@ impl InlineScript {
             vars.extend(file.used_variables());
         }
 
+        if let Some(cwd) = cwd {
+            vars.extend(cwd.used_variables());
+        }
+
         vars.sort();
         vars.dedup();
         vars
+    }
+}
+
+/// Stage0 Script - contains templates and conditionals, before evaluation
+/// This mirrors the structure of rattler_build_script::Script but with Value/ConditionalList wrappers
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Script {
+    /// Optional interpreter (e.g., "bash", "python")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interpreter: Option<Value<String>>,
+
+    /// Environment variables for the script
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub env: indexmap::IndexMap<String, Value<String>>,
+
+    /// Secrets to expose to the script
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<String>,
+
+    /// Inline script content - can be a string or array of commands with conditionals
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ConditionalList<String>>,
+
+    /// File path to script
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<Value<String>>,
+
+    /// Working directory for the script
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<Value<String>>,
+}
+
+impl Display for Script {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.content.is_some() {
+            write!(f, "Script(content: [...])")
+        } else if let Some(file) = &self.file {
+            write!(f, "Script(file: {})", file)
+        } else {
+            write!(f, "Script(default)")
+        }
+    }
+}
+
+impl Script {
+    /// Collect all variables used in this script
+    pub fn used_variables(&self) -> Vec<String> {
+        let Script {
+            interpreter,
+            env,
+            secrets: _,
+            content,
+            file,
+            cwd,
+        } = self;
+
+        let mut vars = Vec::new();
+
+        if let Some(interpreter) = interpreter {
+            vars.extend(interpreter.used_variables());
+        }
+
+        for value in env.values() {
+            vars.extend(value.used_variables());
+        }
+
+        if let Some(content) = content {
+            vars.extend(content.used_variables());
+        }
+
+        if let Some(file) = file {
+            vars.extend(file.used_variables());
+        }
+
+        if let Some(cwd) = cwd {
+            vars.extend(cwd.used_variables());
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+
+    /// Check if this is the default/empty script
+    pub fn is_default(&self) -> bool {
+        self.interpreter.is_none()
+            && self.env.is_empty()
+            && self.secrets.is_empty()
+            && self.content.is_none()
+            && self.file.is_none()
+            && self.cwd.is_none()
     }
 }
 

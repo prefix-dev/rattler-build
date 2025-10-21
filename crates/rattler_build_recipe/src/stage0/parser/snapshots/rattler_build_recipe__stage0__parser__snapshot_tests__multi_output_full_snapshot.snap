@@ -16,7 +16,7 @@ source:
 build:
   number: ${{ build_number }}
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -76,8 +76,9 @@ outputs:
       - openssl
   build:
     script:
-    - cmake -GNinja -DCMAKE_BUILD_TYPE=Release .
-    - ninja
+      content:
+      - cmake -GNinja -DCMAKE_BUILD_TYPE=Release .
+      - ninja
 - staging:
     name: python-build
   requirements:
@@ -90,7 +91,8 @@ outputs:
     - pybind11
   build:
     script:
-    - python setup.py build_ext
+      content:
+      - python setup.py build_ext
 - package:
     name: libcomplex
     version: ${{ version }}
@@ -103,7 +105,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []
@@ -144,7 +146,8 @@ outputs:
     repository: null
   tests:
   - script:
-    - test -f $PREFIX/lib/libcomplex.so
+      content:
+      - test -f $PREFIX/lib/libcomplex.so
 - package:
     name: py-complex
     version: ${{ version }}
@@ -156,7 +159,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []
@@ -212,7 +215,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []

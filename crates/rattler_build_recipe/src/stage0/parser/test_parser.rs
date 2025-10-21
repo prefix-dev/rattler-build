@@ -1,18 +1,17 @@
 use marked_yaml::Node;
-use rattler_build_jinja::JinjaTemplate;
 
 use crate::{
     ParseError,
     span::SpannedString,
     stage0::{
-        ConditionalList, Item, Value,
+        ConditionalList,
         parser::helpers::get_span,
         tests::{
             CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
             PackageContentsCheckFiles, PackageContentsTest, PerlTest, PythonTest, PythonVersion,
             RTest, RubyTest, TestType,
         },
-        types::{InlineScript, ScriptContent},
+        types::Script,
     },
 };
 
@@ -203,162 +202,10 @@ fn parse_ruby_test(
     Ok(RubyTest { requires })
 }
 
-fn parse_inline_script(
-    mapping: &marked_yaml::types::MarkedMappingNode,
-) -> Result<InlineScript, ParseError> {
-    let mut interpreter = None;
-    let mut env = indexmap::IndexMap::new();
-    let mut secrets = Vec::new();
-    let mut content = None;
-    let mut file = None;
-
-    for (key_node, value_node) in mapping.iter() {
-        let key = key_node.as_str();
-        match key {
-            "interpreter" => {
-                interpreter = Some(parse_value(value_node)?);
-            }
-            "env" => {
-                let env_mapping = value_node.as_mapping().ok_or_else(|| {
-                    ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
-                        .with_message("env must be a mapping")
-                })?;
-
-                for (env_key_node, env_value_node) in env_mapping.iter() {
-                    let env_key = env_key_node.as_str().to_string();
-                    let env_value = parse_value(env_value_node)?;
-                    env.insert(env_key, env_value);
-                }
-            }
-            "secrets" => {
-                let seq = value_node.as_sequence().ok_or_else(|| {
-                    ParseError::expected_type("sequence", "non-sequence", get_span(value_node))
-                        .with_message("Expected 'secrets' to be a list")
-                })?;
-
-                for item in seq.iter() {
-                    let scalar = item.as_scalar().ok_or_else(|| {
-                        ParseError::expected_type("string", "non-string", get_span(item))
-                            .with_message("Expected secret name to be a string")
-                    })?;
-                    secrets.push(SpannedString::from(scalar).as_str().to_string());
-                }
-            }
-            "content" => {
-                // Content can be either a string or a list
-                if let Some(scalar) = value_node.as_scalar() {
-                    // Single string - convert to ConditionalList with one item
-                    let spanned = SpannedString::from(scalar);
-                    let content_str = spanned.as_str();
-
-                    // Check if it's a template
-                    if content_str.contains("${{") && content_str.contains("}}") {
-                        let template = JinjaTemplate::new(content_str.to_string())
-                            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-                        content = Some(ConditionalList::new(vec![Item::Value(
-                            Value::new_template(template, Some(spanned.span())),
-                        )]));
-                    } else {
-                        // Plain string - split by newlines if multiline
-                        let lines: Vec<String> = content_str
-                            .lines()
-                            .map(|s| s.to_string())
-                            .filter(|s| !s.trim().is_empty())
-                            .collect();
-
-                        let items: Vec<Item<String>> = lines
-                            .into_iter()
-                            .map(|line| {
-                                Item::Value(Value::new_concrete(line, Some(spanned.span())))
-                            })
-                            .collect();
-
-                        content = Some(ConditionalList::new(items));
-                    }
-                } else {
-                    // Parse as a list (with possible conditionals)
-                    content = Some(parse_conditional_list(value_node)?);
-                }
-            }
-            "file" => {
-                file = Some(parse_value(value_node)?);
-            }
-            _ => {
-                return Err(ParseError::invalid_value(
-                    "inline script",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
-                )
-                .with_suggestion("Valid fields are: interpreter, env, secrets, content, file"));
-            }
-        }
-    }
-
-    Ok(InlineScript {
-        interpreter,
-        env,
-        secrets,
-        content,
-        file,
-    })
-}
-
-fn parse_script_field(node: &Node) -> Result<ConditionalList<ScriptContent>, ParseError> {
-    // Try parsing as a sequence first (the standard way for multiple items)
-    if node.as_sequence().is_some() {
-        return parse_conditional_list(node);
-    }
-
-    // Try parsing as a single scalar string
-    if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let script_str = spanned.as_str();
-
-        // Check if it's a template
-        if script_str.contains("${{") && script_str.contains("}}") {
-            let template = JinjaTemplate::new(script_str.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(
-                template,
-                Some(spanned.span()),
-            ))];
-            return Ok(ConditionalList::new(items));
-        }
-
-        // Plain string command
-        let items = vec![Item::Value(Value::new_concrete(
-            ScriptContent::Command(script_str.to_string()),
-            Some(spanned.span()),
-        ))];
-        return Ok(ConditionalList::new(items));
-    }
-
-    // Try parsing as a single inline script object (mapping)
-    if let Some(mapping) = node.as_mapping() {
-        // Parse the inline script from the mapping
-        let inline_script = parse_inline_script(mapping)?;
-        let span = get_span(node);
-        let items = vec![Item::Value(Value::new_concrete(
-            ScriptContent::Inline(Box::new(inline_script)),
-            Some(span),
-        ))];
-        return Ok(ConditionalList::new(items));
-    }
-
-    Err(ParseError::expected_type(
-        "sequence, scalar string, or inline script object",
-        "other",
-        get_span(node),
-    )
-    .with_message("script must be a string, list of strings/objects, or an inline script object"))
-}
-
 fn parse_commands_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTest, ParseError> {
-    use ConditionalList;
-
-    let mut script = ConditionalList::default();
+    let mut script = Script::default();
     let mut requirements = None;
     let mut files = None;
 
@@ -366,7 +213,8 @@ fn parse_commands_test(
         let key = key_node.as_str();
         match key {
             "script" => {
-                script = parse_script_field(value_node)?;
+                // Use the same parse_script function from build parser
+                script = crate::stage0::parser::build::parse_script(value_node)?;
             }
             "requirements" => {
                 requirements = Some(parse_commands_test_requirements(

@@ -8,7 +8,7 @@ package:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -52,30 +52,33 @@ extra:
   recipe-maintainers: []
 tests:
 - script:
-  - test.sh
+    content:
+    - test.sh
 - script:
-  - echo "hello list"
-  - echo "of commands"
-  - echo "in a script"
+    content:
+    - echo "hello list"
+    - echo "of commands"
+    - echo "in a script"
 - script:
-  - if: unix
-    then: echo "This is a unix-like system"
-    else: echo "This is not a unix-like system"
+    content:
+    - if: unix
+      then: echo "This is a unix-like system"
+      else: echo "This is not a unix-like system"
 - script:
-  - content:
+    content:
     - '#!/usr/bin/env bash'
     - echo "This is a script provided as content"
 - script:
-  - interpreter: bash
+    interpreter: bash
     content:
     - echo "This is a script provided as content"
 - script:
-  - file: test.sh
-- script:
-  - interpreter: bash
     file: test.sh
 - script:
-  - env:
+    interpreter: bash
+    file: test.sh
+- script:
+    env:
       TEST_ENV: Hello, world!
       FOOBAR: '42'
     content:

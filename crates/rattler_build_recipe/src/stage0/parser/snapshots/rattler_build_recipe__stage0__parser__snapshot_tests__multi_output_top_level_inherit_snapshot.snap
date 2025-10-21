@@ -124,11 +124,20 @@ MultiOutput(
                 ),
             },
             string: None,
-            script: ConditionalList(
-                [
-                    Value(Concrete { value: Command("echo \"Top-level build script\""), span: Some(Span { start: 277, end: 277, start_line: 14, start_column: 7, end_line: 14, end_column: 7 }) }),
-                ],
-            ),
+            script: Script {
+                interpreter: None,
+                env: {},
+                secrets: [],
+                content: Some(
+                    ConditionalList(
+                        [
+                            Value(Concrete { value: "echo \"Top-level build script\"", span: Some(Span { start: 277, end: 277, start_line: 14, start_column: 7, end_line: 14, end_column: 7 }) }),
+                        ],
+                    ),
+                ),
+                file: None,
+                cwd: None,
+            },
             noarch: None,
             python: PythonBuild {
                 entry_points: ConditionalList(
@@ -359,9 +368,14 @@ MultiOutput(
                             span: None,
                         },
                         string: None,
-                        script: ConditionalList(
-                            [],
-                        ),
+                        script: Script {
+                            interpreter: None,
+                            env: {},
+                            secrets: [],
+                            content: None,
+                            file: None,
+                            cwd: None,
+                        },
                         noarch: None,
                         python: PythonBuild {
                             entry_points: ConditionalList(
@@ -572,9 +586,14 @@ MultiOutput(
                             span: None,
                         },
                         string: None,
-                        script: ConditionalList(
-                            [],
-                        ),
+                        script: Script {
+                            interpreter: None,
+                            env: {},
+                            secrets: [],
+                            content: None,
+                            file: None,
+                            cwd: None,
+                        },
                         noarch: None,
                         python: PythonBuild {
                             entry_points: ConditionalList(
@@ -678,11 +697,20 @@ MultiOutput(
                     tests: [
                         Commands(
                             CommandsTest {
-                                script: ConditionalList(
-                                    [
-                                        Value(Concrete { value: Command("python -c \"import sub_package\""), span: Some(Span { start: 1037, end: 1037, start_line: 48, start_column: 13, end_line: 48, end_column: 13 }) }),
-                                    ],
-                                ),
+                                script: Script {
+                                    interpreter: None,
+                                    env: {},
+                                    secrets: [],
+                                    content: Some(
+                                        ConditionalList(
+                                            [
+                                                Value(Concrete { value: "python -c \"import sub_package\"", span: Some(Span { start: 1037, end: 1037, start_line: 48, start_column: 13, end_line: 48, end_column: 13 }) }),
+                                            ],
+                                        ),
+                                    ),
+                                    file: None,
+                                    cwd: None,
+                                },
                                 requirements: None,
                                 files: None,
                             },
@@ -793,11 +821,20 @@ MultiOutput(
                             ),
                         },
                         string: None,
-                        script: ConditionalList(
-                            [
-                                Value(Concrete { value: Command("echo \"Custom build overriding top-level\""), span: Some(Span { start: 1260, end: 1260, start_line: 58, start_column: 11, end_line: 58, end_column: 11 }) }),
-                            ],
-                        ),
+                        script: Script {
+                            interpreter: None,
+                            env: {},
+                            secrets: [],
+                            content: Some(
+                                ConditionalList(
+                                    [
+                                        Value(Concrete { value: "echo \"Custom build overriding top-level\"", span: Some(Span { start: 1260, end: 1260, start_line: 58, start_column: 11, end_line: 58, end_column: 11 }) }),
+                                    ],
+                                ),
+                            ),
+                            file: None,
+                            cwd: None,
+                        },
                         noarch: None,
                         python: PythonBuild {
                             entry_points: ConditionalList(

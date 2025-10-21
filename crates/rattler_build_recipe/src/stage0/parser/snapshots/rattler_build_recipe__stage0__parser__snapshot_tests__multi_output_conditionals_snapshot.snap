@@ -9,7 +9,7 @@ recipe:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -68,9 +68,10 @@ outputs:
       then: libcxx
   build:
     script:
-    - if: unix
-      then: make all
-      else: nmake all
+      content:
+      - if: unix
+        then: make all
+        else: nmake all
 - package:
     name: conditional-pkg
     version: 3.0.0
@@ -88,7 +89,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []
@@ -129,7 +130,8 @@ outputs:
     repository: null
   tests:
   - script:
-    - if: unix
-      then: test -f $PREFIX/bin/conditional-pkg
-    - if: win
-      then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1
+      content:
+      - if: unix
+        then: test -f $PREFIX/bin/conditional-pkg
+      - if: win
+        then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1

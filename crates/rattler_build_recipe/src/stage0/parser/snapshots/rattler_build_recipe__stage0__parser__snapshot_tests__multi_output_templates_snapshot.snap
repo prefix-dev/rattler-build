@@ -15,7 +15,7 @@ recipe:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -70,10 +70,11 @@ outputs:
     - python ${{ python_version }}
   build:
     script:
-    - if: unix
-      then: make -j${{ CPU_COUNT }}
-    - if: win
-      then: nmake
+      content:
+      - if: unix
+        then: make -j${{ CPU_COUNT }}
+      - if: win
+        then: nmake
 - package:
     name: ${{ name }}
     version: ${{ version }}
@@ -85,7 +86,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []
@@ -134,7 +135,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []

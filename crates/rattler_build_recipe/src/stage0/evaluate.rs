@@ -733,6 +733,76 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
 }
 
 /// Evaluate a ConditionalList<ScriptContent> into rattler_build_script::Script
+/// Evaluate a stage0::Script into a rattler_build_script::Script
+pub fn evaluate_script(
+    script: &crate::stage0::types::Script,
+    context: &EvaluationContext,
+) -> Result<rattler_build_script::Script, ParseError> {
+    use rattler_build_script::{Script, ScriptContent as ScriptContentOutput};
+
+    // If the script is default/empty, return default script
+    if script.is_default() {
+        return Ok(Script::default());
+    }
+
+    // Evaluate interpreter
+    let interpreter = if let Some(interp) = &script.interpreter {
+        Some(evaluate_string_value(interp, context)?)
+    } else {
+        None
+    };
+
+    // Evaluate environment variables
+    // Filter out keys whose values evaluate to empty strings
+    let mut env = indexmap::IndexMap::new();
+    for (key, val) in &script.env {
+        let evaluated_val = evaluate_string_value(val, context)?;
+        if !evaluated_val.is_empty() {
+            env.insert(key.clone(), evaluated_val);
+        }
+    }
+
+    // Copy secrets as-is
+    let secrets = script.secrets.clone();
+
+    // Evaluate cwd
+    let cwd = if let Some(cwd_val) = &script.cwd {
+        Some(PathBuf::from(evaluate_string_value(cwd_val, context)?))
+    } else {
+        None
+    };
+
+    // Evaluate content or file
+    let content = if let Some(file_val) = &script.file {
+        let file_str = evaluate_string_value(file_val, context)?;
+        ScriptContentOutput::Path(PathBuf::from(file_str))
+    } else if let Some(content_list) = &script.content {
+        let commands = evaluate_string_list(content_list, context)?;
+        if commands.is_empty() {
+            ScriptContentOutput::Default
+        } else if commands.len() == 1 {
+            // Single command - could be a path or command, use CommandOrPath
+            ScriptContentOutput::CommandOrPath(commands.into_iter().next().unwrap())
+        } else {
+            // Multiple commands
+            ScriptContentOutput::Commands(commands)
+        }
+    } else {
+        ScriptContentOutput::Default
+    };
+
+    Ok(Script {
+        interpreter,
+        env,
+        secrets,
+        content,
+        cwd,
+    })
+}
+
+/// Legacy function for backward compatibility
+/// Evaluates a ConditionalList<ScriptContent> into a rattler_build_script::Script
+#[deprecated(note = "Use evaluate_script instead, as the script type has been refactored")]
 pub fn evaluate_script_list(
     list: &ConditionalList<ScriptContent>,
     context: &EvaluationContext,
@@ -1470,26 +1540,30 @@ impl Evaluate for Stage0Build {
         });
 
         // Evaluate script
-        let script = evaluate_script_list(&self.script, context)?;
+        let script = evaluate_script(&self.script, context)?;
 
         // Evaluate noarch
         let noarch = match &self.noarch {
             None => None,
             Some(v) => {
-                let s = evaluate_value_to_string(v, context)?;
-                match s.as_str() {
-                    "python" => Some(NoArchType::python()),
-                    "generic" => Some(NoArchType::generic()),
-                    _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some(format!(
-                                "Invalid noarch type '{}'. Expected 'python' or 'generic'",
-                                s
-                            )),
-                            suggestion: None,
-                        });
+                // NoArchType is already validated during parsing, we just need to evaluate templates
+                match v {
+                    Value::Concrete { value, .. } => Some(*value),
+                    Value::Template { template, span } => {
+                        // If it's a template, we need to render it and parse as NoArchType
+                        let s = render_template(template.source(), context, span.as_ref())?;
+                        // Parse the string as NoArchType using serde
+                        serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
+                            .map(Some)
+                            .map_err(|_| ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: span.unwrap_or(Span::unknown()),
+                                message: Some(format!(
+                                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
+                                    s
+                                )),
+                                suggestion: None,
+                            })?
                     }
                 }
             }
@@ -1817,7 +1891,7 @@ impl Evaluate for Stage0CommandsTest {
     type Output = Stage1CommandsTest;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let script = evaluate_script_list(&self.script, context)?;
+        let script = evaluate_script(&self.script, context)?;
         let requirements = evaluate_optional_with_default(&self.requirements, context)?;
         let files = evaluate_optional_with_default(&self.files, context)?;
 

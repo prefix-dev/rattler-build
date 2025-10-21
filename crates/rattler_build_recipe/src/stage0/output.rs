@@ -138,12 +138,12 @@ pub struct StagingMetadata {
 /// Only the script field is allowed for staging outputs.
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct StagingBuild {
-    /// Build script - either inline commands or a file path
+    /// Build script - contains script content, interpreter, environment variables, etc.
     #[serde(
         default,
-        skip_serializing_if = "crate::stage0::types::ConditionalList::is_empty"
+        skip_serializing_if = "crate::stage0::types::Script::is_default"
     )]
-    pub script: crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>,
+    pub script: crate::stage0::types::Script,
 }
 
 /// Package output configuration
@@ -431,9 +431,7 @@ impl StagingBuild {
     /// Get all used variables in staging build
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
-        for item in &self.script {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(self.script.used_variables());
         vars.sort();
         vars.dedup();
         vars

@@ -28,10 +28,12 @@
 //! cargo example parse_recipe -- recipe.yaml --variants variants.yaml -Dunix=true
 //! ```
 
+use std::path::{Path, PathBuf};
+
 use clap::Parser;
 use indexmap::IndexMap;
 use miette::{IntoDiagnostic, NamedSource, Result};
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::variant_render::{RenderConfig, render_recipe_with_variants};
 use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
 
@@ -40,16 +42,20 @@ use rattler_build_recipe::{Evaluate, EvaluationContext, stage0};
 #[command(about = "Parse and evaluate a recipe YAML file", long_about = None)]
 struct Args {
     /// Path to the recipe YAML file
-    recipe: String,
+    recipe: PathBuf,
 
     /// Path to variant configuration file (e.g., variants.yaml)
     #[arg(short, long)]
-    variants: Option<String>,
+    variants: Option<PathBuf>,
 
     /// Define context variables (can be used multiple times)
     /// Format: key=value
     #[arg(short = 'D', long = "define", value_name = "KEY=VALUE")]
     variables: Vec<String>,
+
+    /// Disable experimental features
+    #[arg(long)]
+    no_experimental: bool,
 }
 
 fn main() -> Result<()> {
@@ -98,10 +104,10 @@ fn main() -> Result<()> {
     // Read the recipe file
     let yaml_content = fs_err::read_to_string(&args.recipe).into_diagnostic()?;
 
-    println!("=== Parsing recipe: {} ===\n", args.recipe);
+    println!("=== Parsing recipe: {:?} ===\n", args.recipe);
 
     // Create a named source for better error messages with miette
-    let source = NamedSource::new(&args.recipe, yaml_content.clone());
+    let source = NamedSource::new(&args.recipe.to_string_lossy(), yaml_content.clone());
 
     // Parse stage0 recipe
     let stage0_recipe = stage0::parse_recipe_from_source(&yaml_content)
@@ -124,6 +130,12 @@ fn main() -> Result<()> {
 
     // Create evaluation context
     let mut context = EvaluationContext::from_variables(variables.clone());
+
+    // Enable experimental features unless disabled
+    let mut jinja_config = JinjaConfig::default();
+    jinja_config.recipe_path = Some(PathBuf::from(args.recipe));
+    jinja_config.experimental = !args.no_experimental;
+    context.set_jinja_config(jinja_config);
 
     // Evaluate and merge the recipe's context section
     if !stage0_recipe.context.is_empty() {
@@ -215,15 +227,13 @@ fn main() -> Result<()> {
 }
 
 fn render_with_variants(
-    recipe_path: &str,
-    variant_file: &str,
+    recipe_path: &Path,
+    variant_file: &Path,
     extra_context: IndexMap<String, Variable>,
 ) -> Result<()> {
-    use std::path::Path;
-
     println!("=== Rendering recipe with variants ===");
-    println!("Recipe: {}", recipe_path);
-    println!("Variants: {}", variant_file);
+    println!("Recipe: {:?}", recipe_path);
+    println!("Variants: {:?}", variant_file);
 
     if !extra_context.is_empty() {
         println!("\nExtra context:");
@@ -239,12 +249,8 @@ fn render_with_variants(
     }
 
     // Render the recipe with all variant combinations
-    let rendered = render_recipe_with_variants(
-        Path::new(recipe_path),
-        &[Path::new(variant_file)],
-        Some(config),
-    )
-    .into_diagnostic()?;
+    let rendered = render_recipe_with_variants(recipe_path, &[variant_file], Some(config))
+        .into_diagnostic()?;
 
     println!(
         "\n=== Found {} variant combination(s) ===\n",
