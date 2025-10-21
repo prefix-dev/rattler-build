@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
-use rattler_conda_types::PackageName;
+use rattler_conda_types::{NoArchType, PackageName};
 
 use crate::{
     error::ParseError,
@@ -192,6 +192,12 @@ fn render_single_output_with_variants(
         used_vars.insert(NormalizedKey::from(spec.as_normalized()));
     }
 
+    // Insert always-included variables
+    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+    for key in ALWAYS_INCLUDE {
+        used_vars.insert(NormalizedKey::from(*key));
+    }
+
     // Filter to only variants that exist in the config
     let used_vars: HashSet<NormalizedKey> = used_vars
         .into_iter()
@@ -217,9 +223,6 @@ fn render_single_output_with_variants(
         // Include only target_platform in the variant (matches conda-build behavior)
         // build_platform and host_platform are available in the Jinja context but not in the hash
         let mut variant: BTreeMap<NormalizedKey, Variable> = BTreeMap::new();
-        if let Some(target_platform) = config.extra_context.get("target_platform") {
-            variant.insert("target_platform".into(), target_platform.clone());
-        }
 
         // For noarch packages, override target_platform to "noarch"
         if recipe.build.noarch.is_some() {
@@ -612,19 +615,60 @@ fn compute_output_variant(
     output: &Stage1Recipe,
     previous_outputs: &[(Stage1Recipe, BTreeMap<NormalizedKey, Variable>)],
 ) -> Result<BTreeMap<NormalizedKey, Variable>, ParseError> {
-    let mut output_variant = BTreeMap::new();
+    // Start with all the variables that should be included
+    let mut variables_to_include = HashSet::new();
 
     // Add all variables used in Jinja templates
-    for var in jinja_vars {
-        if let Some(value) = full_variant.get(var) {
-            output_variant.insert(var.clone(), value.clone());
-        }
-    }
+    variables_to_include.extend(jinja_vars.iter().cloned());
 
     // Add all variables from dependencies
-    for var in dep_vars {
-        if let Some(value) = full_variant.get(var) {
-            output_variant.insert(var.clone(), value.clone());
+    variables_to_include.extend(dep_vars.iter().cloned());
+
+    // Add extra `use_keys` from the build.variant section
+    let use_keys: HashSet<NormalizedKey> = output
+        .build
+        .variant
+        .use_keys
+        .iter()
+        .map(|k| NormalizedKey::from(k.as_str()))
+        .collect();
+    variables_to_include.extend(use_keys);
+
+    // If the recipe is `noarch: python`, remove the python key that may come from dependencies
+    let noarch = output.build.noarch.unwrap_or(NoArchType::none());
+    if noarch.is_python() {
+        variables_to_include.remove(&NormalizedKey::from("python"));
+    }
+
+    // Special handling of CONDA_BUILD_SYSROOT
+    // If c_compiler or cxx_compiler are used in jinja, add CONDA_BUILD_SYSROOT
+    if jinja_vars.contains(&NormalizedKey::from("c_compiler"))
+        || jinja_vars.contains(&NormalizedKey::from("cxx_compiler"))
+    {
+        variables_to_include.insert(NormalizedKey::from("CONDA_BUILD_SYSROOT"));
+    }
+
+    // Always add target_platform, channel_sources, and channel_targets
+    // (These are typically needed for hash computation and build metadata)
+    variables_to_include.insert(NormalizedKey::from("target_platform"));
+    variables_to_include.insert(NormalizedKey::from("channel_sources"));
+    variables_to_include.insert(NormalizedKey::from("channel_targets"));
+
+    // Apply ignore_keys filter - remove any keys specified in build.variant.ignore_keys
+    let ignore_keys: HashSet<NormalizedKey> = output
+        .build
+        .variant
+        .ignore_keys
+        .iter()
+        .map(|k| NormalizedKey::from(k.as_str()))
+        .collect();
+    variables_to_include.retain(|k| !ignore_keys.contains(k));
+
+    // Now build the actual variant map with the filtered variables
+    let mut output_variant = BTreeMap::new();
+    for var in variables_to_include {
+        if let Some(value) = full_variant.get(&var) {
+            output_variant.insert(var, value.clone());
         }
     }
 
@@ -661,8 +705,8 @@ fn compute_output_variant(
         }
     }
 
-    // Handle noarch - if noarch, set target_platform to "noarch"
-    if !output.build.noarch.is_none() {
+    // Handle noarch - if noarch, override target_platform to "noarch"
+    if !noarch.is_none() {
         output_variant.insert(
             NormalizedKey::from("target_platform"),
             Variable::from("noarch"),

@@ -2258,7 +2258,7 @@ impl Evaluate for Stage0Recipe {
         // Now that evaluation is complete, we know which variables were actually accessed.
         // Compute the hash from the actual variant (accessed variables) and render the build string.
         // Variables that should ALWAYS be included in the hash, even if not accessed
-        const ALWAYS_INCLUDE: &[&str] = &["target_platform"];
+        const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
 
         let accessed_vars = context_with_vars.accessed_variables();
         let free_specs = requirements

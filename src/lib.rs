@@ -34,7 +34,6 @@ mod unix;
 mod windows;
 
 mod package_cache_reporter;
-pub mod source_code;
 
 use std::{
     collections::{BTreeMap, HashMap},

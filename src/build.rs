@@ -8,8 +8,10 @@ use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    apply_patch_custom, metadata::Output, metadata::build_reindexed_channels,
-    render::resolved_dependencies::RunExportsDownload, render::solver::load_repodatas,
+    apply_patch_custom,
+    metadata::{Output, build_reindexed_channels},
+    package_test::PackageContentsTestExt as _,
+    render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
     tool_configuration,
 };
 
@@ -186,14 +188,10 @@ pub async fn run_build(
 
     // We run all the package content tests
     for test in output.recipe.tests() {
-        if let TestType::PackageContents {
-            package_contents: _,
-        } = test
-        {
-            // TODO implement
-            // package_contents
-            //     .run_test(&paths_json, &output)
-            //     .into_diagnostic()?;
+        if let TestType::PackageContents { package_contents } = test {
+            package_contents
+                .run_test(&paths_json, &output)
+                .into_diagnostic()?;
         }
     }
 
