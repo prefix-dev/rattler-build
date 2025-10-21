@@ -462,10 +462,15 @@ requirements:
         variant.insert("target_platform".to_string(), Variable::from("linux-64"));
         variant.insert("python".to_string(), Variable::from("3.11"));
 
-        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
 
+        assert!(!used_variant.contains_key(&NormalizedKey::from("python")));
+        assert_eq!(
+            used_variant.get(&NormalizedKey::from("target_platform")),
+            Some(&Variable::from("noarch"))
+        );
         let build_string = recipe.build().string.as_ref().unwrap().as_str();
-        assert_eq!(build_string, "pyhb0f4dca_5");
+        assert_eq!(build_string, "pyh4616a5c_5");
     }
 
     #[test]

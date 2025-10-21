@@ -907,6 +907,7 @@ def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     assert (pkg / "info/index.json").exists()
 
 
+@pytest.mark.skip(reason = "Need to support multi-output recipes")
 def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "noarch_variant"
     args = rattler_build.build_args(

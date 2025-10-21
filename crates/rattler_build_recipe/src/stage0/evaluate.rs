@@ -1005,6 +1005,14 @@ impl Evaluate for Value<url::Url> {
     }
 }
 
+impl Evaluate for Option<Value<url::Url>> {
+    type Output = Option<url::Url>;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        self.clone().map(|v| v.evaluate(context)).transpose()
+    }
+}
+
 impl Evaluate for Value<License> {
     type Output = License;
 
@@ -1174,21 +1182,9 @@ impl Evaluate for Stage0About {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1About {
-            homepage: self
-                .homepage
-                .as_ref()
-                .map(|v| v.evaluate(context))
-                .transpose()?,
-            repository: self
-                .repository
-                .as_ref()
-                .map(|v| v.evaluate(context))
-                .transpose()?,
-            documentation: self
-                .documentation
-                .as_ref()
-                .map(|v| v.evaluate(context))
-                .transpose()?,
+            homepage: self.homepage.evaluate(context)?,
+            repository: self.repository.evaluate(context)?,
+            documentation: self.documentation.evaluate(context)?,
             license: self
                 .license
                 .as_ref()
@@ -1266,15 +1262,19 @@ impl Evaluate for Stage0VariantKeyUsage {
             None => None,
             Some(val) => {
                 let s = evaluate_value_to_string(val, context)?;
-                Some(s.parse::<i32>().map_err(|_| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: Span::unknown(),
-                    message: Some(format!(
-                        "Invalid integer value for down_prioritize_variant: '{}'",
-                        s
-                    )),
-                    suggestion: None,
-                })?)
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.parse::<i32>().map_err(|_| ParseError {
+                        kind: ErrorKind::InvalidValue,
+                        span: Span::unknown(),
+                        message: Some(format!(
+                            "Invalid integer value for down_prioritize_variant: '{}'",
+                            s
+                        )),
+                        suggestion: None,
+                    })?)
+                }
             }
         };
 
@@ -1528,15 +1528,20 @@ impl Evaluate for Stage0Build {
             Value::Concrete { value: n, .. } => *n,
             Value::Template { template, span } => {
                 let s = render_template(template.source(), context, span.as_ref())?;
-                s.parse::<u64>().map_err(|_| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.unwrap_or_else(Span::unknown),
-                    message: Some(format!(
-                        "Invalid build number: '{}' is not a valid positive integer",
-                        s
-                    )),
-                    suggestion: None,
-                })?
+                // If we render to an empty string, treat it as 0
+                if s.is_empty() {
+                    0
+                } else {
+                    s.parse::<u64>().map_err(|_| ParseError {
+                        kind: ErrorKind::InvalidValue,
+                        span: span.unwrap_or_else(Span::unknown),
+                        message: Some(format!(
+                            "Invalid build number: '{}' is not a valid positive integer",
+                            s
+                        )),
+                        suggestion: None,
+                    })?
+                }
             }
         };
 
@@ -1958,7 +1963,7 @@ impl Evaluate for Stage0Recipe {
             }
         };
 
-        let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+        let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
             .variables()
             .iter()
             .filter(|(k, _)| {
@@ -1983,6 +1988,11 @@ impl Evaluate for Stage0Recipe {
             })
             .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
             .collect();
+
+        // Ensure that `target_platform` is set to "noarch" for noarch packages
+        if !noarch.is_none() {
+            actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
+        }
 
         // Compute hash from the actual variant (includes prefix like "py312h...")
         let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
