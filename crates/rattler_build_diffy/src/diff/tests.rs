@@ -1,10 +1,10 @@
 use super::*;
 use crate::{
+    PatchFormatter,
     apply::apply,
     diff::{DiffLine, DiffRange},
     patch::Diff,
     range::Range,
-    PatchFormatter,
 };
 
 // Helper macros are based off of the ones used in [dissimilar](https://docs.rs/dissimilar)

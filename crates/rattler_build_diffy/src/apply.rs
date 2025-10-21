@@ -168,11 +168,7 @@ impl FuzzyComparable for [u8] {
             s1.similarity(s2, config)
         } else {
             // Fall back to exact byte comparison
-            if self == other {
-                1.0
-            } else {
-                0.0
-            }
+            if self == other { 1.0 } else { 0.0 }
         }
     }
 }
@@ -712,7 +708,7 @@ where
 mod test {
     use std::path::PathBuf;
 
-    use crate::{apply, Diff};
+    use crate::{Diff, apply};
 
     fn load_files(name: &str) -> (String, String) {
         let base_folder = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

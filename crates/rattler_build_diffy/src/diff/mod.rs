@@ -1,8 +1,8 @@
 use crate::{
+    LineEnd,
     patch::{Diff, Hunk, HunkRange, Line},
     range::{DiffRange, SliceLike},
     utils::{Classifier, Text},
-    LineEnd,
 };
 use std::{borrow::Cow, cmp, ops};
 

@@ -8,8 +8,7 @@ repository = "https://github.com/bmwill/diffy"
 readme = "README.md"
 keywords = ["diff", "patch", "merge"]
 categories = ["text-processing"]
-rust-version = "1.62.1"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 nu-ansi-term = "0.50"

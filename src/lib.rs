@@ -379,7 +379,7 @@ pub async fn get_build_output(
 
     let outputs_and_variants = find_variants(
         &variant_config,
-        &recipe_path,
+        recipe_path,
         &recipe_content,
         build_data.target_platform,
         build_data.build_platform,

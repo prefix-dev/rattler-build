@@ -379,7 +379,7 @@ fn render_template(
 
             Err(ParseError {
                 kind: ErrorKind::JinjaError,
-                span: span.map_or_else(|| Span::unknown(), |s| *s),
+                span: span.map_or_else(Span::unknown, |s| *s),
                 message: Some(format!(
                     "Template rendering failed: {} (template: {})",
                     e, template
@@ -824,21 +824,6 @@ pub fn evaluate_entry_point_list(
 /// - `python >=3.8` (has version constraint)
 /// - `numpy 1.20.*` (has version constraint)
 /// - `gcc_linux-64` (has build constraint via name)
-
-/// Check if a MatchSpec is a "free spec" (no version constraints).
-///
-/// A free spec is one that doesn't have any version constraints, build constraints,
-/// or other specifications beyond the package name. These are used to determine
-/// which variant variables should be included in the hash.
-///
-/// Examples of free specs:
-/// - `python` (free)
-/// - `numpy` (free)
-///
-/// Examples of NON-free specs:
-/// - `python >=3.8` (has version constraint)
-/// - `numpy 1.20.*` (has version constraint)
-/// - `gcc_linux-64` (has build constraint via name)
 pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
     let rattler_conda_types::MatchSpec {
         name,
@@ -950,10 +935,7 @@ fn process_value(
 ///
 /// Handles both JSON pin expressions and regular MatchSpec strings
 fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
-    let span = span
-        .as_ref()
-        .map(|s| s.clone())
-        .unwrap_or_else(Span::unknown);
+    let span = (*span).unwrap_or_else(Span::unknown);
 
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
     if s.trim().starts_with('{') {

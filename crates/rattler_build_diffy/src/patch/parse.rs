@@ -1,10 +1,10 @@
 //! Parse a Patch
 
-use super::{Hunk, HunkRange, Line, ESCAPED_CHARS_BYTES, NO_NEWLINE_AT_EOF};
+use super::{ESCAPED_CHARS_BYTES, Hunk, HunkRange, Line, NO_NEWLINE_AT_EOF};
 use crate::{
+    LineEnd,
     patch::Diff,
     utils::{LineIter, Text},
-    LineEnd,
 };
 use std::{borrow::Cow, fmt};
 
@@ -551,8 +551,8 @@ fn hunk_lines<'a, T: Text + ?Sized + ToOwned>(
 
 #[cfg(test)]
 mod tests {
-    use crate::patch::parse::{parse_multiple_with_config, HunkRangeStrategy, ParserConfig};
     use crate::patch::Line;
+    use crate::patch::parse::{HunkRangeStrategy, ParserConfig, parse_multiple_with_config};
 
     use super::{parse, parse_bytes};
 

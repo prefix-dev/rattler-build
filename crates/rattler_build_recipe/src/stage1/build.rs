@@ -240,7 +240,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 }
 
 /// Evaluated build configuration with all templates and conditionals resolved
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -299,27 +299,6 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
-}
-
-impl Default for Build {
-    fn default() -> Self {
-        Self {
-            number: 0,
-            string: None,
-            script: Script::default(),
-            noarch: None,
-            python: PythonBuild::default(),
-            skip: Vec::new(),
-            always_copy_files: GlobVec::default(),
-            always_include_files: GlobVec::default(),
-            merge_build_and_host_envs: false,
-            files: GlobVec::default(),
-            dynamic_linking: DynamicLinking::default(),
-            variant: VariantKeyUsage::default(),
-            prefix_detection: PrefixDetection::default(),
-            post_process: Vec::new(),
-        }
-    }
 }
 
 /// Dynamic linking configuration

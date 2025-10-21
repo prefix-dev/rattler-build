@@ -1,8 +1,8 @@
 use crate::{
+    LineEnd,
     diff::DiffOptions,
     range::{DiffRange, Range, SliceLike},
     utils::Classifier,
-    LineEnd,
 };
 use std::{cmp, fmt};
 
@@ -365,10 +365,10 @@ fn merge_solutions<'ancestor, 'ours, 'theirs, T: ?Sized + SliceLike>(
 
         solution.push(merge_range);
 
-        if ours.map_or(true, |range| range.is_empty()) {
+        if ours.is_none_or(|range| range.is_empty()) {
             ours = our_solution.next();
         }
-        if theirs.map_or(true, |range| range.is_empty()) {
+        if theirs.is_none_or(|range| range.is_empty()) {
             theirs = their_solution.next();
         }
     }

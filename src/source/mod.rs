@@ -180,13 +180,7 @@ fn convert_url_source(
     use rattler_build_source_cache::Checksum;
 
     // Convert checksum if present
-    let checksum = if let Some(sha256) = &url_src.sha256 {
-        Some(Checksum::Sha256(sha256.to_vec()))
-    } else if let Some(md5) = &url_src.md5 {
-        Some(Checksum::Md5(md5.to_vec()))
-    } else {
-        None
-    };
+    let checksum = url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()));
 
     Ok(CacheUrlSource {
         urls: url_src.url.clone(),
