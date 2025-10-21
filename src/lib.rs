@@ -128,8 +128,8 @@ fn find_variants(
     recipe_path: &std::path::Path,
     recipe_content: &str,
     target_platform: Platform,
-    _build_platform: Platform,
-    _host_platform: Platform,
+    build_platform: Platform,
+    host_platform: Platform,
 ) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
     // Parse the recipe
     tracing::info!("Parsing recipe for variant expansion");
@@ -147,18 +147,10 @@ fn find_variants(
     };
 
     // Build render config with platform information
-    let mut render_config = RenderConfig::new()
+    let render_config = RenderConfig::new()
         .with_context("target_platform", target_platform.to_string())
-        .with_context("build_platform", _build_platform.to_string())
-        .with_context("host_platform", _host_platform.to_string());
-
-    // Add platform selectors for conditionals as boolean values (unix, win, osx, linux)
-    // These are derived from target_platform and should be proper booleans in Jinja
-    render_config = render_config
-        .with_context("unix", target_platform.is_unix())
-        .with_context("win", target_platform.is_windows())
-        .with_context("linux", target_platform.is_linux())
-        .with_context("osx", target_platform.is_osx());
+        .with_context("build_platform", build_platform.to_string())
+        .with_context("host_platform", host_platform.to_string());
 
     // Render with variant config
     let rendered_variants = render_recipe_with_variant_config(
@@ -187,13 +179,21 @@ fn find_variants(
             Platform::NoArch
         };
 
-        let default_noarch = NoArchType::none();
-        let noarch = recipe.build().noarch.as_ref().unwrap_or(&default_noarch);
-        let hash = HashInfo::from_variant(&variant, noarch);
+        // The recipe has already been evaluated and has its build string resolved
+        // (including proper variant filtering for noarch python)
+        // Extract the build string and hash from the already-evaluated recipe
+        let build_string = recipe
+            .build()
+            .string
+            .as_ref()
+            .map(|s| s.as_str().to_string())
+            .expect("Recipe build string should be resolved after evaluation");
 
-        // TODO: Build string computation needs to be integrated
-        // For now, use the hash display which formats as "prefixh<hash>"
-        let build_string = hash.to_string();
+        // The recipe's used_variant already contains the filtered variant (noarch python excludes python keys)
+        // Use it to reconstruct the hash for consistency
+        let noarch = recipe.build().noarch.as_ref();
+        let hash =
+            HashInfo::from_variant(&recipe.used_variant, noarch.unwrap_or(&NoArchType::none()));
 
         recipes.insert(DiscoveredOutput {
             name: recipe.package().name().as_source().to_string(),

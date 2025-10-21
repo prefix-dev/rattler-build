@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 pub fn compute_hash(
     variant: &BTreeMap<NormalizedKey, Variable>,
     noarch: &rattler_conda_types::NoArchType,
-) -> String {
+) -> (String, String) {
     use sha1::{Digest, Sha1};
 
     // Compute the version prefix (py, np, etc.)
@@ -45,7 +45,7 @@ pub fn compute_hash(
 
     // Take first 7 characters and combine with prefix
     let hash = hex.chars().take(7).collect::<String>();
-    format!("{}h{}", prefix, hash)
+    (prefix, hash)
 }
 
 /// Compute the hash prefix based on special packages in the variant
@@ -253,13 +253,13 @@ mod tests {
             Variable::from("3.11".to_string()),
         );
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let (prefix, hash) = compute_hash(&variant, &NoArchType::none());
 
         // Hash should include prefix "py311h" + 7 hex chars = "py311h" + hash
-        assert!(hash.starts_with("py311h"));
-        assert!(hash.len() > 7);
+        assert_eq!(prefix, "py311");
+        assert_eq!(hash.len(), 7);
         // The hex part should be valid hex
-        assert!(hash[6..].chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]
@@ -282,7 +282,7 @@ mod tests {
         // Same input should produce same hash
         assert_eq!(hash1, hash2);
         // Should have both numpy and python prefix
-        assert!(hash1.contains("np") && hash1.contains("py"));
+        assert!(hash1.0.contains("np") && hash1.0.contains("py"));
     }
 
     #[test]
@@ -307,7 +307,7 @@ mod tests {
         // Different inputs should produce different hashes
         assert_ne!(hash1, hash2);
         // Should have different python versions in prefix
-        assert!(hash1.starts_with("py311"));
-        assert!(hash2.starts_with("py312"));
+        assert_eq!(hash1.0, "py311");
+        assert_eq!(hash2.0, "py312");
     }
 }

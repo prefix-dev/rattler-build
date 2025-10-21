@@ -19,8 +19,13 @@
 //! 4. Compute the hash from the actual variant
 //! 5. Call `Build::render_build_string_with_hash()` to finalize the build string
 
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+    str::FromStr,
+};
 
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
 use rattler_digest::{Md5Hash, Sha256Hash};
 
@@ -82,7 +87,7 @@ use crate::{
         },
     },
 };
-use rattler_build_jinja::Jinja;
+use rattler_build_jinja::{Jinja, Variable};
 
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
@@ -575,46 +580,52 @@ pub fn evaluate_entry_point_list(
 /// - `python >=3.8` (has version constraint)
 /// - `numpy 1.20.*` (has version constraint)
 /// - `gcc_linux-64` (has build constraint via name)
-fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
-    // Must have a name
-    if spec.name.is_none() {
-        return false;
-    }
 
-    // Check if there's any version specification
-    if spec.version.is_some() {
-        return false;
-    }
+/// Check if a MatchSpec is a "free spec" (no version constraints).
+///
+/// A free spec is one that doesn't have any version constraints, build constraints,
+/// or other specifications beyond the package name. These are used to determine
+/// which variant variables should be included in the hash.
+///
+/// Examples of free specs:
+/// - `python` (free)
+/// - `numpy` (free)
+///
+/// Examples of NON-free specs:
+/// - `python >=3.8` (has version constraint)
+/// - `numpy 1.20.*` (has version constraint)
+/// - `gcc_linux-64` (has build constraint via name)
+pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
+    let rattler_conda_types::MatchSpec {
+        name,
+        version,
+        build,
+        build_number,
+        channel,
+        subdir,
+        namespace,
+        md5,
+        sha256,
+        file_name,
+        extras,
+        url,
+        license,
+    } = spec;
 
-    // Check if there's a build specification
-    if spec.build.is_some() || spec.build_number.is_some() {
-        return false;
-    }
-
-    // Check if there's a channel specification
-    if spec.channel.is_some() {
-        return false;
-    }
-
-    // Check if there's a subdir specification
-    if spec.subdir.is_some() {
-        return false;
-    }
-
-    // Check if there's a namespace specification
-    if spec.namespace.is_some() {
-        return false;
-    }
-
-    // Check if there's a hash specification (md5, sha256)
-    if spec.md5.is_some() || spec.sha256.is_some() {
-        return false;
-    }
-
-    // If we get here, it's a free spec (just the package name)
-    true
+    name.is_some()
+        && version.is_none()
+        && build.is_none()
+        && build_number.is_none()
+        && channel.is_none()
+        && subdir.is_none()
+        && namespace.is_none()
+        && md5.is_none()
+        && sha256.is_none()
+        && file_name.is_none()
+        && extras.is_none()
+        && url.is_none()
+        && license.is_none()
 }
-
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
 /// This handles dependencies which may be:
@@ -627,125 +638,33 @@ fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
 /// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
 /// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
 ///
-/// Free specs (dependencies with no version constraints) are tracked as variant variables
-/// during evaluation, as they influence the build variant.
+/// # Arguments
+/// * `list` - The conditional list of dependencies to evaluate
+/// * `context` - The evaluation context
+///   are tracked as variant variables. This should be true for build/host dependencies
+///   and false for run dependencies, since run dependencies don't affect the build variant.
 pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     let mut results = Vec::new();
 
-    // Iterate over the conditional list items directly to preserve span information
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                match value {
-                    Value::Concrete {
-                        value: match_spec, ..
-                    } => {
-                        // Concrete MatchSpec - already validated at parse time!
-                        // Check if this is a "free spec" (no version constraints) and track as variant
-                        if is_free_matchspec(&match_spec.0) {
-                            let name = match_spec.0.name.as_ref().map(|n| n.as_normalized());
-                            if let Some(name) = name {
-                                context.track_access(name);
-                            }
-                        }
-                        results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-                    }
-                    Value::Template { template, span } => {
-                        // Template - need to render and parse
-                        let s = render_template(template.source(), context, span.as_ref())?;
-
-                        // Filter out empty strings from templates like `${{ "numpy" if unix }}`
-                        if s.is_empty() {
-                            continue;
-                        }
-
-                        // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                        if s.trim().starts_with('{') {
-                            // Try to deserialize as Dependency (which handles pin types)
-                            let dep: Dependency =
-                                serde_yaml::from_str(&s).map_err(|e| ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: span.unwrap_or_else(Span::unknown),
-                                    message: Some(format!("Failed to parse pin dependency: {}", e)),
-                                    suggestion: None,
-                                })?;
-                            results.push(dep);
-                        } else {
-                            // It's a regular MatchSpec string
-                            let spec =
-                                MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
-                                    ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: span.unwrap_or_else(Span::unknown),
-                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                                        suggestion: None,
-                                    }
-                                })?;
-                            // Check if this is a free spec and track as variant
-                            if is_free_matchspec(&spec) {
-                                let name = spec.name.as_ref().map(|n| n.as_normalized());
-                                if let Some(name) = name {
-                                    context.track_access(name);
-                                }
-                            }
-                            results.push(Dependency::Spec(Box::new(spec)));
-                        }
-                    }
-                }
+                process_value(value, context, &mut results)?;
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
-
                 let items_to_process = if condition_met {
                     Some(&cond.then)
                 } else {
                     cond.else_value.as_ref()
                 };
-                if let Some(items_to_process) = items_to_process {
-                    for val in items_to_process.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: match_spec, ..
-                            } => {
-                                // Check if this is a free spec and track as variant
-                                if is_free_matchspec(&match_spec.0) {
-                                    let name =
-                                        match_spec.0.name.as_ref().map(|n| n.as_normalized());
-                                    if let Some(name) = name {
-                                        context.track_access(name);
-                                    }
-                                }
-                                results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-                            }
-                            Value::Template { template, span } => {
-                                // Render the template and parse as matchspec
-                                let s = render_template(template.source(), context, span.as_ref())?;
 
-                                // Filter out empty strings
-                                if s.is_empty() {
-                                    continue;
-                                }
-
-                                let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
-                                    .map_err(|e| ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: span.unwrap_or_else(Span::unknown),
-                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                                        suggestion: None,
-                                    })?;
-                                // Check if this is a free spec and track as variant
-                                if is_free_matchspec(&spec) {
-                                    let name = spec.name.as_ref().map(|n| n.as_normalized());
-                                    if let Some(name) = name {
-                                        context.track_access(name);
-                                    }
-                                }
-                                results.push(Dependency::Spec(Box::new(spec)));
-                            }
-                        }
+                if let Some(items) = items_to_process {
+                    for val in items.iter() {
+                        process_value(val, context, &mut results)?;
                     }
                 }
             }
@@ -753,6 +672,64 @@ pub fn evaluate_dependency_list(
     }
 
     Ok(results)
+}
+
+/// Process a single Value into a Dependency and add to results
+fn process_value(
+    value: &Value<crate::stage0::SerializableMatchSpec>,
+    context: &EvaluationContext,
+    results: &mut Vec<crate::stage1::Dependency>,
+) -> Result<(), ParseError> {
+    match value {
+        Value::Concrete {
+            value: match_spec, ..
+        } => {
+            results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
+            Ok(())
+        }
+        Value::Template { template, span } => {
+            let s = render_template(template.source(), context, span.as_ref())?;
+
+            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+            if s.is_empty() {
+                return Ok(());
+            }
+
+            let dep = parse_dependency_string(&s, span)?;
+            results.push(dep);
+            Ok(())
+        }
+    }
+}
+
+/// Parse a dependency string into a Dependency
+///
+/// Handles both JSON pin expressions and regular MatchSpec strings
+fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
+    let span = span
+        .as_ref()
+        .map(|s| s.clone())
+        .unwrap_or_else(Span::unknown);
+
+    // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+    if s.trim().starts_with('{') {
+        // Try to deserialize as Dependency (which handles pin types)
+        serde_yaml::from_str(s).map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span,
+            message: Some(format!("Failed to parse pin dependency: {}", e)),
+            suggestion: None,
+        })
+    } else {
+        // It's a regular MatchSpec string
+        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span,
+            message: Some(format!("Invalid match spec '{}': {}", s, e)),
+            suggestion: None,
+        })?;
+        Ok(Dependency::Spec(Box::new(spec)))
+    }
 }
 
 /// Evaluate a ConditionalList<ScriptContent> into rattler_build_script::Script
@@ -1230,6 +1207,7 @@ impl Evaluate for Stage0RunExports {
     type Output = Stage1RunExports;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Run exports don't affect the build variant
         Ok(Stage1RunExports {
             noarch: evaluate_dependency_list(&self.noarch, context)?,
             strong: evaluate_dependency_list(&self.strong, context)?,
@@ -1252,6 +1230,7 @@ impl Evaluate for Stage0Requirements {
         Ok(Stage1Requirements {
             build: evaluate_dependency_list(&self.build, context)?,
             host: evaluate_dependency_list(&self.host, context)?,
+            // Run dependencies don't affect the build variant, so don't track free specs
             run: evaluate_dependency_list(&self.run, context)?,
             run_constraints: evaluate_dependency_list(&self.run_constraints, context)?,
             run_exports: self.run_exports.evaluate(context)?,
@@ -1953,45 +1932,72 @@ impl Evaluate for Stage0Recipe {
         // Extract the resolved context variables (all variables from the evaluation context)
         let resolved_context = context_with_vars.variables().clone();
 
-        // IMPORTANT: Finalize the build string with the hash
         // Now that evaluation is complete, we know which variables were actually accessed.
         // Compute the hash from the actual variant (accessed variables) and render the build string.
-        use rattler_build_types::NormalizedKey;
-        use std::collections::BTreeMap;
-
         // Variables that should ALWAYS be included in the hash, even if not accessed
         const ALWAYS_INCLUDE: &[&str] = &["target_platform"];
 
         let accessed_vars = context_with_vars.accessed_variables();
-        let actual_variant: BTreeMap<NormalizedKey, rattler_build_jinja::Variable> =
-            context_with_vars
-                .variables()
-                .iter()
-                .filter(|(k, _)| {
-                    // Include if accessed OR if it's an always-include variable
-                    accessed_vars.contains(k.as_str()) || ALWAYS_INCLUDE.contains(&k.as_str())
-                })
-                .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
-                .collect();
+        let free_specs = requirements
+            .free_specs()
+            .into_iter()
+            .map(NormalizedKey::from)
+            .collect::<HashSet<_>>();
+
+        // Get the noarch type to determine which variant keys to exclude
+        let noarch = build.noarch.unwrap_or(NoArchType::none());
+
+        // For noarch packages, certain variant keys should be excluded from the hash
+        // because these packages work across multiple versions of the language
+        let should_exclude_from_variant = |key: &str| -> bool {
+            if noarch.is_python() {
+                // Python noarch packages should exclude python version from hash
+                key == "python"
+            } else {
+                false
+            }
+        };
+
+        let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+            .variables()
+            .iter()
+            .filter(|(k, _)| {
+                let key_str = k.as_str();
+
+                // Context variables (defined in the context: section) should not be included
+                // in the variant for hash computation. We need to determine which variables
+                // are context variables vs variant variables.
+                // Exclude context variables (from context: section)
+                if self.context.contains_key(key_str) {
+                    return false;
+                }
+                // Exclude if it's a noarch-excluded key
+                if should_exclude_from_variant(key_str) {
+                    return false;
+                }
+
+                // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+                accessed_vars.contains(key_str)
+                    || free_specs.contains(&NormalizedKey::from(key_str))
+                    || ALWAYS_INCLUDE.contains(&key_str)
+            })
+            .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+            .collect();
 
         // Compute hash from the actual variant (includes prefix like "py312h...")
-        let noarch_default = rattler_conda_types::NoArchType::none();
-        let noarch = build.noarch.as_ref().unwrap_or(&noarch_default);
-        let hash = crate::stage1::compute_hash(&actual_variant, noarch);
+        let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
 
-        // If no build string was specified, use the default: {hash}_{build_number}
-        // Note: hash already includes prefix and "h", so it's like "py312h507f6e9_0"
+        // If no build string was specified, use the default: {prefix}{hash}_{build_number}
         if build.string.is_none() {
             build.string = Some(crate::stage1::build::BuildString::resolved(format!(
-                "{}_{}",
-                hash, build.number
+                "{}h{}_{}",
+                prefix, hash, build.number
             )));
         } else {
             // For custom build strings, we need to extract just the hash part (without prefix)
             // The template will add its own formatting
             // Extract the part after the last 'h' which is the actual hash
-            let hash_only = hash.rsplit('h').next().unwrap_or(&hash);
-            build.resolve_build_string(hash_only, &context_with_vars)?;
+            build.resolve_build_string(&hash, &context_with_vars)?;
         }
 
         Ok(Stage1Recipe::new(

@@ -159,6 +159,7 @@ build:
         // Free specs in build/host requirements ARE tracked as variant variables
         // python is a free spec (no version constraints), so it should be in the variant
         assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+        println!("Used variant keys: {:?}", used_variant.keys());
         assert!(
             used_variant.contains_key(&NormalizedKey::from("python")),
             "Free spec 'python' should be tracked as variant"
@@ -322,10 +323,8 @@ build:
 
         let hash = compute_hash(&variant, &NoArchType::none());
 
-        // Should start with "py312h" (python prefix + h + hash)
-        assert!(hash.starts_with("py312h"));
-        // Should be followed by 7 hex chars
-        assert_eq!(hash.len(), "py312h".len() + 7);
+        // Should start with "py312" (python prefix + h + hash)
+        assert_eq!(hash.0, "py312");
     }
 
     #[test]
@@ -342,7 +341,7 @@ build:
 
         // Should start with "np120py311h" (numpy prefix + python prefix + h + hash)
         // Order is: np, py, pl, lua, r
-        assert!(hash.starts_with("np120py311h"));
+        assert_eq!(hash.0, "np120py311");
     }
 
     #[test]
@@ -357,8 +356,7 @@ build:
         let hash = compute_hash(&variant, &NoArchType::python());
 
         // For python noarch, should just be "pyh" + hash
-        assert!(hash.starts_with("pyh"));
-        assert_eq!(hash.len(), "pyh".len() + 7);
+        assert_eq!(hash.0, "py");
     }
 
     #[test]
@@ -397,8 +395,8 @@ build:
 
         assert_ne!(hash1, hash2);
         // But both should have py311 and py312 prefixes respectively
-        assert!(hash1.starts_with("py311h"));
-        assert!(hash2.starts_with("py312h"));
+        assert_eq!(hash1.0, "py311");
+        assert_eq!(hash2.0, "py312");
     }
 
     #[test]
@@ -418,46 +416,82 @@ build:
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
 
         let build_string = recipe.build().string.as_ref().unwrap().as_str();
-
-        // Default should be: py311h<hash>_5 (prefix + h + hash + _ + build_number)
-        // But python wasn't used, so should just be h<hash>_5
-        assert!(build_string.starts_with("h"));
-        assert!(build_string.ends_with("_5"));
-        // Format: h + 7 hex chars + _ + number
-        let parts: Vec<&str> = build_string.split('_').collect();
-        assert_eq!(parts.len(), 2);
-        assert_eq!(parts[0].len(), 8); // "h" + 7 hex chars
-        assert_eq!(parts[1], "5");
+        assert_eq!(build_string, "hb0f4dca_5");
     }
 
     #[test]
-    fn test_build_string_custom_with_hash_variable() {
+    fn test_build_string_py311() {
         let yaml = r#"
 package:
   name: test
   version: "1.0.0"
 
 build:
-  number: 0
-  string: custom_${{ hash }}_build
+  number: 5
+
+requirements:
+  host:
+    - python
 "#;
         let mut variant = IndexMap::new();
-        variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.11"));
 
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
 
         let build_string = recipe.build().string.as_ref().unwrap().as_str();
+        assert_eq!(build_string, "py311h48b7412_5");
+    }
 
-        // Should be: custom_<hash>_build (hash is just 7 hex chars, no prefix)
-        assert!(build_string.starts_with("custom_"));
-        assert!(build_string.ends_with("_build"));
+    #[test]
+    fn test_build_string_py_noarch() {
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
 
-        // Extract hash part
-        let parts: Vec<&str> = build_string.split('_').collect();
-        assert_eq!(parts.len(), 3);
-        assert_eq!(parts[0], "custom");
-        assert_eq!(parts[1].len(), 7); // Just the 7 hex chars
-        assert_eq!(parts[2], "build");
+build:
+  number: 5
+  noarch: python
+
+requirements:
+  host:
+    - python
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.11"));
+
+        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+
+        let build_string = recipe.build().string.as_ref().unwrap().as_str();
+        assert_eq!(build_string, "pyhb0f4dca_5");
+    }
+
+    #[test]
+    fn test_build_string_custom_with_hash_variable() {
+        let yaml = r#"
+context:
+  build_number: 12
+
+package:
+  name: test
+  version: "1.0.0"
+
+build:
+  number: ${{ build_number }}
+  string: custom_${{ hash }}_build_${{ target_platform }}_${{ foobar }}_${{ build_number }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant.insert("foobar".to_string(), Variable::from("baz"));
+
+        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+
+        assert_eq!(
+            recipe.build().string.as_ref().unwrap().as_str(),
+            "custom_60d57d3_build_osx-arm64_baz_12"
+        );
     }
 
     #[test]
@@ -545,7 +579,7 @@ build:
         let hash = compute_hash(&variant, &NoArchType::none());
 
         // Snapshot test to ensure hash format doesn't change
-        insta::assert_snapshot!(hash);
+        insta::assert_snapshot!(format!("{}h{}", hash.0, hash.1));
     }
 
     /// Test that variant order doesn't affect hash (BTreeMap ensures sorted keys)
@@ -584,10 +618,11 @@ build:
         );
         variant.insert(NormalizedKey::from("r_base"), Variable::from("4.2"));
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let (prefix, hash) = compute_hash(&variant, &NoArchType::none());
 
         // Should start with "r42h"
-        assert!(hash.starts_with("r42h"));
+        assert_eq!(prefix, "r42");
+        assert_eq!(hash, "aee9047");
     }
 
     /// Test that Perl packages get proper prefix
@@ -600,10 +635,10 @@ build:
         );
         variant.insert(NormalizedKey::from("perl"), Variable::from("5.32"));
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let (prefix, _hash) = compute_hash(&variant, &NoArchType::none());
 
-        // Should start with "pl532h"
-        assert!(hash.starts_with("pl532h"));
+        // Should start with "pl532"
+        assert_eq!(prefix, "pl532");
     }
 
     /// Test combined prefixes in correct order
@@ -619,9 +654,9 @@ build:
         variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20")); // np
         variant.insert(NormalizedKey::from("r_base"), Variable::from("4.2")); // r
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let (prefix, _hash) = compute_hash(&variant, &NoArchType::none());
 
         // Order should be: np, py, pl, lua, r
-        assert!(hash.starts_with("np120py311pl532r42h"));
+        assert_eq!(prefix, "np120py311pl532r42");
     }
 }

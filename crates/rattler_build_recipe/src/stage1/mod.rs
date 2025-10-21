@@ -42,6 +42,8 @@ pub use tests::TestType;
 // Re-export glob types from rattler_build_types
 pub use rattler_build_types::{AllOrGlobVec, GlobCheckerVec, GlobVec, GlobWithSource};
 
+// TODO(refactor): Track more closely where variables come from (context, computed vars, variant vars)
+
 /// Evaluation context containing variables for template rendering and conditional evaluation
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {

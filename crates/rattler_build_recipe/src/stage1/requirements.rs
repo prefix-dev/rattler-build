@@ -1,8 +1,10 @@
 //! Stage 1 Requirements - evaluated dependencies with concrete values
 
 use rattler_build_types::Pin;
-use rattler_conda_types::MatchSpec;
+use rattler_conda_types::{MatchSpec, PackageName};
 use serde::{Deserialize, Serialize};
+
+use crate::stage0::evaluate::is_free_matchspec;
 
 /// A pin_subpackage dependency - pins to another output of the same recipe
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -245,6 +247,25 @@ impl Requirements {
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
+    }
+
+    /// Get the free specs of the rendered dependencies (any MatchSpec without pins)
+    pub fn free_specs(&self) -> Vec<PackageName> {
+        self.build
+            .iter()
+            .chain(self.host.iter())
+            .filter_map(|dep| match dep {
+                Dependency::Spec(spec) => {
+                    if is_free_matchspec(spec.as_ref()) {
+                        // is_free_matchspec ensures name is Some
+                        Some(spec.name.clone().unwrap())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .collect()
     }
 }
 

@@ -200,7 +200,7 @@ fn render_single_output_with_variants(
     // Render recipe for each variant combination
     let mut results = Vec::with_capacity(combinations.len());
 
-    for mut variant in combinations {
+    for variant in combinations {
         // Build evaluation context from variant values and extra context
         // Preserve Variable types (e.g., booleans for platform selectors)
         let mut context_map = config.extra_context.clone();
@@ -213,22 +213,10 @@ fn render_single_output_with_variants(
 
         let recipe = stage0_recipe.evaluate(&context)?;
 
-        // Include target_platform in the variant (matches conda-build behavior)
-        // build_platform and host_platform are available in the Jinja context but not in the hash
-        // Platform selectors (unix, osx, linux, win) are also not included in the hash
-        if !variant.contains_key(&"target_platform".into()) {
-            if let Some(target_platform) = config.extra_context.get("target_platform") {
-                variant.insert("target_platform".into(), target_platform.clone());
-            }
-        }
-
-        // For noarch packages, override target_platform to "noarch"
-        // This matches conda-build behavior and ensures consistent hashes
-        if recipe.build.noarch.is_some() {
-            variant.insert("target_platform".into(), "noarch".into());
-        }
-
-        results.push(RenderedVariant { variant, recipe });
+        results.push(RenderedVariant {
+            variant: recipe.used_variant.clone(),
+            recipe,
+        });
     }
 
     Ok(results)

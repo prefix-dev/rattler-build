@@ -64,6 +64,12 @@ impl From<String> for NormalizedKey {
     }
 }
 
+impl From<PackageName> for NormalizedKey {
+    fn from(p: PackageName) -> Self {
+        p.as_normalized().into()
+    }
+}
+
 impl From<&str> for NormalizedKey {
     fn from(s: &str) -> Self {
         NormalizedKey(s.to_string())
