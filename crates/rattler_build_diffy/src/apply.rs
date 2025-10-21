@@ -715,8 +715,8 @@ mod test {
             .join("test-data")
             .join(name);
 
-        let base_image = std::fs::read_to_string(base_folder.join("target.txt")).unwrap();
-        let patch = std::fs::read_to_string(base_folder.join("patch.patch")).unwrap();
+        let base_image = fs_err::read_to_string(base_folder.join("target.txt")).unwrap();
+        let patch = fs_err::read_to_string(base_folder.join("patch.patch")).unwrap();
         (base_image, patch)
     }
 

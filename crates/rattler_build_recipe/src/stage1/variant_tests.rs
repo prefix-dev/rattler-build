@@ -457,6 +457,8 @@ build:
 requirements:
   host:
     - python
+  run:
+    - __unix
 "#;
         let mut variant = IndexMap::new();
         variant.insert("target_platform".to_string(), Variable::from("linux-64"));
@@ -464,13 +466,18 @@ requirements:
 
         let (recipe, used_variant) = evaluate_recipe(yaml, variant);
 
+        // For a noarch recipe, python should not be in the used variant
         assert!(!used_variant.contains_key(&NormalizedKey::from("python")));
+        // The virtual __unix dependency should be included in the variant
+        assert!(used_variant.contains_key(&NormalizedKey::from("__unix")));
         assert_eq!(
             used_variant.get(&NormalizedKey::from("target_platform")),
             Some(&Variable::from("noarch"))
         );
+
+        insta::assert_snapshot!(format!("{:?}", used_variant));
         let build_string = recipe.build().string.as_ref().unwrap().as_str();
-        assert_eq!(build_string, "pyh4616a5c_5");
+        assert_eq!(build_string, "pyh5600cae_5");
     }
 
     #[test]

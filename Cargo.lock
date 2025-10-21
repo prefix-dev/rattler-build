@@ -4296,6 +4296,7 @@ dependencies = [
 name = "rattler_build_diffy"
 version = "0.4.2"
 dependencies = [
+ "fs-err",
  "insta",
  "nu-ansi-term",
  "rstest",

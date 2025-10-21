@@ -18,3 +18,4 @@ thiserror = "2.0.12"
 [dev-dependencies]
 insta = { workspace = true, features = ["glob"] }
 rstest = { workspace = true }
+fs-err = { workspace = true }
