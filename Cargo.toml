@@ -269,7 +269,9 @@ rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator
   "cli",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
-rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
+rattler_build_variant_config = { path = "crates/rattler_build_variant_config", features = [
+  "parser",
+] }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
 rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
   "variant-config",

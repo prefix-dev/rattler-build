@@ -113,6 +113,9 @@ pub mod combination;
 pub mod conda_build_config;
 pub mod config;
 pub mod error;
+pub mod evaluate;
+pub mod stage0_types;
+pub mod yaml_parser;
 
 #[cfg(feature = "parser")]
 pub mod parser;
@@ -122,6 +125,11 @@ pub use combination::compute_combinations;
 pub use conda_build_config::{SelectorContext, load_conda_build_config};
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
+
+// Re-export advanced types for users who need fine-grained control
+pub use evaluate::evaluate_variant_config;
+pub use stage0_types::{Conditional, ConditionalList, Item, ListOrItem, Value};
+pub use yaml_parser::Stage0VariantConfig;
 
 #[cfg(feature = "parser")]
 pub use parser::{parse_variant_file, parse_variant_str};

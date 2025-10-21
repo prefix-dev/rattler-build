@@ -238,11 +238,13 @@ fn render_single_output_with_variants(
     // If no combinations, render once with just the extra context
     if combinations.is_empty() {
         // Use from_variables to preserve Variable types (e.g., booleans)
-        let mut context = EvaluationContext::from_variables(config.extra_context.clone())
-            .with_context(&stage0_recipe.context)?;
+        let mut context = EvaluationContext::from_variables(config.extra_context.clone());
 
         // Set the JinjaConfig with experimental and recipe_path
         context.set_jinja_config(create_jinja_config(&config));
+
+        // Render actual context
+        context.with_context(&stage0_recipe.context)?;
 
         let recipe = stage0_recipe.evaluate(&context)?;
 
@@ -269,11 +271,14 @@ fn render_single_output_with_variants(
             context_map.insert(key.normalize(), value.clone());
         }
 
-        let mut context =
-            EvaluationContext::from_variables(context_map).with_context(&stage0_recipe.context)?;
+        // Use from_variables to preserve Variable types (e.g., booleans)
+        let mut context = EvaluationContext::from_variables(context_map);
 
         // Set the JinjaConfig with experimental and recipe_path
         context.set_jinja_config(create_jinja_config(&config));
+
+        // Render actual context
+        context.with_context(&stage0_recipe.context)?;
 
         let recipe = stage0_recipe.evaluate(&context)?;
 
@@ -321,10 +326,9 @@ fn render_multi_output_with_variants(
 
     // If no combinations, render once with just the extra context
     if combinations.is_empty() {
-        let mut context = EvaluationContext::from_variables(config.extra_context.clone())
-            .with_context(&stage0_recipe.context)?;
-
+        let mut context = EvaluationContext::from_variables(config.extra_context.clone());
         context.set_jinja_config(create_jinja_config(&config));
+        context.with_context(&stage0_recipe.context)?;
 
         // Evaluate the multi-output recipe - this returns Vec<Stage1Recipe>
         let outputs = stage0_recipe.evaluate(&context)?;
@@ -350,10 +354,11 @@ fn render_multi_output_with_variants(
             context_map.insert(key.normalize(), value.clone());
         }
 
-        let mut context =
-            EvaluationContext::from_variables(context_map).with_context(&stage0_recipe.context)?;
+        let mut context = EvaluationContext::from_variables(context_map);
 
         context.set_jinja_config(create_jinja_config(&config));
+
+        context.with_context(&stage0_recipe.context)?;
 
         // Evaluate the multi-output recipe - this returns Vec<Stage1Recipe>
         // Each output already has its hash and variant computed correctly

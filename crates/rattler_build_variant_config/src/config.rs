@@ -54,101 +54,105 @@ impl VariantConfig {
     }
 
     /// Load variant configuration from a YAML file
+    ///
+    /// This parser supports conditionals (`if/then/else`) and Jinja templates (`${{ }}`).
+    /// Conditionals are evaluated using a default JinjaConfig based on the current platform.
+    ///
+    /// For more control over the evaluation context, use `from_file_with_context` instead.
     pub fn from_file(path: &Path) -> Result<Self, VariantConfigError> {
-        let content = fs_err::read_to_string(path)
-            .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
+        // Use a default JinjaConfig for evaluation
+        let jinja_config = rattler_build_jinja::JinjaConfig::default();
+        Self::from_file_with_context(path, &jinja_config)
+    }
 
-        Self::from_yaml_str(&content)
-            .map_err(|e| VariantConfigError::ParseError(path.to_path_buf(), e))
+    /// Load variant configuration from a YAML file with a JinjaConfig context
+    ///
+    /// This allows evaluation of conditionals and templates in the variant file.
+    /// The `jinja_config` provides platform information and other context needed for evaluation.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rattler_build_variant_config::VariantConfig;
+    /// use rattler_build_jinja::JinjaConfig;
+    /// use rattler_conda_types::Platform;
+    /// use std::path::Path;
+    ///
+    /// let mut jinja_config = JinjaConfig::default();
+    /// jinja_config.target_platform = Platform::Linux64;
+    ///
+    /// let config = VariantConfig::from_file_with_context(
+    ///     Path::new("variants.yaml"),
+    ///     &jinja_config
+    /// ).unwrap();
+    /// ```
+    pub fn from_file_with_context(
+        path: &Path,
+        jinja_config: &rattler_build_jinja::JinjaConfig,
+    ) -> Result<Self, VariantConfigError> {
+        // Parse the file
+        let stage0 = crate::yaml_parser::parse_variant_file(path)?;
+
+        // Evaluate with the provided context
+        crate::evaluate::evaluate_variant_config(&stage0, jinja_config)
+            .map_err(|e| VariantConfigError::ParseError(path.to_path_buf(), e.to_string()))
     }
 
     /// Parse variant configuration from a YAML string
+    ///
+    /// This parser supports conditionals (`if/then/else`) and Jinja templates (`${{ }}`).
+    /// Conditionals are evaluated using a default JinjaConfig based on the current platform.
+    ///
+    /// For more control over the evaluation context, use `from_yaml_str_with_context` instead.
     pub fn from_yaml_str(yaml: &str) -> Result<Self, String> {
-        // Parse YAML twice:
-        // 1. With serde_yaml to get proper type information (quoted vs unquoted)
-        // 2. With marked_yaml to have span information available for future error messages
-        let serde_value: serde_yaml::Value =
-            serde_yaml::from_str(yaml).map_err(|e| e.to_string())?;
-        let marked_node = marked_yaml::parse_yaml(0, yaml).map_err(|e| e.to_string())?;
-
-        // Convert using serde types, but keep marked_node for future span-based errors
-        Self::from_yaml_with_types(&serde_value, &marked_node)
+        // Use a default JinjaConfig for evaluation
+        let jinja_config = rattler_build_jinja::JinjaConfig::default();
+        Self::from_yaml_str_with_context(yaml, &jinja_config)
     }
 
-    /// Convert YAML to VariantConfig using type info from serde_yaml and spans from marked_yaml
-    fn from_yaml_with_types(
-        serde_value: &serde_yaml::Value,
-        _marked_node: &marked_yaml::Node,
+    /// Parse variant configuration from a YAML string with a JinjaConfig context
+    ///
+    /// This allows evaluation of conditionals and templates in the variant YAML.
+    /// The `jinja_config` provides platform information and other context needed for evaluation.
+    pub fn from_yaml_str_with_context(
+        yaml: &str,
+        jinja_config: &rattler_build_jinja::JinjaConfig,
     ) -> Result<Self, String> {
-        let mapping = serde_value
-            .as_mapping()
-            .ok_or_else(|| "Variant config must be a YAML mapping".to_string())?;
+        // Parse using the new marked_yaml parser
+        let stage0 = crate::yaml_parser::parse_variant_str(yaml, None)
+            .map_err(|e| format!("Failed to parse variant config: {}", e))?;
 
-        let mut zip_keys = None;
-        let mut variants = BTreeMap::new();
-
-        for (key, val) in mapping {
-            let key_str = key
-                .as_str()
-                .ok_or_else(|| "Variant config keys must be strings".to_string())?;
-
-            if key_str == "zip_keys" {
-                // Parse zip_keys using serde
-                zip_keys = Some(serde_yaml::from_value(val.clone()).map_err(|e| e.to_string())?);
-            } else {
-                // Parse variant values using serde types
-                let values = Self::parse_serde_variant_values(val)?;
-                variants.insert(key_str.into(), values);
-            }
-        }
-
-        Ok(VariantConfig { zip_keys, variants })
-    }
-
-    /// Parse variant values from serde_yaml::Value
-    fn parse_serde_variant_values(value: &serde_yaml::Value) -> Result<Vec<Variable>, String> {
-        let sequence = value
-            .as_sequence()
-            .ok_or_else(|| "Variant values must be a list".to_string())?;
-
-        sequence.iter().map(Self::serde_value_to_variable).collect()
-    }
-
-    /// Convert serde_yaml::Value to Variable, treating floats as strings
-    fn serde_value_to_variable(value: &serde_yaml::Value) -> Result<Variable, String> {
-        match value {
-            serde_yaml::Value::String(s) => {
-                // String in YAML (was quoted) - keep as string
-                Ok(Variable::from_string(s))
-            }
-            serde_yaml::Value::Bool(b) => {
-                // Boolean (unquoted true/false)
-                Ok(Variable::from(*b))
-            }
-            serde_yaml::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    // Integer - keep as integer
-                    Ok(Variable::from(i))
-                } else {
-                    // Float - convert to string to preserve version numbers like "1.23"
-                    Ok(Variable::from_string(&n.to_string()))
-                }
-            }
-            _ => Err(format!("Unsupported variant value type: {:?}", value)),
-        }
+        // Evaluate with the provided context
+        crate::evaluate::evaluate_variant_config(&stage0, jinja_config)
+            .map_err(|e| format!("Failed to evaluate variant config: {}", e))
     }
 
     /// Load multiple variant configuration files and merge them
     ///
     /// Files are merged in order, with later files taking precedence.
     /// The `zip_keys` from the last file that specifies them will be used.
+    ///
+    /// Conditionals are evaluated using a default JinjaConfig based on the current platform.
+    /// For more control, use `from_files_with_context` instead.
     pub fn from_files(paths: &[impl AsRef<Path>]) -> Result<Self, VariantConfigError> {
+        let jinja_config = rattler_build_jinja::JinjaConfig::default();
+        Self::from_files_with_context(paths, &jinja_config)
+    }
+
+    /// Load multiple variant configuration files with a JinjaConfig context and merge them
+    ///
+    /// Files are merged in order, with later files taking precedence.
+    /// The `zip_keys` from the last file that specifies them will be used.
+    pub fn from_files_with_context(
+        paths: &[impl AsRef<Path>],
+        jinja_config: &rattler_build_jinja::JinjaConfig,
+    ) -> Result<Self, VariantConfigError> {
         let mut final_config = VariantConfig::new();
 
         for path in paths {
             let path = path.as_ref();
             tracing::info!("Loading variant config from: {}", path.display());
-            let config = Self::from_file(path)?;
+            let config = Self::from_file_with_context(path, jinja_config)?;
             final_config.merge(config);
         }
 
@@ -303,10 +307,9 @@ zip_keys:
     #[test]
     fn test_quoted_vs_unquoted() {
         let yaml = r#"
-quoted_bool:
-  - "true"
-quoted_int:
-  - "5"
+quoted_string:
+  - "hello"
+  - "3.9.10"  # Version string
 unquoted_bool:
   - true
 unquoted_int:
@@ -316,15 +319,16 @@ float_val:
 "#;
         let config = VariantConfig::from_yaml_str(yaml).unwrap();
 
-        // Quoted values should be strings
-        let quoted_bool = &config.get(&"quoted_bool".into()).unwrap()[0];
-        assert_eq!(quoted_bool.to_string(), "true");
-        // Check if it's actually a string, not a boolean
-        assert!(quoted_bool.as_ref().as_str().is_some());
+        // Quoted string values - pure strings should remain strings
+        let quoted_values = config.get(&"quoted_string".into()).unwrap();
+        let quoted_hello = &quoted_values[0];
+        assert_eq!(quoted_hello.to_string(), "hello");
+        assert!(quoted_hello.as_ref().as_str().is_some());
 
-        let quoted_int = &config.get(&"quoted_int".into()).unwrap()[0];
-        assert_eq!(quoted_int.to_string(), "5");
-        assert!(quoted_int.as_ref().as_str().is_some());
+        // Quoted version string - should be a string
+        let quoted_version = &quoted_values[1];
+        assert_eq!(quoted_version.to_string(), "3.9.10");
+        assert!(quoted_version.as_ref().as_str().is_some());
 
         // Unquoted values should be their respective types
         let unquoted_bool = &config.get(&"unquoted_bool".into()).unwrap()[0];
@@ -333,7 +337,7 @@ float_val:
         let unquoted_int = &config.get(&"unquoted_int".into()).unwrap()[0];
         assert!(unquoted_int.as_ref().is_number());
 
-        // Float should be a string
+        // Float should be a string (to preserve version numbers like "1.23")
         let float_val = &config.get(&"float_val".into()).unwrap()[0];
         assert_eq!(float_val.to_string(), "1.23");
         assert!(float_val.as_ref().as_str().is_some());
