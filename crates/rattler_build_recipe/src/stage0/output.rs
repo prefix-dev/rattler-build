@@ -3,6 +3,7 @@
 //! This module defines the types for multi-output recipes, which allow building
 //! multiple packages from a single recipe with staging/caching support.
 
+use indexmap::IndexMap;
 use serde::Serialize;
 
 use crate::stage0::{
@@ -33,8 +34,8 @@ pub struct SingleOutputRecipe {
     pub schema_version: Option<u32>,
 
     /// Context variables for Jinja template rendering (order-preserving)
-    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub context: IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     pub package: Package,
     pub build: Build,
@@ -55,8 +56,8 @@ pub struct MultiOutputRecipe {
     pub schema_version: Option<u32>,
 
     /// Context variables for Jinja template rendering (order-preserving)
-    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub context: IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     /// Recipe metadata (name is optional, version is required)
     pub recipe: RecipeMetadata,

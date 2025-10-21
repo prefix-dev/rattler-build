@@ -9,10 +9,10 @@
 //! - Stage 1: Add variants from dependencies and compute lazy hashes
 
 use std::collections::{BTreeMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::PackageName;
@@ -31,6 +31,10 @@ pub struct RenderConfig {
     /// Additional context variables to provide (beyond variant values)
     /// These can be strings, booleans, numbers, etc. using the Variable type
     pub extra_context: IndexMap<String, Variable>,
+    /// Whether experimental features are enabled
+    pub experimental: bool,
+    /// Path to the recipe file (for relative path resolution in Jinja functions)
+    pub recipe_path: Option<PathBuf>,
 }
 
 impl RenderConfig {
@@ -44,6 +48,18 @@ impl RenderConfig {
         self.extra_context.insert(key.into(), value.into());
         self
     }
+
+    /// Enable experimental features
+    pub fn with_experimental(mut self, experimental: bool) -> Self {
+        self.experimental = experimental;
+        self
+    }
+
+    /// Set the recipe path for relative path resolution
+    pub fn with_recipe_path(mut self, recipe_path: impl Into<PathBuf>) -> Self {
+        self.recipe_path = Some(recipe_path.into());
+        self
+    }
 }
 
 /// Result of rendering a recipe with a specific variant combination
@@ -53,6 +69,14 @@ pub struct RenderedVariant {
     pub variant: BTreeMap<NormalizedKey, Variable>,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
+}
+
+/// Helper function to create a JinjaConfig from RenderConfig
+fn create_jinja_config(config: &RenderConfig) -> JinjaConfig {
+    let mut jinja_config = JinjaConfig::default();
+    jinja_config.experimental = config.experimental;
+    jinja_config.recipe_path = config.recipe_path.clone();
+    jinja_config
 }
 
 /// Render a recipe with variant configuration files
@@ -102,7 +126,12 @@ pub fn render_recipe_with_variants(
     variant_files: &[impl AsRef<Path>],
     config: Option<RenderConfig>,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    let config = config.unwrap_or_default();
+    let mut config = config.unwrap_or_default();
+
+    // Set the recipe path if not already set
+    if config.recipe_path.is_none() {
+        config.recipe_path = Some(recipe_path.to_path_buf());
+    }
 
     // Read and parse the recipe
     let yaml_content = fs_err::read_to_string(recipe_path)
@@ -177,8 +206,11 @@ fn render_single_output_with_variants(
     // If no combinations, render once with just the extra context
     if combinations.is_empty() {
         // Use from_variables to preserve Variable types (e.g., booleans)
-        let context = EvaluationContext::from_variables(config.extra_context.clone())
+        let mut context = EvaluationContext::from_variables(config.extra_context.clone())
             .with_context(&stage0_recipe.context)?;
+
+        // Set the JinjaConfig with experimental and recipe_path
+        context.set_jinja_config(create_jinja_config(&config));
 
         let recipe = stage0_recipe.evaluate(&context)?;
 
@@ -208,8 +240,11 @@ fn render_single_output_with_variants(
             context_map.insert(key.normalize(), value.clone());
         }
 
-        let context =
+        let mut context =
             EvaluationContext::from_variables(context_map).with_context(&stage0_recipe.context)?;
+
+        // Set the JinjaConfig with experimental and recipe_path
+        context.set_jinja_config(create_jinja_config(&config));
 
         let recipe = stage0_recipe.evaluate(&context)?;
 
@@ -342,8 +377,11 @@ fn stage1_render_multi_output(
                 context_map.insert(key.normalize(), value.clone());
             }
 
-            let context = EvaluationContext::from_variables(context_map)
+            let mut context = EvaluationContext::from_variables(context_map)
                 .with_context(&stage0.recipe.context)?;
+
+            // Set the JinjaConfig with experimental and recipe_path
+            context.set_jinja_config(create_jinja_config(config));
 
             // Collect additional variant keys from dependencies
             let (additional_vars, exact_pins) = match output {
@@ -394,8 +432,11 @@ fn stage1_render_multi_output(
                     context_map.insert(key.normalize(), value.clone());
                 }
 
-                let context = EvaluationContext::from_variables(context_map)
+                let mut context = EvaluationContext::from_variables(context_map)
                     .with_context(&stage0.recipe.context)?;
+
+                // Set the JinjaConfig with experimental and recipe_path
+                context.set_jinja_config(create_jinja_config(config));
 
                 match output {
                     Output::Package(pkg_output) => {

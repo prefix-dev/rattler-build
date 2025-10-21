@@ -89,6 +89,234 @@ use crate::{
 };
 use rattler_build_jinja::{Jinja, Variable};
 
+/// Helper to render a Jinja template to a Variable (preserving type information)
+fn render_template_to_variable(
+    template: &str,
+    context: &EvaluationContext,
+    span: Option<&Span>,
+) -> Result<Variable, ParseError> {
+    // Create a Jinja instance with the configuration from the evaluation context
+    let jinja_config = context.jinja_config().clone();
+    let mut jinja = Jinja::new(jinja_config);
+
+    // Use with_context to add all variables from the evaluation context
+    jinja = jinja.with_context(context.variables());
+
+    let trimmed = template.trim();
+
+    // Check if it's a simple expression: starts with "${{", ends with "}}", and no additional "${{" inside
+    // Simple examples: "${{ true }}", "${{ 42 }}", "${{ name }}"
+    // Complex examples: "${{ a }}/${{ b }}", "prefix ${{ x }}", "${{ a }} ${{ b }}"
+    let is_simple_expression = trimmed.starts_with("${{")
+        && trimmed.ends_with("}}")
+        && !trimmed[3..trimmed.len() - 2].contains("${{");
+
+    let minijinja_value = if is_simple_expression {
+        // Extract the expression between ${{ and }}
+        let expression = trimmed[3..trimmed.len() - 2].trim();
+
+        // Simple expression - use compile_expression for type-preserving evaluation
+        let env = jinja.env();
+        let compiled_expr = match env.compile_expression(expression) {
+            Ok(expr) => expr,
+            Err(e) => {
+                return Err(ParseError {
+                    kind: ErrorKind::JinjaError,
+                    span: span.cloned().unwrap_or(Span::unknown()),
+                    message: Some(format!(
+                        "Failed to compile expression '{}': {}",
+                        expression, e
+                    )),
+                    suggestion: None,
+                });
+            }
+        };
+
+        // Evaluate the expression with the context to get a typed Value
+        match compiled_expr.eval(jinja.context()) {
+            Ok(val) => val,
+            Err(e) => {
+                // Transfer the tracked variables from Jinja to EvaluationContext
+                for var in jinja.accessed_variables() {
+                    context.track_access(&var);
+                }
+                for var in jinja.undefined_variables() {
+                    context.track_undefined(&var);
+                }
+
+                // Build error suggestion based on undefined variables
+                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let suggestion = if !undefined_vars.is_empty() {
+                    if undefined_vars.len() == 1 {
+                        Some(format!(
+                            "Variable '{}' is not defined in the context",
+                            undefined_vars[0]
+                        ))
+                    } else {
+                        Some(format!(
+                            "Variables {} are not defined in the context",
+                            undefined_vars.join(", ")
+                        ))
+                    }
+                } else {
+                    None
+                };
+
+                return Err(ParseError {
+                    kind: ErrorKind::JinjaError,
+                    span: span.cloned().unwrap_or(Span::unknown()),
+                    message: Some(format!(
+                        "Failed to evaluate expression '{}': {}",
+                        expression, e
+                    )),
+                    suggestion,
+                });
+            }
+        }
+    } else {
+        // Complex template (e.g., "${{ base }}/${{ name }}") - render as string
+        let rendered_str = match jinja.render_str(template) {
+            Ok(s) => s,
+            Err(e) => {
+                // Transfer the tracked variables from Jinja to EvaluationContext
+                for var in jinja.accessed_variables() {
+                    context.track_access(&var);
+                }
+                for var in jinja.undefined_variables() {
+                    context.track_undefined(&var);
+                }
+
+                // Build error suggestion based on undefined variables
+                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let suggestion = if !undefined_vars.is_empty() {
+                    if undefined_vars.len() == 1 {
+                        Some(format!(
+                            "Variable '{}' is not defined in the context",
+                            undefined_vars[0]
+                        ))
+                    } else {
+                        Some(format!(
+                            "Variables {} are not defined in the context",
+                            undefined_vars.join(", ")
+                        ))
+                    }
+                } else {
+                    None
+                };
+
+                return Err(ParseError {
+                    kind: ErrorKind::JinjaError,
+                    span: span.cloned().unwrap_or(Span::unknown()),
+                    message: Some(format!("Failed to render template: {}", e)),
+                    suggestion,
+                });
+            }
+        };
+
+        // Parse the string to detect type (for simple values like "true" or "42")
+        // This is a fallback - it won't preserve types for complex expressions
+        return Ok(parse_rendered_value(&rendered_str));
+    };
+
+    // Transfer the tracked variables from Jinja to EvaluationContext
+    for var in jinja.accessed_variables() {
+        context.track_access(&var);
+    }
+    for var in jinja.undefined_variables() {
+        context.track_undefined(&var);
+    }
+
+    // Wrap the minijinja::Value in our Variable type
+    // This preserves the type information (bool, int, string, etc.)
+    Ok(Variable::from(minijinja_value))
+}
+
+/// Parse a rendered string value into a Variable with proper type detection
+///
+/// This function detects booleans and integers from their string representation
+/// and creates properly-typed Variable instances.
+fn parse_rendered_value(s: &str) -> Variable {
+    let trimmed = s.trim();
+
+    // Try to parse as boolean
+    if trimmed.eq_ignore_ascii_case("true") {
+        return Variable::from(true);
+    }
+    if trimmed.eq_ignore_ascii_case("false") {
+        return Variable::from(false);
+    }
+
+    // Try to parse as integer
+    if let Ok(i) = trimmed.parse::<i64>() {
+        return Variable::from(i);
+    }
+
+    // Default to string
+    Variable::from(s.to_string())
+}
+
+#[cfg(test)]
+mod variable_evaluation_tests {
+    use super::*;
+    use crate::stage1::EvaluationContext;
+
+    #[test]
+    fn test_evaluate_value_to_variable_preserves_bool() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to boolean
+        let true_template =
+            crate::stage0::types::JinjaTemplate::new("${{ true }}".to_string()).unwrap();
+        let value = Value::new_template(true_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a boolean
+        assert!(result.as_ref().is_true());
+        assert_eq!(result.as_ref().to_string(), "true");
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_preserves_int() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to integer
+        let int_template =
+            crate::stage0::types::JinjaTemplate::new("${{ 42 }}".to_string()).unwrap();
+        let value = Value::new_template(int_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a number
+        assert!(result.as_ref().is_number());
+        assert_eq!(result.as_ref().to_string(), "42");
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_string() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to string
+        let str_template =
+            crate::stage0::types::JinjaTemplate::new("${{ 'hello' }}".to_string()).unwrap();
+        let value = Value::new_template(str_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        assert_eq!(result.as_ref().as_str(), Some("hello"));
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_concrete() {
+        let context = EvaluationContext::new();
+
+        // Test concrete Variable value
+        let concrete_bool = Variable::from(true);
+        let value = Value::new_concrete(concrete_bool.clone(), None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a boolean
+        assert!(result.as_ref().is_true());
+    }
+}
+
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
     template: &str,
@@ -238,6 +466,22 @@ pub fn evaluate_value_to_string<T: ToString>(
         Value::Concrete { value: v, .. } => Ok(v.to_string()),
         Value::Template { template, span } => {
             render_template(template.source(), context, span.as_ref())
+        }
+    }
+}
+
+/// Evaluate a Value<Variable> into a Variable, preserving type information
+///
+/// This function properly handles templates that evaluate to booleans, integers, or strings,
+/// rather than converting everything to strings.
+pub fn evaluate_value_to_variable(
+    value: &Value<Variable>,
+    context: &EvaluationContext,
+) -> Result<Variable, ParseError> {
+    match value {
+        Value::Concrete { value: var, .. } => Ok(var.clone()),
+        Value::Template { template, span } => {
+            render_template_to_variable(template.source(), context, span.as_ref())
         }
     }
 }

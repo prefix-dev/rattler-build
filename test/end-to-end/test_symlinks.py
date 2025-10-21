@@ -7,7 +7,7 @@ from helpers import RattlerBuild, get_extracted_package
 from syrupy.filters import paths as filter_paths
 
 
-@pytest.mark.skip(reason = "cache is not implemented in new parser")
+@pytest.mark.skip(reason="cache is not implemented in new parser")
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )

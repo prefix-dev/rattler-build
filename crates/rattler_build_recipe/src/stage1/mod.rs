@@ -200,28 +200,15 @@ impl EvaluationContext {
             crate::stage0::Value<rattler_build_jinja::Variable>,
         >,
     ) -> Result<Self, ParseError> {
-        use rattler_build_jinja::Variable;
-
         // Clone the current context
         let mut new_context = self.clone();
 
         // Evaluate each context variable in order
         for (key, value) in context_vars {
             // Evaluate the value using the current context (which includes previously evaluated context vars)
-            let evaluated_var = match value {
-                crate::stage0::Value::Concrete { value: var, .. } => {
-                    // Already a concrete Variable, just clone it
-                    var.clone()
-                }
-                crate::stage0::Value::Template { .. } => {
-                    // Render the template to a string first
-                    // We need to create a Value<Variable> from the template
-                    // For now, convert template to string and parse it as Variable
-                    let rendered =
-                        crate::stage0::evaluate::evaluate_value_to_string(value, &new_context)?;
-                    Variable::from(rendered)
-                }
-            };
+            // This properly handles templates that evaluate to booleans, integers, or strings
+            let evaluated_var =
+                crate::stage0::evaluate::evaluate_value_to_variable(value, &new_context)?;
 
             // Insert the evaluated variable directly
             new_context.variables.insert(key.clone(), evaluated_var);

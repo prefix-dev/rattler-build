@@ -266,7 +266,7 @@ fn render_with_variants(
         if !variant_result.variant.is_empty() {
             println!("\n📦 Variant values:");
             for (key, value) in &variant_result.variant {
-                println!("  {} = {}", key.normalize(), value);
+                println!("  {} = {:?}", key.normalize(), value);
             }
         } else {
             println!("\n(No variant values - using defaults)");
@@ -275,39 +275,7 @@ fn render_with_variants(
         let recipe = &variant_result.recipe;
 
         println!("\n📋 Package:");
-        println!("  Name:    {}", recipe.package().name().as_normalized());
-        println!("  Version: {}", recipe.package().version());
-
-        if !recipe.requirements().build.is_empty() {
-            println!("\n🔨 Build requirements:");
-            for dep in &recipe.requirements().build {
-                println!("  - {}", dep);
-            }
-        }
-
-        if !recipe.requirements().host.is_empty() {
-            println!("\n🏠 Host requirements:");
-            for dep in &recipe.requirements().host {
-                println!("  - {}", dep);
-            }
-        }
-
-        if !recipe.requirements().run.is_empty() {
-            println!("\n🏃 Run requirements:");
-            for dep in &recipe.requirements().run {
-                println!("  - {}", dep);
-            }
-        }
-
-        if let Some(homepage) = &recipe.about().homepage {
-            println!("\n🌐 Homepage: {}", homepage);
-        }
-
-        if let Some(license) = &recipe.about().license {
-            println!("📄 License: {}", license);
-        }
-
-        println!();
+        println!("{}", serde_yaml::to_string(&recipe).unwrap());
     }
 
     println!("✓ Successfully rendered {} variant(s)", rendered.len());

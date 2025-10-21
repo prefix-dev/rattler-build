@@ -1,5 +1,6 @@
 {
   "boolean": true,
+  "build_platform": "osx-arm64",
   "cboolean": true,
   "cfloat": "1.23",
   "cinteger": 5,
@@ -9,6 +10,7 @@
   "cstring": "blah",
   "ending_with": true,
   "float": "1.23",
+  "host_platform": "osx-arm64",
   "inline_list": [
     "a",
     "b",
@@ -38,6 +40,13 @@
   ],
   "not_ending_with": false,
   "not_starting_with": false,
+  "quoted_bool": "true",
+  "quoted_int": "5",
   "starting_with": true,
-  "string": "blah"
+  "string": "blah",
+  "target_platform": "osx-arm64",
+  "xboolean": true,
+  "xfloat": "1.23",
+  "xinteger": 5,
+  "xstring": "blah"
 }

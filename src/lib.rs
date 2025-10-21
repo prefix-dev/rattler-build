@@ -130,6 +130,7 @@ fn find_variants(
     target_platform: Platform,
     build_platform: Platform,
     host_platform: Platform,
+    experimental: bool,
 ) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
     // Parse the recipe
     tracing::info!("Parsing recipe for variant expansion");
@@ -146,11 +147,13 @@ fn find_variants(
         }
     };
 
-    // Build render config with platform information
+    // Build render config with platform information, experimental flag, and recipe path
     let render_config = RenderConfig::new()
         .with_context("target_platform", target_platform.to_string())
         .with_context("build_platform", build_platform.to_string())
-        .with_context("host_platform", host_platform.to_string());
+        .with_context("host_platform", host_platform.to_string())
+        .with_experimental(experimental)
+        .with_recipe_path(recipe_path);
 
     // Render with variant config
     let rendered_variants = render_recipe_with_variant_config(
@@ -382,6 +385,7 @@ pub async fn get_build_output(
         build_data.target_platform,
         build_data.build_platform,
         build_data.host_platform,
+        build_data.common.experimental,
     )?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
