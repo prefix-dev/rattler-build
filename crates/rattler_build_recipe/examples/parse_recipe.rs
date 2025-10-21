@@ -118,6 +118,8 @@ fn main() -> Result<()> {
         for var in &used_vars {
             println!("  - {}", var);
         }
+    } else {
+        println!("\n=== No template variables used in recipe ===");
     }
 
     // Create evaluation context

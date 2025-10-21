@@ -42,6 +42,7 @@ pub struct Build {
     pub script: ConditionalList<ScriptContent>,
 
     /// Noarch type - "python" or "generic"
+    /// TODO(refactor): possibly parse this into enum directly
     pub noarch: Option<Value<String>>,
 
     /// Python-specific configuration
