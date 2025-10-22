@@ -135,6 +135,7 @@ fn find_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
             // Use Source type which implements AsRef<str> for better span expansion
+            // TODO: possibly move this to stage0::parse_recipe_or_multi_from_source
             let source = rattler_build_recipe::source_code::Source::from_string(
                 recipe_path.display().to_string(),
                 recipe_content.to_string(),
@@ -359,7 +360,23 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config = VariantConfig::from_files(&variant_configs)?;
+    let mut variant_config = VariantConfig::from_files(&variant_configs).map_err(|e| {
+        // Check if this is a ParseError with a file path
+        if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } = &e {
+            // Read the file to provide source code context
+            if let Ok(content) = std::fs::read_to_string(path) {
+                let source_code = rattler_build_recipe::source_code::Source::from_string(
+                    path.display().to_string(),
+                    content,
+                );
+                let error_with_source =
+                    rattler_build_recipe::ParseErrorWithSource::new(source_code, source.clone());
+                return miette::Report::new(error_with_source);
+            }
+        }
+        // Fallback to original error if we can't provide source context
+        miette::Report::new(e)
+    })?;
 
     // Always insert target_platform and build_platform
     variant_config.variants.insert(

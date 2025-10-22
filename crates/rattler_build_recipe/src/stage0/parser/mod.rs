@@ -30,7 +30,7 @@ use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{ParseError, ParseResult};
 
-use crate::span::Span;
+use crate::Span;
 
 // Re-export parsing functions
 pub use about::parse_about;
@@ -220,8 +220,6 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
     // Check for unknown top-level fields
     for (key, _) in mapping.iter() {
         let key_str = key.as_str();
-        println!("Key str: {}", key_str);
-        println!("Key span: {:?}", key.span());
         if !matches!(
             key_str,
             "package"

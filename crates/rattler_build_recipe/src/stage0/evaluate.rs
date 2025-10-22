@@ -517,46 +517,46 @@ where
     }
 }
 
-/// Evaluate a ConditionalList<String> into Vec<String>
+/// Generic helper to evaluate a ConditionalList<T> by processing each Value<T>
 ///
-/// Empty strings are filtered out. This allows conditional list items like
-/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
-/// (Jinja renders them as empty strings).
-pub fn evaluate_string_list(
-    list: &ConditionalList<String>,
+/// This abstracts the common pattern of iterating over a conditional list,
+/// evaluating conditionals, and processing each value with a closure.
+///
+/// This helper significantly reduces code duplication across the evaluation functions
+/// for different list types (strings, globs, dependencies, etc.).
+fn evaluate_conditional_list<T, R, F>(
+    list: &ConditionalList<T>,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
+    mut process: F,
+) -> Result<Vec<R>, ParseError>
+where
+    T: std::fmt::Debug,
+    F: FnMut(&Value<T>, &EvaluationContext) -> Result<Option<R>, ParseError>,
+{
     let mut results = Vec::new();
 
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                let s = evaluate_string_value(value, context)?;
-                // Filter out empty strings from templates like `${{ "value" if condition }}`
-                if !s.is_empty() {
-                    results.push(s);
+                if let Some(result) = process(value, context)? {
+                    results.push(result);
                 }
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
 
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        let s = evaluate_string_value(val, context)?;
-                        if !s.is_empty() {
-                            results.push(s);
-                        }
-                    }
+                let items_to_process = if condition_met {
+                    &cond.then
                 } else {
-                    // Evaluate the "else" items
-                    if let Some(else_value) = &cond.else_value {
-                        for val in else_value.iter() {
-                            let s = evaluate_string_value(val, context)?;
-                            if !s.is_empty() {
-                                results.push(s);
-                            }
-                        }
+                    match &cond.else_value {
+                        Some(else_items) => else_items,
+                        None => continue,
+                    }
+                };
+
+                for val in items_to_process.iter() {
+                    if let Some(result) = process(val, context)? {
+                        results.push(result);
                     }
                 }
             }
@@ -566,68 +566,56 @@ pub fn evaluate_string_list(
     Ok(results)
 }
 
-/// Evaluate a ConditionalList<String> into a GlobVec (include-only), preserving span information for error reporting
+/// Evaluate a ConditionalList<String> into Vec<String>
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
+pub fn evaluate_string_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let s = evaluate_string_value(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        Ok(if s.is_empty() { None } else { Some(s) })
+    })
+}
+
+/// Helper function to validate and evaluate glob patterns from a ConditionalList
+fn evaluate_glob_patterns(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let pattern = evaluate_string_value(value, ctx)?;
+        // Validate the glob pattern immediately with proper error reporting
+        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+            Ok(_) => Ok(Some(pattern)),
+            Err(e) => Err(
+                ParseError::invalid_value(
+                    "glob pattern",
+                    &format!("Invalid glob pattern '{}': {}", pattern, e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+                .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
+            ),
+        }
+    })
+}
+
+/// Evaluate a ConditionalList<String> into a GlobVec (include-only)
+///
+/// This is a convenience wrapper around `evaluate_glob_vec` for simple include-only lists.
 pub fn evaluate_glob_vec_simple(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<GlobVec, ParseError> {
-    let mut globs = Vec::new();
-
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                let pattern = evaluate_string_value(value, context)?;
-                // Validate the glob pattern immediately with proper error reporting
-                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                    Ok(_) => globs.push(pattern),
-                    Err(e) => {
-                        return Err(
-                            ParseError::invalid_value(
-                                "glob pattern",
-                                &format!("Invalid glob pattern '{}': {}", pattern, e),
-                                value.span().copied().unwrap_or_else(Span::new_blank),
-                            )
-                            .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
-                        );
-                    }
-                }
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
-
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        let pattern = evaluate_string_value(val, context)?;
-                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                            Ok(_) => globs.push(pattern),
-                            Err(e) => {
-                                return Err(ParseError::invalid_value(
-                                    "glob pattern",
-                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
-                                    val.span().copied().unwrap_or_else(Span::new_blank),
-                                )
-                                .with_suggestion("Check your glob pattern syntax."));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Create the GlobVec with only include patterns
-    GlobVec::from_strings(globs, Vec::new()).map_err(|e| {
-        ParseError::invalid_value(
-            "glob set",
-            &format!("Failed to build glob set: {}", e),
-            Span::new_blank(),
-        )
-    })
+    // Just delegate to evaluate_glob_vec with a simple List variant
+    evaluate_glob_vec(
+        &crate::stage0::types::IncludeExclude::List(list.clone()),
+        context,
+    )
 }
 
 /// Evaluate an IncludeExclude into a GlobVec, preserving span information for error reporting
@@ -640,100 +628,13 @@ pub fn evaluate_glob_vec(
         crate::stage0::types::IncludeExclude::Mapping { include, exclude } => (include, exclude),
     };
 
-    // Evaluate and parse include patterns
-    let mut include_globs = Vec::new();
-    for item in include_list.iter() {
-        match item {
-            Item::Value(value) => {
-                let pattern = evaluate_string_value(value, context)?;
-                // Validate the glob pattern immediately with proper error reporting
-                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                    Ok(_) => include_globs.push(pattern),
-                    Err(e) => {
-                        return Err(ParseError::invalid_value(
-                            "glob pattern",
-                            &format!("Invalid glob pattern '{}': {}", pattern, e),
-                            value.span().copied().unwrap_or_else(Span::new_blank),
-                        )
-                        .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences."));
-                    }
-                }
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
+    // Evaluate and validate include patterns
+    let include_globs = evaluate_glob_patterns(include_list, context)?;
 
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        let pattern = evaluate_string_value(val, context)?;
-                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                            Ok(_) => include_globs.push(pattern),
-                            Err(e) => {
-                                return Err(ParseError::invalid_value(
-                                    "glob pattern",
-                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
-                                    val.span().copied().unwrap_or_else(Span::new_blank),
-                                )
-                                .with_suggestion("Check your glob pattern syntax."));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Evaluate and validate exclude patterns
+    let exclude_globs = evaluate_glob_patterns(exclude_list, context)?;
 
-    // Evaluate and parse exclude patterns
-    let mut exclude_globs = Vec::new();
-    for item in exclude_list.iter() {
-        match item {
-            Item::Value(value) => {
-                let pattern = evaluate_string_value(value, context)?;
-                match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                    Ok(_) => exclude_globs.push(pattern),
-                    Err(e) => {
-                        return Err(ParseError::invalid_value(
-                            "glob pattern",
-                            &format!("Invalid glob pattern '{}': {}", pattern, e),
-                            value.span().copied().unwrap_or_else(Span::new_blank),
-                        )
-                        .with_suggestion("Check your glob pattern syntax."));
-                    }
-                }
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
-
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        let pattern = evaluate_string_value(val, context)?;
-                        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
-                            Ok(_) => exclude_globs.push(pattern),
-                            Err(e) => {
-                                return Err(ParseError::invalid_value(
-                                    "glob pattern",
-                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
-                                    val.span().copied().unwrap_or_else(Span::new_blank),
-                                )
-                                .with_suggestion("Check your glob pattern syntax."));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Now create the GlobVec - this should not fail since we've already validated
+    // Create the GlobVec - this should not fail since we've already validated
     GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| {
         ParseError::invalid_value(
             "glob set",
@@ -749,51 +650,27 @@ pub fn evaluate_entry_point_list(
     list: &ConditionalList<rattler_conda_types::package::EntryPoint>,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
-    let mut results = Vec::new();
-
-    // Helper to evaluate a single Value<EntryPoint>
-    let evaluate_entry_point = |val: &Value<rattler_conda_types::package::EntryPoint>| -> Result<rattler_conda_types::package::EntryPoint, ParseError> {
+    evaluate_conditional_list(list, context, |val, ctx| {
         if let Some(ep) = val.as_concrete() {
-            Ok(ep.clone())
+            Ok(Some(ep.clone()))
         } else if let Some(template) = val.as_template() {
-            let s = render_template(template.source(), context, val.span())?;
+            let s = render_template(template.source(), ctx, val.span())?;
             s.parse::<rattler_conda_types::package::EntryPoint>()
+                .map(Some)
                 .map_err(|e| {
                     ParseError::invalid_value(
                         "entry point",
                         &format!("Invalid entry point '{}': {}", s, e),
                         val.span().copied().unwrap_or_else(Span::new_blank),
                     )
-                    .with_suggestion("Entry points should be in the format 'command = module:function'")
+                    .with_suggestion(
+                        "Entry points should be in the format 'command = module:function'",
+                    )
                 })
         } else {
             unreachable!("Value must be either concrete or template")
         }
-    };
-
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                results.push(evaluate_entry_point(value)?);
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
-
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        results.push(evaluate_entry_point(val)?);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(results)
+    })
 }
 
 /// Check if a MatchSpec is a "free spec" (no version constraints).
@@ -862,57 +739,24 @@ pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
-    let mut results = Vec::new();
+    evaluate_conditional_list(list, context, |value, ctx| {
+        if let Some(match_spec) = value.as_concrete() {
+            Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
+        } else if let Some(template) = value.as_template() {
+            let s = render_template(template.source(), ctx, value.span())?;
 
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                process_value(value, context, &mut results)?;
+            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+            if s.is_empty() {
+                return Ok(None);
             }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
 
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        process_value(val, context, &mut results)?;
-                    }
-                }
-            }
+            let span_opt = value.span().copied();
+            let dep = parse_dependency_string(&s, &span_opt)?;
+            Ok(Some(dep))
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
-    }
-
-    Ok(results)
-}
-
-/// Process a single Value into a Dependency and add to results
-fn process_value(
-    value: &Value<crate::stage0::SerializableMatchSpec>,
-    context: &EvaluationContext,
-    results: &mut Vec<crate::stage1::Dependency>,
-) -> Result<(), ParseError> {
-    if let Some(match_spec) = value.as_concrete() {
-        results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-        Ok(())
-    } else if let Some(template) = value.as_template() {
-        let s = render_template(template.source(), context, value.span())?;
-
-        // Filter out empty strings from templates like `${{ "numpy" if unix }}`
-        if s.is_empty() {
-            return Ok(());
-        }
-
-        let span_opt = value.span().copied();
-        let dep = parse_dependency_string(&s, &span_opt)?;
-        results.push(dep);
-        Ok(())
-    } else {
-        unreachable!("Value must be either concrete or template")
-    }
+    })
 }
 
 /// Parse a dependency string into a Dependency
@@ -1015,12 +859,12 @@ pub fn evaluate_script(
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
-        "true" | "yes" | "1" => Ok(true),
-        "false" | "no" | "0" => Ok(false),
+        "true" => Ok(true),
+        "false" => Ok(false),
         _ => Err(ParseError::invalid_value(
             field_name,
             &format!(
-                "Invalid boolean value for '{}': '{}' (expected true/false, yes/no, or 1/0)",
+                "Invalid boolean value for '{}': '{}' (expected true/false)",
                 field_name, s
             ),
             Span::new_blank(),
@@ -1359,7 +1203,6 @@ impl Evaluate for Stage0Requirements {
         Ok(Stage1Requirements {
             build: evaluate_dependency_list(&self.build, context)?,
             host: evaluate_dependency_list(&self.host, context)?,
-            // Run dependencies don't affect the build variant, so don't track free specs
             run: evaluate_dependency_list(&self.run, context)?,
             run_constraints: evaluate_dependency_list(&self.run_constraints, context)?,
             run_exports: self.run_exports.evaluate(context)?,

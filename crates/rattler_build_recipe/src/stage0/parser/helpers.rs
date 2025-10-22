@@ -3,8 +3,8 @@
 use marked_yaml::{Node as MarkedNode, types::MarkedMappingNode};
 
 use crate::{
+    Span,
     error::{ParseError, ParseResult},
-    span::Span,
 };
 
 /// Get the span from a marked_yaml node
