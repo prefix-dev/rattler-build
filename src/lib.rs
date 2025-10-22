@@ -137,9 +137,9 @@ fn find_variants(
 
     // Build render config with platform information, experimental flag, and recipe path
     let render_config = RenderConfig::new()
-        .with_context("target_platform", target_platform.to_string())
-        .with_context("build_platform", build_platform.to_string())
-        .with_context("host_platform", host_platform.to_string())
+        .with_target_platform(target_platform)
+        .with_build_platform(build_platform)
+        .with_host_platform(host_platform)
         .with_experimental(experimental)
         .with_recipe_path(recipe_path);
 

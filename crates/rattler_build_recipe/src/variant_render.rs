@@ -42,7 +42,7 @@ pub struct PinSubpackageInfo {
 }
 
 /// Configuration for rendering recipes with variants
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RenderConfig {
     /// Additional context variables to provide (beyond variant values)
     /// These can be strings, booleans, numbers, etc. using the Variable type
@@ -51,6 +51,25 @@ pub struct RenderConfig {
     pub experimental: bool,
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
+    /// Target platform for the build
+    pub target_platform: rattler_conda_types::Platform,
+    /// Build platform (where the build runs)
+    pub build_platform: rattler_conda_types::Platform,
+    /// Host platform (for cross-compilation)
+    pub host_platform: rattler_conda_types::Platform,
+}
+
+impl Default for RenderConfig {
+    fn default() -> Self {
+        Self {
+            extra_context: IndexMap::new(),
+            experimental: false,
+            recipe_path: None,
+            target_platform: rattler_conda_types::Platform::current(),
+            build_platform: rattler_conda_types::Platform::current(),
+            host_platform: rattler_conda_types::Platform::current(),
+        }
+    }
 }
 
 impl RenderConfig {
@@ -74,6 +93,24 @@ impl RenderConfig {
     /// Set the recipe path for relative path resolution
     pub fn with_recipe_path(mut self, recipe_path: impl Into<PathBuf>) -> Self {
         self.recipe_path = Some(recipe_path.into());
+        self
+    }
+
+    /// Set the target platform
+    pub fn with_target_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+        self.target_platform = platform;
+        self
+    }
+
+    /// Set the build platform
+    pub fn with_build_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+        self.build_platform = platform;
+        self
+    }
+
+    /// Set the host platform
+    pub fn with_host_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+        self.host_platform = platform;
         self
     }
 }
@@ -447,41 +484,14 @@ fn build_name_index(
 
 /// Helper function to create a JinjaConfig from RenderConfig
 fn create_jinja_config(config: &RenderConfig) -> JinjaConfig {
-    use rattler_conda_types::Platform;
-    use std::str::FromStr;
-
-    let mut jinja_config = JinjaConfig {
+    JinjaConfig {
         experimental: config.experimental,
         recipe_path: config.recipe_path.clone(),
+        target_platform: config.target_platform,
+        build_platform: config.build_platform,
+        host_platform: config.host_platform,
         ..Default::default()
-    };
-
-    // Extract platform information from extra_context
-    if let Some(target_platform_var) = config.extra_context.get("target_platform") {
-        if let Some(platform_str) = target_platform_var.as_ref().as_str() {
-            if let Ok(platform) = Platform::from_str(platform_str) {
-                jinja_config.target_platform = platform;
-            }
-        }
     }
-
-    if let Some(build_platform_var) = config.extra_context.get("build_platform") {
-        if let Some(platform_str) = build_platform_var.as_ref().as_str() {
-            if let Ok(platform) = Platform::from_str(platform_str) {
-                jinja_config.build_platform = platform;
-            }
-        }
-    }
-
-    if let Some(host_platform_var) = config.extra_context.get("host_platform") {
-        if let Some(platform_str) = host_platform_var.as_ref().as_str() {
-            if let Ok(platform) = Platform::from_str(platform_str) {
-                jinja_config.host_platform = platform;
-            }
-        }
-    }
-
-    jinja_config
 }
 
 /// Render a recipe with variant configuration files
