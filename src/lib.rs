@@ -133,7 +133,14 @@ fn find_variants(
     // Parse the recipe
     tracing::info!("Parsing recipe for variant expansion");
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
-        .map_err(|e| miette::miette!("Failed to parse recipe: {}", e))?;
+        .map_err(|e| {
+            let source = miette::NamedSource::new(
+                recipe_path.display().to_string(),
+                recipe_content.to_string(),
+            );
+            miette::Report::new(e).with_source_code(source)
+        })
+        .wrap_err("Failed to parse recipe")?;
 
     // Build render config with platform information, experimental flag, and recipe path
     let render_config = RenderConfig::new()

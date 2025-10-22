@@ -1,5 +1,6 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
 use rattler_build_script::Script;
+use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
@@ -86,7 +87,7 @@ impl BuildString {
         hash_value: &str,
         build_number: u64,
         context: &super::EvaluationContext,
-    ) -> Result<(), crate::ParseError> {
+    ) -> Result<(), ParseError> {
         if let BuildString::Unresolved(template) = self {
             use rattler_build_jinja::{Jinja, Variable};
 
@@ -109,13 +110,10 @@ impl BuildString {
             );
 
             // Render the template
-            let rendered = jinja.render_str(template).map_err(|e| crate::ParseError {
-                kind: crate::ErrorKind::JinjaError,
+            let rendered = jinja.render_str(template).map_err(|e| ParseError::JinjaError {
+                message: format!("Failed to render build string template: {}", e),
                 span: crate::Span::new_blank(),
-                message: Some(format!("Failed to render build string template: {}", e)),
-                suggestion: None,
             })?;
-
             *self = BuildString::Resolved(rendered);
         }
 
@@ -496,7 +494,7 @@ impl Build {
         &mut self,
         hash_value: &str,
         context: &super::EvaluationContext,
-    ) -> Result<(), crate::ParseError> {
+    ) -> Result<(), ParseError> {
         if let Some(build_string) = &mut self.string {
             build_string.resolve(hash_value, self.number, context)?;
         }

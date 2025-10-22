@@ -1,8 +1,8 @@
 use marked_yaml::Node;
+use rattler_build_yaml_parser::ParseError;
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 
 use crate::{
-    ParseError,
     span::SpannedString,
     stage0::{
         parser::helpers::get_span,
@@ -361,18 +361,15 @@ fn parse_path_source(
             }
             "use_gitignore" => {
                 let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'use_gitignore' to be a boolean")
+                    ParseError::expected_type("boolean", "non-scalar", get_span(value_node))
                 })?;
-                let spanned = SpannedString::from(scalar);
-                use_gitignore = match spanned.as_str() {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
+                use_gitignore = match scalar.as_bool() {
+                    Some(b) => b,
+                    None => {
                         return Err(ParseError::invalid_value(
                             "use_gitignore",
-                            &format!("not a valid boolean value (found '{}')", spanned.as_str()),
-                            spanned.span(),
+                            &format!("expected boolean, got '{}'", scalar.as_str()),
+                            (*value_node.span()).into(),
                         ));
                     }
                 };

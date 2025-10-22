@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use petgraph::graph::{DiGraph, NodeIndex};
+use rattler_build_yaml_parser::ParseError;
 use serde::{Deserialize, Serialize};
 
 use rattler_build_jinja::{JinjaConfig, Variable};
@@ -20,7 +21,6 @@ use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::{
-    error::ParseError,
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
@@ -550,7 +550,7 @@ pub fn render_recipe_with_variants(
 
     // Read and parse the recipe
     let yaml_content = fs_err::read_to_string(recipe_path)
-        .map_err(|e| ParseError::io_error(e, recipe_path.to_path_buf()))?;
+        .map_err(|e| ParseError::io_error(recipe_path.to_path_buf(), e))?;
 
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
 

@@ -1,9 +1,8 @@
 use marked_yaml::{Node, types::MarkedMappingNode};
+use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 
 use crate::{
-    ParseError,
-    span::SpannedString,
     stage0::{
         build::{
             BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
@@ -32,18 +31,15 @@ fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
         ParseError::expected_type("scalar", "non-scalar", get_span(node))
             .with_message(format!("Expected '{}' to be a boolean", field_name))
     })?;
-    let spanned = SpannedString::from(scalar);
-    let bool_str = spanned.as_str();
 
-    match bool_str {
-        "true" | "True" | "yes" | "Yes" => Ok(true),
-        "false" | "False" | "no" | "No" => Ok(false),
-        _ => Err(ParseError::invalid_value(
+    scalar.as_bool().ok_or_else(|| {
+        ParseError::invalid_value(
             field_name,
-            &format!("not a valid boolean value (found '{}')", bool_str),
-            spanned.span(),
-        )),
-    }
+            "expected boolean ('true', 'false')",
+            (*scalar.span()).into(),
+        )
+    })
+
 }
 
 /// Parse a field that can be either a boolean or a list of patterns
@@ -59,37 +55,9 @@ fn parse_bool_or_patterns<T>(
     patterns_variant: fn(crate::stage0::types::ConditionalList<String>) -> T,
 ) -> Result<T, ParseError> {
     // Try to parse as a scalar (boolean or template)
-    if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let str_val = spanned.as_str();
-
-        // Check if it's a boolean-like value
-        match str_val {
-            "true" | "True" | "yes" | "Yes" => {
-                return Ok(bool_variant(Value::new_concrete(
-                    true,
-                    Some(spanned.span()),
-                )));
-            }
-            "false" | "False" | "no" | "No" => {
-                return Ok(bool_variant(Value::new_concrete(
-                    false,
-                    Some(spanned.span()),
-                )));
-            }
-            _ => {
-                // If it contains ${{ }}, treat it as a template
-                if str_val.contains("${{") {
-                    return Ok(bool_variant(parse_value(node)?));
-                }
-                // Otherwise it's an error
-                return Err(ParseError::invalid_value(
-                    field_name,
-                    "expected 'true', 'false', or a list of glob patterns",
-                    spanned.span(),
-                ));
-            }
-        }
+    if let Some(scalar) = node.as_scalar().and_then(|s| s.as_bool()) {
+        let value = Value::new_concrete(scalar, Some((*node.span()).into()));
+        return Ok(bool_variant(value));
     }
 
     // Try to parse as a list of patterns
@@ -115,14 +83,13 @@ fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
             .with_message("Expected 'noarch' to be a string (\"python\" or \"generic\")")
     })?;
 
-    let spanned = SpannedString::from(scalar);
-    let str_val = spanned.as_str();
+    let str_val = scalar.as_str();
 
     // Check if it's a template
     if str_val.contains("${{") {
         let template = crate::stage0::types::JinjaTemplate::new(str_val.to_string())
-            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-        return Ok(Value::new_template(template, Some(spanned.span())));
+            .map_err(|e| ParseError::jinja_error(e, *scalar.span()))?;
+        return Ok(Value::new_template(template, Some(*scalar.span())));
     }
 
     // Parse as concrete NoArchType
@@ -136,12 +103,12 @@ fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
                     "invalid noarch type '{}'. Expected 'python' or 'generic'",
                     str_val
                 ),
-                spanned.span(),
+                *scalar.span(),
             ));
         }
     };
 
-    Ok(Value::new_concrete(noarch, Some(spanned.span())))
+    Ok(Value::new_concrete(noarch, Some(*scalar.span())))
 }
 
 /// Parse a script field from YAML

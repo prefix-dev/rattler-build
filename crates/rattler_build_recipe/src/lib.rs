@@ -8,7 +8,6 @@ pub mod stage1;
 #[cfg(feature = "variant-config")]
 pub mod variant_render;
 
-pub use error::{ErrorKind, ParseError, ParseErrors, ParseResult};
 pub use span::{Span, SpannedString};
 pub use stage0::Stage0Recipe;
 pub use stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe};

@@ -12,7 +12,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::ParseError;
 use rattler_build_jinja::{JinjaConfig, Variable};
 
 pub mod about;
@@ -34,6 +33,7 @@ pub use extra::Extra;
 pub use hash::{HashInfo, HashInput, compute_hash};
 use indexmap::IndexMap;
 pub use package::Package;
+use rattler_build_yaml_parser::ParseError;
 pub use recipe::Recipe;
 pub use requirements::{Dependency, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
