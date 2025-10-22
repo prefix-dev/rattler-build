@@ -57,7 +57,7 @@ use crate::{
             PythonTest as Stage0PythonTest, PythonVersion as Stage0PythonVersion,
             RTest as Stage0RTest, RubyTest as Stage0RubyTest,
         },
-        types::{ConditionalList, Item, JinjaExpression, ScriptContent, Value},
+        types::{ConditionalList, Item, JinjaExpression, Value},
     },
     stage1::{
         About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
@@ -122,7 +122,7 @@ fn render_template_to_variable(
             Err(e) => {
                 return Err(ParseError {
                     kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::unknown()),
+                    span: span.cloned().unwrap_or(Span::new_blank()),
                     message: Some(format!(
                         "Failed to compile expression '{}': {}",
                         expression, e
@@ -164,7 +164,7 @@ fn render_template_to_variable(
 
                 return Err(ParseError {
                     kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::unknown()),
+                    span: span.cloned().unwrap_or(Span::new_blank()),
                     message: Some(format!(
                         "Failed to evaluate expression '{}': {}",
                         expression, e
@@ -206,7 +206,7 @@ fn render_template_to_variable(
 
                 return Err(ParseError {
                     kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::unknown()),
+                    span: span.cloned().unwrap_or(Span::new_blank()),
                     message: Some(format!("Failed to render template: {}", e)),
                     suggestion,
                 });
@@ -379,7 +379,7 @@ fn render_template(
 
             Err(ParseError {
                 kind: ErrorKind::JinjaError,
-                span: span.map_or_else(Span::unknown, |s| *s),
+                span: span.map_or_else(Span::new_blank, |s| *s),
                 message: Some(format!(
                     "Template rendering failed: {} (template: {})",
                     e, template
@@ -405,7 +405,7 @@ fn evaluate_condition(
     // Evaluate the expression to get its value
     let value = jinja.eval(expr.source()).map_err(|e| ParseError {
         kind: ErrorKind::JinjaError,
-        span: Span::unknown(),
+        span: Span::new_blank(),
         message: Some(format!(
             "Failed to evaluate condition '{}': {}",
             expr.source(),
@@ -428,7 +428,7 @@ fn evaluate_condition(
     if !undefined_vars.is_empty() {
         return Err(ParseError {
             kind: ErrorKind::JinjaError,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!(
                 "Undefined variable(s) in condition '{}': {}",
                 expr.source(),
@@ -449,11 +449,12 @@ pub fn evaluate_string_value(
     value: &Value<String>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    match value {
-        Value::Concrete { value: s, .. } => Ok(s.clone()),
-        Value::Template { template, span } => {
-            render_template(template.source(), context, span.as_ref())
-        }
+    if let Some(s) = value.as_concrete() {
+        Ok(s.clone())
+    } else if let Some(template) = value.as_template() {
+        render_template(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -462,11 +463,12 @@ pub fn evaluate_value_to_string<T: ToString>(
     value: &Value<T>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    match value {
-        Value::Concrete { value: v, .. } => Ok(v.to_string()),
-        Value::Template { template, span } => {
-            render_template(template.source(), context, span.as_ref())
-        }
+    if let Some(v) = value.as_concrete() {
+        Ok(v.to_string())
+    } else if let Some(template) = value.as_template() {
+        render_template(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -478,11 +480,12 @@ pub fn evaluate_value_to_variable(
     value: &Value<Variable>,
     context: &EvaluationContext,
 ) -> Result<Variable, ParseError> {
-    match value {
-        Value::Concrete { value: var, .. } => Ok(var.clone()),
-        Value::Template { template, span } => {
-            render_template_to_variable(template.source(), context, span.as_ref())
-        }
+    if let Some(var) = value.as_concrete() {
+        Ok(var.clone())
+    } else if let Some(template) = value.as_template() {
+        render_template_to_variable(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -500,9 +503,12 @@ pub fn evaluate_optional_string_value(
 /// Extract the template source from a Value<String> without evaluating it
 /// This is used for deferred evaluation (e.g., build.string with hash variable)
 fn extract_template_source(value: &Value<String>) -> Option<String> {
-    match value {
-        Value::Concrete { value: v, .. } => Some(v.clone()),
-        Value::Template { template, .. } => Some(template.source().to_string()),
+    if let Some(v) = value.as_concrete() {
+        Some(v.clone())
+    } else if let Some(template) = value.as_template() {
+        Some(template.source().to_string())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -521,7 +527,7 @@ where
             let s = evaluate_value_to_string(v, context)?;
             T::from_str(&s).map(Some).map_err(|e| ParseError {
                 kind: ErrorKind::InvalidValue,
-                span: Span::unknown(),
+                span: Span::new_blank(),
                 message: Some(format!("Failed to parse value: {}", e)),
                 suggestion: None,
             })
@@ -595,7 +601,7 @@ pub fn evaluate_glob_vec_simple(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span().unwrap_or_else(Span::unknown),
+                            span: value.span().copied().unwrap_or_else(Span::new_blank),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
                         });
@@ -618,7 +624,7 @@ pub fn evaluate_glob_vec_simple(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span().unwrap_or_else(Span::unknown),
+                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -636,7 +642,7 @@ pub fn evaluate_glob_vec_simple(
     // Create the GlobVec with only include patterns
     GlobVec::from_strings(globs, Vec::new()).map_err(|e| ParseError {
         kind: ErrorKind::InvalidValue,
-        span: Span::unknown(),
+        span: Span::new_blank(),
         message: Some(format!("Failed to build glob set: {}", e)),
         suggestion: None,
     })
@@ -664,7 +670,7 @@ pub fn evaluate_glob_vec(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span().unwrap_or_else(Span::unknown),
+                            span: value.span().copied().unwrap_or_else(Span::new_blank),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
                         });
@@ -687,7 +693,7 @@ pub fn evaluate_glob_vec(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span().unwrap_or_else(Span::unknown),
+                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -713,7 +719,7 @@ pub fn evaluate_glob_vec(
                     Err(e) => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: value.span().unwrap_or_else(Span::unknown),
+                            span: value.span().copied().unwrap_or_else(Span::new_blank),
                             message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
                             suggestion: Some("Check your glob pattern syntax.".to_string()),
                         });
@@ -736,7 +742,7 @@ pub fn evaluate_glob_vec(
                             Err(e) => {
                                 return Err(ParseError {
                                     kind: ErrorKind::InvalidValue,
-                                    span: val.span().unwrap_or_else(Span::unknown),
+                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
                                     message: Some(format!(
                                         "Invalid glob pattern '{}': {}",
                                         pattern, e
@@ -754,7 +760,7 @@ pub fn evaluate_glob_vec(
     // Now create the GlobVec - this should not fail since we've already validated
     GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| ParseError {
         kind: ErrorKind::InvalidValue,
-        span: Span::unknown(),
+        span: Span::new_blank(),
         message: Some(format!("Failed to build glob set: {}", e)),
         suggestion: None,
     })
@@ -770,18 +776,19 @@ pub fn evaluate_entry_point_list(
 
     // Helper to evaluate a single Value<EntryPoint>
     let evaluate_entry_point = |val: &Value<rattler_conda_types::package::EntryPoint>| -> Result<rattler_conda_types::package::EntryPoint, ParseError> {
-        match val {
-            Value::Concrete { value: ep, .. } => Ok(ep.clone()),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span.as_ref())?;
-                s.parse::<rattler_conda_types::package::EntryPoint>()
-                    .map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: span.unwrap_or_else(Span::unknown),
-                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
-                    })
-            }
+        if let Some(ep) = val.as_concrete() {
+            Ok(ep.clone())
+        } else if let Some(template) = val.as_template() {
+            let s = render_template(template.source(), context, val.span())?;
+            s.parse::<rattler_conda_types::package::EntryPoint>()
+                .map_err(|e| ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: val.span().copied().unwrap_or_else(Span::new_blank),
+                    message: Some(format!("Invalid entry point '{}': {}", s, e)),
+                    suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                })
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
     };
 
@@ -909,25 +916,23 @@ fn process_value(
     context: &EvaluationContext,
     results: &mut Vec<crate::stage1::Dependency>,
 ) -> Result<(), ParseError> {
-    match value {
-        Value::Concrete {
-            value: match_spec, ..
-        } => {
-            results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-            Ok(())
-        }
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span.as_ref())?;
+    if let Some(match_spec) = value.as_concrete() {
+        results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
+        Ok(())
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
 
-            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
-            if s.is_empty() {
-                return Ok(());
-            }
-
-            let dep = parse_dependency_string(&s, span)?;
-            results.push(dep);
-            Ok(())
+        // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+        if s.is_empty() {
+            return Ok(());
         }
+
+        let span_opt = value.span().copied();
+        let dep = parse_dependency_string(&s, &span_opt)?;
+        results.push(dep);
+        Ok(())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -935,7 +940,7 @@ fn process_value(
 ///
 /// Handles both JSON pin expressions and regular MatchSpec strings
 fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
-    let span = (*span).unwrap_or_else(Span::unknown);
+    let span = (*span).unwrap_or_else(Span::new_blank);
 
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
     if s.trim().starts_with('{') {
@@ -1026,165 +1031,6 @@ pub fn evaluate_script(
     })
 }
 
-/// Legacy function for backward compatibility
-/// Evaluates a ConditionalList<ScriptContent> into a rattler_build_script::Script
-#[deprecated(note = "Use evaluate_script instead, as the script type has been refactored")]
-pub fn evaluate_script_list(
-    list: &ConditionalList<ScriptContent>,
-    context: &EvaluationContext,
-) -> Result<rattler_build_script::Script, ParseError> {
-    use rattler_build_script::{Script, ScriptContent as ScriptContentOutput};
-
-    // If the list is empty, return default script
-    if list.is_empty() {
-        return Ok(Script::default());
-    }
-
-    // Collect all script items after evaluating conditionals
-    let mut all_commands = Vec::new();
-    let mut interpreter: Option<String> = None;
-    let mut env = indexmap::IndexMap::new();
-    let mut secrets = Vec::new();
-    let mut file_path: Option<PathBuf> = None;
-
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                match value {
-                    Value::Concrete {
-                        value: script_content,
-                        ..
-                    } => {
-                        match script_content {
-                            ScriptContent::Command(cmd) => {
-                                all_commands.push(cmd.clone());
-                            }
-                            ScriptContent::Inline(inline) => {
-                                // Extract interpreter if specified
-                                if let Some(interp) = &inline.interpreter {
-                                    interpreter = Some(evaluate_string_value(interp, context)?);
-                                }
-
-                                // Extract environment variables
-                                // Filter out keys whose values evaluate to empty strings
-                                for (key, val) in &inline.env {
-                                    let evaluated_val = evaluate_string_value(val, context)?;
-                                    if !evaluated_val.is_empty() {
-                                        env.insert(key.clone(), evaluated_val);
-                                    }
-                                }
-
-                                // Extract secrets
-                                secrets.extend(inline.secrets.clone());
-
-                                // Extract content or file
-                                if let Some(content_list) = &inline.content {
-                                    let commands = evaluate_string_list(content_list, context)?;
-                                    all_commands.extend(commands);
-                                } else if let Some(file_val) = &inline.file {
-                                    let file_str = evaluate_string_value(file_val, context)?;
-                                    file_path = Some(PathBuf::from(file_str));
-                                }
-                            }
-                        }
-                    }
-                    Value::Template { .. } => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some("Script content cannot be a template".to_string()),
-                            suggestion: None,
-                        });
-                    }
-                }
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-
-                let items_to_process = if condition_met {
-                    &cond.then.0
-                } else {
-                    cond.else_value
-                        .as_ref()
-                        .map(|v| v.0.as_slice())
-                        .unwrap_or(&[])
-                };
-
-                for val in items_to_process {
-                    match val {
-                        Value::Concrete {
-                            value: script_content,
-                            ..
-                        } => {
-                            match script_content {
-                                ScriptContent::Command(cmd) => {
-                                    all_commands.push(cmd.clone());
-                                }
-                                ScriptContent::Inline(inline) => {
-                                    // Extract interpreter if specified
-                                    if let Some(interp) = &inline.interpreter {
-                                        interpreter = Some(evaluate_string_value(interp, context)?);
-                                    }
-
-                                    // Extract environment variables
-                                    // Filter out keys whose values evaluate to empty strings
-                                    for (key, val) in &inline.env {
-                                        let evaluated_val = evaluate_string_value(val, context)?;
-                                        if !evaluated_val.is_empty() {
-                                            env.insert(key.clone(), evaluated_val);
-                                        }
-                                    }
-
-                                    // Extract secrets
-                                    secrets.extend(inline.secrets.clone());
-
-                                    // Extract content or file
-                                    if let Some(content_list) = &inline.content {
-                                        let commands = evaluate_string_list(content_list, context)?;
-                                        all_commands.extend(commands);
-                                    } else if let Some(file_val) = &inline.file {
-                                        let file_str = evaluate_string_value(file_val, context)?;
-                                        file_path = Some(PathBuf::from(file_str));
-                                    }
-                                }
-                            }
-                        }
-                        Value::Template { .. } => {
-                            return Err(ParseError {
-                                kind: ErrorKind::InvalidValue,
-                                span: Span::unknown(),
-                                message: Some("Script content cannot be a template".to_string()),
-                                suggestion: None,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Build the final Script content
-    let content = if let Some(path) = file_path {
-        ScriptContentOutput::Path(path)
-    } else if all_commands.is_empty() {
-        ScriptContentOutput::Default
-    } else if all_commands.len() == 1 {
-        // Single command - could be a path or command, use CommandOrPath
-        ScriptContentOutput::CommandOrPath(all_commands.into_iter().next().unwrap())
-    } else {
-        // Multiple commands
-        ScriptContentOutput::Commands(all_commands)
-    };
-
-    Ok(Script {
-        interpreter,
-        env,
-        secrets,
-        content,
-        cwd: None,
-    })
-}
-
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
@@ -1192,7 +1038,7 @@ fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
         "false" | "no" | "0" => Ok(false),
         _ => Err(ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!(
                 "Invalid boolean value for '{}': '{}' (expected true/false, yes/no, or 1/0)",
                 field_name, s
@@ -1208,12 +1054,13 @@ pub fn evaluate_bool_value(
     context: &EvaluationContext,
     field_name: &str,
 ) -> Result<bool, ParseError> {
-    match value {
-        Value::Concrete { value: b, .. } => Ok(*b),
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span.as_ref())?;
-            parse_bool_from_str(&s, field_name)
-        }
+    if let Some(b) = value.as_concrete() {
+        Ok(*b)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        parse_bool_from_str(&s, field_name)
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -1244,22 +1091,23 @@ where
     T: ToString + FromStr,
     T::Err: std::fmt::Display,
 {
-    match value {
-        Value::Concrete { value: v, .. } => Ok(v.to_string().parse().map_err(|e| ParseError {
+    if let Some(v) = value.as_concrete() {
+        Ok(v.to_string().parse().map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!("Failed to parse {}: {}", type_name, e)),
             suggestion: None,
-        })?),
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span.as_ref())?;
-            s.parse().map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: span.unwrap_or_else(Span::unknown),
-                message: Some(format!("Invalid {} '{}': {}", type_name, s, e)),
-                suggestion: None,
-            })
-        }
+        })?)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        s.parse().map_err(|e| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: value.span().copied().unwrap_or_else(Span::new_blank),
+            message: Some(format!("Invalid {} '{}': {}", type_name, s, e)),
+            suggestion: None,
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -1286,17 +1134,18 @@ impl Evaluate for Value<url::Url> {
     type Output = url::Url;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        match self {
-            Value::Concrete { value: u, .. } => Ok(u.clone()),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span.as_ref())?;
-                url::Url::parse(&s).map_err(|e| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.unwrap_or_else(Span::unknown),
-                    message: Some(format!("Invalid URL '{}': {}", s, e)),
-                    suggestion: None,
-                })
-            }
+        if let Some(u) = self.as_concrete() {
+            Ok(u.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            url::Url::parse(&s).map_err(|e| ParseError {
+                kind: ErrorKind::InvalidValue,
+                span: self.span().copied().unwrap_or_else(Span::new_blank),
+                message: Some(format!("Invalid URL '{}': {}", s, e)),
+                suggestion: None,
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
     }
 }
@@ -1313,17 +1162,18 @@ impl Evaluate for Value<License> {
     type Output = License;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        match self {
-            Value::Concrete { value: license, .. } => Ok(license.clone()),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span.as_ref())?;
-                s.parse::<License>().map_err(|e| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.unwrap_or_else(Span::unknown),
-                    message: Some(format!("Invalid SPDX license expression: {}", e)),
-                    suggestion: None,
-                })
-            }
+        if let Some(license) = self.as_concrete() {
+            Ok(license.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            s.parse::<License>().map_err(|e| ParseError {
+                kind: ErrorKind::InvalidValue,
+                span: self.span().copied().unwrap_or_else(Span::new_blank),
+                message: Some(format!("Invalid SPDX license expression: {}", e)),
+                suggestion: None,
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
     }
 }
@@ -1332,12 +1182,13 @@ impl Evaluate for Value<PathBuf> {
     type Output = PathBuf;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        match self {
-            Value::Concrete { value: p, .. } => Ok(p.clone()),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span.as_ref())?;
-                Ok(PathBuf::from(s))
-            }
+        if let Some(p) = self.as_concrete() {
+            Ok(p.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            Ok(PathBuf::from(s))
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
     }
 }
@@ -1351,19 +1202,20 @@ fn evaluate_sha256(
     value: &Value<Sha256Hash>,
     context: &EvaluationContext,
 ) -> Result<Sha256Hash, ParseError> {
-    match value {
-        Value::Concrete { value: hash, .. } => Ok(*hash),
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span.as_ref())?;
-            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
-                ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.unwrap_or_else(Span::unknown),
-                    message: Some(format!("Invalid SHA256 checksum: {}", s)),
-                    suggestion: None,
-                }
-            })
-        }
+    if let Some(hash) = value.as_concrete() {
+        Ok(*hash)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+            ParseError {
+                kind: ErrorKind::InvalidValue,
+                span: value.span().copied().unwrap_or_else(Span::new_blank),
+                message: Some(format!("Invalid SHA256 checksum: {}", s)),
+                suggestion: None,
+            }
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -1372,19 +1224,18 @@ fn evaluate_md5(
     value: &Value<Md5Hash>,
     context: &EvaluationContext,
 ) -> Result<Md5Hash, ParseError> {
-    match value {
-        Value::Concrete { value: hash, .. } => Ok(*hash),
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span.as_ref())?;
-            rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
-                ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.unwrap_or_else(Span::unknown),
-                    message: Some(format!("Invalid MD5 checksum: {}", s)),
-                    suggestion: None,
-                }
-            })
-        }
+    if let Some(hash) = value.as_concrete() {
+        Ok(*hash)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| ParseError {
+            kind: ErrorKind::InvalidValue,
+            span: value.span().copied().unwrap_or_else(Span::new_blank),
+            message: Some(format!("Invalid MD5 checksum: {}", s)),
+            suggestion: None,
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -1451,7 +1302,7 @@ impl Evaluate for Stage0Package {
         // Parse into concrete types
         let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!(
                 "invalid value for name: '{}' is not a valid package name: {}",
                 name_str, e
@@ -1461,7 +1312,7 @@ impl Evaluate for Stage0Package {
 
         let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!(
                 "invalid value for version: '{}' is not a valid version: {}",
                 version_str, e
@@ -1563,7 +1414,7 @@ impl Evaluate for Stage0VariantKeyUsage {
                 } else {
                     Some(s.parse::<i32>().map_err(|_| ParseError {
                         kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
+                        span: Span::new_blank(),
                         message: Some(format!(
                             "Invalid integer value for down_prioritize_variant: '{}'",
                             s
@@ -1599,26 +1450,27 @@ impl Evaluate for Stage0PrefixDetection {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let ignore = match &self.ignore {
             Stage0PrefixIgnore::Boolean(val) => {
-                let bool_val = match val {
-                    Value::Concrete { value: b, .. } => *b,
-                    Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span.as_ref())?;
-                        match s.as_str() {
-                            "true" | "True" | "yes" | "Yes" => true,
-                            "false" | "False" | "no" | "No" => false,
-                            _ => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: span.unwrap_or_else(Span::unknown),
-                                    message: Some(format!(
-                                        "Invalid boolean value for prefix_detection.ignore: '{}'",
-                                        s
-                                    )),
-                                    suggestion: None,
-                                });
-                            }
+                let bool_val = if let Some(b) = val.as_concrete() {
+                    *b
+                } else if let Some(template) = val.as_template() {
+                    let s = render_template(template.source(), context, val.span())?;
+                    match s.as_str() {
+                        "true" | "True" | "yes" | "Yes" => true,
+                        "false" | "False" | "no" | "No" => false,
+                        _ => {
+                            return Err(ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: val.span().copied().unwrap_or_else(Span::new_blank),
+                                message: Some(format!(
+                                    "Invalid boolean value for prefix_detection.ignore: '{}'",
+                                    s
+                                )),
+                                suggestion: None,
+                            });
                         }
                     }
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 };
                 AllOrGlobVec::All(bool_val)
             }
@@ -1642,7 +1494,7 @@ impl Evaluate for Stage0PostProcess {
         let regex_str = evaluate_string_value(&self.regex, context)?;
         let regex = regex::Regex::new(&regex_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!("Invalid regular expression: {}", e)),
             suggestion: Some("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.".to_string()),
         })?;
@@ -1664,26 +1516,27 @@ impl Evaluate for Stage0DynamicLinking {
         // Evaluate binary_relocation
         let binary_relocation = match &self.binary_relocation {
             Stage0BinaryRelocation::Boolean(val) => {
-                let bool_val = match val {
-                    Value::Concrete { value: b, .. } => *b,
-                    Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span.as_ref())?;
-                        match s.as_str() {
-                            "true" | "True" | "yes" | "Yes" => true,
-                            "false" | "False" | "no" | "No" => false,
-                            _ => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: span.unwrap_or_else(Span::unknown),
-                                    message: Some(format!(
-                                        "Invalid boolean value for binary_relocation: '{}'",
-                                        s
-                                    )),
-                                    suggestion: None,
-                                });
-                            }
+                let bool_val = if let Some(b) = val.as_concrete() {
+                    *b
+                } else if let Some(template) = val.as_template() {
+                    let s = render_template(template.source(), context, val.span())?;
+                    match s.as_str() {
+                        "true" | "True" | "yes" | "Yes" => true,
+                        "false" | "False" | "no" | "No" => false,
+                        _ => {
+                            return Err(ParseError {
+                                kind: ErrorKind::InvalidValue,
+                                span: val.span().copied().unwrap_or_else(Span::new_blank),
+                                message: Some(format!(
+                                    "Invalid boolean value for binary_relocation: '{}'",
+                                    s
+                                )),
+                                suggestion: None,
+                            });
                         }
                     }
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 };
                 AllOrGlobVec::All(bool_val)
             }
@@ -1707,7 +1560,7 @@ impl Evaluate for Stage0DynamicLinking {
                     _ => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
+                            span: Span::new_blank(),
                             message: Some(format!(
                                 "Invalid overdepending_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
@@ -1730,7 +1583,7 @@ impl Evaluate for Stage0DynamicLinking {
                     _ => {
                         return Err(ParseError {
                             kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
+                            span: Span::new_blank(),
                             message: Some(format!(
                                 "Invalid overlinking_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
@@ -1773,24 +1626,25 @@ impl Evaluate for Stage0Build {
             None => None,
             Some(v) => {
                 // NoArchType is already validated during parsing, we just need to evaluate templates
-                match v {
-                    Value::Concrete { value, .. } => Some(*value),
-                    Value::Template { template, span } => {
-                        // If it's a template, we need to render it and parse as NoArchType
-                        let s = render_template(template.source(), context, span.as_ref())?;
-                        // Parse the string as NoArchType using serde
-                        serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
-                            .map(Some)
-                            .map_err(|_| ParseError {
-                                kind: ErrorKind::InvalidValue,
-                                span: span.unwrap_or(Span::unknown()),
-                                message: Some(format!(
-                                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
-                                    s
-                                )),
-                                suggestion: None,
-                            })?
-                    }
+                if let Some(value) = v.as_concrete() {
+                    Some(*value)
+                } else if let Some(template) = v.as_template() {
+                    // If it's a template, we need to render it and parse as NoArchType
+                    let s = render_template(template.source(), context, v.span())?;
+                    // Parse the string as NoArchType using serde
+                    serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
+                        .map(Some)
+                        .map_err(|_| ParseError {
+                            kind: ErrorKind::InvalidValue,
+                            span: v.span().copied().unwrap_or(Span::new_blank()),
+                            message: Some(format!(
+                                "Invalid noarch type '{}'. Expected 'python' or 'generic'",
+                                s
+                            )),
+                            suggestion: None,
+                        })?
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 }
             }
         };
@@ -1824,25 +1678,26 @@ impl Evaluate for Stage0Build {
         }
 
         // Evaluate build number
-        let number = match &self.number {
-            Value::Concrete { value: n, .. } => *n,
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span.as_ref())?;
-                // If we render to an empty string, treat it as 0
-                if s.is_empty() {
-                    0
-                } else {
-                    s.parse::<u64>().map_err(|_| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: span.unwrap_or_else(Span::unknown),
-                        message: Some(format!(
-                            "Invalid build number: '{}' is not a valid positive integer",
-                            s
-                        )),
-                        suggestion: None,
-                    })?
-                }
+        let number = if let Some(n) = self.number.as_concrete() {
+            *n
+        } else if let Some(template) = self.number.as_template() {
+            let s = render_template(template.source(), context, self.number.span())?;
+            // If we render to an empty string, treat it as 0
+            if s.is_empty() {
+                0
+            } else {
+                s.parse::<u64>().map_err(|_| ParseError {
+                    kind: ErrorKind::InvalidValue,
+                    span: self.number.span().copied().unwrap_or_else(Span::new_blank),
+                    message: Some(format!(
+                        "Invalid build number: '{}' is not a valid positive integer",
+                        s
+                    )),
+                    suggestion: None,
+                })?
             }
+        } else {
+            unreachable!("Value must be either concrete or template")
         };
 
         Ok(Stage1Build {
@@ -1889,7 +1744,7 @@ impl Evaluate for Stage0GitSource {
                     let rev_str = evaluate_string_value(v, context)?;
                     Stage1GitRev::from_str(&rev_str).map_err(|e| ParseError {
                         kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
+                        span: Span::new_blank(),
                         message: Some(format!("Invalid git revision: {}", e)),
                         suggestion: None,
                     })?
@@ -1946,7 +1801,7 @@ impl Evaluate for Stage0UrlSource {
             let url_str = evaluate_string_value(url_value, context)?;
             let url = url::Url::parse(&url_str).map_err(|e| ParseError {
                 kind: ErrorKind::InvalidValue,
-                span: Span::unknown(),
+                span: Span::new_blank(),
                 message: Some(format!("Invalid URL '{}': {}", url_str, e)),
                 suggestion: None,
             })?;
@@ -2039,7 +1894,7 @@ impl Evaluate for Stage0PythonVersion {
             MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
                 ParseError {
                     kind: ErrorKind::InvalidValue,
-                    span: span.cloned().unwrap_or(Span::unknown()),
+                    span: span.cloned().unwrap_or(Span::new_blank()),
                     message: Some(format!(
                         "Invalid python version spec '{}': {}",
                         version_str, e
@@ -2056,14 +1911,14 @@ impl Evaluate for Stage0PythonVersion {
         match self {
             Stage0PythonVersion::Single(v) => {
                 let evaluated = evaluate_string_value(v, context)?;
-                validate_version(&evaluated, v.span().as_ref())?;
+                validate_version(&evaluated, v.span())?;
                 Ok(Stage1PythonVersion::Single(evaluated))
             }
             Stage0PythonVersion::Multiple(versions) => {
                 let mut evaluated = Vec::new();
                 for v in versions {
                     let version_str = evaluate_string_value(v, context)?;
-                    validate_version(&version_str, v.span().as_ref())?;
+                    validate_version(&version_str, v.span())?;
                     evaluated.push(version_str);
                 }
                 Ok(Stage1PythonVersion::Multiple(evaluated))
@@ -2353,7 +2208,7 @@ fn evaluate_package_output_to_recipe(
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
     let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
         kind: ErrorKind::InvalidValue,
-        span: Span::unknown(),
+        span: Span::new_blank(),
         message: Some(format!(
             "invalid value for name: '{}' is not a valid package name: {}",
             name_str, e
@@ -2369,7 +2224,7 @@ fn evaluate_package_output_to_recipe(
     } else {
         return Err(ParseError {
             kind: ErrorKind::MissingField,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some("version is required for package output".to_string()),
             suggestion: None,
         });
@@ -2377,7 +2232,7 @@ fn evaluate_package_output_to_recipe(
 
     let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
         kind: ErrorKind::InvalidValue,
-        span: Span::unknown(),
+        span: Span::new_blank(),
         message: Some(format!(
             "invalid value for version: '{}' is not a valid version: {}",
             version_str, e
@@ -2521,7 +2376,7 @@ fn evaluate_staging_output_to_recipe(
     let name = PackageName::from_str(&format!("_staging_{}", staging_name_str)).map_err(|e| {
         ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!(
                 "invalid staging name: '{}' cannot be converted to package name: {}",
                 staging_name_str, e
@@ -2535,7 +2390,7 @@ fn evaluate_staging_output_to_recipe(
         let version_str = evaluate_value_to_string(version_value, context)?;
         VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
             kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
+            span: Span::new_blank(),
             message: Some(format!("invalid version '{}': {}", version_str, e)),
             suggestion: None,
         })?

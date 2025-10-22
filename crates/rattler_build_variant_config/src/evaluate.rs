@@ -89,25 +89,26 @@ fn evaluate_value(
     jinja: &Jinja,
     key: &NormalizedKey,
 ) -> Result<Option<Variable>, VariantConfigError> {
-    match value {
-        Value::Concrete { value, .. } => Ok(Some(value.clone())),
-        Value::Template { template, .. } => {
-            let rendered = jinja.render_str(template.as_str()).map_err(|e| {
-                VariantConfigError::InvalidConfig(format!(
-                    "Failed to render template '{}' for variant key '{:?}': {}",
-                    template.as_str(),
-                    key,
-                    e
-                ))
-            })?;
+    if let Some(concrete) = value.as_concrete() {
+        Ok(Some(concrete.clone()))
+    } else if let Some(template) = value.as_template() {
+        let rendered = jinja.render_str(template.as_str()).map_err(|e| {
+            VariantConfigError::InvalidConfig(format!(
+                "Failed to render template '{}' for variant key '{:?}': {}",
+                template.as_str(),
+                key,
+                e
+            ))
+        })?;
 
-            // Filter out empty strings (which represent null/false values from Jinja)
-            if rendered.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(Variable::from_string(&rendered)))
-            }
+        // Filter out empty strings (which represent null/false values from Jinja)
+        if rendered.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(Variable::from_string(&rendered)))
         }
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -238,7 +239,7 @@ python:
         let stage0 = parse_variant_str(yaml, None).unwrap();
 
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Win64,
+            target_platform: Platform::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();

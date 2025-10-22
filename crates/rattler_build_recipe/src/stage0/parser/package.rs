@@ -124,11 +124,10 @@ mod tests {
         assert!(package.version.is_concrete());
 
         // Check name
-        match package.name {
-            Value::Concrete { ref value, .. } => {
-                assert_eq!(value.to_string(), "my-package");
-            }
-            _ => panic!("Expected concrete name"),
+        if let Some(value) = package.name.as_concrete() {
+            assert_eq!(value.to_string(), "my-package");
+        } else {
+            panic!("Expected concrete name");
         }
     }
 

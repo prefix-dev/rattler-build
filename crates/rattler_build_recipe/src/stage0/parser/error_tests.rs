@@ -78,10 +78,19 @@ impl ParseErrorWithSource {
         use miette::SourceOffset;
 
         // Calculate byte offset from line/column
-        let start_offset = SourceOffset::from_location(source, span.start_line, span.start_column);
+        let (start_line, start_column) = if let Some(start) = span.start() {
+            (start.line(), start.column())
+        } else {
+            (1, 1)
+        };
+        let start_offset = SourceOffset::from_location(source, start_line, start_column);
 
-        let end_offset = if span.end_line > 0 && span.end_column > 0 {
-            SourceOffset::from_location(source, span.end_line, span.end_column)
+        let end_offset = if let Some(end) = span.end() {
+            if end.line() > 0 && end.column() > 0 {
+                SourceOffset::from_location(source, end.line(), end.column())
+            } else {
+                start_offset
+            }
         } else {
             start_offset
         };

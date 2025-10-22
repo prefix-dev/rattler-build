@@ -9,7 +9,6 @@ mod match_spec;
 mod output;
 mod package;
 mod parser;
-mod parser_adapter;
 mod requirements;
 mod source;
 mod tests;

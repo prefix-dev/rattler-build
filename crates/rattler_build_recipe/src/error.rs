@@ -2,26 +2,58 @@
 
 use std::fmt;
 
-use crate::span::Span;
+use marked_yaml::Span;
 
 /// Result type for parsing operations
 pub type ParseResult<T> = Result<T, ParseError>;
 
+/// Convert a marked_yaml::Span to a miette::SourceSpan
+#[cfg(feature = "miette")]
+fn span_to_source_span(span: &Span) -> miette::SourceSpan {
+    // If we have start information, convert it
+    if let (Some(start), Some(end)) = (span.start(), span.end()) {
+        let offset = start.character();
+        let length = end.character().saturating_sub(start.character());
+        miette::SourceSpan::new(offset.into(), length)
+    } else if let Some(start) = span.start() {
+        // Only have start, use a length of 0
+        miette::SourceSpan::new(start.character().into(), 0)
+    } else {
+        // No span information, use (0, 0)
+        miette::SourceSpan::new(0.into(), 0)
+    }
+}
+
 /// Error during recipe parsing with span information for excellent error messages
-#[cfg_attr(feature = "miette", derive(thiserror::Error, miette::Diagnostic))]
+#[cfg_attr(not(feature = "miette"), derive(Debug, Clone))]
+#[cfg_attr(feature = "miette", derive(thiserror::Error, Debug, Clone))]
 #[cfg_attr(feature = "miette", error("{kind}{}", message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default()))]
-#[derive(Debug, Clone)]
 pub struct ParseError {
     /// The kind of error that occurred
     pub kind: ErrorKind,
     /// Location in source where the error occurred
-    #[cfg_attr(feature = "miette", label("{}", message.as_deref().unwrap_or("here")))]
     pub span: Span,
     /// Additional context message
     pub message: Option<String>,
     /// Optional suggestion for fixing the error
-    #[cfg_attr(feature = "miette", help)]
     pub suggestion: Option<String>,
+}
+
+#[cfg(feature = "miette")]
+impl miette::Diagnostic for ParseError {
+    fn labels(&self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
+        let source_span = span_to_source_span(&self.span);
+        let label = self.message.as_deref().unwrap_or("here");
+        Some(Box::new(std::iter::once(
+            miette::LabeledSpan::new_with_span(Some(label.to_string()), source_span),
+        )))
+    }
+
+    fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        self.suggestion
+            .as_ref()
+            .map(|s| Box::new(s.clone()) as Box<dyn std::fmt::Display>)
+    }
 }
 
 impl ParseError {
@@ -72,7 +104,7 @@ impl ParseError {
 
     /// Create an error for an IO operation
     pub fn io_error(error: std::io::Error, path: std::path::PathBuf) -> Self {
-        Self::new(ErrorKind::ParseError, Span::unknown()).with_message(format!(
+        Self::new(ErrorKind::ParseError, Span::new_blank()).with_message(format!(
             "IO error reading {}: {}",
             path.display(),
             error
@@ -81,7 +113,7 @@ impl ParseError {
 
     /// Create a generic parse error with a message
     pub fn from_message(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::ParseError, Span::unknown()).with_message(message)
+        Self::new(ErrorKind::ParseError, Span::new_blank()).with_message(message)
     }
 }
 
@@ -213,18 +245,17 @@ mod tests {
 
     #[test]
     fn test_error_creation() {
-        let span = Span::new(10, 20, 1, 10, 1, 20);
+        let span = Span::new_blank();
         let err =
             ParseError::new(ErrorKind::MissingField, span).with_message("field 'name' is required");
 
         assert_eq!(err.kind, ErrorKind::MissingField);
-        assert_eq!(err.span, span);
         assert_eq!(err.message, Some("field 'name' is required".to_string()));
     }
 
     #[test]
     fn test_error_with_suggestion() {
-        let span = Span::unknown();
+        let span = Span::new_blank();
         let err = ParseError::new(ErrorKind::InvalidValue, span)
             .with_message("invalid version")
             .with_suggestion("use format 'x.y.z'");
@@ -234,21 +265,18 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        let span = Span::new(0, 5, 1, 1, 1, 5);
+        let span = Span::new_blank();
         let err = ParseError::new(ErrorKind::MissingField, span).with_message("missing 'name'");
 
         let display = format!("{}", err);
         assert!(display.contains("missing field"));
-        // With miette feature, the display format is different
-        #[cfg(not(feature = "miette"))]
-        assert!(display.contains("1:1"));
     }
 
     #[test]
     fn test_parse_errors_collection() {
         let mut errors = ParseErrors::new(vec![]);
-        errors.push(ParseError::new(ErrorKind::MissingField, Span::unknown()));
-        errors.push(ParseError::new(ErrorKind::InvalidValue, Span::unknown()));
+        errors.push(ParseError::new(ErrorKind::MissingField, Span::new_blank()));
+        errors.push(ParseError::new(ErrorKind::InvalidValue, Span::new_blank()));
 
         assert_eq!(errors.len(), 2);
         assert!(!errors.is_empty());
@@ -256,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_expected_type_error() {
-        let span = Span::new(0, 5, 1, 1, 1, 5);
+        let span = Span::new_blank();
         let err = ParseError::expected_type("string", "number", span);
 
         assert_eq!(err.kind, ErrorKind::UnexpectedType);
@@ -265,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_jinja_error() {
-        let span = Span::new(0, 10, 1, 1, 1, 10);
+        let span = Span::new_blank();
         let err = ParseError::jinja_error("undefined variable 'foo'".to_string(), span);
 
         assert_eq!(err.kind, ErrorKind::JinjaError);

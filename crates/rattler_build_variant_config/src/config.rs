@@ -94,8 +94,15 @@ impl VariantConfig {
         let stage0 = crate::yaml_parser::parse_variant_file(path)?;
 
         // Evaluate with the provided context
-        crate::evaluate::evaluate_variant_config(&stage0, jinja_config)
-            .map_err(|e| VariantConfigError::ParseError(path.to_path_buf(), e.to_string()))
+        crate::evaluate::evaluate_variant_config(&stage0, jinja_config).map_err(|e| {
+            VariantConfigError::ParseError {
+                path: path.to_path_buf(),
+                source: rattler_build_yaml_parser::ParseError::generic(
+                    e.to_string(),
+                    marked_yaml::Span::new_blank(),
+                ),
+            }
+        })
     }
 
     /// Parse variant configuration from a YAML string

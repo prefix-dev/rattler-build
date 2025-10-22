@@ -736,9 +736,10 @@ mod tests {
         let yaml = "{}";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        match build.number {
-            Value::Concrete { value: n, .. } => assert_eq!(n, 0),
-            _ => panic!("Expected concrete value"),
+        if let Some(n) = build.number.as_concrete() {
+            assert_eq!(*n, 0);
+        } else {
+            panic!("Expected concrete value");
         }
         assert!(build.string.is_none());
         assert!(build.script.is_default());
@@ -749,9 +750,10 @@ mod tests {
         let yaml = "number: 5";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        match build.number {
-            Value::Concrete { value: n, .. } => assert_eq!(n, 5),
-            _ => panic!("Expected concrete value"),
+        if let Some(n) = build.number.as_concrete() {
+            assert_eq!(*n, 5);
+        } else {
+            panic!("Expected concrete value");
         }
     }
 

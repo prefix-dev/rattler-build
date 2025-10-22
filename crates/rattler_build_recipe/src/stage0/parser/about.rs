@@ -170,18 +170,16 @@ mod tests {
         assert!(about.summary.is_some());
 
         // Verify concrete values
-        match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete { value: url, .. } => {
-                assert_eq!(url.as_str(), "https://example.com/");
-            }
-            _ => panic!("Expected concrete value"),
+        if let Some(url) = about.homepage.as_ref().unwrap().as_concrete() {
+            assert_eq!(url.as_str(), "https://example.com/");
+        } else {
+            panic!("Expected concrete value");
         }
 
-        match about.license.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete { value: license, .. } => {
-                assert_eq!(license.0.as_ref(), "MIT");
-            }
-            _ => panic!("Expected concrete value"),
+        if let Some(license) = about.license.as_ref().unwrap().as_concrete() {
+            assert_eq!(license.0.as_ref(), "MIT");
+        } else {
+            panic!("Expected concrete value");
         }
     }
 
@@ -195,20 +193,18 @@ mod tests {
         let about = parse_about(&yaml).unwrap();
 
         // Verify templates
-        match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Template { template: t, .. } => {
-                assert_eq!(t.used_variables(), &["homepage"]);
-            }
-            _ => panic!("Expected template value"),
+        if let Some(t) = about.homepage.as_ref().unwrap().as_template() {
+            assert_eq!(t.used_variables(), &["homepage"]);
+        } else {
+            panic!("Expected template value");
         }
 
-        match about.summary.as_ref().unwrap() {
-            crate::stage0::types::Value::Template { template: t, .. } => {
-                let mut vars = t.used_variables().to_vec();
-                vars.sort();
-                assert_eq!(vars, vec!["name", "summary"]);
-            }
-            _ => panic!("Expected template value"),
+        if let Some(t) = about.summary.as_ref().unwrap().as_template() {
+            let mut vars = t.used_variables().to_vec();
+            vars.sort();
+            assert_eq!(vars, vec!["name", "summary"]);
+        } else {
+            panic!("Expected template value");
         }
     }
 

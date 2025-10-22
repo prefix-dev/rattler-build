@@ -111,7 +111,7 @@ impl BuildString {
             // Render the template
             let rendered = jinja.render_str(template).map_err(|e| crate::ParseError {
                 kind: crate::ErrorKind::JinjaError,
-                span: crate::Span::unknown(),
+                span: crate::Span::new_blank(),
                 message: Some(format!("Failed to render build string template: {}", e)),
                 suggestion: None,
             })?;

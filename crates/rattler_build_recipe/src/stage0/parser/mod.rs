@@ -55,7 +55,7 @@ pub(crate) use helpers::get_span;
 /// and returns the appropriate Recipe variant.
 pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
     let yaml = yaml::parse_yaml(source).map_err(|e| {
-        ParseError::new(ErrorKind::YamlError, Span::unknown())
+        ParseError::new(ErrorKind::YamlError, Span::new_blank())
             .with_message(format!("Failed to parse YAML: {}", e))
     })?;
 
@@ -68,7 +68,7 @@ pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::sta
 /// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = yaml::parse_yaml(source).map_err(|e| {
-        ParseError::new(ErrorKind::YamlError, Span::unknown())
+        ParseError::new(ErrorKind::YamlError, Span::new_blank())
             .with_message(format!("Failed to parse YAML: {}", e))
     })?;
 

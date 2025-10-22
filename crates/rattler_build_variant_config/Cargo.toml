@@ -44,3 +44,5 @@ fs-err.workspace = true
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
+rstest = { workspace = true }
+serial_test = "3.2.0"

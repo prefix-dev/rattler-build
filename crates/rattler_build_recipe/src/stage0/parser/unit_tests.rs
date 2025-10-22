@@ -25,9 +25,10 @@ fn parse_yaml_list(yaml_str: &str) -> MarkedNode {
 fn test_parse_concrete_value() {
     let yaml = parse_yaml_field("hello", "value");
     let result: crate::stage0::types::Value<String> = parse_value(&yaml).unwrap();
-    match result {
-        crate::stage0::types::Value::Concrete { value: s, .. } => assert_eq!(s, "hello"),
-        _ => panic!("Expected concrete value"),
+    if let Some(s) = result.as_concrete() {
+        assert_eq!(s, "hello");
+    } else {
+        panic!("Expected concrete value");
     }
 }
 
@@ -35,12 +36,11 @@ fn test_parse_concrete_value() {
 fn test_parse_template_value() {
     let yaml = parse_yaml_field("'${{ name }}'", "value");
     let result: crate::stage0::types::Value<String> = parse_value(&yaml).unwrap();
-    match result {
-        crate::stage0::types::Value::Template { template: t, .. } => {
-            assert_eq!(t.as_str(), "${{ name }}");
-            assert_eq!(t.used_variables(), &["name"]);
-        }
-        _ => panic!("Expected template value"),
+    if let Some(t) = result.as_template() {
+        assert_eq!(t.as_str(), "${{ name }}");
+        assert_eq!(t.used_variables(), &["name"]);
+    } else {
+        panic!("Expected template value");
     }
 }
 
@@ -113,12 +113,11 @@ fn test_parse_context_scalar_type_coercion() {
         );
 
         let result = super::parse_context_scalar(scalar).unwrap();
-        match result {
-            crate::stage0::types::Value::Concrete { value: var, .. } => {
-                let json = serde_json::to_string(&var).unwrap();
-                assert_eq!(json, expected_json, "JSON mismatch for: {}", input);
-            }
-            _ => panic!("Expected concrete value for: {}", input),
+        if let Some(var) = result.as_concrete() {
+            let json = serde_json::to_string(&var).unwrap();
+            assert_eq!(json, expected_json, "JSON mismatch for: {}", input);
+        } else {
+            panic!("Expected concrete value for: {}", input);
         }
     }
 }
@@ -143,12 +142,11 @@ fn test_parse_context_scalar_quoted_and_templates() {
         );
 
         let result = super::parse_context_scalar(scalar).unwrap();
-        match result {
-            crate::stage0::types::Value::Concrete { value: var, .. } => {
-                let json = serde_json::to_string(&var).unwrap();
-                assert_eq!(json, expected_json, "JSON mismatch for: {}", input);
-            }
-            _ => panic!("Expected concrete value for: {}", input),
+        if let Some(var) = result.as_concrete() {
+            let json = serde_json::to_string(&var).unwrap();
+            assert_eq!(json, expected_json, "JSON mismatch for: {}", input);
+        } else {
+            panic!("Expected concrete value for: {}", input);
         }
     }
 
@@ -157,11 +155,10 @@ fn test_parse_context_scalar_quoted_and_templates() {
     let scalar = yaml.as_scalar().expect("Expected scalar");
     let result = super::parse_context_scalar(scalar).unwrap();
 
-    match result {
-        crate::stage0::types::Value::Template { template, .. } => {
-            assert_eq!(template.as_str(), "${{ name }}");
-            assert_eq!(template.used_variables(), &["name"]);
-        }
-        _ => panic!("Expected template value"),
+    if let Some(template) = result.as_template() {
+        assert_eq!(template.as_str(), "${{ name }}");
+        assert_eq!(template.used_variables(), &["name"]);
+    } else {
+        panic!("Expected template value");
     }
 }

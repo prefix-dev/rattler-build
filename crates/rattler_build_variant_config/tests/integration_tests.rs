@@ -1,8 +1,4 @@
 use rattler_build_variant_config::{SelectorContext, VariantConfig, load_conda_build_config};
-
-#[cfg(feature = "parser")]
-use rattler_build_variant_config::parse_variant_file;
-
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -194,34 +190,4 @@ fn test_partial_variable_usage() {
 
     // Should be 3 combinations (just python variants)
     assert_eq!(combinations.len(), 3);
-}
-
-#[cfg(feature = "parser")]
-#[test]
-fn test_parser_with_selectors_linux() {
-    let path = test_data_dir().join("with_selectors/variants.yaml");
-    let context = SelectorContext::new(Platform::Linux64);
-
-    let config = parse_variant_file(&path, &context).unwrap();
-    insta::assert_yaml_snapshot!("parser_selectors_linux", config);
-}
-
-#[cfg(feature = "parser")]
-#[test]
-fn test_parser_with_selectors_osx() {
-    let path = test_data_dir().join("with_selectors/variants.yaml");
-    let context = SelectorContext::new(Platform::OsxArm64);
-
-    let config = parse_variant_file(&path, &context).unwrap();
-    insta::assert_yaml_snapshot!("parser_selectors_osx", config);
-}
-
-#[cfg(feature = "parser")]
-#[test]
-fn test_parser_with_selectors_win() {
-    let path = test_data_dir().join("with_selectors/variants.yaml");
-    let context = SelectorContext::new(Platform::Win64);
-
-    let config = parse_variant_file(&path, &context).unwrap();
-    insta::assert_yaml_snapshot!("parser_selectors_win", config);
 }

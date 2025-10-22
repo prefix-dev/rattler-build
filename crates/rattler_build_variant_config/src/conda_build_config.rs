@@ -190,8 +190,14 @@ pub fn load_conda_build_config(
     let out = lines.join("\n");
 
     // Parse as YAML and filter null values
-    let value: serde_yaml::Value = serde_yaml::from_str(&out)
-        .map_err(|e| VariantConfigError::ParseError(path.to_path_buf(), e.to_string()))?;
+    let value: serde_yaml::Value =
+        serde_yaml::from_str(&out).map_err(|e| VariantConfigError::ParseError {
+            path: path.to_path_buf(),
+            source: rattler_build_yaml_parser::ParseError::generic(
+                e.to_string(),
+                marked_yaml::Span::new_blank(),
+            ),
+        })?;
 
     if value.is_null() {
         return Ok(VariantConfig::default());
@@ -219,8 +225,16 @@ pub fn load_conda_build_config(
         })
         .collect::<serde_yaml::Mapping>();
 
-    let config: VariantConfig = serde_yaml::from_value(serde_yaml::Value::Mapping(value))
-        .map_err(|e| VariantConfigError::ParseError(path.to_path_buf(), e.to_string()))?;
+    let config: VariantConfig =
+        serde_yaml::from_value(serde_yaml::Value::Mapping(value)).map_err(|e| {
+            VariantConfigError::ParseError {
+                path: path.to_path_buf(),
+                source: rattler_build_yaml_parser::ParseError::generic(
+                    e.to_string(),
+                    marked_yaml::Span::new_blank(),
+                ),
+            }
+        })?;
 
     Ok(config)
 }
@@ -228,6 +242,9 @@ pub fn load_conda_build_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
+    use serial_test::serial;
+    use std::path::PathBuf;
 
     #[test]
     fn test_parse_line() {
@@ -262,5 +279,56 @@ mod tests {
         assert!(ctx.get("linux").unwrap().is_true());
         assert!(!ctx.get("win").unwrap().is_true());
         assert!(ctx.get("linux64").unwrap().is_true());
+    }
+
+    #[rstest]
+    #[case("conda_build_config/test_1.yaml", None)]
+    #[case("conda_build_config/all_filtered.yaml", None)]
+    #[case("conda_build_config/conda_forge_subset.yaml", Some(false))]
+    #[case("conda_build_config/conda_forge_subset.yaml", Some(true))]
+    #[case("conda_build_config/conda_forge_subset.yaml", None)]
+    #[serial]
+    fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
+        let path = test_data_dir().join(config_path);
+
+        // fix the platform for the snapshots
+        let selector_config = SelectorContext::new(Platform::OsxArm64);
+
+        if let Some(cuda) = cuda {
+            unsafe {
+                std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" })
+            };
+        }
+
+        let config = load_conda_build_config(&path, &selector_config).unwrap();
+        insta::assert_yaml_snapshot!(
+            format!(
+                "{}_{}",
+                config_path,
+                cuda.map(|o| o.to_string()).unwrap_or("none".to_string())
+            ),
+            config
+        );
+
+        if let Some(cuda) = cuda {
+            if cuda {
+                assert_eq!(
+                    config.variants[&"environment_var".into()],
+                    vec!["CF_CUDA_ENABLED".into()]
+                );
+            } else {
+                assert_eq!(
+                    config.variants[&"environment_var".into()],
+                    vec!["CF_CUDA_DISABLED".into()]
+                );
+            }
+            unsafe {
+                std::env::remove_var("TEST_CF_CUDA_ENABLED");
+            }
+        }
+    }
+
+    fn test_data_dir() -> PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/")
     }
 }

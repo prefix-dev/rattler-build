@@ -172,10 +172,13 @@ mod sha256_serialization {
     {
         match value {
             None => serializer.serialize_none(),
-            Some(Value::Concrete { value, .. }) => {
-                serializer.serialize_str(&format!("{:x}", value))
+            Some(v) if v.is_concrete() => {
+                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
             }
-            Some(Value::Template { template, .. }) => serializer.serialize_str(template.source()),
+            Some(v) if v.is_template() => {
+                serializer.serialize_str(v.as_template().unwrap().source())
+            }
+            _ => unreachable!("Value must be either concrete or template"),
         }
     }
 }
@@ -191,10 +194,13 @@ mod md5_serialization {
     {
         match value {
             None => serializer.serialize_none(),
-            Some(Value::Concrete { value, .. }) => {
-                serializer.serialize_str(&format!("{:x}", value))
+            Some(v) if v.is_concrete() => {
+                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
             }
-            Some(Value::Template { template, .. }) => serializer.serialize_str(template.source()),
+            Some(v) if v.is_template() => {
+                serializer.serialize_str(v.as_template().unwrap().source())
+            }
+            _ => unreachable!("Value must be either concrete or template"),
         }
     }
 }
@@ -244,8 +250,10 @@ impl GitSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template { template: t, .. }) = target_directory {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(td) = target_directory {
+            if let Some(t) = td.as_template() {
+                vars.extend(t.used_variables().iter().cloned());
+            }
         }
         if let Some(lfs) = lfs {
             vars.extend(lfs.used_variables());
@@ -287,8 +295,10 @@ impl UrlSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(Value::Template { template: t, .. }) = target_directory {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(td) = target_directory {
+            if let Some(t) = td.as_template() {
+                vars.extend(t.used_variables().iter().cloned());
+            }
         }
         vars.sort();
         vars.dedup();
@@ -311,7 +321,7 @@ impl PathSource {
         } = self;
 
         let mut vars = Vec::new();
-        if let Value::Template { template: t, .. } = path {
+        if let Some(t) = path.as_template() {
             vars.extend(t.used_variables().iter().cloned());
         }
         if let Some(sha256) = sha256 {
@@ -321,11 +331,15 @@ impl PathSource {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(Value::Template { template: t, .. }) = target_directory {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(td) = target_directory {
+            if let Some(t) = td.as_template() {
+                vars.extend(t.used_variables().iter().cloned());
+            }
         }
-        if let Some(Value::Template { template: t, .. }) = file_name {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(fn_val) = file_name {
+            if let Some(t) = fn_val.as_template() {
+                vars.extend(t.used_variables().iter().cloned());
+            }
         }
         vars.extend(filter.used_variables());
         vars.sort();

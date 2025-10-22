@@ -7,15 +7,17 @@ use std::fmt;
 
 /// A value that can be either a concrete value or a Jinja2 template
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Value<T> {
     /// The inner value - either concrete or template
     inner: ValueInner<T>,
-    /// Optional span for error reporting
+    /// Optional span for error reporting (not serialized)
     #[serde(skip)]
     span: Option<Span>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ValueInner<T> {
     Concrete(T),
     Template(JinjaTemplate),
@@ -69,6 +71,15 @@ impl<T> Value<T> {
         self.span.as_ref()
     }
 
+    /// Get the list of variables used in this value
+    /// Returns empty vector for concrete values, template variables for templates
+    pub fn used_variables(&self) -> Vec<String> {
+        match &self.inner {
+            ValueInner::Concrete(_) => Vec::new(),
+            ValueInner::Template(t) => t.used_variables().to_vec(),
+        }
+    }
+
     /// Convert into the inner value, if concrete
     pub fn into_concrete(self) -> Option<T> {
         match self.inner {
@@ -110,8 +121,79 @@ impl<T: fmt::Display> fmt::Display for Value<T> {
 }
 
 /// A list or a single item
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ListOrItem<T>(Vec<T>);
+
+// Custom serialization: single item => just the item, multiple => array
+impl<T: Serialize> Serialize for ListOrItem<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0.as_slice() {
+            [single] => single.serialize(serializer),
+            multiple => multiple.serialize(serializer),
+        }
+    }
+}
+
+// Custom deserialization: accept either single value or array
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ListOrItem<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::marker::PhantomData;
+
+        struct ListOrItemVisitor<T>(PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ListOrItemVisitor<T> {
+            type Value = ListOrItem<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a single value or a list of values")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(ListOrItem(items))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                T::deserialize(de::value::StrDeserializer::new(v))
+                    .map(|item| ListOrItem(vec![item]))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                T::deserialize(de::value::StringDeserializer::new(v))
+                    .map(|item| ListOrItem(vec![item]))
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                T::deserialize(de::value::MapAccessDeserializer::new(map))
+                    .map(|item| ListOrItem(vec![item]))
+            }
+        }
+
+        deserializer.deserialize_any(ListOrItemVisitor(PhantomData))
+    }
+}
 
 impl<T> ListOrItem<T> {
     /// Create from a list of items
@@ -172,20 +254,46 @@ impl<'a, T> IntoIterator for &'a ListOrItem<T> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conditional<T> {
     /// The condition to evaluate
+    #[serde(rename = "if")]
     pub condition: JinjaExpression,
     /// The values to use if condition is true
     pub then: ListOrItem<Value<T>>,
     /// The values to use if condition is false
+    #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
     pub else_value: Option<ListOrItem<Value<T>>>,
+}
+
+impl<T> Conditional<T> {
+    /// Get all variables used in this conditional
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = self.condition.used_variables().to_vec();
+
+        // Collect from then branch
+        for value in self.then.iter() {
+            vars.extend(value.used_variables());
+        }
+
+        // Collect from else branch if present
+        if let Some(else_value) = &self.else_value {
+            for value in else_value.iter() {
+                vars.extend(value.used_variables());
+            }
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
 }
 
 /// An item in a conditional list - either a value or a conditional
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Item<T> {
+    /// A conditional if/then/else (must be first for untagged to work)
+    Conditional(Conditional<T>),
     /// A concrete value or template
     Value(Value<T>),
-    /// A conditional if/then/else
-    Conditional(Conditional<T>),
 }
 
 impl<T> Item<T> {
@@ -214,10 +322,28 @@ impl<T> Item<T> {
             Item::Conditional(c) => Some(c),
         }
     }
+
+    /// Get all variables used in this item
+    pub fn used_variables(&self) -> Vec<String> {
+        match self {
+            Item::Value(v) => v.used_variables(),
+            Item::Conditional(c) => c.used_variables(),
+        }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Item<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Item::Value(v) => write!(f, "{}", v),
+            Item::Conditional(_) => write!(f, "<conditional>"),
+        }
+    }
 }
 
 /// A list that may contain conditionals
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ConditionalList<T> {
     items: Vec<Item<T>>,
 }
@@ -261,6 +387,17 @@ impl<T> ConditionalList<T> {
     /// Get as a slice
     pub fn as_slice(&self) -> &[Item<T>] {
         &self.items
+    }
+
+    /// Get all variables used in all items
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for item in self.items.iter() {
+            vars.extend(item.used_variables());
+        }
+        vars.sort();
+        vars.dedup();
+        vars
     }
 }
 
