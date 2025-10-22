@@ -5,7 +5,7 @@ use rattler_build_jinja::JinjaExpression;
 
 use crate::{
     error::{ParseError, ParseResult},
-    helpers::{SpannedString, contains_jinja_template, get_span},
+    helpers::{contains_jinja_template, get_span},
     list::parse_list_or_item,
     types::{Conditional, ConditionalList, Item, Value},
 };
@@ -49,9 +49,8 @@ where
 
     // Otherwise, it's a simple value
     if let Some(scalar) = yaml.as_scalar() {
-        let spanned = SpannedString::from_scalar(scalar);
-        let s = spanned.as_str();
-        let span = spanned.span();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it's a template
         if contains_jinja_template(s) {
@@ -92,9 +91,8 @@ where
         ParseError::expected_type("scalar", "non-scalar", get_span(condition_node))
     })?;
 
-    let condition_spanned = SpannedString::from_scalar(condition_scalar);
-    let condition = JinjaExpression::new(condition_spanned.as_str().to_string())
-        .map_err(|e| ParseError::jinja_error(e, condition_spanned.span()))?;
+    let condition = JinjaExpression::new(condition_scalar.as_str().to_string())
+        .map_err(|e| ParseError::jinja_error(e, *condition_scalar.span()))?;
 
     // Get the "then" field
     let then_yaml = mapping

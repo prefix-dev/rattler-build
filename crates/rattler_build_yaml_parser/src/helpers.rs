@@ -13,32 +13,6 @@ pub fn get_span(node: &MarkedNode) -> Span {
     }
 }
 
-/// Convert a marked scalar to a string with span information
-pub struct SpannedString {
-    value: String,
-    span: Span,
-}
-
-impl SpannedString {
-    /// Create from a marked scalar
-    pub fn from_scalar(scalar: &marked_yaml::types::MarkedScalarNode) -> Self {
-        Self {
-            value: scalar.as_str().to_string(),
-            span: *scalar.span(),
-        }
-    }
-
-    /// Get the string value
-    pub fn as_str(&self) -> &str {
-        &self.value
-    }
-
-    /// Get the span
-    pub fn span(&self) -> Span {
-        self.span
-    }
-}
-
 /// Helper for validating that all fields in a mapping are known
 ///
 /// This checks that every key in the mapping appears in the valid_fields list

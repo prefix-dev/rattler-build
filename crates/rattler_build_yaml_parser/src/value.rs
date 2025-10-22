@@ -5,7 +5,7 @@ use rattler_build_jinja::JinjaTemplate;
 
 use crate::{
     error::{ParseError, ParseResult},
-    helpers::{SpannedString, contains_jinja_template, get_span},
+    helpers::{contains_jinja_template, get_span},
     types::Value,
 };
 
@@ -39,9 +39,8 @@ where
         .as_scalar()
         .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(yaml)))?;
 
-    let spanned = SpannedString::from_scalar(scalar);
-    let s = spanned.as_str();
-    let span = spanned.span();
+    let s = scalar.as_str();
+    let span = *scalar.span();
 
     // Check if it contains a Jinja template
     if contains_jinja_template(s) {
