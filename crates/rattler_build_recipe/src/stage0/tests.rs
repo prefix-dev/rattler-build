@@ -146,6 +146,7 @@ pub struct PackageContentsCheckFiles {
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum TestType {
     /// A Python test that will test if the imports are available and run `pip check`
     Python {

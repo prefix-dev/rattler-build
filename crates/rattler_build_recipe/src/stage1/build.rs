@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{AllOrGlobVec, GlobVec};
 
 /// RPaths configuration with a default value of ["lib/"] when empty
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Rpaths(Vec<String>);
 
@@ -33,12 +33,6 @@ impl Rpaths {
     /// Get the inner vector (without applying defaults)
     pub fn inner(&self) -> &Vec<String> {
         &self.0
-    }
-}
-
-impl Default for Rpaths {
-    fn default() -> Self {
-        Self(Vec::new())
     }
 }
 
