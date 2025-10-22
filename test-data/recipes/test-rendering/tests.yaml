@@ -1,14 +1,14 @@
 - python:
     imports:
-      - numpy.testing
+    - numpy.testing
 - python:
     imports:
-      - numpy.matrix
+    - numpy.matrix
     python_version:
-      - 3.8.*
+    - 3.8.*
 - python:
     imports:
-      - numpy.matrix
+    - numpy.matrix
     python_version: 3.8.*
 - script:
     content: echo "FOO"
@@ -21,16 +21,16 @@
       FOO: BAR
       BAZ: QUX
     secrets:
-      - ABC
-      - DEF
+    - ABC
+    - DEF
     content: print("i am the test")
 - downstream: foo
 - perl:
     uses:
-      - Test::More
+    - Test::More
 - r:
     libraries:
-      - testthat
+    - testthat
 - ruby:
     requires:
-      - minitest
+    - minitest
