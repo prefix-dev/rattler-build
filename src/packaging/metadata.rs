@@ -26,7 +26,8 @@ use rayon::prelude::*;
 use url::Url;
 
 use super::{PackagingError, TempFiles};
-use crate::{hash::HashInput, metadata::Output};
+use crate::metadata::Output;
+use rattler_build_recipe::stage1::HashInput;
 
 /// Safely check if a symlink resolves to a regular file, with basic loop protection
 fn is_symlink_to_file(path: &Path) -> bool {

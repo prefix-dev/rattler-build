@@ -7,12 +7,10 @@ use rattler_conda_types::{ChannelUrl, PackageName, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    hash::HashInfo,
-    types::{
-        Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
-    },
+use crate::types::{
+    Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
+use rattler_build_recipe::stage1::HashInfo;
 
 use rattler_build_script::SandboxConfiguration;
 

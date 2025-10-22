@@ -3,7 +3,8 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{env_vars, hash::HashInfo, source_code::SourceCode};
+use crate::{env_vars, source_code::SourceCode};
+use rattler_build_recipe::stage1::HashInfo;
 use petgraph::graph::DiGraph;
 use rattler_build_jinja::{Jinja, Variable};
 use rattler_build_recipe::stage1::Dependency;

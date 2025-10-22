@@ -31,7 +31,7 @@ mod variant_tests;
 pub use about::About;
 pub use build::{Build, Rpaths};
 pub use extra::Extra;
-pub(crate) use hash::compute_hash;
+pub use hash::{HashInfo, HashInput, compute_hash};
 use indexmap::IndexMap;
 pub use package::Package;
 pub use recipe::Recipe;

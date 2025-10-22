@@ -25,7 +25,6 @@ pub mod utils;
 
 mod consts;
 mod env_vars;
-pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
@@ -62,6 +61,7 @@ use rattler_build_variant_config::VariantConfig;
 
 // Re-export types needed by Python bindings and external consumers
 pub use rattler_build_jinja::Variable;
+pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
 pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
@@ -80,7 +80,6 @@ use types::{
     build_reindexed_channels,
 };
 
-use crate::hash::HashInfo;
 use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
 use indexmap::IndexSet;
 use rattler_conda_types::NoArchType;
