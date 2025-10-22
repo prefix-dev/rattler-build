@@ -1,12 +1,9 @@
-//! Value parsing functions
+//! Value parsing functions - now delegating to shared rattler_build_yaml_parser
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser as yaml_parser;
 
-use crate::{
-    error::{ParseError, ParseResult},
-    span::SpannedString,
-    stage0::parser::helpers::get_span,
-};
+use crate::{error::ParseResult, stage0::parser_adapter};
 
 /// Parse a Value<T> from YAML
 ///
@@ -14,7 +11,6 @@ use crate::{
 ///
 /// # Arguments
 /// * `yaml` - The YAML node to parse
-/// * `field_name` - Optional field name for better error messages (e.g., "build.number")
 pub fn parse_value<T>(yaml: &MarkedNode) -> ParseResult<crate::stage0::types::Value<T>>
 where
     T: std::str::FromStr,
@@ -38,28 +34,10 @@ where
     T: std::str::FromStr,
     T::Err: std::fmt::Display,
 {
-    let scalar = yaml
-        .as_scalar()
-        .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(yaml)))?;
+    // Use the shared parser
+    let shared_value = yaml_parser::parse_value_with_name(yaml, field_name)
+        .map_err(parser_adapter::convert_error)?;
 
-    let spanned = SpannedString::from(scalar);
-    let s = spanned.as_str();
-    let span = spanned.span();
-
-    // Check if it contains a Jinja template
-    if s.contains("${{") && s.contains("}}") {
-        // It's a template
-        let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
-            .map_err(|e| ParseError::jinja_error(e, span))?;
-        Ok(crate::stage0::types::Value::new_template(
-            template,
-            Some(span),
-        ))
-    } else {
-        // Try to parse as concrete value
-        let value = s
-            .parse::<T>()
-            .map_err(|e| ParseError::invalid_value(field_name, &e.to_string(), span))?;
-        Ok(crate::stage0::types::Value::new_concrete(value, Some(span)))
-    }
+    // Convert to recipe Value
+    Ok(parser_adapter::convert_value(shared_value))
 }

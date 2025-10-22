@@ -1,6 +1,6 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
-expression: format_miette_report(error_with_source)
+expression: error_with_source
 ---
   × invalid value: invalid value for value: InvalidLicense
   │ ^^^^^^^^^^^^^^ unknown term

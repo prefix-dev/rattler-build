@@ -4355,6 +4355,7 @@ dependencies = [
  "rattler_build_script",
  "rattler_build_types",
  "rattler_build_variant_config",
+ "rattler_build_yaml_parser",
  "rattler_conda_types",
  "rattler_digest",
  "regex",
@@ -4486,11 +4487,24 @@ dependencies = [
  "minijinja",
  "rattler_build_jinja",
  "rattler_build_types",
+ "rattler_build_yaml_parser",
  "rattler_conda_types",
  "serde",
  "serde_yaml",
  "thiserror 2.0.17",
  "tracing",
+]
+
+[[package]]
+name = "rattler_build_yaml_parser"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "marked-yaml",
+ "miette",
+ "rattler_build_jinja",
+ "serde",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

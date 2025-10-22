@@ -1,18 +1,41 @@
-//! Helper functions for parsing
+//! Helper functions for YAML parsing
 
-use marked_yaml::{Node as MarkedNode, types::MarkedMappingNode};
+use marked_yaml::{Node as MarkedNode, Span, types::MarkedMappingNode};
 
-use crate::{
-    error::{ParseError, ParseResult},
-    span::Span,
-};
+use crate::error::{ParseError, ParseResult};
 
 /// Get the span from a marked_yaml node
-pub(crate) fn get_span(node: &MarkedNode) -> Span {
+pub fn get_span(node: &MarkedNode) -> Span {
     match node {
-        MarkedNode::Scalar(s) => (*s.span()).into(),
-        MarkedNode::Mapping(m) => (*m.span()).into(),
-        MarkedNode::Sequence(s) => (*s.span()).into(),
+        MarkedNode::Scalar(s) => *s.span(),
+        MarkedNode::Mapping(m) => *m.span(),
+        MarkedNode::Sequence(s) => *s.span(),
+    }
+}
+
+/// Convert a marked scalar to a string with span information
+pub struct SpannedString {
+    value: String,
+    span: Span,
+}
+
+impl SpannedString {
+    /// Create from a marked scalar
+    pub fn from_scalar(scalar: &marked_yaml::types::MarkedScalarNode) -> Self {
+        Self {
+            value: scalar.as_str().to_string(),
+            span: *scalar.span(),
+        }
+    }
+
+    /// Get the string value
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
+
+    /// Get the span
+    pub fn span(&self) -> Span {
+        self.span
     }
 }
 
@@ -30,7 +53,7 @@ pub(crate) fn get_span(node: &MarkedNode) -> Span {
 /// ```ignore
 /// validate_mapping_fields(mapping, "python test", &["imports", "pip_check", "python_version"])?;
 /// ```
-pub(super) fn validate_mapping_fields(
+pub fn validate_mapping_fields(
     mapping: &MarkedMappingNode,
     context_name: &str,
     valid_fields: &[&str],
@@ -41,10 +64,15 @@ pub(super) fn validate_mapping_fields(
             return Err(ParseError::invalid_value(
                 context_name,
                 &format!("unknown field '{}'", key),
-                (*key_node.span()).into(),
+                *key_node.span(),
             )
             .with_suggestion(format!("Valid fields are: {}", valid_fields.join(", "))));
         }
     }
     Ok(())
+}
+
+/// Check if a string contains a Jinja2 template
+pub fn contains_jinja_template(s: &str) -> bool {
+    s.contains("${{") && s.contains("}}")
 }

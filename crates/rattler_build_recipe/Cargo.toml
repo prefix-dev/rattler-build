@@ -17,6 +17,9 @@ rattler_build_types = { workspace = true }
 rattler_build_jinja = { workspace = true }
 rattler_build_script = { path = "../rattler_build_script" }
 rattler_build_variant_config = { path = "../rattler_build_variant_config", optional = true }
+rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser", version = "0.1.0", features = [
+  "miette",
+] }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

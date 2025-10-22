@@ -11,6 +11,7 @@ members = [
   "crates/rattler_build_jinja",
   "crates/rattler_build_script",
   "crates/rattler_build_diffy",
+  "crates/rattler_build_yaml_parser",
 ]
 
 [workspace.package]
