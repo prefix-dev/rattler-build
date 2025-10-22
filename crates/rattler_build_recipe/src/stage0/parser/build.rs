@@ -2,18 +2,16 @@ use marked_yaml::{Node, types::MarkedMappingNode};
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 
-use crate::{
-    stage0::{
-        build::{
-            BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
-            PrefixIgnore, PythonBuild, VariantKeyUsage,
-        },
-        parser::helpers::get_span,
-        types::{IncludeExclude, Value},
+use crate::stage0::{
+    build::{
+        BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
+        PrefixIgnore, PythonBuild, VariantKeyUsage,
     },
+    parser::helpers::get_span,
+    types::{IncludeExclude, Value},
 };
 
-use super::{parse_conditional_list, parse_value, parse_value_with_name};
+use super::{parse_conditional_list, parse_value_with_name};
 
 /// Macro to parse a value with automatic field name inference for better error messages
 ///
@@ -39,7 +37,6 @@ fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
             (*scalar.span()).into(),
         )
     })
-
 }
 
 /// Parse a field that can be either a boolean or a list of patterns
@@ -50,7 +47,7 @@ fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
 /// Returns an enum with either Boolean(Value<bool>) or Patterns(ConditionalList<String>)
 fn parse_bool_or_patterns<T>(
     node: &Node,
-    field_name: &str,
+    _field_name: &str,
     bool_variant: fn(Value<bool>) -> T,
     patterns_variant: fn(crate::stage0::types::ConditionalList<String>) -> T,
 ) -> Result<T, ParseError> {
@@ -126,18 +123,15 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
 
     // Try parsing as a scalar string (multiline or single line) - simple case
     if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let script_str = spanned.as_str();
+        let script_str = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it's a template
         if script_str.contains("${{") && script_str.contains("}}") {
             // It's a templated script - keep as is
             let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(
-                template,
-                Some(spanned.span()),
-            ))];
+                .map_err(|e| ParseError::jinja_error(e, span))?;
+            let items = vec![Item::Value(Value::new_template(template, Some(span)))];
             return Ok(Script {
                 content: Some(ConditionalList::new(items)),
                 ..Default::default()
@@ -153,7 +147,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
 
         let items: Vec<Item<String>> = lines
             .into_iter()
-            .map(|line| Item::Value(Value::new_concrete(line, Some(spanned.span()))))
+            .map(|line| Item::Value(Value::new_concrete(line, Some(span))))
             .collect();
 
         return Ok(Script {
@@ -164,6 +158,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
 
     // Try parsing as a sequence - simple list of commands
     if node.as_sequence().is_some() {
+        // TODO this should be a list of Value?
         let content = parse_conditional_list(node)?;
         return Ok(Script {
             content: Some(content),
@@ -211,25 +206,25 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                             ParseError::expected_type("string", "non-string", get_span(item))
                                 .with_message("Expected secret name to be a string")
                         })?;
-                        secrets.push(SpannedString::from(scalar).as_str().to_string());
+                        secrets.push(scalar.as_str().to_string());
                     }
                 }
                 "content" => {
                     // Content can be either a string or a list
                     if let Some(scalar) = value_node.as_scalar() {
                         // Single string - convert to ConditionalList with one item
-                        let spanned = SpannedString::from(scalar);
-                        let content_str = spanned.as_str();
+                        let content_str = scalar.as_str();
+                        let span = *scalar.span();
 
                         // Check if it's a template
                         if content_str.contains("${{") && content_str.contains("}}") {
                             let template =
                                 crate::stage0::types::JinjaTemplate::new(content_str.to_string())
-                                    .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
+                                    .map_err(|e| ParseError::jinja_error(e, span))?;
                             content = Some(crate::stage0::types::ConditionalList::new(vec![
                                 crate::stage0::types::Item::Value(Value::new_template(
                                     template,
-                                    Some(spanned.span()),
+                                    Some(span),
                                 )),
                             ]));
                         } else {
@@ -245,7 +240,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                                 .map(|line| {
                                     crate::stage0::types::Item::Value(Value::new_concrete(
                                         line,
-                                        Some(spanned.span()),
+                                        Some(span),
                                     ))
                                 })
                                 .collect();
@@ -696,7 +691,7 @@ fn parse_post_process_list(node: &Node) -> Result<Vec<PostProcess>, ParseError> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ErrorKind;
+    use crate::ParseError;
 
     #[test]
     fn test_parse_empty_build() {
@@ -753,7 +748,8 @@ script:
         assert!(result.is_err());
         let err = result.unwrap_err();
         // Check that the error is about an invalid value (unknown field)
-        assert!(matches!(err.kind, ErrorKind::InvalidValue));
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        assert!(matches!(err, ParseError::InvalidValue { .. }));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 }

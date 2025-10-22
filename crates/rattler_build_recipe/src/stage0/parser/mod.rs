@@ -30,9 +30,7 @@ use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{ParseError, ParseResult};
 
-use crate::{
-    span::Span,
-};
+use crate::span::Span;
 
 // Re-export parsing functions
 pub use about::parse_about;
@@ -55,8 +53,7 @@ pub(crate) use helpers::get_span;
 /// and returns the appropriate Recipe variant.
 pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
     let yaml = yaml::parse_yaml(source).map_err(|e| {
-        ParseError::yaml_error(e, Span::new_blank())
-            .with_message(format!("Failed to parse YAML: {}", e))
+        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
     parse_recipe_or_multi(&yaml)
@@ -68,8 +65,7 @@ pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::sta
 /// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = yaml::parse_yaml(source).map_err(|e| {
-        ParseError::yaml_error(e, Span::new_blank())
-            .with_message(format!("Failed to parse YAML: {}", e))
+        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
     parse_recipe(&yaml)
@@ -224,6 +220,8 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
     // Check for unknown top-level fields
     for (key, _) in mapping.iter() {
         let key_str = key.as_str();
+        println!("Key str: {}", key_str);
+        println!("Key span: {:?}", key.span());
         if !matches!(
             key_str,
             "package"
@@ -352,9 +350,8 @@ fn parse_context_sequence(
 fn parse_context_scalar(
     scalar: &MarkedScalarNode,
 ) -> ParseResult<crate::stage0::types::Value<rattler_build_jinja::Variable>> {
-    let spanned = crate::span::SpannedString::from(scalar);
-    let s = spanned.as_str();
-    let span = spanned.span();
+    let s = scalar.as_str();
+    let span = *scalar.span();
 
     if s.contains("${{") && s.contains("}}") {
         let template = crate::stage0::types::JinjaTemplate::new(s.to_string())

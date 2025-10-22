@@ -337,7 +337,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 
     #[test]
@@ -353,7 +354,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 
     #[test]
@@ -369,6 +371,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 }

@@ -1,7 +1,7 @@
 //! List and conditional parsing functions - delegating to shared rattler_build_yaml_parser
 //!
-//! Since we now use the shared parser types directly, these are just thin wrappers
-//! that convert errors from the shared parser format to recipe error format.
+//! Since we now use the shared parser types directly (including ParseError),
+//! these are just thin wrappers that directly delegate to the yaml_parser.
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser as yaml_parser;
@@ -18,6 +18,6 @@ where
     T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
-    // Use the shared parser directly - no conversion needed since we use the same types!
-    yaml_parser::parse_conditional_list(yaml).map_err(super::value::convert_yaml_error)
+    // Use the shared parser directly - no conversion needed since we use the same ParseError type!
+    yaml_parser::parse_conditional_list(yaml)
 }

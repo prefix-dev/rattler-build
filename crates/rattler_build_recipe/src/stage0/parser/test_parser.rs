@@ -2,7 +2,6 @@ use marked_yaml::Node;
 
 use crate::{
     ParseError,
-    span::SpannedString,
     stage0::{
         ConditionalList,
         parser::helpers::get_span,
@@ -372,15 +371,16 @@ fn parse_package_contents_test(
                     ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
                         .with_message("Expected 'strict' to be a boolean")
                 })?;
-                let spanned = SpannedString::from(scalar);
-                strict = match spanned.as_str() {
+                let s = scalar.as_str();
+                let span = *scalar.span();
+                strict = match s {
                     "true" | "True" | "yes" | "Yes" => true,
                     "false" | "False" | "no" | "No" => false,
                     _ => {
                         return Err(ParseError::invalid_value(
                             "strict",
-                            &format!("not a valid boolean value (found '{}')", spanned.as_str()),
-                            spanned.span(),
+                            &format!("not a valid boolean value (found '{}')", s),
+                            span,
                         ));
                     }
                 };

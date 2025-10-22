@@ -3,7 +3,7 @@
 use marked_yaml::Node as MarkedNode;
 
 use crate::{
-    error::{ErrorKind, ParseResult},
+    error::{ParseError, ParseResult},
     stage0::parser::{parse_conditional_list, parse_value},
 };
 
@@ -87,7 +87,7 @@ fn test_jinja_error_with_span() {
     let result: ParseResult<crate::stage0::types::Value<String>> = parse_value(&yaml);
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert_eq!(err.kind, ErrorKind::JinjaError);
+    assert!(matches!(err, ParseError::JinjaError { .. }));
 }
 
 #[test]

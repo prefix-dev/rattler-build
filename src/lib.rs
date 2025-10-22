@@ -134,11 +134,14 @@ fn find_variants(
     tracing::info!("Parsing recipe for variant expansion");
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
-            let source = miette::NamedSource::new(
+            // Use Source type which implements AsRef<str> for better span expansion
+            let source = rattler_build_recipe::source_code::Source::from_string(
                 recipe_path.display().to_string(),
                 recipe_content.to_string(),
             );
-            miette::Report::new(e).with_source_code(source)
+            // Use ParseErrorWithSource for better span highlighting
+            let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(source, e);
+            miette::Report::new(error_with_source)
         })
         .wrap_err("Failed to parse recipe")?;
 

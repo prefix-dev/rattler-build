@@ -110,10 +110,12 @@ impl BuildString {
             );
 
             // Render the template
-            let rendered = jinja.render_str(template).map_err(|e| ParseError::JinjaError {
-                message: format!("Failed to render build string template: {}", e),
-                span: crate::Span::new_blank(),
-            })?;
+            let rendered = jinja
+                .render_str(template)
+                .map_err(|e| ParseError::JinjaError {
+                    message: format!("Failed to render build string template: {}", e),
+                    span: crate::Span::new_blank(),
+                })?;
             *self = BuildString::Resolved(rendered);
         }
 

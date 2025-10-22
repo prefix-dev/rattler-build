@@ -7,7 +7,6 @@ use std::str::FromStr;
 
 use crate::{
     error::{ParseError, ParseResult},
-    span::SpannedString,
     stage0::{Value, package::Package, parser::helpers::get_span},
 };
 
@@ -37,22 +36,22 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
             .with_message("Package name must be a scalar")
     })?;
 
-    let name_spanned = SpannedString::from(name_scalar);
-    let name_str = name_spanned.as_str();
+    let name_str = name_scalar.as_str();
+    let name_span = *name_scalar.span();
 
     // Parse the name - check if it's a template or concrete value
     let name = if name_str.contains("${{") && name_str.contains("}}") {
         // Template
         let template = JinjaTemplate::new(name_str.to_string())
-            .map_err(|e| ParseError::jinja_error(e, name_spanned.span()))?;
-        Value::new_template(template, Some(name_spanned.span()))
+            .map_err(|e| ParseError::jinja_error(e, name_span))?;
+        Value::new_template(template, Some(name_span))
     } else {
         // Concrete package name
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
-            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), name_spanned.span()))?;
+            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), name_span))?;
         Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
-            Some(name_spanned.span()),
+            Some(name_span),
         )
     };
 
@@ -66,22 +65,20 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
             .with_message("Package version must be a scalar")
     })?;
 
-    let version_spanned = SpannedString::from(version_scalar);
-    let version_str = version_spanned.as_str();
+    let version_str = version_scalar.as_str();
+    let version_span = *version_scalar.span();
 
     // Parse the version - check if it's a template or concrete value
     let version = if version_str.contains("${{") && version_str.contains("}}") {
         // Template
         let template = JinjaTemplate::new(version_str.to_string())
-            .map_err(|e| ParseError::jinja_error(e, version_spanned.span()))?;
-        Value::new_template(template, Some(version_spanned.span()))
+            .map_err(|e| ParseError::jinja_error(e, version_span))?;
+        Value::new_template(template, Some(version_span))
     } else {
         // Concrete version
         let version_with_source = rattler_conda_types::VersionWithSource::from_str(version_str)
-            .map_err(|e| {
-                ParseError::invalid_value("version", &e.to_string(), version_spanned.span())
-            })?;
-        Value::new_concrete(version_with_source, Some(version_spanned.span()))
+            .map_err(|e| ParseError::invalid_value("version", &e.to_string(), version_span))?;
+        Value::new_concrete(version_with_source, Some(version_span))
     };
 
     // Check for unknown fields
@@ -159,8 +156,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("missing"));
-        assert!(err.message.as_ref().unwrap().contains("name"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("name"));
     }
 
     #[test]
@@ -172,8 +170,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("missing"));
-        assert!(err.message.as_ref().unwrap().contains("version"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("version"));
     }
 
     #[test]
@@ -198,6 +197,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 }

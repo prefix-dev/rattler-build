@@ -4,7 +4,6 @@ use marked_yaml::Node as MarkedNode;
 
 use crate::{
     error::{ParseError, ParseResult},
-    span::SpannedString,
     stage0::{
         about::About,
         parser::{helpers::get_span, list::parse_conditional_list, value::parse_value},
@@ -21,25 +20,19 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
 
     // Try parsing as a single scalar string
     if let Some(scalar) = yaml.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let s = spanned.as_str();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it's a template
         if s.contains("${{") && s.contains("}}") {
-            let template = JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(
-                template,
-                Some(spanned.span()),
-            ))];
+            let template =
+                JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
+            let items = vec![Item::Value(Value::new_template(template, Some(span)))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string
-        let items = vec![Item::Value(Value::new_concrete(
-            s.to_string(),
-            Some(spanned.span()),
-        ))];
+        let items = vec![Item::Value(Value::new_concrete(s.to_string(), Some(span)))];
         return Ok(ConditionalList::new(items));
     }
 
@@ -240,7 +233,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 
     #[test]
@@ -253,7 +247,8 @@ mod tests {
         let result = parse_about(yaml);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("must be a mapping"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("mapping") || err_string.contains("expected"));
     }
 
     #[test]

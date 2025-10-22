@@ -2,12 +2,12 @@
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
 expression: error_with_source
 ---
-  × invalid value: invalid value for staging output: unknown field 'about'
+  × invalid value for 'staging output': unknown field 'about'
     ╭─[multi_output_staging_with_about.yaml:17:5]
  16 │         - make
  17 │     about:
     ·     ──┬──
-    ·       ╰── invalid value for staging output: unknown field 'about'
+    ·       ╰── invalid value for 'staging output': unknown field 'about'
  18 │       summary: This should not be allowed
     ╰────
   help: valid fields for staging outputs are: staging, source, requirements,

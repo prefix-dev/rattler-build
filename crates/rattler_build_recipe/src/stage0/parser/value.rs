@@ -1,7 +1,7 @@
 //! Value parsing functions - delegating to shared rattler_build_yaml_parser
 //!
-//! Since we now use the shared parser types directly, these are just thin wrappers
-//! that convert errors from the shared parser format to recipe error format.
+//! Since we now use the shared parser types directly (including ParseError),
+//! these are just thin wrappers that directly delegate to the yaml_parser.
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser::{self as yaml_parser, ParseResult};
@@ -35,6 +35,6 @@ where
     T: std::str::FromStr,
     T::Err: std::fmt::Display,
 {
-    // Use the shared parser directly - no conversion needed since we use the same types!
-    yaml_parser::parse_value_with_name(yaml, field_name).map_err(convert_yaml_error)
+    // Use the shared parser directly - no conversion needed since we use the same ParseError type!
+    yaml_parser::parse_value_with_name(yaml, field_name)
 }

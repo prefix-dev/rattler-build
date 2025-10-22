@@ -103,7 +103,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 
     #[test]
@@ -116,6 +117,7 @@ mod tests {
         let result = parse_extra(yaml);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("must be a mapping"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("mapping") || err_string.contains("expected"));
     }
 }

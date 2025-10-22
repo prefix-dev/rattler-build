@@ -44,6 +44,8 @@ pub mod value;
 
 // Re-export commonly used items
 pub use conditional::parse_conditional_list;
+#[cfg(feature = "miette")]
+pub use error::ParseErrorWithSource;
 pub use error::{FileParseError, ParseError, ParseResult};
 pub use helpers::{contains_jinja_template, get_span, validate_mapping_fields};
 pub use list::parse_list_or_item;

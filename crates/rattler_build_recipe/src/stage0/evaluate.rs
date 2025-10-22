@@ -30,7 +30,7 @@ use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, V
 use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::{
-    ErrorKind, ParseError, Span,
+    ParseError, Span,
     stage0::{
         About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
@@ -120,15 +120,10 @@ fn render_template_to_variable(
         let compiled_expr = match env.compile_expression(expression) {
             Ok(expr) => expr,
             Err(e) => {
-                return Err(ParseError {
-                    kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::new_blank()),
-                    message: Some(format!(
-                        "Failed to compile expression '{}': {}",
-                        expression, e
-                    )),
-                    suggestion: None,
-                });
+                return Err(ParseError::jinja_error(
+                    format!("Failed to compile expression '{}': {}", expression, e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                ));
             }
         };
 
@@ -144,33 +139,29 @@ fn render_template_to_variable(
                     context.track_undefined(&var);
                 }
 
-                // Build error suggestion based on undefined variables
+                // Build error with suggestion based on undefined variables
                 let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
-                let suggestion = if !undefined_vars.is_empty() {
-                    if undefined_vars.len() == 1 {
-                        Some(format!(
+                let mut error = ParseError::jinja_error(
+                    format!("Failed to evaluate expression '{}': {}", expression, e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                );
+
+                if !undefined_vars.is_empty() {
+                    let suggestion = if undefined_vars.len() == 1 {
+                        format!(
                             "Variable '{}' is not defined in the context",
                             undefined_vars[0]
-                        ))
+                        )
                     } else {
-                        Some(format!(
+                        format!(
                             "Variables {} are not defined in the context",
                             undefined_vars.join(", ")
-                        ))
-                    }
-                } else {
-                    None
-                };
+                        )
+                    };
+                    error = error.with_suggestion(suggestion);
+                }
 
-                return Err(ParseError {
-                    kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::new_blank()),
-                    message: Some(format!(
-                        "Failed to evaluate expression '{}': {}",
-                        expression, e
-                    )),
-                    suggestion,
-                });
+                return Err(error);
             }
         }
     } else {
@@ -186,30 +177,29 @@ fn render_template_to_variable(
                     context.track_undefined(&var);
                 }
 
-                // Build error suggestion based on undefined variables
+                // Build error with suggestion based on undefined variables
                 let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
-                let suggestion = if !undefined_vars.is_empty() {
-                    if undefined_vars.len() == 1 {
-                        Some(format!(
+                let mut error = ParseError::jinja_error(
+                    format!("Failed to render template: {}", e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                );
+
+                if !undefined_vars.is_empty() {
+                    let suggestion = if undefined_vars.len() == 1 {
+                        format!(
                             "Variable '{}' is not defined in the context",
                             undefined_vars[0]
-                        ))
+                        )
                     } else {
-                        Some(format!(
+                        format!(
                             "Variables {} are not defined in the context",
                             undefined_vars.join(", ")
-                        ))
-                    }
-                } else {
-                    None
-                };
+                        )
+                    };
+                    error = error.with_suggestion(suggestion);
+                }
 
-                return Err(ParseError {
-                    kind: ErrorKind::JinjaError,
-                    span: span.cloned().unwrap_or(Span::new_blank()),
-                    message: Some(format!("Failed to render template: {}", e)),
-                    suggestion,
-                });
+                return Err(error);
             }
         };
 
@@ -355,15 +345,20 @@ fn render_template(
 
             // Build error suggestion based on undefined variables
             let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
-            let suggestion = if !undefined_vars.is_empty() {
-                if undefined_vars.len() == 1 {
-                    Some(format!(
+            let mut error = ParseError::jinja_error(
+                format!("Template rendering failed: {} (template: {})", e, template),
+                span.map_or_else(Span::new_blank, |s| *s),
+            );
+
+            if !undefined_vars.is_empty() {
+                let suggestion_text = if undefined_vars.len() == 1 {
+                    format!(
                         "The variable '{}' is not defined in the evaluation context. \
                          Make sure it is provided or defined in the context section.",
                         undefined_vars[0]
-                    ))
+                    )
                 } else {
-                    Some(format!(
+                    format!(
                         "The variables {} are not defined in the evaluation context. \
                          Make sure they are provided or defined in the context section.",
                         undefined_vars
@@ -371,21 +366,12 @@ fn render_template(
                             .map(|s| format!("'{}'", s))
                             .collect::<Vec<_>>()
                             .join(", ")
-                    ))
-                }
-            } else {
-                None
-            };
+                    )
+                };
+                error = error.with_suggestion(suggestion_text);
+            }
 
-            Err(ParseError {
-                kind: ErrorKind::JinjaError,
-                span: span.map_or_else(Span::new_blank, |s| *s),
-                message: Some(format!(
-                    "Template rendering failed: {} (template: {})",
-                    e, template
-                )),
-                suggestion,
-            })
+            Err(error)
         }
     }
 }
@@ -403,15 +389,11 @@ fn evaluate_condition(
     jinja = jinja.with_context(context.variables());
 
     // Evaluate the expression to get its value
-    let value = jinja.eval(expr.source()).map_err(|e| ParseError {
-        kind: ErrorKind::JinjaError,
-        span: Span::new_blank(),
-        message: Some(format!(
-            "Failed to evaluate condition '{}': {}",
-            expr.source(),
-            e
-        )),
-        suggestion: None,
+    let value = jinja.eval(expr.source()).map_err(|e| {
+        ParseError::jinja_error(
+            format!("Failed to evaluate condition '{}': {}", expr.source(), e),
+            Span::new_blank(),
+        )
     })?;
 
     // Transfer the tracked variables from Jinja to EvaluationContext
@@ -426,18 +408,17 @@ fn evaluate_condition(
     }
 
     if !undefined_vars.is_empty() {
-        return Err(ParseError {
-            kind: ErrorKind::JinjaError,
-            span: Span::new_blank(),
-            message: Some(format!(
-                "Undefined variable(s) in condition '{}': {}",
-                expr.source(),
-                undefined_vars.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
-            )),
-            suggestion: Some(
-                "Make sure all variables used in conditions are defined in the variant config or context".to_string()
-            ),
-        });
+        return Err(
+            ParseError::jinja_error(
+                format!(
+                    "Undefined variable(s) in condition '{}': {}",
+                    expr.source(),
+                    undefined_vars.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
+                ),
+                Span::new_blank(),
+            )
+            .with_suggestion("Make sure all variables used in conditions are defined in the variant config or context")
+        );
     }
 
     // Convert the minijinja Value to a boolean using Jinja's truthiness rules
@@ -525,11 +506,12 @@ where
         None => Ok(None),
         Some(v) => {
             let s = evaluate_value_to_string(v, context)?;
-            T::from_str(&s).map(Some).map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: Span::new_blank(),
-                message: Some(format!("Failed to parse value: {}", e)),
-                suggestion: None,
+            T::from_str(&s).map(Some).map_err(|e| {
+                ParseError::invalid_value(
+                    "value",
+                    &format!("Failed to parse: {}", e),
+                    Span::new_blank(),
+                )
             })
         }
     }
@@ -599,12 +581,14 @@ pub fn evaluate_glob_vec_simple(
                 match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                     Ok(_) => globs.push(pattern),
                     Err(e) => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: value.span().copied().unwrap_or_else(Span::new_blank),
-                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
-                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
-                        });
+                        return Err(
+                            ParseError::invalid_value(
+                                "glob pattern",
+                                &format!("Invalid glob pattern '{}': {}", pattern, e),
+                                value.span().copied().unwrap_or_else(Span::new_blank),
+                            )
+                            .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
+                        );
                     }
                 }
             }
@@ -622,15 +606,12 @@ pub fn evaluate_glob_vec_simple(
                         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                             Ok(_) => globs.push(pattern),
                             Err(e) => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
-                                    message: Some(format!(
-                                        "Invalid glob pattern '{}': {}",
-                                        pattern, e
-                                    )),
-                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
-                                });
+                                return Err(ParseError::invalid_value(
+                                    "glob pattern",
+                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
+                                    val.span().copied().unwrap_or_else(Span::new_blank),
+                                )
+                                .with_suggestion("Check your glob pattern syntax."));
                             }
                         }
                     }
@@ -640,11 +621,12 @@ pub fn evaluate_glob_vec_simple(
     }
 
     // Create the GlobVec with only include patterns
-    GlobVec::from_strings(globs, Vec::new()).map_err(|e| ParseError {
-        kind: ErrorKind::InvalidValue,
-        span: Span::new_blank(),
-        message: Some(format!("Failed to build glob set: {}", e)),
-        suggestion: None,
+    GlobVec::from_strings(globs, Vec::new()).map_err(|e| {
+        ParseError::invalid_value(
+            "glob set",
+            &format!("Failed to build glob set: {}", e),
+            Span::new_blank(),
+        )
     })
 }
 
@@ -668,12 +650,12 @@ pub fn evaluate_glob_vec(
                 match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                     Ok(_) => include_globs.push(pattern),
                     Err(e) => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: value.span().copied().unwrap_or_else(Span::new_blank),
-                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
-                            suggestion: Some("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.".to_string()),
-                        });
+                        return Err(ParseError::invalid_value(
+                            "glob pattern",
+                            &format!("Invalid glob pattern '{}': {}", pattern, e),
+                            value.span().copied().unwrap_or_else(Span::new_blank),
+                        )
+                        .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences."));
                     }
                 }
             }
@@ -691,15 +673,12 @@ pub fn evaluate_glob_vec(
                         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                             Ok(_) => include_globs.push(pattern),
                             Err(e) => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
-                                    message: Some(format!(
-                                        "Invalid glob pattern '{}': {}",
-                                        pattern, e
-                                    )),
-                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
-                                });
+                                return Err(ParseError::invalid_value(
+                                    "glob pattern",
+                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
+                                    val.span().copied().unwrap_or_else(Span::new_blank),
+                                )
+                                .with_suggestion("Check your glob pattern syntax."));
                             }
                         }
                     }
@@ -717,12 +696,12 @@ pub fn evaluate_glob_vec(
                 match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                     Ok(_) => exclude_globs.push(pattern),
                     Err(e) => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: value.span().copied().unwrap_or_else(Span::new_blank),
-                            message: Some(format!("Invalid glob pattern '{}': {}", pattern, e)),
-                            suggestion: Some("Check your glob pattern syntax.".to_string()),
-                        });
+                        return Err(ParseError::invalid_value(
+                            "glob pattern",
+                            &format!("Invalid glob pattern '{}': {}", pattern, e),
+                            value.span().copied().unwrap_or_else(Span::new_blank),
+                        )
+                        .with_suggestion("Check your glob pattern syntax."));
                     }
                 }
             }
@@ -740,15 +719,12 @@ pub fn evaluate_glob_vec(
                         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
                             Ok(_) => exclude_globs.push(pattern),
                             Err(e) => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: val.span().copied().unwrap_or_else(Span::new_blank),
-                                    message: Some(format!(
-                                        "Invalid glob pattern '{}': {}",
-                                        pattern, e
-                                    )),
-                                    suggestion: Some("Check your glob pattern syntax.".to_string()),
-                                });
+                                return Err(ParseError::invalid_value(
+                                    "glob pattern",
+                                    &format!("Invalid glob pattern '{}': {}", pattern, e),
+                                    val.span().copied().unwrap_or_else(Span::new_blank),
+                                )
+                                .with_suggestion("Check your glob pattern syntax."));
                             }
                         }
                     }
@@ -758,11 +734,12 @@ pub fn evaluate_glob_vec(
     }
 
     // Now create the GlobVec - this should not fail since we've already validated
-    GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| ParseError {
-        kind: ErrorKind::InvalidValue,
-        span: Span::new_blank(),
-        message: Some(format!("Failed to build glob set: {}", e)),
-        suggestion: None,
+    GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| {
+        ParseError::invalid_value(
+            "glob set",
+            &format!("Failed to build glob set: {}", e),
+            Span::new_blank(),
+        )
     })
 }
 
@@ -781,11 +758,13 @@ pub fn evaluate_entry_point_list(
         } else if let Some(template) = val.as_template() {
             let s = render_template(template.source(), context, val.span())?;
             s.parse::<rattler_conda_types::package::EntryPoint>()
-                .map_err(|e| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: val.span().copied().unwrap_or_else(Span::new_blank),
-                    message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                    suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
+                .map_err(|e| {
+                    ParseError::invalid_value(
+                        "entry point",
+                        &format!("Invalid entry point '{}': {}", s, e),
+                        val.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                    .with_suggestion("Entry points should be in the format 'command = module:function'")
                 })
         } else {
             unreachable!("Value must be either concrete or template")
@@ -945,19 +924,21 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
     if s.trim().starts_with('{') {
         // Try to deserialize as Dependency (which handles pin types)
-        serde_yaml::from_str(s).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span,
-            message: Some(format!("Failed to parse pin dependency: {}", e)),
-            suggestion: None,
+        serde_yaml::from_str(s).map_err(|e| {
+            ParseError::invalid_value(
+                "pin dependency",
+                &format!("Failed to parse pin dependency: {}", e),
+                span,
+            )
         })
     } else {
         // It's a regular MatchSpec string
-        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span,
-            message: Some(format!("Invalid match spec '{}': {}", s, e)),
-            suggestion: None,
+        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
+            ParseError::invalid_value(
+                "match spec",
+                &format!("Invalid match spec '{}': {}", s, e),
+                span,
+            )
         })?;
         Ok(Dependency::Spec(Box::new(spec)))
     }
@@ -1036,15 +1017,14 @@ fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
         "true" | "yes" | "1" => Ok(true),
         "false" | "no" | "0" => Ok(false),
-        _ => Err(ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!(
+        _ => Err(ParseError::invalid_value(
+            field_name,
+            &format!(
                 "Invalid boolean value for '{}': '{}' (expected true/false, yes/no, or 1/0)",
                 field_name, s
-            )),
-            suggestion: None,
-        }),
+            ),
+            Span::new_blank(),
+        )),
     }
 }
 
@@ -1092,19 +1072,21 @@ where
     T::Err: std::fmt::Display,
 {
     if let Some(v) = value.as_concrete() {
-        Ok(v.to_string().parse().map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!("Failed to parse {}: {}", type_name, e)),
-            suggestion: None,
+        Ok(v.to_string().parse().map_err(|e| {
+            ParseError::invalid_value(
+                type_name,
+                &format!("Failed to parse {}: {}", type_name, e),
+                Span::new_blank(),
+            )
         })?)
     } else if let Some(template) = value.as_template() {
         let s = render_template(template.source(), context, value.span())?;
-        s.parse().map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: value.span().copied().unwrap_or_else(Span::new_blank),
-            message: Some(format!("Invalid {} '{}': {}", type_name, s, e)),
-            suggestion: None,
+        s.parse().map_err(|e| {
+            ParseError::invalid_value(
+                type_name,
+                &format!("Invalid {} '{}': {}", type_name, s, e),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
         })
     } else {
         unreachable!("Value must be either concrete or template")
@@ -1138,11 +1120,12 @@ impl Evaluate for Value<url::Url> {
             Ok(u.clone())
         } else if let Some(template) = self.as_template() {
             let s = render_template(template.source(), context, self.span())?;
-            url::Url::parse(&s).map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: self.span().copied().unwrap_or_else(Span::new_blank),
-                message: Some(format!("Invalid URL '{}': {}", s, e)),
-                suggestion: None,
+            url::Url::parse(&s).map_err(|e| {
+                ParseError::invalid_value(
+                    "URL",
+                    &format!("Invalid URL '{}': {}", s, e),
+                    self.span().copied().unwrap_or_else(Span::new_blank),
+                )
             })
         } else {
             unreachable!("Value must be either concrete or template")
@@ -1166,11 +1149,12 @@ impl Evaluate for Value<License> {
             Ok(license.clone())
         } else if let Some(template) = self.as_template() {
             let s = render_template(template.source(), context, self.span())?;
-            s.parse::<License>().map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: self.span().copied().unwrap_or_else(Span::new_blank),
-                message: Some(format!("Invalid SPDX license expression: {}", e)),
-                suggestion: None,
+            s.parse::<License>().map_err(|e| {
+                ParseError::invalid_value(
+                    "SPDX license",
+                    &format!("Invalid SPDX license expression: {}", e),
+                    self.span().copied().unwrap_or_else(Span::new_blank),
+                )
             })
         } else {
             unreachable!("Value must be either concrete or template")
@@ -1207,12 +1191,11 @@ fn evaluate_sha256(
     } else if let Some(template) = value.as_template() {
         let s = render_template(template.source(), context, value.span())?;
         rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
-            ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: value.span().copied().unwrap_or_else(Span::new_blank),
-                message: Some(format!("Invalid SHA256 checksum: {}", s)),
-                suggestion: None,
-            }
+            ParseError::invalid_value(
+                "SHA256 checksum",
+                &format!("Invalid SHA256 checksum: {}", s),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
         })
     } else {
         unreachable!("Value must be either concrete or template")
@@ -1228,11 +1211,12 @@ fn evaluate_md5(
         Ok(*hash)
     } else if let Some(template) = value.as_template() {
         let s = render_template(template.source(), context, value.span())?;
-        rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: value.span().copied().unwrap_or_else(Span::new_blank),
-            message: Some(format!("Invalid MD5 checksum: {}", s)),
-            suggestion: None,
+        rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
+            ParseError::invalid_value(
+                "MD5 checksum",
+                &format!("Invalid MD5 checksum: {}", s),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
         })
     } else {
         unreachable!("Value must be either concrete or template")
@@ -1300,24 +1284,26 @@ impl Evaluate for Stage0Package {
         let version_str = evaluate_value_to_string(&self.version, context)?;
 
         // Parse into concrete types
-        let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!(
-                "invalid value for name: '{}' is not a valid package name: {}",
-                name_str, e
-            )),
-            suggestion: None,
+        let name = PackageName::from_str(&name_str).map_err(|e| {
+            ParseError::invalid_value(
+                "name",
+                &format!(
+                    "invalid value for name: '{}' is not a valid package name: {}",
+                    name_str, e
+                ),
+                Span::new_blank(),
+            )
         })?;
 
-        let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!(
-                "invalid value for version: '{}' is not a valid version: {}",
-                version_str, e
-            )),
-            suggestion: None,
+        let version = VersionWithSource::from_str(&version_str).map_err(|e| {
+            ParseError::invalid_value(
+                "version",
+                &format!(
+                    "invalid value for version: '{}' is not a valid version: {}",
+                    version_str, e
+                ),
+                Span::new_blank(),
+            )
         })?;
 
         Ok(Stage1Package::new(name, version))
@@ -1412,14 +1398,12 @@ impl Evaluate for Stage0VariantKeyUsage {
                 if s.is_empty() {
                     None
                 } else {
-                    Some(s.parse::<i32>().map_err(|_| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: Span::new_blank(),
-                        message: Some(format!(
-                            "Invalid integer value for down_prioritize_variant: '{}'",
-                            s
-                        )),
-                        suggestion: None,
+                    Some(s.parse::<i32>().map_err(|_| {
+                        ParseError::invalid_value(
+                            "down_prioritize_variant",
+                            &format!("Invalid integer value for down_prioritize_variant: '{}'", s),
+                            Span::new_blank(),
+                        )
                     })?)
                 }
             }
@@ -1458,15 +1442,14 @@ impl Evaluate for Stage0PrefixDetection {
                         "true" | "True" | "yes" | "Yes" => true,
                         "false" | "False" | "no" | "No" => false,
                         _ => {
-                            return Err(ParseError {
-                                kind: ErrorKind::InvalidValue,
-                                span: val.span().copied().unwrap_or_else(Span::new_blank),
-                                message: Some(format!(
+                            return Err(ParseError::invalid_value(
+                                "prefix_detection.ignore",
+                                &format!(
                                     "Invalid boolean value for prefix_detection.ignore: '{}'",
                                     s
-                                )),
-                                suggestion: None,
-                            });
+                                ),
+                                val.span().copied().unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
                 } else {
@@ -1492,11 +1475,13 @@ impl Evaluate for Stage0PostProcess {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let regex_str = evaluate_string_value(&self.regex, context)?;
-        let regex = regex::Regex::new(&regex_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!("Invalid regular expression: {}", e)),
-            suggestion: Some("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.".to_string()),
+        let regex = regex::Regex::new(&regex_str).map_err(|e| {
+            ParseError::invalid_value(
+                "regex",
+                &format!("Invalid regular expression: {}", e),
+                Span::new_blank(),
+            )
+            .with_suggestion("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.")
         })?;
 
         Ok(Stage1PostProcess {
@@ -1524,15 +1509,11 @@ impl Evaluate for Stage0DynamicLinking {
                         "true" | "True" | "yes" | "Yes" => true,
                         "false" | "False" | "no" | "No" => false,
                         _ => {
-                            return Err(ParseError {
-                                kind: ErrorKind::InvalidValue,
-                                span: val.span().copied().unwrap_or_else(Span::new_blank),
-                                message: Some(format!(
-                                    "Invalid boolean value for binary_relocation: '{}'",
-                                    s
-                                )),
-                                suggestion: None,
-                            });
+                            return Err(ParseError::invalid_value(
+                                "binary_relocation",
+                                &format!("Invalid boolean value for binary_relocation: '{}'", s),
+                                val.span().copied().unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
                 } else {
@@ -1558,15 +1539,14 @@ impl Evaluate for Stage0DynamicLinking {
                     "ignore" => LinkingCheckBehavior::Ignore,
                     "error" => LinkingCheckBehavior::Error,
                     _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::new_blank(),
-                            message: Some(format!(
+                        return Err(ParseError::invalid_value(
+                            "overdepending_behavior",
+                            &format!(
                                 "Invalid overdepending_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
-                            )),
-                            suggestion: None,
-                        });
+                            ),
+                            Span::new_blank(),
+                        ));
                     }
                 }
             }
@@ -1581,15 +1561,14 @@ impl Evaluate for Stage0DynamicLinking {
                     "ignore" => LinkingCheckBehavior::Ignore,
                     "error" => LinkingCheckBehavior::Error,
                     _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::new_blank(),
-                            message: Some(format!(
+                        return Err(ParseError::invalid_value(
+                            "overlinking_behavior",
+                            &format!(
                                 "Invalid overlinking_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
-                            )),
-                            suggestion: None,
-                        });
+                            ),
+                            Span::new_blank(),
+                        ));
                     }
                 }
             }
@@ -1634,14 +1613,15 @@ impl Evaluate for Stage0Build {
                     // Parse the string as NoArchType using serde
                     serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
                         .map(Some)
-                        .map_err(|_| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: v.span().copied().unwrap_or(Span::new_blank()),
-                            message: Some(format!(
-                                "Invalid noarch type '{}'. Expected 'python' or 'generic'",
-                                s
-                            )),
-                            suggestion: None,
+                        .map_err(|_| {
+                            ParseError::invalid_value(
+                                "noarch type",
+                                &format!(
+                                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
+                                    s
+                                ),
+                                v.span().copied().unwrap_or(Span::new_blank()),
+                            )
                         })?
                 } else {
                     unreachable!("Value must be either concrete or template")
@@ -1686,14 +1666,15 @@ impl Evaluate for Stage0Build {
             if s.is_empty() {
                 0
             } else {
-                s.parse::<u64>().map_err(|_| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: self.number.span().copied().unwrap_or_else(Span::new_blank),
-                    message: Some(format!(
-                        "Invalid build number: '{}' is not a valid positive integer",
-                        s
-                    )),
-                    suggestion: None,
+                s.parse::<u64>().map_err(|_| {
+                    ParseError::invalid_value(
+                        "build number",
+                        &format!(
+                            "Invalid build number: '{}' is not a valid positive integer",
+                            s
+                        ),
+                        self.number.span().copied().unwrap_or_else(Span::new_blank),
+                    )
                 })?
             }
         } else {
@@ -1742,11 +1723,12 @@ impl Evaluate for Stage0GitSource {
             match rev {
                 Stage0GitRev::Value(v) => {
                     let rev_str = evaluate_string_value(v, context)?;
-                    Stage1GitRev::from_str(&rev_str).map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: Span::new_blank(),
-                        message: Some(format!("Invalid git revision: {}", e)),
-                        suggestion: None,
+                    Stage1GitRev::from_str(&rev_str).map_err(|e| {
+                        ParseError::invalid_value(
+                            "git revision",
+                            &format!("Invalid git revision: {}", e),
+                            Span::new_blank(),
+                        )
                     })?
                 }
             }
@@ -1799,11 +1781,12 @@ impl Evaluate for Stage0UrlSource {
         let mut urls = Vec::new();
         for url_value in &self.url {
             let url_str = evaluate_string_value(url_value, context)?;
-            let url = url::Url::parse(&url_str).map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: Span::new_blank(),
-                message: Some(format!("Invalid URL '{}': {}", url_str, e)),
-                suggestion: None,
+            let url = url::Url::parse(&url_str).map_err(|e| {
+                ParseError::invalid_value(
+                    "URL",
+                    &format!("Invalid URL '{}': {}", url_str, e),
+                    Span::new_blank(),
+                )
             })?;
             urls.push(url);
         }
@@ -1892,18 +1875,17 @@ impl Evaluate for Stage0PythonVersion {
         let validate_version = |version_str: &str, span: Option<&Span>| -> Result<(), ParseError> {
             let spec_str = format!("python={}", version_str);
             MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
-                ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: span.cloned().unwrap_or(Span::new_blank()),
-                    message: Some(format!(
+                ParseError::invalid_value(
+                    "python version spec",
+                    &format!(
                         "Invalid python version spec '{}': {}",
                         version_str, e
-                    )),
-                    suggestion: Some(
-                        "Python version must be a valid version constraint (e.g., '3.8', '>=3.7', '3.8.*')"
-                            .to_string(),
                     ),
-                }
+                    span.cloned().unwrap_or(Span::new_blank()),
+                )
+                .with_suggestion(
+                    "Python version must be a valid version constraint (e.g., '3.8', '>=3.7', '3.8.*')",
+                )
             })?;
             Ok(())
         };
@@ -2206,14 +2188,15 @@ fn evaluate_package_output_to_recipe(
 
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
-    let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
-        kind: ErrorKind::InvalidValue,
-        span: Span::new_blank(),
-        message: Some(format!(
-            "invalid value for name: '{}' is not a valid package name: {}",
-            name_str, e
-        )),
-        suggestion: None,
+    let name = PackageName::from_str(&name_str).map_err(|e| {
+        ParseError::invalid_value(
+            "name",
+            &format!(
+                "invalid value for name: '{}' is not a valid package name: {}",
+                name_str, e
+            ),
+            Span::new_blank(),
+        )
     })?;
 
     // Get version from output or fallback to recipe-level version
@@ -2222,22 +2205,21 @@ fn evaluate_package_output_to_recipe(
     } else if let Some(ref version_value) = recipe.recipe.version {
         evaluate_value_to_string(version_value, context)?
     } else {
-        return Err(ParseError {
-            kind: ErrorKind::MissingField,
-            span: Span::new_blank(),
-            message: Some("version is required for package output".to_string()),
-            suggestion: None,
-        });
+        return Err(ParseError::missing_field(
+            "version is required for package output",
+            Span::new_blank(),
+        ));
     };
 
-    let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
-        kind: ErrorKind::InvalidValue,
-        span: Span::new_blank(),
-        message: Some(format!(
-            "invalid value for version: '{}' is not a valid version: {}",
-            version_str, e
-        )),
-        suggestion: None,
+    let version = VersionWithSource::from_str(&version_str).map_err(|e| {
+        ParseError::invalid_value(
+            "version",
+            &format!(
+                "invalid value for version: '{}' is not a valid version: {}",
+                version_str, e
+            ),
+            Span::new_blank(),
+        )
     })?;
 
     let package = Stage1Package::new(name, version);
@@ -2374,25 +2356,25 @@ fn evaluate_staging_output_to_recipe(
     // For staging outputs, we create a special package name based on the staging name
     let staging_name_str = evaluate_string_value(&output.staging.name, context)?;
     let name = PackageName::from_str(&format!("_staging_{}", staging_name_str)).map_err(|e| {
-        ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!(
+        ParseError::invalid_value(
+            "staging name",
+            &format!(
                 "invalid staging name: '{}' cannot be converted to package name: {}",
                 staging_name_str, e
-            )),
-            suggestion: None,
-        }
+            ),
+            Span::new_blank(),
+        )
     })?;
 
     // Use recipe-level version or a default
     let version = if let Some(ref version_value) = recipe.recipe.version {
         let version_str = evaluate_value_to_string(version_value, context)?;
-        VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::new_blank(),
-            message: Some(format!("invalid version '{}': {}", version_str, e)),
-            suggestion: None,
+        VersionWithSource::from_str(&version_str).map_err(|e| {
+            ParseError::invalid_value(
+                "version",
+                &format!("invalid version '{}': {}", version_str, e),
+                Span::new_blank(),
+            )
         })?
     } else {
         VersionWithSource::from_str("0.0.0").unwrap()

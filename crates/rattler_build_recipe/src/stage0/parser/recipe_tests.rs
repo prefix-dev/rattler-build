@@ -134,8 +134,9 @@ about:
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(err.message.as_ref().unwrap().contains("missing"));
-    assert!(err.message.as_ref().unwrap().contains("package"));
+    let err_string = err.to_string();
+    assert!(err_string.contains("missing"));
+    assert!(err_string.contains("package"));
 }
 
 #[test]
@@ -153,7 +154,8 @@ unknown_field:
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(err.message.as_ref().unwrap().contains("unknown"));
+    let err_string = err.to_string();
+    assert!(err_string.contains("unknown"));
 }
 
 #[test]

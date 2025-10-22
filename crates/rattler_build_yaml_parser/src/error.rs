@@ -1,7 +1,7 @@
 //! Error types for YAML parsing
 
 use marked_yaml::Span;
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, sync::Arc};
 use thiserror::Error;
 
 #[cfg(feature = "miette")]
@@ -17,7 +17,7 @@ pub enum ParseError {
     #[error("IO error while reading file {path}: {source}")]
     IoError {
         path: PathBuf,
-        source: Rc<std::io::Error>,
+        source: Arc<std::io::Error>,
     },
 
     /// Generic parse error with message and location
@@ -118,7 +118,7 @@ impl ParseError {
     pub fn io_error(path: PathBuf, source: std::io::Error) -> Self {
         Self::IoError {
             path,
-            source: Rc::new(source),
+            source: Arc::new(source),
         }
     }
 
@@ -185,24 +185,20 @@ impl Diagnostic for ParseError {
             Self::Generic { message, .. } => {
                 miette::LabeledSpan::new_with_span(Some(message.clone()), source_span)
             }
-            Self::MissingField { field, .. } => {
-                miette::LabeledSpan::new_with_span(
-                    Some(format!("missing field '{}'", field)),
-                    source_span,
-                )
-            }
-            Self::TypeMismatch { expected, actual, .. } => {
-                miette::LabeledSpan::new_with_span(
-                    Some(format!("expected {} but got {}", expected, actual)),
-                    source_span,
-                )
-            }
-            Self::InvalidValue { field, reason, .. } => {
-                miette::LabeledSpan::new_with_span(
-                    Some(format!("invalid value for '{}': {}", field, reason)),
-                    source_span,
-                )
-            }
+            Self::MissingField { field, .. } => miette::LabeledSpan::new_with_span(
+                Some(format!("missing field '{}'", field)),
+                source_span,
+            ),
+            Self::TypeMismatch {
+                expected, actual, ..
+            } => miette::LabeledSpan::new_with_span(
+                Some(format!("expected {} but got {}", expected, actual)),
+                source_span,
+            ),
+            Self::InvalidValue { field, reason, .. } => miette::LabeledSpan::new_with_span(
+                Some(format!("invalid value for '{}': {}", field, reason)),
+                source_span,
+            ),
             Self::JinjaError { message, .. } => {
                 miette::LabeledSpan::new_with_span(Some(message.clone()), source_span)
             }
@@ -216,9 +212,14 @@ impl Diagnostic for ParseError {
 
     fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
         match self {
-            Self::Generic { suggestion: Some(s), .. } | Self::InvalidValue { suggestion: Some(s), .. } => {
-                Some(Box::new(s.clone()))
+            Self::Generic {
+                suggestion: Some(s),
+                ..
             }
+            | Self::InvalidValue {
+                suggestion: Some(s),
+                ..
+            } => Some(Box::new(s.clone())),
             _ => None,
         }
     }
@@ -236,11 +237,20 @@ pub fn format_span(span: &Span) -> String {
 /// Convert marked_yaml Span to miette SourceSpan
 #[cfg(feature = "miette")]
 fn span_to_source_span(span: &Span) -> SourceSpan {
+    span_to_source_span_with_source(span, None)
+}
+
+/// Convert marked_yaml Span to miette SourceSpan, optionally using source code to expand single-character spans
+#[cfg(feature = "miette")]
+pub fn span_to_source_span_with_source(span: &Span, source: Option<&str>) -> SourceSpan {
     if let Some(start) = span.start() {
         let offset = start.character();
         // If we have an end marker, calculate the length
         let len = if let Some(end) = span.end() {
             end.character().saturating_sub(offset).max(1)
+        } else if let Some(src) = source {
+            // Try to find the token length from the source
+            find_token_length(src, offset)
         } else {
             1 // Default to highlighting 1 character
         };
@@ -248,6 +258,112 @@ fn span_to_source_span(span: &Span) -> SourceSpan {
     } else {
         // No span information, use offset 0 with length 0
         SourceSpan::new(0.into(), 0)
+    }
+}
+
+/// Find the length of a YAML token starting at the given byte offset
+#[cfg(feature = "miette")]
+fn find_token_length(src: &str, start: usize) -> usize {
+    let remaining = &src[start..];
+    let mut len = 0;
+
+    for (i, ch) in remaining.char_indices() {
+        // Stop at whitespace, colon, comma, or newline
+        if ch.is_whitespace() || ch == ':' || ch == ',' {
+            return if len == 0 { i.max(1) } else { len };
+        }
+        len = i + ch.len_utf8();
+    }
+
+    // Return the full remaining length if we didn't find a delimiter
+    if len == 0 {
+        remaining.len().max(1)
+    } else {
+        len
+    }
+}
+
+/// Wrapper that combines a ParseError with source code for better miette diagnostics
+///
+/// This wrapper provides enhanced error reporting by:
+/// - Including source code context in error messages
+/// - Expanding single-character spans to cover full YAML tokens
+/// - Preserving all diagnostic information from the inner ParseError
+///
+/// # Example
+/// ```ignore
+/// let source = std::fs::read_to_string("recipe.yaml")?;
+/// let result = parse_recipe(&source);
+/// match result {
+///     Err(err) => {
+///         let report = ParseErrorWithSource::new(source, err);
+///         eprintln!("{:?}", miette::Report::new(report));
+///     }
+///     Ok(recipe) => { /* ... */ }
+/// }
+/// ```
+#[cfg(feature = "miette")]
+#[derive(Debug)]
+pub struct ParseErrorWithSource<S> {
+    source: S,
+    error: ParseError,
+}
+
+#[cfg(feature = "miette")]
+impl<S> ParseErrorWithSource<S> {
+    pub fn new(source: S, error: ParseError) -> Self {
+        Self { source, error }
+    }
+
+    pub fn error(&self) -> &ParseError {
+        &self.error
+    }
+
+    pub fn into_error(self) -> ParseError {
+        self.error
+    }
+}
+
+#[cfg(feature = "miette")]
+impl<S> std::fmt::Display for ParseErrorWithSource<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error)
+    }
+}
+
+#[cfg(feature = "miette")]
+impl<S> std::error::Error for ParseErrorWithSource<S> where S: std::fmt::Debug {}
+
+// Implementation for types that implement AsRef<str> (like Source)
+// This allows us to expand single-character spans to full tokens
+#[cfg(feature = "miette")]
+impl<S> Diagnostic for ParseErrorWithSource<S>
+where
+    S: AsRef<str> + miette::SourceCode + std::fmt::Debug,
+{
+    fn source_code(&self) -> Option<&dyn miette::SourceCode> {
+        Some(&self.source)
+    }
+
+    fn labels(&self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
+        let labels = self.error.labels()?;
+        let source_str = self.source.as_ref();
+
+        let expanded_labels = labels.map(move |label| {
+            let span = label.inner();
+            if span.len() == 1 && span.offset() < source_str.len() {
+                let offset = span.offset();
+                let token_len = find_token_length(source_str, offset);
+                miette::LabeledSpan::new(label.label().map(|s| s.to_string()), offset, token_len)
+            } else {
+                label
+            }
+        });
+        Some(Box::new(expanded_labels))
+    }
+
+    fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        self.error.help()
     }
 }
 
