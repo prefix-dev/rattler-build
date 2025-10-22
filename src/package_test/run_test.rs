@@ -459,7 +459,6 @@ pub async fn run_test(
     if package_folder.join("info/tests/tests.yaml").exists() {
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
-
         if let Some(test_index) = config.test_index {
             if test_index >= tests.len() {
                 return Err(TestError::TestFailed(format!(
@@ -477,6 +476,7 @@ pub async fn run_test(
         };
 
         for test in tests {
+            println!("Running test: {:?}", test);
             let test_prefix =
                 TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.keep();
             match test {

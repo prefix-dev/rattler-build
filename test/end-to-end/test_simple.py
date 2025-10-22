@@ -1770,6 +1770,18 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "all tests passed!" in test_result
 
 
+def test_rendering_of_tests_yaml(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-rendering", tmp_path, extra_args=["--no-test"])
+    pkg = get_extracted_package(tmp_path, "test-rendering")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # expected file is under recipes/test-rendering/tests.yaml, make sure it's identical
+    expected_tests_yaml = (recipes / "test-rendering" / "tests.yaml").read_text()
+    actual_tests_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    assert expected_tests_yaml == actual_tests_yaml
+
 def test_channel_sources(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
 ):
