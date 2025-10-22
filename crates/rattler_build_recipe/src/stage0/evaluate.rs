@@ -62,7 +62,7 @@ use crate::{
     stage1::{
         About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
-        Requirements as Stage1Requirements,
+        Requirements as Stage1Requirements, Rpaths,
         build::{
             Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
@@ -1743,7 +1743,7 @@ impl Evaluate for Stage0DynamicLinking {
         };
 
         Ok(Stage1DynamicLinking {
-            rpaths: evaluate_string_list(&self.rpaths, context)?,
+            rpaths: Rpaths::new(evaluate_string_list(&self.rpaths, context)?),
             binary_relocation,
             missing_dso_allowlist,
             rpath_allowlist,

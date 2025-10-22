@@ -5,6 +5,43 @@ use serde::{Deserialize, Serialize};
 
 use super::{AllOrGlobVec, GlobVec};
 
+/// RPaths configuration with a default value of ["lib/"] when empty
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Rpaths(Vec<String>);
+
+impl Rpaths {
+    /// Create a new Rpaths from a vector
+    pub fn new(paths: Vec<String>) -> Self {
+        Self(paths)
+    }
+
+    /// Get the rpaths as a Vec, with default ["lib/"] if empty
+    pub fn to_vec(&self) -> Vec<String> {
+        if self.0.is_empty() {
+            vec![String::from("lib/")]
+        } else {
+            self.0.clone()
+        }
+    }
+
+    /// Check if the rpaths are empty (before applying defaults)
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Get the inner vector (without applying defaults)
+    pub fn inner(&self) -> &Vec<String> {
+        &self.0
+    }
+}
+
+impl Default for Rpaths {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
 /// Represents the state of the build string during evaluation
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -312,8 +349,9 @@ pub struct Build {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DynamicLinking {
     /// RPaths to use (Linux/macOS only)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rpaths: Vec<String>,
+    /// Defaults to ["lib/"] when empty
+    #[serde(default, skip_serializing_if = "Rpaths::is_empty")]
+    pub rpaths: Rpaths,
 
     /// Binary relocation setting
     /// - All(true): relocate all binaries (default)
@@ -342,7 +380,7 @@ pub struct DynamicLinking {
 impl Default for DynamicLinking {
     fn default() -> Self {
         Self {
-            rpaths: Vec::new(),
+            rpaths: Rpaths::default(),
             binary_relocation: AllOrGlobVec::All(true),
             missing_dso_allowlist: GlobVec::default(),
             rpath_allowlist: GlobVec::default(),

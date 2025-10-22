@@ -157,7 +157,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         return Ok(());
     }
 
-    let rpaths = &dynamic_linking.rpaths;
+    let rpaths = dynamic_linking.rpaths.to_vec();
     let rpath_allowlist = &dynamic_linking.rpath_allowlist;
 
     let tmp_prefix = temp_files.temp_dir.path();
@@ -193,7 +193,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                         relinker.relink(
                             tmp_prefix,
                             encoded_prefix,
-                            rpaths,
+                            &rpaths,
                             rpath_allowlist,
                             &system_tools,
                         )?;

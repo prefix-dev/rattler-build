@@ -306,10 +306,6 @@ pretty_assertions = "1.4.1"
 
 
 [[bench]]
-name = "line_breaks"
-harness = false
-
-[[bench]]
 name = "parse_file"
 harness = false
 

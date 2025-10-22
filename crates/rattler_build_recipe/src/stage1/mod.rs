@@ -29,7 +29,7 @@ pub mod tests;
 mod variant_tests;
 
 pub use about::About;
-pub use build::Build;
+pub use build::{Build, Rpaths};
 pub use extra::Extra;
 pub(crate) use hash::compute_hash;
 use indexmap::IndexMap;
