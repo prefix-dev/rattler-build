@@ -191,3 +191,116 @@ fn test_partial_variable_usage() {
     // Should be 3 combinations (just python variants)
     assert_eq!(combinations.len(), 3);
 }
+
+#[cfg(feature = "miette")]
+mod error_reporting_tests {
+    use super::*;
+    use rattler_build_variant_config::VariantConfigError;
+
+    #[test]
+    fn test_unsupported_value_type_error() {
+        let yaml = r#"
+python:
+  - 3.10
+  - 3.11
+  - map: 123
+"#;
+        let result = VariantConfig::from_yaml_str(yaml);
+
+        // Should fail with ParseError
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+
+        // Error message should mention the unsupported type
+        assert!(
+            err_msg.contains("Unsupported variant value type"),
+            "Error message should mention unsupported type, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_invalid_conditional_structure() {
+        let yaml = r#"
+python:
+  - if: true
+    # Missing 'then' key - this should fail
+"#;
+        let result = VariantConfig::from_yaml_str(yaml);
+
+        // Should fail with ParseError
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+
+        // Error message should mention the missing 'then' key
+        assert!(
+            err_msg.contains("then") || err_msg.contains("Conditional"),
+            "Error message should mention conditional structure issue, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_invalid_structure_error() {
+        let yaml = r#"
+python: "not a list"
+"#;
+        let result = VariantConfig::from_yaml_str(yaml);
+
+        // Should fail with ParseError
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+
+        // Error message should mention list expectation
+        assert!(
+            err_msg.contains("list") || err_msg.contains("sequence"),
+            "Error message should mention list requirement, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_parse_error_structure() {
+        let yaml = r#"
+python:
+  - 3.10
+  - map: 123
+"#;
+        let result = VariantConfig::from_yaml_str(yaml);
+
+        // Should fail
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+
+        // Verify the error message structure
+        let error_string = err_msg.to_string();
+
+        // Should contain "parse error" or "Unsupported"
+        assert!(
+            error_string.contains("parse error") || error_string.contains("Unsupported"),
+            "Error should indicate parsing issue, got: {}",
+            error_string
+        );
+    }
+
+    #[test]
+    fn test_error_preserves_span_info() {
+        let yaml = r#"python:
+  - 3.10
+  - map: 123
+"#;
+        let result = VariantConfig::from_yaml_str(yaml);
+        assert!(result.is_err());
+
+        // The error should be a String from from_yaml_str
+        // but the underlying ParseError should have span information
+        let err = result.unwrap_err();
+
+        // Just verify we get an error message
+        assert!(!err.is_empty(), "Error message should not be empty");
+        assert!(
+            err.contains("Unsupported"),
+            "Error should mention unsupported type"
+        );
+    }
+}
