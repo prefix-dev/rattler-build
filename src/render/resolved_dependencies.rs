@@ -452,7 +452,7 @@ pub enum ResolveError {
     FinalizedDependencyNotFound,
 
     #[error("Failed to resolve dependencies: {0}")]
-    DependencyResolutionError(#[from] anyhow::Error),
+    DependencyResolutionError(String),
 
     #[error("Could not collect run exports")]
     CouldNotCollectRunExports(#[from] RunExportExtractorError),
@@ -656,7 +656,8 @@ pub async fn install_environments(
         &output.build_configuration.directories.build_prefix,
         tool_configuration,
     )
-    .await?;
+    .await
+    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
     install_packages(
         "host",
@@ -669,7 +670,8 @@ pub async fn install_environments(
         &output.build_configuration.directories.host_prefix,
         tool_configuration,
     )
-    .await?;
+    .await
+    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
     Ok(())
 }
@@ -768,7 +770,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(ResolveError::from)?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
@@ -877,7 +879,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(ResolveError::from)?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json

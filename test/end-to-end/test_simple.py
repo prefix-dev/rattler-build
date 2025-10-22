@@ -936,13 +936,12 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         }
     }
     # Second output doesn't have __unix in requirements, so it has a different hash
-    # TODO: pin_subpackage with exact=True should add the pinned package to variant
     assert rendered[1]["recipe"]["build"]["string"] == "unix_4616a5c_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     # The second output doesn't have virtual packages in requirements, so no virtual packages in variant
-    # TODO: This should include the pinned package (rattler_build_demo) in the variant
     assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler_build_demo": "1 unix_5600cae_0",
         "target_platform": "noarch",
     }
 
@@ -967,12 +966,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         }
     }
     # Second output has same hash as unix version since it has no virtual packages
-    # TODO: pin_subpackage with exact=True should add the pinned package to variant
     assert rendered[1]["recipe"]["build"]["string"] == "win_4616a5c_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
-    # TODO: This should include the pinned package (rattler_build_demo) in the variant
     assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler_build_demo": "1 win_19aa286_0",
         "target_platform": "noarch",
     }
 

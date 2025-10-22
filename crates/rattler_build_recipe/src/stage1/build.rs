@@ -49,10 +49,11 @@ impl BuildString {
         }
     }
 
-    /// Resolve the build string by rendering the template with the hash value
+    /// Resolve the build string by rendering the template with the hash value and build number
     pub fn resolve(
         &mut self,
         hash_value: &str,
+        build_number: u64,
         context: &super::EvaluationContext,
     ) -> Result<(), crate::ParseError> {
         if let BuildString::Unresolved(template) = self {
@@ -68,6 +69,12 @@ impl BuildString {
             jinja.context_mut().insert(
                 "hash".to_string(),
                 Variable::from(hash_value.to_string()).into(),
+            );
+
+            // Add the build_number variable to the context
+            jinja.context_mut().insert(
+                "build_number".to_string(),
+                Variable::from(build_number as i64).into(),
             );
 
             // Render the template
@@ -459,7 +466,7 @@ impl Build {
         context: &super::EvaluationContext,
     ) -> Result<(), crate::ParseError> {
         if let Some(build_string) = &mut self.string {
-            build_string.resolve(hash_value, context)?;
+            build_string.resolve(hash_value, self.number, context)?;
         }
 
         Ok(())

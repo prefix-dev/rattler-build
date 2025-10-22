@@ -6,6 +6,7 @@
 
 use rattler_build_jinja::Variable;
 use rattler_build_types::NormalizedKey;
+use sha1::{Digest, Sha1};
 use std::collections::BTreeMap;
 
 /// Compute a hash string from a variant map with version prefix
@@ -29,8 +30,6 @@ pub fn compute_hash(
     variant: &BTreeMap<NormalizedKey, Variable>,
     noarch: &rattler_conda_types::NoArchType,
 ) -> (String, String) {
-    use sha1::{Digest, Sha1};
-
     // Compute the version prefix (py, np, etc.)
     let prefix = compute_hash_prefix(variant, noarch);
 

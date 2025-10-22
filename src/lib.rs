@@ -156,6 +156,11 @@ fn find_variants(
             })
             .wrap_err("Failed to render recipe with variants")?;
 
+    // Apply topological sorting to ensure correct build order for multi-output recipes
+    let rendered_variants =
+        rattler_build_recipe::variant_render::topological_sort_variants(rendered_variants)
+            .map_err(|e| miette::miette!("{}", e))?;
+
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();
     for rendered in rendered_variants {

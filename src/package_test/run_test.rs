@@ -68,7 +68,7 @@ pub enum TestError {
     MatchSpecParse(String),
 
     #[error("failed to setup test environment: {0}")]
-    TestEnvironmentSetup(#[from] anyhow::Error),
+    TestEnvironmentSetup(String),
 
     #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
@@ -345,9 +345,12 @@ pub async fn run_test(
     };
 
     // index the temporary channel
-    index_fs(index_config).await?;
+    index_fs(index_config)
+        .await
+        .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-    let cache_dir = rattler::default_cache_dir()?;
+    let cache_dir =
+        rattler::default_cache_dir().map_err(|e| TestError::TestFailed(e.to_string()))?;
 
     let pkg = ArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
@@ -434,7 +437,7 @@ pub async fn run_test(
             config.exclude_newer,
         )
         .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+        .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
         // These are the legacy tests
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
@@ -623,7 +626,7 @@ async fn run_python_test_inner(
         config.exclude_newer,
     )
     .await
-    .map_err(TestError::TestEnvironmentSetup)?;
+    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
     let mut imports = String::new();
     for import in &python_test.imports {
@@ -718,7 +721,7 @@ async fn run_perl_test(
         config.exclude_newer,
     )
     .await
-    .map_err(TestError::TestEnvironmentSetup)?;
+    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
     let mut imports = String::new();
     tracing::info!("Testing perl imports:\n");
@@ -789,7 +792,7 @@ async fn run_commands_test(
             config.exclude_newer,
         )
         .await
-        .map_err(TestError::TestEnvironmentSetup)?;
+        .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
         Some(build_prefix)
     } else {
         None
@@ -825,7 +828,7 @@ async fn run_commands_test(
         config.exclude_newer,
     )
     .await
-    .map_err(TestError::TestEnvironmentSetup)?;
+    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
@@ -984,7 +987,7 @@ async fn run_r_test(
         config.exclude_newer,
     )
     .await
-    .map_err(TestError::TestEnvironmentSetup)?;
+    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
     let mut libraries = String::new();
     tracing::info!("Testing R libraries:\n");
@@ -1054,7 +1057,7 @@ async fn run_ruby_test(
         config.exclude_newer,
     )
     .await
-    .map_err(TestError::TestEnvironmentSetup)?;
+    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
 
     let mut requires = String::new();
     tracing::info!("Testing Ruby requires:\n");

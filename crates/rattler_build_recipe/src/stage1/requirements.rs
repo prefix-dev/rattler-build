@@ -267,6 +267,28 @@ impl Requirements {
             })
             .collect()
     }
+
+    /// Get all pin_subpackage dependencies from all requirement sections
+    pub fn all_pin_subpackages(&self) -> impl Iterator<Item = &PinSubpackage> {
+        self.all_requirements().filter_map(|dep| match dep {
+            Dependency::PinSubpackage(pin) => Some(pin),
+            _ => None,
+        })
+    }
+
+    /// Get all pin_subpackage dependencies with exact=true
+    pub fn exact_pin_subpackages(&self) -> impl Iterator<Item = &PinSubpackage> {
+        self.all_pin_subpackages()
+            .filter(|pin| pin.pin_subpackage.args.exact)
+    }
+
+    /// Get all pin_compatible dependencies from all requirement sections
+    pub fn all_pin_compatible(&self) -> impl Iterator<Item = &PinCompatible> {
+        self.all_requirements().filter_map(|dep| match dep {
+            Dependency::PinCompatible(pin) => Some(pin),
+            _ => None,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -322,5 +344,50 @@ mod tests {
             ..Default::default()
         };
         assert!(!ire.is_empty());
+    }
+
+    #[test]
+    fn test_pin_extraction() {
+        use rattler_build_types::Pin;
+        use rattler_conda_types::PackageName;
+
+        let pin_sub = PinSubpackage {
+            pin_subpackage: Pin {
+                name: PackageName::try_from("mylib").unwrap(),
+                args: rattler_build_types::PinArgs {
+                    exact: true,
+                    ..Default::default()
+                },
+            },
+        };
+
+        let pin_sub_no_exact = PinSubpackage {
+            pin_subpackage: Pin {
+                name: PackageName::try_from("otherlib").unwrap(),
+                args: rattler_build_types::PinArgs {
+                    exact: false,
+                    ..Default::default()
+                },
+            },
+        };
+
+        let reqs = Requirements {
+            run: vec![
+                Dependency::Spec(Box::new("python".parse().unwrap())),
+                Dependency::PinSubpackage(pin_sub.clone()),
+                Dependency::PinSubpackage(pin_sub_no_exact.clone()),
+            ],
+            ..Default::default()
+        };
+
+        // Test all_pin_subpackages
+        let all_pins: Vec<_> = reqs.all_pin_subpackages().collect();
+        assert_eq!(all_pins.len(), 2);
+
+        // Test exact_pin_subpackages
+        let exact_pins: Vec<_> = reqs.exact_pin_subpackages().collect();
+        assert_eq!(exact_pins.len(), 1);
+        assert_eq!(exact_pins[0].pin_subpackage.name.as_normalized(), "mylib");
+        assert!(exact_pins[0].pin_subpackage.args.exact);
     }
 }

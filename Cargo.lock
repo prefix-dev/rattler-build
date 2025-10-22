@@ -4182,7 +4182,6 @@ name = "rattler-build"
 version = "0.48.1"
 dependencies = [
  "ansi-to-tui",
- "anyhow",
  "async-once-cell",
  "async-recursion",
  "base64",
@@ -4213,7 +4212,6 @@ dependencies = [
  "itertools 0.14.0",
  "lazy_static",
  "line-ending",
- "marked-yaml",
  "memchr",
  "memmap2",
  "miette",
@@ -4352,6 +4350,7 @@ dependencies = [
  "miette",
  "minijinja",
  "pathdiff",
+ "petgraph",
  "rattler_build_jinja",
  "rattler_build_script",
  "rattler_build_types",
