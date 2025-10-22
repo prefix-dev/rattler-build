@@ -203,7 +203,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
-    fn test_hash() {
+    fn test_hash_full_variant() {
         let mut input = BTreeMap::new();
         input.insert("rust_compiler".into(), "rust".into());
         input.insert("build_platform".into(), "osx-64".into());
@@ -218,8 +218,77 @@ mod tests {
         input.insert("python".into(), "3.11.* *_cpython".into());
         input.insert("c_compiler_version".into(), "14".into());
 
-        let build_string_from_output = HashInfo::from_variant(&input, &NoArchType::none());
-        assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");
+        let hash_info = HashInfo::from_variant(&input, &NoArchType::none());
+        assert_eq!(hash_info.to_string(), "py311h507f6e9");
+        assert_eq!(hash_info.prefix, "py311");
+        assert_eq!(hash_info.hash, "507f6e9");
+    }
+
+    #[test]
+    fn test_compute_hash_simple() {
+        let mut variant = BTreeMap::new();
+        variant.insert(
+            NormalizedKey::from("python"),
+            Variable::from("3.11".to_string()),
+        );
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Hash should include prefix "py311" + 7 hex chars
+        assert_eq!(hash_info.prefix, "py311");
+        assert_eq!(hash_info.hash.len(), 7);
+        // The hex part should be valid hex
+        assert!(hash_info.hash.chars().all(|c| c.is_ascii_hexdigit()));
+        // Should match display format
+        assert_eq!(hash_info.to_string(), format!("py311h{}", hash_info.hash));
+    }
+
+    #[test]
+    fn test_compute_hash_deterministic() {
+        let mut variant = BTreeMap::new();
+        variant.insert(
+            NormalizedKey::from("python"),
+            Variable::from("3.11".to_string()),
+        );
+        variant.insert(
+            NormalizedKey::from("numpy"),
+            Variable::from("1.20".to_string()),
+        );
+
+        let hash1 = HashInfo::from_variant(&variant, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Same input should produce same hash
+        assert_eq!(hash1, hash2);
+        // Should have both numpy and python prefix (in correct order: np, py)
+        assert!(hash1.prefix.contains("np") && hash1.prefix.contains("py"));
+        assert_eq!(hash1.prefix, "np120py311");
+    }
+
+    #[test]
+    fn test_compute_hash_different_variants() {
+        let mut variant1 = BTreeMap::new();
+        variant1.insert(
+            NormalizedKey::from("python"),
+            Variable::from("3.11".to_string()),
+        );
+
+        let mut variant2 = BTreeMap::new();
+        variant2.insert(
+            NormalizedKey::from("python"),
+            Variable::from("3.12".to_string()),
+        );
+
+        let hash1 = HashInfo::from_variant(&variant1, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&variant2, &NoArchType::none());
+
+        // Different inputs should produce different hashes
+        assert_ne!(hash1, hash2);
+        // Should have different python versions in prefix
+        assert_eq!(hash1.prefix, "py311");
+        assert_eq!(hash2.prefix, "py312");
+        // The hash parts should also differ
+        assert_ne!(hash1.hash, hash2.hash);
     }
 
     #[test]
@@ -234,5 +303,140 @@ mod tests {
         // The compute_hash function should produce the same results as HashInfo
         assert_eq!(prefix, hash_info.prefix);
         assert_eq!(hash, hash_info.hash);
+    }
+
+    #[test]
+    fn test_hash_prefix_ordering() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("python"), Variable::from("3.10"));
+        variant.insert(NormalizedKey::from("numpy"), Variable::from("1.21"));
+        variant.insert(NormalizedKey::from("lua"), Variable::from("5.4"));
+        variant.insert(NormalizedKey::from("r"), Variable::from("4.2"));
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Check that prefixes are in the correct order: np, py, pl, lua, r
+        assert_eq!(hash_info.prefix, "np121py310lua54r42");
+    }
+
+    #[test]
+    fn test_hash_prefix_perl() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("perl"), Variable::from("5.26.2"));
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Perl uses 3 digits instead of 2
+        // The function extracts the first 3 parts: "5", "26", "2" -> "5262"
+        assert_eq!(hash_info.prefix, "pl5262");
+
+        // Test with a simpler version
+        let mut variant2 = BTreeMap::new();
+        variant2.insert(NormalizedKey::from("perl"), Variable::from("5.26"));
+        let hash_info2 = HashInfo::from_variant(&variant2, &NoArchType::none());
+        assert_eq!(hash_info2.prefix, "pl526");
+    }
+
+    #[test]
+    fn test_hash_noarch_python() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
+        variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20"));
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::python());
+
+        // For noarch python, prefix should just be "py" (without version)
+        assert_eq!(hash_info.prefix, "py");
+    }
+
+    #[test]
+    fn test_hash_r_variants() {
+        // Test that all R variant keys produce the same prefix
+        let variants = vec![("r", "4.1"), ("r-base", "4.1"), ("r_base", "4.1")];
+
+        for (key, version) in variants {
+            let mut variant = BTreeMap::new();
+            variant.insert(NormalizedKey::from(key), Variable::from(version));
+            let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+            // All should have the same prefix
+            assert_eq!(hash_info.prefix, "r41", "Failed for key: {}", key);
+        }
+
+        // However, the full hash will differ because NormalizedKey normalizes differently
+        // (e.g., "r-base" becomes "r_base"), so the JSON representation differs
+        let mut variant1 = BTreeMap::new();
+        variant1.insert(NormalizedKey::from("r"), Variable::from("4.1"));
+        let hash1 = HashInfo::from_variant(&variant1, &NoArchType::none());
+
+        let mut variant2 = BTreeMap::new();
+        variant2.insert(NormalizedKey::from("r-base"), Variable::from("4.1"));
+        let hash2 = HashInfo::from_variant(&variant2, &NoArchType::none());
+
+        // Prefixes should be the same
+        assert_eq!(hash1.prefix, hash2.prefix);
+        // But hashes might differ due to key normalization in the JSON
+    }
+
+    #[test]
+    fn test_hash_input_json_format() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
+        variant.insert(
+            NormalizedKey::from("target_platform"),
+            Variable::from("linux-64"),
+        );
+
+        let hash_input = HashInput::from_variant(&variant);
+        let json_str = hash_input.as_str();
+
+        // Should be valid JSON
+        assert!(json_str.starts_with('{'));
+        assert!(json_str.ends_with('}'));
+        // Should contain both keys (BTreeMap ensures sorted order)
+        assert!(json_str.contains("python"));
+        assert!(json_str.contains("target_platform"));
+        // Should use Python-style formatting with ", " separators
+        assert!(json_str.contains(": "));
+    }
+
+    #[test]
+    fn test_hash_empty_variant() {
+        let variant = BTreeMap::new();
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Empty variant should have empty prefix but still produce a hash
+        assert_eq!(hash_info.prefix, "");
+        assert_eq!(hash_info.hash.len(), 7);
+        // Display should just be "h" + hash
+        assert_eq!(hash_info.to_string(), format!("h{}", hash_info.hash));
+    }
+
+    #[test]
+    fn test_hash_only_non_prefix_vars() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("openssl"), Variable::from("3"));
+        variant.insert(NormalizedKey::from("c_compiler"), Variable::from("gcc"));
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // No special prefix variables, so prefix should be empty
+        assert_eq!(hash_info.prefix, "");
+        // But should still have a hash
+        assert_eq!(hash_info.hash.len(), 7);
+    }
+
+    #[test]
+    fn test_short_version_extraction() {
+        let mut variant = BTreeMap::new();
+        variant.insert(NormalizedKey::from("python"), Variable::from("3.11.5"));
+        variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20.3"));
+        variant.insert(NormalizedKey::from("perl"), Variable::from("5.26.2"));
+
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+
+        // Should extract short versions correctly
+        assert!(hash_info.prefix.contains("py311")); // python: 2 digits
+        assert!(hash_info.prefix.contains("np120")); // numpy: 2 digits
+        assert!(hash_info.prefix.contains("pl526")); // perl: 3 digits
     }
 }
