@@ -62,7 +62,8 @@ mod tests {
         // Resolve the build string with the computed hash info
         recipe
             .build
-            .resolve_build_string(&hash_info.prefix, &hash_info.hash, &context)
+            .string
+            .resolve(&hash_info, recipe.build.number, &context)
             .unwrap();
 
         // Extract used variant from recipe

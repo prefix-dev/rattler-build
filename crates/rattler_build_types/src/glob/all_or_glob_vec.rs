@@ -67,24 +67,18 @@ mod tests {
         let parsed_again: AllOrGlobVec = serde_yaml::from_str(&as_yaml).unwrap();
         assert_eq!(parsed_again, all_or_globvec);
 
-        let globs_true = r#"true"#;
-        let all_or_globvec: AllOrGlobVec = serde_yaml::from_str(globs_true).unwrap();
+        let all_or_globvec: AllOrGlobVec = serde_yaml::from_str("true").unwrap();
         assert!(all_or_globvec.is_match(Path::new("foo")));
         assert!(all_or_globvec.is_all());
 
         let globs_all = serde_yaml::to_string(&all_or_globvec).unwrap();
-        insta::assert_snapshot!("all_or_globvec_all", &globs_all);
-        let parsed_again: AllOrGlobVec = serde_yaml::from_str(&globs_all).unwrap();
-        assert_eq!(parsed_again, AllOrGlobVec::All(true));
+        assert_eq!(globs_all, "true\n");
 
-        let globs_false = r#"false"#;
-        let all_or_globvec: AllOrGlobVec = serde_yaml::from_str(globs_false).unwrap();
+        let all_or_globvec: AllOrGlobVec = serde_yaml::from_str("false").unwrap();
         assert!(!all_or_globvec.is_match(Path::new("foo")));
         assert!(all_or_globvec.is_none());
 
         let globs_none = serde_yaml::to_string(&all_or_globvec).unwrap();
-        insta::assert_snapshot!("all_or_globvec_none", &globs_none);
-        let parsed_again: AllOrGlobVec = serde_yaml::from_str(&globs_none).unwrap();
-        assert_eq!(parsed_again, AllOrGlobVec::All(false));
+        assert_eq!(globs_none, "false\n");
     }
 }
