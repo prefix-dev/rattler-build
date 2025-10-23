@@ -34,7 +34,7 @@ pub use hash::{HashInfo, HashInput, compute_hash};
 use indexmap::IndexMap;
 pub use package::Package;
 use rattler_build_yaml_parser::ParseError;
-pub use recipe::Recipe;
+pub use recipe::{InheritsFrom, Recipe, StagingCache};
 pub use requirements::{Dependency, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
 pub use tests::TestType;

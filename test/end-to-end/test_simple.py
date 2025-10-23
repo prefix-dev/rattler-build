@@ -181,7 +181,6 @@ def test_run_exports(
 
     assert (pkg / "info/run_exports.json").exists()
     actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
-    print("Run exports found:", actual_run_export)
     assert set(actual_run_export.keys()) == {"weak"}
     assert len(actual_run_export["weak"]) == 1
     x = actual_run_export["weak"][0]
@@ -935,11 +934,9 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    # Second output doesn't have __unix in requirements, so it has a different hash
-    assert rendered[1]["recipe"]["build"]["string"] == "unix_4616a5c_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_63d9094_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
-    # The second output doesn't have virtual packages in requirements, so no virtual packages in variant
     assert rendered[1]["build_configuration"]["variant"] == {
         "rattler_build_demo": "1 unix_5600cae_0",
         "target_platform": "noarch",
@@ -965,8 +962,7 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    # Second output has same hash as unix version since it has no virtual packages
-    assert rendered[1]["recipe"]["build"]["string"] == "win_4616a5c_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "win_95d38b2_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {

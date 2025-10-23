@@ -420,17 +420,39 @@ fn render_with_empty_combinations(
                 variant.insert("target_platform".into(), "noarch".into());
             }
 
-            let pin_subpackages = extract_pin_subpackages(&recipe);
             RenderedVariant {
                 variant,
                 recipe,
-                pin_subpackages,
+                pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
             }
         })
         .collect();
 
-    // Add pin information to variants
-    finalize_pin_subpackages(&mut results)?;
+    // Sort variants topologically by pin_subpackage dependencies
+    // This ensures we resolve build strings in the correct order
+    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+
+    // Resolve build strings in topological order
+    // For each variant, we:
+    // 1. Extract its pin_subpackages (which may reference already-resolved variants)
+    // 2. Add those pins to its variant
+    // 3. Compute its hash and finalize its build string
+    // This ensures that when variant B pins variant A, A's build string is already finalized
+    for i in 0..results.len() {
+        // Extract pin_subpackages for this variant
+        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
+        results[i].pin_subpackages = pin_subpackages.clone();
+
+        // Add pin information to this variant's variant map
+        if !pin_subpackages.is_empty() {
+            let results_snapshot = results.clone();
+            add_pins_to_variant(&mut results[i].variant, &pin_subpackages, &results_snapshot)
+                .map_err(ParseError::from_message)?;
+        }
+
+        // Finalize build string with complete pin information
+        finalize_build_string_single(&mut results[i])?;
+    }
 
     Ok(results)
 }
@@ -449,6 +471,56 @@ fn finalize_pin_subpackages(results: &mut [RenderedVariant]) -> Result<(), Parse
                 &results_snapshot,
             )
             .map_err(ParseError::from_message)?;
+        }
+    }
+    Ok(())
+}
+
+/// Helper function to finalize a single build string
+///
+/// This computes the hash from the variant (which includes pin information)
+/// and resolves the build string for one variant.
+fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
+    use crate::stage1::{build::BuildString, compute_hash};
+    use rattler_conda_types::NoArchType;
+
+    let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
+
+    // Compute hash from the variant (which now includes pin_subpackage information)
+    let (prefix, hash) = compute_hash(&result.variant, &noarch);
+
+    // If build string is not set, create the default
+    if result.recipe.build.string.is_none() {
+        result.recipe.build.string = Some(BuildString::resolved(format!(
+            "{}h{}_{}",
+            prefix, hash, result.recipe.build.number
+        )));
+    } else if let Some(build_string) = &mut result.recipe.build.string {
+        // Always resolve/re-resolve the build string with the current hash
+        // This ensures we use the latest hash that includes all pin information
+        // Create a temporary evaluation context for build string resolution
+        // Merge both recipe context variables and variant variables
+        let mut variables = IndexMap::new();
+
+        // First add recipe context variables (from context: section)
+        for (k, v) in &result.recipe.context {
+            variables.insert(k.clone(), v.clone());
+        }
+
+        // Then add variant variables (which may override context variables)
+        for (k, v) in &result.variant {
+            variables.insert(k.0.as_str().to_string(), v.clone());
+        }
+
+        let eval_ctx = EvaluationContext::from_variables(variables);
+
+        // If unresolved, resolve it. If already resolved, update it with new hash.
+        if !build_string.is_resolved() {
+            build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
+        } else {
+            // Re-resolve even if already resolved, to get the updated hash
+            *build_string = BuildString::unresolved(build_string.as_str().to_string());
+            build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
         }
     }
     Ok(())
@@ -636,17 +708,33 @@ fn render_with_variants(
         // Convert each output to a RenderedVariant
         for recipe in outputs {
             let variant = recipe.used_variant.clone();
-            let pin_subpackages = extract_pin_subpackages(&recipe);
             results.push(RenderedVariant {
                 variant,
                 recipe,
-                pin_subpackages,
+                pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
             });
         }
     }
 
-    // Add pin information to variants for hash computation
-    finalize_pin_subpackages(&mut results)?;
+    // Sort variants topologically by pin_subpackage dependencies
+    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+
+    // Resolve build strings in topological order
+    for i in 0..results.len() {
+        // Extract pin_subpackages for this variant
+        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
+        results[i].pin_subpackages = pin_subpackages.clone();
+
+        // Add pin information to variant if needed
+        if !pin_subpackages.is_empty() {
+            let results_snapshot = results.clone();
+            add_pins_to_variant(&mut results[i].variant, &pin_subpackages, &results_snapshot)
+                .map_err(ParseError::from_message)?;
+        }
+
+        // Finalize build string with complete pin information
+        finalize_build_string_single(&mut results[i])?;
+    }
 
     Ok(results)
 }

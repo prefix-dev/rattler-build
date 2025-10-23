@@ -1898,7 +1898,7 @@ impl Evaluate for Stage0Recipe {
         };
 
         let package = self.package.evaluate(&context_with_vars)?;
-        let mut build = self.build.evaluate(&context_with_vars)?;
+        let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
         let requirements = self.requirements.evaluate(&context_with_vars)?;
         let extra = self.extra.evaluate(&context_with_vars)?;
@@ -1987,21 +1987,9 @@ impl Evaluate for Stage0Recipe {
             }
         }
 
-        // Compute hash from the actual variant (includes prefix like "py312h...")
-        let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
-
-        // If no build string was specified, use the default: {prefix}{hash}_{build_number}
-        if build.string.is_none() {
-            build.string = Some(crate::stage1::build::BuildString::resolved(format!(
-                "{}h{}_{}",
-                prefix, hash, build.number
-            )));
-        } else {
-            // For custom build strings, we need to extract just the hash part (without prefix)
-            // The template will add its own formatting
-            // Extract the part after the last 'h' which is the actual hash
-            build.resolve_build_string(&hash, &context_with_vars)?;
-        }
+        // DO NOT compute hash here! Hash computation must happen AFTER pin_subpackages are
+        // added to the variant (which happens in variant_render.rs after evaluation).
+        // The build string will remain unresolved until finalize_build_strings() is called.
 
         Ok(Stage1Recipe::new(
             package,
@@ -2066,7 +2054,7 @@ fn evaluate_package_output_to_recipe(
     let package = Stage1Package::new(name, version);
 
     // Evaluate build section (output-specific, no inheritance from top-level currently)
-    let mut build = output.build.evaluate(context)?;
+    let build = output.build.evaluate(context)?;
 
     // Evaluate about section (output-specific, or could inherit from top-level)
     let about = output.about.evaluate(context)?;
@@ -2158,120 +2146,9 @@ fn evaluate_package_output_to_recipe(
         }
     }
 
-    // Compute hash from the actual variant
-    let (prefix, hash) = crate::stage1::compute_hash(&actual_variant, &noarch);
-
-    // Resolve build string with hash
-    if build.string.is_none() {
-        build.string = Some(crate::stage1::build::BuildString::resolved(format!(
-            "{}h{}_{}",
-            prefix, hash, build.number
-        )));
-    } else {
-        build.resolve_build_string(&hash, context)?;
-    }
-
-    Ok(Stage1Recipe::new(
-        package,
-        build,
-        about,
-        requirements,
-        extra,
-        source,
-        tests,
-        resolved_context,
-        actual_variant,
-    ))
-}
-
-/// Helper to evaluate a staging output into a Stage1Recipe
-/// Staging outputs are simpler - they don't produce packages but cache build results
-fn evaluate_staging_output_to_recipe(
-    output: &crate::stage0::StagingOutput,
-    recipe: &crate::stage0::MultiOutputRecipe,
-    context: &EvaluationContext,
-) -> Result<Stage1Recipe, ParseError> {
-    use rattler_conda_types::{PackageName, VersionWithSource};
-    use std::str::FromStr;
-
-    // For staging outputs, we create a special package name based on the staging name
-    let staging_name_str = evaluate_string_value(&output.staging.name, context)?;
-    let name = PackageName::from_str(&format!("_staging_{}", staging_name_str)).map_err(|e| {
-        ParseError::invalid_value(
-            "staging name",
-            &format!(
-                "invalid staging name: '{}' cannot be converted to package name: {}",
-                staging_name_str, e
-            ),
-            Span::new_blank(),
-        )
-    })?;
-
-    // Use recipe-level version or a default
-    let version = if let Some(ref version_value) = recipe.recipe.version {
-        let version_str = evaluate_value_to_string(version_value, context)?;
-        VersionWithSource::from_str(&version_str).map_err(|e| {
-            ParseError::invalid_value(
-                "version",
-                &format!("invalid version '{}': {}", version_str, e),
-                Span::new_blank(),
-            )
-        })?
-    } else {
-        VersionWithSource::from_str("0.0.0").unwrap()
-    };
-
-    let package = Stage1Package::new(name, version);
-
-    // Evaluate staging build (only has script field)
-    let script = evaluate_script(&output.build.script, context)?;
-    let build = Stage1Build {
-        script,
-        ..Stage1Build::default()
-    };
-
-    // Staging outputs don't have about/tests
-    let about = Stage1About::default();
-    let extra = recipe.extra.evaluate(context)?;
-
-    // Evaluate requirements (only build/host/ignore_run_exports allowed for staging)
-    let requirements = output.requirements.evaluate(context)?;
-
-    // Evaluate source
-    let mut source = Vec::new();
-    for src in &output.source {
-        source.push(src.evaluate(context)?);
-    }
-
-    let tests = Vec::new(); // No tests for staging outputs
-
-    let resolved_context = context.variables().clone();
-
-    // Staging outputs still need a variant for caching purposes
-    // Use similar logic to package outputs
-    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
-
-    let accessed_vars = context.accessed_variables();
-    let free_specs = requirements
-        .free_specs()
-        .into_iter()
-        .map(NormalizedKey::from)
-        .collect::<HashSet<_>>();
-
-    let actual_variant: BTreeMap<NormalizedKey, Variable> = context
-        .variables()
-        .iter()
-        .filter(|(k, _)| {
-            let key_str = k.as_str();
-            if recipe.context.contains_key(key_str) {
-                return false;
-            }
-            accessed_vars.contains(key_str)
-                || free_specs.contains(&NormalizedKey::from(key_str))
-                || ALWAYS_INCLUDE.contains(&key_str)
-        })
-        .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
-        .collect();
+    // DO NOT compute hash here! Hash computation must happen AFTER pin_subpackages are
+    // added to the variant (which happens in variant_render.rs after evaluation).
+    // The build string will remain unresolved until finalize_build_strings() is called.
 
     Ok(Stage1Recipe::new(
         package,
@@ -2292,6 +2169,8 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
     type Output = Vec<Stage1Recipe>;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        use crate::stage1::StagingCache;
+
         // First, evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
@@ -2299,32 +2178,113 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             (context.clone(), IndexMap::new())
         };
 
-        let mut evaluated_outputs = Vec::with_capacity(self.outputs.len());
-
-        // Evaluate each output
+        // First pass: Evaluate all staging outputs and collect them
+        let mut staging_caches = IndexMap::new();
         for output in &self.outputs {
-            // Clear accessed variables for each output to track them independently
-            context_with_vars.clear_accessed();
+            if let crate::stage0::Output::Staging(staging_output) = output {
+                context_with_vars.clear_accessed();
 
-            match output {
-                crate::stage0::Output::Package(pkg_output) => {
-                    let mut recipe = evaluate_package_output_to_recipe(
-                        pkg_output.as_ref(),
-                        self,
-                        &context_with_vars,
-                    )?;
-                    recipe.context = evaluated_context.clone();
-                    evaluated_outputs.push(recipe);
+                let staging_name =
+                    evaluate_string_value(&staging_output.staging.name, &context_with_vars)?;
+
+                // Evaluate staging output components
+                let script = evaluate_script(&staging_output.build.script, &context_with_vars)?;
+                let build = crate::stage1::Build {
+                    script,
+                    ..crate::stage1::Build::default()
+                };
+
+                let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+
+                let mut source = Vec::new();
+                for src in &staging_output.source {
+                    source.push(src.evaluate(&context_with_vars)?);
                 }
-                crate::stage0::Output::Staging(staging_output) => {
-                    let mut recipe = evaluate_staging_output_to_recipe(
-                        staging_output.as_ref(),
-                        self,
-                        &context_with_vars,
-                    )?;
-                    recipe.context = evaluated_context.clone();
-                    evaluated_outputs.push(recipe);
+
+                // Compute variant for staging output
+                let accessed_vars = context_with_vars.accessed_variables();
+                let free_specs = requirements
+                    .free_specs()
+                    .into_iter()
+                    .map(NormalizedKey::from)
+                    .collect::<HashSet<_>>();
+
+                const ALWAYS_INCLUDE: &[&str] =
+                    &["target_platform", "channel_targets", "channel_sources"];
+
+                let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+                    .variables()
+                    .iter()
+                    .filter(|(k, _)| {
+                        let key_str = k.as_str();
+                        if self.context.contains_key(key_str) {
+                            return false;
+                        }
+                        accessed_vars.contains(key_str)
+                            || free_specs.contains(&NormalizedKey::from(key_str))
+                            || ALWAYS_INCLUDE.contains(&key_str)
+                    })
+                    .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+                    .collect();
+
+                let staging_cache = StagingCache::new(
+                    staging_name.clone(),
+                    build,
+                    requirements,
+                    source,
+                    actual_variant,
+                );
+
+                staging_caches.insert(staging_name, staging_cache);
+            }
+        }
+
+        let mut evaluated_outputs = Vec::new();
+
+        // Second pass: Evaluate package outputs only and set their staging cache dependencies
+        for output in &self.outputs {
+            // Only process package outputs - staging outputs are not converted to recipes
+            if let crate::stage0::Output::Package(pkg_output) = output {
+                context_with_vars.clear_accessed();
+
+                let mut recipe = evaluate_package_output_to_recipe(
+                    pkg_output.as_ref(),
+                    self,
+                    &context_with_vars,
+                )?;
+                recipe.context = evaluated_context.clone();
+
+                // Set staging_caches and inherits_from based on the inherit field
+                match &pkg_output.inherit {
+                    crate::stage0::Inherit::CacheName(cache_name_value) => {
+                        let cache_name =
+                            evaluate_string_value(cache_name_value, &context_with_vars)?;
+                        if let Some(cache) = staging_caches.get(&cache_name) {
+                            recipe.staging_caches = vec![cache.clone()];
+                            recipe.inherits_from =
+                                Some(crate::stage1::InheritsFrom::new(cache_name));
+                        }
+                    }
+                    crate::stage0::Inherit::CacheWithOptions(cache_inherit) => {
+                        let cache_name =
+                            evaluate_string_value(&cache_inherit.from, &context_with_vars)?;
+                        if let Some(cache) = staging_caches.get(&cache_name) {
+                            recipe.staging_caches = vec![cache.clone()];
+                            recipe.inherits_from =
+                                Some(crate::stage1::InheritsFrom::with_run_exports(
+                                    cache_name,
+                                    cache_inherit.run_exports,
+                                ));
+                        }
+                    }
+                    crate::stage0::Inherit::TopLevel => {
+                        // No staging cache dependency
+                        recipe.staging_caches = Vec::new();
+                        recipe.inherits_from = None;
+                    }
                 }
+
+                evaluated_outputs.push(recipe);
             }
         }
 
@@ -2583,5 +2543,141 @@ mod tests {
         assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("platform"));
         assert!(accessed.contains("arch"));
+    }
+
+    #[test]
+    fn test_multi_output_staging_cache_populated() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    requirements:
+      build:
+        - gcc
+        - cmake
+      host:
+        - zlib
+    build:
+      script:
+        - echo "Building"
+
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: build-cache
+    requirements:
+      run:
+        - libgcc
+    about:
+      summary: My library
+      license: MIT
+
+  - package:
+      name: mylib-dev
+      version: 1.0.0
+    inherit:
+      from: build-cache
+      run_exports: false
+    requirements:
+      run:
+        - mylib
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+
+                // Should have 2 outputs: only package outputs (staging is not converted to recipe)
+                assert_eq!(recipes.len(), 2);
+
+                // First output is mylib (inherits from build-cache with short form)
+                let mylib_recipe = &recipes[0];
+                assert_eq!(mylib_recipe.package.name.as_normalized(), "mylib");
+                assert_eq!(mylib_recipe.staging_caches.len(), 1); // Should have the staging cache
+                assert_eq!(mylib_recipe.staging_caches[0].name, "build-cache");
+                assert!(mylib_recipe.inherits_from.is_some());
+                let inherits = mylib_recipe.inherits_from.as_ref().unwrap();
+                assert_eq!(inherits.cache_name, "build-cache");
+                assert!(inherits.inherit_run_exports); // Default is true
+
+                // Second output is mylib-dev (inherits with run_exports: false)
+                let mylib_dev_recipe = &recipes[1];
+                assert_eq!(mylib_dev_recipe.package.name.as_normalized(), "mylib-dev");
+                assert_eq!(mylib_dev_recipe.staging_caches.len(), 1);
+                assert_eq!(mylib_dev_recipe.staging_caches[0].name, "build-cache");
+                assert!(mylib_dev_recipe.inherits_from.is_some());
+                let inherits_dev = mylib_dev_recipe.inherits_from.as_ref().unwrap();
+                assert_eq!(inherits_dev.cache_name, "build-cache");
+                assert!(!inherits_dev.inherit_run_exports); // Explicitly set to false
+
+                // Verify staging cache structure (from mylib's staging_caches)
+                let staging_cache = &mylib_recipe.staging_caches[0];
+                assert_eq!(staging_cache.name, "build-cache");
+                assert!(!staging_cache.requirements.build.is_empty()); // Should have gcc, cmake
+                assert!(!staging_cache.requirements.host.is_empty()); // Should have zlib
+                assert!(staging_cache.requirements.run.is_empty()); // Staging has no run requirements
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_top_level_inherit() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: ~
+    about:
+      summary: My library
+      license: MIT
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+
+                assert_eq!(recipes.len(), 1);
+                let recipe = &recipes[0];
+
+                // Top-level inheritance should have no staging caches
+                assert!(recipe.staging_caches.is_empty());
+                assert!(recipe.inherits_from.is_none());
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
     }
 }
