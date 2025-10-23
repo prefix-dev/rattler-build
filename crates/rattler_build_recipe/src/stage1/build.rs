@@ -5,6 +5,8 @@ use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
+use crate::stage1::HashInfo;
+
 use super::{AllOrGlobVec, GlobVec};
 
 /// RPaths configuration with a default value of ["lib/"] when empty
@@ -91,15 +93,14 @@ impl BuildString {
     /// Resolve the build string by rendering the template with the hash value and build number
     pub fn resolve(
         &mut self,
-        prefix: &str,
-        hash_value: &str,
+        hash_info: &HashInfo,
         build_number: u64,
         context: &super::EvaluationContext,
     ) -> Result<(), ParseError> {
         match self {
             BuildString::Default => {
                 // Generate default build string: <prefix>h<hash>_<build_number>
-                let rendered = format!("{}h{}_{}", prefix, hash_value, build_number);
+                let rendered = format!("{}h{}_{}", hash_info.prefix, hash_info.hash, build_number);
                 *self = BuildString::Resolved(rendered);
             }
             BuildString::Unresolved(template, span) => {
@@ -112,7 +113,7 @@ impl BuildString {
                 // Add the hash variable to the context
                 jinja.context_mut().insert(
                     "hash".to_string(),
-                    Variable::from(hash_value.to_string()).into(),
+                    Variable::from(hash_info.hash.as_str()).into(),
                 );
 
                 // Add the build_number variable to the context
@@ -501,31 +502,6 @@ impl Build {
             number,
             ..Default::default()
         }
-    }
-
-    /// Resolve the build string with the computed hash value
-    ///
-    /// This method should be called after the full recipe evaluation is complete and
-    /// the actual variant (subset of used variables) is known.
-    ///
-    /// # Arguments
-    ///
-    /// * `prefix` - The hash prefix (e.g., "py311", "np120py311")
-    /// * `hash_value` - The computed hash value to substitute in the template
-    /// * `context` - Evaluation context with all variables
-    ///
-    /// # Returns
-    ///
-    /// Ok(()) on success, or an error if template rendering fails
-    pub fn resolve_build_string(
-        &mut self,
-        prefix: &str,
-        hash_value: &str,
-        context: &super::EvaluationContext,
-    ) -> Result<(), ParseError> {
-        self.string
-            .resolve(prefix, hash_value, self.number, context)?;
-        Ok(())
     }
 
     /// Check if the build section is empty (all default values)

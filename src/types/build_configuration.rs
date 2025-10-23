@@ -2,6 +2,7 @@
 use std::collections::BTreeMap;
 
 use rattler_build_jinja::{JinjaConfig, Variable};
+use rattler_build_recipe::stage1::HashInfo;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{ChannelUrl, PackageName, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
@@ -10,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::types::{
     Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
-use rattler_build_recipe::stage1::HashInfo;
 
 use rattler_build_script::SandboxConfiguration;
 
@@ -30,7 +30,7 @@ pub struct BuildConfiguration {
     pub build_platform: PlatformWithVirtualPackages,
     /// The selected variant for this build
     pub variant: BTreeMap<NormalizedKey, Variable>,
-    /// THe computed hash of the variant
+    /// The computed hash of the variant
     pub hash: HashInfo,
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,

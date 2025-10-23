@@ -192,12 +192,6 @@ fn find_variants(
             .as_resolved()
             .expect("Recipe build string should be resolved after evaluation");
 
-        // The recipe's used_variant already contains the filtered variant (noarch python excludes python keys)
-        // Use it to reconstruct the hash for consistency
-        let noarch = recipe.build().noarch.as_ref();
-        let hash =
-            HashInfo::from_variant(&recipe.used_variant, noarch.unwrap_or(&NoArchType::none()));
-
         recipes.insert(DiscoveredOutput {
             name: recipe.package().name().as_source().to_string(),
             version: recipe.package().version().to_string(),
@@ -206,7 +200,7 @@ fn find_variants(
             target_platform: effective_target_platform,
             used_vars: variant,
             recipe,
-            hash,
+            hash: rendered.hash_info.expect("Should be set after evaluation"),
         });
     }
 

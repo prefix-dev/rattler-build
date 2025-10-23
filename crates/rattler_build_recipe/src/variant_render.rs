@@ -20,6 +20,7 @@ use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
+use crate::stage1::HashInfo;
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
@@ -126,6 +127,8 @@ pub struct RenderedVariant {
     /// Maps package name (normalized) to pin information
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub pin_subpackages: BTreeMap<NormalizedKey, PinSubpackageInfo>,
+    /// The hash info that was used to compute the build string.
+    pub hash_info: Option<HashInfo>,
 }
 
 /// Helper function to extract pin_subpackage information from a recipe
@@ -169,7 +172,7 @@ fn add_pins_to_variant(
                 if let Some(build_string) = pinned_variant.recipe.build.string.as_resolved() {
                     format!("{} {}", pinned_variant.recipe.package.version, build_string)
                 } else {
-                    pinned_variant.recipe.package.version.to_string()
+                    unreachable!("Should not happen when topological ordering succeeded");
                 };
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
@@ -420,7 +423,8 @@ fn render_with_empty_combinations(
             RenderedVariant {
                 variant,
                 recipe,
-                pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
+                pin_subpackages: BTreeMap::new(),
+                hash_info: None,
             }
         })
         .collect();
@@ -491,12 +495,12 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
         let eval_ctx = EvaluationContext::from_variables(variables);
 
         // Resolve the build string template with the hash
-        result.recipe.build.string.resolve(
-            &hash_info.prefix,
-            &hash_info.hash,
-            result.recipe.build.number,
-            &eval_ctx,
-        )?;
+        result
+            .recipe
+            .build
+            .string
+            .resolve(&hash_info, result.recipe.build.number, &eval_ctx)?;
+        result.hash_info = Some(hash_info);
     }
     Ok(())
 }
@@ -687,6 +691,7 @@ fn render_with_variants(
                 variant,
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
+                hash_info: None,
             });
         }
     }
