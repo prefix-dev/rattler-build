@@ -157,11 +157,17 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
 ///
 /// Returns an error if a pinned package cannot be found in the rendered outputs.
 fn add_pins_to_variant(
+    self_name: &rattler_conda_types::PackageName,
     variant: &mut BTreeMap<NormalizedKey, Variable>,
     pin_subpackages: &BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
 ) -> Result<(), String> {
+    let self_name = NormalizedKey::from(self_name.as_normalized());
     for (pin_name, pin_info) in pin_subpackages {
+        // Ignore ourselves
+        if self_name == *pin_name {
+            continue;
+        }
         // Find the rendered variant for this pinned package
         if let Some(pinned_variant) = all_rendered
             .iter()
@@ -447,8 +453,13 @@ fn render_with_empty_combinations(
         // Add pin information to this variant's variant map
         if !pin_subpackages.is_empty() {
             let results_snapshot = results.clone();
-            add_pins_to_variant(&mut results[i].variant, &pin_subpackages, &results_snapshot)
-                .map_err(ParseError::from_message)?;
+            add_pins_to_variant(
+                results_snapshot[i].recipe.package.name(),
+                &mut results[i].variant,
+                &pin_subpackages,
+                &results_snapshot,
+            )
+            .map_err(ParseError::from_message)?;
         }
 
         // Finalize build string with complete pin information
@@ -708,8 +719,13 @@ fn render_with_variants(
         // Add pin information to variant if needed
         if !pin_subpackages.is_empty() {
             let results_snapshot = results.clone();
-            add_pins_to_variant(&mut results[i].variant, &pin_subpackages, &results_snapshot)
-                .map_err(ParseError::from_message)?;
+            add_pins_to_variant(
+                results_snapshot[i].recipe.package().name(),
+                &mut results[i].variant,
+                &pin_subpackages,
+                &results_snapshot,
+            )
+            .map_err(ParseError::from_message)?;
         }
 
         // Finalize build string with complete pin information
