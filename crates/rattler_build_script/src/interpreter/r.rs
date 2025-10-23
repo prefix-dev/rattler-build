@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use rattler_conda_types::Platform;
 
-use crate::script::{ExecutionArgs, ResolvedScriptContents};
+use crate::execution::{ExecutionArgs, ResolvedScriptContents};
 
 use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
 
-pub(crate) struct RInterpreter;
+pub struct RInterpreter;
 
 // R interpreter calls either bash or cmd.exe interpreter for activation and then runs R script
 impl Interpreter for RInterpreter {

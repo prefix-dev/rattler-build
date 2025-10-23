@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{ExecutionArgs, run_process_with_replacements};
+use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
 use super::{BASH_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
 
-pub(crate) struct BashInterpreter;
+pub struct BashInterpreter;
 
 fn print_debug_info(args: &ExecutionArgs) -> String {
     let mut output = String::new();

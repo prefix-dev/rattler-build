@@ -2,20 +2,20 @@ use std::path::PathBuf;
 
 use rattler_conda_types::Platform;
 
-use crate::script::{ExecutionArgs, ResolvedScriptContents};
+use crate::execution::{ExecutionArgs, ResolvedScriptContents};
 
 use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
 
-pub(crate) struct PythonInterpreter;
+pub struct PerlInterpreter;
 
-// python interpreter calls either bash or cmd.exe interpreter for activation and then runs python script
-impl Interpreter for PythonInterpreter {
+// Perl interpreter calls either bash or cmd.exe interpreter for activation and then runs Perl script
+impl Interpreter for PerlInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let py_script = args.work_dir.join("conda_build_script.py");
-        tokio::fs::write(&py_script, args.script.script()).await?;
+        let perl_script = args.work_dir.join("conda_build_script.pl");
+        tokio::fs::write(&perl_script, args.script.script()).await?;
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(format!("python {:?}", py_script)),
+            script: ResolvedScriptContents::Inline(format!("perl {:?}", perl_script)),
             ..args
         };
 
@@ -31,6 +31,6 @@ impl Interpreter for PythonInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("python", build_prefix, platform)
+        find_interpreter("perl", build_prefix, platform)
     }
 }

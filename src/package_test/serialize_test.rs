@@ -88,9 +88,15 @@ pub(crate) fn write_test_files(
 
             // Try to render the script contents here
             // Note: we want to improve this with better rendering in the future
+            let jinja_context = default_jinja_context(output);
+            let jinja_renderer = |template: &str| -> Result<String, String> {
+                jinja_context
+                    .render_str(template)
+                    .map_err(|e| e.to_string())
+            };
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
-                Some(default_jinja_context(output)),
+                Some(jinja_renderer),
                 &["sh", "bat"],
             )?;
 

@@ -1,43 +1,19 @@
-//! Module for running scripts in different interpreters.
-mod interpreter;
-mod sandbox;
-pub use interpreter::InterpreterError;
-pub use sandbox::{SandboxArguments, SandboxConfiguration};
+//! Script execution types and utilities.
 
-use crate::script::interpreter::Interpreter;
+use crate::sandbox::SandboxConfiguration;
+use crate::script::{Script, ScriptContent};
 use futures::TryStreamExt;
 use indexmap::IndexMap;
-use interpreter::{
-    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NodeJsInterpreter,
-    NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter, RubyInterpreter,
-};
 use itertools::Itertools;
-use minijinja::Value;
 use rattler_conda_types::Platform;
-use rattler_shell::shell;
-use std::{
-    collections::HashMap,
-    collections::HashSet,
-    io,
-    path::{Path, PathBuf},
-    process::Stdio,
-};
+use std::collections::HashMap;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
-use tokio_util::{
-    bytes::BytesMut,
-    codec::{Decoder, FramedRead},
-    compat::FuturesAsyncReadCompatExt,
-};
-
-use crate::{
-    env_vars::{self},
-    metadata::Debug,
-    metadata::Output,
-    recipe::{
-        Jinja,
-        parser::{Script, ScriptContent},
-    },
-};
+use tokio_util::bytes::BytesMut;
+use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
@@ -134,7 +110,109 @@ impl ResolvedScriptContents {
     }
 }
 
+/// Debug mode for script execution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Debug(bool);
+
+impl Debug {
+    /// Create a new Debug mode
+    pub fn new(enabled: bool) -> Self {
+        Self(enabled)
+    }
+
+    /// Check if debug mode is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.0
+    }
+}
+
+impl From<bool> for Debug {
+    fn from(enabled: bool) -> Self {
+        Self(enabled)
+    }
+}
+
 impl Script {
+    /// Run the script with the given parameters
+    ///
+    /// This is a high-level convenience method that handles the full script execution flow:
+    /// - Resolves script content (from file or inline)
+    /// - Sets up environment variables and secrets
+    /// - Configures the working directory
+    /// - Renders Jinja templates if a renderer is provided
+    /// - Executes the script in the appropriate interpreter
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_script<F>(
+        &self,
+        env_vars: HashMap<String, Option<String>>,
+        work_dir: &Path,
+        recipe_dir: &Path,
+        run_prefix: &Path,
+        build_prefix: Option<&PathBuf>,
+        jinja_renderer: Option<F>,
+        sandbox_config: Option<&SandboxConfiguration>,
+        debug: Debug,
+    ) -> Result<(), crate::InterpreterError>
+    where
+        F: Fn(&str) -> Result<String, String>,
+    {
+        // Determine the valid script extensions based on the available interpreters.
+        let mut valid_script_extensions = Vec::new();
+        if cfg!(windows) {
+            valid_script_extensions.push("bat");
+        } else {
+            valid_script_extensions.push("sh");
+        }
+
+        let env_vars = env_vars
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .chain(self.env().clone().into_iter())
+            .collect::<IndexMap<String, String>>();
+
+        let contents =
+            self.resolve_content(recipe_dir, jinja_renderer, &valid_script_extensions)?;
+
+        let secrets = self
+            .secrets()
+            .iter()
+            .filter_map(|k| {
+                let secret = k.to_string();
+
+                if let Ok(value) = std::env::var(&secret) {
+                    Some((secret, value))
+                } else {
+                    tracing::warn!("Secret {} not found in environment", secret);
+                    None
+                }
+            })
+            .collect::<IndexMap<String, String>>();
+
+        let work_dir = if let Some(cwd) = self.cwd.as_ref() {
+            run_prefix.join(cwd)
+        } else {
+            work_dir.to_owned()
+        };
+
+        tracing::debug!("Running script in {}", work_dir.display());
+
+        let exec_args = ExecutionArgs {
+            script: contents,
+            env_vars,
+            secrets,
+            build_prefix: build_prefix.map(|p| p.to_owned()),
+            run_prefix: run_prefix.to_owned(),
+            execution_platform: Platform::current(),
+            work_dir,
+            sandbox_config: sandbox_config.cloned(),
+            debug,
+        };
+
+        crate::execution::run_script(exec_args, self.interpreter()).await?;
+
+        Ok(())
+    }
+
     fn find_file(&self, recipe_dir: &Path, extensions: &[&str], path: &Path) -> Option<PathBuf> {
         let path = if path.is_absolute() {
             path.to_path_buf()
@@ -154,12 +232,19 @@ impl Script {
         }
     }
 
-    pub(crate) fn resolve_content(
+    /// Resolve the script content to actual script text
+    ///
+    /// If `jinja_renderer` is provided, it will be used to render inline scripts.
+    /// The renderer function takes a template string and returns the rendered result.
+    pub fn resolve_content<F>(
         &self,
         recipe_dir: &Path,
-        jinja_context: Option<Jinja>,
+        jinja_renderer: Option<F>,
         extensions: &[&str],
-    ) -> Result<ResolvedScriptContents, std::io::Error> {
+    ) -> Result<ResolvedScriptContents, std::io::Error>
+    where
+        F: Fn(&str) -> Result<String, String>,
+    {
         let script_content = match self.contents() {
             // No script was specified, so we try to read the default script. If the file cannot be
             // found we return an empty string.
@@ -227,10 +312,10 @@ impl Script {
         };
 
         // render jinja if it is an inline script
-        if let Some(jinja_context) = jinja_context {
+        if let Some(renderer) = jinja_renderer {
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
-                    let rendered = jinja_context.render_str(&script).map_err(|e| {
+                    let rendered = renderer(&script).map_err(|e| {
                         std::io::Error::new(
                             std::io::ErrorKind::Other,
                             format!("Failed to render jinja template in build `script`: {}", e),
@@ -243,267 +328,6 @@ impl Script {
         } else {
             script_content
         }
-    }
-
-    /// Run the script with the given parameters
-    #[allow(clippy::too_many_arguments)]
-    pub async fn run_script(
-        &self,
-        env_vars: HashMap<String, Option<String>>,
-        work_dir: &Path,
-        recipe_dir: &Path,
-        run_prefix: &Path,
-        build_prefix: Option<&PathBuf>,
-        mut jinja_config: Option<Jinja>,
-        sandbox_config: Option<&SandboxConfiguration>,
-        debug: Debug,
-    ) -> Result<(), InterpreterError> {
-        // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
-        if cfg!(windows) {
-            valid_script_extensions.push("bat");
-        } else {
-            valid_script_extensions.push("sh");
-        }
-
-        let env_vars = env_vars
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .chain(self.env().clone().into_iter())
-            .collect::<IndexMap<String, String>>();
-
-        // Get the contents of the script.
-        for (k, v) in &env_vars {
-            jinja_config.as_mut().map(|jinja| {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()))
-            });
-        }
-
-        let contents = self.resolve_content(recipe_dir, jinja_config, &valid_script_extensions)?;
-
-        let secrets = self
-            .secrets()
-            .iter()
-            .filter_map(|k| {
-                let secret = k.to_string();
-
-                if let Ok(value) = std::env::var(&secret) {
-                    Some((secret, value))
-                } else {
-                    tracing::warn!("Secret {} not found in environment", secret);
-                    None
-                }
-            })
-            .collect::<IndexMap<String, String>>();
-
-        let work_dir = if let Some(cwd) = self.cwd.as_ref() {
-            run_prefix.join(cwd)
-        } else {
-            work_dir.to_owned()
-        };
-
-        tracing::debug!("Running script in {}", work_dir.display());
-
-        let exec_args = ExecutionArgs {
-            script: contents,
-            env_vars,
-            secrets,
-            build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: run_prefix.to_owned(),
-            execution_platform: Platform::current(),
-            work_dir,
-            sandbox_config: sandbox_config.cloned(),
-            debug,
-        };
-
-        match self.interpreter() {
-            "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
-            "bash" => BashInterpreter.run(exec_args).await?,
-            "cmd" => CmdExeInterpreter.run(exec_args).await?,
-            "python" => PythonInterpreter.run(exec_args).await?,
-            "perl" => PerlInterpreter.run(exec_args).await?,
-            "rscript" => RInterpreter.run(exec_args).await?,
-            "ruby" => RubyInterpreter.run(exec_args).await?,
-            "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Unsupported interpreter: {}", self.interpreter()),
-                )
-                .into());
-            }
-        };
-
-        Ok(())
-    }
-}
-
-impl Output {
-    /// Add environment variables from the variant to the environment variables.
-    fn env_vars_from_variant(&self) -> HashMap<String, Option<String>> {
-        let languages: HashSet<&str> =
-            HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON", "RUBY", "NODEJS"]);
-        self.variant()
-            .iter()
-            .filter_map(|(k, v)| {
-                let key_upper = k.normalize().to_uppercase();
-                if !languages.contains(key_upper.as_str()) {
-                    Some((k.normalize(), Some(v.to_string())))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Helper method to prepare build script execution arguments
-    async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
-        let host_prefix = self.build_configuration.directories.host_prefix.clone();
-        let target_platform = self.build_configuration.target_platform;
-        let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
-        env_vars.extend(self.env_vars_from_variant());
-
-        let selector_config = self.build_configuration.selector_config();
-        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
-
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
-
-        let work_dir = &self.build_configuration.directories.work_dir;
-        Ok(ExecutionArgs {
-            script: self.recipe.build().script().resolve_content(
-                &self.build_configuration.directories.recipe_dir,
-                Some(jinja.clone()),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
-            )?,
-            env_vars: env_vars
-                .into_iter()
-                .filter_map(|(k, v)| v.map(|v| (k, v)))
-                .collect(),
-            secrets: IndexMap::new(),
-            build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: host_prefix,
-            execution_platform: Platform::current(),
-            work_dir: work_dir.clone(),
-            sandbox_config: self.build_configuration.sandbox_config().cloned(),
-            debug: self.build_configuration.debug,
-        })
-    }
-
-    /// Run the build script for the output as defined in the recipe's build section.
-    ///
-    /// This method executes the build script with the configured environment variables,
-    /// working directory, and other build settings. The script execution respects the
-    /// configured interpreter (bash/cmd/nushell) and sandbox settings.
-    ///
-    /// # Errors
-    ///
-    /// Returns an `std::io::Error` if:
-    /// - The script file cannot be read or found
-    /// - The script execution fails
-    /// - The interpreter is not supported or not available
-    pub async fn run_build_script(&self) -> Result<(), InterpreterError> {
-        let span = tracing::info_span!("Running build script");
-        let _enter = span.enter();
-
-        let exec_args = self.prepare_build_script().await?;
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
-
-        self.recipe
-            .build()
-            .script()
-            .run_script(
-                exec_args
-                    .env_vars
-                    .into_iter()
-                    .map(|(k, v)| (k, Some(v)))
-                    .collect(),
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(
-                    Jinja::new(self.build_configuration.selector_config())
-                        .with_context(&self.recipe.context),
-                ),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.debug,
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    /// Create the build script files without executing them.
-    ///
-    /// This method generates the build script and environment setup files in the working
-    /// directory but does not execute them. This is useful for debugging or when you want
-    /// to inspect or modify the scripts before running them manually.
-    ///
-    /// The method creates two files:
-    /// - A build environment setup file (`build_env.sh`/`build_env.bat`)
-    /// - The main build script file (`conda_build.sh`/`conda_build.bat`)
-    ///
-    /// # Errors
-    ///
-    /// Returns an `std::io::Error` if:
-    /// - The script file cannot be read or found
-    /// - The script files cannot be written to the working directory
-    pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
-        let span = tracing::info_span!("Creating build script");
-        let _enter = span.enter();
-
-        let exec_args = self.prepare_build_script().await?;
-        let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
-        let work_dir = &self.build_configuration.directories.work_dir;
-
-        if interpreter == "bash" {
-            let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
-            let build_env_path = work_dir.join("build_env.sh");
-            let build_script_path = work_dir.join("conda_build.sh");
-
-            tokio::fs::write(&build_env_path, script).await?;
-
-            let preamble =
-                BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
-            let script = format!("{}\n{}", preamble, exec_args.script.script());
-            tokio::fs::write(&build_script_path, script).await?;
-
-            tracing::info!("Build script created at {}", build_script_path.display());
-        } else if interpreter == "cmd" {
-            let script = CmdExeInterpreter
-                .get_script(&exec_args, shell::CmdExe)
-                .unwrap();
-            let build_env_path = work_dir.join("build_env.bat");
-            let build_script_path = work_dir.join("conda_build.bat");
-
-            tokio::fs::write(&build_env_path, script).await?;
-
-            let build_script = format!(
-                "{}\n{}",
-                CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-                exec_args.script.script()
-            );
-            tokio::fs::write(
-                &build_script_path,
-                &build_script.replace('\n', "\r\n").as_bytes(),
-            )
-            .await?;
-
-            tracing::info!("Build script created at {}", build_script_path.display());
-        }
-
-        Ok(())
     }
 }
 
@@ -557,6 +381,82 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
+use crate::interpreter::{
+    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, Interpreter,
+    NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter,
+    RubyInterpreter,
+};
+use rattler_shell::shell;
+
+/// Run a script with the given execution arguments and interpreter
+pub async fn run_script(
+    exec_args: ExecutionArgs,
+    interpreter: &str,
+) -> Result<(), crate::InterpreterError> {
+    match interpreter {
+        "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
+        "bash" => BashInterpreter.run(exec_args).await?,
+        "cmd" => CmdExeInterpreter.run(exec_args).await?,
+        "python" => PythonInterpreter.run(exec_args).await?,
+        "perl" => PerlInterpreter.run(exec_args).await?,
+        "rscript" => RInterpreter.run(exec_args).await?,
+        "ruby" => RubyInterpreter.run(exec_args).await?,
+        "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
+        _ => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Unsupported interpreter: {}", interpreter),
+            )
+            .into());
+        }
+    };
+
+    Ok(())
+}
+
+/// Create build script files without executing them
+pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
+    let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
+    let work_dir = &exec_args.work_dir;
+
+    if interpreter == "bash" {
+        let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
+        let build_env_path = work_dir.join("build_env.sh");
+        let build_script_path = work_dir.join("conda_build.sh");
+
+        tokio::fs::write(&build_env_path, script).await?;
+
+        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
+        let script = format!("{}\n{}", preamble, exec_args.script.script());
+        tokio::fs::write(&build_script_path, script).await?;
+
+        tracing::info!("Build script created at {}", build_script_path.display());
+    } else if interpreter == "cmd" {
+        let script = CmdExeInterpreter
+            .get_script(&exec_args, shell::CmdExe)
+            .unwrap();
+        let build_env_path = work_dir.join("build_env.bat");
+        let build_script_path = work_dir.join("conda_build.bat");
+
+        tokio::fs::write(&build_env_path, script).await?;
+
+        let build_script = format!(
+            "{}\n{}",
+            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
+            exec_args.script.script()
+        );
+        tokio::fs::write(
+            &build_script_path,
+            &build_script.replace('\n', "\r\n").as_bytes(),
+        )
+        .await?;
+
+        tracing::info!("Build script created at {}", build_script_path.display());
+    }
+
+    Ok(())
+}
+
 /// Find the rattler-sandbox executable in PATH
 fn find_rattler_sandbox() -> Option<PathBuf> {
     which::which("rattler-sandbox").ok()
@@ -564,7 +464,7 @@ fn find_rattler_sandbox() -> Option<PathBuf> {
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
-async fn run_process_with_replacements(
+pub async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
@@ -676,7 +576,7 @@ mod tests {
 
     #[test]
     fn test_cmd_errorlevel_injected() {
-        use crate::recipe::parser::{Script, ScriptContent};
+        use crate::script::{Script, ScriptContent};
         let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
         let script = Script {
             content: ScriptContent::Commands(commands.clone()),
@@ -691,7 +591,11 @@ mod tests {
         let extensions = &["bat"];
 
         let resolved = script
-            .resolve_content(recipe_dir, None, extensions)
+            .resolve_content(
+                recipe_dir,
+                None::<fn(&str) -> Result<String, String>>,
+                extensions,
+            )
             .unwrap();
 
         if cfg!(windows) {

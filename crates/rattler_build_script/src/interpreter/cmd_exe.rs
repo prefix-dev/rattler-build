@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{ExecutionArgs, run_process_with_replacements};
+use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
 use super::{CMDEXE_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
 
@@ -35,7 +35,7 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
     output
 }
 
-pub(crate) struct CmdExeInterpreter;
+pub struct CmdExeInterpreter;
 
 impl Interpreter for CmdExeInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
