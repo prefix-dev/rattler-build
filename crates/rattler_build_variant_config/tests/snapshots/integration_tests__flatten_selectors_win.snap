@@ -2,17 +2,17 @@
 source: crates/rattler_build_variant_config/tests/integration_tests.rs
 expression: config
 ---
-compiler:
-  - clang
+c_compiler:
+  - vs2019
+  - vs2022
 filter:
   - appears
 foobar:
-  - unknown
+  - known
 mixed:
   - static_value
   - jinja_value
 python:
   - "3.14"
-  - "3.15"
 target:
-  - osx-arm64
+  - win-64
