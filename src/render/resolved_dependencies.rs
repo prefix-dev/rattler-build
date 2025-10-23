@@ -728,6 +728,15 @@ pub(crate) async fn resolve_dependencies(
     tool_configuration: &tool_configuration::Configuration,
     download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
+    // DEBUG: Check if finalized_cache_dependencies is set
+    tracing::warn!(
+        "resolve_dependencies called for '{}', finalized_cache_deps: {}, finalized_deps: {}, inherits_from: {:?}",
+        output.identifier(),
+        output.finalized_cache_dependencies.is_some(),
+        output.finalized_dependencies.is_some(),
+        output.recipe.inherits_from
+    );
+
     let merge_build_host = output.recipe.build().merge_build_and_host_envs;
 
     let mut compatibility_specs = HashMap::new();
@@ -937,23 +946,32 @@ pub(crate) async fn resolve_dependencies(
     )?;
 
     // add in dependencies from the finalized cache
+    // This includes run_exports that were already filtered during staging cache build
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
-        tracing::info!(
-            "Adding dependencies from finalized cache: {:?}",
-            finalized_cache.run.depends
-        );
+        // Check if we should inherit run_exports from the staging cache
+        // Default is true if not specified
+        let should_inherit_run_exports = output
+            .recipe
+            .inherits_from
+            .as_ref()
+            .map(|i| i.inherit_run_exports)
+            .unwrap_or(true);
 
+        // Add dependencies from cache, but filter out RunExports if inherit_run_exports is false
         depends = depends
             .iter()
-            .chain(finalized_cache.run.depends.iter())
-            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
+            .chain(finalized_cache.run.depends.iter().filter(|dep| {
+                // Include non-RunExport dependencies always
+                // Include RunExport dependencies only if inherit_run_exports is true
+                if matches!(dep, DependencyInfo::RunExport(_)) {
+                    should_inherit_run_exports
+                } else {
+                    true
+                }
+            }))
             .cloned()
             .collect();
 
-        tracing::info!(
-            "Adding constraints from finalized cache: {:?}",
-            finalized_cache.run.constraints
-        );
         constraints = constraints
             .iter()
             .chain(finalized_cache.run.constraints.iter())
@@ -976,20 +994,11 @@ pub(crate) async fn resolve_dependencies(
     let host_run_exports =
         filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
 
-    // if let Some(cache) = &output.finalized_cache_dependencies {
-    //     if let Some(cache_host_env) = &cache.host {
-    //         let cache_host_run_exports = cache_host_env.run_exports(true);
-    //         let filtered = output
-    //             .recipe
-    //             .cache
-    //             .as_ref()
-    //             .expect("recipe should have cache section")
-    //             .requirements
-    //             .ignore_run_exports(Some(&output_ignore_run_exports))
-    //             .filter(&cache_host_run_exports, "cache-host")?;
-    //         host_run_exports.extend(&filtered);
-    //     }
-    // }
+    // NOTE: We don't need to separately add run_exports from staging cache here.
+    // Run_exports from the staging cache are already included in finalized_cache_dependencies.run.depends
+    // (see the code above that adds cache dependencies to `depends`).
+    // The staging cache's run_exports were filtered based on the staging output's ignore_run_exports
+    // settings when the cache was built, so we don't need to re-filter them here.
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {

@@ -33,6 +33,7 @@ pre-commit:
       glob: "*.{py,pyi}"
       exclude:
         - test-data/conda-forge/**/*
+        - test-data/recipes/test-rendering/*
       stage_fixed: true
       group:
         piped: true

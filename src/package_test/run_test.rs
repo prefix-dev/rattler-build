@@ -476,7 +476,6 @@ pub async fn run_test(
         };
 
         for test in tests {
-            println!("Running test: {:?}", test);
             let test_prefix =
                 TempDir::with_prefix_in(format!("test_{}", pkg.name), &config.test_prefix)?.keep();
             match test {

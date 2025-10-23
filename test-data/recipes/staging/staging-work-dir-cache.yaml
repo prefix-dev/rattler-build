@@ -1,0 +1,45 @@
+# New test case: Staging output that caches work directory files
+# Tests that both prefix AND work directory files are cached and restored
+
+schema_version: 1
+
+recipe:
+  name: work-dir-cache-test
+  version: 1.0.0
+
+source:
+  - url: https://example.com/source.tar.gz
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+outputs:
+  # Staging output that generates files in both work dir and prefix
+  - staging:
+      name: work-stage
+    build:
+      script:
+        # Generate files in prefix
+        - mkdir -p $PREFIX/lib
+        - echo "library" > $PREFIX/lib/mylib.a
+        # Generate files in work directory (build artifacts)
+        - mkdir -p build
+        - echo "build config" > build/config.txt
+        - echo "build log" > build/build.log
+        # These work dir files should be cached and restored
+
+  # Package that inherits and should have access to both
+  # the prefix files AND the work directory files from cache
+  - package:
+      name: work-dir-test
+      version: 1.0.0
+    inherit: work-stage
+    build:
+      script:
+        # Verify work dir files were restored from cache
+        - test -f build/config.txt || exit 1
+        - test -f build/build.log || exit 1
+        - cat build/config.txt
+      files:
+        - lib/**
+    tests:
+      - script:
+          - test -f $PREFIX/lib/mylib.a

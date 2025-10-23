@@ -1,0 +1,40 @@
+# Converted from test-data/recipes/cache/recipe.yaml
+# Tests basic staging output with multiple package outputs that inherit from it
+
+schema_version: 1
+
+recipe:
+  name: foo
+  version: 1.0.0
+
+outputs:
+  # Staging output - builds once and caches results
+  - staging:
+      name: foo-build
+    build:
+      script: |
+        echo $PREFIX > $PREFIX/foo.txt
+
+  # First package output inheriting from staging cache
+  - package:
+      name: foo-split-1
+      version: 1.0.0
+    inherit: foo-build
+    build:
+      files:
+        - "**/*"
+    tests:
+      - script:
+          - cat $PREFIX/foo.txt
+
+  # Second package output inheriting from the same staging cache
+  - package:
+      name: foo-othersplit
+      version: 1.0.0
+    inherit: foo-build
+    build:
+      files:
+        - "**/*"
+    tests:
+      - script:
+          - cat $PREFIX/foo.txt

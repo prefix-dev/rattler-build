@@ -12,6 +12,7 @@ pub mod packaging;
 pub mod render;
 pub mod script;
 pub mod source;
+pub mod staging;
 pub mod system_tools;
 pub mod tool_configuration;
 
@@ -429,10 +430,19 @@ pub async fn get_build_output(
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
 
-    // let global_build_name = outputs_and_variants
-    //     .first()
-    //     .map(|o| o.name.clone())
-    //     .unwrap_or_default();
+    // For multi-output recipes, all outputs (including staging caches) need to use the same
+    // build directory so that paths are consistent across outputs. We derive the build name
+    // from the recipe file name, or use the first package name as a fallback.
+    let global_build_name = recipe_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            outputs_and_variants
+                .first()
+                .map(|o| o.name.clone())
+                .unwrap_or_else(|| "recipe".to_string())
+        });
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -451,13 +461,9 @@ pub async fn get_build_output(
             },
         );
 
-        // TODO: determine build name properly
-        // let build_name = if recipe.cache.is_some() {
-        //     global_build_name.clone()
-        // } else {
-        //     recipe.package().name().as_normalized().to_string()
-        // };
-        let build_name = recipe.package().name().as_normalized().to_string();
+        // Use the global build name for all outputs in a multi-output recipe
+        // This ensures staging caches and their dependent packages share the same build directory
+        let build_name = global_build_name.clone();
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars

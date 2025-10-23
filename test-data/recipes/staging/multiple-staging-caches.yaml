@@ -1,0 +1,83 @@
+# New test case: Multiple staging outputs with dependencies between package outputs
+# Tests that multiple staging caches can coexist and be used selectively
+
+schema_version: 1
+
+recipe:
+  name: multi-stage-project
+  version: 1.0.0
+
+source:
+  - url: https://example.com/source.tar.gz
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+outputs:
+  # First staging output - builds core library
+  - staging:
+      name: core-build
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+        - cmake
+      host:
+        - zlib
+    build:
+      script:
+        - mkdir -p $PREFIX/lib
+        - echo "libcore.so" > $PREFIX/lib/libcore.so
+        - echo "core.h" > $PREFIX/include/core.h
+
+  # Second staging output - builds python bindings (depends on first)
+  - staging:
+      name: python-build
+    requirements:
+      build:
+        - python
+        - setuptools
+      host:
+        - python
+    build:
+      script:
+        - mkdir -p $PREFIX/lib/python3.11/site-packages
+        - echo "import core" > $PREFIX/lib/python3.11/site-packages/mycore.py
+
+  # Package output 1: Core library only
+  - package:
+      name: libcore
+      version: 1.0.0
+    inherit: core-build
+    build:
+      files:
+        - lib/libcore.so
+        - include/core.h
+    about:
+      summary: Core library
+      license: MIT
+
+  # Package output 2: Python bindings (inherits from python-build)
+  - package:
+      name: python-mycore
+      version: 1.0.0
+    inherit: python-build
+    requirements:
+      run:
+        - python
+        - libcore =1.0.0
+    about:
+      summary: Python bindings for core library
+      license: MIT
+
+  # Package output 3: Development headers only (inherits from core-build)
+  - package:
+      name: libcore-dev
+      version: 1.0.0
+    inherit: core-build
+    build:
+      files:
+        - include/**
+    requirements:
+      run:
+        - libcore =1.0.0
+    about:
+      summary: Development headers for core library
+      license: MIT

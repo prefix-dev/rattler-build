@@ -1,0 +1,37 @@
+# Converted from test-data/recipes/cache/recipe-variants.yaml
+# Tests staging output with variant-dependent requirements
+
+schema_version: 1
+
+recipe:
+  name: variant-cache
+  version: "1.0.0"
+
+outputs:
+  # Staging output with variant-dependent dependency
+  - staging:
+      name: variant-stage
+    requirements:
+      host:
+        - libfoo
+    build:
+      script:
+        - echo "hello" > $PREFIX/hello.txt
+
+  # Package output inheriting from staging
+  - package:
+      name: variant-cache
+      version: "1.0.0"
+    inherit: variant-stage
+    build:
+      files:
+        - "hello.txt"
+
+  # Package output with additional python dependency
+  - package:
+      name: variant-cache-py
+      version: "1.0.0"
+    inherit: variant-stage
+    requirements:
+      host:
+        - python

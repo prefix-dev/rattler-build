@@ -1,0 +1,50 @@
+# Converted from test-data/recipes/cache_run_exports/recipe_test_1.yaml
+# Tests run_exports handling with staging outputs
+
+schema_version: 1
+
+outputs:
+  # Helper package that provides run_exports
+  - package:
+      name: normal-run-exports
+      version: "1.0.0"
+    requirements:
+      run_exports:
+        - normal-run-exports
+
+  # Staging output with run_exports dependency
+  - staging:
+      name: build-stage
+    requirements:
+      host:
+        - normal-run-exports
+
+  # Package that inherits run_exports from staging
+  - package:
+      name: cache-run-exports
+      version: "1.0.0"
+    inherit: build-stage
+
+  # Package that ignores run_exports from specific package
+  - package:
+      name: no-cache-from-package-run-exports
+      version: "1.0.0"
+    inherit:
+      from: build-stage
+      run_exports: false
+    requirements:
+      ignore_run_exports:
+        from_package:
+          - normal-run-exports
+
+  # Package that ignores run_exports by name
+  - package:
+      name: no-cache-by-name-run-exports
+      version: "1.0.0"
+    inherit:
+      from: build-stage
+      run_exports: false
+    requirements:
+      ignore_run_exports:
+        by_name:
+          - normal-run-exports
