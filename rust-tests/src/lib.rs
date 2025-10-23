@@ -186,22 +186,22 @@ mod tests {
             .join("test-data")
     }
 
-    fn run_build_from_yaml_string(recipe_yaml_string: String) {
-        // Create output directory
-        let tmp = tmp("test_run_build_from_yaml_string");
-        let output_dir = tmp.as_dir().join("output");
+    // fn run_build_from_yaml_string(recipe_yaml_string: String) {
+    //     // Create output directory
+    //     let tmp = tmp("test_run_build_from_yaml_string");
+    //     let output_dir = tmp.as_dir().join("output");
 
-        // Create recipe directory
-        let recipe_dir = tmp.as_dir().join("recipe");
-        fs::create_dir_all(&recipe_dir).unwrap();
+    //     // Create recipe directory
+    //     let recipe_dir = tmp.as_dir().join("recipe");
+    //     fs::create_dir_all(&recipe_dir).unwrap();
 
-        // Write recipe.yaml file
-        fs::write(recipe_dir.join("recipe.yaml"), recipe_yaml_string).unwrap();
+    //     // Write recipe.yaml file
+    //     fs::write(recipe_dir.join("recipe.yaml"), recipe_yaml_string).unwrap();
 
-        // Build with rattler-build
-        let rattler_build = rattler().build(recipe_dir, output_dir, None, None);
-        assert!(rattler_build.status.success());
-    }
+    //     // Build with rattler-build
+    //     let rattler_build = rattler().build(recipe_dir, output_dir, None, None);
+    //     assert!(rattler_build.status.success());
+    // }
 
     #[test]
     fn test_help() {
