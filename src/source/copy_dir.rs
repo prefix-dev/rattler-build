@@ -80,49 +80,49 @@ pub(crate) fn create_symlink(
     Ok(())
 }
 
-/// Copy a file or directory, or symlink to another location.
-/// Use reflink if possible.
-pub(crate) fn copy_file(
-    from: impl AsRef<Path>,
-    to: impl AsRef<Path>,
-    paths_created: &mut HashSet<PathBuf>,
-    options: &CopyOptions,
-) -> Result<(), SourceError> {
-    let path = from.as_ref();
-    let dest_path = to.as_ref();
+// /// Copy a file or directory, or symlink to another location.
+// /// Use reflink if possible.
+// pub(crate) fn copy_file(
+//     from: impl AsRef<Path>,
+//     to: impl AsRef<Path>,
+//     paths_created: &mut HashSet<PathBuf>,
+//     options: &CopyOptions,
+// ) -> Result<(), SourceError> {
+//     let path = from.as_ref();
+//     let dest_path = to.as_ref();
 
-    // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
-    if path.is_symlink() {
-        let link_target = fs_err::read_link(path)?;
+//     // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
+//     if path.is_symlink() {
+//         let link_target = fs_err::read_link(path)?;
 
-        if let Some(parent) = dest_path.parent() {
-            create_dir_all_cached(parent, paths_created)?;
-        }
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
 
-        create_symlink(link_target, dest_path)?;
-        Ok(())
-    } else if path.is_dir() {
-        create_dir_all_cached(dest_path, paths_created)?;
-        Ok(())
-    } else {
-        // create dir if parent does not exist
-        if let Some(parent) = dest_path.parent() {
-            create_dir_all_cached(parent, paths_created)?;
-        }
+//         create_symlink(link_target, dest_path)?;
+//         Ok(())
+//     } else if path.is_dir() {
+//         create_dir_all_cached(dest_path, paths_created)?;
+//         Ok(())
+//     } else {
+//         // create dir if parent does not exist
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
 
-        if dest_path.exists() {
-            if !(options.overwrite || options.skip_exist) {
-                tracing::error!("File already exists: {:?}", dest_path);
-            } else if options.skip_exist {
-                tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
-            } else if options.overwrite {
-                tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
-            }
-        }
-        reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
-        Ok(())
-    }
-}
+//         if dest_path.exists() {
+//             if !(options.overwrite || options.skip_exist) {
+//                 tracing::error!("File already exists: {:?}", dest_path);
+//             } else if options.skip_exist {
+//                 tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
+//             } else if options.overwrite {
+//                 tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+//             }
+//         }
+//         reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
+//         Ok(())
+//     }
+// }
 
 /// The copy_dir function accepts additionally a list of globs to ignore or include in the copy process.
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
