@@ -192,16 +192,17 @@ impl EvaluationContext {
     /// * `context_vars` - The context variables to evaluate (from the recipe's context section)
     ///
     /// # Returns
-    /// A new EvaluationContext with the evaluated context variables merged in
+    /// A new EvaluationContext with the evaluated context variables merged in, as well as a map of the evaluated context variables
     pub fn with_context(
         &self,
         context_vars: &indexmap::IndexMap<
             String,
             crate::stage0::Value<rattler_build_jinja::Variable>,
         >,
-    ) -> Result<Self, ParseError> {
+    ) -> Result<(Self, IndexMap<String, Variable>), ParseError> {
         // Clone the current context
         let mut new_context = self.clone();
+        let mut evaluated_context = IndexMap::<String, Variable>::new();
 
         // Evaluate each context variable in order
         for (key, value) in context_vars {
@@ -211,10 +212,13 @@ impl EvaluationContext {
                 crate::stage0::evaluate::evaluate_value_to_variable(value, &new_context)?;
 
             // Insert the evaluated variable directly
-            new_context.variables.insert(key.clone(), evaluated_var);
+            new_context
+                .variables
+                .insert(key.clone(), evaluated_var.clone());
+            evaluated_context.insert(key.clone(), evaluated_var);
         }
 
-        Ok(new_context)
+        Ok((new_context, evaluated_context))
     }
 }
 

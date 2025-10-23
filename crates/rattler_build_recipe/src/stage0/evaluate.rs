@@ -25,6 +25,7 @@ use std::{
     str::FromStr,
 };
 
+use indexmap::IndexMap;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
 use rattler_digest::{Md5Hash, Sha256Hash};
@@ -1890,10 +1891,10 @@ impl Evaluate for Stage0Recipe {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         // First, evaluate the context variables and merge them into a new context
-        let context_with_vars = if !self.context.is_empty() {
+        let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
-            context.clone()
+            (context.clone(), IndexMap::new())
         };
 
         let package = self.package.evaluate(&context_with_vars)?;
@@ -1913,9 +1914,6 @@ impl Evaluate for Stage0Recipe {
         for test in &self.tests {
             tests.push(test.evaluate(&context_with_vars)?);
         }
-
-        // Extract the resolved context variables (all variables from the evaluation context)
-        let resolved_context = context_with_vars.variables().clone();
 
         // Now that evaluation is complete, we know which variables were actually accessed.
         // Compute the hash from the actual variant (accessed variables) and render the build string.
@@ -2013,7 +2011,7 @@ impl Evaluate for Stage0Recipe {
             extra,
             source,
             tests,
-            resolved_context,
+            evaluated_context,
             actual_variant,
         ))
     }
@@ -2295,10 +2293,10 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         // First, evaluate the context variables and merge them into a new context
-        let context_with_vars = if !self.context.is_empty() {
+        let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
-            context.clone()
+            (context.clone(), IndexMap::new())
         };
 
         let mut evaluated_outputs = Vec::with_capacity(self.outputs.len());
@@ -2310,19 +2308,21 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
 
             match output {
                 crate::stage0::Output::Package(pkg_output) => {
-                    let recipe = evaluate_package_output_to_recipe(
+                    let mut recipe = evaluate_package_output_to_recipe(
                         pkg_output.as_ref(),
                         self,
                         &context_with_vars,
                     )?;
+                    recipe.context = evaluated_context.clone();
                     evaluated_outputs.push(recipe);
                 }
                 crate::stage0::Output::Staging(staging_output) => {
-                    let recipe = evaluate_staging_output_to_recipe(
+                    let mut recipe = evaluate_staging_output_to_recipe(
                         staging_output.as_ref(),
                         self,
                         &context_with_vars,
                     )?;
+                    recipe.context = evaluated_context.clone();
                     evaluated_outputs.push(recipe);
                 }
             }

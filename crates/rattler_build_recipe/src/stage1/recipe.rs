@@ -40,6 +40,12 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub context: IndexMap<String, Variable>,
 
+    /// Staging caches that need to be available when building this recipe.
+    /// The staging cache is created / build before the recipe execution and results are copied into the
+    /// working directory before the package build starts.
+    // #[serde(default, skip_serializing_if = "Option::is_none")]
+    // pub staging_caches: Option<Vec<StagingCache>>,
+
     /// Used variant - the subset of variant variables that were actually accessed
     /// during recipe evaluation (plus always-included variables like target_platform)
     #[serde(skip)]
