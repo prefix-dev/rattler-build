@@ -40,11 +40,11 @@ pub fn parse_multi_output_recipe(
         if version != 1 {
             return Err(ParseError::invalid_value(
                 "schema_version",
-                &format!(
+                format!(
                     "unsupported schema version {} (only version 1 is supported)",
                     version
                 ),
-                (*scalar.span()).into(),
+                *scalar.span(),
             ));
         }
         Some(version)
@@ -176,7 +176,7 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
         } else {
             // Parse as PackageName
             let package_name = rattler_conda_types::PackageName::try_from(name_str)
-                .map_err(|e| ParseError::invalid_value("name", &e.to_string(), span))?;
+                .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
             Some(Value::new_concrete(
                 crate::stage0::package::PackageName(package_name),
                 Some(span),
@@ -279,8 +279,8 @@ fn parse_staging_output(
         if !matches!(key_str, "staging" | "source" | "requirements" | "build") {
             return Err(ParseError::invalid_value(
                 "staging output",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid fields for staging outputs are: staging, source, requirements, build",
@@ -293,14 +293,14 @@ fn parse_staging_output(
         return Err(ParseError::invalid_value(
             "staging output",
             "staging outputs cannot have an 'about' section",
-            (*mapping.get("about").unwrap().span()).into(),
+            *mapping.get("about").unwrap().span(),
         ));
     }
     if mapping.get("tests").is_some() {
         return Err(ParseError::invalid_value(
             "staging output",
             "staging outputs cannot have a 'tests' section",
-            (*mapping.get("tests").unwrap().span()).into(),
+            *mapping.get("tests").unwrap().span(),
         ));
     }
 
@@ -331,8 +331,8 @@ fn parse_staging_metadata(yaml: &MarkedNode) -> ParseResult<StagingMetadata> {
         if key_str != "name" {
             return Err(ParseError::invalid_value(
                 "staging",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("only 'name' field is allowed in staging metadata"));
         }
@@ -356,8 +356,8 @@ fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
             "run" | "run_constraints" | "run_exports" => {
                 return Err(ParseError::invalid_value(
                     "staging requirements",
-                    &format!("'{}' is not allowed in staging requirements", key),
-                    (*key_node.span()).into(),
+                    format!("'{}' is not allowed in staging requirements", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "staging outputs can only have 'build', 'host', and 'ignore_run_exports' requirements",
@@ -366,8 +366,8 @@ fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "staging requirements",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("valid fields are: build, host, ignore_run_exports"));
             }
@@ -397,11 +397,11 @@ fn parse_staging_build(yaml: &MarkedNode) -> ParseResult<StagingBuild> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "staging build",
-                    &format!(
+                    format!(
                         "unknown field '{}' - only 'script' is allowed in staging builds",
                         key
                     ),
-                    (*key_node.span()).into(),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "staging outputs can only have a 'script' field in the build section",
@@ -441,7 +441,7 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
     } else {
         // Parse as PackageName
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
-            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), span))?;
+            .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
         Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
             Some(span),
@@ -461,8 +461,8 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
         if !matches!(key_str, "name" | "version") {
             return Err(ParseError::invalid_value(
                 "package",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid fields are: name, version"));
         }
@@ -532,8 +532,8 @@ fn parse_package_output(
         ) {
             return Err(ParseError::invalid_value(
                 "package output",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid fields for package outputs are: package, inherit, source, requirements, build, about, tests",
@@ -605,8 +605,8 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
                         _ => {
                             return Err(ParseError::invalid_value(
                                 "run_exports",
-                                &format!("not a valid boolean value (found '{}')", bool_str),
-                                (*scalar.span()).into(),
+                                format!("not a valid boolean value (found '{}')", bool_str),
+                                *scalar.span(),
                             ));
                         }
                     };
@@ -614,8 +614,8 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
                 _ => {
                     return Err(ParseError::invalid_value(
                         "inherit",
-                        &format!("unknown field '{}'", key),
-                        (*key_node.span()).into(),
+                        format!("unknown field '{}'", key),
+                        *key_node.span(),
                     )
                     .with_suggestion("valid fields are: from, run_exports"));
                 }

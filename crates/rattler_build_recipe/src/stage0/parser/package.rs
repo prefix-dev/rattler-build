@@ -48,7 +48,7 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
     } else {
         // Concrete package name
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
-            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), name_span))?;
+            .map_err(|e| ParseError::invalid_value("name", e.to_string(), name_span))?;
         Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
             Some(name_span),
@@ -77,7 +77,7 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
     } else {
         // Concrete version
         let version_with_source = rattler_conda_types::VersionWithSource::from_str(version_str)
-            .map_err(|e| ParseError::invalid_value("version", &e.to_string(), version_span))?;
+            .map_err(|e| ParseError::invalid_value("version", e.to_string(), version_span))?;
         Value::new_concrete(version_with_source, Some(version_span))
     };
 

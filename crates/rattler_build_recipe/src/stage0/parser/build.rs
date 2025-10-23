@@ -33,7 +33,7 @@ fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
         ParseError::invalid_value(
             field_name,
             "expected boolean ('true', 'false')",
-            (*scalar.span()).into(),
+            *scalar.span(),
         )
     })
 }
@@ -52,7 +52,7 @@ fn parse_bool_or_patterns<T>(
 ) -> Result<T, ParseError> {
     // Try to parse as a scalar (boolean or template)
     if let Some(scalar) = node.as_scalar().and_then(|s| s.as_bool()) {
-        let value = Value::new_concrete(scalar, Some((*node.span()).into()));
+        let value = Value::new_concrete(scalar, Some(*node.span()));
         return Ok(bool_variant(value));
     }
 
@@ -95,7 +95,7 @@ fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
         _ => {
             return Err(ParseError::invalid_value(
                 "noarch",
-                &format!(
+                format!(
                     "invalid noarch type '{}'. Expected 'python' or 'generic'",
                     str_val
                 ),
@@ -260,8 +260,8 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                 _ => {
                     return Err(ParseError::invalid_value(
                         "script",
-                        &format!("unknown field '{}' in script object", key),
-                        (*key_node.span()).into(),
+                        format!("unknown field '{}' in script object", key),
+                        *key_node.span(),
                     )
                     .with_suggestion(
                         "Valid fields are: interpreter, env, secrets, content, file, cwd",
@@ -310,8 +310,8 @@ fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
                 _ => {
                     return Err(ParseError::invalid_value(
                         "files",
-                        &format!("unknown field '{}' in files mapping", key),
-                        (*key_node.span()).into(),
+                        format!("unknown field '{}' in files mapping", key),
+                        *key_node.span(),
                     )
                     .with_suggestion("Valid fields are: include, exclude"));
                 }
@@ -401,7 +401,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             }
             _ => {
                 return Err(
-                    ParseError::invalid_value("build", &format!("unknown field '{}'", key), (*key_node.span()).into())
+                    ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
                         .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
                 );
             }
@@ -458,7 +458,7 @@ fn parse_dynamic_linking(node: &Node) -> Result<DynamicLinking, ParseError> {
             }
             _ => {
                 return Err(
-                    ParseError::invalid_value("dynamic_linking", &format!("unknown field '{}'", key), (*key_node.span()).into())
+                    ParseError::invalid_value("dynamic_linking", format!("unknown field '{}'", key), *key_node.span())
                         .with_suggestion("Valid fields are: rpaths, binary_relocation, missing_dso_allowlist, rpath_allowlist, overdepending_behavior, overlinking_behavior")
                 );
             }
@@ -499,7 +499,7 @@ fn parse_python_build(node: &Node) -> Result<PythonBuild, ParseError> {
             }
             _ => {
                 return Err(
-                    ParseError::invalid_value("python", &format!("unknown field '{}'", key), (*key_node.span()).into())
+                    ParseError::invalid_value("python", format!("unknown field '{}'", key), *key_node.span())
                         .with_suggestion("Valid fields are: entry_points, skip_pyc_compilation, use_python_app_entrypoint, version_independent, site_packages_path")
                 );
             }
@@ -534,8 +534,8 @@ fn parse_variant_key_usage(node: &Node) -> Result<VariantKeyUsage, ParseError> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "variant",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: use_keys, ignore_keys, down_prioritize_variant",
@@ -568,8 +568,8 @@ fn parse_force_file_type(node: &Node) -> Result<ForceFileType, ParseError> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "force_file_type",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: text, binary"));
             }
@@ -613,8 +613,8 @@ fn parse_prefix_detection(node: &Node) -> Result<PrefixDetection, ParseError> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "prefix_detection",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: force_file_type, ignore, ignore_binary_files",
@@ -652,8 +652,8 @@ fn parse_post_process(node: &Node) -> Result<PostProcess, ParseError> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "post_process",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: files, regex, replacement"));
             }

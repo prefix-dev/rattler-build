@@ -118,8 +118,8 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
         ) {
             return Err(ParseError::invalid_value(
                 "about",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid fields are: homepage, license, license_file, license_family, summary, description, documentation, repository"

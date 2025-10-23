@@ -304,7 +304,7 @@ mod unit_tests {
             Value::new_concrete(Variable::from("1.0.0"), None),
         );
 
-        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap().0;
 
         assert_eq!(
             evaluated_ctx.get("name"),
@@ -334,7 +334,7 @@ mod unit_tests {
             ),
         );
 
-        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap().0;
 
         assert_eq!(
             evaluated_ctx.get("name"),
@@ -377,7 +377,7 @@ mod unit_tests {
             ),
         );
 
-        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap().0;
 
         assert_eq!(
             evaluated_ctx.get("package_version"),
@@ -414,7 +414,7 @@ mod unit_tests {
             ),
         );
 
-        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap().0;
 
         assert_eq!(
             evaluated_ctx.get("package_version"),
@@ -443,7 +443,7 @@ mod unit_tests {
             ),
         );
 
-        let evaluated_ctx = ctx.with_context(&context_vars).unwrap();
+        let evaluated_ctx = ctx.with_context(&context_vars).unwrap().0;
 
         // Both the original context and the evaluated context should be present
         assert_eq!(

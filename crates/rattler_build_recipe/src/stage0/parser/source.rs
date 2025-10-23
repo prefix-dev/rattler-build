@@ -54,7 +54,7 @@ fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
 
         // Otherwise parse as concrete MD5 hash
         let hash = rattler_digest::parse_digest_from_hex::<Md5>(s).ok_or_else(|| {
-            ParseError::invalid_value("md5", &format!("Invalid MD5 checksum: {}", s), span)
+            ParseError::invalid_value("md5", format!("Invalid MD5 checksum: {}", s), span)
         })?;
         Ok(Value::new_concrete(hash, Some(span)))
     } else {

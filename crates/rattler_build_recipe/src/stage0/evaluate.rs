@@ -510,7 +510,7 @@ where
             T::from_str(&s).map(Some).map_err(|e| {
                 ParseError::invalid_value(
                     "value",
-                    &format!("Failed to parse: {}", e),
+                    format!("Failed to parse: {}", e),
                     Span::new_blank(),
                 )
             })
@@ -596,7 +596,7 @@ fn evaluate_glob_patterns(
             Err(e) => Err(
                 ParseError::invalid_value(
                     "glob pattern",
-                    &format!("Invalid glob pattern '{}': {}", pattern, e),
+                    format!("Invalid glob pattern '{}': {}", pattern, e),
                     value.span().copied().unwrap_or_else(Span::new_blank),
                 )
                 .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
@@ -639,7 +639,7 @@ pub fn evaluate_glob_vec(
     GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| {
         ParseError::invalid_value(
             "glob set",
-            &format!("Failed to build glob set: {}", e),
+            format!("Failed to build glob set: {}", e),
             Span::new_blank(),
         )
     })
@@ -661,7 +661,7 @@ pub fn evaluate_entry_point_list(
                 .map_err(|e| {
                     ParseError::invalid_value(
                         "entry point",
-                        &format!("Invalid entry point '{}': {}", s, e),
+                        format!("Invalid entry point '{}': {}", s, e),
                         val.span().copied().unwrap_or_else(Span::new_blank),
                     )
                     .with_suggestion(
@@ -772,7 +772,7 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
         serde_yaml::from_str(s).map_err(|e| {
             ParseError::invalid_value(
                 "pin dependency",
-                &format!("Failed to parse pin dependency: {}", e),
+                format!("Failed to parse pin dependency: {}", e),
                 span,
             )
         })
@@ -781,7 +781,7 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
         let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
             ParseError::invalid_value(
                 "match spec",
-                &format!("Invalid match spec '{}': {}", s, e),
+                format!("Invalid match spec '{}': {}", s, e),
                 span,
             )
         })?;
@@ -864,7 +864,7 @@ fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
         "false" => Ok(false),
         _ => Err(ParseError::invalid_value(
             field_name,
-            &format!(
+            format!(
                 "Invalid boolean value for '{}': '{}' (expected true/false)",
                 field_name, s
             ),
@@ -920,7 +920,7 @@ where
         Ok(v.to_string().parse().map_err(|e| {
             ParseError::invalid_value(
                 type_name,
-                &format!("Failed to parse {}: {}", type_name, e),
+                format!("Failed to parse {}: {}", type_name, e),
                 Span::new_blank(),
             )
         })?)
@@ -929,7 +929,7 @@ where
         s.parse().map_err(|e| {
             ParseError::invalid_value(
                 type_name,
-                &format!("Invalid {} '{}': {}", type_name, s, e),
+                format!("Invalid {} '{}': {}", type_name, s, e),
                 value.span().copied().unwrap_or_else(Span::new_blank),
             )
         })
@@ -968,7 +968,7 @@ impl Evaluate for Value<url::Url> {
             url::Url::parse(&s).map_err(|e| {
                 ParseError::invalid_value(
                     "URL",
-                    &format!("Invalid URL '{}': {}", s, e),
+                    format!("Invalid URL '{}': {}", s, e),
                     self.span().copied().unwrap_or_else(Span::new_blank),
                 )
             })
@@ -997,7 +997,7 @@ impl Evaluate for Value<License> {
             s.parse::<License>().map_err(|e| {
                 ParseError::invalid_value(
                     "SPDX license",
-                    &format!("Invalid SPDX license expression: {}", e),
+                    format!("Invalid SPDX license expression: {}", e),
                     self.span().copied().unwrap_or_else(Span::new_blank),
                 )
             })
@@ -1038,7 +1038,7 @@ fn evaluate_sha256(
         rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
             ParseError::invalid_value(
                 "SHA256 checksum",
-                &format!("Invalid SHA256 checksum: {}", s),
+                format!("Invalid SHA256 checksum: {}", s),
                 value.span().copied().unwrap_or_else(Span::new_blank),
             )
         })
@@ -1059,7 +1059,7 @@ fn evaluate_md5(
         rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
             ParseError::invalid_value(
                 "MD5 checksum",
-                &format!("Invalid MD5 checksum: {}", s),
+                format!("Invalid MD5 checksum: {}", s),
                 value.span().copied().unwrap_or_else(Span::new_blank),
             )
         })
@@ -1132,7 +1132,7 @@ impl Evaluate for Stage0Package {
         let name = PackageName::from_str(&name_str).map_err(|e| {
             ParseError::invalid_value(
                 "name",
-                &format!(
+                format!(
                     "invalid value for name: '{}' is not a valid package name: {}",
                     name_str, e
                 ),
@@ -1143,7 +1143,7 @@ impl Evaluate for Stage0Package {
         let version = VersionWithSource::from_str(&version_str).map_err(|e| {
             ParseError::invalid_value(
                 "version",
-                &format!(
+                format!(
                     "invalid value for version: '{}' is not a valid version: {}",
                     version_str, e
                 ),
@@ -1245,7 +1245,7 @@ impl Evaluate for Stage0VariantKeyUsage {
                     Some(s.parse::<i32>().map_err(|_| {
                         ParseError::invalid_value(
                             "down_prioritize_variant",
-                            &format!("Invalid integer value for down_prioritize_variant: '{}'", s),
+                            format!("Invalid integer value for down_prioritize_variant: '{}'", s),
                             Span::new_blank(),
                         )
                     })?)
@@ -1288,7 +1288,7 @@ impl Evaluate for Stage0PrefixDetection {
                         _ => {
                             return Err(ParseError::invalid_value(
                                 "prefix_detection.ignore",
-                                &format!(
+                                format!(
                                     "Invalid boolean value for prefix_detection.ignore: '{}'",
                                     s
                                 ),
@@ -1322,7 +1322,7 @@ impl Evaluate for Stage0PostProcess {
         let regex = regex::Regex::new(&regex_str).map_err(|e| {
             ParseError::invalid_value(
                 "regex",
-                &format!("Invalid regular expression: {}", e),
+                format!("Invalid regular expression: {}", e),
                 Span::new_blank(),
             )
             .with_suggestion("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.")
@@ -1355,7 +1355,7 @@ impl Evaluate for Stage0DynamicLinking {
                         _ => {
                             return Err(ParseError::invalid_value(
                                 "binary_relocation",
-                                &format!("Invalid boolean value for binary_relocation: '{}'", s),
+                                format!("Invalid boolean value for binary_relocation: '{}'", s),
                                 val.span().copied().unwrap_or_else(Span::new_blank),
                             ));
                         }
@@ -1385,7 +1385,7 @@ impl Evaluate for Stage0DynamicLinking {
                     _ => {
                         return Err(ParseError::invalid_value(
                             "overdepending_behavior",
-                            &format!(
+                            format!(
                                 "Invalid overdepending_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
                             ),
@@ -1407,7 +1407,7 @@ impl Evaluate for Stage0DynamicLinking {
                     _ => {
                         return Err(ParseError::invalid_value(
                             "overlinking_behavior",
-                            &format!(
+                            format!(
                                 "Invalid overlinking_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
                             ),
@@ -1460,7 +1460,7 @@ impl Evaluate for Stage0Build {
                         .map_err(|_| {
                             ParseError::invalid_value(
                                 "noarch type",
-                                &format!(
+                                format!(
                                     "Invalid noarch type '{}'. Expected 'python' or 'generic'",
                                     s
                                 ),
@@ -1513,7 +1513,7 @@ impl Evaluate for Stage0Build {
                 s.parse::<u64>().map_err(|_| {
                     ParseError::invalid_value(
                         "build number",
-                        &format!(
+                        format!(
                             "Invalid build number: '{}' is not a valid positive integer",
                             s
                         ),
@@ -1570,7 +1570,7 @@ impl Evaluate for Stage0GitSource {
                     Stage1GitRev::from_str(&rev_str).map_err(|e| {
                         ParseError::invalid_value(
                             "git revision",
-                            &format!("Invalid git revision: {}", e),
+                            format!("Invalid git revision: {}", e),
                             Span::new_blank(),
                         )
                     })?
@@ -1628,7 +1628,7 @@ impl Evaluate for Stage0UrlSource {
             let url = url::Url::parse(&url_str).map_err(|e| {
                 ParseError::invalid_value(
                     "URL",
-                    &format!("Invalid URL '{}': {}", url_str, e),
+                    format!("Invalid URL '{}': {}", url_str, e),
                     Span::new_blank(),
                 )
             })?;
@@ -1721,7 +1721,7 @@ impl Evaluate for Stage0PythonVersion {
             MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
                 ParseError::invalid_value(
                     "python version spec",
-                    &format!(
+                    format!(
                         "Invalid python version spec '{}': {}",
                         version_str, e
                     ),
@@ -2020,7 +2020,7 @@ fn evaluate_package_output_to_recipe(
     let name = PackageName::from_str(&name_str).map_err(|e| {
         ParseError::invalid_value(
             "name",
-            &format!(
+            format!(
                 "invalid value for name: '{}' is not a valid package name: {}",
                 name_str, e
             ),
@@ -2043,7 +2043,7 @@ fn evaluate_package_output_to_recipe(
     let version = VersionWithSource::from_str(&version_str).map_err(|e| {
         ParseError::invalid_value(
             "version",
-            &format!(
+            format!(
                 "invalid value for version: '{}' is not a valid version: {}",
                 version_str, e
             ),

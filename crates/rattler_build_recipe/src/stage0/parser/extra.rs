@@ -39,8 +39,8 @@ pub fn parse_extra(yaml: &MarkedNode) -> ParseResult<Extra> {
         if !matches!(key_str, "recipe-maintainers") {
             return Err(ParseError::invalid_value(
                 "extra",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid fields are: recipe-maintainers"));
         }

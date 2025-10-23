@@ -265,7 +265,7 @@ pub(crate) fn parse_context(
             return Err(ParseError::invalid_value(
                 "context variable name",
                 "variable names cannot contain hyphens (-) as they are not valid in Jinja expressions",
-                (*key_node.span()).into(),
+                *key_node.span(),
             ));
         }
 

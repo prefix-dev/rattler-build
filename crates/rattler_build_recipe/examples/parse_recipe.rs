@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     println!("=== Parsing recipe: {:?} ===\n", args.recipe);
 
     // Create a named source for better error messages with miette
-    let source = NamedSource::new(&args.recipe.to_string_lossy(), yaml_content.clone());
+    let source = NamedSource::new(args.recipe.to_string_lossy(), yaml_content.clone());
 
     // Parse stage0 recipe
     let stage0_recipe = stage0::parse_recipe_from_source(&yaml_content)
@@ -132,9 +132,11 @@ fn main() -> Result<()> {
     let mut context = EvaluationContext::from_variables(variables.clone());
 
     // Enable experimental features unless disabled
-    let mut jinja_config = JinjaConfig::default();
-    jinja_config.recipe_path = Some(PathBuf::from(args.recipe));
-    jinja_config.experimental = !args.no_experimental;
+    let jinja_config = JinjaConfig {
+        recipe_path: Some(args.recipe.clone()),
+        experimental: !args.no_experimental,
+        ..Default::default()
+    };
     context.set_jinja_config(jinja_config);
 
     // Evaluate and merge the recipe's context section
@@ -144,7 +146,7 @@ fn main() -> Result<()> {
             println!("  {} = {}", key, value);
         }
 
-        context = context
+        let (_, _) = context
             .with_context(&stage0_recipe.context)
             .map_err(|e| miette::Report::new(e).with_source_code(source.clone()))?;
 
