@@ -1,6 +1,6 @@
 <h1>
-  <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/3bad9a38-939d-4513-8c61-dcc4ddb7fb51">
+  <a href="https://github.com/goldenolu/rattler-build/">
+    <img alt="banner" src="https://github.com/goldenolu/rattler-build/assets/885054/3bad9a38-939d-4513-8c61-dcc4ddb7fb51">
   </a>
 </h1>
 
@@ -50,10 +50,10 @@ Other options are:
 === "Binary"
     ```shell
     # Download the latest release from the GitHub releases page, for example the linux x86 version with curl:
-    curl -SL --progress-bar https://github.com/prefix-dev/rattler-build/releases/latest/download/rattler-build-x86_64-unknown-linux-musl
+    curl -SL --progress-bar https://github.com/goldenolu/rattler-build/releases/latest/download/rattler-build-x86_64-unknown-linux-musl
     ```
     You can grab version of `rattler-build` from the [Github
-    Releases](https://github.com/prefix-dev/rattler-build/releases/).
+    Releases](https://github.com/goldenolu/rattler-build/releases/).
 
 ### Completion
 
@@ -137,11 +137,11 @@ On Windows, to obtain these dependencies from conda-forge, one can install
 
 ### GitHub Action
 
-There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/goldenolu/rattler-build-action) for more information.
 
 ### The recipe format
 
-> **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
+> **Note** You can find all examples below in the [`examples`](https://github.com/goldenolu/rattler-build/tree/main/examples)
 > folder in the codebase and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
