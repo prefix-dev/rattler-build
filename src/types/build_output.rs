@@ -75,20 +75,7 @@ impl BuildOutput {
 
     /// The build string from the recipe (always present after evaluation)
     pub fn build_string(&self) -> Cow<'_, str> {
-        self.recipe
-            .build()
-            .string
-            .as_ref()
-            .map(|bs| Cow::Borrowed(bs.as_str()))
-            .unwrap_or_else(|| {
-                // Fallback: compute build string from hash and build number
-                // This should not happen if recipe.evaluate() was called properly
-                Cow::Owned(format!(
-                    "{}_{}",
-                    self.build_configuration.hash,
-                    self.recipe.build().number
-                ))
-            })
+        self.recipe.build().string.as_ref().into()
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})

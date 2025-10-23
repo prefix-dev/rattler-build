@@ -39,9 +39,13 @@ impl Rpaths {
 }
 
 /// Represents the state of the build string during evaluation
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BuildString {
+    #[default]
+    /// The default build string will be resolved as {prefix}h{hash}, e.g. `py312habc123f`
+    Default,
+
     /// Unresolved template that needs hash substitution
     /// This state exists during evaluation before the hash is computed
     #[serde(skip)]
@@ -71,52 +75,65 @@ impl BuildString {
     pub fn as_resolved(&self) -> Option<&str> {
         match self {
             BuildString::Resolved(s) => Some(s),
-            BuildString::Unresolved(_, _) => None,
+            BuildString::Unresolved(_, _) | BuildString::Default => None,
         }
     }
 
-    /// Get the string value (resolved or unresolved)
-    pub fn as_str(&self) -> &str {
+    /// Get the string value, only if resolved
+    /// Returns None for Default or Unresolved variants since they're not valid build strings yet
+    pub fn as_str(&self) -> Option<&str> {
         match self {
-            BuildString::Resolved(s) | BuildString::Unresolved(s, _) => s,
+            BuildString::Resolved(s) => Some(s),
+            BuildString::Unresolved(_, _) | BuildString::Default => None,
         }
     }
 
     /// Resolve the build string by rendering the template with the hash value and build number
     pub fn resolve(
         &mut self,
+        prefix: &str,
         hash_value: &str,
         build_number: u64,
         context: &super::EvaluationContext,
     ) -> Result<(), ParseError> {
-        if let BuildString::Unresolved(template, span) = self {
-            // Create a Jinja instance
-            let mut jinja = Jinja::new(context.jinja_config().clone());
+        match self {
+            BuildString::Default => {
+                // Generate default build string: <prefix>h<hash>_<build_number>
+                let rendered = format!("{}h{}_{}", prefix, hash_value, build_number);
+                *self = BuildString::Resolved(rendered);
+            }
+            BuildString::Unresolved(template, span) => {
+                // Create a Jinja instance
+                let mut jinja = Jinja::new(context.jinja_config().clone());
 
-            // Add all context variables
-            jinja = jinja.with_context(context.variables());
+                // Add all context variables
+                jinja = jinja.with_context(context.variables());
 
-            // Add the hash variable to the context
-            jinja.context_mut().insert(
-                "hash".to_string(),
-                Variable::from(hash_value.to_string()).into(),
-            );
+                // Add the hash variable to the context
+                jinja.context_mut().insert(
+                    "hash".to_string(),
+                    Variable::from(hash_value.to_string()).into(),
+                );
 
-            // Add the build_number variable to the context
-            jinja.context_mut().insert(
-                "build_number".to_string(),
-                Variable::from(build_number as i64).into(),
-            );
+                // Add the build_number variable to the context
+                jinja.context_mut().insert(
+                    "build_number".to_string(),
+                    Variable::from(build_number as i64).into(),
+                );
 
-            // Render the template
-            let rendered = jinja
-                .render_str(template)
-                .map_err(|e| ParseError::JinjaError {
-                    message: format!("Failed to render build string template: {}", e)
-                        .into_boxed_str(),
-                    span: span.unwrap_or(crate::Span::new_blank()).into(),
-                })?;
-            *self = BuildString::Resolved(rendered);
+                // Render the template
+                let rendered = jinja
+                    .render_str(template)
+                    .map_err(|e| ParseError::JinjaError {
+                        message: format!("Failed to render build string template: {}", e)
+                            .into_boxed_str(),
+                        span: span.unwrap_or(crate::Span::new_blank()).into(),
+                    })?;
+                *self = BuildString::Resolved(rendered);
+            }
+            BuildString::Resolved(_) => {
+                // Already resolved, nothing to do
+            }
         }
 
         Ok(())
@@ -129,17 +146,24 @@ impl From<String> for BuildString {
     }
 }
 
-impl From<BuildString> for String {
+impl From<BuildString> for Option<String> {
     fn from(bs: BuildString) -> Self {
         match bs {
-            BuildString::Resolved(s) | BuildString::Unresolved(s, _) => s,
+            BuildString::Resolved(s) => Some(s),
+            BuildString::Unresolved(s, _) => Some(s),
+            BuildString::Default => None,
         }
     }
 }
 
 impl AsRef<str> for BuildString {
+    /// Get the build string as a string reference
+    ///
+    /// # Panics
+    /// Panics if the build string is not yet resolved (Default or Unresolved state)
     fn as_ref(&self) -> &str {
         self.as_str()
+            .expect("BuildString must be resolved before calling as_ref(). Call resolve() first.")
     }
 }
 
@@ -286,8 +310,8 @@ pub struct Build {
 
     /// Build string - can be unresolved (template) or resolved (with hash)
     /// Serializes only the resolved string value
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub string: Option<BuildString>,
+    #[serde(default)]
+    pub string: BuildString,
 
     /// Build script - contains script content, interpreter, environment variables, etc.
     #[serde(default, skip_serializing_if = "Script::is_default")]
@@ -486,6 +510,7 @@ impl Build {
     ///
     /// # Arguments
     ///
+    /// * `prefix` - The hash prefix (e.g., "py311", "np120py311")
     /// * `hash_value` - The computed hash value to substitute in the template
     /// * `context` - Evaluation context with all variables
     ///
@@ -494,20 +519,19 @@ impl Build {
     /// Ok(()) on success, or an error if template rendering fails
     pub fn resolve_build_string(
         &mut self,
+        prefix: &str,
         hash_value: &str,
         context: &super::EvaluationContext,
     ) -> Result<(), ParseError> {
-        if let Some(build_string) = &mut self.string {
-            build_string.resolve(hash_value, self.number, context)?;
-        }
-
+        self.string
+            .resolve(prefix, hash_value, self.number, context)?;
         Ok(())
     }
 
     /// Check if the build section is empty (all default values)
     pub fn is_default(&self) -> bool {
         self.number == 0
-            && self.string.is_none()
+            && matches!(self.string, BuildString::Default)
             && self.script.is_default()
             && self.noarch.is_none()
             && self.python.entry_points.is_empty()

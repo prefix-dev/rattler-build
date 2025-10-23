@@ -1436,10 +1436,13 @@ impl Evaluate for Stage0Build {
         // IMPORTANT: Do NOT fully evaluate build.string here - it may contain a "hash" variable
         // that needs to be deferred until after we know the actual variant and can compute the hash.
         // Store it as BuildString::Unresolved if it contains templates.
-        let string = self.string.as_ref().map(|s| {
-            let template = extract_template_source(s).unwrap();
-            crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
-        });
+        let string = self
+            .string
+            .as_ref()
+            .map_or(crate::stage1::build::BuildString::Default, |s| {
+                let template = extract_template_source(s).unwrap();
+                crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
+            });
 
         // Evaluate script
         let script = evaluate_script(&self.script, context)?;

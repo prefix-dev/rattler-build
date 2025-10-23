@@ -9,7 +9,7 @@
 #[cfg(test)]
 mod tests {
     use crate::stage0;
-    use crate::stage1::{Evaluate, EvaluationContext, compute_hash};
+    use crate::stage1::{Evaluate, EvaluationContext, HashInfo};
     use indexmap::IndexMap;
     use rattler_build_jinja::{JinjaConfig, Variable};
     use rattler_build_types::NormalizedKey;
@@ -53,7 +53,17 @@ mod tests {
         let mut context = EvaluationContext::from_variables(variant);
         context.set_jinja_config(jinja_config);
 
-        let recipe = single.as_ref().evaluate(&context).unwrap();
+        let mut recipe = single.as_ref().evaluate(&context).unwrap();
+
+        // Compute hash from the used variant and resolve the build string
+        let noarch = recipe.build.noarch.unwrap_or(NoArchType::none());
+        let hash_info = HashInfo::from_variant(&recipe.used_variant, &noarch);
+
+        // Resolve the build string with the computed hash info
+        recipe
+            .build
+            .resolve_build_string(&hash_info.prefix, &hash_info.hash, &context)
+            .unwrap();
 
         // Extract used variant from recipe
         (recipe.clone(), recipe.used_variant.clone())
@@ -321,10 +331,10 @@ build:
         );
         variant.insert(NormalizedKey::from("python"), Variable::from("3.12"));
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Should start with "py312" (python prefix + h + hash)
-        assert_eq!(hash.0, "py312");
+        assert_eq!(hash_info.prefix, "py312");
     }
 
     #[test]
@@ -337,11 +347,11 @@ build:
         variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
         variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20"));
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Should start with "np120py311h" (numpy prefix + python prefix + h + hash)
         // Order is: np, py, pl, lua, r
-        assert_eq!(hash.0, "np120py311");
+        assert_eq!(hash_info.prefix, "np120py311");
     }
 
     #[test]
@@ -353,10 +363,10 @@ build:
         );
         variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
 
-        let hash = compute_hash(&variant, &NoArchType::python());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::python());
 
         // For python noarch, should just be "pyh" + hash
-        assert_eq!(hash.0, "py");
+        assert_eq!(hash_info.prefix, "py");
     }
 
     #[test]
@@ -368,8 +378,8 @@ build:
         );
         variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
 
-        let hash1 = compute_hash(&variant, &NoArchType::none());
-        let hash2 = compute_hash(&variant, &NoArchType::none());
+        let hash1 = HashInfo::from_variant(&variant, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&variant, &NoArchType::none());
 
         assert_eq!(hash1, hash2);
     }
@@ -390,13 +400,13 @@ build:
         );
         variant2.insert(NormalizedKey::from("python"), Variable::from("3.12"));
 
-        let hash1 = compute_hash(&variant1, &NoArchType::none());
-        let hash2 = compute_hash(&variant2, &NoArchType::none());
+        let hash1 = HashInfo::from_variant(&variant1, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&variant2, &NoArchType::none());
 
         assert_ne!(hash1, hash2);
         // But both should have py311 and py312 prefixes respectively
-        assert_eq!(hash1.0, "py311");
-        assert_eq!(hash2.0, "py312");
+        assert_eq!(hash1.prefix, "py311");
+        assert_eq!(hash2.prefix, "py312");
     }
 
     #[test]
@@ -415,7 +425,11 @@ build:
 
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
 
-        let build_string = recipe.build().string.as_ref().unwrap().as_str();
+        let build_string = recipe
+            .build()
+            .string
+            .as_str()
+            .expect("build string should be resolved");
         assert_eq!(build_string, "hb0f4dca_5");
     }
 
@@ -439,7 +453,11 @@ requirements:
 
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
 
-        let build_string = recipe.build().string.as_ref().unwrap().as_str();
+        let build_string = recipe
+            .build()
+            .string
+            .as_str()
+            .expect("build string should be resolved");
         assert_eq!(build_string, "py311h48b7412_5");
     }
 
@@ -476,7 +494,11 @@ requirements:
         );
 
         insta::assert_snapshot!(format!("{:?}", used_variant));
-        let build_string = recipe.build().string.as_ref().unwrap().as_str();
+        let build_string = recipe
+            .build()
+            .string
+            .as_str()
+            .expect("build string should be resolved");
         assert_eq!(build_string, "pyh5600cae_5");
     }
 
@@ -501,7 +523,11 @@ build:
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
 
         assert_eq!(
-            recipe.build().string.as_ref().unwrap().as_str(),
+            recipe
+                .build()
+                .string
+                .as_str()
+                .expect("build string should be resolved"),
             "custom_60d57d3_build_osx-arm64_baz_12"
         );
     }
@@ -588,10 +614,10 @@ build:
         variant.insert(NormalizedKey::from("python"), Variable::from("3.11"));
         variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20"));
 
-        let hash = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Snapshot test to ensure hash format doesn't change
-        insta::assert_snapshot!(format!("{}h{}", hash.0, hash.1));
+        insta::assert_snapshot!(format!("{}", hash_info));
     }
 
     /// Test that variant order doesn't affect hash (BTreeMap ensures sorted keys)
@@ -614,8 +640,8 @@ build:
         );
         variant2.insert(NormalizedKey::from("python"), Variable::from("3.11"));
 
-        let hash1 = compute_hash(&variant1, &NoArchType::none());
-        let hash2 = compute_hash(&variant2, &NoArchType::none());
+        let hash1 = HashInfo::from_variant(&variant1, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&variant2, &NoArchType::none());
 
         assert_eq!(hash1, hash2);
     }
@@ -630,11 +656,11 @@ build:
         );
         variant.insert(NormalizedKey::from("r_base"), Variable::from("4.2"));
 
-        let (prefix, hash) = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Should start with "r42h"
-        assert_eq!(prefix, "r42");
-        assert_eq!(hash, "aee9047");
+        assert_eq!(hash_info.prefix, "r42");
+        assert_eq!(hash_info.hash, "aee9047");
     }
 
     /// Test that Perl packages get proper prefix
@@ -647,10 +673,10 @@ build:
         );
         variant.insert(NormalizedKey::from("perl"), Variable::from("5.32"));
 
-        let (prefix, _hash) = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Should start with "pl532"
-        assert_eq!(prefix, "pl532");
+        assert_eq!(hash_info.prefix, "pl532");
     }
 
     /// Test combined prefixes in correct order
@@ -666,9 +692,9 @@ build:
         variant.insert(NormalizedKey::from("numpy"), Variable::from("1.20")); // np
         variant.insert(NormalizedKey::from("r_base"), Variable::from("4.2")); // r
 
-        let (prefix, _hash) = compute_hash(&variant, &NoArchType::none());
+        let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
 
         // Order should be: np, py, pl, lua, r
-        assert_eq!(prefix, "np120py311pl532r42");
+        assert_eq!(hash_info.prefix, "np120py311pl532r42");
     }
 }

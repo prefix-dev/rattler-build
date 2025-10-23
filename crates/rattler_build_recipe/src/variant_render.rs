@@ -138,7 +138,7 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
             let info = PinSubpackageInfo {
                 name: pin.pin_subpackage.name.clone(),
                 version: recipe.package.version.clone(),
-                build_string: recipe.build.string.as_ref().map(|s| s.as_str().to_string()),
+                build_string: recipe.build.string.as_resolved().map(|s| s.to_string()),
                 exact: pin.pin_subpackage.args.exact,
             };
             (key, info)
@@ -165,15 +165,12 @@ fn add_pins_to_variant(
             .find(|v| v.recipe.package.name == pin_info.name)
         {
             // Add the pinned package to the variant with format "version build_string"
-            let variant_value = if let Some(build_string) = &pinned_variant.recipe.build.string {
-                format!(
-                    "{} {}",
-                    pinned_variant.recipe.package.version,
-                    build_string.as_str()
-                )
-            } else {
-                pinned_variant.recipe.package.version.to_string()
-            };
+            let variant_value =
+                if let Some(build_string) = pinned_variant.recipe.build.string.as_resolved() {
+                    format!("{} {}", pinned_variant.recipe.package.version, build_string)
+                } else {
+                    pinned_variant.recipe.package.version.to_string()
+                };
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
         } else {
@@ -462,21 +459,19 @@ fn render_with_empty_combinations(
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
 fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
-    use crate::stage1::{build::BuildString, compute_hash};
+    use crate::stage1::{HashInfo, build::BuildString};
     use rattler_conda_types::NoArchType;
 
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
-    let (prefix, hash) = compute_hash(&result.variant, &noarch);
+    let hash_info = HashInfo::from_variant(&result.variant, &noarch);
 
-    // If build string is not set, create the default
-    if result.recipe.build.string.is_none() {
-        result.recipe.build.string = Some(BuildString::resolved(format!(
-            "{}h{}_{}",
-            prefix, hash, result.recipe.build.number
-        )));
-    } else if let Some(build_string) = &mut result.recipe.build.string {
+    // If build string is not set (Default), or if it needs resolving
+    if matches!(
+        result.recipe.build.string,
+        BuildString::Default | BuildString::Unresolved(_, _)
+    ) {
         // Always resolve/re-resolve the build string with the current hash
         // This ensures we use the latest hash that includes all pin information
         // Create a temporary evaluation context for build string resolution
@@ -496,7 +491,12 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
         let eval_ctx = EvaluationContext::from_variables(variables);
 
         // Resolve the build string template with the hash
-        build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
+        result.recipe.build.string.resolve(
+            &hash_info.prefix,
+            &hash_info.hash,
+            result.recipe.build.number,
+            &eval_ctx,
+        )?;
     }
     Ok(())
 }

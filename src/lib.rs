@@ -189,8 +189,7 @@ fn find_variants(
         let build_string = recipe
             .build()
             .string
-            .as_ref()
-            .map(|s| s.as_str().to_string())
+            .as_resolved()
             .expect("Recipe build string should be resolved after evaluation");
 
         // The recipe's used_variant already contains the filtered variant (noarch python excludes python keys)
@@ -202,7 +201,7 @@ fn find_variants(
         recipes.insert(DiscoveredOutput {
             name: recipe.package().name().as_source().to_string(),
             version: recipe.package().version().to_string(),
-            build_string,
+            build_string: build_string.to_string(),
             noarch_type: recipe.build().noarch.unwrap_or(NoArchType::none()),
             target_platform: effective_target_platform,
             used_vars: variant,
