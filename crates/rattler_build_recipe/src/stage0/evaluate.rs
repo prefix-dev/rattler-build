@@ -1438,7 +1438,7 @@ impl Evaluate for Stage0Build {
         // Store it as BuildString::Unresolved if it contains templates.
         let string = self.string.as_ref().map(|s| {
             let template = extract_template_source(s).unwrap();
-            crate::stage1::build::BuildString::unresolved(template)
+            crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
         });
 
         // Evaluate script

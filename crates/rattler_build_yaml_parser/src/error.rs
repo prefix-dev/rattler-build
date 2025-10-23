@@ -23,47 +23,47 @@ pub enum ParseError {
     /// Generic parse error with message and location
     #[error("parse error: {message}")]
     Generic {
-        message: String,
-        span: Span,
-        suggestion: Option<String>,
+        message: Box<str>,
+        span: Box<Span>,
+        suggestion: Option<Box<str>>,
     },
 
     /// Missing required field
     #[error("missing required field '{field}'")]
-    MissingField { field: String, span: Span },
+    MissingField { field: Box<str>, span: Box<Span> },
 
     /// Type mismatch
     #[error("expected {expected} but got {actual}")]
     TypeMismatch {
-        expected: String,
-        actual: String,
-        span: Span,
+        expected: Box<str>,
+        actual: Box<str>,
+        span: Box<Span>,
     },
 
     /// Invalid value
     #[error("invalid value for '{field}': {reason}")]
     InvalidValue {
-        field: String,
-        reason: String,
-        span: Span,
-        suggestion: Option<String>,
+        field: Box<str>,
+        reason: Box<str>,
+        span: Box<Span>,
+        suggestion: Option<Box<str>>,
     },
 
     /// Jinja template error
     #[error("Jinja template error: {message}")]
-    JinjaError { message: String, span: Span },
+    JinjaError { message: Box<str>, span: Box<Span> },
 
     /// Invalid conditional structure
     #[error("invalid conditional: {message}")]
-    InvalidConditional { message: String, span: Span },
+    InvalidConditional { message: Box<str>, span: Box<Span> },
 }
 
 impl ParseError {
     /// Create a generic parse error
     pub fn generic(message: impl Into<String>, span: Span) -> Self {
         Self::Generic {
-            message: message.into(),
-            span,
+            message: message.into().into_boxed_str(),
+            span: Box::new(span),
             suggestion: None,
         }
     }
@@ -71,8 +71,8 @@ impl ParseError {
     /// Create a missing field error
     pub fn missing_field(field: impl Into<String>, span: Span) -> Self {
         Self::MissingField {
-            field: field.into(),
-            span,
+            field: field.into().into_boxed_str(),
+            span: Box::new(span),
         }
     }
 
@@ -83,18 +83,18 @@ impl ParseError {
         span: Span,
     ) -> Self {
         Self::TypeMismatch {
-            expected: expected.into(),
-            actual: actual.into(),
-            span,
+            expected: expected.into().into_boxed_str(),
+            actual: actual.into().into_boxed_str(),
+            span: Box::new(span),
         }
     }
 
     /// Create an invalid value error
     pub fn invalid_value(field: impl Into<String>, reason: impl Into<String>, span: Span) -> Self {
         Self::InvalidValue {
-            field: field.into(),
-            reason: reason.into(),
-            span,
+            field: field.into().into_boxed_str(),
+            reason: reason.into().into_boxed_str(),
+            span: Box::new(span),
             suggestion: None,
         }
     }
@@ -102,16 +102,16 @@ impl ParseError {
     /// Create a Jinja error
     pub fn jinja_error(error: impl Into<String>, span: Span) -> Self {
         Self::JinjaError {
-            message: error.into(),
-            span,
+            message: error.into().into_boxed_str(),
+            span: Box::new(span),
         }
     }
 
     /// Create an invalid conditional error
     pub fn invalid_conditional(message: impl Into<String>, span: Span) -> Self {
         Self::InvalidConditional {
-            message: message.into(),
-            span,
+            message: message.into().into_boxed_str(),
+            span: Box::new(span),
         }
     }
 
@@ -126,7 +126,7 @@ impl ParseError {
     pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
         match &mut self {
             Self::Generic { suggestion: s, .. } | Self::InvalidValue { suggestion: s, .. } => {
-                *s = Some(suggestion.into());
+                *s = Some(suggestion.into().into_boxed_str());
             }
             _ => {}
         }
@@ -141,7 +141,7 @@ impl ParseError {
             | Self::TypeMismatch { span, .. }
             | Self::InvalidValue { span, .. }
             | Self::JinjaError { span, .. }
-            | Self::InvalidConditional { span, .. } => span,
+            | Self::InvalidConditional { span, .. } => span.as_ref(),
             Self::IoError { .. } => panic!("IO errors do not have associated spans"),
         }
     }
@@ -149,18 +149,15 @@ impl ParseError {
     /// Create a simple error from a message (for compatibility)
     pub fn from_message(message: impl Into<String>) -> Self {
         Self::Generic {
-            message: message.into(),
-            span: marked_yaml::Span::new_blank(),
+            message: message.into().into_boxed_str(),
+            span: Box::new(marked_yaml::Span::new_blank()),
             suggestion: None,
         }
     }
 
     pub fn with_message(mut self, message: impl Into<String>) -> Self {
-        match &mut self {
-            Self::Generic { message: m, .. } => {
-                *m = message.into();
-            }
-            _ => {}
+        if let Self::Generic { message: m, .. } = &mut self {
+            *m = message.into().into_boxed_str();
         }
         self
     }
@@ -169,9 +166,8 @@ impl ParseError {
 #[cfg(feature = "miette")]
 impl Diagnostic for ParseError {
     fn labels(&self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
-        match self {
-            Self::IoError { .. } => return None,
-            _ => {}
+        if let Self::IoError { .. } = self {
+            return None;
         }
 
         let source_span = span_to_source_span(self.span());
@@ -183,7 +179,7 @@ impl Diagnostic for ParseError {
                 source
             ),
             Self::Generic { message, .. } => {
-                miette::LabeledSpan::new_with_span(Some(message.clone()), source_span)
+                miette::LabeledSpan::new_with_span(Some(message.to_string()), source_span)
             }
             Self::MissingField { field, .. } => miette::LabeledSpan::new_with_span(
                 Some(format!("missing field '{}'", field)),
@@ -200,10 +196,10 @@ impl Diagnostic for ParseError {
                 source_span,
             ),
             Self::JinjaError { message, .. } => {
-                miette::LabeledSpan::new_with_span(Some(message.clone()), source_span)
+                miette::LabeledSpan::new_with_span(Some(message.to_string()), source_span)
             }
             Self::InvalidConditional { message, .. } => {
-                miette::LabeledSpan::new_with_span(Some(message.clone()), source_span)
+                miette::LabeledSpan::new_with_span(Some(message.to_string()), source_span)
             }
         };
 
@@ -219,7 +215,7 @@ impl Diagnostic for ParseError {
             | Self::InvalidValue {
                 suggestion: Some(s),
                 ..
-            } => Some(Box::new(s.clone())),
+            } => Some(Box::new(s.as_ref())),
             _ => None,
         }
     }

@@ -10,9 +10,9 @@ use crate::{
 /// Get the span from a marked_yaml node
 pub(crate) fn get_span(node: &MarkedNode) -> Span {
     match node {
-        MarkedNode::Scalar(s) => (*s.span()).into(),
-        MarkedNode::Mapping(m) => (*m.span()).into(),
-        MarkedNode::Sequence(s) => (*s.span()).into(),
+        MarkedNode::Scalar(s) => *s.span(),
+        MarkedNode::Mapping(m) => *m.span(),
+        MarkedNode::Sequence(s) => *s.span(),
     }
 }
 
@@ -40,8 +40,8 @@ pub(super) fn validate_mapping_fields(
         if !valid_fields.contains(&key) {
             return Err(ParseError::invalid_value(
                 context_name,
-                &format!("unknown field '{}'", key),
-                (*key_node.span()).into(),
+                format!("unknown field '{}'", key),
+                *key_node.span(),
             )
             .with_suggestion(format!("Valid fields are: {}", valid_fields.join(", "))));
         }

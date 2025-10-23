@@ -37,7 +37,7 @@ pub fn validate_mapping_fields(
         if !valid_fields.contains(&key) {
             return Err(ParseError::invalid_value(
                 context_name,
-                &format!("unknown field '{}'", key),
+                format!("unknown field '{}'", key),
                 *key_node.span(),
             )
             .with_suggestion(format!("Valid fields are: {}", valid_fields.join(", "))));

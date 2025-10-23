@@ -106,8 +106,8 @@ fn parse_python_test(
             _ => {
                 return Err(ParseError::invalid_value(
                     "python test",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: imports, pip_check, python_version"));
             }
@@ -233,8 +233,8 @@ fn parse_commands_test(
             _ => {
                 return Err(ParseError::invalid_value(
                     "commands test",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: script, requirements, files"));
             }
@@ -268,8 +268,8 @@ fn parse_commands_test_requirements(
             _ => {
                 return Err(ParseError::invalid_value(
                     "commands test requirements",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: run, build"));
             }
@@ -299,8 +299,8 @@ fn parse_commands_test_files(
             _ => {
                 return Err(ParseError::invalid_value(
                     "commands test files",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: source, recipe"));
             }
@@ -324,8 +324,8 @@ fn parse_downstream_test(
             _ => {
                 return Err(ParseError::invalid_value(
                     "downstream test",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: downstream"));
             }
@@ -380,7 +380,7 @@ fn parse_package_contents_test(
                     _ => {
                         return Err(ParseError::invalid_value(
                             "strict",
-                            &format!("not a valid boolean value (found '{}')", s),
+                            format!("not a valid boolean value (found '{}')", s),
                             span,
                         ));
                     }
@@ -389,8 +389,8 @@ fn parse_package_contents_test(
             _ => {
                 return Err(ParseError::invalid_value(
                     "package_contents test",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: files, site_packages, bin, lib, include, strict",
@@ -462,8 +462,8 @@ fn parse_package_contents_check_files(
             _ => {
                 return Err(ParseError::invalid_value(
                     "package_contents check files",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion("Valid fields are: exists, not_exists"));
             }

@@ -1,4 +1,5 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
+use rattler_build_jinja::{Jinja, Variable};
 use rattler_build_script::Script;
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
@@ -44,7 +45,7 @@ pub enum BuildString {
     /// Unresolved template that needs hash substitution
     /// This state exists during evaluation before the hash is computed
     #[serde(skip)]
-    Unresolved(String),
+    Unresolved(String, Option<crate::Span>),
 
     /// Fully resolved build string with hash computed and substituted
     Resolved(String),
@@ -52,8 +53,8 @@ pub enum BuildString {
 
 impl BuildString {
     /// Create an unresolved build string from a template
-    pub fn unresolved(template: String) -> Self {
-        BuildString::Unresolved(template)
+    pub fn unresolved(template: String, span: Option<crate::Span>) -> Self {
+        BuildString::Unresolved(template, span)
     }
 
     /// Create a resolved build string
@@ -70,14 +71,14 @@ impl BuildString {
     pub fn as_resolved(&self) -> Option<&str> {
         match self {
             BuildString::Resolved(s) => Some(s),
-            BuildString::Unresolved(_) => None,
+            BuildString::Unresolved(_, _) => None,
         }
     }
 
     /// Get the string value (resolved or unresolved)
     pub fn as_str(&self) -> &str {
         match self {
-            BuildString::Resolved(s) | BuildString::Unresolved(s) => s,
+            BuildString::Resolved(s) | BuildString::Unresolved(s, _) => s,
         }
     }
 
@@ -88,9 +89,7 @@ impl BuildString {
         build_number: u64,
         context: &super::EvaluationContext,
     ) -> Result<(), ParseError> {
-        if let BuildString::Unresolved(template) = self {
-            use rattler_build_jinja::{Jinja, Variable};
-
+        if let BuildString::Unresolved(template, span) = self {
             // Create a Jinja instance
             let mut jinja = Jinja::new(context.jinja_config().clone());
 
@@ -113,8 +112,9 @@ impl BuildString {
             let rendered = jinja
                 .render_str(template)
                 .map_err(|e| ParseError::JinjaError {
-                    message: format!("Failed to render build string template: {}", e),
-                    span: crate::Span::new_blank(),
+                    message: format!("Failed to render build string template: {}", e)
+                        .into_boxed_str(),
+                    span: span.unwrap_or(crate::Span::new_blank()).into(),
                 })?;
             *self = BuildString::Resolved(rendered);
         }
@@ -132,7 +132,7 @@ impl From<String> for BuildString {
 impl From<BuildString> for String {
     fn from(bs: BuildString) -> Self {
         match bs {
-            BuildString::Resolved(s) | BuildString::Unresolved(s) => s,
+            BuildString::Resolved(s) | BuildString::Unresolved(s, _) => s,
         }
     }
 }

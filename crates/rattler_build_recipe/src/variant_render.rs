@@ -410,7 +410,7 @@ fn render_with_empty_combinations(
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
     // Convert each output to a RenderedVariant
-    let mut results: Vec<_> = outputs
+    let results: Vec<_> = outputs
         .into_iter()
         .map(|recipe| {
             let mut variant = recipe.used_variant.clone();
@@ -457,25 +457,6 @@ fn render_with_empty_combinations(
     Ok(results)
 }
 
-/// Helper function to finalize pin_subpackages across all variants
-///
-/// This adds pin_subpackage information to variant maps for hash computation.
-/// Must be called after all variants are rendered.
-fn finalize_pin_subpackages(results: &mut [RenderedVariant]) -> Result<(), ParseError> {
-    let results_snapshot = results.to_vec();
-    for result in results.iter_mut() {
-        if !result.pin_subpackages.is_empty() {
-            add_pins_to_variant(
-                &mut result.variant,
-                &result.pin_subpackages,
-                &results_snapshot,
-            )
-            .map_err(ParseError::from_message)?;
-        }
-    }
-    Ok(())
-}
-
 /// Helper function to finalize a single build string
 ///
 /// This computes the hash from the variant (which includes pin information)
@@ -514,14 +495,8 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
 
         let eval_ctx = EvaluationContext::from_variables(variables);
 
-        // If unresolved, resolve it. If already resolved, update it with new hash.
-        if !build_string.is_resolved() {
-            build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
-        } else {
-            // Re-resolve even if already resolved, to get the updated hash
-            *build_string = BuildString::unresolved(build_string.as_str().to_string());
-            build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
-        }
+        // Resolve the build string template with the hash
+        build_string.resolve(&hash, result.recipe.build.number, &eval_ctx)?;
     }
     Ok(())
 }

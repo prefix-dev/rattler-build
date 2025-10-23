@@ -26,7 +26,7 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
 
         // Otherwise parse as concrete SHA256 hash
         let hash = rattler_digest::parse_digest_from_hex::<Sha256>(s).ok_or_else(|| {
-            ParseError::invalid_value("sha256", &format!("Invalid SHA256 checksum: {}", s), span)
+            ParseError::invalid_value("sha256", format!("Invalid SHA256 checksum: {}", s), span)
         })?;
         Ok(Value::new_concrete(hash, Some(span)))
     } else {
@@ -86,8 +86,8 @@ fn parse_source_filter(node: &Node) -> Result<IncludeExclude, ParseError> {
                 _ => {
                     return Err(ParseError::invalid_value(
                         "filter",
-                        &format!("unknown field '{}' in filter mapping", key),
-                        (*key_node.span()).into(),
+                        format!("unknown field '{}' in filter mapping", key),
+                        *key_node.span(),
                     )
                     .with_suggestion("Valid fields are: include, exclude"));
                 }
@@ -202,8 +202,8 @@ fn parse_git_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "git source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs",
@@ -285,8 +285,8 @@ fn parse_url_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: url, sha256, md5, file_name, patches, target_directory",
@@ -357,8 +357,8 @@ fn parse_path_source(
                     None => {
                         return Err(ParseError::invalid_value(
                             "use_gitignore",
-                            &format!("expected boolean, got '{}'", scalar.as_str()),
-                            (*value_node.span()).into(),
+                            format!("expected boolean, got '{}'", scalar.as_str()),
+                            *value_node.span(),
                         ));
                     }
                 };
@@ -369,8 +369,8 @@ fn parse_path_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "path source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: path, sha256, md5, patches, target_directory, file_name, use_gitignore, filter",

@@ -137,22 +137,18 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         })?;
         let version_str = scalar.as_str();
         let version: u32 = version_str.parse().map_err(|_| {
-            ParseError::invalid_value(
-                "schema_version",
-                "not a valid integer",
-                (*scalar.span()).into(),
-            )
+            ParseError::invalid_value("schema_version", "not a valid integer", *scalar.span())
         })?;
 
         // Only version 1 is supported
         if version != 1 {
             return Err(ParseError::invalid_value(
                 "schema_version",
-                &format!(
+                format!(
                     "unsupported schema version {} (only version 1 is supported)",
                     version
                 ),
-                (*scalar.span()).into(),
+                *scalar.span(),
             ));
         }
         Some(version)
@@ -229,8 +225,8 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         ) {
             return Err(ParseError::invalid_value(
                 "recipe",
-                &format!("unknown top-level field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown top-level field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
         }

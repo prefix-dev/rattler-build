@@ -52,7 +52,7 @@ where
         // Try to parse as concrete value
         let value = s
             .parse::<T>()
-            .map_err(|e| ParseError::invalid_value(field_name, &e.to_string(), span))?;
+            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))?;
         Ok(Value::new_concrete(value, Some(span)))
     }
 }

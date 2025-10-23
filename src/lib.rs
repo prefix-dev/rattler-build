@@ -364,7 +364,7 @@ pub async fn get_build_output(
         // Check if this is a ParseError with a file path
         if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } = &e {
             // Read the file to provide source code context
-            if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(content) = fs_err::read_to_string(path) {
                 let source_code = rattler_build_recipe::source_code::Source::from_string(
                     path.display().to_string(),
                     content,

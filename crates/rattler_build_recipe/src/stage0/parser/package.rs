@@ -87,8 +87,8 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
         if !matches!(key_str, "name" | "version") {
             return Err(ParseError::invalid_value(
                 "package",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid fields are: name, version"));
         }

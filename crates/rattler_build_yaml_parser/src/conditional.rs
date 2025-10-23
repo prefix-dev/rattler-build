@@ -60,7 +60,7 @@ where
         } else {
             let value = s
                 .parse::<T>()
-                .map_err(|e| ParseError::invalid_value("item", &e.to_string(), span))?;
+                .map_err(|e| ParseError::invalid_value("item", e.to_string(), span))?;
             Ok(Item::Value(Value::new_concrete(value, Some(span))))
         }
     } else {

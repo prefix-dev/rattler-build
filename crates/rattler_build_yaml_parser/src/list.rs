@@ -60,7 +60,7 @@ mod tests {
         let node = yaml.as_mapping().unwrap().get("val").unwrap();
         let list: ListOrItem<Value<String>> = parse_list_or_item(node).unwrap();
         assert_eq!(list.len(), 2);
-        assert!(list.iter().nth(0).unwrap().is_concrete());
+        assert!(list.iter().next().unwrap().is_concrete());
         assert!(list.iter().nth(1).unwrap().is_template());
     }
 }

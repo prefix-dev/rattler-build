@@ -70,8 +70,8 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
         ) {
             return Err(ParseError::invalid_value(
                 "requirements",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid fields are: build, host, run, run_constraints, run_exports, ignore_run_exports",
@@ -134,8 +134,8 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
         ) {
             return Err(ParseError::invalid_value(
                 "run_exports",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid fields are: noarch, strong, strong_constraints, weak, weak_constraints",
@@ -169,8 +169,8 @@ pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreR
         if !matches!(key_str, "by_name" | "from_package") {
             return Err(ParseError::invalid_value(
                 "ignore_run_exports",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid fields are: by_name, from_package"));
         }

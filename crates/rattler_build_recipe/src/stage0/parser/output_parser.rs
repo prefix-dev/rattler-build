@@ -33,11 +33,7 @@ pub fn parse_multi_output_recipe(
         })?;
         let version_str = scalar.as_str();
         let version: u32 = version_str.parse().map_err(|_| {
-            ParseError::invalid_value(
-                "schema_version",
-                "not a valid integer",
-                (*scalar.span()).into(),
-            )
+            ParseError::invalid_value("schema_version", "not a valid integer", *scalar.span())
         })?;
 
         // Only version 1 is supported
@@ -134,8 +130,8 @@ pub fn parse_multi_output_recipe(
         ) {
             return Err(ParseError::invalid_value(
                 "multi-output recipe",
-                &format!("unknown top-level field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown top-level field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion(
                 "valid top-level fields for multi-output recipes are: recipe, version, build, about, extra, source, outputs, schema_version, context",
@@ -203,8 +199,8 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
         if !matches!(key_str, "name" | "version") {
             return Err(ParseError::invalid_value(
                 "recipe",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid fields are: name, version"));
         }
