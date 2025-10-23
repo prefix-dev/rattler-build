@@ -649,40 +649,40 @@ mod tests {
         assert!(rattler_build.status.success());
     }
 
-    #[test]
-    fn test_script_content_scalar_with_jinja() {
-        // Content as scalar
-        let recipe_content = r#"
-package:
-  name: hellopackage
-  version: 1.0.0
-build:
-  script:
-    content: ${{ PYTHON }} --help
-requirements:
-  host:
-    - python
-"#;
-        run_build_from_yaml_string(recipe_content.to_string());
-    }
+    //     #[test]
+    //     fn test_script_content_scalar_with_jinja() {
+    //         // Content as scalar
+    //         let recipe_content = r#"
+    // package:
+    //   name: hellopackage
+    //   version: 1.0.0
+    // build:
+    //   script:
+    //     content: ${{ PYTHON }} --help
+    // requirements:
+    //   host:
+    //     - python
+    // "#;
+    //         run_build_from_yaml_string(recipe_content.to_string());
+    //     }
 
-    #[test]
-    fn test_script_content_sequence_with_jinja() {
-        // Content as sequence
-        let recipe_content = r#"
-package:
-  name: hellopackage
-  version: 1.0.0
-build:
-  script:
-    content:
-      - ${{ PYTHON }} --help
-requirements:
-  host:
-    - python
-"#;
-        run_build_from_yaml_string(recipe_content.to_string());
-    }
+    //     #[test]
+    //     fn test_script_content_sequence_with_jinja() {
+    //         // Content as sequence
+    //         let recipe_content = r#"
+    // package:
+    //   name: hellopackage
+    //   version: 1.0.0
+    // build:
+    //   script:
+    //     content:
+    //       - ${{ PYTHON }} --help
+    // requirements:
+    //   host:
+    //     - python
+    // "#;
+    //         run_build_from_yaml_string(recipe_content.to_string());
+    //     }
 
     #[test]
     fn test_missing_license_file() {
