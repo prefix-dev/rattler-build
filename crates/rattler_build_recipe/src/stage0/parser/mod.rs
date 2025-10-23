@@ -13,7 +13,6 @@ mod package;
 mod requirements;
 mod source;
 mod test_parser;
-mod yaml;
 
 #[cfg(test)]
 mod error_tests;
@@ -26,7 +25,7 @@ mod unit_tests;
 
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
-use rattler_build_yaml_parser::{ParseError, ParseResult};
+use rattler_build_yaml_parser::{ParseError, ParseResult, parse_yaml};
 
 use crate::Span;
 
@@ -48,7 +47,7 @@ pub(crate) use helpers::get_span;
 /// This function automatically detects whether the recipe is single-output or multi-output
 /// and returns the appropriate Recipe variant.
 pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
-    let yaml = yaml::parse_yaml(source).map_err(|e| {
+    let yaml = parse_yaml(source).map_err(|e| {
         ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
@@ -60,7 +59,7 @@ pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::sta
 /// Note: This function returns a SingleOutputRecipe for backwards compatibility.
 /// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
-    let yaml = yaml::parse_yaml(source).map_err(|e| {
+    let yaml = parse_yaml(source).map_err(|e| {
         ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 

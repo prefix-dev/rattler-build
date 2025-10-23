@@ -7,7 +7,7 @@ use crate::stage0_types::{Conditional, ConditionalList, Item, ListOrItem, Value}
 use marked_yaml::{Node, Span};
 use rattler_build_jinja::{JinjaExpression, JinjaTemplate, Variable};
 use rattler_build_types::NormalizedKey;
-use rattler_build_yaml_parser::ParseError;
+use rattler_build_yaml_parser::{ParseError, parse_yaml};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -37,7 +37,7 @@ pub fn parse_variant_str(
     yaml: &str,
     path: Option<PathBuf>,
 ) -> Result<Stage0VariantConfig, VariantConfigError> {
-    let node = marked_yaml::parse_yaml(0, yaml).map_err(|e| VariantConfigError::ParseError {
+    let node = parse_yaml(yaml).map_err(|e| VariantConfigError::ParseError {
         path: path.clone().unwrap_or_default(),
         source: ParseError::generic(e.to_string(), Span::new_blank()),
     })?;

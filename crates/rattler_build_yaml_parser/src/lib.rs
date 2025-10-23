@@ -41,6 +41,7 @@ pub mod helpers;
 pub mod list;
 pub mod types;
 pub mod value;
+pub mod yaml;
 
 // Re-export commonly used items
 pub use conditional::parse_conditional_list;
@@ -51,3 +52,4 @@ pub use helpers::{contains_jinja_template, get_span, validate_mapping_fields};
 pub use list::parse_list_or_item;
 pub use types::{Conditional, ConditionalList, Item, ListOrItem, Value, ValueInner};
 pub use value::{parse_value, parse_value_with_name};
+pub use yaml::parse_yaml;

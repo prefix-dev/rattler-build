@@ -1,20 +1,20 @@
 //! Tests for parser module
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value, parse_yaml};
 
 use crate::error::{ParseError, ParseResult};
 
 fn parse_yaml_field(yaml_str: &str, field: &str) -> MarkedNode {
     let wrapped = format!("{}: {}", field, yaml_str);
-    let root = super::yaml::parse_yaml(&wrapped).expect("Failed to parse test YAML");
+    let root = parse_yaml(&wrapped).expect("Failed to parse test YAML");
     let mapping = root.as_mapping().expect("Expected mapping");
     mapping.get(field).expect("Field not found").clone()
 }
 
 fn parse_yaml_list(yaml_str: &str) -> MarkedNode {
     let wrapped = format!("list:\n{}", yaml_str);
-    let root = super::yaml::parse_yaml(&wrapped).expect("Failed to parse test YAML");
+    let root = parse_yaml(&wrapped).expect("Failed to parse test YAML");
     let mapping = root.as_mapping().expect("Expected mapping");
     mapping.get("list").expect("Field not found").clone()
 }

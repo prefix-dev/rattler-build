@@ -4,7 +4,7 @@ python:
   - if: win
     then: ["3.14"]
 
-compiler:
+c_compiler:
   - if: linux
     then: [gcc, clang]
   - if: osx
@@ -27,3 +27,7 @@ mixed:
   - if: linux
     then: ["linux_only"]
   - ${{ "jinja_value" }}
+
+unix_level:
+  - if: unix
+    then: 1
