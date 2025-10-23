@@ -1,11 +1,9 @@
 //! Tests for parser module
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
 
-use crate::{
-    error::{ParseError, ParseResult},
-    stage0::parser::{parse_conditional_list, parse_value},
-};
+use crate::error::{ParseError, ParseResult};
 
 fn parse_yaml_field(yaml_str: &str, field: &str) -> MarkedNode {
     let wrapped = format!("{}: {}", field, yaml_str);
