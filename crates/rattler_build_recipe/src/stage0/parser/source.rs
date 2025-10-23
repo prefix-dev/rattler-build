@@ -8,7 +8,7 @@ use crate::stage0::{
     types::{IncludeExclude, JinjaTemplate, Value},
 };
 
-use super::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
 
 /// Parse a SHA256 hash value (can be concrete or template)
 fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {

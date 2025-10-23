@@ -1,11 +1,12 @@
 //! Parser for the Requirements section
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser::parse_conditional_list;
 
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
-        parser::{helpers::get_span, list::parse_conditional_list},
+        parser::helpers::get_span,
         requirements::{IgnoreRunExports, Requirements, RunExports},
     },
 };

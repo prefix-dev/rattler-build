@@ -10,8 +10,7 @@ use crate::stage0::{
     parser::helpers::get_span,
     types::{IncludeExclude, Value},
 };
-
-use super::{parse_conditional_list, parse_value_with_name};
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value_with_name};
 
 /// Macro to parse a value with automatic field name inference for better error messages
 ///

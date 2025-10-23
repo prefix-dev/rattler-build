@@ -1,10 +1,12 @@
 //! Parser for the Extra section
+//! TODO: Turn this into a hashmap
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser::parse_conditional_list;
 
 use crate::{
     error::{ParseError, ParseResult},
-    stage0::{extra::Extra, parser::helpers::get_span, parser::list::parse_conditional_list},
+    stage0::{extra::Extra, parser::helpers::get_span},
 };
 
 /// Parse an Extra section from YAML

@@ -1,12 +1,13 @@
 //! Parser for the About section
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
 
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
         about::About,
-        parser::{helpers::get_span, list::parse_conditional_list, value::parse_value},
+        parser::helpers::get_span,
         types::{ConditionalList, Item, JinjaTemplate, Value},
     },
 };

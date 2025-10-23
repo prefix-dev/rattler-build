@@ -8,13 +8,11 @@ mod about;
 mod build;
 mod extra;
 mod helpers;
-mod list;
 mod output_parser;
 mod package;
 mod requirements;
 mod source;
 mod test_parser;
-mod value;
 mod yaml;
 
 #[cfg(test)]
@@ -36,13 +34,11 @@ use crate::Span;
 pub use about::parse_about;
 pub use build::parse_build;
 pub use extra::parse_extra;
-pub use list::parse_conditional_list;
 pub use output_parser::parse_multi_output_recipe;
 pub use package::parse_package;
 pub use requirements::parse_requirements;
 pub use source::parse_source;
 pub use test_parser::parse_tests;
-pub use value::{parse_value, parse_value_with_name};
 
 // Re-export helpers within crate only
 pub(crate) use helpers::get_span;

@@ -1,4 +1,5 @@
 use marked_yaml::Node;
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
 
 use crate::{
     ParseError,
@@ -14,7 +15,7 @@ use crate::{
     },
 };
 
-use super::{helpers::validate_mapping_fields, parse_conditional_list, parse_value};
+use super::helpers::validate_mapping_fields;
 
 /// Parse tests section from YAML (expects a sequence)
 pub fn parse_tests(node: &Node) -> Result<Vec<TestType>, ParseError> {

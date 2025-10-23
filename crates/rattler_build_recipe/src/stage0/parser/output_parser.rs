@@ -2,6 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
+use rattler_build_yaml_parser::parse_value;
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -13,7 +14,7 @@ use crate::{
         },
         parser::{
             get_span, parse_about, parse_build, parse_extra, parse_requirements, parse_source,
-            parse_tests, parse_value,
+            parse_tests,
         },
     },
 };
