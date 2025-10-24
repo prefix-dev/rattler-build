@@ -6,7 +6,7 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use fs_err as fs;
@@ -209,7 +209,7 @@ impl Output {
     async fn build_staging_cache(
         &self,
         staging: &StagingCache,
-        cache_dir: &PathBuf,
+        cache_dir: &Path,
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<
         (
@@ -392,7 +392,7 @@ impl Output {
     async fn restore_staging_cache(
         &self,
         metadata: StagingCacheMetadata,
-        cache_dir: &PathBuf,
+        cache_dir: &Path,
     ) -> Result<
         (
             FinalizedDependencies,

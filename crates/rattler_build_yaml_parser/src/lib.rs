@@ -40,6 +40,7 @@ pub mod converter;
 pub mod error;
 pub mod helpers;
 pub mod list;
+pub mod node_ext;
 pub mod types;
 pub mod value;
 pub mod yaml;

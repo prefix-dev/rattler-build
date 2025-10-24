@@ -42,7 +42,7 @@ fn evaluate_condition(condition: &str, jinja: &Jinja) -> bool {
     let template_str = format!("{{% if {} %}}true{{% else %}}false{{% endif %}}", condition);
 
     let jinja_res = jinja.render_str(&template_str);
-    jinja_res.map(|v| v.to_string() == "true").unwrap_or(false)
+    jinja_res.map(|v| v == "true").unwrap_or(false)
 }
 
 /// Obtain a Jinja instance for conda_build_config parsing purposes

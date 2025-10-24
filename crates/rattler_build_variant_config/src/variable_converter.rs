@@ -47,7 +47,7 @@ impl NodeConverter<Variable> for VariableConverter {
             } else if let Some(i) = scalar.as_i64() {
                 // Parse as integer
                 Ok(Variable::from(i))
-            } else if let Some(_) = scalar.as_f64() {
+            } else if scalar.as_f64().is_some() {
                 // Float - but we convert to string to preserve version numbers
                 // This is important because "3.14" should be treated as a version string,
                 // not as a float 3.14
