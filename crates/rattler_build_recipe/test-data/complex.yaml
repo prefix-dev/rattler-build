@@ -58,5 +58,5 @@ requirements:
 
 extra:
   recipe-maintainers:
-    - "${{ maintainer1 }}"
-    - "${{ maintainer2 }}"
+    - someone
+    - otherone

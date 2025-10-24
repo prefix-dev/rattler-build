@@ -1,14 +1,57 @@
 //! Parser for the Extra section
-//! TODO: Turn this into a hashmap
 
+use indexmap::IndexMap;
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::ParseMapping;
+use rattler_build_yaml_parser::helpers::get_span;
 
 use crate::{error::ParseResult, stage0::extra::Extra};
 
+/// Convert a marked_yaml node to serde_value::Value
+fn node_to_yaml_value(node: &MarkedNode) -> serde_value::Value {
+    match node {
+        MarkedNode::Scalar(s) => {
+            // Try to parse as different types
+            let val_str = s.as_str();
+
+            // Check for null
+            if val_str == "null" || val_str == "~" || s.is_empty() {
+                return serde_value::Value::Option(None);
+            }
+
+            // Check for boolean
+            if let Some(bool) = s.as_bool() {
+                return serde_value::Value::Bool(bool);
+            }
+
+            // Try to parse as number
+            if let Some(i) = s.as_i64() {
+                return serde_value::Value::I64(i);
+            }
+            if let Some(f) = s.as_f64() {
+                return serde_value::Value::F64(f);
+            }
+
+            // Default to string
+            serde_value::Value::String(val_str.to_string())
+        }
+        MarkedNode::Mapping(m) => {
+            let mut map = std::collections::BTreeMap::new();
+            for (k, v) in m.iter() {
+                let key = serde_value::Value::String(k.as_str().to_string());
+                map.insert(key, node_to_yaml_value(v));
+            }
+            serde_value::Value::Map(map)
+        }
+        MarkedNode::Sequence(s) => {
+            let seq: Vec<serde_value::Value> = s.iter().map(node_to_yaml_value).collect();
+            serde_value::Value::Seq(seq)
+        }
+    }
+}
+
 /// Parse an Extra section from YAML
 ///
-/// The Extra section contains metadata like recipe maintainers.
+/// The Extra section is a free-form mapping that can contain any metadata.
 ///
 /// Example YAML:
 /// ```yaml
@@ -16,18 +59,26 @@ use crate::{error::ParseResult, stage0::extra::Extra};
 ///   recipe-maintainers:
 ///     - alice
 ///     - bob
+///   custom-field: value
+///   another-field: 123
 /// ```
 pub fn parse_extra(yaml: &MarkedNode) -> ParseResult<Extra> {
-    // Validate field names
-    yaml.validate_keys("extra", &["recipe-maintainers"])?;
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        crate::ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+    })?;
 
-    let mut extra = Extra::default();
+    let mut extra_map = IndexMap::new();
 
-    if let Some(maintainers) = yaml.try_get_conditional_list("recipe-maintainers")? {
-        extra.recipe_maintainers = maintainers;
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str().to_string();
+
+        // Convert the value node to serde_value::Value
+        let value = node_to_yaml_value(value_node);
+
+        extra_map.insert(key, value);
     }
 
-    Ok(extra)
+    Ok(Extra { extra: extra_map })
 }
 
 #[cfg(test)]
@@ -45,7 +96,7 @@ mod tests {
     fn test_parse_empty_extra() {
         let yaml = parse_yaml_extra("  {}");
         let extra = parse_extra(&yaml).unwrap();
-        assert!(extra.recipe_maintainers.is_empty());
+        assert!(extra.extra.is_empty());
     }
 
     #[test]
@@ -57,37 +108,33 @@ mod tests {
     - charlie"#;
         let yaml = parse_yaml_extra(yaml_str);
         let extra = parse_extra(&yaml).unwrap();
-        assert_eq!(extra.recipe_maintainers.len(), 3);
+        assert_eq!(extra.extra.len(), 1);
+        assert!(extra.extra.contains_key("recipe-maintainers"));
+
+        // Verify the value is a sequence
+        let value = extra.extra.get("recipe-maintainers").unwrap();
+        match value {
+            serde_value::Value::Seq(seq) => {
+                assert_eq!(seq.len(), 3);
+            }
+            _ => panic!("Expected sequence value"),
+        }
     }
 
     #[test]
-    fn test_parse_extra_with_template_maintainers() {
-        let yaml_str = r#"
-  recipe-maintainers:
-    - '${{ maintainer_1 }}'
-    - bob"#;
-        let yaml = parse_yaml_extra(yaml_str);
-        let extra = parse_extra(&yaml).unwrap();
-        assert_eq!(extra.recipe_maintainers.len(), 2);
-
-        // Verify template variable extraction
-        let vars = extra.used_variables();
-        assert_eq!(vars, vec!["maintainer_1"]);
-    }
-
-    #[test]
-    fn test_parse_extra_unknown_field() {
+    fn test_parse_extra_with_multiple_fields() {
         let yaml_str = r#"
   recipe-maintainers:
     - alice
-  unknown-field: value"#;
+    - bob
+  custom-field: some-value
+  numeric-field: 123"#;
         let yaml = parse_yaml_extra(yaml_str);
-        let result = parse_extra(&yaml);
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        let err_string = err.to_string();
-        assert!(err_string.contains("unknown field"));
+        let extra = parse_extra(&yaml).unwrap();
+        assert_eq!(extra.extra.len(), 3);
+        assert!(extra.extra.contains_key("recipe-maintainers"));
+        assert!(extra.extra.contains_key("custom-field"));
+        assert!(extra.extra.contains_key("numeric-field"));
     }
 
     #[test]

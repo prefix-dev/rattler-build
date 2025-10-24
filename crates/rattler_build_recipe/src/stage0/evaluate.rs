@@ -769,7 +769,7 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
     if s.trim().starts_with('{') {
         // Try to deserialize as Dependency (which handles pin types)
-        serde_yaml::from_str(s).map_err(|e| {
+        serde_json::from_str(s).map_err(|e| {
             ParseError::invalid_value(
                 "pin dependency",
                 format!("Failed to parse pin dependency: {}", e),
@@ -1212,8 +1212,14 @@ impl Evaluate for Stage0Requirements {
     }
 }
 
-// Use macro for simple list field evaluation
-impl_evaluate_list_fields!(Stage0Extra => Stage1Extra { recipe_maintainers });
+// Pass through Extra as-is without evaluation
+impl Evaluate for Stage0Extra {
+    type Output = Stage1Extra;
+
+    fn evaluate(&self, _context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1Extra { extra: self.extra.clone() })
+    }
+}
 
 impl Evaluate for Stage0PythonBuild {
     type Output = Stage1PythonBuild;

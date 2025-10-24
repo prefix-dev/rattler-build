@@ -95,7 +95,7 @@ impl InheritsFrom {
     }
 }
 
-fn default_schema_version() -> u32 {
+fn default_schema_version() -> u64 {
     1
 }
 
@@ -104,7 +104,7 @@ fn default_schema_version() -> u32 {
 pub struct Recipe {
     /// Schema version
     #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
+    pub schema_version: u64,
 
     /// Resolved context variables (the evaluated context after template rendering)
     #[serde(default)]
@@ -125,6 +125,10 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "Requirements::is_empty")]
     pub requirements: Requirements,
 
+    /// Tests (can be multiple tests)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<TestType>,
+
     /// About metadata
     #[serde(default, skip_serializing_if = "About::is_empty")]
     pub about: About,
@@ -132,10 +136,6 @@ pub struct Recipe {
     /// Extra metadata
     #[serde(default, skip_serializing_if = "Extra::is_empty")]
     pub extra: Extra,
-
-    /// Tests (can be multiple tests)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tests: Vec<TestType>,
 
     /// Staging caches that need to be built before this recipe.
     /// These are staging outputs from multi-output recipes that must be built and cached first.
@@ -313,9 +313,12 @@ mod tests {
             run: vec![Dependency::Spec(Box::new("python".parse().unwrap()))],
             ..Default::default()
         };
-        let extra = Extra {
-            recipe_maintainers: vec!["Alice".to_string()],
-        };
+        let mut extra_map = indexmap::IndexMap::new();
+        extra_map.insert(
+            "recipe-maintainers".to_string(),
+            serde_value::Value::Seq(vec![serde_value::Value::String("Alice".to_string())]),
+        );
+        let extra = Extra { extra: extra_map };
 
         let recipe = Recipe::new(
             pkg.clone(),

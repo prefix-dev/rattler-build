@@ -58,4 +58,4 @@ about:
   repository: null
 extra:
   recipe-maintainers:
-  - ${{ maintainer }}
+  - foobar

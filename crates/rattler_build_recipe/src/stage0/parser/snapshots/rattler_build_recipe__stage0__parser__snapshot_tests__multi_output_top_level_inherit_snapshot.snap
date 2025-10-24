@@ -322,9 +322,7 @@ MultiOutput(
             repository: None,
         },
         extra: Extra {
-            recipe_maintainers: ConditionalList {
-                items: [],
-            },
+            extra: {},
         },
         outputs: [
             Package(

@@ -25,4 +25,4 @@ requirements:
 extra:
   recipe-maintainers:
     - Alice <alice@example.com>
-    - ${{ maintainer }}
+    - foobar

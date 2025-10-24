@@ -14,8 +14,6 @@ expression: vars
     "has_cpp_lib",
     "license",
     "linux",
-    "maintainer1",
-    "maintainer2",
     "name",
     "org",
     "osx",

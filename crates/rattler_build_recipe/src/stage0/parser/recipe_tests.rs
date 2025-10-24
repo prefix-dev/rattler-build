@@ -21,7 +21,7 @@ package:
     assert!(recipe.package.name.is_concrete());
     assert!(recipe.about.homepage.is_none());
     assert!(recipe.requirements.is_empty());
-    assert!(recipe.extra.recipe_maintainers.is_empty());
+    assert!(recipe.extra.extra.is_empty());
 }
 
 #[test]
@@ -65,7 +65,8 @@ extra:
     assert_eq!(recipe.requirements.run.len(), 1);
 
     // Verify extra
-    assert_eq!(recipe.extra.recipe_maintainers.len(), 2);
+    assert_eq!(recipe.extra.extra.len(), 1);
+    assert!(recipe.extra.extra.contains_key("recipe-maintainers"));
 }
 
 #[test]
