@@ -44,7 +44,6 @@ mod tests {
             build_platform: target_platform,
             host_platform: target_platform,
             variant: variant_map,
-            hash: None,
             experimental: false,
             recipe_path: None,
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Strict,
@@ -521,7 +520,12 @@ build:
         variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
         variant.insert("foobar".to_string(), Variable::from("baz"));
 
-        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+        assert!(used_variant.contains_key(&"foobar".into()));
+        assert!(used_variant.contains_key(&"target_platform".into()));
+        assert_eq!(used_variant.len(), 2);
+        let hash_info = HashInfo::from_variant(&used_variant, &NoArchType::none());
+        assert_eq!(hash_info.hash, "bf59cf5");
 
         assert_eq!(
             recipe
@@ -529,7 +533,7 @@ build:
                 .string
                 .as_str()
                 .expect("build string should be resolved"),
-            "custom_60d57d3_build_osx-arm64_baz_12"
+            "custom_bf59cf5_build_osx-arm64_baz_12"
         );
     }
 
@@ -697,5 +701,97 @@ build:
 
         // Order should be: np, py, pl, lua, r
         assert_eq!(hash_info.prefix, "np120py311pl532r42");
+    }
+
+    #[test]
+    fn test_script_variable_tracking() {
+        // Test that variables used in build script are tracked even if undefined at evaluation time
+        let yaml = r#"
+package:
+  name: test-script-vars
+  version: "1.0.0"
+
+build:
+  number: 0
+  script: "echo Using variant: ${{ python }}"
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.11"));
+        // Note: PYTHON and PREFIX are environment variables available at build time,
+        // not at parse/evaluation time
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Should include python because it's used in the script
+        assert!(used_variant.contains_key(&NormalizedKey::from("python")));
+        // Should include target_platform (always included)
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+    }
+
+    #[test]
+    fn test_build_string_variable_tracking() {
+        // Test that variables used in build.string are tracked
+        let yaml = r#"
+package:
+  name: test-build-string
+  version: "1.0.0"
+
+build:
+  number: 0
+  string: "py${{ python }}_${{ hash }}_${{ build_number }}"
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.11"));
+        variant.insert("numpy".to_string(), Variable::from("1.20"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Should include python because it's used in build.string
+        assert!(used_variant.contains_key(&NormalizedKey::from("python")));
+        // Should NOT include numpy since it's not referenced
+        assert!(!used_variant.contains_key(&NormalizedKey::from("numpy")));
+
+        // Verify build string was resolved
+        assert!(recipe.build.string.is_resolved());
+        let build_str = recipe.build.string.as_resolved().unwrap();
+        assert!(build_str.contains("py3"));
+    }
+
+    #[test]
+    fn test_script_and_build_string_combined() {
+        // Test that variables from both script and build.string are tracked
+        let yaml = r#"
+package:
+  name: test-combined
+  version: "1.0.0"
+
+build:
+  number: 42
+  string: "py${{ python }}_h${{ hash }}"
+  script: "echo NumPy ${{ numpy }} and R ${{ r_base }}"
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.12"));
+        variant.insert("numpy".to_string(), Variable::from("1.26"));
+        variant.insert("r_base".to_string(), Variable::from("4.3"));
+        variant.insert("perl".to_string(), Variable::from("5.38")); // unused
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Should include python (from build.string), numpy and r_base (from script)
+        assert!(used_variant.contains_key(&NormalizedKey::from("python")));
+        assert!(used_variant.contains_key(&NormalizedKey::from("numpy")));
+        assert!(used_variant.contains_key(&NormalizedKey::from("r_base")));
+        // Should NOT include perl since it's not referenced
+        assert!(!used_variant.contains_key(&NormalizedKey::from("perl")));
+
+        // Verify build string was resolved
+        assert!(recipe.build.string.is_resolved());
+        let build_str = recipe.build.string.as_resolved().unwrap();
+        // Build string should be in format "py{python_version}_h{hash}"
+        assert!(build_str.contains("py3") && build_str.contains("_h"));
     }
 }

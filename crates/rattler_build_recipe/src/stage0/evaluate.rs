@@ -494,6 +494,53 @@ fn extract_template_source(value: &Value<String>) -> Option<String> {
     }
 }
 
+/// Track variables used in a template without evaluating it
+/// This is used to track variable access for deferred evaluation (e.g., build.script with environment variables)
+/// Returns the variables that are referenced in the template
+fn track_template_variables(value: &Value<String>, context: &EvaluationContext) -> Vec<String> {
+    if let Some(template) = value.as_template() {
+        let vars = template.used_variables();
+        for var in vars {
+            context.track_access(var);
+        }
+        vars.to_vec()
+    } else {
+        Vec::new()
+    }
+}
+
+/// Try to evaluate a template string, but preserve it if there are undefined variables
+/// This is specifically for build script content where environment variables like ${{ PYTHON }}
+/// are only available at build time.
+/// Returns Ok(evaluated_string) if successful, or Ok(raw_template) if there were undefined variables.
+/// Returns Err only for non-undefined-variable errors (syntax errors, etc.)
+fn evaluate_or_preserve_template(
+    value: &Value<String>,
+    context: &EvaluationContext,
+) -> Result<String, ParseError> {
+    // First, track the variables
+    track_template_variables(value, context);
+
+    // Try to evaluate
+    match evaluate_string_value(value, context) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            // Check if this error was due to undefined variables
+            // The error message will contain "undefined value" or we can check the tracked undefined vars
+            let error_msg = e.to_string();
+            if error_msg.contains("undefined value")
+                || error_msg.contains("not defined in the evaluation context")
+            {
+                // This is an undefined variable error - preserve the template
+                Ok(extract_template_source(value).unwrap_or_default())
+            } else {
+                // This is a different error (syntax error, etc.) - propagate it
+                Err(e)
+            }
+        }
+    }
+}
+
 /// Evaluate an optional Value<T: ToString> into an Option<T> by parsing the string result
 pub fn evaluate_optional_value_to_type<T>(
     value: &Option<Value<T>>,
@@ -578,6 +625,19 @@ pub fn evaluate_string_list(
 ) -> Result<Vec<String>, ParseError> {
     evaluate_conditional_list(list, context, |value, ctx| {
         let s = evaluate_string_value(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        Ok(if s.is_empty() { None } else { Some(s) })
+    })
+}
+
+/// Evaluate a string list, preserving templates with undefined variables
+/// This is used for script content where build-time environment variables might be referenced
+pub fn evaluate_string_list_lenient(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let s = evaluate_or_preserve_template(value, ctx)?;
         // Filter out empty strings from templates like `${{ "value" if condition }}`
         Ok(if s.is_empty() { None } else { Some(s) })
     })
@@ -789,8 +849,12 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
     }
 }
 
-/// Evaluate a ConditionalList<ScriptContent> into rattler_build_script::Script
-/// Evaluate a stage0::Script into a rattler_build_script::Script
+/// Evaluate script with variable tracking for content, allowing undefined environment variables
+///
+/// This function evaluates script metadata (interpreter, env, cwd, file) normally, but for
+/// script content (inline commands), it tracks variables and preserves templates with undefined
+/// variables. This allows build-time environment variables like ${{ PYTHON }} or ${{ PREFIX }}
+/// to be used in scripts without failing during recipe evaluation.
 pub fn evaluate_script(
     script: &crate::stage0::types::Script,
     context: &EvaluationContext,
@@ -802,7 +866,7 @@ pub fn evaluate_script(
         return Ok(Script::default());
     }
 
-    // Evaluate interpreter
+    // Evaluate interpreter normally (it's typically simple and doesn't use env vars)
     let interpreter = if let Some(interp) = &script.interpreter {
         Some(evaluate_string_value(interp, context)?)
     } else {
@@ -810,7 +874,6 @@ pub fn evaluate_script(
     };
 
     // Evaluate environment variables
-    // Filter out keys whose values evaluate to empty strings
     let mut env = indexmap::IndexMap::new();
     for (key, val) in &script.env {
         let evaluated_val = evaluate_string_value(val, context)?;
@@ -822,19 +885,23 @@ pub fn evaluate_script(
     // Copy secrets as-is
     let secrets = script.secrets.clone();
 
-    // Evaluate cwd
+    // Evaluate cwd normally (it's a path, not a script command)
     let cwd = if let Some(cwd_val) = &script.cwd {
         Some(PathBuf::from(evaluate_string_value(cwd_val, context)?))
     } else {
         None
     };
 
-    // Evaluate content or file
+    // For content: evaluate conditionals but preserve templates with undefined vars
     let content = if let Some(file_val) = &script.file {
+        // File paths should be evaluated normally
         let file_str = evaluate_string_value(file_val, context)?;
         ScriptContentOutput::Path(PathBuf::from(file_str))
     } else if let Some(content_list) = &script.content {
-        let commands = evaluate_string_list(content_list, context)?;
+        // Use the lenient evaluation that preserves templates with undefined variables
+        // This handles conditional logic (if/then/else) while preserving build-time env vars
+        let commands = evaluate_string_list_lenient(content_list, context)?;
+
         if commands.is_empty() {
             ScriptContentOutput::Default
         } else if commands.len() == 1 {
@@ -1217,7 +1284,9 @@ impl Evaluate for Stage0Extra {
     type Output = Stage1Extra;
 
     fn evaluate(&self, _context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        Ok(Stage1Extra { extra: self.extra.clone() })
+        Ok(Stage1Extra {
+            extra: self.extra.clone(),
+        })
     }
 }
 
@@ -1442,15 +1511,22 @@ impl Evaluate for Stage0Build {
         // IMPORTANT: Do NOT fully evaluate build.string here - it may contain a "hash" variable
         // that needs to be deferred until after we know the actual variant and can compute the hash.
         // Store it as BuildString::Unresolved if it contains templates.
+        // Track the variables used in the template to count towards "actually used" variables.
         let string = self
             .string
             .as_ref()
             .map_or(crate::stage1::build::BuildString::Default, |s| {
+                // Track variables without failing on undefined
+                track_template_variables(s, context);
+
                 let template = extract_template_source(s).unwrap();
                 crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
             });
 
-        // Evaluate script
+        // IMPORTANT: Do NOT fully evaluate build.script here - it may contain environment variables
+        // like ${{ PYTHON }} or ${{ PREFIX }} that are only available at build time.
+        // Track the variables used in the script to count towards "actually used" variables,
+        // but defer actual evaluation until build time.
         let script = evaluate_script(&self.script, context)?;
 
         // Evaluate noarch

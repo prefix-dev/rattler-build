@@ -13,8 +13,7 @@ build:
   number: 0
   python:
     version_independent: true
-  # TODO(refactor): Change back to ${{ PYTHON }} once templates in script allowed.
-  script: python -m pip install . -vv
+  script: ${{ PYTHON }} -m pip install . -vv
 
 requirements:
   build:

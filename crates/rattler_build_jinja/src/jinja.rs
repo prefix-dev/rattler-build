@@ -22,7 +22,6 @@ use crate::variable::Variable;
 pub use minijinja::UndefinedBehavior;
 
 /// Configuration for Jinja template rendering in rattler-build
-/// TODO(refactor): think about splitting this type?
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
     /// The target platform for the build
@@ -33,8 +32,6 @@ pub struct JinjaConfig {
     pub host_platform: Platform,
     /// Variant configuration (compiler versions, etc.)
     pub variant: BTreeMap<NormalizedKey, Variable>,
-    /// The special `hash` variable (TODO(refactor): remove this in the future)
-    pub hash: Option<String>,
     /// Whether experimental features are enabled
     pub experimental: bool,
     /// Path to the recipe file (for relative path resolution in load_from_file)
@@ -51,7 +48,6 @@ impl Default for JinjaConfig {
             build_platform: current,
             host_platform: current,
             variant: BTreeMap::new(),
-            hash: None,
             experimental: false,
             recipe_path: None,
             undefined_behavior: UndefinedBehavior::SemiStrict,
@@ -576,7 +572,6 @@ fn set_jinja(
         host_platform,
         build_platform,
         variant,
-        hash,
         experimental,
         recipe_path,
         undefined_behavior,
@@ -671,7 +666,6 @@ fn set_jinja(
         Ok(res)
     });
 
-    // "${{ PREFIX }}" delay the expansion. -> $PREFIX on unix and %PREFIX% on windows?
     let variant_clone = variant.clone();
     let accessed_clone = accessed_variables.clone();
     env.add_function("compiler", move |lang: String| {
@@ -828,13 +822,6 @@ fn set_jinja(
 
     // Add git object (experimental)
     env.add_global("git", Value::from_object(crate::git::Git { experimental }));
-
-    if let Some(hash) = hash {
-        env.add_global("hash", Value::from(hash));
-    } else {
-        // TODO(refactor): fix when we use `hash` in build string
-        env.add_global("hash", Value::from("undefined"));
-    }
 
     env
 }

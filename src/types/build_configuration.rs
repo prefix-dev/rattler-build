@@ -85,7 +85,6 @@ impl BuildConfiguration {
             host_platform: self.host_platform.platform,
             build_platform: self.build_platform.platform,
             variant: self.variant.clone(),
-            hash: Some(self.hash.to_string()),
             experimental: false,
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Lenient,
             recipe_path: None,
