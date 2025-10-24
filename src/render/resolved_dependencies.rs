@@ -728,15 +728,6 @@ pub(crate) async fn resolve_dependencies(
     tool_configuration: &tool_configuration::Configuration,
     download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
-    // DEBUG: Check if finalized_cache_dependencies is set
-    tracing::warn!(
-        "resolve_dependencies called for '{}', finalized_cache_deps: {}, finalized_deps: {}, inherits_from: {:?}",
-        output.identifier(),
-        output.finalized_cache_dependencies.is_some(),
-        output.finalized_dependencies.is_some(),
-        output.recipe.inherits_from
-    );
-
     let merge_build_host = output.recipe.build().merge_build_and_host_envs;
 
     let mut compatibility_specs = HashMap::new();
@@ -843,22 +834,6 @@ pub(crate) async fn resolve_dependencies(
         "build",
     )?;
 
-    // TODO: re-enable cache
-    // if let Some(cache) = &output.finalized_cache_dependencies {
-    //     if let Some(cache_build_env) = &cache.build {
-    //         let cache_build_run_exports = cache_build_env.run_exports(true);
-    //         let filtered = output
-    //             .recipe
-    //             .cache
-    //             .as_ref()
-    //             .expect("recipe should have cache section")
-    //             .requirements
-    //             .ignore_run_exports(Some(&output_ignore_run_exports))
-    //             .filter(&cache_build_run_exports, "cache-build")?;
-    //         build_run_exports.extend(&filtered);
-    //     }
-    // }
-
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
 
     let mut match_specs = host_env_specs
@@ -945,7 +920,7 @@ pub(crate) async fn resolve_dependencies(
         false,
     )?;
 
-    // add in dependencies from the finalized cache
+    // Add in dependencies from the finalized cache
     // This includes run_exports that were already filtered during staging cache build
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
         // Check if we should inherit run_exports from the staging cache
@@ -994,12 +969,6 @@ pub(crate) async fn resolve_dependencies(
     let host_run_exports =
         filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
 
-    // NOTE: We don't need to separately add run_exports from staging cache here.
-    // Run_exports from the staging cache are already included in finalized_cache_dependencies.run.depends
-    // (see the code above that adds cache dependencies to `depends`).
-    // The staging cache's run_exports were filtered based on the staging output's ignore_run_exports
-    // settings when the cache was built, so we don't need to re-filter them here.
-
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
         // ignore build noarch depends
@@ -1012,39 +981,6 @@ pub(crate) async fn resolve_dependencies(
         constraints.extend(build_run_exports.strong_constraints.iter().cloned());
         constraints.extend(host_run_exports.strong_constraints.iter().cloned());
         constraints.extend(host_run_exports.weak_constraints.iter().cloned());
-    }
-
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        // add in the run exports from the cache
-        // filter run dependencies that came from run exports
-        let ignore_run_exports = &requirements.ignore_run_exports;
-        // Note: these run exports are already filtered
-        let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
-            DependencyInfo::RunExport(run_export) => {
-                let source_package: Option<PackageName> = run_export.source_package.parse().ok();
-                let spec_name = &run_export.spec.name;
-
-                // TODO use package names here.
-                let by_name = spec_name
-                    .as_ref()
-                    .map(|n| {
-                        ignore_run_exports
-                            .by_name
-                            .contains(&n.as_normalized().to_string())
-                    })
-                    .unwrap_or(false);
-                let by_package = source_package
-                    .map(|s| {
-                        ignore_run_exports
-                            .from_package
-                            .contains(&s.as_normalized().to_string())
-                    })
-                    .unwrap_or(false);
-
-                !by_name && !by_package
-            }
-            _ => false,
-        });
     }
 
     let run_specs = FinalizedRunDependencies {
