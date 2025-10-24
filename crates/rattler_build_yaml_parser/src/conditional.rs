@@ -157,6 +157,7 @@ val:
     then: ["3.9", "3.10"]
   - if: win
     then: ["3.8"]
+    else: ["3.11", "3.12", "3.13"]
 "#,
         )
         .unwrap();
@@ -167,6 +168,14 @@ val:
         let first = list.iter().next().unwrap();
         if let Item::Conditional(cond) = first {
             assert_eq!(cond.then.len(), 2);
+        } else {
+            panic!("Expected conditional");
+        }
+
+        let second = list.iter().nth(1).unwrap();
+        if let Item::Conditional(cond) = second {
+            assert_eq!(cond.then.len(), 1);
+            assert_eq!(cond.else_value.as_ref().unwrap().len(), 3);
         } else {
             panic!("Expected conditional");
         }
