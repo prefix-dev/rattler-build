@@ -7,10 +7,6 @@ recipe:
   name: multi-stage-project
   version: 1.0.0
 
-source:
-  - url: https://example.com/source.tar.gz
-    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-
 outputs:
   # First staging output - builds core library
   - staging:

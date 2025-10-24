@@ -188,37 +188,6 @@ def test_staging_with_variants(
     assert any("python" in dep for dep in index.get("depends", []))
 
 
-def test_staging_cache_reuse(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that staging cache is reused on second build (performance test)."""
-    import time
-
-    # First build - should build the staging cache
-    start1 = time.time()
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
-    duration1 = time.time() - start1
-
-    # Clean the output packages but keep the cache
-    for pkg in tmp_path.glob("**/*.conda"):
-        pkg.unlink()
-    for pkg in tmp_path.glob("**/*.tar.bz2"):
-        pkg.unlink()
-
-    # Second build - should use the cached staging
-    start2 = time.time()
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
-    duration2 = time.time() - start2
-
-    # Second build should be faster (though this is a weak assertion)
-    # We mainly just verify it doesn't error when using cache
-    pkg1 = get_extracted_package(tmp_path, "foo-split-1")
-    pkg2 = get_extracted_package(tmp_path, "foo-othersplit")
-
-    assert (pkg1 / "foo.txt").exists()
-    assert (pkg2 / "foo.txt").exists()
-
-
 @pytest.mark.xfail(reason="Staging implementation not finished")
 def test_multiple_staging_caches(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path

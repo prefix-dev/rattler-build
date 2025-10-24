@@ -7,10 +7,6 @@ recipe:
   name: work-dir-cache-test
   version: 1.0.0
 
-source:
-  - url: https://example.com/source.tar.gz
-    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-
 outputs:
   # Staging output that generates files in both work dir and prefix
   - staging:

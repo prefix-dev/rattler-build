@@ -24,12 +24,7 @@ pub fn filter_run_exports(
     from_env: &str,
 ) -> Result<FilteredRunExports, ParseMatchSpecError> {
     let mut run_export_map = run_export_map.clone();
-    // TODO(refactor): Use PackageName in ignore_run_exports
-    run_export_map.retain(|name, _| {
-        !ignore_run_exports
-            .from_package
-            .contains(&name.as_normalized().to_string())
-    });
+    run_export_map.retain(|name, _| !ignore_run_exports.from_package.contains(name));
 
     let mut filtered_run_exports = FilteredRunExports::default();
 
@@ -43,12 +38,7 @@ pub fn filter_run_exports(
                     if spec
                         .name
                         .as_ref()
-                        // TODO(refactor): Use PackageName in ignore_run_exports
-                        .map(|n| {
-                            !ignore_run_exports
-                                .by_name
-                                .contains(&n.as_normalized().to_string())
-                        })
+                        .map(|n| !ignore_run_exports.by_name.contains(n))
                         .unwrap_or(false)
                     {
                         Some(Ok(spec))
@@ -70,10 +60,7 @@ pub fn filter_run_exports(
     };
 
     for (name, run_export) in run_export_map.iter() {
-        if ignore_run_exports
-            .from_package
-            .contains(&name.as_normalized().to_string())
-        {
+        if ignore_run_exports.from_package.contains(name) {
             continue;
         }
 

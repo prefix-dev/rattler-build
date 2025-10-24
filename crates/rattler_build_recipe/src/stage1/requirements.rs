@@ -163,11 +163,11 @@ pub struct IgnoreRunExports {
     /// Packages to ignore run exports from by name
     /// TODO: move to PackageName perhaps (or spec!?)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub by_name: Vec<String>,
+    pub by_name: Vec<PackageName>,
 
     /// Packages whose run_exports to ignore
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub from_package: Vec<String>,
+    pub from_package: Vec<PackageName>,
 }
 
 impl IgnoreRunExports {
