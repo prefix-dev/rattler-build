@@ -1,7 +1,7 @@
 //! Parser for the About section
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{ParseMapping, parse_conditional_list};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -62,69 +62,35 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
 ///   repository: https://github.com/example/repo
 /// ```
 pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("About section must be a mapping")
-    })?;
+    // Validate field names first
+    yaml.validate_keys(
+        "about",
+        &[
+            "homepage",
+            "license",
+            "license_file",
+            "license_family",
+            "summary",
+            "description",
+            "documentation",
+            "repository",
+        ],
+    )?;
 
-    let mut about = About::default();
+    let mut about = About {
+        homepage: yaml.try_get_field("homepage")?,
+        license: yaml.try_get_field("license")?,
+        license_family: yaml.try_get_field("license_family")?,
+        summary: yaml.try_get_field("summary")?,
+        description: yaml.try_get_field("description")?,
+        documentation: yaml.try_get_field("documentation")?,
+        repository: yaml.try_get_field("repository")?,
+        license_file: Default::default(),
+    };
 
-    // Parse each optional field
-    if let Some(homepage) = mapping.get("homepage") {
-        about.homepage = Some(parse_value(homepage)?);
-    }
-
-    if let Some(license) = mapping.get("license") {
-        about.license = Some(parse_value(license)?);
-    }
-
-    if let Some(license_file) = mapping.get("license_file") {
-        about.license_file = parse_license_file(license_file)?;
-    }
-
-    if let Some(license_family) = mapping.get("license_family") {
-        about.license_family = Some(parse_value(license_family)?);
-    }
-
-    if let Some(summary) = mapping.get("summary") {
-        about.summary = Some(parse_value(summary)?);
-    }
-
-    if let Some(description) = mapping.get("description") {
-        about.description = Some(parse_value(description)?);
-    }
-
-    if let Some(documentation) = mapping.get("documentation") {
-        about.documentation = Some(parse_value(documentation)?);
-    }
-
-    if let Some(repository) = mapping.get("repository") {
-        about.repository = Some(parse_value(repository)?);
-    }
-
-    // Check for unknown fields to provide helpful error messages
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "homepage"
-                | "license"
-                | "license_file"
-                | "license_family"
-                | "summary"
-                | "description"
-                | "documentation"
-                | "repository"
-        ) {
-            return Err(ParseError::invalid_value(
-                "about",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion(
-                "valid fields are: homepage, license, license_file, license_family, summary, description, documentation, repository"
-            ));
-        }
+    // Handle license_file specially since it can be a single value or list
+    if let Some(license_file_node) = yaml.as_mapping().and_then(|m| m.get("license_file")) {
+        about.license_file = parse_license_file(license_file_node)?;
     }
 
     Ok(about)

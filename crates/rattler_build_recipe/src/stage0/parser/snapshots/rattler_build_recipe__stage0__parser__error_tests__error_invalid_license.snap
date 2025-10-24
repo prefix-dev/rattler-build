@@ -2,13 +2,13 @@
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
 expression: error_with_source
 ---
-  × invalid value for 'value': InvalidLicense
+  × invalid value for 'license': InvalidLicense
   │ ^^^^^^^^^^^^^^ unknown term
    ╭─[error_license.yaml:6:12]
  5 │ about:
  6 │   license: InvalidLicense
    ·            ───────┬──────
-   ·                   ╰─┤ invalid value for 'value': InvalidLicense
+   ·                   ╰─┤ invalid value for 'license': InvalidLicense
    ·                     │ ^^^^^^^^^^^^^^ unknown term
  7 │   summary: An example package with an invalid license
    ╰────

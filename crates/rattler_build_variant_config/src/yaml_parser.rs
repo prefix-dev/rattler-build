@@ -7,9 +7,7 @@ use crate::stage0_types::ConditionalList;
 use crate::variable_converter::VariableConverter;
 use marked_yaml::{Node, Span};
 use rattler_build_types::NormalizedKey;
-use rattler_build_yaml_parser::{
-    ParseError, ParseResult, parse_conditional_list_with_converter, parse_yaml,
-};
+use rattler_build_yaml_parser::{ParseError, ParseNode, ParseResult, parse_yaml};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -41,15 +39,17 @@ pub fn parse_variant_str(
     yaml: &str,
     path: Option<PathBuf>,
 ) -> Result<Stage0VariantConfig, VariantConfigError> {
+    let path_buf = path.unwrap_or_default();
+
     let node = parse_yaml(yaml)
         .map_err(|e| ParseError::generic(e.to_string(), Span::new_blank()))
         .map_err(|source| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
+            path: path_buf.clone(),
             source,
         })?;
 
     parse_node(&node).map_err(|source| VariantConfigError::ParseError {
-        path: path.unwrap_or_default(),
+        path: path_buf,
         source,
     })
 }
@@ -100,21 +100,8 @@ fn parse_zip_keys(node: &Node) -> ParseResult<Vec<Vec<NormalizedKey>>> {
 
     let mut result = Vec::new();
     for seq_node in sequences.iter() {
-        let inner = seq_node.as_sequence().ok_or_else(|| {
-            ParseError::generic("zip_keys must be a list of lists", *seq_node.span())
-        })?;
-
-        let keys: Vec<NormalizedKey> = inner
-            .iter()
-            .map(|v| {
-                let key_str = v
-                    .as_scalar()
-                    .ok_or_else(|| ParseError::generic("Invalid zip key", *v.span()))?;
-                Ok(key_str.as_str().into())
-            })
-            .collect::<ParseResult<_>>()?;
-
-        result.push(keys);
+        let keys: Vec<String> = seq_node.parse_sequence("zip_keys")?;
+        result.push(keys.into_iter().map(NormalizedKey::from).collect());
     }
 
     Ok(result)
@@ -122,7 +109,7 @@ fn parse_zip_keys(node: &Node) -> ParseResult<Vec<Vec<NormalizedKey>>> {
 
 /// Parse variant values from a marked_yaml Node, handling conditionals and templates
 fn parse_variant_values(node: &Node, key: &str) -> ParseResult<ConditionalList> {
-    // Check that it's a sequence first to provide better error message
+    // Provide a helpful error message if not a sequence
     if node.as_sequence().is_none() {
         return Err(ParseError::generic(
             format!("Variant values for '{}' must be a list", key),
@@ -130,9 +117,7 @@ fn parse_variant_values(node: &Node, key: &str) -> ParseResult<ConditionalList> 
         ));
     }
 
-    // Use the shared parser with VariableConverter
-    let converter = VariableConverter::new();
-    parse_conditional_list_with_converter(node, &converter)
+    node.parse_conditional_list_with(&VariableConverter::new())
 }
 
 #[cfg(test)]

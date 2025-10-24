@@ -1,7 +1,7 @@
 //! Parser for the Requirements section
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::parse_conditional_list;
+use rattler_build_yaml_parser::{ParseMapping, parse_conditional_list};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -29,29 +29,41 @@ use crate::{
 ///     - numpy >=1.19
 /// ```
 pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("Requirements section must be a mapping")
-    })?;
+    // Validate field names first
+    yaml.validate_keys(
+        "requirements",
+        &[
+            "build",
+            "host",
+            "run",
+            "run_constraints",
+            "run_exports",
+            "ignore_run_exports",
+        ],
+    )?;
 
     let mut requirements = Requirements::default();
 
-    // Parse each optional field
-    if let Some(build) = mapping.get("build") {
-        requirements.build = parse_conditional_list(build)?;
+    if let Some(build) = yaml.try_get_conditional_list("build")? {
+        requirements.build = build;
     }
 
-    if let Some(host) = mapping.get("host") {
-        requirements.host = parse_conditional_list(host)?;
+    if let Some(host) = yaml.try_get_conditional_list("host")? {
+        requirements.host = host;
     }
 
-    if let Some(run) = mapping.get("run") {
-        requirements.run = parse_conditional_list(run)?;
+    if let Some(run) = yaml.try_get_conditional_list("run")? {
+        requirements.run = run;
     }
 
-    if let Some(run_constraints) = mapping.get("run_constraints") {
-        requirements.run_constraints = parse_conditional_list(run_constraints)?;
+    if let Some(run_constraints) = yaml.try_get_conditional_list("run_constraints")? {
+        requirements.run_constraints = run_constraints;
     }
+
+    // Handle run_exports and ignore_run_exports with special parsing
+    let mapping = yaml
+        .as_mapping()
+        .ok_or_else(|| ParseError::expected_type("mapping", "non-mapping", get_span(yaml)))?;
 
     if let Some(run_exports) = mapping.get("run_exports") {
         requirements.run_exports = parse_run_exports(run_exports)?;
@@ -59,24 +71,6 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
 
     if let Some(ignore_run_exports) = mapping.get("ignore_run_exports") {
         requirements.ignore_run_exports = parse_ignore_run_exports(ignore_run_exports)?;
-    }
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "build" | "host" | "run" | "run_constraints" | "run_exports" | "ignore_run_exports"
-        ) {
-            return Err(ParseError::invalid_value(
-                "requirements",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion(
-                "valid fields are: build, host, run, run_constraints, run_exports, ignore_run_exports",
-            ));
-        }
     }
 
     Ok(requirements)
@@ -97,50 +91,38 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
         });
     }
 
-    // Otherwise, parse as mapping
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping or list", "other", get_span(yaml))
-            .with_message("run_exports must be either a list or a mapping")
-    })?;
+    // Otherwise, parse as mapping with validation
+    yaml.validate_keys(
+        "run_exports",
+        &[
+            "noarch",
+            "strong",
+            "strong_constraints",
+            "weak",
+            "weak_constraints",
+        ],
+    )?;
 
     let mut run_exports = RunExports::default();
 
-    if let Some(noarch) = mapping.get("noarch") {
-        run_exports.noarch = parse_conditional_list(noarch)?;
+    if let Some(noarch) = yaml.try_get_conditional_list("noarch")? {
+        run_exports.noarch = noarch;
     }
 
-    if let Some(strong) = mapping.get("strong") {
-        run_exports.strong = parse_conditional_list(strong)?;
+    if let Some(strong) = yaml.try_get_conditional_list("strong")? {
+        run_exports.strong = strong;
     }
 
-    if let Some(strong_constraints) = mapping.get("strong_constraints") {
-        run_exports.strong_constraints = parse_conditional_list(strong_constraints)?;
+    if let Some(strong_constraints) = yaml.try_get_conditional_list("strong_constraints")? {
+        run_exports.strong_constraints = strong_constraints;
     }
 
-    if let Some(weak) = mapping.get("weak") {
-        run_exports.weak = parse_conditional_list(weak)?;
+    if let Some(weak) = yaml.try_get_conditional_list("weak")? {
+        run_exports.weak = weak;
     }
 
-    if let Some(weak_constraints) = mapping.get("weak_constraints") {
-        run_exports.weak_constraints = parse_conditional_list(weak_constraints)?;
-    }
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "noarch" | "strong" | "strong_constraints" | "weak" | "weak_constraints"
-        ) {
-            return Err(ParseError::invalid_value(
-                "run_exports",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion(
-                "valid fields are: noarch, strong, strong_constraints, weak, weak_constraints",
-            ));
-        }
+    if let Some(weak_constraints) = yaml.try_get_conditional_list("weak_constraints")? {
+        run_exports.weak_constraints = weak_constraints;
     }
 
     Ok(run_exports)
@@ -148,32 +130,18 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
 
 /// Parse an IgnoreRunExports section
 pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreRunExports> {
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("ignore_run_exports must be a mapping")
-    })?;
+    // Validate field names first
+    yaml.validate_keys("ignore_run_exports", &["by_name", "from_package"])?;
 
     let mut ignore = IgnoreRunExports::default();
 
-    if let Some(by_name) = mapping.get("by_name") {
-        ignore.by_name = parse_conditional_list(by_name)?;
+    // Parse each optional field using ergonomic API
+    if let Some(by_name) = yaml.try_get_conditional_list("by_name")? {
+        ignore.by_name = by_name;
     }
 
-    if let Some(from_package) = mapping.get("from_package") {
-        ignore.from_package = parse_conditional_list(from_package)?;
-    }
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "by_name" | "from_package") {
-            return Err(ParseError::invalid_value(
-                "ignore_run_exports",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion("valid fields are: by_name, from_package"));
-        }
+    if let Some(from_package) = yaml.try_get_conditional_list("from_package")? {
+        ignore.from_package = from_package;
     }
 
     Ok(ignore)

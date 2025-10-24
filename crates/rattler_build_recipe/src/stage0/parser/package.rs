@@ -2,6 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
+use rattler_build_yaml_parser::ParseMapping;
 
 use std::str::FromStr;
 
@@ -21,6 +22,9 @@ use crate::{
 ///   version: 1.0.0
 /// ```
 pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
+    // Validate field names first
+    yaml.validate_keys("package", &["name", "version"])?;
+
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("Package section must be a mapping")
@@ -80,19 +84,6 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
             .map_err(|e| ParseError::invalid_value("version", e.to_string(), version_span))?;
         Value::new_concrete(version_with_source, Some(version_span))
     };
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "name" | "version") {
-            return Err(ParseError::invalid_value(
-                "package",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion("valid fields are: name, version"));
-        }
-    }
 
     Ok(Package { name, version })
 }

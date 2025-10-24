@@ -10,5 +10,4 @@ expression: error_with_source
     ·       ╰── invalid value for 'staging output': unknown field 'about'
  18 │       summary: This should not be allowed
     ╰────
-  help: valid fields for staging outputs are: staging, source, requirements,
-        build
+  help: valid fields are: staging, source, requirements, build

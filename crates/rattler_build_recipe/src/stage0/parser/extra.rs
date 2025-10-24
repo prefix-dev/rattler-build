@@ -2,12 +2,9 @@
 //! TODO: Turn this into a hashmap
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::parse_conditional_list;
+use rattler_build_yaml_parser::ParseMapping;
 
-use crate::{
-    error::{ParseError, ParseResult},
-    stage0::{extra::Extra, parser::helpers::get_span},
-};
+use crate::{error::ParseResult, stage0::extra::Extra};
 
 /// Parse an Extra section from YAML
 ///
@@ -21,29 +18,13 @@ use crate::{
 ///     - bob
 /// ```
 pub fn parse_extra(yaml: &MarkedNode) -> ParseResult<Extra> {
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("Extra section must be a mapping")
-    })?;
+    // Validate field names
+    yaml.validate_keys("extra", &["recipe-maintainers"])?;
 
     let mut extra = Extra::default();
 
-    // Parse recipe-maintainers field
-    if let Some(maintainers) = mapping.get("recipe-maintainers") {
-        extra.recipe_maintainers = parse_conditional_list(maintainers)?;
-    }
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "recipe-maintainers") {
-            return Err(ParseError::invalid_value(
-                "extra",
-                format!("unknown field '{}'", key_str),
-                *key.span(),
-            )
-            .with_suggestion("valid fields are: recipe-maintainers"));
-        }
+    if let Some(maintainers) = yaml.try_get_conditional_list("recipe-maintainers")? {
+        extra.recipe_maintainers = maintainers;
     }
 
     Ok(extra)
