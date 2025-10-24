@@ -643,6 +643,39 @@ pub fn evaluate_string_list_lenient(
     })
 }
 
+/// Evaluate a ConditionalList<PackageName> into Vec<PackageName>
+///
+/// This evaluates templates in PackageName values and filters out empty results.
+pub fn evaluate_package_name_list(
+    list: &ConditionalList<PackageName>,
+    context: &EvaluationContext,
+) -> Result<Vec<PackageName>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        // Handle both concrete PackageName and template values
+        if let Some(concrete) = value.as_concrete() {
+            // For concrete values, just clone it
+            Ok(Some(concrete.clone()))
+        } else if let Some(template) = value.as_template() {
+            // Render the template
+            let s = render_template(template.source(), ctx, value.span())?;
+            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+            if s.is_empty() {
+                return Ok(None);
+            }
+            // Parse the string into a PackageName
+            PackageName::from_str(&s).map(Some).map_err(|e| {
+                ParseError::invalid_value(
+                    "package name",
+                    format!("'{}' is not a valid package name: {}", s, e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    })
+}
+
 /// Helper function to validate and evaluate glob patterns from a ConditionalList
 fn evaluate_glob_patterns(
     list: &ConditionalList<String>,
@@ -1259,10 +1292,16 @@ impl Evaluate for Stage0RunExports {
     }
 }
 
-impl_evaluate_list_fields!(Stage0IgnoreRunExports => Stage1IgnoreRunExports {
-    by_name,
-    from_package,
-});
+impl Evaluate for Stage0IgnoreRunExports {
+    type Output = Stage1IgnoreRunExports;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1IgnoreRunExports {
+            by_name: evaluate_package_name_list(&self.by_name, context)?,
+            from_package: evaluate_package_name_list(&self.from_package, context)?,
+        })
+    }
+}
 
 impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;

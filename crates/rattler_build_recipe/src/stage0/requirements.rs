@@ -195,11 +195,11 @@ impl RunExports {
 pub struct IgnoreRunExports {
     /// Package names to ignore (can contain templates/conditionals)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub by_name: ConditionalList<String>,
+    pub by_name: ConditionalList<PackageName>,
 
     /// Packages whose run_exports to ignore (can contain templates/conditionals)
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub from_package: ConditionalList<String>,
+    pub from_package: ConditionalList<PackageName>,
 }
 
 impl IgnoreRunExports {

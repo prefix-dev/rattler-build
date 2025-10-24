@@ -1024,21 +1024,13 @@ pub(crate) async fn resolve_dependencies(
                 let source_package: Option<PackageName> = run_export.source_package.parse().ok();
                 let spec_name = &run_export.spec.name;
 
-                // TODO use package names here.
                 let by_name = spec_name
                     .as_ref()
-                    .map(|n| {
-                        ignore_run_exports
-                            .by_name
-                            .contains(&n.as_normalized().to_string())
-                    })
+                    .map(|n| ignore_run_exports.by_name.contains(n))
                     .unwrap_or(false);
                 let by_package = source_package
-                    .map(|s| {
-                        ignore_run_exports
-                            .from_package
-                            .contains(&s.as_normalized().to_string())
-                    })
+                    .as_ref()
+                    .map(|s| ignore_run_exports.from_package.contains(s))
                     .unwrap_or(false);
 
                 !by_name && !by_package

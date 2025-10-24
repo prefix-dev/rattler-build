@@ -17,14 +17,9 @@ use rattler_build_yaml_parser::{NodeConverter, ParseError, ParseResult};
 pub struct VariableConverter;
 
 impl VariableConverter {
+    /// Create a new VariableConverter
     pub fn new() -> Self {
         Self
-    }
-}
-
-impl Default for VariableConverter {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

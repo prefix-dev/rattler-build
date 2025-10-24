@@ -1,7 +1,8 @@
 //! Parser for the Requirements section
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::{ParseMapping, parse_conditional_list};
+use rattler_build_yaml_parser::{NodeConverter, ParseMapping, parse_conditional_list};
+use rattler_conda_types::{MatchSpec, PackageName};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -130,8 +131,8 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
 
 struct IgnoreListConverter;
 
-impl NodeConverter for IgnoreListConverter {
-    /// Convert a YAML scalar node to a concrete value
+impl NodeConverter<PackageName> for IgnoreListConverter {
+    /// Convert a scalar YAML node to a PackageName (via MatchSpec to make it more lenient)
     ///
     /// # Arguments
     /// * `node` - The YAML node to convert (must be a scalar)
@@ -147,9 +148,14 @@ impl NodeConverter for IgnoreListConverter {
         let s = scalar.as_str();
         let span = *scalar.span();
 
-        s.parse::<T>()
-            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))
-        Ok()
+        let as_match_spec = MatchSpec::from_str(s, rattler_conda_types::ParseStrictness::Strict)
+            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))?;
+
+        Ok(as_match_spec.name.ok_or(ParseError::invalid_value(
+            field_name,
+            format!("Could not find name in \"{}\"", s),
+            span,
+        ))?)
     }
 }
 
@@ -160,12 +166,14 @@ pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreR
 
     let mut ignore = IgnoreRunExports::default();
 
-    // Parse each optional field using ergonomic API
-    if let Some(by_name) = yaml.try_get_conditional_list("by_name")? {
+    // Parse each optional field using custom converter for PackageName
+    if let Some(by_name) = yaml.try_get_conditional_list_with("by_name", &IgnoreListConverter)? {
         ignore.by_name = by_name;
     }
 
-    if let Some(from_package) = yaml.try_get_conditional_list("from_package")? {
+    if let Some(from_package) =
+        yaml.try_get_conditional_list_with("from_package", &IgnoreListConverter)?
+    {
         ignore.from_package = from_package;
     }
 
