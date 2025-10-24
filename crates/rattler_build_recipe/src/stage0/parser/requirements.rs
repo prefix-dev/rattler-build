@@ -128,31 +128,6 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
     Ok(run_exports)
 }
 
-struct IgnoreListConverter;
-
-impl NodeConverter for IgnoreListConverter {
-    /// Convert a YAML scalar node to a concrete value
-    ///
-    /// # Arguments
-    /// * `node` - The YAML node to convert (must be a scalar)
-    /// * `field_name` - Field name for error messages (e.g., "build.number")
-    ///
-    /// # Returns
-    /// The converted value or a parse error
-    fn convert_scalar(&self, node: &MarkedNode, field_name: &str) -> ParseResult<PackageName> {
-        let scalar = node
-            .as_scalar()
-            .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
-
-        let s = scalar.as_str();
-        let span = *scalar.span();
-
-        s.parse::<T>()
-            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))
-        Ok()
-    }
-}
-
 /// Parse an IgnoreRunExports section
 pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreRunExports> {
     // Validate field names first

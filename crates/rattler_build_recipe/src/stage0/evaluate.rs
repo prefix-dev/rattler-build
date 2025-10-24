@@ -2096,35 +2096,108 @@ fn merge_stage1_build(
     toplevel: crate::stage1::Build,
     output: crate::stage1::Build,
 ) -> crate::stage1::Build {
+    // Script: use output if not default, otherwise inherit from top-level
     let script = if output.script.is_default() {
         toplevel.script
     } else {
         output.script
     };
 
-    // For build string, use output unless it's Default, then use toplevel
+    // Build string: use output unless it's Default, then inherit from top-level
     let string = match output.string {
         BuildString::Default => toplevel.string,
         _ => output.string,
     };
 
+    // Build number: use output if non-zero, otherwise inherit from top-level
+    let number = if output.number == 0 {
+        toplevel.number
+    } else {
+        output.number
+    };
+
+    // Noarch: inherit from top-level if not set in output
+    let noarch = output.noarch.or(toplevel.noarch);
+
+    // Python: use output if not default, otherwise inherit from top-level
+    let python = if output.python.is_default() {
+        toplevel.python
+    } else {
+        output.python
+    };
+
+    // Skip: combine top-level and output skip conditions with OR logic
+    let mut skip = toplevel.skip;
+    skip.extend(output.skip);
+
+    // Always copy files: use output if not empty, otherwise inherit from top-level
+    let always_copy_files = if output.always_copy_files.is_empty() {
+        toplevel.always_copy_files
+    } else {
+        output.always_copy_files
+    };
+
+    // Always include files: use output if not empty, otherwise inherit from top-level
+    let always_include_files = if output.always_include_files.is_empty() {
+        toplevel.always_include_files
+    } else {
+        output.always_include_files
+    };
+
+    // Merge build and host envs: use OR logic (true if either is true)
+    let merge_build_and_host_envs =
+        output.merge_build_and_host_envs || toplevel.merge_build_and_host_envs;
+
+    // Files: use output if not empty, otherwise inherit from top-level
+    let files = if output.files.is_empty() {
+        toplevel.files
+    } else {
+        output.files
+    };
+
+    // Dynamic linking: use output if not default, otherwise inherit from top-level
+    let dynamic_linking = if output.dynamic_linking.is_default() {
+        toplevel.dynamic_linking
+    } else {
+        output.dynamic_linking
+    };
+
+    // Variant: use output if not default, otherwise inherit from top-level
+    let variant = if output.variant.is_default() {
+        toplevel.variant
+    } else {
+        output.variant
+    };
+
+    // Prefix detection: use output if not default, otherwise inherit from top-level
+    let prefix_detection = if output.prefix_detection.is_default() {
+        toplevel.prefix_detection
+    } else {
+        output.prefix_detection
+    };
+
+    // Post-process: use output if not empty, otherwise inherit from top-level
+    let post_process = if output.post_process.is_empty() {
+        toplevel.post_process
+    } else {
+        output.post_process
+    };
+
     stage1::Build {
         script,
-        // For other fields, prefer output over top-level
-        number: output.number,
+        number,
         string,
-        noarch: output.noarch.or(toplevel.noarch),
-        python: output.python, // Python settings from output
-        skip: output.skip,
-        always_copy_files: output.always_copy_files,
-        always_include_files: output.always_include_files,
-        merge_build_and_host_envs: output.merge_build_and_host_envs
-            || toplevel.merge_build_and_host_envs,
-        files: output.files, // Files selection from output
-        dynamic_linking: output.dynamic_linking,
-        variant: output.variant,
-        prefix_detection: output.prefix_detection,
-        post_process: output.post_process,
+        noarch,
+        python,
+        skip,
+        always_copy_files,
+        always_include_files,
+        merge_build_and_host_envs,
+        files,
+        dynamic_linking,
+        variant,
+        prefix_detection,
+        post_process,
     }
 }
 
@@ -2267,7 +2340,13 @@ fn evaluate_package_output_to_recipe(
     }
 
     // Evaluate tests list
+    // If inheriting from top-level, prepend top-level tests
     let mut tests = Vec::new();
+    if inherits_from_toplevel {
+        for test in &recipe.tests {
+            tests.push(test.evaluate(context)?);
+        }
+    }
     for test in &output.tests {
         tests.push(test.evaluate(context)?);
     }
@@ -2391,7 +2470,11 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
 
                 let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
 
+                // Staging outputs inherit top-level sources (prepend), then add their own
                 let mut source = Vec::new();
+                for src in &self.source {
+                    source.push(src.evaluate(&context_with_vars)?);
+                }
                 for src in &staging_output.source {
                     source.push(src.evaluate(&context_with_vars)?);
                 }
@@ -2871,6 +2954,369 @@ outputs:
                 // Top-level inheritance should have no staging caches
                 assert!(recipe.staging_caches.is_empty());
                 assert!(recipe.inherits_from.is_none());
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_build_field_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  number: 5
+  noarch: python
+  skip:
+    - win
+  always_copy_files:
+    - "*.txt"
+
+outputs:
+  - package:
+      name: output-with-defaults
+      version: 1.0.0
+
+  - package:
+      name: output-with-overrides
+      version: 1.0.0
+    build:
+      number: 10
+      skip:
+        - osx
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits everything from top-level
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "output-with-defaults");
+                assert_eq!(output1.build.number, 5); // Inherited
+                assert_eq!(output1.build.noarch, Some(rattler_conda_types::NoArchType::python())); // Inherited
+                assert_eq!(output1.build.skip, vec!["win"]); // Inherited
+                assert!(!output1.build.always_copy_files.is_empty()); // Inherited
+
+                // Second output: overrides some fields
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "output-with-overrides");
+                assert_eq!(output2.build.number, 10); // Overridden
+                assert_eq!(output2.build.noarch, Some(rattler_conda_types::NoArchType::python())); // Inherited
+                // Skip should combine with OR: ["win", "osx"]
+                assert_eq!(output2.build.skip.len(), 2);
+                assert!(output2.build.skip.contains(&"win".to_string()));
+                assert!(output2.build.skip.contains(&"osx".to_string()));
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_source_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+source:
+  - url: https://example.com/top-level.tar.gz
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+
+outputs:
+  - staging:
+      name: build-cache
+    source:
+      - url: https://example.com/staging.tar.gz
+        sha256: 1111111111111111111111111111111111111111111111111111111111111111
+
+  - package:
+      name: pkg-inherit-toplevel
+      version: 1.0.0
+    source:
+      - url: https://example.com/output.tar.gz
+        sha256: 2222222222222222222222222222222222222222222222222222222222222222
+
+  - package:
+      name: pkg-inherit-cache
+      version: 1.0.0
+    inherit: build-cache
+    source:
+      - url: https://example.com/cache-output.tar.gz
+        sha256: 3333333333333333333333333333333333333333333333333333333333333333
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2); // Only package outputs
+
+                // First package output: inherits from top-level (prepends top-level sources)
+                let pkg1 = &recipes[0];
+                assert_eq!(pkg1.package.name.as_normalized(), "pkg-inherit-toplevel");
+                assert_eq!(pkg1.source.len(), 2); // top-level + output
+                if let crate::stage1::Source::Url(url_src) = &pkg1.source[0] {
+                    assert!(url_src.url[0].to_string().contains("top-level.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                if let crate::stage1::Source::Url(url_src) = &pkg1.source[1] {
+                    assert!(url_src.url[0].to_string().contains("output.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                // pkg1 doesn't inherit from cache, so no staging_caches
+                assert_eq!(pkg1.staging_caches.len(), 0);
+
+                // Second package output: inherits from cache (NO top-level sources in the output itself)
+                let pkg2 = &recipes[1];
+                assert_eq!(pkg2.package.name.as_normalized(), "pkg-inherit-cache");
+                assert_eq!(pkg2.source.len(), 1); // Only output source (cache already has top-level)
+                if let crate::stage1::Source::Url(url_src) = &pkg2.source[0] {
+                    assert!(url_src.url[0].to_string().contains("cache-output.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+
+                // pkg2 inherits from cache, so it should have the staging cache
+                assert_eq!(pkg2.staging_caches.len(), 1);
+                // Check that the staging cache has top-level + staging sources
+                let staging_sources = &pkg2.staging_caches[0].source;
+                assert_eq!(staging_sources.len(), 2); // top-level + staging
+                if let crate::stage1::Source::Url(url_src) = &staging_sources[0] {
+                    assert!(url_src.url[0].to_string().contains("top-level.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                if let crate::stage1::Source::Url(url_src) = &staging_sources[1] {
+                    assert!(url_src.url[0].to_string().contains("staging.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_tests_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+tests:
+  - script:
+      - echo "Top-level test"
+
+outputs:
+  - package:
+      name: output1
+      version: 1.0.0
+    tests:
+      - script:
+          - echo "Output test"
+
+  - package:
+      name: output2
+      version: 1.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: should have both top-level and output tests
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "output1");
+                assert_eq!(output1.tests.len(), 2); // top-level + output
+                // First test is from top-level
+                if let crate::stage1::TestType::Commands(cmd_test) = &output1.tests[0] {
+                    // Script could be in various forms
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Top-level test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+                // Second test is from output
+                if let crate::stage1::TestType::Commands(cmd_test) = &output1.tests[1] {
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Output test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Output test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Output test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+
+                // Second output: should have only top-level test
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "output2");
+                assert_eq!(output2.tests.len(), 1); // Only top-level
+                if let crate::stage1::TestType::Commands(cmd_test) = &output2.tests[0] {
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Top-level test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_version_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: output-inherits-version
+      # No version specified, should inherit from recipe
+
+  - package:
+      name: output-overrides-version
+      version: 2.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits version from recipe
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "output-inherits-version");
+                assert_eq!(output1.package.version().to_string(), "1.0.0");
+
+                // Second output: uses its own version
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "output-overrides-version");
+                assert_eq!(output2.package.version().to_string(), "2.0.0");
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_about_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+about:
+  homepage: https://example.com
+  license: MIT
+  summary: Top-level summary
+
+outputs:
+  - package:
+      name: output-full-inherit
+      version: 1.0.0
+
+  - package:
+      name: output-partial-override
+      version: 1.0.0
+    about:
+      summary: Custom output summary
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits all about fields
+                let output1 = &recipes[0];
+                // URL parser adds a trailing slash
+                assert!(output1.about.homepage.as_ref().unwrap().as_str().starts_with("https://example.com"));
+                assert_eq!(output1.about.summary.as_ref().unwrap(), "Top-level summary");
+                assert!(output1.about.license.is_some());
+
+                // Second output: overrides summary but inherits homepage and license
+                let output2 = &recipes[1];
+                assert!(output2.about.homepage.as_ref().unwrap().as_str().starts_with("https://example.com")); // Inherited
+                assert_eq!(output2.about.summary.as_ref().unwrap(), "Custom output summary"); // Overridden
+                assert!(output2.about.license.is_some()); // Inherited
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }

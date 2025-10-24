@@ -78,6 +78,10 @@ pub struct MultiOutputRecipe {
     #[serde(default)]
     pub extra: crate::stage0::extra::Extra,
 
+    /// Top-level tests (inheritable by outputs, prepended to output tests)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<TestType>,
+
     /// List of outputs (staging and package outputs)
     pub outputs: Vec<Output>,
 }
@@ -284,6 +288,7 @@ impl MultiOutputRecipe {
             build,
             about,
             extra,
+            tests,
             outputs,
         } = self;
 
@@ -303,6 +308,9 @@ impl MultiOutputRecipe {
         vars.extend(extra.used_variables());
         for src in source {
             vars.extend(src.used_variables());
+        }
+        for test in tests {
+            vars.extend(test.used_variables());
         }
 
         // Context variables

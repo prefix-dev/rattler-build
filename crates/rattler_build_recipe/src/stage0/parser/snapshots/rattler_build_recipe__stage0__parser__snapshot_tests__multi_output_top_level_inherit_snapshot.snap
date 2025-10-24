@@ -324,6 +324,7 @@ MultiOutput(
         extra: Extra {
             extra: {},
         },
+        tests: [],
         outputs: [
             Package(
                 PackageOutput {

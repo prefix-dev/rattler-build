@@ -98,6 +98,12 @@ pub fn parse_multi_output_recipe(
         crate::stage0::Extra::default()
     };
 
+    let tests = if let Some(tests_node) = mapping.get("tests") {
+        parse_tests(tests_node)?
+    } else {
+        Vec::new()
+    };
+
     // Parse outputs (required)
     let outputs_node = mapping.get("outputs").ok_or_else(|| {
         ParseError::missing_field("outputs", get_span(&MarkedNode::Mapping(mapping.clone())))
@@ -124,6 +130,7 @@ pub fn parse_multi_output_recipe(
             "about",
             "extra",
             "source",
+            "tests",
             "outputs",
             "schema_version",
             "context",
@@ -138,6 +145,7 @@ pub fn parse_multi_output_recipe(
         build,
         about,
         extra,
+        tests,
         outputs,
     })
 }
