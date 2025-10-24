@@ -4,8 +4,9 @@ use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
 
 use crate::{
+    converter::{FromStrConverter, NodeConverter},
     error::{ParseError, ParseResult},
-    helpers::{contains_jinja_template, get_span},
+    helpers::get_span,
     types::Value,
 };
 
@@ -35,6 +36,25 @@ where
     T: std::str::FromStr,
     T::Err: std::fmt::Display,
 {
+    parse_value_with_converter(yaml, field_name, &FromStrConverter::new())
+}
+
+/// Parse a Value<T> from YAML using a custom converter
+///
+/// This is the most flexible parsing function that allows custom conversion logic
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse
+/// * `field_name` - Field name for error messages (e.g., "build.number")
+/// * `converter` - The converter to use for parsing concrete values
+pub fn parse_value_with_converter<T, C>(
+    yaml: &MarkedNode,
+    field_name: &str,
+    converter: &C,
+) -> ParseResult<Value<T>>
+where
+    C: NodeConverter<T>,
+{
     let scalar = yaml
         .as_scalar()
         .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(yaml)))?;
@@ -43,16 +63,14 @@ where
     let span = *scalar.span();
 
     // Check if it contains a Jinja template
-    if contains_jinja_template(s) {
+    if converter.is_template(s) {
         // It's a template
         let template =
             JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
         Ok(Value::new_template(template, Some(span)))
     } else {
-        // Try to parse as concrete value
-        let value = s
-            .parse::<T>()
-            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))?;
+        // Try to parse as concrete value using the converter
+        let value = converter.convert_scalar(yaml, field_name)?;
         Ok(Value::new_concrete(value, Some(span)))
     }
 }

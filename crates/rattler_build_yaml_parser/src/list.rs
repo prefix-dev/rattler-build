@@ -3,9 +3,10 @@
 use marked_yaml::Node as MarkedNode;
 
 use crate::{
+    converter::{FromStrConverter, NodeConverter},
     error::ParseResult,
     types::{ListOrItem, Value},
-    value::parse_value,
+    value::parse_value_with_converter,
 };
 
 /// Parse a ListOrItem<Value<T>> from YAML
@@ -19,17 +20,34 @@ where
     T: std::str::FromStr + ToString,
     T::Err: std::fmt::Display,
 {
+    parse_list_or_item_with_converter(yaml, &FromStrConverter::new())
+}
+
+/// Parse a ListOrItem<Value<T>> from YAML using a custom converter
+///
+/// This handles both single values and lists of values
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse
+/// * `converter` - The converter to use for parsing concrete values
+pub fn parse_list_or_item_with_converter<T, C>(
+    yaml: &MarkedNode,
+    converter: &C,
+) -> ParseResult<ListOrItem<Value<T>>>
+where
+    C: NodeConverter<T>,
+{
     if let Some(sequence) = yaml.as_sequence() {
         // It's a list
         let mut items = Vec::new();
         for item in sequence.iter() {
-            let parsed = parse_value(item)?;
+            let parsed = parse_value_with_converter(item, "item", converter)?;
             items.push(parsed);
         }
         Ok(ListOrItem::new(items))
     } else {
         // It's a single value
-        let item = parse_value(yaml)?;
+        let item = parse_value_with_converter(yaml, "item", converter)?;
         Ok(ListOrItem::single(item))
     }
 }

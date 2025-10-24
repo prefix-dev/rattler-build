@@ -396,10 +396,10 @@ python:
         assert!(result.is_err());
         let err_msg = result.unwrap_err();
 
-        // Error message should mention the unsupported type
+        // Error message should mention the type mismatch (scalar expected)
         assert!(
-            err_msg.contains("Unsupported variant value type"),
-            "Error message should mention unsupported type, got: {}",
+            err_msg.contains("scalar") || err_msg.contains("Unsupported variant value type"),
+            "Error message should mention type issue, got: {}",
             err_msg
         );
     }
@@ -460,9 +460,11 @@ python:
         // Verify the error message structure
         let error_string = err_msg.to_string();
 
-        // Should contain "parse error" or "Unsupported"
+        // Should contain "parse error", "scalar", or "Unsupported"
         assert!(
-            error_string.contains("parse error") || error_string.contains("Unsupported"),
+            error_string.contains("parse error")
+                || error_string.contains("Unsupported")
+                || error_string.contains("scalar"),
             "Error should indicate parsing issue, got: {}",
             error_string
         );
@@ -484,8 +486,8 @@ python:
         // Just verify we get an error message
         assert!(!err.is_empty(), "Error message should not be empty");
         assert!(
-            err.contains("Unsupported"),
-            "Error should mention unsupported type"
+            err.contains("Unsupported") || err.contains("scalar"),
+            "Error should mention type issue"
         );
     }
 }

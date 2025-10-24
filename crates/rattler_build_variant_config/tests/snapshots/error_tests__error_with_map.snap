@@ -2,10 +2,10 @@
 source: crates/rattler_build_variant_config/tests/error_tests.rs
 expression: error_with_source
 ---
-  × parse error: Unsupported variant value type
+  × expected scalar but got non-scalar
    ╭─[with_map.yaml:2:8]
  1 │ foobar:
  2 │   - map: 1234
    ·        ───┬───
-   ·           ╰── Unsupported variant value type
+   ·           ╰── expected scalar but got non-scalar
    ╰────

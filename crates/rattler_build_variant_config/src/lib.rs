@@ -115,6 +115,7 @@ pub mod config;
 pub mod error;
 pub mod evaluate;
 pub mod stage0_types;
+mod variable_converter;
 pub mod yaml_parser;
 
 // Re-export main types

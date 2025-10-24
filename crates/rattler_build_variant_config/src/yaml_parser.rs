@@ -3,11 +3,13 @@
 //! This parser uses the shared parser with Variable type specialization.
 
 use crate::error::VariantConfigError;
-use crate::stage0_types::{Conditional, ConditionalList, Item, ListOrItem, Value};
+use crate::stage0_types::ConditionalList;
+use crate::variable_converter::VariableConverter;
 use marked_yaml::{Node, Span};
-use rattler_build_jinja::{JinjaExpression, JinjaTemplate, Variable};
 use rattler_build_types::NormalizedKey;
-use rattler_build_yaml_parser::{ParseError, parse_yaml};
+use rattler_build_yaml_parser::{
+    ParseError, ParseResult, parse_conditional_list_with_converter, parse_yaml,
+};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -29,7 +31,9 @@ pub fn parse_variant_file(path: &Path) -> Result<Stage0VariantConfig, VariantCon
     let content = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
 
-    parse_variant_str(&content, Some(path.to_path_buf()))
+    let mut config = parse_variant_str(&content, Some(path.to_path_buf()))?;
+    config.path = Some(path.to_path_buf());
+    Ok(config)
 }
 
 /// Parse a variant configuration string using marked_yaml
@@ -37,25 +41,24 @@ pub fn parse_variant_str(
     yaml: &str,
     path: Option<PathBuf>,
 ) -> Result<Stage0VariantConfig, VariantConfigError> {
-    let node = parse_yaml(yaml).map_err(|e| VariantConfigError::ParseError {
-        path: path.clone().unwrap_or_default(),
-        source: ParseError::generic(e.to_string(), Span::new_blank()),
-    })?;
+    let node = parse_yaml(yaml)
+        .map_err(|e| ParseError::generic(e.to_string(), Span::new_blank()))
+        .map_err(|source| VariantConfigError::ParseError {
+            path: path.clone().unwrap_or_default(),
+            source,
+        })?;
 
-    parse_node(&node, path)
+    parse_node(&node).map_err(|source| VariantConfigError::ParseError {
+        path: path.unwrap_or_default(),
+        source,
+    })
 }
 
 /// Parse a marked_yaml Node into a Stage0VariantConfig
-fn parse_node(
-    node: &Node,
-    path: Option<PathBuf>,
-) -> Result<Stage0VariantConfig, VariantConfigError> {
+fn parse_node(node: &Node) -> ParseResult<Stage0VariantConfig> {
     let mapping = node
         .as_mapping()
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::expected_type("mapping", "other", *node.span()),
-        })?;
+        .ok_or_else(|| ParseError::expected_type("mapping", "other", *node.span()))?;
 
     let mut zip_keys = None;
     let mut variants = BTreeMap::new();
@@ -64,7 +67,7 @@ fn parse_node(
         let key_str = key_node.as_str();
 
         if key_str == "zip_keys" {
-            zip_keys = Some(parse_zip_keys(value_node, &path)?);
+            zip_keys = Some(parse_zip_keys(value_node)?);
             continue;
         }
 
@@ -76,7 +79,7 @@ fn parse_node(
         }
 
         // Parse variant values (which may contain conditionals or templates)
-        let values = parse_variant_values(value_node, key_str, &path)?;
+        let values = parse_variant_values(value_node, key_str)?;
         if !values.is_empty() {
             variants.insert(key_str.into(), values);
         }
@@ -85,43 +88,31 @@ fn parse_node(
     Ok(Stage0VariantConfig {
         zip_keys,
         variants,
-        path,
+        path: None,
     })
 }
 
 /// Parse zip_keys from a marked_yaml Node
-fn parse_zip_keys(
-    node: &Node,
-    path: &Option<PathBuf>,
-) -> Result<Vec<Vec<NormalizedKey>>, VariantConfigError> {
+fn parse_zip_keys(node: &Node) -> ParseResult<Vec<Vec<NormalizedKey>>> {
     let sequences = node
         .as_sequence()
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::expected_type("list", "other", *node.span()),
-        })?;
+        .ok_or_else(|| ParseError::expected_type("list", "other", *node.span()))?;
 
     let mut result = Vec::new();
     for seq_node in sequences.iter() {
-        let inner = seq_node
-            .as_sequence()
-            .ok_or_else(|| VariantConfigError::ParseError {
-                path: path.clone().unwrap_or_default(),
-                source: ParseError::generic("zip_keys must be a list of lists", *seq_node.span()),
-            })?;
+        let inner = seq_node.as_sequence().ok_or_else(|| {
+            ParseError::generic("zip_keys must be a list of lists", *seq_node.span())
+        })?;
 
         let keys: Vec<NormalizedKey> = inner
             .iter()
             .map(|v| {
                 let key_str = v
                     .as_scalar()
-                    .ok_or_else(|| VariantConfigError::ParseError {
-                        path: path.clone().unwrap_or_default(),
-                        source: ParseError::generic("Invalid zip key", *v.span()),
-                    })?;
+                    .ok_or_else(|| ParseError::generic("Invalid zip key", *v.span()))?;
                 Ok(key_str.as_str().into())
             })
-            .collect::<Result<_, VariantConfigError>>()?;
+            .collect::<ParseResult<_>>()?;
 
         result.push(keys);
     }
@@ -130,204 +121,24 @@ fn parse_zip_keys(
 }
 
 /// Parse variant values from a marked_yaml Node, handling conditionals and templates
-fn parse_variant_values(
-    node: &Node,
-    key: &str,
-    path: &Option<PathBuf>,
-) -> Result<ConditionalList, VariantConfigError> {
-    let sequence = node
-        .as_sequence()
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::generic(
-                format!("Variant values for '{}' must be a list", key),
-                *node.span(),
-            ),
-        })?;
-
-    let mut items = Vec::new();
-
-    for item_node in sequence.iter() {
-        // Check if this is a conditional (has 'if' and 'then' keys)
-        if let Some(mapping) = item_node.as_mapping() {
-            // Check if this has an 'if' key
-            let if_key = mapping.iter().find(|(k, _)| k.as_str() == "if");
-
-            if let Some((_, _condition_node)) = if_key {
-                // This is a conditional
-                let conditional = parse_conditional(item_node, key, path)?;
-                items.push(Item::Conditional(conditional));
-                continue;
-            }
-        }
-
-        // Regular value - convert to Item::Value
-        let value = parse_value(item_node, path)?;
-        items.push(Item::Value(value));
+fn parse_variant_values(node: &Node, key: &str) -> ParseResult<ConditionalList> {
+    // Check that it's a sequence first to provide better error message
+    if node.as_sequence().is_none() {
+        return Err(ParseError::generic(
+            format!("Variant values for '{}' must be a list", key),
+            *node.span(),
+        ));
     }
 
-    Ok(ConditionalList::new(items))
-}
-
-/// Parse a conditional from a marked_yaml Node
-fn parse_conditional(
-    node: &Node,
-    key: &str,
-    path: &Option<PathBuf>,
-) -> Result<Conditional, VariantConfigError> {
-    let mapping = node
-        .as_mapping()
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::expected_type("mapping", "other", *node.span()),
-        })?;
-
-    // Extract 'if' condition
-    let (_, condition_node) = mapping
-        .iter()
-        .find(|(k, _)| k.as_str() == "if")
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::generic(
-                format!("Conditional for '{}' must have 'if' key", key),
-                *node.span(),
-            ),
-        })?;
-
-    let condition_scalar =
-        condition_node
-            .as_scalar()
-            .ok_or_else(|| VariantConfigError::ParseError {
-                path: path.clone().unwrap_or_default(),
-                source: ParseError::expected_type("string", "other", *condition_node.span()),
-            })?;
-
-    let condition_str = condition_scalar.as_str();
-
-    let condition = JinjaExpression::new(condition_str.to_string()).map_err(|e| {
-        VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::jinja_error(
-                format!("Invalid condition '{}': {}", condition_str, e),
-                *condition_node.span(),
-            ),
-        }
-    })?;
-
-    // Extract 'then' values
-    let (_, then_node) = mapping
-        .iter()
-        .find(|(k, _)| k.as_str() == "then")
-        .ok_or_else(|| VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::generic(
-                format!("Conditional for '{}' must have 'then' key", key),
-                *node.span(),
-            ),
-        })?;
-
-    let then_values = parse_then_else_values(then_node, path)?;
-
-    // Extract optional 'else' values
-    let else_values = mapping
-        .iter()
-        .find(|(k, _)| k.as_str() == "else")
-        .map(|(_, else_node)| parse_then_else_values(else_node, path))
-        .transpose()?;
-
-    Ok(Conditional {
-        condition,
-        then: then_values,
-        else_value: else_values,
-    })
-}
-
-/// Parse then/else values - can be a single value or a list
-fn parse_then_else_values(
-    node: &Node,
-    path: &Option<PathBuf>,
-) -> Result<ListOrItem<Value>, VariantConfigError> {
-    if let Some(sequence) = node.as_sequence() {
-        // It's a list
-        let mut values = Vec::new();
-        for item_node in sequence.iter() {
-            values.push(parse_value(item_node, path)?);
-        }
-        Ok(ListOrItem::new(values))
-    } else {
-        // It's a single value
-        let value = parse_value(node, path)?;
-        Ok(ListOrItem::single(value))
-    }
-}
-
-/// Parse a single value from a marked_yaml Node
-fn parse_value(node: &Node, path: &Option<PathBuf>) -> Result<Value, VariantConfigError> {
-    let span = *node.span();
-
-    // Check if it's a scalar that might be a template
-    if let Some(scalar) = node.as_scalar() {
-        let s = scalar.as_str();
-        if s.contains("${{") && s.contains("}}") {
-            // It's a template
-            let template =
-                JinjaTemplate::new(s.to_string()).map_err(|e| VariantConfigError::ParseError {
-                    path: path.clone().unwrap_or_default(),
-                    source: ParseError::jinja_error(
-                        format!("Invalid Jinja template '{}': {}", s, e),
-                        span,
-                    ),
-                })?;
-            return Ok(Value::new_template(template, Some(span)));
-        }
-    }
-
-    // Convert to Variable based on the node type
-    let variable = node_to_variable(node, path)?;
-    Ok(Value::new_concrete(variable, Some(span)))
-}
-
-/// Convert a marked_yaml Node to a Variable
-fn node_to_variable(node: &Node, path: &Option<PathBuf>) -> Result<Variable, VariantConfigError> {
-    if let Some(scalar) = node.as_scalar() {
-        // Get the string representation
-        let s = scalar.as_str();
-
-        // Check if the scalar may coerce to a non-string type (i.e., it's unquoted)
-        // may_coerce() returns true for unquoted values that could be numbers/booleans
-        let may_coerce = scalar.may_coerce();
-
-        if !may_coerce {
-            // Quoted string - use the same method as From<String> impl but this uses from_safe_string
-            // which parses the string. We need to check if this is actually a problem in practice.
-            // The from_safe_string method creates arc'd strings which is what we want.
-            Ok(Variable::from(s.to_string()))
-        } else {
-            // Try to parse as bool
-            if s == "true" || s == "false" {
-                Ok(Variable::from(s == "true"))
-            } else if let Ok(i) = s.parse::<i64>() {
-                // Parse as integer
-                Ok(Variable::from(i))
-            } else if s.parse::<f64>().is_ok() {
-                // Float - convert to string to preserve version numbers
-                Ok(Variable::from(minijinja::Value::from(s.to_string())))
-            } else {
-                // Fallback to string
-                Ok(Variable::from(minijinja::Value::from(s.to_string())))
-            }
-        }
-    } else {
-        Err(VariantConfigError::ParseError {
-            path: path.clone().unwrap_or_default(),
-            source: ParseError::generic("Unsupported variant value type", *node.span()),
-        })
-    }
+    // Use the shared parser with VariableConverter
+    let converter = VariableConverter::new();
+    parse_conditional_list_with_converter(node, &converter)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stage0_types::Item;
 
     #[test]
     fn test_simple_parsing() {

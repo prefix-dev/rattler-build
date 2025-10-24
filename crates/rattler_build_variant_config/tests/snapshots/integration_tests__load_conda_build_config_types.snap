@@ -33,6 +33,8 @@ aws_sdk_cpp:
   - "4.5"
 blas_impl:
   - openblas
+  - mkl
+  - blis
 boolean:
   - true
 integer:
