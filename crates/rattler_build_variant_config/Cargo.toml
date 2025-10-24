@@ -40,9 +40,13 @@ miette = { workspace = true, optional = true }
 
 # Utilities
 tracing = { workspace = true }
-fs-err.workspace = true
+fs-err = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
 serial_test = "3.2.0"
+rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser", version = "0.1.0", features = [
+  "miette",
+] }
+miette = { workspace = true, features = ["fancy"] }

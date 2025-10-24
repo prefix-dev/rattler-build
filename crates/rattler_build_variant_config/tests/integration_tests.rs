@@ -1,4 +1,5 @@
-use rattler_build_variant_config::{SelectorContext, VariantConfig, load_conda_build_config};
+use rattler_build_jinja::JinjaConfig;
+use rattler_build_variant_config::{VariantConfig, load_conda_build_config};
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -94,7 +95,10 @@ fn test_zip_keys_all_combinations() {
 #[test]
 fn test_conda_build_config_linux() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
-    let context = SelectorContext::new(Platform::Linux64);
+    let context = JinjaConfig {
+        target_platform: Platform::Linux64,
+        ..Default::default()
+    };
 
     let config = load_conda_build_config(&path, &context).unwrap();
     insta::assert_yaml_snapshot!("conda_build_config_linux", config);
@@ -103,7 +107,10 @@ fn test_conda_build_config_linux() {
 #[test]
 fn test_conda_build_config_osx() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
-    let context = SelectorContext::new(Platform::OsxArm64);
+    let context = JinjaConfig {
+        target_platform: Platform::OsxArm64,
+        ..Default::default()
+    };
 
     let config = load_conda_build_config(&path, &context).unwrap();
     insta::assert_yaml_snapshot!("conda_build_config_osx", config);
@@ -112,7 +119,10 @@ fn test_conda_build_config_osx() {
 #[test]
 fn test_conda_build_config_win() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
-    let context = SelectorContext::new(Platform::Win64);
+    let context = JinjaConfig {
+        target_platform: Platform::Win64,
+        ..Default::default()
+    };
 
     let config = load_conda_build_config(&path, &context).unwrap();
     insta::assert_yaml_snapshot!("conda_build_config_win", config);
@@ -210,7 +220,10 @@ fn test_flatten_selectors_win() {
 #[test]
 fn test_load_conda_build_config_with_types() {
     let path = test_data_dir().join("variant_files/variant_config_1.yaml");
-    let context = SelectorContext::new(Platform::Linux64);
+    let context = JinjaConfig {
+        target_platform: Platform::Linux64,
+        ..Default::default()
+    };
 
     let config = load_conda_build_config(&path, &context).unwrap();
 

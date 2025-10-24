@@ -726,6 +726,7 @@ fn set_jinja(
     env.add_function("is_unix", |platform: &str| {
         Ok(parse_platform(platform)?.is_unix())
     });
+
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     enum FileFormat {
         Yaml,

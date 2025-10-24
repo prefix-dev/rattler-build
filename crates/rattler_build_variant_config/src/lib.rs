@@ -119,7 +119,7 @@ pub mod yaml_parser;
 
 // Re-export main types
 pub use combination::compute_combinations;
-pub use conda_build_config::{SelectorContext, load_conda_build_config};
+pub use conda_build_config::load_conda_build_config;
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
 

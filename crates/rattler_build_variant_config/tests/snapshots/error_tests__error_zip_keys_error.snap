@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_variant_config/tests/error_tests.rs
+expression: error_with_source
+---
+  × parse error: zip_keys must be a list of lists
+   ╭─[zip_keys_error.yaml:2:5]
+ 1 │ zip_keys:
+ 2 │   - list
+   ·     ──┬─
+   ·       ╰── zip_keys must be a list of lists
+ 3 │   - bar
+   ╰────

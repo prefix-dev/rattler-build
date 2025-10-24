@@ -3,79 +3,11 @@
 //! This module provides support for the older conda-build configuration format,
 //! which supports conditional lines using `# [selector]` syntax.
 
-use minijinja::{Environment, Value};
-use rattler_conda_types::Platform;
-use std::{collections::BTreeMap, path::Path};
+use minijinja::Value;
+use rattler_build_jinja::{Jinja, JinjaConfig};
+use std::path::Path;
 
 use crate::{config::VariantConfig, error::VariantConfigError};
-
-/// Context for evaluating selectors in conda_build_config files
-#[derive(Debug, Clone)]
-pub struct SelectorContext {
-    /// Target platform (e.g., linux-64, osx-arm64)
-    pub target_platform: Platform,
-    /// Build platform (usually same as target)
-    pub build_platform: Platform,
-    /// Additional context variables
-    pub variables: BTreeMap<String, Value>,
-}
-
-impl SelectorContext {
-    /// Create a new selector context
-    pub fn new(target_platform: Platform) -> Self {
-        Self {
-            target_platform,
-            build_platform: target_platform,
-            variables: BTreeMap::new(),
-        }
-    }
-
-    /// Convert to minijinja context
-    pub fn to_context(&self) -> BTreeMap<String, Value> {
-        let mut context = self.variables.clone();
-
-        // Add platform info
-        context.insert(
-            "target_platform".to_string(),
-            Value::from(self.target_platform.to_string()),
-        );
-        context.insert(
-            "build_platform".to_string(),
-            Value::from(self.build_platform.to_string()),
-        );
-
-        // Add boolean platform shortcuts
-        let platform_str = self.target_platform.to_string();
-        context.insert(
-            "unix".to_string(),
-            Value::from(!platform_str.starts_with("win")),
-        );
-        context.insert(
-            "linux".to_string(),
-            Value::from(platform_str.starts_with("linux")),
-        );
-        context.insert(
-            "osx".to_string(),
-            Value::from(platform_str.starts_with("osx")),
-        );
-        context.insert(
-            "win".to_string(),
-            Value::from(platform_str.starts_with("win")),
-        );
-
-        // Add short platform name without dash (e.g., linux64, osxarm64)
-        let short_platform = platform_str.replace("-", "");
-        context.insert(short_platform, Value::from(true));
-
-        context
-    }
-}
-
-impl Default for SelectorContext {
-    fn default() -> Self {
-        Self::new(Platform::current())
-    }
-}
 
 #[derive(Debug)]
 struct ParsedLine<'a> {
@@ -102,25 +34,37 @@ impl<'a> ParsedLine<'a> {
     }
 }
 
-fn evaluate_condition(
-    condition: &str,
-    env: &Environment,
-    context: &BTreeMap<String, Value>,
-) -> bool {
+fn evaluate_condition(condition: &str, jinja: &Jinja) -> bool {
     if condition.is_empty() {
         return true;
     }
 
     let template_str = format!("{{% if {} %}}true{{% else %}}false{{% endif %}}", condition);
-    let template = match env.template_from_str(&template_str) {
-        Ok(t) => t,
-        Err(_) => return false,
-    };
 
-    template
-        .render(context)
-        .unwrap_or_else(|_| "false".to_string())
-        == "true"
+    let jinja_res = jinja.render_str(&template_str);
+    jinja_res.map(|v| v.to_string() == "true").unwrap_or(false)
+}
+
+/// Obtain a Jinja instance for conda_build_config parsing purposes
+fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
+    let mut jinja = Jinja::new(jinja_config.clone());
+
+    // Add platform shorthands to jinja context
+    let short_target_platform = jinja_config.target_platform.to_string().replace("-", "");
+    jinja
+        .context_mut()
+        .insert(short_target_platform, Value::from(true));
+
+    // Add environ_get function for environment variable access
+    jinja.env_mut().add_function(
+        "environ_get",
+        move |name: String, default: Option<String>| {
+            let value = std::env::var(name).unwrap_or_else(|_| default.unwrap_or_default());
+            Ok(Value::from(value))
+        },
+    );
+
+    jinja
 }
 
 /// Load a `conda_build_config.yaml` file with selector support
@@ -140,22 +84,12 @@ fn evaluate_condition(
 /// ```
 pub fn load_conda_build_config(
     path: &Path,
-    context: &SelectorContext,
+    config: &JinjaConfig,
 ) -> Result<VariantConfig, VariantConfigError> {
     let mut input = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
 
-    let selector_context = context.to_context();
-    let mut env = Environment::new();
-
-    // Add environ_get function for environment variable access
-    env.add_function(
-        "environ_get",
-        move |name: String, default: Option<String>| {
-            let value = std::env::var(name).unwrap_or_else(|_| default.unwrap_or_default());
-            Ok(Value::from(value))
-        },
-    );
+    let jinja = conda_build_config_jinja(config);
 
     // Replace Python-style calls with Jinja-compatible ones
     input = input.replace("os.environ.get", "environ_get");
@@ -166,7 +100,7 @@ pub fn load_conda_build_config(
     for line in input.lines() {
         let parsed = ParsedLine::from_str(line);
         let mut line_content = if let Some(condition) = &parsed.condition {
-            if evaluate_condition(condition, &env, &selector_context) {
+            if evaluate_condition(condition, &jinja) {
                 parsed.content.to_string()
             } else {
                 continue; // Skip lines that don't match selector
@@ -242,6 +176,7 @@ pub fn load_conda_build_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rattler_conda_types::Platform;
     use rstest::rstest;
     use serial_test::serial;
     use std::path::PathBuf;
@@ -259,21 +194,26 @@ mod tests {
 
     #[test]
     fn test_evaluate_condition() {
-        let mut context = BTreeMap::new();
-        context.insert("py3k".to_string(), Value::from(true));
-        let env = Environment::new();
-        assert!(evaluate_condition("py3k", &env, &context));
+        let mut jinja = Jinja::new(JinjaConfig::default());
+        jinja
+            .context_mut()
+            .insert("py3k".to_string(), Value::from(true));
+        assert!(evaluate_condition("py3k", &jinja));
 
-        let mut context = BTreeMap::new();
-        context.insert("py3k".to_string(), Value::from(false));
-        let env = Environment::new();
-        assert!(!evaluate_condition("py3k", &env, &context));
+        jinja
+            .context_mut()
+            .insert("py3k".to_string(), Value::from(false));
+        assert!(!evaluate_condition("py3k", &jinja));
     }
 
     #[test]
     fn test_selector_context() {
-        let context = SelectorContext::new(Platform::Linux64);
-        let ctx = context.to_context();
+        let config = JinjaConfig {
+            target_platform: Platform::Linux64,
+            ..Default::default()
+        };
+        let jinja = conda_build_config_jinja(&config);
+        let ctx = jinja.context();
 
         assert!(ctx.get("unix").unwrap().is_true());
         assert!(ctx.get("linux").unwrap().is_true());
@@ -292,7 +232,10 @@ mod tests {
         let path = test_data_dir().join(config_path);
 
         // fix the platform for the snapshots
-        let selector_config = SelectorContext::new(Platform::OsxArm64);
+        let jinja_config = JinjaConfig {
+            target_platform: Platform::OsxArm64,
+            ..Default::default()
+        };
 
         if let Some(cuda) = cuda {
             unsafe {
@@ -300,7 +243,7 @@ mod tests {
             };
         }
 
-        let config = load_conda_build_config(&path, &selector_config).unwrap();
+        let config = load_conda_build_config(&path, &jinja_config).unwrap();
         insta::assert_yaml_snapshot!(
             format!(
                 "{}_{}",
