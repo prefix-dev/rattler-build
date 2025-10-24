@@ -2008,6 +2008,102 @@ impl Evaluate for Stage0Recipe {
     }
 }
 
+/// Merge two Stage1 Build configurations
+/// The output build takes precedence, but if output has default/empty values, use top-level
+fn merge_stage1_build(
+    toplevel: crate::stage1::Build,
+    output: crate::stage1::Build,
+) -> crate::stage1::Build {
+    use crate::stage1::Build;
+
+    // If output has a default script, use top-level script; otherwise use output script
+    use crate::stage1::build::BuildString;
+    use rattler_build_script::Script;
+
+    let script = if output.script.is_default() {
+        toplevel.script
+    } else {
+        output.script
+    };
+
+    // For build string, use output unless it's Default, then use toplevel
+    let string = match output.string {
+        BuildString::Default => toplevel.string,
+        _ => output.string,
+    };
+
+    Build {
+        script,
+        // For other fields, prefer output over top-level
+        number: output.number,
+        string,
+        noarch: output.noarch.or(toplevel.noarch),
+        python: output.python, // Python settings from output
+        skip: output.skip,
+        always_copy_files: output.always_copy_files,
+        always_include_files: output.always_include_files,
+        merge_build_and_host_envs: output.merge_build_and_host_envs
+            || toplevel.merge_build_and_host_envs,
+        files: output.files, // Files selection from output
+        dynamic_linking: output.dynamic_linking,
+        variant: output.variant,
+        prefix_detection: output.prefix_detection,
+        post_process: output.post_process,
+    }
+}
+
+/// Merge two Stage1 About configurations
+/// The output about takes precedence for non-empty fields
+fn merge_stage1_about(
+    toplevel: crate::stage1::About,
+    output: crate::stage1::About,
+) -> crate::stage1::About {
+    use crate::stage1::About;
+
+    About {
+        homepage: if output.homepage.is_some() {
+            output.homepage
+        } else {
+            toplevel.homepage
+        },
+        repository: if output.repository.is_some() {
+            output.repository
+        } else {
+            toplevel.repository
+        },
+        documentation: if output.documentation.is_some() {
+            output.documentation
+        } else {
+            toplevel.documentation
+        },
+        license: if output.license.is_some() {
+            output.license
+        } else {
+            toplevel.license
+        },
+        license_family: if output.license_family.is_some() {
+            output.license_family
+        } else {
+            toplevel.license_family
+        },
+        license_file: if !output.license_file.is_empty() {
+            output.license_file
+        } else {
+            toplevel.license_file
+        },
+        summary: if output.summary.is_some() {
+            output.summary
+        } else {
+            toplevel.summary
+        },
+        description: if output.description.is_some() {
+            output.description
+        } else {
+            toplevel.description
+        },
+    }
+}
+
 /// Helper to evaluate a package output into a Stage1Recipe
 /// This handles merging top-level recipe sections with output-specific sections
 fn evaluate_package_output_to_recipe(
@@ -2056,11 +2152,33 @@ fn evaluate_package_output_to_recipe(
 
     let package = Stage1Package::new(name, version);
 
-    // Evaluate build section (output-specific, no inheritance from top-level currently)
-    let build = output.build.evaluate(context)?;
+    // Check if this output inherits from top-level
+    let inherits_from_toplevel = matches!(output.inherit, crate::stage0::Inherit::TopLevel);
 
-    // Evaluate about section (output-specific, or could inherit from top-level)
-    let about = output.about.evaluate(context)?;
+    // Evaluate build section
+    // If inheriting from top-level, merge top-level build with output build
+    let build = if inherits_from_toplevel {
+        // First evaluate top-level build, then merge with output-specific build
+        let toplevel_build = recipe.build.evaluate(context)?;
+        let output_build = output.build.evaluate(context)?;
+
+        // Merge: output-specific settings take precedence, but use top-level script if output has none
+        merge_stage1_build(toplevel_build, output_build)
+    } else {
+        output.build.evaluate(context)?
+    };
+
+    // Evaluate about section
+    // If inheriting from top-level, merge top-level about with output about
+    let about = if inherits_from_toplevel {
+        let toplevel_about = recipe.about.evaluate(context)?;
+        let output_about = output.about.evaluate(context)?;
+
+        // Merge: output-specific fields take precedence
+        merge_stage1_about(toplevel_about, output_about)
+    } else {
+        output.about.evaluate(context)?
+    };
 
     // Evaluate requirements
     let requirements = output.requirements.evaluate(context)?;
@@ -2068,8 +2186,14 @@ fn evaluate_package_output_to_recipe(
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
 
-    // Evaluate source list (output-specific sources)
+    // Evaluate source list
+    // If inheriting from top-level, prepend top-level sources
     let mut source = Vec::new();
+    if inherits_from_toplevel {
+        for src in &recipe.source {
+            source.push(src.evaluate(context)?);
+        }
+    }
     for src in &output.source {
         source.push(src.evaluate(context)?);
     }
