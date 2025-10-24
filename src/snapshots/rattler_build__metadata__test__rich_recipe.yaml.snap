@@ -3,23 +3,20 @@ source: src/metadata.rs
 expression: output
 ---
 recipe:
+  schema_version: 1
+  context: {}
   package:
     name: rich
     version: 13.4.2
+  source:
+    - url: "https://pypi.io/packages/source/r/rich/rich-13.4.2.tar.gz"
+      sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
   build:
+    number: 0
     string: pyh4616a5c_0
     script:
       - python -m pip install . -vv
     noarch: python
-  about:
-    homepage: "https://github.com/Textualize/rich"
-    repository: "https://github.com/Textualize/rich"
-    documentation: "https://rich.readthedocs.io/"
-    license: MIT
-    license_file:
-      - LICENSE
-    summary: "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
-    description: "Rich is a Python library for rich text and beautiful formatting in the terminal.\n\nThe Rich API makes it easy to add color and style to terminal output. Rich\ncan also render pretty tables, progress bars, markdown, syntax highlighted\nsource code, tracebacks, and more — out of the box."
   requirements:
     host:
       - pip
@@ -30,9 +27,15 @@ recipe:
       - "pygments >=2.13.0,<3.0.0"
       - python ==3.10
       - "typing_extensions >=4.0.0,<5.0.0"
-  source:
-    - url: "https://pypi.io/packages/source/r/rich/rich-13.4.2.tar.gz"
-      sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
+  about:
+    homepage: "https://github.com/Textualize/rich"
+    repository: "https://github.com/Textualize/rich"
+    documentation: "https://rich.readthedocs.io/"
+    license: MIT
+    license_file:
+      - LICENSE
+    summary: "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
+    description: "Rich is a Python library for rich text and beautiful formatting in the terminal.\n\nThe Rich API makes it easy to add color and style to terminal output. Rich\ncan also render pretty tables, progress bars, markdown, syntax highlighted\nsource code, tracebacks, and more — out of the box."
   tests:
     - python:
         imports:

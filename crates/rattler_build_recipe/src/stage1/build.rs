@@ -168,11 +168,6 @@ impl AsRef<str> for BuildString {
     }
 }
 
-/// Helper function to check if a u64 is zero (for skip_serializing_if)
-fn is_zero(value: &u64) -> bool {
-    *value == 0
-}
-
 /// Variant key usage configuration (evaluated)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
@@ -306,7 +301,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default)]
     pub number: u64,
 
     /// Build string - can be unresolved (template) or resolved (with hash)

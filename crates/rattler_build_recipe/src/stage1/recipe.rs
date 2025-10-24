@@ -95,39 +95,47 @@ impl InheritsFrom {
     }
 }
 
+fn default_schema_version() -> u32 {
+    1
+}
+
 /// Evaluated recipe with all templates and conditionals resolved
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Recipe {
+    /// Schema version
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+
+    /// Resolved context variables (the evaluated context after template rendering)
+    #[serde(default)]
+    pub context: IndexMap<String, Variable>,
+
     /// Package information (required)
     pub package: Package,
-
-    /// Build configuration
-    #[serde(default, skip_serializing_if = "Build::is_default")]
-    pub build: Build,
-
-    /// About metadata
-    #[serde(default, skip_serializing_if = "About::is_empty")]
-    pub about: About,
-
-    /// Requirements/dependencies
-    #[serde(default, skip_serializing_if = "Requirements::is_empty")]
-    pub requirements: Requirements,
-
-    /// Extra metadata
-    #[serde(default, skip_serializing_if = "Extra::is_empty")]
-    pub extra: Extra,
 
     /// Source information (can be multiple sources)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
 
+    /// Build configuration
+    #[serde(default, skip_serializing_if = "Build::is_default")]
+    pub build: Build,
+
+    /// Requirements/dependencies
+    #[serde(default, skip_serializing_if = "Requirements::is_empty")]
+    pub requirements: Requirements,
+
+    /// About metadata
+    #[serde(default, skip_serializing_if = "About::is_empty")]
+    pub about: About,
+
+    /// Extra metadata
+    #[serde(default, skip_serializing_if = "Extra::is_empty")]
+    pub extra: Extra,
+
     /// Tests (can be multiple tests)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tests: Vec<TestType>,
-
-    /// Resolved context variables (the evaluated context after template rendering)
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub context: IndexMap<String, Variable>,
 
     /// Staging caches that need to be built before this recipe.
     /// These are staging outputs from multi-output recipes that must be built and cached first.
@@ -163,6 +171,7 @@ impl Recipe {
         used_variant: std::collections::BTreeMap<rattler_build_types::NormalizedKey, Variable>,
     ) -> Self {
         Self {
+            schema_version: default_schema_version(),
             package,
             build,
             about,
@@ -193,6 +202,7 @@ impl Recipe {
         used_variant: std::collections::BTreeMap<rattler_build_types::NormalizedKey, Variable>,
     ) -> Self {
         Self {
+            schema_version: default_schema_version(),
             package,
             build,
             about,

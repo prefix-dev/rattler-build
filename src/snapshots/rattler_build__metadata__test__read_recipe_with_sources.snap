@@ -3,14 +3,11 @@ source: src/metadata.rs
 expression: git_source_output
 ---
 recipe:
+  schema_version: 1
+  context: {}
   package:
     name: git_source
     version: "1"
-  build:
-    string: h60d57d3_0
-    script:
-      - test -f README.md
-      - cat ./initial_version/build.sh
   source:
     - git: "https://github.com/prefix-dev/rattler-build"
       rev: refs/tags/v0.1.0
@@ -22,6 +19,12 @@ recipe:
     - git: "https://github.com/prefix-dev/rattler-build"
       rev: df83c1edf287a756b8fc995e03e9632af0344777
       target_directory: initial_version
+  build:
+    number: 0
+    string: h60d57d3_0
+    script:
+      - test -f README.md
+      - cat ./initial_version/build.sh
 build_configuration:
   target_platform: osx-arm64
   host_platform:
