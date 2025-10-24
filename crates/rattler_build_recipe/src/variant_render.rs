@@ -680,7 +680,7 @@ fn render_with_variants(
 
     // Compute all variant combinations
     let combinations = variant_config
-        .combinations(&used_vars, None)
+        .combinations(&used_vars)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     // If no combinations, render once with just the extra context

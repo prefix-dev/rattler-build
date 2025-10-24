@@ -25,7 +25,7 @@ fn test_simple_combinations() {
     used_vars.insert("python".into());
     used_vars.insert("numpy".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("simple_python_numpy_combos", combinations);
 }
 
@@ -40,7 +40,7 @@ fn test_simple_all_combinations() {
     used_vars.insert("numpy".into());
     used_vars.insert("compiler".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("simple_all_combos", combinations);
 
     // Should be 3 python × 3 numpy × 2 compiler = 18 combinations
@@ -65,7 +65,7 @@ fn test_zip_keys_combinations() {
     used_vars.insert("python".into());
     used_vars.insert("numpy".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("zip_keys_python_numpy_combos", combinations);
 
     // Should be 3 combinations (zipped), not 9
@@ -84,7 +84,7 @@ fn test_zip_keys_all_combinations() {
     used_vars.insert("compiler".into());
     used_vars.insert("compiler_version".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("zip_keys_all_combos", combinations);
 
     // Should be 3 (python/numpy zipped) × 2 (compiler/version zipped) = 6
@@ -144,36 +144,11 @@ fn test_multi_file_combinations() {
     used_vars.insert("numpy".into());
     used_vars.insert("compiler".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("multi_file_combos", combinations);
 
     // Should be 2 python/numpy (zipped) × 1 compiler = 2 combinations
     assert_eq!(combinations.len(), 2);
-}
-
-#[test]
-fn test_filtered_combinations() {
-    let path = test_data_dir().join("simple/variants.yaml");
-    let config = VariantConfig::from_file(&path).unwrap();
-
-    let mut used_vars = HashSet::new();
-    used_vars.insert("python".into());
-    used_vars.insert("compiler".into());
-
-    // Filter to only python=3.10
-    let mut filter = std::collections::BTreeMap::new();
-    filter.insert("python".into(), "3.10".into());
-
-    let combinations = config.combinations(&used_vars, Some(&filter)).unwrap();
-    insta::assert_yaml_snapshot!("filtered_python_310_combos", combinations);
-
-    // Should only have 2 combinations (python=3.10 with gcc and clang)
-    assert_eq!(combinations.len(), 2);
-
-    // All should have python=3.10
-    for combo in &combinations {
-        assert_eq!(combo.get(&"python".into()).unwrap().to_string(), "3.10");
-    }
 }
 
 #[test]
@@ -185,7 +160,7 @@ fn test_partial_variable_usage() {
     let mut used_vars = HashSet::new();
     used_vars.insert("python".into());
 
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     insta::assert_yaml_snapshot!("partial_python_only_combos", combinations);
 
     // Should be 3 combinations (just python variants)
@@ -311,12 +286,12 @@ fn test_variant_combinations_with_zip_and_filter() {
 
     // Test with just 'a' used
     let used_vars = vec!["a".into()].into_iter().collect();
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     assert_eq!(combinations.len(), 2);
 
     // Test with both 'a' and 'b' used
     let used_vars = vec!["a".into(), "b".into()].into_iter().collect();
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     assert_eq!(combinations.len(), 2);
 
     // Add 'c' variable
@@ -324,25 +299,13 @@ fn test_variant_combinations_with_zip_and_filter() {
     let used_vars = vec!["a".into(), "b".into(), "c".into()]
         .into_iter()
         .collect();
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     assert_eq!(combinations.len(), 2 * 3); // 2 zipped pairs × 3 c values
 
     // Test without zip_keys (full cartesian product)
     config.zip_keys = None;
-    let combinations = config.combinations(&used_vars, None).unwrap();
+    let combinations = config.combinations(&used_vars).unwrap();
     assert_eq!(combinations.len(), 2 * 2 * 3); // 2a × 2b × 3c
-
-    // Test with filter (already_used_vars)
-    let already_used = std::collections::BTreeMap::from_iter(vec![("a".into(), "1".into())]);
-    let combinations = config
-        .combinations(&used_vars, Some(&already_used))
-        .unwrap();
-    assert_eq!(combinations.len(), 2 * 3); // Only combinations with a=1
-
-    // Verify all combinations have a=1
-    for combo in &combinations {
-        assert_eq!(combo.get(&"a".into()).unwrap().to_string(), "1");
-    }
 }
 
 #[test]

@@ -78,7 +78,6 @@ fn find_combinations(
 /// * `variants` - All available variants (key -> list of values)
 /// * `zip_keys` - Keys that should be zipped together
 /// * `used_vars` - Variables that are actually used (only these will be in the result)
-/// * `already_used_vars` - Optional filter to only return combinations matching these values
 ///
 /// # Returns
 ///
@@ -87,7 +86,6 @@ pub fn compute_combinations(
     variants: &BTreeMap<NormalizedKey, Vec<Variable>>,
     zip_keys: &[Vec<NormalizedKey>],
     used_vars: &HashSet<NormalizedKey>,
-    already_used_vars: Option<&BTreeMap<NormalizedKey, Variable>>,
 ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, VariantExpandError> {
     // Validate zip keys
     validate_zip_keys(variants, zip_keys)?;
@@ -148,24 +146,7 @@ pub fn compute_combinations(
     // Sort combinations by their serialized form for deterministic output
     result.sort_by_cached_key(|combo| format!("{:?}", combo));
 
-    // Filter by already_used_vars if provided
-    if let Some(already_used_vars) = already_used_vars {
-        let result = result
-            .into_iter()
-            .filter(|combination| {
-                if already_used_vars.is_empty() {
-                    true
-                } else {
-                    already_used_vars
-                        .iter()
-                        .all(|(key, value)| combination.get(key) == Some(value))
-                }
-            })
-            .collect();
-        Ok(result)
-    } else {
-        Ok(result)
-    }
+    Ok(result)
 }
 
 /// Validate that zip keys are properly structured and have matching lengths
@@ -212,7 +193,7 @@ mod tests {
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let result = compute_combinations(&variants, &[], &used_vars, None).unwrap();
+        let result = compute_combinations(&variants, &[], &used_vars).unwrap();
 
         // Should create 2x2 = 4 combinations
         assert_eq!(result.len(), 4);
@@ -230,7 +211,7 @@ mod tests {
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let result = compute_combinations(&variants, &zip_keys, &used_vars, None).unwrap();
+        let result = compute_combinations(&variants, &zip_keys, &used_vars).unwrap();
 
         // Should create 2 combinations (zipped)
         assert_eq!(result.len(), 2);

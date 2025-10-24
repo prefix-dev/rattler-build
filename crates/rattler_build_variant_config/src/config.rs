@@ -194,7 +194,6 @@ impl VariantConfig {
     /// # Arguments
     ///
     /// * `used_vars` - Set of variable keys that are actually used in the recipe
-    /// * `already_used_vars` - Optional filter to only return combinations matching these values
     ///
     /// # Returns
     ///
@@ -202,10 +201,9 @@ impl VariantConfig {
     pub fn combinations(
         &self,
         used_vars: &HashSet<NormalizedKey>,
-        already_used_vars: Option<&BTreeMap<NormalizedKey, Variable>>,
     ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, VariantExpandError> {
         let zip_keys = self.zip_keys.as_deref().unwrap_or(&[]);
-        compute_combinations(&self.variants, zip_keys, used_vars, already_used_vars)
+        compute_combinations(&self.variants, zip_keys, used_vars)
     }
 
     /// Get all variant keys
@@ -294,7 +292,7 @@ zip_keys:
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let combos = config.combinations(&used_vars, None).unwrap();
+        let combos = config.combinations(&used_vars).unwrap();
         assert_eq!(combos.len(), 4); // 2x2 combinations
     }
 

@@ -33,7 +33,7 @@ use rattler_digest::{Md5Hash, Sha256Hash};
 use crate::{
     ParseError, Span,
     stage0::{
-        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
+        self, About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
         Stage0Recipe, TestType as Stage0TestType,
         build::{
@@ -61,11 +61,11 @@ use crate::{
         types::{ConditionalList, Item, JinjaExpression, Value},
     },
     stage1::{
-        About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
+        self, About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements, Rpaths,
         build::{
-            Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
+            Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
             VariantKeyUsage as Stage1VariantKeyUsage,
@@ -2014,12 +2014,6 @@ fn merge_stage1_build(
     toplevel: crate::stage1::Build,
     output: crate::stage1::Build,
 ) -> crate::stage1::Build {
-    use crate::stage1::Build;
-
-    // If output has a default script, use top-level script; otherwise use output script
-    use crate::stage1::build::BuildString;
-    use rattler_build_script::Script;
-
     let script = if output.script.is_default() {
         toplevel.script
     } else {
@@ -2032,7 +2026,7 @@ fn merge_stage1_build(
         _ => output.string,
     };
 
-    Build {
+    stage1::Build {
         script,
         // For other fields, prefer output over top-level
         number: output.number,
@@ -2054,13 +2048,8 @@ fn merge_stage1_build(
 
 /// Merge two Stage1 About configurations
 /// The output about takes precedence for non-empty fields
-fn merge_stage1_about(
-    toplevel: crate::stage1::About,
-    output: crate::stage1::About,
-) -> crate::stage1::About {
-    use crate::stage1::About;
-
-    About {
+fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1::About {
+    stage1::About {
         homepage: if output.homepage.is_some() {
             output.homepage
         } else {
@@ -2107,13 +2096,10 @@ fn merge_stage1_about(
 /// Helper to evaluate a package output into a Stage1Recipe
 /// This handles merging top-level recipe sections with output-specific sections
 fn evaluate_package_output_to_recipe(
-    output: &crate::stage0::PackageOutput,
-    recipe: &crate::stage0::MultiOutputRecipe,
+    output: &stage0::PackageOutput,
+    recipe: &stage0::MultiOutputRecipe,
     context: &EvaluationContext,
 ) -> Result<Stage1Recipe, ParseError> {
-    use rattler_conda_types::{PackageName, VersionWithSource};
-    use std::str::FromStr;
-
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
     let name = PackageName::from_str(&name_str).map_err(|e| {

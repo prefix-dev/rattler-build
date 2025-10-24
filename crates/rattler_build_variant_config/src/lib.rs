@@ -36,7 +36,7 @@
 //! used_vars.insert("numpy".into());
 //!
 //! // Compute all combinations
-//! let combinations = config.combinations(&used_vars, None)?;
+//! let combinations = config.combinations(&used_vars)?;
 //!
 //! // With zip_keys, we get 2 combinations (not 3x2=6)
 //! assert_eq!(combinations.len(), 2);
@@ -150,7 +150,7 @@ numpy:
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let combos = config.combinations(&used_vars, None).unwrap();
+        let combos = config.combinations(&used_vars).unwrap();
         assert_eq!(combos.len(), 4); // 2x2 combinations
     }
 
@@ -173,7 +173,7 @@ zip_keys:
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let combos = config.combinations(&used_vars, None).unwrap();
+        let combos = config.combinations(&used_vars).unwrap();
         assert_eq!(combos.len(), 2); // Zipped: only 2 combinations
     }
 }
