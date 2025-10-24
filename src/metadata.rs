@@ -2,7 +2,6 @@
 pub use crate::types::{
     BuildConfiguration, Debug, Output, PlatformWithVirtualPackages, build_reindexed_channels,
 };
-
 #[cfg(test)]
 mod test {
     use chrono::TimeZone;

@@ -67,10 +67,12 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::parser::output::resolve_cache_inheritance_with_caches;
+use recipe::parser::{Dependency, Recipe, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
+use serde_json::{Value, to_string_pretty, to_value};
 use source::patch::apply_patch_custom;
 use source_code::Source;
 use system_tools::SystemTools;
@@ -213,6 +215,35 @@ pub async fn get_build_output(
     // First find all outputs from the recipe
     let named_source = Source::from_path(recipe_path).into_diagnostic()?;
     let outputs = find_outputs_from_src(named_source.clone())?;
+    let has_cache_or_inheritance = outputs.iter().any(|output| {
+        output.as_mapping().is_some_and(|mapping| {
+            mapping.contains_key("cache")
+                || mapping
+                    .get("package")
+                    .and_then(|p| p.as_mapping())
+                    .and_then(|pm| pm.get("inherit"))
+                    .is_some()
+        })
+    });
+
+    let (outputs, global_cache_outputs, inheritance_relationships) = if has_cache_or_inheritance {
+        let has_toplevel_cache = outputs.iter().any(|output| {
+            matches!(
+                Recipe::from_output_node(output, selector_config.clone()),
+                Ok(recipe) if recipe.cache.is_some()
+            )
+        });
+
+        let jinja = recipe::Jinja::new(selector_config.clone());
+        resolve_cache_inheritance_with_caches(
+            outputs,
+            has_toplevel_cache,
+            selector_config.experimental,
+            &jinja,
+        )?
+    } else {
+        (outputs, Vec::new(), HashMap::new())
+    };
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -254,8 +285,13 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
-    let outputs_and_variants =
-        variant_config.find_variants(&outputs, named_source, &selector_config)?;
+    let outputs_and_variants = variant_config.find_variants(
+        &outputs,
+        named_source,
+        &selector_config,
+        &global_cache_outputs,
+        &inheritance_relationships,
+    )?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
@@ -400,6 +436,13 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
+            restored_cache_prefix_files: None,
+            restored_cache_work_dir_files: None,
+            cache_outputs_to_build: recipe.get_cache_outputs_for_package(
+                recipe.package.name.as_normalized(),
+                &global_cache_outputs,
+                &inheritance_relationships,
+            ),
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
@@ -1052,10 +1095,26 @@ pub async fn build_recipes(
             outputs
         };
 
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&outputs).into_diagnostic()?
-        );
+        let mut json_value = to_value(&outputs).into_diagnostic()?;
+        if let Value::Array(outputs_array) = &mut json_value {
+            outputs_array.iter_mut().for_each(|output| {
+                if let Some(Value::Object(recipe)) = output.get_mut("recipe") {
+                    let requirements = recipe
+                        .entry("requirements".to_string())
+                        .or_insert_with(|| Value::Object(Default::default()));
+
+                    if let Value::Object(requirements_map) = requirements {
+                        for key in ["build", "host", "run", "run_constraints"] {
+                            requirements_map
+                                .entry(key.to_string())
+                                .or_insert_with(|| Value::Array(Vec::new()));
+                        }
+                    }
+                }
+            });
+        }
+
+        println!("{}", to_string_pretty(&json_value).into_diagnostic()?);
         return Ok(());
     }
 

@@ -3,8 +3,10 @@
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use indexmap::IndexMap;
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 use crate::{
@@ -18,14 +20,19 @@ use crate::{
     selectors::SelectorConfig,
     source_code::SourceCode,
 };
+use marked_yaml;
 
 mod about;
 mod build;
 mod cache;
+mod cache_output;
+mod common_output;
 mod glob_vec;
 mod helper;
-mod output;
+pub mod output;
+mod output_parser;
 mod package;
+pub(crate) mod parsing_utils;
 mod regex;
 mod requirements;
 mod script;
@@ -37,9 +44,16 @@ pub use self::{
     about::About,
     build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
+    cache_output::{CacheBuild, CacheOutput, CacheRequirements},
+    common_output::{ALLOWED_KEYS_MULTI_OUTPUTS, DEEP_MERGE_KEYS, InheritSpec},
     glob_vec::{GlobCheckerVec, GlobVec, GlobWithSource},
     output::find_outputs_from_src,
+    output_parser::{Output, OutputType},
     package::{OutputPackage, Package},
+    parsing_utils::{
+        StandardTryConvert, invalid_field_error, missing_field_error, parse_bool,
+        parse_required_string, validate_mapping_keys, validate_multi_output_root_keys,
+    },
     regex::SerializableRegex,
     requirements::{
         Dependency, IgnoreRunExports, Language, PinCompatible, PinSubpackage, Requirements,
@@ -84,6 +98,12 @@ pub struct Recipe {
     /// Extra information as a map with string keys and any value
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub extra: IndexMap<String, serde_yaml::Value>,
+    /// Cache outputs discovered during inheritance resolution
+    #[serde(skip)]
+    pub cache_outputs: Vec<CacheOutput>,
+    /// Cache inheritance relationships (package name -> cache names)
+    #[serde(skip)]
+    pub cache_inheritance: HashMap<String, Vec<String>>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -169,6 +189,22 @@ impl Recipe {
         root_node: &Node,
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
+        Self::from_node_with_options(root_node, jinja_opt, false)
+    }
+
+    /// Create recipes from an output [`Node`] that may contain inheritance metadata.
+    pub fn from_output_node(
+        root_node: &Node,
+        jinja_opt: SelectorConfig,
+    ) -> Result<Self, Vec<PartialParsingError>> {
+        Self::from_node_with_options(root_node, jinja_opt, true)
+    }
+
+    fn from_node_with_options(
+        root_node: &Node,
+        jinja_opt: SelectorConfig,
+        allow_inherit: bool,
+    ) -> Result<Self, Vec<PartialParsingError>> {
         let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
@@ -253,6 +289,8 @@ impl Recipe {
         let mut about = About::default();
         let mut cache = None;
         let mut extra = IndexMap::default();
+        let cache_outputs_result = Vec::new();
+        let cache_inheritance = HashMap::new();
 
         rendered_node
             .iter()
@@ -260,7 +298,9 @@ impl Recipe {
                 let key_str = key.as_str();
                 match key_str {
                     "schema_version" => schema_version = value.try_convert(key_str)?,
-                    "package" => package = Some(value.try_convert(key_str)?),
+                    "package" => {
+                        package = Some(value.try_convert(key_str)?);
+                    }
                     "recipe" => {
                         return Err(vec![_partialerror!(
                         *key.span(),
@@ -285,6 +325,27 @@ impl Recipe {
                     "requirements" => requirements = value.try_convert(key_str)?,
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
+                    "inherit" => {
+                        if allow_inherit {
+                            if experimental {
+                                let _: InheritSpec =
+                                    value.try_convert("output.inherit")?;
+                            } else {
+                                return Err(vec![_partialerror!(
+                                    *value.span(),
+                                    ErrorKind::ExperimentalOnly("inherit".to_string()),
+                                    help = "The `inherit` key requires enabling experimental mode (`--experimental`)"
+                                )]);
+                            }
+                        } else {
+                            return Err(vec![_partialerror!(
+                                *key.span(),
+                                ErrorKind::InvalidField("inherit".to_string().into()),
+                                help = "The 'inherit' key is only valid in outputs, not at the recipe level. \
+                                        To use top-level cache, use the 'cache' key instead and omit 'inherit' in outputs."
+                            )]);
+                        }
+                    }
                     "context" => {}
                     "extra" => extra = value.as_mapping().ok_or_else(|| {
                                             vec![_partialerror!(
@@ -334,6 +395,8 @@ impl Recipe {
             tests,
             about,
             extra,
+            cache_outputs: cache_outputs_result,
+            cache_inheritance,
         };
 
         Ok(recipe)
@@ -367,6 +430,103 @@ impl Recipe {
     /// Get the about information.
     pub const fn about(&self) -> &About {
         &self.about
+    }
+
+    /// Convert top-level cache to a synthetic CacheOutput
+    pub fn synthetic_cache_output(&self) -> Option<CacheOutput> {
+        self.cache.as_ref().map(|cache| CacheOutput {
+            name: PackageName::new_unchecked(format!(
+                "__recipe_{}_cache",
+                self.package.name.as_normalized()
+            )),
+            source: cache.source.clone(),
+            build: CacheBuild {
+                script: Some(cache.build.script.clone()),
+                variant: cache.build.variant().clone(),
+                files: GlobVec::default(),
+                always_include_files: GlobVec::default(),
+            },
+            requirements: CacheRequirements {
+                build: cache.requirements.build.clone(),
+                host: cache.requirements.host.clone(),
+            },
+            run_exports: RunExports::default(),
+            ignore_run_exports: Some(cache.requirements.ignore_run_exports.clone()),
+            about: None,
+            span: marked_yaml::Span::new_blank(),
+        })
+    }
+
+    /// Check if recipe uses legacy top-level cache format
+    pub fn has_toplevel_cache(&self) -> bool {
+        self.cache.is_some()
+    }
+
+    /// Extract cache outputs from resolved inheritance
+    /// This method looks at the resolved outputs and extracts cache outputs that this package depends on
+    pub fn extract_cache_outputs_from_inheritance(&self) -> Vec<CacheOutput> {
+        self.cache_outputs.clone()
+    }
+
+    /// Get cache outputs that this package depends on based on inheritance
+    /// This is called during Output creation to populate cache_outputs_to_build
+    /// Includes transitive dependencies (e.g., if A inherits from B and B inherits from C,
+    /// then A depends on both C and B, in that order)
+    pub fn get_cache_outputs_for_package(
+        &self,
+        package_name: &str,
+        all_cache_outputs: &[CacheOutput],
+        inheritance_relationships: &HashMap<String, Vec<String>>,
+    ) -> Vec<CacheOutput> {
+        fn find_cache<'a>(caches: &'a [CacheOutput], name: &str) -> Option<&'a CacheOutput> {
+            caches
+                .iter()
+                .find(|cache| cache.name.as_normalized() == name)
+        }
+
+        fn collect(
+            name: &str,
+            relationships: &HashMap<String, Vec<String>>,
+            caches: &[CacheOutput],
+            visiting: &mut HashSet<String>,
+            seen: &mut HashSet<String>,
+            acc: &mut Vec<CacheOutput>,
+        ) {
+            if !visiting.insert(name.to_owned()) {
+                tracing::warn!(
+                    "Circular cache dependency detected involving '{}' - this likely indicates a configuration error",
+                    name
+                );
+                return;
+            }
+
+            if let Some(children) = relationships.get(name) {
+                for child in children {
+                    collect(child, relationships, caches, visiting, seen, acc);
+
+                    if seen.insert(child.clone()) {
+                        if let Some(cache_output) = find_cache(caches, child) {
+                            acc.push(cache_output.clone());
+                        }
+                    }
+                }
+            }
+
+            visiting.remove(name);
+        }
+
+        let mut result = Vec::new();
+        let mut seen = HashSet::new();
+        let mut visiting = HashSet::new();
+        collect(
+            package_name,
+            inheritance_relationships,
+            all_cache_outputs,
+            &mut visiting,
+            &mut seen,
+            &mut result,
+        );
+        result
     }
 }
 
@@ -431,7 +591,7 @@ mod tests {
             include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip_multi.yaml");
         let recipes = find_outputs_from_src(raw_recipe).unwrap();
         for recipe in recipes {
-            let recipe = Recipe::from_node(&recipe, SelectorConfig::default());
+            let recipe = Recipe::from_output_node(&recipe, SelectorConfig::default());
             if recipe.is_ok() {
                 assert_eq!(recipe.unwrap().package().name().as_normalized(), "zlib-dev");
                 continue;

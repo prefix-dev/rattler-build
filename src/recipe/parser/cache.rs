@@ -9,7 +9,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Build, Requirements, Source};
+use super::{Build, Requirements, Source, cache_output::CacheOutput};
 
 /// A cache build that can be used to split up a build into multiple outputs
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -21,6 +21,9 @@ pub struct Cache {
     pub build: Build,
     /// The requirements for building the cache
     pub requirements: Requirements,
+    /// Cache outputs that define intermediate build artifacts
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outputs: Vec<CacheOutput>,
 }
 
 impl TryConvertNode<Cache> for RenderedNode {
@@ -35,13 +38,17 @@ impl TryConvertNode<Cache> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Cache, Vec<PartialParsingError>> {
         let mut cache = Cache::default();
 
-        validate_keys! {
-            cache,
-            self.iter(),
-            source,
-            build,
-            requirements
-        };
+        validate_keys!(cache, self.iter(), source, build, requirements, outputs);
+
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "source" => cache.source = value.try_convert("cache.source")?,
+                "build" => cache.build = value.try_convert("cache.build")?,
+                "requirements" => cache.requirements = value.try_convert("cache.requirements")?,
+                "outputs" => cache.outputs = value.try_convert("cache.outputs")?,
+                _ => {}
+            }
+        }
 
         Ok(cache)
     }

@@ -1,4 +1,5 @@
 {
+  "build": [],
   "host": [
     "python"
   ],
@@ -9,5 +10,6 @@
         "name": "python"
       }
     }
-  ]
+  ],
+  "run_constraints": []
 }

@@ -464,6 +464,17 @@ impl RunExports {
     pub fn weak_constraints(&self) -> &[Dependency] {
         self.weak_constraints.as_slice()
     }
+
+    /// Extend this RunExports with entries from another instance
+    pub fn extend_from(&mut self, other: &RunExports) {
+        self.noarch.extend(other.noarch.iter().cloned());
+        self.strong.extend(other.strong.iter().cloned());
+        self.strong_constraints
+            .extend(other.strong_constraints.iter().cloned());
+        self.weak.extend(other.weak.iter().cloned());
+        self.weak_constraints
+            .extend(other.weak_constraints.iter().cloned());
+    }
 }
 
 impl TryConvertNode<RunExports> for RenderedNode {
@@ -546,6 +557,12 @@ impl IgnoreRunExports {
     /// all.
     pub fn is_empty(&self) -> bool {
         self.by_name.is_empty() && self.from_package.is_empty()
+    }
+
+    /// Merge IgnoreRunExports with another
+    pub fn merge_from(&mut self, other: &IgnoreRunExports) {
+        self.by_name.extend(other.by_name.iter().cloned());
+        self.from_package.extend(other.from_package.iter().cloned());
     }
 }
 
