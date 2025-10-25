@@ -222,6 +222,7 @@ def test_staging_with_top_level_inherit(
     # Package that inherits from staging
     pkg_compiled = get_extracted_package(tmp_path, "mixed-compiled")
     import platform
+
     if platform.system() == "Windows":
         assert (pkg_compiled / "lib/compiled.dll").exists()
     else:
@@ -260,6 +261,7 @@ def test_staging_work_dir_cache(
 
     # Should have the library from prefix
     import platform
+
     if platform.system() == "Windows":
         assert (pkg / "lib/mylib.lib").exists()
         assert (pkg / "lib/mylib.lib").read_text().strip() == "library"
@@ -276,7 +278,11 @@ def test_staging_complex_deps(
 
     # Package with run_exports inherited
     pkg_full = get_extracted_package(tmp_path, "complex-deps-full")
-    assert (pkg_full / "lib/libcomplex.so").exists()
+    import platform
+    if platform.system() == "Windows":
+        assert (pkg_full / "lib/libcomplex.dll").exists()
+    else:
+        assert (pkg_full / "lib/libcomplex.so").exists()
     index_full = json.loads((pkg_full / "info/index.json").read_text())
     # Should have dependencies
     assert any("zlib" in dep for dep in index_full.get("depends", []))
@@ -284,7 +290,10 @@ def test_staging_complex_deps(
 
     # Package without run_exports
     pkg_minimal = get_extracted_package(tmp_path, "complex-deps-minimal")
-    assert (pkg_minimal / "lib/libcomplex.so").exists()
+    if platform.system() == "Windows":
+        assert (pkg_minimal / "lib/libcomplex.dll").exists()
+    else:
+        assert (pkg_minimal / "lib/libcomplex.so").exists()
     index_minimal = json.loads((pkg_minimal / "info/index.json").read_text())
     # Should only have explicit dependencies
     assert any("zlib" in dep for dep in index_minimal.get("depends", []))
