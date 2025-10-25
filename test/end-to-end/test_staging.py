@@ -188,20 +188,29 @@ def test_staging_with_variants(
         o for o in rendered_outputs if o["recipe"]["package"]["name"] == "variant-cache"
     ]
     variant_cache_py_outputs = [
-        o for o in rendered_outputs if o["recipe"]["package"]["name"] == "variant-cache-py"
+        o
+        for o in rendered_outputs
+        if o["recipe"]["package"]["name"] == "variant-cache-py"
     ]
 
     # Should have 2 variant-cache outputs (one for each libfoo version)
-    assert len(variant_cache_outputs) == 2, f"Expected 2 variant-cache outputs, got {len(variant_cache_outputs)}"
+    assert (
+        len(variant_cache_outputs) == 2
+    ), f"Expected 2 variant-cache outputs, got {len(variant_cache_outputs)}"
 
     # Should have 6 variant-cache-py outputs (2 libfoo × 3 python versions)
-    assert len(variant_cache_py_outputs) == 6, f"Expected 6 variant-cache-py outputs, got {len(variant_cache_py_outputs)}"
+    assert (
+        len(variant_cache_py_outputs) == 6
+    ), f"Expected 6 variant-cache-py outputs, got {len(variant_cache_py_outputs)}"
 
     # Verify variant-cache has both libfoo versions
     cache_libfoo_versions = {
         o["build_configuration"]["variant"].get("libfoo") for o in variant_cache_outputs
     }
-    assert cache_libfoo_versions == {"1.0", "2.0"}, f"Expected libfoo versions [1.0, 2.0], got {cache_libfoo_versions}"
+    assert cache_libfoo_versions == {
+        "1.0",
+        "2.0",
+    }, f"Expected libfoo versions [1.0, 2.0], got {cache_libfoo_versions}"
 
     # Verify variant-cache-py has all combinations of libfoo and python
     expected_combinations = {
@@ -213,12 +222,15 @@ def test_staging_with_variants(
         ("2.0", "3.12"),
     }
     actual_combinations = {
-        (o["build_configuration"]["variant"].get("libfoo"), o["build_configuration"]["variant"].get("python"))
+        (
+            o["build_configuration"]["variant"].get("libfoo"),
+            o["build_configuration"]["variant"].get("python"),
+        )
         for o in variant_cache_py_outputs
     }
-    assert actual_combinations == expected_combinations, (
-        f"Expected combinations {expected_combinations}, got {actual_combinations}"
-    )
+    assert (
+        actual_combinations == expected_combinations
+    ), f"Expected combinations {expected_combinations}, got {actual_combinations}"
 
 
 def test_multiple_staging_caches(
