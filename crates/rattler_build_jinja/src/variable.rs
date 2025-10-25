@@ -15,6 +15,12 @@ impl From<Variable> for Value {
     }
 }
 
+impl From<Value> for Variable {
+    fn from(value: Value) -> Self {
+        Variable(value)
+    }
+}
+
 impl AsRef<Value> for Variable {
     fn as_ref(&self) -> &Value {
         &self.0

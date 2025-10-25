@@ -1,3 +1,8 @@
 # GitHub syntax highlighting
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true
 Cargo.lock merge=binary linguist-generated=true
+
+# Patch test files should always use LF line endings to ensure consistent snapshots across platforms
+crates/rattler_build_diffy/src/patch/test-data/*.patch text eol=lf
+# Keep one file with CRLF endings to test Windows-style line ending handling
+crates/rattler_build_diffy/src/patch/test-data/define_byteswap.patch text eol=crlf

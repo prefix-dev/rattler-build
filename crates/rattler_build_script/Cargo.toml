@@ -1,0 +1,56 @@
+[package]
+name = "rattler_build_script"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+description = "Script execution and data model for rattler-build"
+
+[features]
+default = ["execution"]
+execution = [
+  "itertools",
+  "thiserror",
+  "tracing",
+  "futures",
+  "tokio",
+  "tokio-util",
+  "rattler_conda_types",
+  "rattler_shell",
+  "fs-err",
+  "which",
+  "minijinja",
+]
+
+[dependencies]
+# Core dependencies (always needed)
+indexmap = { workspace = true }
+serde = { workspace = true }
+
+# Sandbox dependencies
+console = { workspace = true }
+clap = { workspace = true }
+
+# Execution dependencies (optional)
+itertools = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+tokio = { workspace = true, features = [
+  "process",
+  "io-util",
+  "fs",
+], optional = true }
+tokio-util = { workspace = true, optional = true }
+rattler_conda_types = { workspace = true, optional = true }
+rattler_shell = { workspace = true, optional = true }
+fs-err = { workspace = true, optional = true }
+which = { workspace = true, optional = true }
+minijinja = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "fs"] }
+insta = { workspace = true, features = ["yaml"] }
+serde_yaml = { workspace = true }

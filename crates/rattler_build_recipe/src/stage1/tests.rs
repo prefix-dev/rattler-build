@@ -1,6 +1,7 @@
+use rattler_build_script::Script;
 use serde::{Deserialize, Serialize};
 
-use super::glob_vec::GlobVec;
+use super::GlobVec;
 
 /// Python version specification for tests (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -112,8 +113,9 @@ impl CommandsTestFiles {
 /// A test that executes a script in a freshly created environment (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
-    /// The script to run (list of commands)
-    pub script: Vec<String>,
+    /// The script to run - contains script content, interpreter, environment variables, etc.
+    /// This field is required to distinguish CommandsTest from other test types during deserialization.
+    pub script: Script,
 
     /// The (extra) requirements for the test.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
@@ -132,7 +134,7 @@ pub struct DownstreamTest {
 }
 
 /// Files to check for existence or non-existence (evaluated)
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PackageContentsCheckFiles {
     /// Files that must exist (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -141,6 +143,37 @@ pub struct PackageContentsCheckFiles {
     /// Files that must not exist (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub not_exists: GlobVec,
+}
+
+impl<'de> Deserialize<'de> for PackageContentsCheckFiles {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum PackageContentsCheckFilesInput {
+            Map {
+                #[serde(default)]
+                exists: GlobVec,
+                #[serde(default)]
+                not_exists: GlobVec,
+            },
+            // Backward compatibility: a simple list is treated as 'exists' patterns
+            List(GlobVec),
+        }
+
+        let input = PackageContentsCheckFilesInput::deserialize(deserializer)?;
+        match input {
+            PackageContentsCheckFilesInput::Map { exists, not_exists } => {
+                Ok(PackageContentsCheckFiles { exists, not_exists })
+            }
+            PackageContentsCheckFilesInput::List(exists) => Ok(PackageContentsCheckFiles {
+                exists,
+                not_exists: GlobVec::default(),
+            }),
+        }
+    }
 }
 
 impl PackageContentsCheckFiles {
@@ -216,4 +249,131 @@ pub enum TestType {
         /// The package contents to test against
         package_contents: PackageContentsTest,
     },
+}
+
+#[allow(clippy::module_inception)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler_build_script::ScriptContent;
+
+    /// Test serialization of all test types with insta snapshots
+    #[test]
+    fn test_serialization() {
+        // Python test
+        let python = TestType::Python {
+            python: PythonTest {
+                imports: vec!["numpy".to_string()],
+                pip_check: true,
+                python_version: PythonVersion::Single("3.11".to_string()),
+            },
+        };
+        insta::assert_snapshot!(serde_yaml::to_string(&python).unwrap(), @r###"
+        python:
+          imports:
+          - numpy
+          python_version: '3.11'
+        "###);
+
+        // Downstream test
+        let downstream = TestType::Downstream(DownstreamTest {
+            downstream: "downstream-package".to_string(),
+        });
+        insta::assert_snapshot!(serde_yaml::to_string(&downstream).unwrap(), @r###"
+        downstream: downstream-package
+        "###);
+
+        // Commands test
+        let commands = TestType::Commands(CommandsTest {
+            script: Script {
+                content: ScriptContent::Command("echo 'test'".to_string()),
+                ..Default::default()
+            },
+            requirements: CommandsTestRequirements::default(),
+            files: CommandsTestFiles::default(),
+        });
+        insta::assert_snapshot!(serde_yaml::to_string(&commands).unwrap(), @r###"
+        script:
+          content: echo 'test'
+        "###);
+    }
+
+    /// Test deserialization of all test types
+    #[test]
+    fn test_deserialization() {
+        // Python
+        let python: TestType = serde_yaml::from_str("python:\n  imports: [numpy]").unwrap();
+        assert!(matches!(python, TestType::Python { .. }));
+
+        // Downstream - this is the key fix for the reported bug
+        let downstream: TestType = serde_yaml::from_str("downstream: pkg").unwrap();
+        match downstream {
+            TestType::Downstream(d) => assert_eq!(d.downstream, "pkg"),
+            _ => panic!("Expected Downstream test"),
+        }
+
+        // Commands
+        let commands: TestType = serde_yaml::from_str("script:\n  content: echo test").unwrap();
+        assert!(matches!(commands, TestType::Commands(_)));
+    }
+
+    /// Test roundtrip serialization for all test types
+    #[test]
+    fn test_roundtrip() {
+        let test_cases = vec![
+            TestType::Python {
+                python: PythonTest {
+                    imports: vec!["numpy".to_string()],
+                    pip_check: false,
+                    python_version: PythonVersion::Multiple(vec!["3.10".to_string()]),
+                },
+            },
+            TestType::Downstream(DownstreamTest {
+                downstream: "my-pkg".to_string(),
+            }),
+            TestType::Commands(CommandsTest {
+                script: Script {
+                    content: ScriptContent::Commands(vec!["echo 'test'".to_string()]),
+                    ..Default::default()
+                },
+                requirements: CommandsTestRequirements {
+                    run: vec!["pytest".to_string()],
+                    build: vec![],
+                },
+                files: CommandsTestFiles::default(),
+            }),
+        ];
+
+        for original in test_cases {
+            let yaml = serde_yaml::to_string(&original).unwrap();
+            let deserialized: TestType = serde_yaml::from_str(&yaml).unwrap();
+            assert_eq!(original, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_downstream_not_confused_with_commands() {
+        let yaml = "downstream: downstream-good";
+        let test: TestType = serde_yaml::from_str(yaml).unwrap();
+        match test {
+            TestType::Downstream(d) => assert_eq!(d.downstream, "downstream-good"),
+            other => panic!("Expected Downstream, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_multiple_tests_vector() {
+        let yaml = r#"
+- script:
+    content: echo "test"
+- downstream: downstream-good
+- python:
+    imports: [numpy]
+"#;
+        let tests: Vec<TestType> = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(tests.len(), 3);
+        assert!(matches!(tests[0], TestType::Commands(_)));
+        assert!(matches!(tests[1], TestType::Downstream(_)));
+        assert!(matches!(tests[2], TestType::Python { .. }));
+    }
 }

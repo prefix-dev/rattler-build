@@ -1,34 +1,25 @@
 use std::fmt::Display;
 
-use itertools::Itertools as _;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::ConditionalList;
-
+/// Stage0 Extra - free-form metadata that can contain templates and conditionals
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct Extra {
-    #[serde(rename = "recipe-maintainers")]
-    pub recipe_maintainers: ConditionalList<String>,
+    /// Free-form extra metadata with Jinja template support
+    #[serde(flatten, default, skip_serializing_if = "IndexMap::is_empty")]
+    pub extra: IndexMap<String, serde_value::Value>,
 }
 
 impl Display for Extra {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{ recipe_maintainers: {} }}",
-            self.recipe_maintainers.iter().format(", ")
-        )
+        write!(f, "{{ extra: {} fields }}", self.extra.len())
     }
 }
 
 impl Extra {
+    /// Collect all variables used in template expressions
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = Vec::new();
-        for maintainer in &self.recipe_maintainers {
-            vars.extend(maintainer.used_variables());
-        }
-        vars.sort();
-        vars.dedup();
-        vars
+        Vec::new()
     }
 }

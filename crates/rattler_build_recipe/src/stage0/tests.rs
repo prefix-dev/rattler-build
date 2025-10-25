@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, ScriptContent, Value};
+use crate::stage0::types::{ConditionalList, Script, Value};
 
 /// Python version specification for tests
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -79,9 +79,9 @@ pub struct CommandsTestFiles {
 /// A test that executes a script in a freshly created environment
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
-    /// The script to run (list of commands or script objects)
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub script: ConditionalList<ScriptContent>,
+    /// The script to run (with optional interpreter, env, content, etc.)
+    #[serde(default, skip_serializing_if = "Script::is_default")]
+    pub script: Script,
 
     /// The (extra) requirements for the test.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -146,6 +146,7 @@ pub struct PackageContentsCheckFiles {
 /// The test type enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum TestType {
     /// A Python test that will test if the imports are available and run `pip check`
     Python {
@@ -225,11 +226,7 @@ impl TestType {
                 }
             }
             TestType::Commands(commands) => {
-                for item in &commands.script {
-                    if let crate::stage0::types::Item::Value(v) = item {
-                        vars.extend(v.used_variables());
-                    }
-                }
+                vars.extend(commands.script.used_variables());
                 if let Some(reqs) = &commands.requirements {
                     for item in &reqs.run {
                         if let crate::stage0::types::Item::Value(v) = item {

@@ -8,7 +8,7 @@ package:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -95,5 +95,5 @@ about:
   repository: https://github.com/${{ org }}/${{ name }}
 extra:
   recipe-maintainers:
-  - ${{ maintainer1 }}
-  - ${{ maintainer2 }}
+  - someone
+  - otherone

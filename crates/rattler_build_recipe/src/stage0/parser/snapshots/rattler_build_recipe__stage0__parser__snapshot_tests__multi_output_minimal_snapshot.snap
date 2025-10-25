@@ -13,7 +13,7 @@ source:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -52,8 +52,7 @@ about:
   description: null
   documentation: null
   repository: null
-extra:
-  recipe-maintainers: []
+extra: {}
 outputs:
 - staging:
     name: build-cache
@@ -69,8 +68,9 @@ outputs:
     - zlib
   build:
     script:
-    - cmake -S . -B build
-    - cmake --build build
+      content:
+      - cmake -S . -B build
+      - cmake --build build
 - package:
     name: mylib
     version: 1.0.0
@@ -81,7 +81,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []

@@ -1,0 +1,31 @@
+--- make.config	2023-02-06 09:35:42.000000000 -0800
++++ make.config 2023-02-06 09:35:42.000000000 -0800
+@@ -96,23 +96,23 @@ ALLSOURCES=$(LIBSOURCES) $(addsuffix .f90, $(addprefix ../main/, $(PROGRAMS))) .
+ 
+ # g95: 
+ FC_G95               = g95
+-FCOPTIONS_OPT_G95    = -O3 -fzero -fshort-circuit -std=f95 -fintrinsic-extensions 
++FCOPTIONS_OPT_G95    = -O3 -fzero -fshort-circuit -std=f95 -fintrinsic-extensions
+ FCOPTIONS_DEB_G95    = -g -O0 -fbounds-check -fintrinsic-extensions -fzero -fshort-circuit -ftrace=full -std=f95
+ FC_INC_G95           = -I
+ FC_SHARED_G95        = -dynamiclib -single_module -read_only_relocs suppress
+ 
+ # gfortran: 
+ FC_GFORTRAN               = gfortran
+-FCOPTIONS_OPT_GFORTRAN    = -O2 -fPIC -std=f95 -fall-intrinsics -cpp -flto -pipe -funroll-loops -fstack-arrays -fno-protect-parens
+-FCOPTIONS_DEB_GFORTRAN    = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe
++FCOPTIONS_OPT_GFORTRAN    = ${FFLAGS} -O2 -fPIC -std=f95 -fall-intrinsics -cpp -pipe -funroll-loops -fstack-arrays -fno-protect-parens -L${PREFIX}/lib
++FCOPTIONS_DEB_GFORTRAN    = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe -L${PREFIX}/lib
+ FC_INC_GFORTRAN           = -I
+ FC_SHARED_GFORTRAN        = -shared
+ F2PY_FCOMPILER_GFORTRAN   = --fcompiler=gnu95
+ 
+ # flang: 
+ FC_FLANG                  = flang
+-FCOPTIONS_OPT_FLANG       = -O2 -fPIC -std=f95 -fall-intrinsics -cpp -flto -pipe -funroll-loops -fstack-arrays -fno-protect-parens
+-FCOPTIONS_DEB_FLANG       = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe
++FCOPTIONS_OPT_FLANG       = ${FFLAGS} -O2 -fPIC -std=f95 -fall-intrinsics -cpp -pipe -funroll-loops -fstack-arrays -fno-protect-parens -L${PREFIX}/lib
++FCOPTIONS_DEB_FLANG       = -g -O0 -fPIC -fbounds-check -pedantic -Wall -std=f95 -fall-intrinsics -cpp -pipe -L${PREFIX}/lib
+ FC_INC_FLANG              = -I
+ FC_SHARED_FLANG           = -shared
+ F2PY_FCOMPILER_FLANG      = --fcompiler=flang

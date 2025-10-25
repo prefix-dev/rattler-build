@@ -1,0 +1,27 @@
+diff --git a/image/decode/segdec.c b/image/decode/segdec.c
+index fb83f2b..1eb9ae4 100644
+--- a/image/decode/segdec.c
++++ b/image/decode/segdec.c
+@@ -52,6 +52,9 @@ static Int DecodeSignificantAbsLevel (struct CAdaptiveHuffman *pAHexpt, BitIOInf
+ //================================================================
+ // Memory access functions
+ //================================================================
++
++U32 _byteswap_ulong(U32 bits);
++
+ static U32 _FORCEINLINE _load4(void* pv)
+ {
+ #ifdef _BIG__ENDIAN_
+diff --git a/jxrgluelib/JXRGlueJxr.c b/jxrgluelib/JXRGlueJxr.c
+index 0fde9bb..e6c54e4 100644
+--- a/jxrgluelib/JXRGlueJxr.c
++++ b/jxrgluelib/JXRGlueJxr.c
+@@ -28,7 +28,7 @@
+ //*@@@---@@@@******************************************************************
+ #include <limits.h>
+ #include <JXRGlue.h>
+-
++#include <wchar.h>
+ 
+ static const char szHDPhotoFormat[] = "<dc:format>image/vnd.ms-photo</dc:format>";
+ const U32 IFDEntryTypeSizes[] = { 0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8 };

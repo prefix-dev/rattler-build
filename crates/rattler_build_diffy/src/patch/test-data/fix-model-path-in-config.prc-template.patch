@@ -1,0 +1,26 @@
+From c71d98815a927f27ef5c17a15be193f67e3c120a Mon Sep 17 00:00:00 2001
+From: Olivier Roussel <olivier.roussel@inria.fr>
+Date: Tue, 25 Mar 2025 17:05:42 +0100
+Subject: [PATCH] fix model path in config.prc template
+
+---
+ makepanda/config.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/makepanda/config.in b/makepanda/config.in
+index e262da5bf0..87b1867e73 100644
+--- a/makepanda/config.in
++++ b/makepanda/config.in
+@@ -61,8 +61,8 @@ default-directnotify-level warning
+ # particular Config.prc file.
+ 
+ model-path    $MAIN_DIR
+-model-path    $THIS_PRC_DIR/..
+-model-path    $THIS_PRC_DIR/../models
++model-path    $THIS_PRC_DIR/../../share/panda3d
++model-path    $THIS_PRC_DIR/../../share/panda3d/models
+ 
+ # This enable the automatic creation of a TK window when running
+ # Direct.
+
+

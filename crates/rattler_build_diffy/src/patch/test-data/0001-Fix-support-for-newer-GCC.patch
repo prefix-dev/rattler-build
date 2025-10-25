@@ -1,0 +1,60 @@
+From e3e2b5e56d6992443ab8d3c9eb9b045b9028fbad Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Sat, 15 Jul 2023 22:18:03 +0200
+Subject: [PATCH] Fix support for newer GCC
+
+---
+ CMakeModules/CompilerChecks.cmake   | 2 +-
+ Tests/GTest/src/gtest-death-test.cc | 4 ++--
+ include/Hammer/Math/Utils.hh        | 1 +
+ 3 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeModules/CompilerChecks.cmake b/CMakeModules/CompilerChecks.cmake
+index 80664d46..f0216f4c 100644
+--- a/CMakeModules/CompilerChecks.cmake
++++ b/CMakeModules/CompilerChecks.cmake
+@@ -59,7 +59,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STR
+     set(Hammer_SanitizeOptions "${Hammer_SanitizeOptions} -fsanitize=address -fsanitize=undefined -fno-sanitize=vptr")
+ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+ 	message(STATUS "Detected GNU compiler.")
+-	set(Hammer_CompileOptions "${Hammer_CompileOptions} -ansi -D_FILE_OFFSET_BITS=64 -Wno-unknown-pragmas")
++	set(Hammer_CompileOptions "${Hammer_CompileOptions} -D_FILE_OFFSET_BITS=64 -Wno-unknown-pragmas")
+     set(Hammer_VerboseOptions "${Hammer_VerboseOptions} -O0 -Wextra -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+     set(Hammer_VerboseOptions "${Hammer_VerboseOptions} -fno-sanitize-recover -fstack-protector")
+     set(Hammer_VerboseOptions "${Hammer_VerboseOptions} -pedantic -Wall -Wextra -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wlogical-op")
+diff --git a/Tests/GTest/src/gtest-death-test.cc b/Tests/GTest/src/gtest-death-test.cc
+index 09083551..d6f492e3 100644
+--- a/Tests/GTest/src/gtest-death-test.cc
++++ b/Tests/GTest/src/gtest-death-test.cc
+@@ -1212,14 +1212,14 @@ static int ExecDeathTestChildMain(void* child_arg) {
+ static void StackLowerThanAddress(const void* ptr,
+                                   bool* result) GTEST_NO_INLINE_;
+ static void StackLowerThanAddress(const void* ptr, bool* result) {
+-  int dummy;
++  int dummy = 0;
+   *result = (&dummy < ptr);
+ }
+ 
+ // Make sure AddressSanitizer does not tamper with the stack here.
+ GTEST_ATTRIBUTE_NO_SANITIZE_ADDRESS_
+ static bool StackGrowsDown() {
+-  int dummy;
++  int dummy = 0;
+   bool result;
+   StackLowerThanAddress(&dummy, &result);
+   return result;
+diff --git a/include/Hammer/Math/Utils.hh b/include/Hammer/Math/Utils.hh
+index 28f7ef35..3aa85333 100644
+--- a/include/Hammer/Math/Utils.hh
++++ b/include/Hammer/Math/Utils.hh
+@@ -12,6 +12,7 @@
+ #ifndef HAMMER_MATH_UTILS
+ #define HAMMER_MATH_UTILS
+ 
++#include <cstdint>
+ #include <complex>
+ #include <limits>
+ #include <climits>
+-- 
+2.45.0
+

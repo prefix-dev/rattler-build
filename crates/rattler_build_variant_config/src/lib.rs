@@ -36,7 +36,7 @@
 //! used_vars.insert("numpy".into());
 //!
 //! // Compute all combinations
-//! let combinations = config.combinations(&used_vars, None)?;
+//! let combinations = config.combinations(&used_vars)?;
 //!
 //! // With zip_keys, we get 2 combinations (not 3x2=6)
 //! assert_eq!(combinations.len(), 2);
@@ -113,18 +113,21 @@ pub mod combination;
 pub mod conda_build_config;
 pub mod config;
 pub mod error;
-
-#[cfg(feature = "parser")]
-pub mod parser;
+pub mod evaluate;
+pub mod stage0_types;
+mod variable_converter;
+pub mod yaml_parser;
 
 // Re-export main types
 pub use combination::compute_combinations;
-pub use conda_build_config::{SelectorContext, load_conda_build_config};
+pub use conda_build_config::load_conda_build_config;
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
 
-#[cfg(feature = "parser")]
-pub use parser::{parse_variant_file, parse_variant_str};
+// Re-export advanced types for users who need fine-grained control
+pub use evaluate::evaluate_variant_config;
+pub use stage0_types::{Conditional, ConditionalList, Item, ListOrItem, Value};
+pub use yaml_parser::Stage0VariantConfig;
 
 #[cfg(test)]
 mod tests {
@@ -148,7 +151,7 @@ numpy:
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let combos = config.combinations(&used_vars, None).unwrap();
+        let combos = config.combinations(&used_vars).unwrap();
         assert_eq!(combos.len(), 4); // 2x2 combinations
     }
 
@@ -171,7 +174,7 @@ zip_keys:
         used_vars.insert("python".into());
         used_vars.insert("numpy".into());
 
-        let combos = config.combinations(&used_vars, None).unwrap();
+        let combos = config.combinations(&used_vars).unwrap();
         assert_eq!(combos.len(), 2); // Zipped: only 2 combinations
     }
 }

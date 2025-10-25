@@ -1,0 +1,25 @@
+From d0c1a747c4f277c847622e6bb4198518544160fc Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Mon, 13 Jan 2025 11:07:51 +0100
+Subject: [PATCH] Force CMake to use the correct Python
+
+---
+ setup.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/setup.py b/setup.py
+index 6125588..cb1f0da 100755
+--- a/setup.py
++++ b/setup.py
+@@ -82,7 +82,7 @@ def _run_make(build_dir, lib_path):
+         os.makedirs(full_lib_path)
+ 
+     # Run the cmake and make commands
+-    check_call(['cmake', '-DSKIP_TESTS=TRUE', source_dir], cwd=build_dir)
++    check_call(['cmake', f'-DPython_EXECUTABLE={sys.executable}', '-DSKIP_TESTS=TRUE', source_dir], cwd=build_dir)
+     check_call(['make'], cwd=build_dir)
+ 
+     # install
+-- 
+2.44.0
+

@@ -1,41 +1,34 @@
 use marked_yaml::Node;
+use rattler_build_yaml_parser::ParseError;
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 
-use crate::{
-    ParseError,
-    span::SpannedString,
-    stage0::{
-        parser::helpers::get_span,
-        source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-        types::{IncludeExclude, JinjaTemplate, Value},
-    },
+use crate::stage0::{
+    parser::helpers::get_span,
+    source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
+    types::{IncludeExclude, JinjaTemplate, Value},
 };
 
-use super::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
 
 /// Parse a SHA256 hash value (can be concrete or template)
 fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
     // Check if it's a template
     if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let s = spanned.as_str();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it contains Jinja template syntax
         if s.contains("${{") {
             let template = JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::invalid_value("sha256", &e, spanned.span()))?;
-            return Ok(Value::new_template(template, spanned.span()));
+                .map_err(|e| ParseError::invalid_value("sha256", &e, span))?;
+            return Ok(Value::new_template(template, Some(span)));
         }
 
         // Otherwise parse as concrete SHA256 hash
         let hash = rattler_digest::parse_digest_from_hex::<Sha256>(s).ok_or_else(|| {
-            ParseError::invalid_value(
-                "sha256",
-                &format!("Invalid SHA256 checksum: {}", s),
-                spanned.span(),
-            )
+            ParseError::invalid_value("sha256", format!("Invalid SHA256 checksum: {}", s), span)
         })?;
-        Ok(Value::new_concrete(hash, spanned.span()))
+        Ok(Value::new_concrete(hash, Some(span)))
     } else {
         Err(ParseError::expected_type(
             "scalar",
@@ -49,25 +42,21 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
 fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
     // Check if it's a template
     if let Some(scalar) = node.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let s = spanned.as_str();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it contains Jinja template syntax
         if s.contains("${{") {
             let template = JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::invalid_value("md5", &e, spanned.span()))?;
-            return Ok(Value::new_template(template, spanned.span()));
+                .map_err(|e| ParseError::invalid_value("md5", &e, span))?;
+            return Ok(Value::new_template(template, Some(span)));
         }
 
         // Otherwise parse as concrete MD5 hash
         let hash = rattler_digest::parse_digest_from_hex::<Md5>(s).ok_or_else(|| {
-            ParseError::invalid_value(
-                "md5",
-                &format!("Invalid MD5 checksum: {}", s),
-                spanned.span(),
-            )
+            ParseError::invalid_value("md5", format!("Invalid MD5 checksum: {}", s), span)
         })?;
-        Ok(Value::new_concrete(hash, spanned.span()))
+        Ok(Value::new_concrete(hash, Some(span)))
     } else {
         Err(ParseError::expected_type(
             "scalar",
@@ -97,8 +86,8 @@ fn parse_source_filter(node: &Node) -> Result<IncludeExclude, ParseError> {
                 _ => {
                     return Err(ParseError::invalid_value(
                         "filter",
-                        &format!("unknown field '{}' in filter mapping", key),
-                        (*key_node.span()).into(),
+                        format!("unknown field '{}' in filter mapping", key),
+                        *key_node.span(),
                     )
                     .with_suggestion("Valid fields are: include, exclude"));
                 }
@@ -213,8 +202,8 @@ fn parse_git_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "git source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs",
@@ -296,8 +285,8 @@ fn parse_url_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: url, sha256, md5, file_name, patches, target_directory",
@@ -361,18 +350,15 @@ fn parse_path_source(
             }
             "use_gitignore" => {
                 let scalar = value_node.as_scalar().ok_or_else(|| {
-                    ParseError::expected_type("scalar", "non-scalar", get_span(value_node))
-                        .with_message("Expected 'use_gitignore' to be a boolean")
+                    ParseError::expected_type("boolean", "non-scalar", get_span(value_node))
                 })?;
-                let spanned = SpannedString::from(scalar);
-                use_gitignore = match spanned.as_str() {
-                    "true" | "True" | "yes" | "Yes" => true,
-                    "false" | "False" | "no" | "No" => false,
-                    _ => {
+                use_gitignore = match scalar.as_bool() {
+                    Some(b) => b,
+                    None => {
                         return Err(ParseError::invalid_value(
                             "use_gitignore",
-                            &format!("not a valid boolean value (found '{}')", spanned.as_str()),
-                            spanned.span(),
+                            format!("expected boolean, got '{}'", scalar.as_str()),
+                            *value_node.span(),
                         ));
                     }
                 };
@@ -383,8 +369,8 @@ fn parse_path_source(
             _ => {
                 return Err(ParseError::invalid_value(
                     "path source",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "Valid fields are: path, sha256, md5, patches, target_directory, file_name, use_gitignore, filter",

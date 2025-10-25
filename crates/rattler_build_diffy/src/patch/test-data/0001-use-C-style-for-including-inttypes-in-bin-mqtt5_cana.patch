@@ -1,0 +1,23 @@
+From ac5d9363f77b0a0eb5cfa3aa45ffc8e0f6d5d2fd Mon Sep 17 00:00:00 2001
+From: "H. Vetinari" <h.vetinari@gmx.com>
+Date: Thu, 2 Feb 2023 15:38:02 +1100
+Subject: [PATCH] use C++ style for including inttypes in
+ bin/mqtt5_canary/main.cpp
+
+---
+ bin/mqtt5_canary/main.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bin/mqtt5_canary/main.cpp b/bin/mqtt5_canary/main.cpp
+index 30116fe..e1d65cf 100644
+--- a/bin/mqtt5_canary/main.cpp
++++ b/bin/mqtt5_canary/main.cpp
+@@ -17,7 +17,7 @@
+ #include <aws/common/command_line_parser.h>
+ #include <aws/common/mutex.h>
+ #include <condition_variable>
+-#include <inttypes.h>
++#include <cinttypes>
+ #include <iostream>
+ 
+ #define AWS_MQTT5_CANARY_CLIENT_CREATION_SLEEP_TIME 10000000

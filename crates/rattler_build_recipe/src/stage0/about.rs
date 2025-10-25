@@ -75,27 +75,38 @@ impl Display for About {
 
 impl About {
     pub fn used_variables(&self) -> Vec<String> {
+        let About {
+            homepage,
+            license,
+            license_file,
+            license_family,
+            summary,
+            description,
+            documentation,
+            repository,
+        } = self;
+
         let mut vars = Vec::new();
-        if let Some(homepage) = &self.homepage {
+        if let Some(homepage) = homepage {
             vars.extend(homepage.used_variables());
         }
-        if let Some(license) = &self.license {
+        if let Some(license) = license {
             vars.extend(license.used_variables());
         }
-        vars.extend(self.license_file.used_variables());
-        if let Some(license_family) = &self.license_family {
+        vars.extend(license_file.used_variables());
+        if let Some(license_family) = license_family {
             vars.extend(license_family.used_variables());
         }
-        if let Some(summary) = &self.summary {
+        if let Some(summary) = summary {
             vars.extend(summary.used_variables());
         }
-        if let Some(description) = &self.description {
+        if let Some(description) = description {
             vars.extend(description.used_variables());
         }
-        if let Some(documentation) = &self.documentation {
+        if let Some(documentation) = documentation {
             vars.extend(documentation.used_variables());
         }
-        if let Some(repository) = &self.repository {
+        if let Some(repository) = repository {
             vars.extend(repository.used_variables());
         }
         vars.sort();

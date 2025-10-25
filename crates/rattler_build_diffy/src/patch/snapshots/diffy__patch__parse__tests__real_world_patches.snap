@@ -1,0 +1,146 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/Makefile.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/src/Makefile",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/src/Makefile",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 11,
+                        len: 6,
+                    },
+                    new_range: HunkRange {
+                        start: 11,
+                        len: 9,
+                    },
+                    function_context: Some(
+                        "CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS)\n",
+                    ),
+                    lines: [
+                        Context(
+                            "LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)\n",
+                        ),
+                        Context(
+                            "LIBS= -lm $(SYSLIBS) $(MYLIBS)\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Insert(
+                            "# Sets the default path for lua modules\n",
+                        ),
+                        Insert(
+                            "INSTALL_TOP=/usr/local\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Context(
+                            "AR= ar rcu\n",
+                        ),
+                        Context(
+                            "RANLIB= ranlib\n",
+                        ),
+                        Context(
+                            "RM= rm -f\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 20,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 23,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "SYSCFLAGS=\n",
+                    ),
+                    lines: [
+                        Context(
+                            "SYSLDFLAGS=\n",
+                        ),
+                        Context(
+                            "SYSLIBS=\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "MYCFLAGS=\n",
+                        ),
+                        Insert(
+                            "MYCFLAGS= -DLUA_USER_DEFAULT_PATH='\"$(INSTALL_TOP)/\"'\n",
+                        ),
+                        Context(
+                            "MYLDFLAGS=\n",
+                        ),
+                        Context(
+                            "MYLIBS=\n",
+                        ),
+                        Context(
+                            "MYOBJS=\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 128,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 131,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "linux-noreadline:\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\t$(MAKE) $(ALL) SYSCFLAGS=\"-DLUA_USE_LINUX\" SYSLIBS=\"-Wl,-E -ldl\"\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "linux-readline:\n",
+                        ),
+                        Delete(
+                            "\t$(MAKE) $(ALL) SYSCFLAGS=\"-DLUA_USE_LINUX -DLUA_USE_READLINE\" SYSLIBS=\"-Wl,-E -ldl -lreadline\"\n",
+                        ),
+                        Insert(
+                            "\t$(MAKE) $(ALL) SYSCFLAGS=\"-DLUA_USE_LINUX -DLUA_USE_READLINE\" SYSLIBS=\"-Wl,-E -ldl -lreadline -lhistory -lncursesw\"\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "Darwin macos macosx:\n",
+                        ),
+                        Delete(
+                            "\t$(MAKE) $(ALL) SYSCFLAGS=\"-DLUA_USE_MACOSX -DLUA_USE_READLINE\" SYSLIBS=\"-lreadline\"\n",
+                        ),
+                        Insert(
+                            "\t$(MAKE) $(ALL) SYSCFLAGS=\"-DLUA_USE_MACOSX -DLUA_USE_READLINE -fno-common\" SYSLIBS=\"-lreadline\"\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

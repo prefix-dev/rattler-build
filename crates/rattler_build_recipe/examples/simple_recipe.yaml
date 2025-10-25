@@ -28,4 +28,4 @@ requirements:
 
 extra:
   recipe-maintainers:
-    - ${{ maintainer }}
+    - foobar

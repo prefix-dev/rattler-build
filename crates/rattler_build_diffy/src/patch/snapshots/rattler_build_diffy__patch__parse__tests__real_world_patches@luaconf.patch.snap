@@ -1,0 +1,57 @@
+---
+source: crates/rattler_build_diffy/src/patch/parse.rs
+expression: patches
+input_file: crates/rattler_build_diffy/src/patch/test-data/luaconf.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/src/luaconf.h",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/src/luaconf.h",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 227,
+                        len: 6,
+                    },
+                    new_range: HunkRange {
+                        start: 227,
+                        len: 6,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "#else\t\t\t/* }{ */\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "#define LUA_ROOT\t\"/usr/local/\"\n",
+                        ),
+                        Insert(
+                            "#define LUA_ROOT\tLUA_USER_DEFAULT_PATH\n",
+                        ),
+                        Context(
+                            "#define LUA_LDIR\tLUA_ROOT \"share/lua/\" LUA_VDIR \"/\"\n",
+                        ),
+                        Context(
+                            "#define LUA_CDIR\tLUA_ROOT \"lib/lua/\" LUA_VDIR \"/\"\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)
