@@ -24,6 +24,8 @@ use rattler_shell::{
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use std::fmt::Write;
+use std::fs::{File, OpenOptions};
+use std::io;
 use std::{
     collections::HashMap,
     io::Write as _,
@@ -39,6 +41,42 @@ use crate::{
     source::copy_dir::CopyDir,
     tool_configuration,
 };
+
+/// A simple file-based lock for package cache operations
+/// TODO: remove once we use temporary package caches for testing
+struct PackageCacheLock {
+    file: File,
+}
+
+impl PackageCacheLock {
+    /// Create a new lock on the given path
+    fn new(path: &Path) -> io::Result<Self> {
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Open or create the lock file
+        let lock_file_path = path.with_extension("lock");
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_file_path)?;
+
+        // Acquire exclusive lock
+        rattler_prefix_guard::lock_exclusive(&file)?;
+
+        Ok(Self { file })
+    }
+}
+
+impl Drop for PackageCacheLock {
+    fn drop(&mut self) {
+        let _ = rattler_prefix_guard::unlock(&self.file);
+    }
+}
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -359,6 +397,10 @@ pub async fn run_test(
     // TODO make this based on SHA256 instead!
     let cache_key = CacheKey::from(pkg.clone());
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
+
+    // Acquire a lock on the package cache directory to prevent race conditions
+    // when multiple tests run in parallel and try to remove/extract the same package
+    let _lock = PackageCacheLock::new(&package_folder)?;
 
     if package_folder.exists() {
         tracing::info!(

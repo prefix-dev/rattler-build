@@ -340,7 +340,7 @@ mod tests {
         assert!(ire.is_empty());
 
         let ire = IgnoreRunExports {
-            by_name: vec!["gcc".to_string()],
+            by_name: vec!["gcc".parse().unwrap()],
             ..Default::default()
         };
         assert!(!ire.is_empty());

@@ -20,6 +20,6 @@ impl Display for Extra {
 impl Extra {
     /// Collect all variables used in template expressions
     pub fn used_variables(&self) -> Vec<String> {
-        return Vec::new();
+        Vec::new()
     }
 }

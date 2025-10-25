@@ -129,6 +129,36 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
     Ok(run_exports)
 }
 
+struct IgnoreListConverter;
+
+impl NodeConverter<PackageName> for IgnoreListConverter {
+    /// Convert a scalar YAML node to a PackageName (via MatchSpec to make it more lenient)
+    ///
+    /// # Arguments
+    /// * `node` - The YAML node to convert (must be a scalar)
+    /// * `field_name` - Field name for error messages (e.g., "build.number")
+    ///
+    /// # Returns
+    /// The converted PackageName or a parse error
+    fn convert_scalar(&self, node: &MarkedNode, field_name: &str) -> ParseResult<PackageName> {
+        let scalar = node
+            .as_scalar()
+            .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
+
+        let s = scalar.as_str();
+        let span = *scalar.span();
+
+        let as_match_spec = MatchSpec::from_str(s, rattler_conda_types::ParseStrictness::Strict)
+            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))?;
+
+        as_match_spec.name.ok_or(ParseError::invalid_value(
+            field_name,
+            format!("Could not find name in \"{}\"", s),
+            span,
+        ))
+    }
+}
+
 /// Parse an IgnoreRunExports section
 pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreRunExports> {
     // Validate field names first

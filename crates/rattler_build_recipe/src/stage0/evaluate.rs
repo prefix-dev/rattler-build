@@ -3036,7 +3036,10 @@ outputs:
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
                 let mut ctx = EvaluationContext::new();
-                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -3045,15 +3048,24 @@ outputs:
                 let output1 = &recipes[0];
                 assert_eq!(output1.package.name.as_normalized(), "output-with-defaults");
                 assert_eq!(output1.build.number, 5); // Inherited
-                assert_eq!(output1.build.noarch, Some(rattler_conda_types::NoArchType::python())); // Inherited
+                assert_eq!(
+                    output1.build.noarch,
+                    Some(rattler_conda_types::NoArchType::python())
+                ); // Inherited
                 assert_eq!(output1.build.skip, vec!["win"]); // Inherited
                 assert!(!output1.build.always_copy_files.is_empty()); // Inherited
 
                 // Second output: overrides some fields
                 let output2 = &recipes[1];
-                assert_eq!(output2.package.name.as_normalized(), "output-with-overrides");
+                assert_eq!(
+                    output2.package.name.as_normalized(),
+                    "output-with-overrides"
+                );
                 assert_eq!(output2.build.number, 10); // Overridden
-                assert_eq!(output2.build.noarch, Some(rattler_conda_types::NoArchType::python())); // Inherited
+                assert_eq!(
+                    output2.build.noarch,
+                    Some(rattler_conda_types::NoArchType::python())
+                ); // Inherited
                 // Skip should combine with OR: ["win", "osx"]
                 assert_eq!(output2.build.skip.len(), 2);
                 assert!(output2.build.skip.contains(&"win".to_string()));
@@ -3106,7 +3118,10 @@ outputs:
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
                 let mut ctx = EvaluationContext::new();
-                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs
@@ -3191,7 +3206,10 @@ outputs:
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
                 let mut ctx = EvaluationContext::new();
-                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -3287,19 +3305,28 @@ outputs:
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
                 let mut ctx = EvaluationContext::new();
-                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
 
                 // First output: inherits version from recipe
                 let output1 = &recipes[0];
-                assert_eq!(output1.package.name.as_normalized(), "output-inherits-version");
+                assert_eq!(
+                    output1.package.name.as_normalized(),
+                    "output-inherits-version"
+                );
                 assert_eq!(output1.package.version().to_string(), "1.0.0");
 
                 // Second output: uses its own version
                 let output2 = &recipes[1];
-                assert_eq!(output2.package.name.as_normalized(), "output-overrides-version");
+                assert_eq!(
+                    output2.package.name.as_normalized(),
+                    "output-overrides-version"
+                );
                 assert_eq!(output2.package.version().to_string(), "2.0.0");
             }
             _ => panic!("Expected MultiOutputRecipe"),
@@ -3339,7 +3366,10 @@ outputs:
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
                 let mut ctx = EvaluationContext::new();
-                ctx.insert("target_platform".to_string(), Variable::from_string("linux-64"));
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -3347,14 +3377,33 @@ outputs:
                 // First output: inherits all about fields
                 let output1 = &recipes[0];
                 // URL parser adds a trailing slash
-                assert!(output1.about.homepage.as_ref().unwrap().as_str().starts_with("https://example.com"));
+                assert!(
+                    output1
+                        .about
+                        .homepage
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://example.com")
+                );
                 assert_eq!(output1.about.summary.as_ref().unwrap(), "Top-level summary");
                 assert!(output1.about.license.is_some());
 
                 // Second output: overrides summary but inherits homepage and license
                 let output2 = &recipes[1];
-                assert!(output2.about.homepage.as_ref().unwrap().as_str().starts_with("https://example.com")); // Inherited
-                assert_eq!(output2.about.summary.as_ref().unwrap(), "Custom output summary"); // Overridden
+                assert!(
+                    output2
+                        .about
+                        .homepage
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://example.com")
+                ); // Inherited
+                assert_eq!(
+                    output2.about.summary.as_ref().unwrap(),
+                    "Custom output summary"
+                ); // Overridden
                 assert!(output2.about.license.is_some()); // Inherited
             }
             _ => panic!("Expected MultiOutputRecipe"),

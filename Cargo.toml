@@ -250,6 +250,7 @@ rattler_repodata_gateway = { version = "0.24.7", default-features = false, featu
   "gateway",
 ] }
 rattler_shell = { workspace = true }
+rattler_prefix_guard = { path = "crates/rattler_prefix_guard" }
 rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",

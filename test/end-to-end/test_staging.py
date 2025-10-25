@@ -112,12 +112,12 @@ def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     abs_symlink = pkg_absolute / "absolute-symlink.txt"
     abs_exe_symlink = pkg_absolute / "bin/absolute-exe-symlink"
 
-    assert abs_symlink.exists() or abs_symlink.is_symlink(), (
-        "absolute-symlink.txt not found"
-    )
-    assert abs_exe_symlink.exists() or abs_exe_symlink.is_symlink(), (
-        "bin/absolute-exe-symlink not found"
-    )
+    assert (
+        abs_symlink.exists() or abs_symlink.is_symlink()
+    ), "absolute-symlink.txt not found"
+    assert (
+        abs_exe_symlink.exists() or abs_exe_symlink.is_symlink()
+    ), "bin/absolute-exe-symlink not found"
 
     # Verify they are symlinks
     if abs_symlink.is_symlink():
@@ -154,9 +154,9 @@ def test_staging_run_exports(
     pkg = get_extracted_package(tmp_path, "cache-run-exports")
     index = json.loads((pkg / "info/index.json").read_text())
     depends = index.get("depends", [])
-    assert any("normal-run-exports" in dep for dep in depends), (
-        f"normal-run-exports should be in dependencies but got {depends}"
-    )
+    assert any(
+        "normal-run-exports" in dep for dep in depends
+    ), f"normal-run-exports should be in dependencies but got {depends}"
 
     # Package that ignores run_exports from specific package
     pkg_no_from = get_extracted_package(tmp_path, "no-cache-from-package-run-exports")
@@ -372,13 +372,16 @@ def test_staging_metadata_preserved(
 
     rendered = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
 
+    # The staging_caches and inherits_from are in the recipe section
+    recipe = rendered["recipe"]
+
     # The recipe should have staging_caches
-    assert "staging_caches" in rendered
-    assert len(rendered["staging_caches"]) >= 1
+    assert "staging_caches" in recipe
+    assert len(recipe["staging_caches"]) >= 1
 
     # Should have inherits_from
-    assert "inherits_from" in rendered
-    assert rendered["inherits_from"]["cache_name"] == "core-build"
+    assert "inherits_from" in recipe
+    assert recipe["inherits_from"]["cache_name"] == "core-build"
 
 
 @pytest.mark.xfail(reason="Staging implementation not finished")
@@ -498,17 +501,17 @@ def test_staging_select_files_with_symlinks(
     path_files = [p["_path"] for p in paths["paths"]]
 
     # Should include versioned .so files
-    assert any("lib/libdav1d.so.7.0.0" in f for f in path_files), (
-        f"lib/libdav1d.so.7.0.0 not found in {path_files}"
-    )
-    assert any("lib/libdav1d.so.7" in f for f in path_files), (
-        f"lib/libdav1d.so.7 not found in {path_files}"
-    )
+    assert any(
+        "lib/libdav1d.so.7.0.0" in f for f in path_files
+    ), f"lib/libdav1d.so.7.0.0 not found in {path_files}"
+    assert any(
+        "lib/libdav1d.so.7" in f for f in path_files
+    ), f"lib/libdav1d.so.7 not found in {path_files}"
 
     # Should NOT include the .so file (no version)
-    assert not any(f.endswith("lib/libdav1d.so") for f in path_files), (
-        f"lib/libdav1d.so should not be included in {path_files}"
-    )
+    assert not any(
+        f.endswith("lib/libdav1d.so") for f in path_files
+    ), f"lib/libdav1d.so should not be included in {path_files}"
 
     # Verify the symlinks exist in the actual package
     assert (pkg / "lib/libdav1d.so.7.0.0").exists()
@@ -533,9 +536,9 @@ def test_staging_run_exports_ignore_from_package(
 
     # normal-run-exports should NOT be in dependencies (ignored by from_package)
     depends = index.get("depends", [])
-    assert not any("normal-run-exports" in dep for dep in depends), (
-        f"normal-run-exports should be ignored but found in {depends}"
-    )
+    assert not any(
+        "normal-run-exports" in dep for dep in depends
+    ), f"normal-run-exports should be ignored but found in {depends}"
 
 
 def test_staging_run_exports_ignore_by_name(
@@ -554,9 +557,9 @@ def test_staging_run_exports_ignore_by_name(
 
     # normal-run-exports should NOT be in dependencies (ignored by name)
     depends = index.get("depends", [])
-    assert not any("normal-run-exports" in dep for dep in depends), (
-        f"normal-run-exports should be ignored but found in {depends}"
-    )
+    assert not any(
+        "normal-run-exports" in dep for dep in depends
+    ), f"normal-run-exports should be ignored but found in {depends}"
 
 
 if __name__ == "__main__":
