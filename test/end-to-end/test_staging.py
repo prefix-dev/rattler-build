@@ -221,7 +221,11 @@ def test_staging_with_top_level_inherit(
 
     # Package that inherits from staging
     pkg_compiled = get_extracted_package(tmp_path, "mixed-compiled")
-    assert (pkg_compiled / "lib/compiled.so").exists()
+    import platform
+    if platform.system() == "Windows":
+        assert (pkg_compiled / "lib/compiled.dll").exists()
+    else:
+        assert (pkg_compiled / "lib/compiled.so").exists()
 
     # Package that inherits from top-level
     pkg_data = get_extracted_package(tmp_path, "mixed-data")
@@ -255,8 +259,13 @@ def test_staging_work_dir_cache(
     pkg = get_extracted_package(tmp_path, "work-dir-test")
 
     # Should have the library from prefix
-    assert (pkg / "lib/mylib.a").exists()
-    assert (pkg / "lib/mylib.a").read_text().strip() == "library"
+    import platform
+    if platform.system() == "Windows":
+        assert (pkg / "lib/mylib.lib").exists()
+        assert (pkg / "lib/mylib.lib").read_text().strip() == "library"
+    else:
+        assert (pkg / "lib/mylib.a").exists()
+        assert (pkg / "lib/mylib.a").read_text().strip() == "library"
 
 
 def test_staging_complex_deps(

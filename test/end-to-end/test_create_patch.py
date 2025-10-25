@@ -628,12 +628,14 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
 
     # Verify it's a proper unified diff
     relative_path = test_file.relative_to(work_dir)
+    # Normalize path separators for comparison (patch files use forward slashes)
+    relative_path_posix = relative_path.as_posix()
     assert (
-        f"--- a/{relative_path}" in patch_content
-        or f"a/{relative_path}" in patch_content
+        f"--- a/{relative_path_posix}" in patch_content
+        or f"a/{relative_path_posix}" in patch_content
     )
     assert (
-        f"+++ b/{relative_path}" in patch_content
-        or f"b/{relative_path}" in patch_content
+        f"+++ b/{relative_path_posix}" in patch_content
+        or f"b/{relative_path_posix}" in patch_content
     )
     assert "+// Test modification for create-patch" in patch_content
