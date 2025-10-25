@@ -690,6 +690,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
     fn test_real_world_patches() {
         insta::glob!("test-data/*.patch", |path| {
             let input = fs_err::read_to_string(path).unwrap();

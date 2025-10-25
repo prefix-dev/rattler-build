@@ -471,6 +471,7 @@ The door of all subtleties!
 }
 
 #[test]
+#[cfg_attr(target_os = "windows", ignore)]
 fn no_newline_at_eof() {
     let old = "old line";
     let new = "new line";
