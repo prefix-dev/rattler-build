@@ -14,9 +14,16 @@ outputs:
       name: prepare-resources
     build:
       script:
-        - mkdir -p $PREFIX/resources
-        - echo "Generated resource file" > $PREFIX/resources/generated.txt
-        - echo "Build timestamp: $(date)" > $PREFIX/resources/timestamp.txt
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/resources
+            echo "Generated resource file" > $PREFIX/resources/generated.txt
+            echo "Build timestamp: $(date)" > $PREFIX/resources/timestamp.txt
+        - if: win
+          then: |
+            mkdir %PREFIX%\resources
+            echo Generated resource file > %PREFIX%\resources\generated.txt
+            echo Build timestamp: %DATE% %TIME% > %PREFIX%\resources\timestamp.txt
 
   # Package outputs that don't explicitly inherit but benefit from staging
   # (This tests that the staging cache is built even if not inherited)
@@ -25,8 +32,10 @@ outputs:
       version: 1.0.0
     build:
       script:
-        # This package builds independently but staging ran first
-        - echo "Package A" > $PREFIX/package-a.txt
+        - if: unix
+          then: echo "Package A" > $PREFIX/package-a.txt
+        - if: win
+          then: echo Package A > %PREFIX%\package-a.txt
       files:
         - package-a.txt
 
@@ -35,6 +44,9 @@ outputs:
       version: 1.0.0
     build:
       script:
-        - echo "Package B" > $PREFIX/package-b.txt
+        - if: unix
+          then: echo "Package B" > $PREFIX/package-b.txt
+        - if: win
+          then: echo Package B > %PREFIX%\package-b.txt
       files:
         - package-b.txt

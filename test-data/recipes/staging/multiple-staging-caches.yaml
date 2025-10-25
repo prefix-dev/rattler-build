@@ -19,9 +19,16 @@ outputs:
         - zlib
     build:
       script:
-        - mkdir -p $PREFIX/lib
-        - echo "libcore.so" > $PREFIX/lib/libcore.so
-        - echo "core.h" > $PREFIX/include/core.h
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib
+            echo "libcore.so" > $PREFIX/lib/libcore.so
+            echo "core.h" > $PREFIX/include/core.h
+        - if: win
+          then: |
+            mkdir %PREFIX%\lib
+            echo libcore.dll > %PREFIX%\lib\libcore.dll
+            echo core.h > %PREFIX%\include\core.h
 
   # Second staging output - builds python bindings (depends on first)
   - staging:
@@ -34,8 +41,14 @@ outputs:
         - python
     build:
       script:
-        - mkdir -p $PREFIX/lib/python3.11/site-packages
-        - echo "import core" > $PREFIX/lib/python3.11/site-packages/mycore.py
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib/python3.11/site-packages
+            echo "import core" > $PREFIX/lib/python3.11/site-packages/mycore.py
+        - if: win
+          then: |
+            mkdir %PREFIX%\Lib\site-packages
+            echo import core > %PREFIX%\Lib\site-packages\mycore.py
 
   # Package output 1: Core library only
   - package:

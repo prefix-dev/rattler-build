@@ -12,8 +12,11 @@ outputs:
   - staging:
       name: foo-build
     build:
-      script: |
-        echo $PREFIX > $PREFIX/foo.txt
+      script:
+        - if: unix
+          then: echo $PREFIX > $PREFIX/foo.txt
+        - if: win
+          then: echo %PREFIX% > %PREFIX%\foo.txt
 
   # First package output inheriting from staging cache
   - package:
@@ -25,7 +28,10 @@ outputs:
         - "**/*"
     tests:
       - script:
-          - cat $PREFIX/foo.txt
+          - if: unix
+            then: cat $PREFIX/foo.txt
+          - if: win
+            then: type %PREFIX%\foo.txt
 
   # Second package output inheriting from the same staging cache
   - package:
@@ -37,4 +43,7 @@ outputs:
         - "**/*"
     tests:
       - script:
-          - cat $PREFIX/foo.txt
+          - if: unix
+            then: cat $PREFIX/foo.txt
+          - if: win
+            then: type %PREFIX%\foo.txt

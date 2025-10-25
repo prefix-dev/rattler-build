@@ -31,9 +31,16 @@ outputs:
     build:
       script:
         - cmake --version
-        - echo "Building with dependencies..."
-        - mkdir -p $PREFIX/lib
-        - echo "libcomplex.so" > $PREFIX/lib/libcomplex.so
+        - if: unix
+          then: |
+            echo "Building with dependencies..."
+            mkdir -p $PREFIX/lib
+            echo "libcomplex.so" > $PREFIX/lib/libcomplex.so
+        - if: win
+          then: |
+            echo Building with dependencies...
+            mkdir %PREFIX%\lib
+            echo libcomplex.dll > %PREFIX%\lib\libcomplex.dll
 
   # Package inheriting with run_exports
   - package:

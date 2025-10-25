@@ -12,12 +12,20 @@ outputs:
       name: build-libs
     build:
       script:
-        - mkdir -p $PREFIX/lib
-        - mkdir -p $PREFIX/include
-        - touch $PREFIX/include/test.h
-        - touch $PREFIX/lib/libdav1d.so.7.0.0
-        - ln -s $PREFIX/lib/libdav1d.so.7.0.0 $PREFIX/lib/libdav1d.so.7
-        - ln -s $PREFIX/lib/libdav1d.so.7 $PREFIX/lib/libdav1d.so
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib
+            mkdir -p $PREFIX/include
+            touch $PREFIX/include/test.h
+            touch $PREFIX/lib/libdav1d.so.7.0.0
+            ln -s $PREFIX/lib/libdav1d.so.7.0.0 $PREFIX/lib/libdav1d.so.7
+            ln -s $PREFIX/lib/libdav1d.so.7 $PREFIX/lib/libdav1d.so
+        - if: win
+          then: |
+            mkdir %PREFIX%\lib
+            mkdir %PREFIX%\include
+            type nul > %PREFIX%\include\test.h
+            echo. > %PREFIX%\lib\dav1d.dll
     requirements:
       build:
         - ${{ compiler('c') }}

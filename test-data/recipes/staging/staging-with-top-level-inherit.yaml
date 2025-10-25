@@ -10,9 +10,16 @@ recipe:
 build:
   number: 0
   script:
-    - echo "Top-level build script"
-    - mkdir -p $PREFIX/share
-    - echo "data.txt" > $PREFIX/share/data.txt
+    - if: unix
+      then: |
+        echo "Top-level build script"
+        mkdir -p $PREFIX/share
+        echo "data.txt" > $PREFIX/share/data.txt
+    - if: win
+      then: |
+        echo Top-level build script
+        mkdir %PREFIX%\share
+        echo data.txt > %PREFIX%\share\data.txt
 
 about:
   summary: Project with mixed inheritance
@@ -28,8 +35,14 @@ outputs:
         - cmake
     build:
       script:
-        - mkdir -p $PREFIX/lib
-        - echo "compiled.so" > $PREFIX/lib/compiled.so
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib
+            echo "compiled.so" > $PREFIX/lib/compiled.so
+        - if: win
+          then: |
+            mkdir %PREFIX%\lib
+            echo compiled.dll > %PREFIX%\lib\compiled.dll
 
   # Package that inherits from staging (gets compiled library)
   - package:

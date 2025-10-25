@@ -13,14 +13,24 @@ outputs:
       name: work-stage
     build:
       script:
-        # Generate files in prefix
-        - mkdir -p $PREFIX/lib
-        - echo "library" > $PREFIX/lib/mylib.a
-        # Generate files in work directory (build artifacts)
-        - mkdir -p build
-        - echo "build config" > build/config.txt
-        - echo "build log" > build/build.log
-        # These work dir files should be cached and restored
+        - if: unix
+          then: |
+            # Generate files in prefix
+            mkdir -p $PREFIX/lib
+            echo "library" > $PREFIX/lib/mylib.a
+            # Generate files in work directory (build artifacts)
+            mkdir -p build
+            echo "build config" > build/config.txt
+            echo "build log" > build/build.log
+        - if: win
+          then: |
+            rem Generate files in prefix
+            mkdir %PREFIX%\lib
+            echo library > %PREFIX%\lib\mylib.lib
+            rem Generate files in work directory (build artifacts)
+            mkdir build
+            echo build config > build\config.txt
+            echo build log > build\build.log
 
   # Package that inherits and should have access to both
   # the prefix files AND the work directory files from cache
@@ -30,12 +40,23 @@ outputs:
     inherit: work-stage
     build:
       script:
-        # Verify work dir files were restored from cache
-        - test -f build/config.txt || exit 1
-        - test -f build/build.log || exit 1
-        - cat build/config.txt
+        - if: unix
+          then: |
+            # Verify work dir files were restored from cache
+            test -f build/config.txt || exit 1
+            test -f build/build.log || exit 1
+            cat build/config.txt
+        - if: win
+          then: |
+            rem Verify work dir files were restored from cache
+            if not exist build\config.txt exit /b 1
+            if not exist build\build.log exit /b 1
+            type build\config.txt
       files:
         - lib/**
     tests:
       - script:
-          - test -f $PREFIX/lib/mylib.a
+          - if: unix
+            then: test -f $PREFIX/lib/mylib.a
+          - if: win
+            then: if not exist %PREFIX%\lib\mylib.lib exit /b 1

@@ -12,17 +12,27 @@ outputs:
   - staging:
       name: symlink-builder
     build:
-      script: |
-        mkdir -p $PREFIX/bin
-        touch $PREFIX/bin/exe
-        ln -s $PREFIX/bin/exe $PREFIX/bin/exe-symlink
-        ln -s $PREFIX/bin/exe $PREFIX/bin/absolute-exe-symlink
-        touch $PREFIX/foo.txt
-        ln -s $PREFIX/foo.txt $PREFIX/foo-symlink.txt
-        ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
-        ln -s $PREFIX/non-existent-file $PREFIX/broken-symlink.txt
-        ln -s ./foo.txt $PREFIX/relative-symlink.txt
-        echo $PREFIX > $PREFIX/prefix.txt
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/bin
+            touch $PREFIX/bin/exe
+            ln -s $PREFIX/bin/exe $PREFIX/bin/exe-symlink
+            ln -s $PREFIX/bin/exe $PREFIX/bin/absolute-exe-symlink
+            touch $PREFIX/foo.txt
+            ln -s $PREFIX/foo.txt $PREFIX/foo-symlink.txt
+            ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
+            ln -s $PREFIX/non-existent-file $PREFIX/broken-symlink.txt
+            ln -s ./foo.txt $PREFIX/relative-symlink.txt
+            echo $PREFIX > $PREFIX/prefix.txt
+        - if: win
+          then: |
+            mkdir %PREFIX%\bin
+            type nul > %PREFIX%\bin\exe.exe
+            mklink %PREFIX%\bin\exe-symlink.exe %PREFIX%\bin\exe.exe
+            type nul > %PREFIX%\foo.txt
+            mklink %PREFIX%\foo-symlink.txt %PREFIX%\foo.txt
+            echo %PREFIX% > %PREFIX%\prefix.txt
 
   # Package output with most symlinks
   - package:
