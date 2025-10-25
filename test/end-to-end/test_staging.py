@@ -169,26 +169,58 @@ def test_staging_run_exports(
     assert "normal-run-exports" not in index.get("depends", [])
 
 
-@pytest.mark.skip(reason="Requires libfoo variant package")
 def test_staging_with_variants(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test staging output with variant-dependent requirements."""
-    rattler_build.build(recipes / "staging/staging-with-variants.yaml", tmp_path)
+    """Test that staging recipes with variant-dependent requirements can be rendered.
 
-    # First package output
-    pkg = get_extracted_package(tmp_path, "variant-cache")
-    assert (pkg / "hello.txt").exists()
-    assert (pkg / "hello.txt").read_text().strip() == "hello"
+    This is a render-only test since we don't have the actual libfoo package,
+    but we can verify the recipe structure and variant handling is correct.
+    """
+    rendered_outputs = rattler_build.render(
+        recipes / "staging/staging-with-variants.yaml",
+        tmp_path,
+        variant_config=recipes / "staging/staging-variants-variant.yaml",
+    )
 
-    # Second package with python dependency
-    pkg_py = get_extracted_package(tmp_path, "variant-cache-py")
-    index = json.loads((pkg_py / "info/index.json").read_text())
-    # Should have python in dependencies
-    assert any("python" in dep for dep in index.get("depends", []))
+    # There should be 2x variant-cache and 2x3 variant-cache-py outputs for 2 versions of libfoo and 3 versions of python
+    variant_cache_outputs = [
+        o for o in rendered_outputs if o["recipe"]["package"]["name"] == "variant-cache"
+    ]
+    variant_cache_py_outputs = [
+        o for o in rendered_outputs if o["recipe"]["package"]["name"] == "variant-cache-py"
+    ]
+
+    # Should have 2 variant-cache outputs (one for each libfoo version)
+    assert len(variant_cache_outputs) == 2, f"Expected 2 variant-cache outputs, got {len(variant_cache_outputs)}"
+
+    # Should have 6 variant-cache-py outputs (2 libfoo × 3 python versions)
+    assert len(variant_cache_py_outputs) == 6, f"Expected 6 variant-cache-py outputs, got {len(variant_cache_py_outputs)}"
+
+    # Verify variant-cache has both libfoo versions
+    cache_libfoo_versions = {
+        o["build_configuration"]["variant"].get("libfoo") for o in variant_cache_outputs
+    }
+    assert cache_libfoo_versions == {"1.0", "2.0"}, f"Expected libfoo versions [1.0, 2.0], got {cache_libfoo_versions}"
+
+    # Verify variant-cache-py has all combinations of libfoo and python
+    expected_combinations = {
+        ("1.0", "3.10"),
+        ("1.0", "3.11"),
+        ("1.0", "3.12"),
+        ("2.0", "3.10"),
+        ("2.0", "3.11"),
+        ("2.0", "3.12"),
+    }
+    actual_combinations = {
+        (o["build_configuration"]["variant"].get("libfoo"), o["build_configuration"]["variant"].get("python"))
+        for o in variant_cache_py_outputs
+    }
+    assert actual_combinations == expected_combinations, (
+        f"Expected combinations {expected_combinations}, got {actual_combinations}"
+    )
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_multiple_staging_caches(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -205,7 +237,7 @@ def test_multiple_staging_caches(
     assert (pkg_py / "lib/python3.11/site-packages/mycore.py").exists()
 
     # Dev package also from core-build staging
-    pkg_dev = get_extracted_package(tmp_path, "libcore-dev")
+    pkg_dev = get_extracted_package(tmp_path, "core-headers")
     assert (pkg_dev / "include/core.h").exists()
     # Should not have the lib file (filtered by files section)
     assert not (pkg_dev / "lib/libcore.so").exists()
@@ -234,7 +266,6 @@ def test_staging_with_top_level_inherit(
     assert (pkg_data / "share/data.txt").read_text().strip() == "data.txt"
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_staging_no_inherit(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test staging output used for side effects without explicit inheritance."""
     rattler_build.build(recipes / "staging/staging-no-inherit.yaml", tmp_path)
@@ -279,6 +310,7 @@ def test_staging_complex_deps(
     # Package with run_exports inherited
     pkg_full = get_extracted_package(tmp_path, "complex-deps-full")
     import platform
+
     if platform.system() == "Windows":
         assert (pkg_full / "lib/libcomplex.dll").exists()
     else:
@@ -402,35 +434,14 @@ def test_staging_metadata_preserved(
     assert recipe["inherits_from"]["cache_name"] == "core-build"
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_staging_error_invalid_inherit(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test that invalid staging cache references produce errors."""
-    # Create a test recipe with invalid inherit reference
-    invalid_recipe = tmp_path / "invalid.yaml"
-    invalid_recipe.write_text(
-        """
-schema_version: 1
-
-recipe:
-  name: invalid-test
-  version: 1.0.0
-
-outputs:
-  - package:
-      name: invalid-pkg
-      version: 1.0.0
-    inherit: nonexistent-cache
-"""
-    )
-
-    # This should fail during rendering
+    # This should fail during rendering because the cache does not exist
     with pytest.raises(CalledProcessError):
-        rattler_build.build(invalid_recipe, tmp_path)
+        rattler_build.build(recipes / "staging/staging-invalid-inherit.yaml", tmp_path)
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_staging_files_selection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -444,15 +455,14 @@ def test_staging_files_selection(
     assert any("lib/libcore.so" in f for f in core_files)
     assert any("include/core.h" in f for f in core_files)
 
-    # libcore-dev should only have include
-    pkg_dev = get_extracted_package(tmp_path, "libcore-dev")
+    # core-headers should only have include
+    pkg_dev = get_extracted_package(tmp_path, "core-headers")
     paths_dev = json.loads((pkg_dev / "info/paths.json").read_text())
     dev_files = [p["_path"] for p in paths_dev["paths"]]
     assert not any("lib/" in f for f in dev_files)
     assert any("include/" in f for f in dev_files)
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_staging_source_handling(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -487,7 +497,6 @@ def test_staging_build_number_propagation(
     assert index["build_number"] == 0
 
 
-@pytest.mark.xfail(reason="Staging implementation not finished")
 def test_staging_about_propagation(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

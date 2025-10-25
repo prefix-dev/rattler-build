@@ -16,7 +16,10 @@ outputs:
         - libfoo
     build:
       script:
-        - echo "hello" > $PREFIX/hello.txt
+        - if: unix
+          then: echo "hello" > $PREFIX/hello.txt
+        - if: win
+          then: echo hello > %PREFIX%\hello.txt
 
   # Package output inheriting from staging
   - package:

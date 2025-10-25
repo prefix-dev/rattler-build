@@ -2293,6 +2293,7 @@ fn evaluate_package_output_to_recipe(
     output: &stage0::PackageOutput,
     recipe: &stage0::MultiOutputRecipe,
     context: &EvaluationContext,
+    staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
 ) -> Result<Stage1Recipe, ParseError> {
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
@@ -2398,11 +2399,37 @@ fn evaluate_package_output_to_recipe(
     const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
 
     let accessed_vars = context.accessed_variables();
-    let free_specs = requirements
+    let mut free_specs = requirements
         .free_specs()
         .into_iter()
         .map(NormalizedKey::from)
         .collect::<HashSet<_>>();
+
+    // If this output inherits from a staging cache, also include the staging cache's free_specs
+    // This ensures that variant variables from the staging cache are included in the hash
+    match &output.inherit {
+        crate::stage0::Inherit::CacheName(cache_name_value) => {
+            let cache_name = evaluate_string_value(cache_name_value, context)?;
+            if let Some(cache) = staging_caches.get(&cache_name) {
+                // Add the staging cache's free specs to our free specs
+                for spec in cache.requirements.free_specs() {
+                    free_specs.insert(NormalizedKey::from(spec));
+                }
+            }
+        }
+        crate::stage0::Inherit::CacheWithOptions(cache_inherit) => {
+            let cache_name = evaluate_string_value(&cache_inherit.from, context)?;
+            if let Some(cache) = staging_caches.get(&cache_name) {
+                // Add the staging cache's free specs to our free specs
+                for spec in cache.requirements.free_specs() {
+                    free_specs.insert(NormalizedKey::from(spec));
+                }
+            }
+        }
+        crate::stage0::Inherit::TopLevel => {
+            // No staging cache, nothing to add
+        }
+    }
 
     // Get the noarch type to determine which variant keys to exclude
     let noarch = build.noarch.unwrap_or(NoArchType::none());
@@ -2568,6 +2595,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     pkg_output.as_ref(),
                     self,
                     &context_with_vars,
+                    &staging_caches,
                 )?;
                 recipe.context = evaluated_context.clone();
 
@@ -2580,6 +2608,27 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::new(cache_name));
+                        } else {
+                            return Err(ParseError::invalid_value(
+                                "inherit",
+                                format!(
+                                    "Staging cache '{}' not found. Available caches: {}",
+                                    cache_name,
+                                    if staging_caches.is_empty() {
+                                        "none".to_string()
+                                    } else {
+                                        staging_caches
+                                            .keys()
+                                            .map(|k| k.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    }
+                                ),
+                                cache_name_value
+                                    .span()
+                                    .copied()
+                                    .unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
                     crate::stage0::Inherit::CacheWithOptions(cache_inherit) => {
@@ -2592,6 +2641,28 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                                     cache_name,
                                     cache_inherit.run_exports,
                                 ));
+                        } else {
+                            return Err(ParseError::invalid_value(
+                                "inherit.from",
+                                format!(
+                                    "Staging cache '{}' not found. Available caches: {}",
+                                    cache_name,
+                                    if staging_caches.is_empty() {
+                                        "none".to_string()
+                                    } else {
+                                        staging_caches
+                                            .keys()
+                                            .map(|k| k.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    }
+                                ),
+                                cache_inherit
+                                    .from
+                                    .span()
+                                    .copied()
+                                    .unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
                     crate::stage0::Inherit::TopLevel => {

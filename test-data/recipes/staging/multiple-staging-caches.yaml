@@ -58,7 +58,7 @@ outputs:
     inherit: core-build
     build:
       files:
-        - lib/libcore.so
+        - lib/**
         - include/core.h
     about:
       summary: Core library
@@ -79,7 +79,7 @@ outputs:
 
   # Package output 3: Development headers only (inherits from core-build)
   - package:
-      name: libcore-dev
+      name: core-headers
       version: 1.0.0
     inherit: core-build
     build:
