@@ -133,8 +133,7 @@ fn test_multi_output_top_level_inherit_snapshot() {
     let source = load_test_recipe("multi_output_top_level_inherit.yaml");
     let recipe = parse_recipe_or_multi_from_source(&source)
         .expect("Failed to parse multi-output top-level inherit recipe");
-    // Use debug snapshot as this recipe has TopLevel inherit which can't be serialized to YAML
-    insta::assert_debug_snapshot!(recipe);
+    insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
 }
 
 #[test]

@@ -2694,6 +2694,7 @@ mod tests {
     fn test_evaluate_condition_simple() {
         let mut ctx = EvaluationContext::new();
         ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("unix".to_string()).unwrap();
         assert!(evaluate_condition(&expr, &ctx).unwrap());
@@ -2706,6 +2707,7 @@ mod tests {
     fn test_evaluate_condition_not() {
         let mut ctx = EvaluationContext::new();
         ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("not unix".to_string()).unwrap();
         assert!(!evaluate_condition(&expr, &ctx).unwrap());

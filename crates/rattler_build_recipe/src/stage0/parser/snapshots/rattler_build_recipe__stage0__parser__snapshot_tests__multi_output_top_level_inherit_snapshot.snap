@@ -1,1307 +1,215 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-expression: recipe
+expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
-MultiOutput(
-    MultiOutputRecipe {
-        schema_version: Some(
-            1,
-        ),
-        context: {},
-        recipe: RecipeMetadata {
-            name: None,
-            version: Some(
-                Value {
-                    inner: Concrete(
-                        VersionWithSource {
-                            version: Version {
-                                version: [[0], [5], [0], [0]],
-                                local: [],
-                            },
-                            source: Some(
-                                "5.0.0",
-                            ),
-                        },
-                    ),
-                    span: Some(
-                        Span {
-                            start: Some(
-                                Marker {
-                                    source: 0,
-                                    character: 96,
-                                    line: 5,
-                                    column: 12,
-                                },
-                            ),
-                            end: None,
-                        },
-                    ),
-                },
-            ),
-        },
-        source: [
-            Url(
-                UrlSource {
-                    url: [
-                        Value {
-                            inner: Concrete(
-                                "https://example.com/top-level-source.tar.gz",
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 120,
-                                            line: 8,
-                                            column: 10,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                    ],
-                    sha256: Some(
-                        Value {
-                            inner: Concrete(
-                                [
-                                    227,
-                                    176,
-                                    196,
-                                    66,
-                                    152,
-                                    252,
-                                    28,
-                                    20,
-                                    154,
-                                    251,
-                                    244,
-                                    200,
-                                    153,
-                                    111,
-                                    185,
-                                    36,
-                                    39,
-                                    174,
-                                    65,
-                                    228,
-                                    100,
-                                    155,
-                                    147,
-                                    76,
-                                    164,
-                                    149,
-                                    153,
-                                    27,
-                                    120,
-                                    82,
-                                    184,
-                                    85,
-                                ],
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 176,
-                                            line: 9,
-                                            column: 13,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                    ),
-                    md5: None,
-                    file_name: None,
-                    patches: ConditionalList {
-                        items: [],
-                    },
-                    target_directory: None,
-                },
-            ),
-        ],
-        build: Build {
-            number: Value {
-                inner: Concrete(
-                    0,
-                ),
-                span: Some(
-                    Span {
-                        start: Some(
-                            Marker {
-                                source: 0,
-                                character: 259,
-                                line: 12,
-                                column: 11,
-                            },
-                        ),
-                        end: None,
-                    },
-                ),
-            },
-            string: None,
-            script: Script {
-                interpreter: None,
-                env: {},
-                secrets: [],
-                content: Some(
-                    ConditionalList {
-                        items: [
-                            Value(
-                                Value {
-                                    inner: Concrete(
-                                        "echo \"Top-level build script\"",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: Some(
-                                                Marker {
-                                                    source: 0,
-                                                    character: 277,
-                                                    line: 14,
-                                                    column: 7,
-                                                },
-                                            ),
-                                            end: None,
-                                        },
-                                    ),
-                                },
-                            ),
-                        ],
-                    },
-                ),
-                file: None,
-                cwd: None,
-            },
-            noarch: None,
-            python: PythonBuild {
-                entry_points: ConditionalList {
-                    items: [],
-                },
-                skip_pyc_compilation: ConditionalList {
-                    items: [],
-                },
-                use_python_app_entrypoint: false,
-                version_independent: false,
-                site_packages_path: None,
-            },
-            skip: ConditionalList {
-                items: [],
-            },
-            always_copy_files: ConditionalList {
-                items: [],
-            },
-            always_include_files: ConditionalList {
-                items: [],
-            },
-            merge_build_and_host_envs: false,
-            files: List(
-                ConditionalList {
-                    items: [],
-                },
-            ),
-            dynamic_linking: DynamicLinking {
-                rpaths: ConditionalList {
-                    items: [],
-                },
-                binary_relocation: Boolean(
-                    Value {
-                        inner: Concrete(
-                            true,
-                        ),
-                        span: None,
-                    },
-                ),
-                missing_dso_allowlist: ConditionalList {
-                    items: [],
-                },
-                rpath_allowlist: ConditionalList {
-                    items: [],
-                },
-                overdepending_behavior: None,
-                overlinking_behavior: None,
-            },
-            variant: VariantKeyUsage {
-                use_keys: ConditionalList {
-                    items: [],
-                },
-                ignore_keys: ConditionalList {
-                    items: [],
-                },
-                down_prioritize_variant: None,
-            },
-            prefix_detection: PrefixDetection {
-                force_file_type: ForceFileType {
-                    text: ConditionalList {
-                        items: [],
-                    },
-                    binary: ConditionalList {
-                        items: [],
-                    },
-                },
-                ignore: Boolean(
-                    Value {
-                        inner: Concrete(
-                            false,
-                        ),
-                        span: None,
-                    },
-                ),
-                ignore_binary_files: false,
-            },
-            post_process: [],
-        },
-        about: About {
-            homepage: Some(
-                Value {
-                    inner: Concrete(
-                        Url {
-                            scheme: "https",
-                            cannot_be_a_base: false,
-                            username: "",
-                            password: None,
-                            host: Some(
-                                Domain(
-                                    "top-level-example.com",
-                                ),
-                            ),
-                            port: None,
-                            path: "/",
-                            query: None,
-                            fragment: None,
-                        },
-                    ),
-                    span: Some(
-                        Span {
-                            start: Some(
-                                Marker {
-                                    source: 0,
-                                    character: 355,
-                                    line: 18,
-                                    column: 13,
-                                },
-                            ),
-                            end: None,
-                        },
-                    ),
-                },
-            ),
-            license: Some(
-                Value {
-                    inner: Concrete(
-                        License(
-                            GPL-3.0-or-later,
-                        ),
-                    ),
-                    span: Some(
-                        Span {
-                            start: Some(
-                                Marker {
-                                    source: 0,
-                                    character: 326,
-                                    line: 17,
-                                    column: 12,
-                                },
-                            ),
-                            end: None,
-                        },
-                    ),
-                },
-            ),
-            license_file: ConditionalList {
-                items: [],
-            },
-            license_family: None,
-            summary: None,
-            description: None,
-            documentation: None,
-            repository: None,
-        },
-        extra: Extra {
-            extra: {},
-        },
-        tests: [],
-        outputs: [
-            Package(
-                PackageOutput {
-                    package: PackageMetadata {
-                        name: Value {
-                            inner: Concrete(
-                                PackageName(
-                                    PackageName {
-                                        normalized: None,
-                                        source: "main-package",
-                                    },
-                                ),
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 477,
-                                            line: 23,
-                                            column: 13,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                        version: Some(
-                            Value {
-                                inner: Concrete(
-                                    VersionWithSource {
-                                        version: Version {
-                                            version: [[0], [5], [0], [0]],
-                                            local: [],
-                                        },
-                                        source: Some(
-                                            "5.0.0",
-                                        ),
-                                    },
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 505,
-                                                line: 24,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                    inherit: TopLevel,
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList {
-                            items: [],
-                        },
-                        host: ConditionalList {
-                            items: [],
-                        },
-                        run: ConditionalList {
-                            items: [
-                                Value(
-                                    Value {
-                                        inner: Concrete(
-                                            SerializableMatchSpec(
-                                                MatchSpec {
-                                                    name: Some(
-                                                        PackageName {
-                                                            normalized: None,
-                                                            source: "python",
-                                                        },
-                                                    ),
-                                                    version: None,
-                                                    build: None,
-                                                    build_number: None,
-                                                    file_name: None,
-                                                    extras: None,
-                                                    channel: None,
-                                                    subdir: None,
-                                                    namespace: None,
-                                                    md5: None,
-                                                    sha256: None,
-                                                    url: None,
-                                                    license: None,
-                                                },
-                                            ),
-                                        ),
-                                        span: Some(
-                                            Span {
-                                                start: Some(
-                                                    Marker {
-                                                        source: 0,
-                                                        character: 568,
-                                                        line: 28,
-                                                        column: 11,
-                                                    },
-                                                ),
-                                                end: None,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        run_constraints: ConditionalList {
-                            items: [],
-                        },
-                        run_exports: RunExports {
-                            noarch: ConditionalList {
-                                items: [],
-                            },
-                            strong: ConditionalList {
-                                items: [],
-                            },
-                            strong_constraints: ConditionalList {
-                                items: [],
-                            },
-                            weak: ConditionalList {
-                                items: [],
-                            },
-                            weak_constraints: ConditionalList {
-                                items: [],
-                            },
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList {
-                                items: [],
-                            },
-                            from_package: ConditionalList {
-                                items: [],
-                            },
-                        },
-                    },
-                    build: Build {
-                        number: Value {
-                            inner: Concrete(
-                                0,
-                            ),
-                            span: None,
-                        },
-                        string: None,
-                        script: Script {
-                            interpreter: None,
-                            env: {},
-                            secrets: [],
-                            content: None,
-                            file: None,
-                            cwd: None,
-                        },
-                        noarch: None,
-                        python: PythonBuild {
-                            entry_points: ConditionalList {
-                                items: [],
-                            },
-                            skip_pyc_compilation: ConditionalList {
-                                items: [],
-                            },
-                            use_python_app_entrypoint: false,
-                            version_independent: false,
-                            site_packages_path: None,
-                        },
-                        skip: ConditionalList {
-                            items: [],
-                        },
-                        always_copy_files: ConditionalList {
-                            items: [],
-                        },
-                        always_include_files: ConditionalList {
-                            items: [],
-                        },
-                        merge_build_and_host_envs: false,
-                        files: List(
-                            ConditionalList {
-                                items: [],
-                            },
-                        ),
-                        dynamic_linking: DynamicLinking {
-                            rpaths: ConditionalList {
-                                items: [],
-                            },
-                            binary_relocation: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        true,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            missing_dso_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            rpath_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            overdepending_behavior: None,
-                            overlinking_behavior: None,
-                        },
-                        variant: VariantKeyUsage {
-                            use_keys: ConditionalList {
-                                items: [],
-                            },
-                            ignore_keys: ConditionalList {
-                                items: [],
-                            },
-                            down_prioritize_variant: None,
-                        },
-                        prefix_detection: PrefixDetection {
-                            force_file_type: ForceFileType {
-                                text: ConditionalList {
-                                    items: [],
-                                },
-                                binary: ConditionalList {
-                                    items: [],
-                                },
-                            },
-                            ignore: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        false,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            ignore_binary_files: false,
-                        },
-                        post_process: [],
-                    },
-                    about: About {
-                        homepage: None,
-                        license: None,
-                        license_file: ConditionalList {
-                            items: [],
-                        },
-                        license_family: None,
-                        summary: Some(
-                            Value {
-                                inner: Concrete(
-                                    "Main package inheriting from top-level",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 601,
-                                                line: 30,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        description: None,
-                        documentation: None,
-                        repository: None,
-                    },
-                    tests: [
-                        Python {
-                            python: PythonTest {
-                                imports: ConditionalList {
-                                    items: [
-                                        Value(
-                                            Value {
-                                                inner: Concrete(
-                                                    "main_package",
-                                                ),
-                                                span: Some(
-                                                    Span {
-                                                        start: Some(
-                                                            Marker {
-                                                                source: 0,
-                                                                character: 700,
-                                                                line: 34,
-                                                                column: 15,
-                                                            },
-                                                        ),
-                                                        end: None,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                },
-                                pip_check: None,
-                                python_version: None,
-                            },
-                        },
-                    ],
-                },
-            ),
-            Package(
-                PackageOutput {
-                    package: PackageMetadata {
-                        name: Value {
-                            inner: Concrete(
-                                PackageName(
-                                    PackageName {
-                                        normalized: None,
-                                        source: "sub-package",
-                                    },
-                                ),
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 819,
-                                            line: 38,
-                                            column: 13,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                        version: Some(
-                            Value {
-                                inner: Concrete(
-                                    VersionWithSource {
-                                        version: Version {
-                                            version: [[0], [5], [0], [0]],
-                                            local: [],
-                                        },
-                                        source: Some(
-                                            "5.0.0",
-                                        ),
-                                    },
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 846,
-                                                line: 39,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                    inherit: TopLevel,
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList {
-                            items: [],
-                        },
-                        host: ConditionalList {
-                            items: [],
-                        },
-                        run: ConditionalList {
-                            items: [
-                                Value(
-                                    Value {
-                                        inner: Concrete(
-                                            SerializableMatchSpec(
-                                                MatchSpec {
-                                                    name: Some(
-                                                        PackageName {
-                                                            normalized: None,
-                                                            source: "python",
-                                                        },
-                                                    ),
-                                                    version: None,
-                                                    build: None,
-                                                    build_number: None,
-                                                    file_name: None,
-                                                    extras: None,
-                                                    channel: None,
-                                                    subdir: None,
-                                                    namespace: None,
-                                                    md5: None,
-                                                    sha256: None,
-                                                    url: None,
-                                                    license: None,
-                                                },
-                                            ),
-                                        ),
-                                        span: Some(
-                                            Span {
-                                                start: Some(
-                                                    Marker {
-                                                        source: 0,
-                                                        character: 891,
-                                                        line: 42,
-                                                        column: 11,
-                                                    },
-                                                ),
-                                                end: None,
-                                            },
-                                        ),
-                                    },
-                                ),
-                                Value(
-                                    Value {
-                                        inner: Concrete(
-                                            SerializableMatchSpec(
-                                                MatchSpec {
-                                                    name: Some(
-                                                        PackageName {
-                                                            normalized: None,
-                                                            source: "main-package",
-                                                        },
-                                                    ),
-                                                    version: Some(
-                                                        Exact(
-                                                            Equals,
-                                                            Version {
-                                                                version: [[0], [5], [0], [0]],
-                                                                local: [],
-                                                            },
-                                                        ),
-                                                    ),
-                                                    build: None,
-                                                    build_number: None,
-                                                    file_name: None,
-                                                    extras: None,
-                                                    channel: None,
-                                                    subdir: None,
-                                                    namespace: None,
-                                                    md5: None,
-                                                    sha256: None,
-                                                    url: None,
-                                                    license: None,
-                                                },
-                                            ),
-                                        ),
-                                        span: Some(
-                                            Span {
-                                                start: Some(
-                                                    Marker {
-                                                        source: 0,
-                                                        character: 908,
-                                                        line: 43,
-                                                        column: 11,
-                                                    },
-                                                ),
-                                                end: None,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        run_constraints: ConditionalList {
-                            items: [],
-                        },
-                        run_exports: RunExports {
-                            noarch: ConditionalList {
-                                items: [],
-                            },
-                            strong: ConditionalList {
-                                items: [],
-                            },
-                            strong_constraints: ConditionalList {
-                                items: [],
-                            },
-                            weak: ConditionalList {
-                                items: [],
-                            },
-                            weak_constraints: ConditionalList {
-                                items: [],
-                            },
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList {
-                                items: [],
-                            },
-                            from_package: ConditionalList {
-                                items: [],
-                            },
-                        },
-                    },
-                    build: Build {
-                        number: Value {
-                            inner: Concrete(
-                                0,
-                            ),
-                            span: None,
-                        },
-                        string: None,
-                        script: Script {
-                            interpreter: None,
-                            env: {},
-                            secrets: [],
-                            content: None,
-                            file: None,
-                            cwd: None,
-                        },
-                        noarch: None,
-                        python: PythonBuild {
-                            entry_points: ConditionalList {
-                                items: [],
-                            },
-                            skip_pyc_compilation: ConditionalList {
-                                items: [],
-                            },
-                            use_python_app_entrypoint: false,
-                            version_independent: false,
-                            site_packages_path: None,
-                        },
-                        skip: ConditionalList {
-                            items: [],
-                        },
-                        always_copy_files: ConditionalList {
-                            items: [],
-                        },
-                        always_include_files: ConditionalList {
-                            items: [],
-                        },
-                        merge_build_and_host_envs: false,
-                        files: List(
-                            ConditionalList {
-                                items: [],
-                            },
-                        ),
-                        dynamic_linking: DynamicLinking {
-                            rpaths: ConditionalList {
-                                items: [],
-                            },
-                            binary_relocation: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        true,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            missing_dso_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            rpath_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            overdepending_behavior: None,
-                            overlinking_behavior: None,
-                        },
-                        variant: VariantKeyUsage {
-                            use_keys: ConditionalList {
-                                items: [],
-                            },
-                            ignore_keys: ConditionalList {
-                                items: [],
-                            },
-                            down_prioritize_variant: None,
-                        },
-                        prefix_detection: PrefixDetection {
-                            force_file_type: ForceFileType {
-                                text: ConditionalList {
-                                    items: [],
-                                },
-                                binary: ConditionalList {
-                                    items: [],
-                                },
-                            },
-                            ignore: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        false,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            ignore_binary_files: false,
-                        },
-                        post_process: [],
-                    },
-                    about: About {
-                        homepage: None,
-                        license: None,
-                        license_file: ConditionalList {
-                            items: [],
-                        },
-                        license_family: None,
-                        summary: Some(
-                            Value {
-                                inner: Concrete(
-                                    "Sub package also inheriting from top-level",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 955,
-                                                line: 45,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        description: None,
-                        documentation: None,
-                        repository: None,
-                    },
-                    tests: [
-                        Commands(
-                            CommandsTest {
-                                script: Script {
-                                    interpreter: None,
-                                    env: {},
-                                    secrets: [],
-                                    content: Some(
-                                        ConditionalList {
-                                            items: [
-                                                Value(
-                                                    Value {
-                                                        inner: Concrete(
-                                                            "python -c \"import sub_package\"",
-                                                        ),
-                                                        span: Some(
-                                                            Span {
-                                                                start: Some(
-                                                                    Marker {
-                                                                        source: 0,
-                                                                        character: 1037,
-                                                                        line: 48,
-                                                                        column: 13,
-                                                                    },
-                                                                ),
-                                                                end: None,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    file: None,
-                                    cwd: None,
-                                },
-                                requirements: None,
-                                files: None,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Package(
-                PackageOutput {
-                    package: PackageMetadata {
-                        name: Value {
-                            inner: Concrete(
-                                PackageName(
-                                    PackageName {
-                                        normalized: None,
-                                        source: "custom-package",
-                                    },
-                                ),
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 1155,
-                                            line: 52,
-                                            column: 13,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                        version: Some(
-                            Value {
-                                inner: Concrete(
-                                    VersionWithSource {
-                                        version: Version {
-                                            version: [[0], [5], [0], [0]],
-                                            local: [],
-                                        },
-                                        source: Some(
-                                            "5.0.0",
-                                        ),
-                                    },
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 1185,
-                                                line: 53,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                    inherit: TopLevel,
-                    source: [],
-                    requirements: Requirements {
-                        build: ConditionalList {
-                            items: [],
-                        },
-                        host: ConditionalList {
-                            items: [],
-                        },
-                        run: ConditionalList {
-                            items: [
-                                Value(
-                                    Value {
-                                        inner: Concrete(
-                                            SerializableMatchSpec(
-                                                MatchSpec {
-                                                    name: Some(
-                                                        PackageName {
-                                                            normalized: None,
-                                                            source: "python",
-                                                        },
-                                                    ),
-                                                    version: None,
-                                                    build: None,
-                                                    build_number: None,
-                                                    file_name: None,
-                                                    extras: None,
-                                                    channel: None,
-                                                    subdir: None,
-                                                    namespace: None,
-                                                    md5: None,
-                                                    sha256: None,
-                                                    url: None,
-                                                    license: None,
-                                                },
-                                            ),
-                                        ),
-                                        span: Some(
-                                            Span {
-                                                start: Some(
-                                                    Marker {
-                                                        source: 0,
-                                                        character: 1422,
-                                                        line: 64,
-                                                        column: 11,
-                                                    },
-                                                ),
-                                                end: None,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        run_constraints: ConditionalList {
-                            items: [],
-                        },
-                        run_exports: RunExports {
-                            noarch: ConditionalList {
-                                items: [],
-                            },
-                            strong: ConditionalList {
-                                items: [],
-                            },
-                            strong_constraints: ConditionalList {
-                                items: [],
-                            },
-                            weak: ConditionalList {
-                                items: [],
-                            },
-                            weak_constraints: ConditionalList {
-                                items: [],
-                            },
-                        },
-                        ignore_run_exports: IgnoreRunExports {
-                            by_name: ConditionalList {
-                                items: [],
-                            },
-                            from_package: ConditionalList {
-                                items: [],
-                            },
-                        },
-                    },
-                    build: Build {
-                        number: Value {
-                            inner: Concrete(
-                                1,
-                            ),
-                            span: Some(
-                                Span {
-                                    start: Some(
-                                        Marker {
-                                            source: 0,
-                                            character: 1234,
-                                            line: 56,
-                                            column: 15,
-                                        },
-                                    ),
-                                    end: None,
-                                },
-                            ),
-                        },
-                        string: None,
-                        script: Script {
-                            interpreter: None,
-                            env: {},
-                            secrets: [],
-                            content: Some(
-                                ConditionalList {
-                                    items: [
-                                        Value(
-                                            Value {
-                                                inner: Concrete(
-                                                    "echo \"Custom build overriding top-level\"",
-                                                ),
-                                                span: Some(
-                                                    Span {
-                                                        start: Some(
-                                                            Marker {
-                                                                source: 0,
-                                                                character: 1260,
-                                                                line: 58,
-                                                                column: 11,
-                                                            },
-                                                        ),
-                                                        end: None,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                },
-                            ),
-                            file: None,
-                            cwd: None,
-                        },
-                        noarch: None,
-                        python: PythonBuild {
-                            entry_points: ConditionalList {
-                                items: [],
-                            },
-                            skip_pyc_compilation: ConditionalList {
-                                items: [],
-                            },
-                            use_python_app_entrypoint: false,
-                            version_independent: false,
-                            site_packages_path: None,
-                        },
-                        skip: ConditionalList {
-                            items: [],
-                        },
-                        always_copy_files: ConditionalList {
-                            items: [],
-                        },
-                        always_include_files: ConditionalList {
-                            items: [],
-                        },
-                        merge_build_and_host_envs: false,
-                        files: List(
-                            ConditionalList {
-                                items: [],
-                            },
-                        ),
-                        dynamic_linking: DynamicLinking {
-                            rpaths: ConditionalList {
-                                items: [],
-                            },
-                            binary_relocation: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        true,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            missing_dso_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            rpath_allowlist: ConditionalList {
-                                items: [],
-                            },
-                            overdepending_behavior: None,
-                            overlinking_behavior: None,
-                        },
-                        variant: VariantKeyUsage {
-                            use_keys: ConditionalList {
-                                items: [],
-                            },
-                            ignore_keys: ConditionalList {
-                                items: [],
-                            },
-                            down_prioritize_variant: None,
-                        },
-                        prefix_detection: PrefixDetection {
-                            force_file_type: ForceFileType {
-                                text: ConditionalList {
-                                    items: [],
-                                },
-                                binary: ConditionalList {
-                                    items: [],
-                                },
-                            },
-                            ignore: Boolean(
-                                Value {
-                                    inner: Concrete(
-                                        false,
-                                    ),
-                                    span: None,
-                                },
-                            ),
-                            ignore_binary_files: false,
-                        },
-                        post_process: [],
-                    },
-                    about: About {
-                        homepage: None,
-                        license: Some(
-                            Value {
-                                inner: Concrete(
-                                    License(
-                                        MIT,
-                                    ),
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 1379,
-                                                line: 61,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        license_file: ConditionalList {
-                            items: [],
-                        },
-                        license_family: None,
-                        summary: Some(
-                            Value {
-                                inner: Concrete(
-                                    "Custom package with overridden build",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: Some(
-                                            Marker {
-                                                source: 0,
-                                                character: 1327,
-                                                line: 60,
-                                                column: 16,
-                                            },
-                                        ),
-                                        end: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        description: None,
-                        documentation: None,
-                        repository: None,
-                    },
-                    tests: [],
-                },
-            ),
-        ],
-    },
-)
+schema_version: 1
+recipe:
+  version: 5.0.0
+source:
+- url:
+  - https://example.com/top-level-source.tar.gz
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+build:
+  number: 0
+  string: null
+  script:
+    content:
+    - echo "Top-level build script"
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    version_independent: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: https://top-level-example.com/
+  license: GPL-3.0-or-later
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra: {}
+outputs:
+- package:
+    name: main-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+  build:
+    number: 0
+    string: null
+    script: {}
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: Main package inheriting from top-level
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - python:
+      imports:
+      - main_package
+- package:
+    name: sub-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+    - main-package ==5.0.0
+  build:
+    number: 0
+    string: null
+    script: {}
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: Sub package also inheriting from top-level
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - script:
+      content:
+      - python -c "import sub_package"
+- package:
+    name: custom-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+  build:
+    number: 1
+    string: null
+    script:
+      content:
+      - echo "Custom build overriding top-level"
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      version_independent: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: MIT
+    license_family: null
+    summary: Custom package with overridden build
+    description: null
+    documentation: null
+    repository: null
