@@ -1,0 +1,67 @@
+# New test case: Mix of staging inheritance and top-level inheritance
+# Tests that package outputs can choose to inherit from staging or from top-level
+
+schema_version: 1
+
+recipe:
+  name: mixed-inheritance
+  version: 2.0.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then: |
+        echo "Top-level build script"
+        mkdir -p $PREFIX/share
+        echo "data.txt" > $PREFIX/share/data.txt
+    - if: win
+      then: |
+        echo Top-level build script
+        mkdir %PREFIX%\share
+        echo data.txt > %PREFIX%\share\data.txt
+
+about:
+  summary: Project with mixed inheritance
+  license: Apache-2.0
+
+outputs:
+  # Staging output for compiled code
+  - staging:
+      name: compile-stage
+    requirements:
+      build:
+        - ${{ compiler('cxx') }}
+        - cmake
+    build:
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib
+            echo "compiled.so" > $PREFIX/lib/compiled.so
+        - if: win
+          then: |
+            mkdir %PREFIX%\lib
+            echo compiled.dll > %PREFIX%\lib\compiled.dll
+
+  # Package that inherits from staging (gets compiled library)
+  - package:
+      name: mixed-compiled
+      version: 2.0.0
+    inherit: compile-stage
+    build:
+      files:
+        - lib/**
+    about:
+      summary: Compiled library package
+
+  # Package that inherits from top-level (gets data files from top-level build)
+  - package:
+      name: mixed-data
+      version: 2.0.0
+    inherit: null # Explicitly inherit from top-level
+    build:
+      files:
+        - share/**
+    about:
+      summary: Data files package

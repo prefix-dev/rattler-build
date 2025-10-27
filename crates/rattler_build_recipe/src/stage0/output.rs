@@ -3,6 +3,7 @@
 //! This module defines the types for multi-output recipes, which allow building
 //! multiple packages from a single recipe with staging/caching support.
 
+use indexmap::IndexMap;
 use serde::Serialize;
 
 use crate::stage0::{
@@ -33,8 +34,8 @@ pub struct SingleOutputRecipe {
     pub schema_version: Option<u32>,
 
     /// Context variables for Jinja template rendering (order-preserving)
-    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub context: IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     pub package: Package,
     pub build: Build,
@@ -55,8 +56,8 @@ pub struct MultiOutputRecipe {
     pub schema_version: Option<u32>,
 
     /// Context variables for Jinja template rendering (order-preserving)
-    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    pub context: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub context: IndexMap<String, Value<rattler_build_jinja::Variable>>,
 
     /// Recipe metadata (name is optional, version is required)
     pub recipe: RecipeMetadata,
@@ -76,6 +77,10 @@ pub struct MultiOutputRecipe {
     /// Extra metadata
     #[serde(default)]
     pub extra: crate::stage0::extra::Extra,
+
+    /// Top-level tests (inheritable by outputs, prepended to output tests)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<TestType>,
 
     /// List of outputs (staging and package outputs)
     pub outputs: Vec<Output>,
@@ -138,12 +143,12 @@ pub struct StagingMetadata {
 /// Only the script field is allowed for staging outputs.
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct StagingBuild {
-    /// Build script - either inline commands or a file path
+    /// Build script - contains script content, interpreter, environment variables, etc.
     #[serde(
         default,
-        skip_serializing_if = "crate::stage0::types::ConditionalList::is_empty"
+        skip_serializing_if = "crate::stage0::types::Script::is_default"
     )]
-    pub script: crate::stage0::types::ConditionalList<crate::stage0::types::ScriptContent>,
+    pub script: crate::stage0::types::Script,
 }
 
 /// Package output configuration
@@ -235,18 +240,30 @@ impl Recipe {
 impl SingleOutputRecipe {
     /// Get all used variables in this single-output recipe
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.package.used_variables();
-        vars.extend(self.build.used_variables());
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.about.used_variables());
-        vars.extend(self.extra.used_variables());
-        for src in &self.source {
+        let SingleOutputRecipe {
+            schema_version: _,
+            context,
+            package,
+            build,
+            requirements,
+            about,
+            extra,
+            source,
+            tests,
+        } = self;
+
+        let mut vars = package.used_variables();
+        vars.extend(build.used_variables());
+        vars.extend(requirements.used_variables());
+        vars.extend(about.used_variables());
+        vars.extend(extra.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
         }
-        for test in &self.tests {
+        for test in tests {
             vars.extend(test.used_variables());
         }
-        for value in self.context.values() {
+        for value in context.values() {
             vars.extend(value.used_variables());
         }
         vars.sort();
@@ -263,29 +280,46 @@ impl SingleOutputRecipe {
 impl MultiOutputRecipe {
     /// Get all used variables across recipe and all outputs
     pub fn used_variables(&self) -> Vec<String> {
+        let MultiOutputRecipe {
+            schema_version: _,
+            context,
+            recipe,
+            source,
+            build,
+            about,
+            extra,
+            tests,
+            outputs,
+        } = self;
+
         let mut vars = Vec::new();
 
         // Top-level variables
-        if let Some(name) = &self.recipe.name {
+        let RecipeMetadata { name, version } = recipe;
+
+        if let Some(name) = name {
             vars.extend(name.used_variables());
         }
-        if let Some(version) = &self.recipe.version {
+        if let Some(version) = version {
             vars.extend(version.used_variables());
         }
-        vars.extend(self.build.used_variables());
-        vars.extend(self.about.used_variables());
-        vars.extend(self.extra.used_variables());
-        for src in &self.source {
+        vars.extend(build.used_variables());
+        vars.extend(about.used_variables());
+        vars.extend(extra.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
+        }
+        for test in tests {
+            vars.extend(test.used_variables());
         }
 
         // Context variables
-        for value in self.context.values() {
+        for value in context.values() {
             vars.extend(value.used_variables());
         }
 
         // Output variables
-        for output in &self.outputs {
+        for output in outputs {
             vars.extend(output.used_variables());
         }
 
@@ -330,12 +364,21 @@ impl Output {
 impl StagingOutput {
     /// Get all used variables in this staging output
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.staging.name.used_variables();
-        for src in &self.source {
+        let StagingOutput {
+            staging,
+            source,
+            requirements,
+            build,
+        } = self;
+
+        let StagingMetadata { name } = staging;
+
+        let mut vars = name.used_variables();
+        for src in source {
             vars.extend(src.used_variables());
         }
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.build.used_variables());
+        vars.extend(requirements.used_variables());
+        vars.extend(build.used_variables());
         vars.sort();
         vars.dedup();
         vars
@@ -350,15 +393,25 @@ impl StagingOutput {
 impl PackageOutput {
     /// Get all used variables in this package output
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.package.used_variables();
-        vars.extend(self.inherit.used_variables());
-        for src in &self.source {
+        let PackageOutput {
+            package,
+            inherit,
+            source,
+            requirements,
+            build,
+            about,
+            tests,
+        } = self;
+
+        let mut vars = package.used_variables();
+        vars.extend(inherit.used_variables());
+        for src in source {
             vars.extend(src.used_variables());
         }
-        vars.extend(self.requirements.used_variables());
-        vars.extend(self.build.used_variables());
-        vars.extend(self.about.used_variables());
-        for test in &self.tests {
+        vars.extend(requirements.used_variables());
+        vars.extend(build.used_variables());
+        vars.extend(about.used_variables());
+        for test in tests {
             vars.extend(test.used_variables());
         }
         vars.sort();
@@ -387,9 +440,7 @@ impl StagingBuild {
     /// Get all used variables in staging build
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();
-        for item in &self.script {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(self.script.used_variables());
         vars.sort();
         vars.dedup();
         vars

@@ -1,13 +1,14 @@
 //! Parser for the Package section
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_jinja::JinjaTemplate;
+use rattler_build_yaml_parser::ParseMapping;
 
 use std::str::FromStr;
 
 use crate::{
     error::{ParseError, ParseResult},
-    span::SpannedString,
-    stage0::{package::Package, parser::helpers::get_span},
+    stage0::{Value, package::Package, parser::helpers::get_span},
 };
 
 /// Parse a Package section from YAML
@@ -21,6 +22,9 @@ use crate::{
 ///   version: 1.0.0
 /// ```
 pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
+    // Validate field names first
+    yaml.validate_keys("package", &["name", "version"])?;
+
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("Package section must be a mapping")
@@ -36,22 +40,22 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
             .with_message("Package name must be a scalar")
     })?;
 
-    let name_spanned = SpannedString::from(name_scalar);
-    let name_str = name_spanned.as_str();
+    let name_str = name_scalar.as_str();
+    let name_span = *name_scalar.span();
 
     // Parse the name - check if it's a template or concrete value
     let name = if name_str.contains("${{") && name_str.contains("}}") {
         // Template
-        let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
-            .map_err(|e| ParseError::jinja_error(e, name_spanned.span()))?;
-        crate::stage0::types::Value::new_template(template, name_spanned.span())
+        let template = JinjaTemplate::new(name_str.to_string())
+            .map_err(|e| ParseError::jinja_error(e, name_span))?;
+        Value::new_template(template, Some(name_span))
     } else {
         // Concrete package name
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
-            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), name_spanned.span()))?;
-        crate::stage0::types::Value::new_concrete(
+            .map_err(|e| ParseError::invalid_value("name", e.to_string(), name_span))?;
+        Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
-            name_spanned.span(),
+            Some(name_span),
         )
     };
 
@@ -65,36 +69,21 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
             .with_message("Package version must be a scalar")
     })?;
 
-    let version_spanned = SpannedString::from(version_scalar);
-    let version_str = version_spanned.as_str();
+    let version_str = version_scalar.as_str();
+    let version_span = *version_scalar.span();
 
     // Parse the version - check if it's a template or concrete value
     let version = if version_str.contains("${{") && version_str.contains("}}") {
         // Template
-        let template = crate::stage0::types::JinjaTemplate::new(version_str.to_string())
-            .map_err(|e| ParseError::jinja_error(e, version_spanned.span()))?;
-        crate::stage0::types::Value::new_template(template, version_spanned.span())
+        let template = JinjaTemplate::new(version_str.to_string())
+            .map_err(|e| ParseError::jinja_error(e, version_span))?;
+        Value::new_template(template, Some(version_span))
     } else {
         // Concrete version
         let version_with_source = rattler_conda_types::VersionWithSource::from_str(version_str)
-            .map_err(|e| {
-                ParseError::invalid_value("version", &e.to_string(), version_spanned.span())
-            })?;
-        crate::stage0::types::Value::new_concrete(version_with_source, version_spanned.span())
+            .map_err(|e| ParseError::invalid_value("version", e.to_string(), version_span))?;
+        Value::new_concrete(version_with_source, Some(version_span))
     };
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "name" | "version") {
-            return Err(ParseError::invalid_value(
-                "package",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion("valid fields are: name, version"));
-        }
-    }
 
     Ok(Package { name, version })
 }
@@ -123,11 +112,10 @@ mod tests {
         assert!(package.version.is_concrete());
 
         // Check name
-        match package.name {
-            crate::stage0::types::Value::Concrete { ref value, .. } => {
-                assert_eq!(value.to_string(), "my-package");
-            }
-            _ => panic!("Expected concrete name"),
+        if let Some(value) = package.name.as_concrete() {
+            assert_eq!(value.to_string(), "my-package");
+        } else {
+            panic!("Expected concrete name");
         }
     }
 
@@ -159,8 +147,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("missing"));
-        assert!(err.message.as_ref().unwrap().contains("name"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("name"));
     }
 
     #[test]
@@ -172,8 +161,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("missing"));
-        assert!(err.message.as_ref().unwrap().contains("version"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("version"));
     }
 
     #[test]
@@ -198,6 +188,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 }

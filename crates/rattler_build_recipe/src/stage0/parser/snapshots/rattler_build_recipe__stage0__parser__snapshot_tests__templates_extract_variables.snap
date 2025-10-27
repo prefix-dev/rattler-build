@@ -9,7 +9,6 @@ expression: vars
     "cxx_compiler_version",
     "homepage",
     "license",
-    "maintainer",
     "name",
     "platform",
     "python",

@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_variant_config/tests/error_tests.rs
+expression: error_with_source
+---
+  × expected sequence but got non-sequence
+   ╭─[zip_keys_error.yaml:2:5]
+ 1 │ zip_keys:
+ 2 │   - list
+   ·     ──┬─
+   ·       ╰── expected sequence but got non-sequence
+ 3 │   - bar
+   ╰────

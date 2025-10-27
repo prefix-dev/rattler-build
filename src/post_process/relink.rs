@@ -1,11 +1,11 @@
 use fs_err as fs;
+use rattler_build_recipe::stage1::GlobVec;
 
 use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
 use crate::metadata::Output;
-use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, ToolError};
 use crate::windows::link::Dll;
 use rattler_conda_types::{Arch, Platform};
@@ -145,9 +145,9 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
 /// On macOS (Mach-O files), we do the same trick and set the rpath to a relative path with the special
 /// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
-    let dynamic_linking = output.recipe.build().dynamic_linking();
+    let dynamic_linking = &output.recipe.build().dynamic_linking;
     let target_platform = output.build_configuration.target_platform;
-    let relocation_config = dynamic_linking.binary_relocation();
+    let relocation_config = &dynamic_linking.binary_relocation;
 
     if target_platform == Platform::NoArch
         // skip linking checks for wasm
@@ -157,8 +157,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         return Ok(());
     }
 
-    let rpaths = dynamic_linking.rpaths();
-    let rpath_allowlist = dynamic_linking.rpath_allowlist();
+    let rpaths = dynamic_linking.rpaths.to_vec();
+    let rpath_allowlist = &dynamic_linking.rpath_allowlist;
 
     let tmp_prefix = temp_files.temp_dir.path();
     let encoded_prefix = &temp_files.encoded_prefix;

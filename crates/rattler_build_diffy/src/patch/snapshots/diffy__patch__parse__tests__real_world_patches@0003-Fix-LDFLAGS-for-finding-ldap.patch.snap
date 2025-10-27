@@ -1,0 +1,62 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0003-Fix-LDFLAGS-for-finding-ldap.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/configure.ac",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/configure.ac",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1725,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 1725,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "if test \"x$enables_ldap\" = \"xyes\"; then\n",
+                    ),
+                    lines: [
+                        Context(
+                            "    LDAP=yes\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    SAVE_LDFLAGS=$LDFLAGS\n",
+                        ),
+                        Delete(
+                            "    LDFLAGS=-lpthread\n",
+                        ),
+                        Insert(
+                            "    LDFLAGS=$LDFLAGS -lpthread\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    AC_CHECK_LIB([ldap_r], [ldap_first_message], [\n",
+                        ),
+                        Context(
+                            "      AC_CHECK_LIB([ldap_r], [ldap_initialize], [\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

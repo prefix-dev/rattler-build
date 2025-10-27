@@ -1,10 +1,10 @@
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{OneOrMany, formats::PreferOne, serde_as};
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
-use super::glob_vec::GlobVec;
+use super::GlobVec;
 
 /// Source information - can be Git, Url, or Path (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -152,6 +152,8 @@ fn is_false(value: &bool) -> bool {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url(s) to the source code
+    /// Can be a single URL or a list of URLs (for mirrors)
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
     pub url: Vec<Url>,
 
     /// Optional SHA256 checksum to verify the downloaded file

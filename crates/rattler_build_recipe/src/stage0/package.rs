@@ -23,8 +23,10 @@ pub struct Package {
 
 impl Package {
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.name.used_variables();
-        vars.extend(self.version.used_variables());
+        let Package { name, version } = self;
+
+        let mut vars = name.used_variables();
+        vars.extend(version.used_variables());
         vars.sort();
         vars.dedup();
         vars
@@ -44,8 +46,10 @@ pub struct PackageMetadata {
 
 impl PackageMetadata {
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = self.name.used_variables();
-        if let Some(version) = &self.version {
+        let PackageMetadata { name, version } = self;
+
+        let mut vars = name.used_variables();
+        if let Some(version) = version {
             vars.extend(version.used_variables());
         }
         vars.sort();

@@ -15,7 +15,7 @@ recipe:
 build:
   number: 0
   string: null
-  script: []
+  script: {}
   noarch: null
   python:
     entry_points: []
@@ -54,8 +54,7 @@ about:
   description: null
   documentation: null
   repository: null
-extra:
-  recipe-maintainers: []
+extra: {}
 outputs:
 - staging:
     name: ${{ staging_name }}
@@ -70,10 +69,11 @@ outputs:
     - python ${{ python_version }}
   build:
     script:
-    - if: unix
-      then: make -j${{ CPU_COUNT }}
-    - if: win
-      then: nmake
+      content:
+      - if: unix
+        then: make -j${{ CPU_COUNT }}
+      - if: win
+        then: nmake
 - package:
     name: ${{ name }}
     version: ${{ version }}
@@ -85,7 +85,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []
@@ -134,7 +134,7 @@ outputs:
   build:
     number: 0
     string: null
-    script: []
+    script: {}
     noarch: null
     python:
       entry_points: []

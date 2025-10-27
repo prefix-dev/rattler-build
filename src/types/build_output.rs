@@ -1,6 +1,7 @@
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_build_jinja::Variable;
+use rattler_build_recipe::{Stage1Recipe, stage1::Source};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     PackageName, Platform, RepoDataRecord, VersionWithSource,
@@ -19,7 +20,6 @@ use std::{
 
 use crate::{
     console_utils::github_integration_enabled,
-    recipe::{Recipe, parser::Source},
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildOutput {
     /// The rendered recipe that is used to build this output
-    pub recipe: Recipe,
+    pub recipe: Stage1Recipe,
     /// The build configuration for this output (e.g. target_platform, channels,
     /// and other settings)
     pub build_configuration: BuildConfiguration,
@@ -73,15 +73,9 @@ impl BuildOutput {
         self.recipe.package().version()
     }
 
-    /// The build string is either the build string from the recipe or computed
-    /// from the hash and build number.
+    /// The build string from the recipe (always present after evaluation)
     pub fn build_string(&self) -> Cow<'_, str> {
-        self.recipe
-            .build()
-            .string
-            .as_resolved()
-            .expect("Build string is not resolved")
-            .into()
+        self.recipe.build().string.as_ref().into()
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
@@ -332,6 +326,17 @@ impl BuildOutput {
         }
 
         Ok(())
+    }
+
+    /// Check if this package is python version independent (ABI3 or noarch) package
+    pub(crate) fn is_python_version_independent(&self) -> bool {
+        self.recipe.build.python.version_independent
+            || self
+                .recipe
+                .build
+                .noarch
+                .map(|n| n.is_python())
+                .unwrap_or(false)
     }
 }
 

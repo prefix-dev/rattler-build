@@ -1,12 +1,12 @@
 use std::{future::IntoFuture, path::Path};
 
 use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
-use anyhow::Context;
 use comfy_table::Table;
 use console::style;
 use futures::FutureExt;
 use indicatif::HumanBytes;
 use itertools::Itertools;
+use miette::{IntoDiagnostic, WrapErr};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
 use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
@@ -63,7 +63,7 @@ pub async fn solve_environment(
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-) -> anyhow::Result<Vec<RepoDataRecord>> {
+) -> miette::Result<Vec<RepoDataRecord>> {
     let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
     tracing::info!("\nResolving {name} environment:\n");
@@ -112,7 +112,8 @@ pub async fn solve_environment(
     // date.
     let solver_result = tool_configuration
         .fancy_log_handler
-        .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
+        .wrap_in_progress("solving", move || Solver.solve(solver_task))
+        .into_diagnostic()?;
 
     // Print the result as a table
     print_as_table(&solver_result.records);
@@ -131,7 +132,7 @@ pub async fn create_environment(
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-) -> anyhow::Result<Vec<RepoDataRecord>> {
+) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
         specs,
@@ -163,7 +164,7 @@ pub async fn load_repodatas(
     target_platform: Platform,
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,
-) -> anyhow::Result<Vec<rattler_repodata_gateway::RepoData>> {
+) -> miette::Result<Vec<rattler_repodata_gateway::RepoData>> {
     let channels = channels
         .iter()
         .map(|url| Channel::from_url(url.clone()))
@@ -195,7 +196,8 @@ pub async fn load_repodatas(
         .recursive(true)
         .into_future()
         .boxed()
-        .await?;
+        .await
+        .into_diagnostic()?;
 
     tool_configuration
         .fancy_log_handler
@@ -212,28 +214,31 @@ pub async fn install_packages(
     target_platform: Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
-) -> anyhow::Result<()> {
+) -> miette::Result<()> {
     // Make sure the target prefix exists, regardless of whether we'll actually
     // install anything in there.
-    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix).with_context(|| {
-        format!(
-            "failed to create target prefix: {}",
-            target_prefix.display()
-        )
-    })?;
+    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to create target prefix: {}",
+                target_prefix.display()
+            )
+        })?;
 
     if !prefix.path().join("conda-meta/history").exists() {
         // Create an empty history file if it doesn't exist
-        fs_err::create_dir_all(prefix.path().join("conda-meta"))?;
-        fs_err::File::create(prefix.path().join("conda-meta/history"))?;
+        fs_err::create_dir_all(prefix.path().join("conda-meta")).into_diagnostic()?;
+        fs_err::File::create(prefix.path().join("conda-meta/history")).into_diagnostic()?;
     }
 
-    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
+    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix).into_diagnostic()?;
 
     if !installed_packages.is_empty() && name.starts_with("host") {
         // we have to clean up extra files in the prefix
         let extra_files =
-            Files::from_prefix(target_prefix, &Default::default(), &Default::default())?;
+            Files::from_prefix(target_prefix, &Default::default(), &Default::default())
+                .into_diagnostic()?;
 
         tracing::info!(
             "Cleaning up {} files in the prefix from a previous build.",
@@ -242,7 +247,7 @@ pub async fn install_packages(
 
         for f in extra_files.new_files {
             if !f.is_dir() {
-                fs_err::remove_file(target_prefix.join(f))?;
+                fs_err::remove_file(target_prefix.join(f)).into_diagnostic()?;
             }
         }
     }
@@ -270,7 +275,8 @@ pub async fn install_packages(
                 .finish(),
         )
         .install(&target_prefix, required_packages.to_owned())
-        .await?;
+        .await
+        .into_diagnostic()?;
 
     tracing::info!(
         "{} Successfully updated the {name} environment",

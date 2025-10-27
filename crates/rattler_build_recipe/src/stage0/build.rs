@@ -1,14 +1,14 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
-use rattler_conda_types::package::EntryPoint;
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, ScriptContent, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, Script, Value};
 
 /// Default build number is 0
 fn default_build_number() -> Value<u64> {
-    Value::new_concrete(0, crate::span::Span::unknown())
+    Value::new_concrete(0, None)
 }
 
 /// Variant key usage configuration
@@ -36,13 +36,13 @@ pub struct Build {
     /// Build string (usually auto-generated from variant hash)
     pub string: Option<Value<String>>,
 
-    /// Build script - either inline commands or a file path
+    /// Build script - contains script content, interpreter, environment variables, etc.
     /// Default is `build.sh` on Unix, `build.bat` on Windows
     #[serde(default)]
-    pub script: ConditionalList<ScriptContent>,
+    pub script: Script,
 
-    /// Noarch type - "python" or "generic"
-    pub noarch: Option<Value<String>>,
+    /// Noarch type - python or generic
+    pub noarch: Option<Value<NoArchType>>,
 
     /// Python-specific configuration
     #[serde(default)]
@@ -90,7 +90,7 @@ impl Default for Build {
         Self {
             number: default_build_number(),
             string: None,
-            script: ConditionalList::default(),
+            script: Script::default(),
             noarch: None,
             python: PythonBuild::default(),
             skip: ConditionalList::default(),
@@ -118,7 +118,7 @@ pub enum BinaryRelocation {
 
 impl Default for BinaryRelocation {
     fn default() -> Self {
-        Self::Boolean(Value::new_concrete(true, crate::span::Span::unknown()))
+        Self::Boolean(Value::new_concrete(true, None))
     }
 }
 
@@ -175,7 +175,7 @@ pub enum PrefixIgnore {
 
 impl Default for PrefixIgnore {
     fn default() -> Self {
-        Self::Boolean(Value::new_concrete(false, crate::span::Span::unknown()))
+        Self::Boolean(Value::new_concrete(false, None))
     }
 }
 
@@ -247,11 +247,14 @@ impl Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Build {{ number: {}, string: {}, script: [{}], noarch: {}, skip: [{}] }}",
+            "Build {{ number: {}, string: {}, script: {}, noarch: {}, skip: [{}] }}",
             self.number,
             self.string.as_ref().into_iter().format(", "),
-            self.script.iter().format(", "),
-            self.noarch.as_ref().into_iter().format(", "),
+            self.script,
+            self.noarch
+                .as_ref()
+                .map(|v| format!("{:?}", v))
+                .unwrap_or_default(),
             self.skip.iter().format(", "),
         )
     }
@@ -260,54 +263,86 @@ impl Display for Build {
 impl Build {
     /// Collect all variables used in the build section
     pub fn used_variables(&self) -> Vec<String> {
+        let Build {
+            number,
+            string,
+            script,
+            noarch,
+            python,
+            skip,
+            always_copy_files,
+            always_include_files,
+            merge_build_and_host_envs: _,
+            files,
+            dynamic_linking,
+            variant,
+            prefix_detection,
+            post_process,
+        } = self;
+
         let mut vars = Vec::new();
 
-        vars.extend(self.number.used_variables());
+        vars.extend(number.used_variables());
 
-        if let Some(string) = &self.string {
+        if let Some(string) = string {
             vars.extend(string.used_variables());
         }
 
-        for item in &self.script {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(script.used_variables());
 
-        if let Some(noarch) = &self.noarch {
+        if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());
         }
 
-        for item in &self.skip {
+        for item in skip {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.python.entry_points {
+        let PythonBuild {
+            entry_points,
+            skip_pyc_compilation,
+            use_python_app_entrypoint: _,
+            version_independent: _,
+            site_packages_path,
+        } = python;
+
+        for item in entry_points {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.python.skip_pyc_compilation {
+        for item in skip_pyc_compilation {
             vars.extend(item.used_variables());
         }
 
-        if let Some(site_packages_path) = &self.python.site_packages_path {
+        if let Some(site_packages_path) = site_packages_path {
             vars.extend(site_packages_path.used_variables());
         }
 
-        for item in &self.always_copy_files {
+        for item in always_copy_files {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.always_include_files {
+        for item in always_include_files {
             vars.extend(item.used_variables());
         }
 
-        vars.extend(self.files.used_variables());
+        vars.extend(files.used_variables());
 
         // Dynamic linking
-        for item in &self.dynamic_linking.rpaths {
+        let DynamicLinking {
+            rpaths,
+            binary_relocation,
+            missing_dso_allowlist,
+            rpath_allowlist,
+            overdepending_behavior,
+            overlinking_behavior,
+        } = dynamic_linking;
+
+        for item in rpaths {
             vars.extend(item.used_variables());
         }
 
-        match &self.dynamic_linking.binary_relocation {
+        match binary_relocation {
             BinaryRelocation::Boolean(val) => {
                 vars.extend(val.used_variables());
             }
@@ -318,45 +353,59 @@ impl Build {
             }
         }
 
-        for item in &self.dynamic_linking.missing_dso_allowlist {
+        for item in missing_dso_allowlist {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.dynamic_linking.rpath_allowlist {
+        for item in rpath_allowlist {
             vars.extend(item.used_variables());
         }
 
-        if let Some(overdepending_behavior) = &self.dynamic_linking.overdepending_behavior {
+        if let Some(overdepending_behavior) = overdepending_behavior {
             vars.extend(overdepending_behavior.used_variables());
         }
 
-        if let Some(overlinking_behavior) = &self.dynamic_linking.overlinking_behavior {
+        if let Some(overlinking_behavior) = overlinking_behavior {
             vars.extend(overlinking_behavior.used_variables());
         }
 
         // Variant
-        for item in &self.variant.use_keys {
+        let VariantKeyUsage {
+            use_keys,
+            ignore_keys,
+            down_prioritize_variant,
+        } = variant;
+
+        for item in use_keys {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.variant.ignore_keys {
+        for item in ignore_keys {
             vars.extend(item.used_variables());
         }
 
-        if let Some(down_prioritize) = &self.variant.down_prioritize_variant {
+        if let Some(down_prioritize) = down_prioritize_variant {
             vars.extend(down_prioritize.used_variables());
         }
 
         // Prefix detection
-        for item in &self.prefix_detection.force_file_type.text {
+        let PrefixDetection {
+            force_file_type,
+            ignore,
+            ignore_binary_files: _,
+        } = prefix_detection;
+
+        let ForceFileType { text, binary } = force_file_type;
+
+        for item in text {
             vars.extend(item.used_variables());
         }
 
-        for item in &self.prefix_detection.force_file_type.binary {
+        for item in binary {
             vars.extend(item.used_variables());
         }
 
-        match &self.prefix_detection.ignore {
+        match ignore {
             PrefixIgnore::Boolean(val) => {
                 vars.extend(val.used_variables());
             }
@@ -368,12 +417,18 @@ impl Build {
         }
 
         // Post-process
-        for pp in &self.post_process {
-            for item in &pp.files {
+        for pp in post_process {
+            let PostProcess {
+                files,
+                regex,
+                replacement,
+            } = pp;
+
+            for item in files {
                 vars.extend(item.used_variables());
             }
-            vars.extend(pp.regex.used_variables());
-            vars.extend(pp.replacement.used_variables());
+            vars.extend(regex.used_variables());
+            vars.extend(replacement.used_variables());
         }
 
         vars.sort();

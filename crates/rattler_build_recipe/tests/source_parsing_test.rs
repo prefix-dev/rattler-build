@@ -1,4 +1,4 @@
-use rattler_build_recipe::stage0::{IncludeExclude, Source, Value, parse_recipe_from_source};
+use rattler_build_recipe::stage0::{IncludeExclude, Source, parse_recipe_from_source};
 
 #[test]
 fn test_parse_recipe_with_git_source() {
@@ -23,11 +23,10 @@ build:
     match &recipe.source[0] {
         Source::Git(git) => {
             // Check that the git URL is correctly parsed
-            match &git.url.0 {
-                Value::Concrete { value: url, .. } => {
-                    assert_eq!(url, "https://github.com/example/repo.git");
-                }
-                _ => panic!("Expected concrete URL"),
+            if let Some(url) = git.url.0.as_concrete() {
+                assert_eq!(url, "https://github.com/example/repo.git");
+            } else {
+                panic!("Expected concrete URL");
             }
 
             // Check tag
@@ -63,11 +62,10 @@ build:
         Source::Url(url_src) => {
             assert_eq!(url_src.url.len(), 1);
 
-            match &url_src.url[0] {
-                Value::Concrete { value: url, .. } => {
-                    assert_eq!(url, "https://example.com/archive.tar.gz");
-                }
-                _ => panic!("Expected concrete URL"),
+            if let Some(url) = url_src.url[0].as_concrete() {
+                assert_eq!(url, "https://example.com/archive.tar.gz");
+            } else {
+                panic!("Expected concrete URL");
             }
 
             assert!(url_src.sha256.is_some());
@@ -100,11 +98,10 @@ build:
 
     match &recipe.source[0] {
         Source::Path(path_src) => {
-            match &path_src.path {
-                Value::Concrete { value: path, .. } => {
-                    assert_eq!(path.to_str().unwrap(), "./local/source");
-                }
-                _ => panic!("Expected concrete path"),
+            if let Some(path) = path_src.path.as_concrete() {
+                assert_eq!(path.to_str().unwrap(), "./local/source");
+            } else {
+                panic!("Expected concrete path");
             }
 
             assert!(path_src.use_gitignore);
@@ -169,11 +166,10 @@ build:
     match &recipe.source[0] {
         Source::Git(git) => {
             // Check that the URL is a template
-            match &git.url.0 {
-                Value::Template { template, .. } => {
-                    assert!(template.source().contains("repo_url"));
-                }
-                _ => panic!("Expected template URL"),
+            if let Some(template) = git.url.0.as_template() {
+                assert!(template.source().contains("repo_url"));
+            } else {
+                panic!("Expected template URL");
             }
 
             // Check tag is template

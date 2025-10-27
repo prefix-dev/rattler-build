@@ -1,0 +1,59 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0001-conda-compat.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "classes/Base_class.f90",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "classes/Base_class.f90",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 624,
+                        len: 6,
+                    },
+                    new_range: HunkRange {
+                        start: 624,
+                        len: 6,
+                    },
+                    function_context: Some(
+                        "END FUNCTION rotationMatrix\n",
+                    ),
+                    lines: [
+                        Context(
+                            "  SUBROUTINE setAccessToDataFiles()\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    IMPLICIT NONE\n",
+                        ),
+                        Delete(
+                            "    OORB_DATA_DIR = resolveDirectory(\"share/oorb\", \"OORB_DATA\")\n",
+                        ),
+                        Insert(
+                            "    OORB_DATA_DIR = resolveDirectory(\"share/openorb\", \"OORB_DATA\")\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "  END SUBROUTINE setAccessToDataFiles\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

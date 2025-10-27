@@ -1,0 +1,35 @@
+From 74124bf346e9a1af0b32f795a3b2e70c32af33a6 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Sun, 5 Feb 2023 14:11:15 +0100
+Subject: [PATCH 2/3] Fix lib suffix
+
+---
+ cmake/modules/DefineInstallationPaths.cmake | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/cmake/modules/DefineInstallationPaths.cmake b/cmake/modules/DefineInstallationPaths.cmake
+index 92215f3c..58d6f237 100644
+--- a/cmake/modules/DefineInstallationPaths.cmake
++++ b/cmake/modules/DefineInstallationPaths.cmake
+@@ -5,17 +5,7 @@ if (UNIX)
+   ENDIF (NOT APPLICATION_NAME)
+ 
+ # detect lib suffix
+-
+-
+-IF(EXISTS "/usr/lib64")
+-	SET(LIB_SUFFIX "64"
+-	CACHE STRING "Suffix of the lib")
+-	SET (PKG_ARCH "x86_64")
+-ELSE(EXISTS "/usr/lib64" )
+-SET(LIB_SUFFIX ""
+-CACHE STRING "Suffix of the lib")
+-SET (PKG_ARCH "i386")
+-ENDIF(EXISTS "/usr/lib64" )
++SET(LIB_SUFFIX "" CACHE STRING "Suffix of the lib")
+ 
+ 
+ #  correct cmake netpath issue with cmake 2.8
+-- 
+2.47.0
+

@@ -1,0 +1,62 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/fix_gitignore_ms.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/.gitignore",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/.gitignore",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 198,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 198,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "test/input_files/**/*.json\n",
+                    ),
+                    lines: [
+                        Context(
+                            "**/scratch/\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# Test microstructure files\n",
+                        ),
+                        Delete(
+                            "!sphere.h5\n",
+                        ),
+                        Insert(
+                            "!sphere32.h5\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "# Test input files\n",
+                        ),
+                        Context(
+                            "!test_LinearElastic.json\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

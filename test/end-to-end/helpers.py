@@ -43,9 +43,20 @@ class RattlerBuild:
                 # Otherwise, it's bytes and needs decoding (but we added encoding, so this won't happen)
                 return output
             except CalledProcessError as e:
-                if kwds.get("stderr") is None:
+                print("\n" + "=" * 80)
+                print("RATTLER-BUILD COMMAND FAILED")
+                print("=" * 80)
+                print(f"Command: {' '.join(str(x) for x in e.cmd)}")
+                print(f"Return code: {e.returncode}")
+                print("-" * 80)
+                if e.output:
+                    print("OUTPUT:")
                     print(e.output)
+                if e.stderr:
+                    print("-" * 80)
+                    print("STDERR:")
                     print(e.stderr)
+                print("=" * 80 + "\n")
                 raise e
 
     def build_args(

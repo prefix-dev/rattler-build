@@ -6,6 +6,7 @@ use goblin::mach::header::{
 };
 use indexmap::IndexSet;
 use memmap2::MmapMut;
+use rattler_build_recipe::stage1::GlobVec;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -13,7 +14,6 @@ use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
-use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
@@ -612,6 +612,7 @@ fn install_name_tool(
 #[cfg(target_os = "macos")]
 mod tests {
     use fs_err as fs;
+    use rattler_build_recipe::stage1::GlobVec;
     use std::{
         collections::{HashMap, HashSet},
         path::{Path, PathBuf},
@@ -619,11 +620,11 @@ mod tests {
     use tempfile::tempdir_in;
 
     use super::{RelinkError, install_name_tool};
+    use crate::post_process::relink::Relinker;
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,
     };
-    use crate::{post_process::relink::Relinker, recipe::parser::GlobVec};
 
     const EXPECTED_PATH: &str = "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib";
 

@@ -1,11 +1,13 @@
-//! Functions to create a new patch for a given directory using `diffy`.
+//! Functions to create a new patch for a given directory using `rattler_build_diffy`.
 //! We take all files found in this directory and compare them to the original files
 //! from the source cache. Any differences will be written to a patch file.
 
-use diffy::DiffOptions;
 use fs_err as fs;
 use globset::{Glob, GlobSet};
 use miette::Diagnostic;
+use rattler_build_diffy::DiffOptions;
+use rattler_build_recipe::stage1::Source;
+use rattler_build_recipe::stage1::source::UrlSource;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::ErrorKind;
@@ -14,7 +16,6 @@ use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::recipe::parser::Source;
 use crate::source::patch::{apply_patch_custom, apply_patches, summarize_patches};
 use crate::source::{SourceError, SourceInformation};
 
@@ -90,7 +91,9 @@ pub fn create_patch<P: AsRef<Path>>(
     let source_info: SourceInformation =
         serde_json::from_reader(fs::File::open(&source_info_path)?).map_err(|e| {
             GeneratePatchError::SourceInfoReadError(format!(
-                "Failed to parse source information: {}",
+                "Failed to parse source information: {}\n\
+                 This may be due to an incompatible format from a previous version.\n\
+                 Try rebuilding the package to regenerate the source information.",
                 e
             ))
         })?;
@@ -121,12 +124,12 @@ pub fn create_patch<P: AsRef<Path>>(
             }
             Source::Url(url_src) => {
                 // For URL sources, extract cache dir and apply existing patches if any
-                if url_src.file_name().is_none() {
-                    tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
+                if url_src.file_name.is_none() {
+                    tracing::info!("Generating patch for URL source: {}", url_src.url[0]);
                     // This was extracted, so find the extracted directory
                     let original_dir =
                         find_url_cache_dir(cache_dir, url_src, &source_info, source_idx)?;
-                    let target_dir = if let Some(target) = url_src.target_directory() {
+                    let target_dir = if let Some(target) = url_src.target_directory.as_ref() {
                         work_dir.join(target)
                     } else {
                         work_dir.to_path_buf()
@@ -136,12 +139,12 @@ pub fn create_patch<P: AsRef<Path>>(
                     let recipe_dir = source_info.recipe_path.parent().unwrap();
                     let patch_output_dir = output_dir.unwrap_or(recipe_dir);
 
-                    let existing_patches = url_src.patches();
+                    let existing_patches = &url_src.patches;
                     // Always do a full-directory diff, applying patches per file
                     let diff = create_directory_diff(
                         &original_dir,
                         &target_dir,
-                        url_src.target_directory(),
+                        url_src.target_directory.as_ref(),
                         &ignored_files,
                         &glob_set,
                         existing_patches,
@@ -150,7 +153,7 @@ pub fn create_patch<P: AsRef<Path>>(
                     if !diff.is_empty() {
                         patch_content.push_str(&diff);
                         if existing_patches.is_empty() {
-                            tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+                            tracing::info!("Created patch for URL source: {}", url_src.url[0]);
                         } else {
                             tracing::info!("Created incremental patch ({} bytes)", diff.len());
                         }
@@ -310,11 +313,15 @@ fn create_directory_diff(
                         .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                         .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                         .create_patch(&original_content, &modified_content);
-                    let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                    let formatted = rattler_build_diffy::PatchFormatter::new()
+                        .fmt_patch(&patch)
+                        .to_string();
                     patch_content.push_str(&formatted);
                     tracing::info!(
                         "{}",
-                        diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                        rattler_build_diffy::PatchFormatter::new()
+                            .with_color()
+                            .fmt_patch(&patch)
                     );
                 }
             }
@@ -324,11 +331,15 @@ fn create_directory_diff(
                     .set_original_filename("/dev/null")
                     .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                     .create_patch("", &modified_content);
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                    rattler_build_diffy::PatchFormatter::new()
+                        .with_color()
+                        .fmt_patch(&patch)
                 );
             }
         }
@@ -365,7 +376,9 @@ fn create_directory_diff(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch("", "");
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 continue;
             }
@@ -379,11 +392,15 @@ fn create_directory_diff(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch(&original_content, "");
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = rattler_build_diffy::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                    rattler_build_diffy::PatchFormatter::new()
+                        .with_color()
+                        .fmt_patch(&patch)
                 );
             }
         }
@@ -395,7 +412,7 @@ fn create_directory_diff(
 /// Find the URL cache directory for a given URL source using the new cache structure
 fn find_url_cache_dir(
     cache_dir: &Path,
-    url_src: &crate::recipe::parser::UrlSource,
+    url_src: &UrlSource,
     source_info: &SourceInformation,
     source_idx: usize,
 ) -> Result<PathBuf, SourceError> {
@@ -411,7 +428,7 @@ fn find_url_cache_dir(
 
     // Convert checksum to cache checksum
     let checksum = url_src
-        .sha256()
+        .sha256
         .map(|sha| {
             let hex_str = hex::encode(sha);
             CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Sha256)
@@ -419,7 +436,7 @@ fn find_url_cache_dir(
         .transpose()
         .or_else(|_| {
             url_src
-                .md5()
+                .md5
                 .map(|md5| {
                     let hex_str = hex::encode(md5);
                     CacheChecksum::from_hex_str(&hex_str, ChecksumKind::Md5)
@@ -429,7 +446,7 @@ fn find_url_cache_dir(
         .map_err(|e| SourceError::UnknownError(format!("Invalid checksum: {}", e)))?;
 
     let first_url = url_src
-        .urls()
+        .url
         .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 

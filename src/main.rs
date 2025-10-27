@@ -103,7 +103,6 @@ async fn async_main() -> miette::Result<()> {
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
-
             if recipe_paths.is_empty() {
                 if recipe_dir.is_some() {
                     tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);

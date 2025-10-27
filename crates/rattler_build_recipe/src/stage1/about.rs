@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::stage0::License;
+use crate::{stage0::License, stage1::GlobVec};
 
 /// Evaluated package metadata with all templates and conditionals resolved
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -25,8 +25,8 @@ pub struct About {
     pub license: Option<License>,
 
     /// License file paths
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub license_file: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub license_file: GlobVec,
 
     /// License family (e.g., MIT, BSD, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]

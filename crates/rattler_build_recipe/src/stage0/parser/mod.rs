@@ -8,13 +8,11 @@ mod about;
 mod build;
 mod extra;
 mod helpers;
-mod list;
 mod output_parser;
 mod package;
 mod requirements;
 mod source;
 mod test_parser;
-mod value;
 
 #[cfg(test)]
 mod error_tests;
@@ -25,24 +23,21 @@ mod snapshot_tests;
 #[cfg(test)]
 mod unit_tests;
 
-use marked_yaml::Node as MarkedNode;
+use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
+use rattler_build_jinja::Variable;
+use rattler_build_yaml_parser::{ParseError, ParseResult, parse_yaml};
 
-use crate::{
-    error::{ErrorKind, ParseError, ParseResult},
-    span::Span,
-};
+use crate::Span;
 
 // Re-export parsing functions
 pub use about::parse_about;
 pub use build::parse_build;
 pub use extra::parse_extra;
-pub use list::parse_conditional_list;
 pub use output_parser::parse_multi_output_recipe;
 pub use package::parse_package;
 pub use requirements::parse_requirements;
 pub use source::parse_source;
 pub use test_parser::parse_tests;
-pub use value::{parse_value, parse_value_with_name};
 
 // Re-export helpers within crate only
 pub(crate) use helpers::get_span;
@@ -52,9 +47,8 @@ pub(crate) use helpers::get_span;
 /// This function automatically detects whether the recipe is single-output or multi-output
 /// and returns the appropriate Recipe variant.
 pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
-    let yaml = marked_yaml::parse_yaml(0, source).map_err(|e| {
-        ParseError::new(ErrorKind::YamlError, Span::unknown())
-            .with_message(format!("Failed to parse YAML: {}", e))
+    let yaml = parse_yaml(source).map_err(|e| {
+        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
     parse_recipe_or_multi(&yaml)
@@ -65,9 +59,8 @@ pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::sta
 /// Note: This function returns a SingleOutputRecipe for backwards compatibility.
 /// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
-    let yaml = marked_yaml::parse_yaml(0, source).map_err(|e| {
-        ParseError::new(ErrorKind::YamlError, Span::unknown())
-            .with_message(format!("Failed to parse YAML: {}", e))
+    let yaml = parse_yaml(source).map_err(|e| {
+        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
     parse_recipe(&yaml)
@@ -144,22 +137,18 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         })?;
         let version_str = scalar.as_str();
         let version: u32 = version_str.parse().map_err(|_| {
-            ParseError::invalid_value(
-                "schema_version",
-                "not a valid integer",
-                (*scalar.span()).into(),
-            )
+            ParseError::invalid_value("schema_version", "not a valid integer", *scalar.span())
         })?;
 
         // Only version 1 is supported
         if version != 1 {
             return Err(ParseError::invalid_value(
                 "schema_version",
-                &format!(
+                format!(
                     "unsupported schema version {} (only version 1 is supported)",
                     version
                 ),
-                (*scalar.span()).into(),
+                *scalar.span(),
             ));
         }
         Some(version)
@@ -236,8 +225,8 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         ) {
             return Err(ParseError::invalid_value(
                 "recipe",
-                &format!("unknown top-level field '{}'", key_str),
-                (*key.span()).into(),
+                format!("unknown top-level field '{}'", key_str),
+                *key.span(),
             )
             .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
         }
@@ -257,9 +246,6 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
 }
 
 /// Parse the context section from YAML
-///
-/// Context is an order-preserving mapping of variable names to values (can be templates or concrete).
-/// Order is important because later context values can reference earlier ones.
 pub(crate) fn parse_context(
     yaml: &MarkedNode,
 ) -> ParseResult<
@@ -275,12 +261,11 @@ pub(crate) fn parse_context(
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str().to_string();
 
-        // Check for hyphens in variable names
         if key.contains('-') {
             return Err(ParseError::invalid_value(
                 "context variable name",
                 "variable names cannot contain hyphens (-) as they are not valid in Jinja expressions",
-                (*key_node.span()).into(),
+                *key_node.span(),
             ));
         }
 
@@ -291,91 +276,27 @@ pub(crate) fn parse_context(
     Ok(context)
 }
 
+/// Parse a scalar into a Variable, preserving type information
+fn parse_scalar_to_variable(s: &MarkedScalarNode) -> rattler_build_jinja::Variable {
+    if s.may_coerce() {
+        if let Some(as_bool) = s.as_bool() {
+            return Variable::from(as_bool);
+        } else if let Some(as_int) = s.as_i64() {
+            return Variable::from(as_int);
+        }
+    }
+    Variable::from(s.as_str().to_string())
+}
+
 /// Parse a context value - can be either a scalar or a list of uniform scalars
 fn parse_context_value(
     yaml: &MarkedNode,
     key: &str,
 ) -> ParseResult<crate::stage0::types::Value<rattler_build_jinja::Variable>> {
-    use rattler_build_jinja::Variable;
-
-    // Check if it's a sequence (list)
     if let Some(sequence) = yaml.as_sequence() {
-        // Parse list of uniform scalar values
-        let mut variables = Vec::new();
-
-        for (index, item_node) in sequence.iter().enumerate() {
-            // Each item must be a scalar
-            let scalar = item_node.as_scalar().ok_or_else(|| {
-                ParseError::expected_type("scalar", "non-scalar", helpers::get_span(item_node))
-                    .with_message(format!(
-                        "context.{}[{}] must be a scalar (string, number, or boolean)",
-                        key, index
-                    ))
-            })?;
-
-            let s = scalar.as_str();
-
-            // Parse the scalar value based on its type:
-            // - Booleans: true/false remain as booleans
-            // - Integers: whole numbers without decimals remain as integers
-            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
-            // - Everything else: strings
-            let variable = if s == "true" || s == "false" {
-                Variable::from(s.parse::<bool>().unwrap())
-            } else if let Ok(int_val) = s.parse::<i64>() {
-                // Only treat as integer if it doesn't contain a decimal point
-                if !s.contains('.') {
-                    Variable::from(int_val)
-                } else {
-                    Variable::from(s.to_string())
-                }
-            } else {
-                Variable::from(s.to_string())
-            };
-
-            variables.push(variable);
-        }
-
-        // Return a concrete value containing a Variable list
-        let list_variable = Variable::from(variables);
-        Ok(crate::stage0::types::Value::new_concrete(
-            list_variable,
-            helpers::get_span(yaml),
-        ))
+        parse_context_sequence(sequence, key, yaml)
     } else if let Some(scalar) = yaml.as_scalar() {
-        // Parse scalar value
-        let spanned = crate::span::SpannedString::from(scalar);
-        let s = spanned.as_str();
-        let span = spanned.span();
-
-        // Check if it contains a Jinja template
-        if s.contains("${{") && s.contains("}}") {
-            // It's a template - we'll store it as a string template for now
-            // The actual Variable will be created during evaluation
-            let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::jinja_error(e, span))?;
-            Ok(crate::stage0::types::Value::new_template(template, span))
-        } else {
-            // Parse the scalar value based on its type:
-            // - Booleans: true/false remain as booleans
-            // - Integers: whole numbers without decimals remain as integers
-            // - Floats: numbers with decimals become strings (to preserve versions like "1.23")
-            // - Everything else: strings
-            let variable = if s == "true" || s == "false" {
-                Variable::from(s.parse::<bool>().unwrap())
-            } else if let Ok(int_val) = s.parse::<i64>() {
-                // Only treat as integer if it doesn't contain a decimal point
-                if !s.contains('.') {
-                    Variable::from(int_val)
-                } else {
-                    Variable::from(s.to_string())
-                }
-            } else {
-                Variable::from(s.to_string())
-            };
-
-            Ok(crate::stage0::types::Value::new_concrete(variable, span))
-        }
+        parse_context_scalar(scalar)
     } else {
         Err(ParseError::expected_type(
             "scalar or list",
@@ -385,5 +306,54 @@ fn parse_context_value(
     }
 }
 
-// All section parsers (parse_package, parse_about, parse_extra, parse_requirements)
-// are now implemented in their respective modules and re-exported above
+/// Parse a sequence of scalars
+fn parse_context_sequence(
+    sequence: &[MarkedNode],
+    key: &str,
+    yaml: &MarkedNode,
+) -> ParseResult<crate::stage0::types::Value<rattler_build_jinja::Variable>> {
+    use rattler_build_jinja::Variable;
+
+    let mut variables = Vec::new();
+
+    for (index, item_node) in sequence.iter().enumerate() {
+        let scalar = item_node.as_scalar().ok_or_else(|| {
+            ParseError::expected_type("scalar", "non-scalar", helpers::get_span(item_node))
+                .with_message(format!(
+                    "context.{}[{}] must be a scalar (string, number, or boolean)",
+                    key, index
+                ))
+        })?;
+
+        variables.push(parse_scalar_to_variable(scalar));
+    }
+
+    let list_variable = Variable::from(variables);
+    Ok(crate::stage0::types::Value::new_concrete(
+        list_variable,
+        Some(helpers::get_span(yaml)),
+    ))
+}
+
+/// Parse a scalar value (may be a template or concrete value)
+fn parse_context_scalar(
+    scalar: &MarkedScalarNode,
+) -> ParseResult<crate::stage0::types::Value<rattler_build_jinja::Variable>> {
+    let s = scalar.as_str();
+    let span = *scalar.span();
+
+    if s.contains("${{") && s.contains("}}") {
+        let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
+            .map_err(|e| ParseError::jinja_error(e, span))?;
+        Ok(crate::stage0::types::Value::new_template(
+            template,
+            Some(span),
+        ))
+    } else {
+        let variable = parse_scalar_to_variable(scalar);
+        Ok(crate::stage0::types::Value::new_concrete(
+            variable,
+            Some(span),
+        ))
+    }
+}

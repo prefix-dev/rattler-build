@@ -25,7 +25,6 @@ recipe:
     script:
       - test -f README.md
       - cat ./initial_version/build.sh
-  requirements: {}
 build_configuration:
   target_platform: osx-arm64
   host_platform:

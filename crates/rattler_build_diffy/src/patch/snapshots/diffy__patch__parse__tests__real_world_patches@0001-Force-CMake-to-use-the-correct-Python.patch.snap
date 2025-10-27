@@ -1,0 +1,62 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/0001-Force-CMake-to-use-the-correct-Python.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/setup.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/setup.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 82,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 82,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "def _run_make(build_dir, lib_path):\n",
+                    ),
+                    lines: [
+                        Context(
+                            "        os.makedirs(full_lib_path)\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    # Run the cmake and make commands\n",
+                        ),
+                        Delete(
+                            "    check_call(['cmake', '-DSKIP_TESTS=TRUE', source_dir], cwd=build_dir)\n",
+                        ),
+                        Insert(
+                            "    check_call(['cmake', f'-DPython_EXECUTABLE={sys.executable}', '-DSKIP_TESTS=TRUE', source_dir], cwd=build_dir)\n",
+                        ),
+                        Context(
+                            "    check_call(['make'], cwd=build_dir)\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    # install\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

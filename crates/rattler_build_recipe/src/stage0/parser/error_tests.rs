@@ -6,7 +6,7 @@
 #[cfg(feature = "miette")]
 use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
 #[cfg(feature = "miette")]
-use crate::{ParseError, source_code::Source};
+use crate::{ParseErrorWithSource, source_code::Source};
 
 #[cfg(feature = "miette")]
 const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/errors");
@@ -22,98 +22,6 @@ macro_rules! assert_miette_snapshot {
             .unwrap();
         ::insta::assert_snapshot!(::insta::_macro_support::AutoName, value, stringify!($value));
     }};
-}
-
-/// Wrapper that combines a ParseError with its Source for miette reporting
-#[cfg(feature = "miette")]
-#[derive(Debug, miette::Diagnostic)]
-#[diagnostic()]
-struct ParseErrorWithSource {
-    #[source_code]
-    source: Source,
-
-    kind: crate::ErrorKind,
-
-    #[label("{}", message.as_deref().unwrap_or("here"))]
-    span: miette::SourceSpan,
-
-    message: Option<String>,
-
-    #[help]
-    suggestion: Option<String>,
-}
-
-#[cfg(feature = "miette")]
-impl std::fmt::Display for ParseErrorWithSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.kind)?;
-        if let Some(msg) = &self.message {
-            write!(f, ": {}", msg)?;
-        }
-        Ok(())
-    }
-}
-
-#[cfg(feature = "miette")]
-impl std::error::Error for ParseErrorWithSource {}
-
-#[cfg(feature = "miette")]
-impl ParseErrorWithSource {
-    fn new(source: Source, error: ParseError) -> Self {
-        // Calculate the actual byte offset from line/column information
-        // miette needs byte offsets to properly highlight the source
-        let span = Self::span_from_line_column(source.as_ref(), &error.span);
-
-        Self {
-            source,
-            kind: error.kind,
-            span,
-            message: error.message,
-            suggestion: error.suggestion,
-        }
-    }
-
-    /// Convert line/column information to byte offsets for miette
-    fn span_from_line_column(source: &str, span: &crate::Span) -> miette::SourceSpan {
-        use miette::SourceOffset;
-
-        // Calculate byte offset from line/column
-        let start_offset = SourceOffset::from_location(source, span.start_line, span.start_column);
-
-        let end_offset = if span.end_line > 0 && span.end_column > 0 {
-            SourceOffset::from_location(source, span.end_line, span.end_column)
-        } else {
-            start_offset
-        };
-
-        let length = end_offset.offset().saturating_sub(start_offset.offset());
-        let length = if length == 0 {
-            // Find the length of the token at this position
-            Self::find_token_length(source, start_offset.offset())
-        } else {
-            length
-        };
-
-        miette::SourceSpan::new(start_offset, length)
-    }
-
-    /// Find the length of a token starting at the given byte offset
-    fn find_token_length(src: &str, start: usize) -> usize {
-        let remaining = &src[start..];
-        let mut len = 0;
-
-        for (i, ch) in remaining.char_indices() {
-            if ch.is_whitespace() || ch == ':' || ch == ',' {
-                if len == 0 {
-                    len = i;
-                }
-                break;
-            }
-            len = i + ch.len_utf8();
-        }
-
-        if len == 0 { remaining.len() } else { len }
-    }
 }
 
 #[cfg(feature = "miette")]

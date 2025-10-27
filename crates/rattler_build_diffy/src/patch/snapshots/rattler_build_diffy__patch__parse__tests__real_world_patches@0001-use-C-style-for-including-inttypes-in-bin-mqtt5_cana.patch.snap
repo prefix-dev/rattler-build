@@ -1,0 +1,60 @@
+---
+source: crates/rattler_build_diffy/src/patch/parse.rs
+expression: patches
+input_file: crates/rattler_build_diffy/src/patch/test-data/0001-use-C-style-for-including-inttypes-in-bin-mqtt5_cana.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/bin/mqtt5_canary/main.cpp",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/bin/mqtt5_canary/main.cpp",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 17,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 17,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#include <aws/common/command_line_parser.h>\n",
+                        ),
+                        Context(
+                            "#include <aws/common/mutex.h>\n",
+                        ),
+                        Context(
+                            "#include <condition_variable>\n",
+                        ),
+                        Delete(
+                            "#include <inttypes.h>\n",
+                        ),
+                        Insert(
+                            "#include <cinttypes>\n",
+                        ),
+                        Context(
+                            "#include <iostream>\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "#define AWS_MQTT5_CANARY_CLIENT_CREATION_SLEEP_TIME 10000000\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

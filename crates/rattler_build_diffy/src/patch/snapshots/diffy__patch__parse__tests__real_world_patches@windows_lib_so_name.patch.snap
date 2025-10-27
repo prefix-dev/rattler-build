@@ -1,0 +1,74 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/windows_lib_so_name.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "a/src/core/CMakeLists.txt",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/src/core/CMakeLists.txt",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 128,
+                        len: 10,
+                    },
+                    new_range: HunkRange {
+                        start: 128,
+                        len: 8,
+                    },
+                    function_context: Some(
+                        "target_include_directories(openjph PUBLIC common)\n",
+                    ),
+                    lines: [
+                        Context(
+                            "target_compile_definitions(openjph PUBLIC _FILE_OFFSET_BITS=64)\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "if (MSVC)\n",
+                        ),
+                        Delete(
+                            "  set(OJPH_LIB_NAME_STRING \"openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}\")\n",
+                        ),
+                        Delete(
+                            "  set_target_properties(openjph\n",
+                        ),
+                        Delete(
+                            "    PROPERTIES\n",
+                        ),
+                        Delete(
+                            "      OUTPUT_NAME \"openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}\")\n",
+                        ),
+                        Insert(
+                            "  set(OJPH_LIB_NAME_STRING \"openjph\")\n",
+                        ),
+                        Insert(
+                            "  set_target_properties(openjph PROPERTIES OUTPUT_NAME \"openjph\")\n",
+                        ),
+                        Context(
+                            "else()\n",
+                        ),
+                        Context(
+                            "  set(OJPH_LIB_NAME_STRING \"openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}\")\n",
+                        ),
+                        Context(
+                            "  set_target_properties(openjph\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

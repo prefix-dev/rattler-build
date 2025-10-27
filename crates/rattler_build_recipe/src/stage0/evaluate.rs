@@ -5,15 +5,35 @@
 //! - Rendering Jinja templates
 //! - Flattening conditionals based on the evaluation context
 //! - Validating the results
+//!
+//! ## Build String Deferred Evaluation
+//!
+//! The build string is NOT evaluated during stage0 → stage1 conversion because it may
+//! depend on a special `hash` variable that must be computed from the actual variant
+//! (the subset of variant variables that were actually used during evaluation).
+//!
+//! The evaluation flow is:
+//! 1. Extract the build.string template source without evaluating it
+//! 2. Track all accessed variables during recipe evaluation
+//! 3. Determine the actual variant from accessed variables
+//! 4. Compute the hash from the actual variant
+//! 5. Call `Build::render_build_string_with_hash()` to finalize the build string
 
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+    str::FromStr,
+};
 
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, VersionWithSource};
+use indexmap::IndexMap;
+use rattler_build_types::NormalizedKey;
+use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
+use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::{
-    ErrorKind, ParseError, Span,
+    ParseError, Span,
     stage0::{
-        About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
+        self, About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
         Stage0Recipe, TestType as Stage0TestType,
         build::{
@@ -38,15 +58,15 @@ use crate::{
             PythonTest as Stage0PythonTest, PythonVersion as Stage0PythonVersion,
             RTest as Stage0RTest, RubyTest as Stage0RubyTest,
         },
-        types::{ConditionalList, Item, JinjaExpression, ScriptContent, Value},
+        types::{ConditionalList, Item, JinjaExpression, Value},
     },
     stage1::{
-        About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
+        self, About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
-        Requirements as Stage1Requirements,
+        Requirements as Stage1Requirements, Rpaths,
         build::{
-            Build as Stage1Build, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, NoArchType, PostProcess as Stage1PostProcess,
+            Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
+            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
@@ -70,28 +90,236 @@ use crate::{
 };
 use rattler_build_jinja::{Jinja, Variable};
 
+/// Helper to render a Jinja template to a Variable (preserving type information)
+fn render_template_to_variable(
+    template: &str,
+    context: &EvaluationContext,
+    span: Option<&Span>,
+) -> Result<Variable, ParseError> {
+    // Create a Jinja instance with the configuration from the evaluation context
+    let jinja_config = context.jinja_config().clone();
+    let mut jinja = Jinja::new(jinja_config);
+
+    // Use with_context to add all variables from the evaluation context
+    jinja = jinja.with_context(context.variables());
+
+    let trimmed = template.trim();
+
+    // Check if it's a simple expression: starts with "${{", ends with "}}", and no additional "${{" inside
+    // Simple examples: "${{ true }}", "${{ 42 }}", "${{ name }}"
+    // Complex examples: "${{ a }}/${{ b }}", "prefix ${{ x }}", "${{ a }} ${{ b }}"
+    let is_simple_expression = trimmed.starts_with("${{")
+        && trimmed.ends_with("}}")
+        && !trimmed[3..trimmed.len() - 2].contains("${{");
+
+    let minijinja_value = if is_simple_expression {
+        // Extract the expression between ${{ and }}
+        let expression = trimmed[3..trimmed.len() - 2].trim();
+
+        // Simple expression - use compile_expression for type-preserving evaluation
+        let env = jinja.env();
+        let compiled_expr = match env.compile_expression(expression) {
+            Ok(expr) => expr,
+            Err(e) => {
+                return Err(ParseError::jinja_error(
+                    format!("Failed to compile expression '{}': {}", expression, e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                ));
+            }
+        };
+
+        // Evaluate the expression with the context to get a typed Value
+        match compiled_expr.eval(jinja.context()) {
+            Ok(val) => val,
+            Err(e) => {
+                // Transfer the tracked variables from Jinja to EvaluationContext
+                for var in jinja.accessed_variables() {
+                    context.track_access(&var);
+                }
+                for var in jinja.undefined_variables() {
+                    context.track_undefined(&var);
+                }
+
+                // Build error with suggestion based on undefined variables
+                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let mut error = ParseError::jinja_error(
+                    format!("Failed to evaluate expression '{}': {}", expression, e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                );
+
+                if !undefined_vars.is_empty() {
+                    let suggestion = if undefined_vars.len() == 1 {
+                        format!(
+                            "Variable '{}' is not defined in the context",
+                            undefined_vars[0]
+                        )
+                    } else {
+                        format!(
+                            "Variables {} are not defined in the context",
+                            undefined_vars.join(", ")
+                        )
+                    };
+                    error = error.with_suggestion(suggestion);
+                }
+
+                return Err(error);
+            }
+        }
+    } else {
+        // Complex template (e.g., "${{ base }}/${{ name }}") - render as string
+        let rendered_str = match jinja.render_str(template) {
+            Ok(s) => s,
+            Err(e) => {
+                // Transfer the tracked variables from Jinja to EvaluationContext
+                for var in jinja.accessed_variables() {
+                    context.track_access(&var);
+                }
+                for var in jinja.undefined_variables() {
+                    context.track_undefined(&var);
+                }
+
+                // Build error with suggestion based on undefined variables
+                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let mut error = ParseError::jinja_error(
+                    format!("Failed to render template: {}", e),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                );
+
+                if !undefined_vars.is_empty() {
+                    let suggestion = if undefined_vars.len() == 1 {
+                        format!(
+                            "Variable '{}' is not defined in the context",
+                            undefined_vars[0]
+                        )
+                    } else {
+                        format!(
+                            "Variables {} are not defined in the context",
+                            undefined_vars.join(", ")
+                        )
+                    };
+                    error = error.with_suggestion(suggestion);
+                }
+
+                return Err(error);
+            }
+        };
+
+        // Parse the string to detect type (for simple values like "true" or "42")
+        // This is a fallback - it won't preserve types for complex expressions
+        return Ok(parse_rendered_value(&rendered_str));
+    };
+
+    // Transfer the tracked variables from Jinja to EvaluationContext
+    for var in jinja.accessed_variables() {
+        context.track_access(&var);
+    }
+    for var in jinja.undefined_variables() {
+        context.track_undefined(&var);
+    }
+
+    // Wrap the minijinja::Value in our Variable type
+    // This preserves the type information (bool, int, string, etc.)
+    Ok(Variable::from(minijinja_value))
+}
+
+/// Parse a rendered string value into a Variable with proper type detection
+///
+/// This function detects booleans and integers from their string representation
+/// and creates properly-typed Variable instances.
+fn parse_rendered_value(s: &str) -> Variable {
+    let trimmed = s.trim();
+
+    // Try to parse as boolean
+    if trimmed.eq_ignore_ascii_case("true") {
+        return Variable::from(true);
+    }
+    if trimmed.eq_ignore_ascii_case("false") {
+        return Variable::from(false);
+    }
+
+    // Try to parse as integer
+    if let Ok(i) = trimmed.parse::<i64>() {
+        return Variable::from(i);
+    }
+
+    // Default to string
+    Variable::from(s.to_string())
+}
+
+#[cfg(test)]
+mod variable_evaluation_tests {
+    use super::*;
+    use crate::stage1::EvaluationContext;
+
+    #[test]
+    fn test_evaluate_value_to_variable_preserves_bool() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to boolean
+        let true_template =
+            crate::stage0::types::JinjaTemplate::new("${{ true }}".to_string()).unwrap();
+        let value = Value::new_template(true_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a boolean
+        assert!(result.as_ref().is_true());
+        assert_eq!(result.as_ref().to_string(), "true");
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_preserves_int() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to integer
+        let int_template =
+            crate::stage0::types::JinjaTemplate::new("${{ 42 }}".to_string()).unwrap();
+        let value = Value::new_template(int_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a number
+        assert!(result.as_ref().is_number());
+        assert_eq!(result.as_ref().to_string(), "42");
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_string() {
+        let context = EvaluationContext::new();
+
+        // Test template that evaluates to string
+        let str_template =
+            crate::stage0::types::JinjaTemplate::new("${{ 'hello' }}".to_string()).unwrap();
+        let value = Value::new_template(str_template, None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        assert_eq!(result.as_ref().as_str(), Some("hello"));
+    }
+
+    #[test]
+    fn test_evaluate_value_to_variable_concrete() {
+        let context = EvaluationContext::new();
+
+        // Test concrete Variable value
+        let concrete_bool = Variable::from(true);
+        let value = Value::new_concrete(concrete_bool.clone(), None);
+
+        let result = evaluate_value_to_variable(&value, &context).unwrap();
+        // Check it's a boolean
+        assert!(result.as_ref().is_true());
+    }
+}
+
 /// Helper to render a Jinja template with the evaluation context
 fn render_template(
     template: &str,
     context: &EvaluationContext,
-    span: &Span,
+    span: Option<&Span>,
 ) -> Result<String, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
     let mut jinja = Jinja::new(jinja_config);
 
-    // This allows our TrackingContext to intercept undefined variable access and track them
-
-    // Add the evaluation context variables to the Jinja context
-    // We need to convert IndexMap<String, String> to IndexMap<String, Variable>
-    let variables: indexmap::IndexMap<String, Variable> = context
-        .variables()
-        .iter()
-        .map(|(k, v)| (k.clone(), Variable::from(v.as_str())))
-        .collect();
-
     // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(&variables);
+    jinja = jinja.with_context(context.variables());
 
     // The Jinja environment is already configured to use ${{ }} syntax
     // so we can pass the template as-is
@@ -118,15 +346,20 @@ fn render_template(
 
             // Build error suggestion based on undefined variables
             let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
-            let suggestion = if !undefined_vars.is_empty() {
-                if undefined_vars.len() == 1 {
-                    Some(format!(
+            let mut error = ParseError::jinja_error(
+                format!("Template rendering failed: {} (template: {})", e, template),
+                span.map_or_else(Span::new_blank, |s| *s),
+            );
+
+            if !undefined_vars.is_empty() {
+                let suggestion_text = if undefined_vars.len() == 1 {
+                    format!(
                         "The variable '{}' is not defined in the evaluation context. \
                          Make sure it is provided or defined in the context section.",
                         undefined_vars[0]
-                    ))
+                    )
                 } else {
-                    Some(format!(
+                    format!(
                         "The variables {} are not defined in the evaluation context. \
                          Make sure they are provided or defined in the context section.",
                         undefined_vars
@@ -134,21 +367,12 @@ fn render_template(
                             .map(|s| format!("'{}'", s))
                             .collect::<Vec<_>>()
                             .join(", ")
-                    ))
-                }
-            } else {
-                None
-            };
+                    )
+                };
+                error = error.with_suggestion(suggestion_text);
+            }
 
-            Err(ParseError {
-                kind: ErrorKind::JinjaError,
-                span: *span,
-                message: Some(format!(
-                    "Template rendering failed: {} (template: {})",
-                    e, template
-                )),
-                suggestion,
-            })
+            Err(error)
         }
     }
 }
@@ -158,17 +382,48 @@ fn evaluate_condition(
     expr: &JinjaExpression,
     context: &EvaluationContext,
 ) -> Result<bool, ParseError> {
-    // For now, simple variable existence check
-    // This should be expanded to support full boolean expressions
-    let expr_str = expr.source().trim();
+    // Create a Jinja instance with the configuration from the evaluation context
+    let jinja_config = context.jinja_config().clone();
+    let mut jinja = Jinja::new(jinja_config);
 
-    // Check for "not" prefix
-    if let Some(rest) = expr_str.strip_prefix("not ") {
-        return Ok(!context.contains(rest.trim()));
+    // Use with_context to add all variables from the evaluation context
+    jinja = jinja.with_context(context.variables());
+
+    // Evaluate the expression to get its value
+    let value = jinja.eval(expr.source()).map_err(|e| {
+        ParseError::jinja_error(
+            format!("Failed to evaluate condition '{}': {}", expr.source(), e),
+            Span::new_blank(),
+        )
+    })?;
+
+    // Transfer the tracked variables from Jinja to EvaluationContext
+    for var in jinja.accessed_variables() {
+        context.track_access(&var);
     }
 
-    // Simple variable existence
-    Ok(context.contains(expr_str))
+    // Check for undefined variables and error out
+    let undefined_vars = jinja.undefined_variables();
+    for var in &undefined_vars {
+        context.track_undefined(var);
+    }
+
+    if !undefined_vars.is_empty() {
+        return Err(
+            ParseError::jinja_error(
+                format!(
+                    "Undefined variable(s) in condition '{}': {}",
+                    expr.source(),
+                    undefined_vars.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
+                ),
+                Span::new_blank(),
+            )
+            .with_suggestion("Make sure all variables used in conditions are defined in the variant config or context")
+        );
+    }
+
+    // Convert the minijinja Value to a boolean using Jinja's truthiness rules
+    Ok(value.is_true())
 }
 
 /// Evaluate a Value<String> into a String
@@ -176,9 +431,12 @@ pub fn evaluate_string_value(
     value: &Value<String>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    match value {
-        Value::Concrete { value: s, .. } => Ok(s.clone()),
-        Value::Template { template, span } => render_template(template.source(), context, span),
+    if let Some(s) = value.as_concrete() {
+        Ok(s.clone())
+    } else if let Some(template) = value.as_template() {
+        render_template(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -187,9 +445,29 @@ pub fn evaluate_value_to_string<T: ToString>(
     value: &Value<T>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    match value {
-        Value::Concrete { value: v, .. } => Ok(v.to_string()),
-        Value::Template { template, span } => render_template(template.source(), context, span),
+    if let Some(v) = value.as_concrete() {
+        Ok(v.to_string())
+    } else if let Some(template) = value.as_template() {
+        render_template(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
+    }
+}
+
+/// Evaluate a Value<Variable> into a Variable, preserving type information
+///
+/// This function properly handles templates that evaluate to booleans, integers, or strings,
+/// rather than converting everything to strings.
+pub fn evaluate_value_to_variable(
+    value: &Value<Variable>,
+    context: &EvaluationContext,
+) -> Result<Variable, ParseError> {
+    if let Some(var) = value.as_concrete() {
+        Ok(var.clone())
+    } else if let Some(template) = value.as_template() {
+        render_template_to_variable(template.source(), context, value.span())
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -201,6 +479,65 @@ pub fn evaluate_optional_string_value(
     match value {
         None => Ok(None),
         Some(v) => evaluate_string_value(v, context).map(Some),
+    }
+}
+
+/// Extract the template source from a Value<String> without evaluating it
+/// This is used for deferred evaluation (e.g., build.string with hash variable)
+fn extract_template_source(value: &Value<String>) -> Option<String> {
+    if let Some(v) = value.as_concrete() {
+        Some(v.clone())
+    } else if let Some(template) = value.as_template() {
+        Some(template.source().to_string())
+    } else {
+        unreachable!("Value must be either concrete or template")
+    }
+}
+
+/// Track variables used in a template without evaluating it
+/// This is used to track variable access for deferred evaluation (e.g., build.script with environment variables)
+/// Returns the variables that are referenced in the template
+fn track_template_variables(value: &Value<String>, context: &EvaluationContext) -> Vec<String> {
+    if let Some(template) = value.as_template() {
+        let vars = template.used_variables();
+        for var in vars {
+            context.track_access(var);
+        }
+        vars.to_vec()
+    } else {
+        Vec::new()
+    }
+}
+
+/// Try to evaluate a template string, but preserve it if there are undefined variables
+/// This is specifically for build script content where environment variables like ${{ PYTHON }}
+/// are only available at build time.
+/// Returns Ok(evaluated_string) if successful, or Ok(raw_template) if there were undefined variables.
+/// Returns Err only for non-undefined-variable errors (syntax errors, etc.)
+fn evaluate_or_preserve_template(
+    value: &Value<String>,
+    context: &EvaluationContext,
+) -> Result<String, ParseError> {
+    // First, track the variables
+    track_template_variables(value, context);
+
+    // Try to evaluate
+    match evaluate_string_value(value, context) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            // Check if this error was due to undefined variables
+            // The error message will contain "undefined value" or we can check the tracked undefined vars
+            let error_msg = e.to_string();
+            if error_msg.contains("undefined value")
+                || error_msg.contains("not defined in the evaluation context")
+            {
+                // This is an undefined variable error - preserve the template
+                Ok(extract_template_source(value).unwrap_or_default())
+            } else {
+                // This is a different error (syntax error, etc.) - propagate it
+                Err(e)
+            }
+        }
     }
 }
 
@@ -217,45 +554,57 @@ where
         None => Ok(None),
         Some(v) => {
             let s = evaluate_value_to_string(v, context)?;
-            T::from_str(&s).map(Some).map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: Span::unknown(),
-                message: Some(format!("Failed to parse value: {}", e)),
-                suggestion: None,
+            T::from_str(&s).map(Some).map_err(|e| {
+                ParseError::invalid_value(
+                    "value",
+                    format!("Failed to parse: {}", e),
+                    Span::new_blank(),
+                )
             })
         }
     }
 }
 
-/// Evaluate a ConditionalList<String> into Vec<String>
-pub fn evaluate_string_list(
-    list: &ConditionalList<String>,
+/// Generic helper to evaluate a ConditionalList<T> by processing each Value<T>
+///
+/// This abstracts the common pattern of iterating over a conditional list,
+/// evaluating conditionals, and processing each value with a closure.
+///
+/// This helper significantly reduces code duplication across the evaluation functions
+/// for different list types (strings, globs, dependencies, etc.).
+fn evaluate_conditional_list<T, R, F>(
+    list: &ConditionalList<T>,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
+    mut process: F,
+) -> Result<Vec<R>, ParseError>
+where
+    T: std::fmt::Debug,
+    F: FnMut(&Value<T>, &EvaluationContext) -> Result<Option<R>, ParseError>,
+{
     let mut results = Vec::new();
 
     for item in list.iter() {
         match item {
             Item::Value(value) => {
-                let s = evaluate_string_value(value, context)?;
-                results.push(s);
+                if let Some(result) = process(value, context)? {
+                    results.push(result);
+                }
             }
             Item::Conditional(cond) => {
                 let condition_met = evaluate_condition(&cond.condition, context)?;
 
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        let s = evaluate_string_value(val, context)?;
-                        results.push(s);
-                    }
+                let items_to_process = if condition_met {
+                    &cond.then
                 } else {
-                    // Evaluate the "else" items
-                    if let Some(else_value) = &cond.else_value {
-                        for val in else_value.iter() {
-                            let s = evaluate_string_value(val, context)?;
-                            results.push(s);
-                        }
+                    match &cond.else_value {
+                        Some(else_items) => else_items,
+                        None => continue,
+                    }
+                };
+
+                for val in items_to_process.iter() {
+                    if let Some(result) = process(val, context)? {
+                        results.push(result);
                     }
                 }
             }
@@ -263,6 +612,130 @@ pub fn evaluate_string_list(
     }
 
     Ok(results)
+}
+
+/// Evaluate a ConditionalList<String> into Vec<String>
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
+pub fn evaluate_string_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let s = evaluate_string_value(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        Ok(if s.is_empty() { None } else { Some(s) })
+    })
+}
+
+/// Evaluate a string list, preserving templates with undefined variables
+/// This is used for script content where build-time environment variables might be referenced
+pub fn evaluate_string_list_lenient(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let s = evaluate_or_preserve_template(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        Ok(if s.is_empty() { None } else { Some(s) })
+    })
+}
+
+/// Evaluate a ConditionalList<PackageName> into Vec<PackageName>
+///
+/// This evaluates templates in PackageName values and filters out empty results.
+pub fn evaluate_package_name_list(
+    list: &ConditionalList<PackageName>,
+    context: &EvaluationContext,
+) -> Result<Vec<PackageName>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        // Handle both concrete PackageName and template values
+        if let Some(concrete) = value.as_concrete() {
+            // For concrete values, just clone it
+            Ok(Some(concrete.clone()))
+        } else if let Some(template) = value.as_template() {
+            // Render the template
+            let s = render_template(template.source(), ctx, value.span())?;
+            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+            if s.is_empty() {
+                return Ok(None);
+            }
+            // Parse the string into a PackageName
+            PackageName::from_str(&s).map(Some).map_err(|e| {
+                ParseError::invalid_value(
+                    "package name",
+                    format!("'{}' is not a valid package name: {}", s, e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    })
+}
+
+/// Helper function to validate and evaluate glob patterns from a ConditionalList
+fn evaluate_glob_patterns(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list, context, |value, ctx| {
+        let pattern = evaluate_string_value(value, ctx)?;
+        // Validate the glob pattern immediately with proper error reporting
+        match rattler_build_types::glob::validate_glob_pattern(&pattern) {
+            Ok(_) => Ok(Some(pattern)),
+            Err(e) => Err(
+                ParseError::invalid_value(
+                    "glob pattern",
+                    format!("Invalid glob pattern '{}': {}", pattern, e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+                .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
+            ),
+        }
+    })
+}
+
+/// Evaluate a ConditionalList<String> into a GlobVec (include-only)
+///
+/// This is a convenience wrapper around `evaluate_glob_vec` for simple include-only lists.
+pub fn evaluate_glob_vec_simple(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    // Just delegate to evaluate_glob_vec with a simple List variant
+    evaluate_glob_vec(
+        &crate::stage0::types::IncludeExclude::List(list.clone()),
+        context,
+    )
+}
+
+/// Evaluate an IncludeExclude into a GlobVec, preserving span information for error reporting
+pub fn evaluate_glob_vec(
+    include_exclude: &crate::stage0::types::IncludeExclude<String>,
+    context: &EvaluationContext,
+) -> Result<GlobVec, ParseError> {
+    let (include_list, exclude_list) = match include_exclude {
+        crate::stage0::types::IncludeExclude::List(list) => (list, &ConditionalList::default()),
+        crate::stage0::types::IncludeExclude::Mapping { include, exclude } => (include, exclude),
+    };
+
+    // Evaluate and validate include patterns
+    let include_globs = evaluate_glob_patterns(include_list, context)?;
+
+    // Evaluate and validate exclude patterns
+    let exclude_globs = evaluate_glob_patterns(exclude_list, context)?;
+
+    // Create the GlobVec - this should not fail since we've already validated
+    GlobVec::from_strings(include_globs, exclude_globs).map_err(|e| {
+        ParseError::invalid_value(
+            "glob set",
+            format!("Failed to build glob set: {}", e),
+            Span::new_blank(),
+        )
+    })
 }
 
 /// Evaluate a ConditionalList<EntryPoint> into Vec<EntryPoint>
@@ -271,50 +744,74 @@ pub fn evaluate_entry_point_list(
     list: &ConditionalList<rattler_conda_types::package::EntryPoint>,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
-    let mut results = Vec::new();
-
-    // Helper to evaluate a single Value<EntryPoint>
-    let evaluate_entry_point = |val: &Value<rattler_conda_types::package::EntryPoint>| -> Result<rattler_conda_types::package::EntryPoint, ParseError> {
-        match val {
-            Value::Concrete { value: ep, .. } => Ok(ep.clone()),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
-                s.parse::<rattler_conda_types::package::EntryPoint>()
-                    .map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: *span,
-                        message: Some(format!("Invalid entry point '{}': {}", s, e)),
-                        suggestion: Some("Entry points should be in the format 'command = module:function'".to_string()),
-                    })
-            }
+    evaluate_conditional_list(list, context, |val, ctx| {
+        if let Some(ep) = val.as_concrete() {
+            Ok(Some(ep.clone()))
+        } else if let Some(template) = val.as_template() {
+            let s = render_template(template.source(), ctx, val.span())?;
+            s.parse::<rattler_conda_types::package::EntryPoint>()
+                .map(Some)
+                .map_err(|e| {
+                    ParseError::invalid_value(
+                        "entry point",
+                        format!("Invalid entry point '{}': {}", s, e),
+                        val.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                    .with_suggestion(
+                        "Entry points should be in the format 'command = module:function'",
+                    )
+                })
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
-    };
-
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                results.push(evaluate_entry_point(value)?);
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
-
-                if let Some(items) = items_to_process {
-                    for val in items.iter() {
-                        results.push(evaluate_entry_point(val)?);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(results)
+    })
 }
 
+/// Check if a MatchSpec is a "free spec" (no version constraints).
+///
+/// A free spec is one that doesn't have any version constraints, build constraints,
+/// or other specifications beyond the package name. These are used to determine
+/// which variant variables should be included in the hash.
+///
+/// Examples of free specs:
+/// - `python` (free)
+/// - `numpy` (free)
+///
+/// Examples of NON-free specs:
+/// - `python >=3.8` (has version constraint)
+/// - `numpy 1.20.*` (has version constraint)
+/// - `gcc_linux-64` (has build constraint via name)
+pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
+    let rattler_conda_types::MatchSpec {
+        name,
+        version,
+        build,
+        build_number,
+        channel,
+        subdir,
+        namespace,
+        md5,
+        sha256,
+        file_name,
+        extras,
+        url,
+        license,
+    } = spec;
+
+    name.is_some()
+        && version.is_none()
+        && build.is_none()
+        && build_number.is_none()
+        && channel.is_none()
+        && subdir.is_none()
+        && namespace.is_none()
+        && md5.is_none()
+        && sha256.is_none()
+        && file_name.is_none()
+        && extras.is_none()
+        && url.is_none()
+        && license.is_none()
+}
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
 /// This handles dependencies which may be:
@@ -326,221 +823,153 @@ pub fn evaluate_entry_point_list(
 /// - Regular match specs (e.g., "python >=3.8")
 /// - Pin subpackage expressions (JSON like `{ pin_subpackage: { name: foo } }`)
 /// - Pin compatible expressions (JSON like `{ pin_compatible: { name: bar } }`)
+///
+/// # Arguments
+/// * `list` - The conditional list of dependencies to evaluate
+/// * `context` - The evaluation context
+///   are tracked as variant variables. This should be true for build/host dependencies
+///   and false for run dependencies, since run dependencies don't affect the build variant.
 pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
-    let mut results = Vec::new();
+    evaluate_conditional_list(list, context, |value, ctx| {
+        if let Some(match_spec) = value.as_concrete() {
+            Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
+        } else if let Some(template) = value.as_template() {
+            let s = render_template(template.source(), ctx, value.span())?;
 
-    // Iterate over the conditional list items directly to preserve span information
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                match value {
-                    Value::Concrete {
-                        value: match_spec, ..
-                    } => {
-                        // Concrete MatchSpec - already validated at parse time!
-                        results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-                    }
-                    Value::Template { template, span } => {
-                        // Template - need to render and parse
-                        let s = render_template(template.source(), context, span)?;
-
-                        // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
-                        if s.trim().starts_with('{') {
-                            // Try to deserialize as Dependency (which handles pin types)
-                            let dep: Dependency =
-                                serde_yaml::from_str(&s).map_err(|e| ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: *span,
-                                    message: Some(format!("Failed to parse pin dependency: {}", e)),
-                                    suggestion: None,
-                                })?;
-                            results.push(dep);
-                        } else {
-                            // It's a regular MatchSpec string
-                            let spec =
-                                MatchSpec::from_str(&s, ParseStrictness::Strict).map_err(|e| {
-                                    ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: *span,
-                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                                        suggestion: None,
-                                    }
-                                })?;
-                            results.push(Dependency::Spec(Box::new(spec)));
-                        }
-                    }
-                }
+            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+            if s.is_empty() {
+                return Ok(None);
             }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
 
-                let items_to_process = if condition_met {
-                    Some(&cond.then)
-                } else {
-                    cond.else_value.as_ref()
-                };
-                if let Some(items_to_process) = items_to_process {
-                    for val in items_to_process.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: match_spec, ..
-                            } => {
-                                results.push(Dependency::Spec(Box::new(match_spec.0.clone())));
-                            }
-                            Value::Template { template, span } => {
-                                // Render the template and parse as matchspec
-                                let s = render_template(template.source(), context, span)?;
-                                let spec = MatchSpec::from_str(&s, ParseStrictness::Strict)
-                                    .map_err(|e| ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: *span,
-                                        message: Some(format!("Invalid match spec '{}': {}", s, e)),
-                                        suggestion: None,
-                                    })?;
-                                results.push(Dependency::Spec(Box::new(spec)));
-                            }
-                        }
-                    }
-                }
-            }
+            let span_opt = value.span().copied();
+            let dep = parse_dependency_string(&s, &span_opt)?;
+            Ok(Some(dep))
+        } else {
+            unreachable!("Value must be either concrete or template")
         }
-    }
-
-    Ok(results)
+    })
 }
 
-/// Evaluate a ScriptContent into a string
-fn evaluate_script_content(
-    content: &ScriptContent,
-    context: &EvaluationContext,
-) -> Result<String, ParseError> {
-    match content {
-        ScriptContent::Command(cmd) => Ok(cmd.clone()),
-        ScriptContent::Inline(inline) => {
-            // For inline scripts, we need to evaluate the content or file
-            if let Some(content_list) = &inline.content {
-                // Evaluate the conditional list to get a Vec<String> of commands
-                let commands = evaluate_string_list(content_list, context)?;
-                // Join the commands with newlines to create a single script
-                Ok(commands.join("\n"))
-            } else if let Some(file_val) = &inline.file {
-                evaluate_string_value(file_val, context)
-            } else {
-                Ok(String::new())
-            }
-        }
+/// Parse a dependency string into a Dependency
+///
+/// Handles both JSON pin expressions and regular MatchSpec strings
+fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
+    let span = (*span).unwrap_or_else(Span::new_blank);
+
+    // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
+    if s.trim().starts_with('{') {
+        // Try to deserialize as Dependency (which handles pin types)
+        serde_json::from_str(s).map_err(|e| {
+            ParseError::invalid_value(
+                "pin dependency",
+                format!("Failed to parse pin dependency: {}", e),
+                span,
+            )
+        })
+    } else {
+        // It's a regular MatchSpec string
+        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
+            ParseError::invalid_value(
+                "match spec",
+                format!("Invalid match spec '{}': {}", s, e),
+                span,
+            )
+        })?;
+        Ok(Dependency::Spec(Box::new(spec)))
     }
 }
 
-/// Evaluate a ConditionalList<ScriptContent> into Vec<String>
-pub fn evaluate_script_list(
-    list: &ConditionalList<ScriptContent>,
+/// Evaluate script with variable tracking for content, allowing undefined environment variables
+///
+/// This function evaluates script metadata (interpreter, env, cwd, file) normally, but for
+/// script content (inline commands), it tracks variables and preserves templates with undefined
+/// variables. This allows build-time environment variables like ${{ PYTHON }} or ${{ PREFIX }}
+/// to be used in scripts without failing during recipe evaluation.
+pub fn evaluate_script(
+    script: &crate::stage0::types::Script,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
-    let mut results = Vec::new();
+) -> Result<rattler_build_script::Script, ParseError> {
+    use rattler_build_script::{Script, ScriptContent as ScriptContentOutput};
 
-    for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                // ScriptContent doesn't use Value wrapper, so we match on it directly
-                // Actually wait, Item<ScriptContent> means Item can be Value(Value<ScriptContent>) or Conditional(Conditional<ScriptContent>)
-                // But ScriptContent is not wrapped in Value...
-                // Let me check the type more carefully
-                match value {
-                    Value::Concrete {
-                        value: script_content,
-                        ..
-                    } => {
-                        let s = evaluate_script_content(script_content, context)?;
-                        results.push(s);
-                    }
-                    Value::Template { .. } => {
-                        // ScriptContent can't be a template itself
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some("Script content cannot be a template".to_string()),
-                            suggestion: None,
-                        });
-                    }
-                }
-            }
-            Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
+    // If the script is default/empty, return default script
+    if script.is_default() {
+        return Ok(Script::default());
+    }
 
-                if condition_met {
-                    // Evaluate the "then" items
-                    for val in cond.then.iter() {
-                        match val {
-                            Value::Concrete {
-                                value: script_content,
-                                ..
-                            } => {
-                                let s = evaluate_script_content(script_content, context)?;
-                                results.push(s);
-                            }
-                            Value::Template { .. } => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: Span::unknown(),
-                                    message: Some(
-                                        "Script content cannot be a template".to_string(),
-                                    ),
-                                    suggestion: None,
-                                });
-                            }
-                        }
-                    }
-                } else {
-                    // Evaluate the "else" items
-                    if let Some(else_value) = &cond.else_value {
-                        for val in else_value.iter() {
-                            match val {
-                                Value::Concrete {
-                                    value: script_content,
-                                    ..
-                                } => {
-                                    let s = evaluate_script_content(script_content, context)?;
-                                    results.push(s);
-                                }
-                                Value::Template { .. } => {
-                                    return Err(ParseError {
-                                        kind: ErrorKind::InvalidValue,
-                                        span: Span::unknown(),
-                                        message: Some(
-                                            "Script content cannot be a template".to_string(),
-                                        ),
-                                        suggestion: None,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    // Evaluate interpreter normally (it's typically simple and doesn't use env vars)
+    let interpreter = if let Some(interp) = &script.interpreter {
+        Some(evaluate_string_value(interp, context)?)
+    } else {
+        None
+    };
+
+    // Evaluate environment variables
+    let mut env = indexmap::IndexMap::new();
+    for (key, val) in &script.env {
+        let evaluated_val = evaluate_string_value(val, context)?;
+        if !evaluated_val.is_empty() {
+            env.insert(key.clone(), evaluated_val);
         }
     }
 
-    Ok(results)
+    // Copy secrets as-is
+    let secrets = script.secrets.clone();
+
+    // Evaluate cwd normally (it's a path, not a script command)
+    let cwd = if let Some(cwd_val) = &script.cwd {
+        Some(PathBuf::from(evaluate_string_value(cwd_val, context)?))
+    } else {
+        None
+    };
+
+    // For content: evaluate conditionals but preserve templates with undefined vars
+    let content = if let Some(file_val) = &script.file {
+        // File paths should be evaluated normally
+        let file_str = evaluate_string_value(file_val, context)?;
+        ScriptContentOutput::Path(PathBuf::from(file_str))
+    } else if let Some(content_list) = &script.content {
+        // Use the lenient evaluation that preserves templates with undefined variables
+        // This handles conditional logic (if/then/else) while preserving build-time env vars
+        let commands = evaluate_string_list_lenient(content_list, context)?;
+
+        if commands.is_empty() {
+            ScriptContentOutput::Default
+        } else if commands.len() == 1 {
+            // Single command - could be a path or command, use CommandOrPath
+            ScriptContentOutput::CommandOrPath(commands.into_iter().next().unwrap())
+        } else {
+            // Multiple commands
+            ScriptContentOutput::Commands(commands)
+        }
+    } else {
+        ScriptContentOutput::Default
+    };
+
+    Ok(Script {
+        interpreter,
+        env,
+        secrets,
+        content,
+        cwd,
+    })
 }
 
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
-        "true" | "yes" | "1" => Ok(true),
-        "false" | "no" | "0" => Ok(false),
-        _ => Err(ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
-            message: Some(format!(
-                "Invalid boolean value for '{}': '{}' (expected true/false, yes/no, or 1/0)",
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(ParseError::invalid_value(
+            field_name,
+            format!(
+                "Invalid boolean value for '{}': '{}' (expected true/false)",
                 field_name, s
-            )),
-            suggestion: None,
-        }),
+            ),
+            Span::new_blank(),
+        )),
     }
 }
 
@@ -550,12 +979,13 @@ pub fn evaluate_bool_value(
     context: &EvaluationContext,
     field_name: &str,
 ) -> Result<bool, ParseError> {
-    match value {
-        Value::Concrete { value: b, .. } => Ok(*b),
-        Value::Template { template, span } => {
-            let s = render_template(template.source(), context, span)?;
-            parse_bool_from_str(&s, field_name)
-        }
+    if let Some(b) = value.as_concrete() {
+        Ok(*b)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        parse_bool_from_str(&s, field_name)
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -572,6 +1002,169 @@ where
     match opt {
         None => Ok(T::default()),
         Some(v) => v.evaluate(context),
+    }
+}
+
+/// Generic helper to evaluate a Value<T> where T implements FromStr
+/// This handles both concrete values and templates
+pub fn evaluate_value<T>(
+    value: &Value<T>,
+    context: &EvaluationContext,
+    type_name: &str,
+) -> Result<T, ParseError>
+where
+    T: ToString + FromStr,
+    T::Err: std::fmt::Display,
+{
+    if let Some(v) = value.as_concrete() {
+        Ok(v.to_string().parse().map_err(|e| {
+            ParseError::invalid_value(
+                type_name,
+                format!("Failed to parse {}: {}", type_name, e),
+                Span::new_blank(),
+            )
+        })?)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        s.parse().map_err(|e| {
+            ParseError::invalid_value(
+                type_name,
+                format!("Invalid {} '{}': {}", type_name, s, e),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
+    }
+}
+
+/// Generic helper to evaluate an Option<Value<T>> where T implements FromStr
+pub fn evaluate_optional_value<T>(
+    value: &Option<Value<T>>,
+    context: &EvaluationContext,
+    type_name: &str,
+) -> Result<Option<T>, ParseError>
+where
+    T: ToString + FromStr,
+    T::Err: std::fmt::Display,
+{
+    match value {
+        None => Ok(None),
+        Some(v) => evaluate_value(v, context, type_name).map(Some),
+    }
+}
+
+// Implement Evaluate for Value<T> where T is a foreign type
+// This is allowed because Value is our local type (orphan rule doesn't apply)
+
+impl Evaluate for Value<url::Url> {
+    type Output = url::Url;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        if let Some(u) = self.as_concrete() {
+            Ok(u.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            url::Url::parse(&s).map_err(|e| {
+                ParseError::invalid_value(
+                    "URL",
+                    format!("Invalid URL '{}': {}", s, e),
+                    self.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    }
+}
+
+impl Evaluate for Option<Value<url::Url>> {
+    type Output = Option<url::Url>;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        self.clone().map(|v| v.evaluate(context)).transpose()
+    }
+}
+
+impl Evaluate for Value<License> {
+    type Output = License;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        if let Some(license) = self.as_concrete() {
+            Ok(license.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            s.parse::<License>().map_err(|e| {
+                ParseError::invalid_value(
+                    "SPDX license",
+                    format!("Invalid SPDX license expression: {}", e),
+                    self.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    }
+}
+
+impl Evaluate for Value<PathBuf> {
+    type Output = PathBuf;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        if let Some(p) = self.as_concrete() {
+            Ok(p.clone())
+        } else if let Some(template) = self.as_template() {
+            let s = render_template(template.source(), context, self.span())?;
+            Ok(PathBuf::from(s))
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    }
+}
+
+// Note: We can't implement Evaluate for Value<Sha256Hash> and Value<Md5Hash>
+// because they are both type aliases to GenericArray<u8, N>, which would create
+// conflicting implementations. We use helper functions instead.
+
+/// Evaluate a Sha256Hash from a Value
+fn evaluate_sha256(
+    value: &Value<Sha256Hash>,
+    context: &EvaluationContext,
+) -> Result<Sha256Hash, ParseError> {
+    if let Some(hash) = value.as_concrete() {
+        Ok(*hash)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+            ParseError::invalid_value(
+                "SHA256 checksum",
+                format!("Invalid SHA256 checksum: {}", s),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
+    }
+}
+
+/// Evaluate an Md5Hash from a Value
+fn evaluate_md5(
+    value: &Value<Md5Hash>,
+    context: &EvaluationContext,
+) -> Result<Md5Hash, ParseError> {
+    if let Some(hash) = value.as_concrete() {
+        Ok(*hash)
+    } else if let Some(template) = value.as_template() {
+        let s = render_template(template.source(), context, value.span())?;
+        rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
+            ParseError::invalid_value(
+                "MD5 checksum",
+                format!("Invalid MD5 checksum: {}", s),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            )
+        })
+    } else {
+        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -636,24 +1229,26 @@ impl Evaluate for Stage0Package {
         let version_str = evaluate_value_to_string(&self.version, context)?;
 
         // Parse into concrete types
-        let name = PackageName::from_str(&name_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
-            message: Some(format!(
-                "invalid value for name: '{}' is not a valid package name: {}",
-                name_str, e
-            )),
-            suggestion: None,
+        let name = PackageName::from_str(&name_str).map_err(|e| {
+            ParseError::invalid_value(
+                "name",
+                format!(
+                    "invalid value for name: '{}' is not a valid package name: {}",
+                    name_str, e
+                ),
+                Span::new_blank(),
+            )
         })?;
 
-        let version = VersionWithSource::from_str(&version_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
-            message: Some(format!(
-                "invalid value for version: '{}' is not a valid version: {}",
-                version_str, e
-            )),
-            suggestion: None,
+        let version = VersionWithSource::from_str(&version_str).map_err(|e| {
+            ParseError::invalid_value(
+                "version",
+                format!(
+                    "invalid value for version: '{}' is not a valid version: {}",
+                    version_str, e
+                ),
+                Span::new_blank(),
+            )
         })?;
 
         Ok(Stage1Package::new(name, version))
@@ -664,53 +1259,16 @@ impl Evaluate for Stage0About {
     type Output = Stage1About;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Helper to evaluate a URL field
-        let evaluate_url = |field_name: &str,
-                            value: &Option<Value<url::Url>>|
-         -> Result<Option<url::Url>, ParseError> {
-            match value {
-                None => Ok(None),
-                Some(v) => {
-                    let s = evaluate_value_to_string(v, context)?;
-                    Some(url::Url::parse(&s).map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
-                        message: Some(format!("Invalid URL for {}: {}", field_name, e)),
-                        suggestion: None,
-                    }))
-                    .transpose()
-                }
-            }
-        };
-
-        // Evaluate URL fields
-        let homepage = evaluate_url("homepage", &self.homepage)?;
-        let repository = evaluate_url("repository", &self.repository)?;
-        let documentation = evaluate_url("documentation", &self.documentation)?;
-
-        // Evaluate license as spdx::Expression (unwrap from License wrapper)
-        let license = match &self.license {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: license, .. } => Some(license.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(s.parse::<License>().map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: *span,
-                        message: Some(format!("Invalid SPDX license expression: {}", e)),
-                        suggestion: None,
-                    })?)
-                }
-            },
-        };
-
         Ok(Stage1About {
-            homepage,
-            repository,
-            documentation,
-            license,
-            license_file: evaluate_string_list(&self.license_file, context)?,
+            homepage: self.homepage.evaluate(context)?,
+            repository: self.repository.evaluate(context)?,
+            documentation: self.documentation.evaluate(context)?,
+            license: self
+                .license
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -723,6 +1281,7 @@ impl Evaluate for Stage0RunExports {
     type Output = Stage1RunExports;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Run exports don't affect the build variant
         Ok(Stage1RunExports {
             noarch: evaluate_dependency_list(&self.noarch, context)?,
             strong: evaluate_dependency_list(&self.strong, context)?,
@@ -733,10 +1292,16 @@ impl Evaluate for Stage0RunExports {
     }
 }
 
-impl_evaluate_list_fields!(Stage0IgnoreRunExports => Stage1IgnoreRunExports {
-    by_name,
-    from_package,
-});
+impl Evaluate for Stage0IgnoreRunExports {
+    type Output = Stage1IgnoreRunExports;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1IgnoreRunExports {
+            by_name: evaluate_package_name_list(&self.by_name, context)?,
+            from_package: evaluate_package_name_list(&self.from_package, context)?,
+        })
+    }
+}
 
 impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
@@ -753,15 +1318,22 @@ impl Evaluate for Stage0Requirements {
     }
 }
 
-// Use macro for simple list field evaluation
-impl_evaluate_list_fields!(Stage0Extra => Stage1Extra { recipe_maintainers });
+// Pass through Extra as-is without evaluation
+impl Evaluate for Stage0Extra {
+    type Output = Stage1Extra;
+
+    fn evaluate(&self, _context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1Extra {
+            extra: self.extra.clone(),
+        })
+    }
+}
 
 impl Evaluate for Stage0PythonBuild {
     type Output = Stage1PythonBuild;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let skip_pyc_compilation =
-            GlobVec::from_strings(evaluate_string_list(&self.skip_pyc_compilation, context)?)?;
+        let skip_pyc_compilation = evaluate_glob_vec_simple(&self.skip_pyc_compilation, context)?;
 
         Ok(Stage1PythonBuild {
             entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
@@ -781,15 +1353,17 @@ impl Evaluate for Stage0VariantKeyUsage {
             None => None,
             Some(val) => {
                 let s = evaluate_value_to_string(val, context)?;
-                Some(s.parse::<i32>().map_err(|_| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: Span::unknown(),
-                    message: Some(format!(
-                        "Invalid integer value for down_prioritize_variant: '{}'",
-                        s
-                    )),
-                    suggestion: None,
-                })?)
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.parse::<i32>().map_err(|_| {
+                        ParseError::invalid_value(
+                            "down_prioritize_variant",
+                            format!("Invalid integer value for down_prioritize_variant: '{}'", s),
+                            Span::new_blank(),
+                        )
+                    })?)
+                }
             }
         };
 
@@ -806,8 +1380,8 @@ impl Evaluate for Stage0ForceFileType {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1ForceFileType {
-            text: GlobVec::from_strings(evaluate_string_list(&self.text, context)?)?,
-            binary: GlobVec::from_strings(evaluate_string_list(&self.binary, context)?)?,
+            text: evaluate_glob_vec_simple(&self.text, context)?,
+            binary: evaluate_glob_vec_simple(&self.binary, context)?,
         })
     }
 }
@@ -818,31 +1392,31 @@ impl Evaluate for Stage0PrefixDetection {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let ignore = match &self.ignore {
             Stage0PrefixIgnore::Boolean(val) => {
-                let bool_val = match val {
-                    Value::Concrete { value: b, .. } => *b,
-                    Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span)?;
-                        match s.as_str() {
-                            "true" | "True" | "yes" | "Yes" => true,
-                            "false" | "False" | "no" | "No" => false,
-                            _ => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: *span,
-                                    message: Some(format!(
-                                        "Invalid boolean value for prefix_detection.ignore: '{}'",
-                                        s
-                                    )),
-                                    suggestion: None,
-                                });
-                            }
+                let bool_val = if let Some(b) = val.as_concrete() {
+                    *b
+                } else if let Some(template) = val.as_template() {
+                    let s = render_template(template.source(), context, val.span())?;
+                    match s.as_str() {
+                        "true" | "True" | "yes" | "Yes" => true,
+                        "false" | "False" | "no" | "No" => false,
+                        _ => {
+                            return Err(ParseError::invalid_value(
+                                "prefix_detection.ignore",
+                                format!(
+                                    "Invalid boolean value for prefix_detection.ignore: '{}'",
+                                    s
+                                ),
+                                val.span().copied().unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 };
                 AllOrGlobVec::All(bool_val)
             }
             Stage0PrefixIgnore::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
@@ -859,15 +1433,17 @@ impl Evaluate for Stage0PostProcess {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let regex_str = evaluate_string_value(&self.regex, context)?;
-        let regex = regex::Regex::new(&regex_str).map_err(|e| ParseError {
-            kind: ErrorKind::InvalidValue,
-            span: Span::unknown(),
-            message: Some(format!("Invalid regular expression: {}", e)),
-            suggestion: Some("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.".to_string()),
+        let regex = regex::Regex::new(&regex_str).map_err(|e| {
+            ParseError::invalid_value(
+                "regex",
+                format!("Invalid regular expression: {}", e),
+                Span::new_blank(),
+            )
+            .with_suggestion("Check your regex syntax. Common issues include unescaped special characters or unbalanced brackets.")
         })?;
 
         Ok(Stage1PostProcess {
-            files: GlobVec::from_strings(evaluate_string_list(&self.files, context)?)?,
+            files: evaluate_glob_vec_simple(&self.files, context)?,
             regex,
             replacement: evaluate_string_value(&self.replacement, context)?,
         })
@@ -883,39 +1459,34 @@ impl Evaluate for Stage0DynamicLinking {
         // Evaluate binary_relocation
         let binary_relocation = match &self.binary_relocation {
             Stage0BinaryRelocation::Boolean(val) => {
-                let bool_val = match val {
-                    Value::Concrete { value: b, .. } => *b,
-                    Value::Template { template, span } => {
-                        let s = render_template(template.source(), context, span)?;
-                        match s.as_str() {
-                            "true" | "True" | "yes" | "Yes" => true,
-                            "false" | "False" | "no" | "No" => false,
-                            _ => {
-                                return Err(ParseError {
-                                    kind: ErrorKind::InvalidValue,
-                                    span: *span,
-                                    message: Some(format!(
-                                        "Invalid boolean value for binary_relocation: '{}'",
-                                        s
-                                    )),
-                                    suggestion: None,
-                                });
-                            }
+                let bool_val = if let Some(b) = val.as_concrete() {
+                    *b
+                } else if let Some(template) = val.as_template() {
+                    let s = render_template(template.source(), context, val.span())?;
+                    match s.as_str() {
+                        "true" | "True" | "yes" | "Yes" => true,
+                        "false" | "False" | "no" | "No" => false,
+                        _ => {
+                            return Err(ParseError::invalid_value(
+                                "binary_relocation",
+                                format!("Invalid boolean value for binary_relocation: '{}'", s),
+                                val.span().copied().unwrap_or_else(Span::new_blank),
+                            ));
                         }
                     }
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 };
                 AllOrGlobVec::All(bool_val)
             }
             Stage0BinaryRelocation::Patterns(list) => {
-                AllOrGlobVec::from_strings(evaluate_string_list(list, context)?)?
+                AllOrGlobVec::SpecificPaths(evaluate_glob_vec_simple(list, context)?)
             }
         };
 
         // Evaluate and validate glob patterns
-        let missing_dso_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.missing_dso_allowlist, context)?)?;
-        let rpath_allowlist =
-            GlobVec::from_strings(evaluate_string_list(&self.rpath_allowlist, context)?)?;
+        let missing_dso_allowlist = evaluate_glob_vec_simple(&self.missing_dso_allowlist, context)?;
+        let rpath_allowlist = evaluate_glob_vec_simple(&self.rpath_allowlist, context)?;
 
         // Parse overdepending_behavior
         let overdepending_behavior = match &self.overdepending_behavior {
@@ -926,15 +1497,14 @@ impl Evaluate for Stage0DynamicLinking {
                     "ignore" => LinkingCheckBehavior::Ignore,
                     "error" => LinkingCheckBehavior::Error,
                     _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some(format!(
+                        return Err(ParseError::invalid_value(
+                            "overdepending_behavior",
+                            format!(
                                 "Invalid overdepending_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
-                            )),
-                            suggestion: None,
-                        });
+                            ),
+                            Span::new_blank(),
+                        ));
                     }
                 }
             }
@@ -949,22 +1519,21 @@ impl Evaluate for Stage0DynamicLinking {
                     "ignore" => LinkingCheckBehavior::Ignore,
                     "error" => LinkingCheckBehavior::Error,
                     _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some(format!(
+                        return Err(ParseError::invalid_value(
+                            "overlinking_behavior",
+                            format!(
                                 "Invalid overlinking_behavior '{}'. Expected 'ignore' or 'error'",
                                 s
-                            )),
-                            suggestion: None,
-                        });
+                            ),
+                            Span::new_blank(),
+                        ));
                     }
                 }
             }
         };
 
         Ok(Stage1DynamicLinking {
-            rpaths: evaluate_string_list(&self.rpaths, context)?,
+            rpaths: Rpaths::new(evaluate_string_list(&self.rpaths, context)?),
             binary_relocation,
             missing_dso_allowlist,
             rpath_allowlist,
@@ -978,31 +1547,52 @@ impl Evaluate for Stage0Build {
     type Output = Stage1Build;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate build string
-        let string = evaluate_optional_string_value(&self.string, context)?;
+        // IMPORTANT: Do NOT fully evaluate build.string here - it may contain a "hash" variable
+        // that needs to be deferred until after we know the actual variant and can compute the hash.
+        // Store it as BuildString::Unresolved if it contains templates.
+        // Track the variables used in the template to count towards "actually used" variables.
+        let string = self
+            .string
+            .as_ref()
+            .map_or(crate::stage1::build::BuildString::Default, |s| {
+                // Track variables without failing on undefined
+                track_template_variables(s, context);
 
-        // Evaluate script
-        let script = evaluate_script_list(&self.script, context)?;
+                let template = extract_template_source(s).unwrap();
+                crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
+            });
+
+        // IMPORTANT: Do NOT fully evaluate build.script here - it may contain environment variables
+        // like ${{ PYTHON }} or ${{ PREFIX }} that are only available at build time.
+        // Track the variables used in the script to count towards "actually used" variables,
+        // but defer actual evaluation until build time.
+        let script = evaluate_script(&self.script, context)?;
 
         // Evaluate noarch
         let noarch = match &self.noarch {
             None => None,
             Some(v) => {
-                let s = evaluate_value_to_string(v, context)?;
-                match s.as_str() {
-                    "python" => Some(NoArchType::Python),
-                    "generic" => Some(NoArchType::Generic),
-                    _ => {
-                        return Err(ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: Span::unknown(),
-                            message: Some(format!(
-                                "Invalid noarch type '{}'. Expected 'python' or 'generic'",
-                                s
-                            )),
-                            suggestion: None,
-                        });
-                    }
+                // NoArchType is already validated during parsing, we just need to evaluate templates
+                if let Some(value) = v.as_concrete() {
+                    Some(*value)
+                } else if let Some(template) = v.as_template() {
+                    // If it's a template, we need to render it and parse as NoArchType
+                    let s = render_template(template.source(), context, v.span())?;
+                    // Parse the string as NoArchType using serde
+                    serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
+                        .map(Some)
+                        .map_err(|_| {
+                            ParseError::invalid_value(
+                                "noarch type",
+                                format!(
+                                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
+                                    s
+                                ),
+                                v.span().copied().unwrap_or(Span::new_blank()),
+                            )
+                        })?
+                } else {
+                    unreachable!("Value must be either concrete or template")
                 }
             }
         };
@@ -1014,25 +1604,11 @@ impl Evaluate for Stage0Build {
         let python = self.python.evaluate(context)?;
 
         // Evaluate file lists and validate glob patterns
-        let always_copy_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_copy_files, context)?)?;
-        let always_include_files =
-            GlobVec::from_strings(evaluate_string_list(&self.always_include_files, context)?)?;
+        let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
+        let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
         // Evaluate files (handle both list and include/exclude variants)
-        let files = match &self.files {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
+        let files = evaluate_glob_vec(&self.files, context)?;
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -1050,20 +1626,27 @@ impl Evaluate for Stage0Build {
         }
 
         // Evaluate build number
-        let number = match &self.number {
-            Value::Concrete { value: n, .. } => *n,
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
-                s.parse::<u64>().map_err(|_| ParseError {
-                    kind: ErrorKind::InvalidValue,
-                    span: *span,
-                    message: Some(format!(
-                        "Invalid build number: '{}' is not a valid positive integer",
-                        s
-                    )),
-                    suggestion: None,
+        let number = if let Some(n) = self.number.as_concrete() {
+            *n
+        } else if let Some(template) = self.number.as_template() {
+            let s = render_template(template.source(), context, self.number.span())?;
+            // If we render to an empty string, treat it as 0
+            if s.is_empty() {
+                0
+            } else {
+                s.parse::<u64>().map_err(|_| {
+                    ParseError::invalid_value(
+                        "build number",
+                        format!(
+                            "Invalid build number: '{}' is not a valid positive integer",
+                            s
+                        ),
+                        self.number.span().copied().unwrap_or_else(Span::new_blank),
+                    )
                 })?
             }
+        } else {
+            unreachable!("Value must be either concrete or template")
         };
 
         Ok(Stage1Build {
@@ -1108,11 +1691,12 @@ impl Evaluate for Stage0GitSource {
             match rev {
                 Stage0GitRev::Value(v) => {
                     let rev_str = evaluate_string_value(v, context)?;
-                    Stage1GitRev::from_str(&rev_str).map_err(|e| ParseError {
-                        kind: ErrorKind::InvalidValue,
-                        span: Span::unknown(),
-                        message: Some(format!("Invalid git revision: {}", e)),
-                        suggestion: None,
+                    Stage1GitRev::from_str(&rev_str).map_err(|e| {
+                        ParseError::invalid_value(
+                            "git revision",
+                            format!("Invalid git revision: {}", e),
+                            Span::new_blank(),
+                        )
                     })?
                 }
             }
@@ -1134,40 +1718,25 @@ impl Evaluate for Stage0GitSource {
             Stage1GitRev::default()
         };
 
-        // Evaluate depth
-        let depth = evaluate_optional_value_to_type(&self.depth, context)?;
-
-        // Evaluate patches (flatten conditionals and convert to PathBuf)
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate lfs flag
-        let lfs = match &self.lfs {
-            None => false,
-            Some(v) => evaluate_bool_value(v, context, "lfs")?,
-        };
-
         Ok(Stage1GitSource {
             url,
             rev,
-            depth,
-            patches,
-            target_directory,
-            lfs,
+            depth: evaluate_optional_value_to_type(&self.depth, context)?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            lfs: self
+                .lfs
+                .as_ref()
+                .map(|v| evaluate_bool_value(v, context, "lfs"))
+                .transpose()?
+                .unwrap_or(false),
         })
     }
 }
@@ -1176,83 +1745,42 @@ impl Evaluate for Stage0UrlSource {
     type Output = Stage1UrlSource;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate URLs and parse into url::Url
+        // Evaluate URLs (they are Value<String>) and parse into url::Url
         let mut urls = Vec::new();
         for url_value in &self.url {
             let url_str = evaluate_string_value(url_value, context)?;
-            let url = url::Url::parse(&url_str).map_err(|e| ParseError {
-                kind: ErrorKind::InvalidValue,
-                span: Span::unknown(),
-                message: Some(format!("Invalid URL '{}': {}", url_str, e)),
-                suggestion: None,
+            let url = url::Url::parse(&url_str).map_err(|e| {
+                ParseError::invalid_value(
+                    "URL",
+                    format!("Invalid URL '{}': {}", url_str, e),
+                    Span::new_blank(),
+                )
             })?;
             urls.push(url);
         }
 
-        // Evaluate checksum fields separately (both can be set)
-        // For hash types, we can just extract the concrete value or evaluate templates
-        let sha256 = match &self.sha256 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let sha256_str = render_template(template.source(), context, span)?;
-                let sha256_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
-                            suggestion: None,
-                        })?;
-                Some(sha256_hash)
-            }
-        };
-
-        let md5 = match &self.md5 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let md5_str = render_template(template.source(), context, span)?;
-                let md5_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
-                            suggestion: None,
-                        })?;
-                Some(md5_hash)
-            }
-        };
-
-        // Evaluate file_name
-        let file_name = evaluate_optional_string_value(&self.file_name, context)?;
-
-        // Evaluate patches
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
         Ok(Stage1UrlSource {
             url: urls,
-            sha256,
-            md5,
-            file_name,
-            patches,
-            target_directory,
+            sha256: self
+                .sha256
+                .as_ref()
+                .map(|v| evaluate_sha256(v, context))
+                .transpose()?,
+            md5: self
+                .md5
+                .as_ref()
+                .map(|v| evaluate_md5(v, context))
+                .transpose()?,
+            file_name: evaluate_optional_string_value(&self.file_name, context)?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
         })
     }
 }
@@ -1261,105 +1789,34 @@ impl Evaluate for Stage0PathSource {
     type Output = Stage1PathSource;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // Evaluate path
-        let path = match &self.path {
-            Value::Concrete { value: p, .. } => p.clone(),
-            Value::Template { template, span } => {
-                let s = render_template(template.source(), context, span)?;
-                PathBuf::from(s)
-            }
-        };
-
-        // Evaluate checksum fields separately (both can be set)
-        // For hash types, we can just extract the concrete value or evaluate templates
-        let sha256 = match &self.sha256 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let sha256_str = render_template(template.source(), context, span)?;
-                let sha256_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&sha256_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid SHA256 checksum: {}", sha256_str)),
-                            suggestion: None,
-                        })?;
-                Some(sha256_hash)
-            }
-        };
-
-        let md5 = match &self.md5 {
-            None => None,
-            Some(Value::Concrete { value, .. }) => Some(*value),
-            Some(Value::Template { template, span }) => {
-                let md5_str = render_template(template.source(), context, span)?;
-                let md5_hash =
-                    rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&md5_str)
-                        .ok_or_else(|| ParseError {
-                            kind: ErrorKind::InvalidValue,
-                            span: *span,
-                            message: Some(format!("Invalid MD5 checksum: {}", md5_str)),
-                            suggestion: None,
-                        })?;
-                Some(md5_hash)
-            }
-        };
-
-        // Evaluate patches
-        let patches = evaluate_string_list(&self.patches, context)?
-            .into_iter()
-            .map(PathBuf::from)
-            .collect();
-
-        // Evaluate target_directory
-        let target_directory = match &self.target_directory {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate file_name
-        let file_name = match &self.file_name {
-            None => None,
-            Some(v) => match v {
-                Value::Concrete { value: p, .. } => Some(p.clone()),
-                Value::Template { template, span } => {
-                    let s = render_template(template.source(), context, span)?;
-                    Some(PathBuf::from(s))
-                }
-            },
-        };
-
-        // Evaluate filter and convert to GlobVec (handle both list and include/exclude variants)
-        let filter = match &self.filter {
-            crate::stage0::types::IncludeExclude::List(list) => {
-                GlobVec::from_strings(evaluate_string_list(list, context)?)?
-            }
-            crate::stage0::types::IncludeExclude::Mapping {
-                include,
-                exclude: _,
-            } => {
-                // For now, just use the include list
-                // TODO: properly handle exclude patterns
-                GlobVec::from_strings(evaluate_string_list(include, context)?)?
-            }
-        };
-
         Ok(Stage1PathSource {
-            path,
-            sha256,
-            md5,
-            patches,
-            target_directory,
-            file_name,
+            path: self.path.evaluate(context)?,
+            sha256: self
+                .sha256
+                .as_ref()
+                .map(|v| evaluate_sha256(v, context))
+                .transpose()?,
+            md5: self
+                .md5
+                .as_ref()
+                .map(|v| evaluate_md5(v, context))
+                .transpose()?,
+            patches: evaluate_string_list(&self.patches, context)?
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            target_directory: self
+                .target_directory
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
+            file_name: self
+                .file_name
+                .as_ref()
+                .map(|v| v.evaluate(context))
+                .transpose()?,
             use_gitignore: self.use_gitignore,
-            filter,
+            filter: evaluate_glob_vec(&self.filter, context)?,
         })
     }
 }
@@ -1382,14 +1839,37 @@ impl Evaluate for Stage0PythonVersion {
     type Output = Stage1PythonVersion;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Helper to validate a python version spec by attempting to create a MatchSpec
+        let validate_version = |version_str: &str, span: Option<&Span>| -> Result<(), ParseError> {
+            let spec_str = format!("python={}", version_str);
+            MatchSpec::from_str(&spec_str, ParseStrictness::Lenient).map_err(|e| {
+                ParseError::invalid_value(
+                    "python version spec",
+                    format!(
+                        "Invalid python version spec '{}': {}",
+                        version_str, e
+                    ),
+                    span.cloned().unwrap_or(Span::new_blank()),
+                )
+                .with_suggestion(
+                    "Python version must be a valid version constraint (e.g., '3.8', '>=3.7', '3.8.*')",
+                )
+            })?;
+            Ok(())
+        };
+
         match self {
-            Stage0PythonVersion::Single(v) => Ok(Stage1PythonVersion::Single(
-                evaluate_string_value(v, context)?,
-            )),
+            Stage0PythonVersion::Single(v) => {
+                let evaluated = evaluate_string_value(v, context)?;
+                validate_version(&evaluated, v.span())?;
+                Ok(Stage1PythonVersion::Single(evaluated))
+            }
             Stage0PythonVersion::Multiple(versions) => {
                 let mut evaluated = Vec::new();
                 for v in versions {
-                    evaluated.push(evaluate_string_value(v, context)?);
+                    let version_str = evaluate_string_value(v, context)?;
+                    validate_version(&version_str, v.span())?;
+                    evaluated.push(version_str);
                 }
                 Ok(Stage1PythonVersion::Multiple(evaluated))
             }
@@ -1432,8 +1912,8 @@ impl Evaluate for Stage0CommandsTestFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1CommandsTestFiles {
-            source: GlobVec::from_strings(evaluate_string_list(&self.source, context)?)?,
-            recipe: GlobVec::from_strings(evaluate_string_list(&self.recipe, context)?)?,
+            source: evaluate_glob_vec_simple(&self.source, context)?,
+            recipe: evaluate_glob_vec_simple(&self.recipe, context)?,
         })
     }
 }
@@ -1442,7 +1922,7 @@ impl Evaluate for Stage0CommandsTest {
     type Output = Stage1CommandsTest;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let script = evaluate_script_list(&self.script, context)?;
+        let script = evaluate_script(&self.script, context)?;
         let requirements = evaluate_optional_with_default(&self.requirements, context)?;
         let files = evaluate_optional_with_default(&self.files, context)?;
 
@@ -1471,8 +1951,8 @@ impl Evaluate for Stage0PackageContentsCheckFiles {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         Ok(Stage1PackageContentsCheckFiles {
-            exists: GlobVec::from_strings(evaluate_string_list(&self.exists, context)?)?,
-            not_exists: GlobVec::from_strings(evaluate_string_list(&self.not_exists, context)?)?,
+            exists: evaluate_glob_vec_simple(&self.exists, context)?,
+            not_exists: evaluate_glob_vec_simple(&self.not_exists, context)?,
         })
     }
 }
@@ -1535,10 +2015,10 @@ impl Evaluate for Stage0Recipe {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         // First, evaluate the context variables and merge them into a new context
-        let context_with_vars = if !self.context.is_empty() {
+        let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
-            context.clone()
+            (context.clone(), IndexMap::new())
         };
 
         let package = self.package.evaluate(&context_with_vars)?;
@@ -1559,8 +2039,81 @@ impl Evaluate for Stage0Recipe {
             tests.push(test.evaluate(&context_with_vars)?);
         }
 
-        // Extract the resolved context variables (all variables from the evaluation context)
-        let resolved_context = context_with_vars.variables().clone();
+        // Now that evaluation is complete, we know which variables were actually accessed.
+        // Compute the hash from the actual variant (accessed variables) and render the build string.
+        // Variables that should ALWAYS be included in the hash, even if not accessed
+        const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+
+        let accessed_vars = context_with_vars.accessed_variables();
+        let free_specs = requirements
+            .free_specs()
+            .into_iter()
+            .map(NormalizedKey::from)
+            .collect::<HashSet<_>>();
+
+        // Get the noarch type to determine which variant keys to exclude
+        let noarch = build.noarch.unwrap_or(NoArchType::none());
+
+        // For noarch packages, certain variant keys should be excluded from the hash
+        // because these packages work across multiple versions of the language
+        let should_exclude_from_variant = |key: &str| -> bool {
+            if noarch.is_python() {
+                // Python noarch packages should exclude python version from hash
+                key == "python"
+            } else {
+                false
+            }
+        };
+
+        let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+            .variables()
+            .iter()
+            .filter(|(k, _)| {
+                let key_str = k.as_str();
+
+                // Context variables (defined in the context: section) should not be included
+                // in the variant for hash computation. We need to determine which variables
+                // are context variables vs variant variables.
+                // Exclude context variables (from context: section)
+                if self.context.contains_key(key_str) {
+                    return false;
+                }
+                // Exclude if it's a noarch-excluded key
+                if should_exclude_from_variant(key_str) {
+                    return false;
+                }
+
+                // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+                accessed_vars.contains(key_str)
+                    || free_specs.contains(&NormalizedKey::from(key_str))
+                    || ALWAYS_INCLUDE.contains(&key_str)
+            })
+            .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+            .collect();
+
+        // Ensure that `target_platform` is set to "noarch" for noarch packages
+        if !noarch.is_none() {
+            actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
+        }
+
+        // Add virtual packages from run requirements to the variant
+        // Virtual packages (starting with '__') should be included in the hash
+        for dep in &requirements.run {
+            if let crate::stage1::Dependency::Spec(spec) = dep {
+                if let Some(ref name) = spec.name {
+                    if name.as_normalized().starts_with("__") {
+                        actual_variant.insert(
+                            NormalizedKey::from(name.as_normalized()),
+                            Variable::from(spec.to_string()),
+                        );
+                    }
+                }
+            }
+        }
+
+        // DO NOT compute hash here! Hash computation must happen AFTER pin_subpackages are
+        // added to the variant (which happens in variant_render.rs after evaluation).
+        // The build string will remain unresolved until finalize_build_strings() is called.
 
         Ok(Stage1Recipe::new(
             package,
@@ -1570,15 +2123,567 @@ impl Evaluate for Stage0Recipe {
             extra,
             source,
             tests,
-            resolved_context,
+            evaluated_context,
+            actual_variant,
         ))
+    }
+}
+
+/// Merge two Stage1 Build configurations
+/// The output build takes precedence, but if output has default/empty values, use top-level
+fn merge_stage1_build(
+    toplevel: crate::stage1::Build,
+    output: crate::stage1::Build,
+) -> crate::stage1::Build {
+    // Script: use output if not default, otherwise inherit from top-level
+    let script = if output.script.is_default() {
+        toplevel.script
+    } else {
+        output.script
+    };
+
+    // Build string: use output unless it's Default, then inherit from top-level
+    let string = match output.string {
+        BuildString::Default => toplevel.string,
+        _ => output.string,
+    };
+
+    // Build number: use output if non-zero, otherwise inherit from top-level
+    let number = if output.number == 0 {
+        toplevel.number
+    } else {
+        output.number
+    };
+
+    // Noarch: inherit from top-level if not set in output
+    let noarch = output.noarch.or(toplevel.noarch);
+
+    // Python: use output if not default, otherwise inherit from top-level
+    let python = if output.python.is_default() {
+        toplevel.python
+    } else {
+        output.python
+    };
+
+    // Skip: combine top-level and output skip conditions with OR logic
+    let mut skip = toplevel.skip;
+    skip.extend(output.skip);
+
+    // Always copy files: use output if not empty, otherwise inherit from top-level
+    let always_copy_files = if output.always_copy_files.is_empty() {
+        toplevel.always_copy_files
+    } else {
+        output.always_copy_files
+    };
+
+    // Always include files: use output if not empty, otherwise inherit from top-level
+    let always_include_files = if output.always_include_files.is_empty() {
+        toplevel.always_include_files
+    } else {
+        output.always_include_files
+    };
+
+    // Merge build and host envs: use OR logic (true if either is true)
+    let merge_build_and_host_envs =
+        output.merge_build_and_host_envs || toplevel.merge_build_and_host_envs;
+
+    // Files: use output if not empty, otherwise inherit from top-level
+    let files = if output.files.is_empty() {
+        toplevel.files
+    } else {
+        output.files
+    };
+
+    // Dynamic linking: use output if not default, otherwise inherit from top-level
+    let dynamic_linking = if output.dynamic_linking.is_default() {
+        toplevel.dynamic_linking
+    } else {
+        output.dynamic_linking
+    };
+
+    // Variant: use output if not default, otherwise inherit from top-level
+    let variant = if output.variant.is_default() {
+        toplevel.variant
+    } else {
+        output.variant
+    };
+
+    // Prefix detection: use output if not default, otherwise inherit from top-level
+    let prefix_detection = if output.prefix_detection.is_default() {
+        toplevel.prefix_detection
+    } else {
+        output.prefix_detection
+    };
+
+    // Post-process: use output if not empty, otherwise inherit from top-level
+    let post_process = if output.post_process.is_empty() {
+        toplevel.post_process
+    } else {
+        output.post_process
+    };
+
+    stage1::Build {
+        script,
+        number,
+        string,
+        noarch,
+        python,
+        skip,
+        always_copy_files,
+        always_include_files,
+        merge_build_and_host_envs,
+        files,
+        dynamic_linking,
+        variant,
+        prefix_detection,
+        post_process,
+    }
+}
+
+/// Merge two Stage1 About configurations
+/// The output about takes precedence for non-empty fields
+fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1::About {
+    stage1::About {
+        homepage: if output.homepage.is_some() {
+            output.homepage
+        } else {
+            toplevel.homepage
+        },
+        repository: if output.repository.is_some() {
+            output.repository
+        } else {
+            toplevel.repository
+        },
+        documentation: if output.documentation.is_some() {
+            output.documentation
+        } else {
+            toplevel.documentation
+        },
+        license: if output.license.is_some() {
+            output.license
+        } else {
+            toplevel.license
+        },
+        license_family: if output.license_family.is_some() {
+            output.license_family
+        } else {
+            toplevel.license_family
+        },
+        license_file: if !output.license_file.is_empty() {
+            output.license_file
+        } else {
+            toplevel.license_file
+        },
+        summary: if output.summary.is_some() {
+            output.summary
+        } else {
+            toplevel.summary
+        },
+        description: if output.description.is_some() {
+            output.description
+        } else {
+            toplevel.description
+        },
+    }
+}
+
+/// Helper to evaluate a package output into a Stage1Recipe
+/// This handles merging top-level recipe sections with output-specific sections
+fn evaluate_package_output_to_recipe(
+    output: &stage0::PackageOutput,
+    recipe: &stage0::MultiOutputRecipe,
+    context: &EvaluationContext,
+    staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
+) -> Result<Stage1Recipe, ParseError> {
+    // Evaluate package name
+    let name_str = evaluate_value_to_string(&output.package.name, context)?;
+    let name = PackageName::from_str(&name_str).map_err(|e| {
+        ParseError::invalid_value(
+            "name",
+            format!(
+                "invalid value for name: '{}' is not a valid package name: {}",
+                name_str, e
+            ),
+            Span::new_blank(),
+        )
+    })?;
+
+    // Get version from output or fallback to recipe-level version
+    let version_str = if let Some(ref version_value) = output.package.version {
+        evaluate_value_to_string(version_value, context)?
+    } else if let Some(ref version_value) = recipe.recipe.version {
+        evaluate_value_to_string(version_value, context)?
+    } else {
+        return Err(ParseError::missing_field(
+            "version is required for package output",
+            Span::new_blank(),
+        ));
+    };
+
+    let version = VersionWithSource::from_str(&version_str).map_err(|e| {
+        ParseError::invalid_value(
+            "version",
+            format!(
+                "invalid value for version: '{}' is not a valid version: {}",
+                version_str, e
+            ),
+            Span::new_blank(),
+        )
+    })?;
+
+    let package = Stage1Package::new(name, version);
+
+    // Check if this output inherits from top-level
+    let inherits_from_toplevel = matches!(output.inherit, crate::stage0::Inherit::TopLevel);
+
+    // Evaluate build section
+    // If inheriting from top-level, merge top-level build with output build
+    let build = if inherits_from_toplevel {
+        // First evaluate top-level build, then merge with output-specific build
+        let toplevel_build = recipe.build.evaluate(context)?;
+        let output_build = output.build.evaluate(context)?;
+
+        // Merge: output-specific settings take precedence, but use top-level script if output has none
+        merge_stage1_build(toplevel_build, output_build)
+    } else {
+        output.build.evaluate(context)?
+    };
+
+    // Evaluate about section
+    // If inheriting from top-level, merge top-level about with output about
+    let about = if inherits_from_toplevel {
+        let toplevel_about = recipe.about.evaluate(context)?;
+        let output_about = output.about.evaluate(context)?;
+
+        // Merge: output-specific fields take precedence
+        merge_stage1_about(toplevel_about, output_about)
+    } else {
+        output.about.evaluate(context)?
+    };
+
+    // Evaluate requirements
+    let requirements = output.requirements.evaluate(context)?;
+
+    // Use recipe-level extra (outputs don't have their own extra)
+    let extra = recipe.extra.evaluate(context)?;
+
+    // Evaluate source list
+    // If inheriting from top-level, prepend top-level sources
+    let mut source = Vec::new();
+    if inherits_from_toplevel {
+        for src in &recipe.source {
+            source.push(src.evaluate(context)?);
+        }
+    }
+    for src in &output.source {
+        source.push(src.evaluate(context)?);
+    }
+
+    // Evaluate tests list
+    // If inheriting from top-level, prepend top-level tests
+    let mut tests = Vec::new();
+    if inherits_from_toplevel {
+        for test in &recipe.tests {
+            tests.push(test.evaluate(context)?);
+        }
+    }
+    for test in &output.tests {
+        tests.push(test.evaluate(context)?);
+    }
+
+    // Extract the resolved context variables
+    let resolved_context = context.variables().clone();
+
+    // Compute the actual variant for this output (subset of accessed variables)
+    // This is the same logic as SingleOutputRecipe
+    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
+
+    let accessed_vars = context.accessed_variables();
+    let mut free_specs = requirements
+        .free_specs()
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
+
+    // If this output inherits from a staging cache, also include the staging cache's free_specs
+    // This ensures that variant variables from the staging cache are included in the hash
+    match &output.inherit {
+        crate::stage0::Inherit::CacheName(cache_name_value) => {
+            let cache_name = evaluate_string_value(cache_name_value, context)?;
+            if let Some(cache) = staging_caches.get(&cache_name) {
+                // Add the staging cache's free specs to our free specs
+                for spec in cache.requirements.free_specs() {
+                    free_specs.insert(NormalizedKey::from(spec));
+                }
+            }
+        }
+        crate::stage0::Inherit::CacheWithOptions(cache_inherit) => {
+            let cache_name = evaluate_string_value(&cache_inherit.from, context)?;
+            if let Some(cache) = staging_caches.get(&cache_name) {
+                // Add the staging cache's free specs to our free specs
+                for spec in cache.requirements.free_specs() {
+                    free_specs.insert(NormalizedKey::from(spec));
+                }
+            }
+        }
+        crate::stage0::Inherit::TopLevel => {
+            // No staging cache, nothing to add
+        }
+    }
+
+    // Get the noarch type to determine which variant keys to exclude
+    let noarch = build.noarch.unwrap_or(NoArchType::none());
+
+    // For noarch packages, certain variant keys should be excluded from the hash
+    let should_exclude_from_variant = |key: &str| -> bool {
+        if noarch.is_python() {
+            key == "python"
+        } else {
+            false
+        }
+    };
+
+    let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context
+        .variables()
+        .iter()
+        .filter(|(k, _)| {
+            let key_str = k.as_str();
+
+            // Exclude recipe context variables
+            if recipe.context.contains_key(key_str) {
+                return false;
+            }
+            // Exclude if it's a noarch-excluded key
+            if should_exclude_from_variant(key_str) {
+                return false;
+            }
+
+            // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+            accessed_vars.contains(key_str)
+                || free_specs.contains(&NormalizedKey::from(key_str))
+                || ALWAYS_INCLUDE.contains(&key_str)
+        })
+        .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+        .collect();
+
+    // Ensure that `target_platform` is set to "noarch" for noarch packages
+    if !noarch.is_none() {
+        actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
+    }
+
+    // Add virtual packages from run requirements to the variant
+    // Virtual packages (starting with '__') should be included in the hash
+    for dep in &requirements.run {
+        if let crate::stage1::Dependency::Spec(spec) = dep {
+            if let Some(ref name) = spec.name {
+                if name.as_normalized().starts_with("__") {
+                    actual_variant.insert(
+                        NormalizedKey::from(name.as_normalized()),
+                        Variable::from(spec.to_string()),
+                    );
+                }
+            }
+        }
+    }
+
+    // DO NOT compute hash here! Hash computation must happen AFTER pin_subpackages are
+    // added to the variant (which happens in variant_render.rs after evaluation).
+    // The build string will remain unresolved until finalize_build_strings() is called.
+
+    Ok(Stage1Recipe::new(
+        package,
+        build,
+        about,
+        requirements,
+        extra,
+        source,
+        tests,
+        resolved_context,
+        actual_variant,
+    ))
+}
+
+/// Implement Evaluate for MultiOutputRecipe
+/// Returns a Vec of Stage1Recipe, one for each output
+impl Evaluate for crate::stage0::MultiOutputRecipe {
+    type Output = Vec<Stage1Recipe>;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        use crate::stage1::StagingCache;
+
+        // First, evaluate the context variables and merge them into a new context
+        let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
+            context.with_context(&self.context)?
+        } else {
+            (context.clone(), IndexMap::new())
+        };
+
+        // First pass: Evaluate all staging outputs and collect them
+        let mut staging_caches = IndexMap::new();
+        for output in &self.outputs {
+            if let crate::stage0::Output::Staging(staging_output) = output {
+                context_with_vars.clear_accessed();
+
+                let staging_name =
+                    evaluate_string_value(&staging_output.staging.name, &context_with_vars)?;
+
+                // Evaluate staging output components
+                let script = evaluate_script(&staging_output.build.script, &context_with_vars)?;
+                let build = crate::stage1::Build {
+                    script,
+                    ..crate::stage1::Build::default()
+                };
+
+                let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+
+                // Staging outputs inherit top-level sources (prepend), then add their own
+                let mut source = Vec::new();
+                for src in &self.source {
+                    source.push(src.evaluate(&context_with_vars)?);
+                }
+                for src in &staging_output.source {
+                    source.push(src.evaluate(&context_with_vars)?);
+                }
+
+                // Compute variant for staging output
+                let accessed_vars = context_with_vars.accessed_variables();
+                let free_specs = requirements
+                    .free_specs()
+                    .into_iter()
+                    .map(NormalizedKey::from)
+                    .collect::<HashSet<_>>();
+
+                const ALWAYS_INCLUDE: &[&str] =
+                    &["target_platform", "channel_targets", "channel_sources"];
+
+                let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+                    .variables()
+                    .iter()
+                    .filter(|(k, _)| {
+                        let key_str = k.as_str();
+                        if self.context.contains_key(key_str) {
+                            return false;
+                        }
+                        accessed_vars.contains(key_str)
+                            || free_specs.contains(&NormalizedKey::from(key_str))
+                            || ALWAYS_INCLUDE.contains(&key_str)
+                    })
+                    .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+                    .collect();
+
+                let staging_cache = StagingCache::new(
+                    staging_name.clone(),
+                    build,
+                    requirements,
+                    source,
+                    actual_variant,
+                );
+
+                staging_caches.insert(staging_name, staging_cache);
+            }
+        }
+
+        let mut evaluated_outputs = Vec::new();
+
+        // Second pass: Evaluate package outputs only and set their staging cache dependencies
+        for output in &self.outputs {
+            // Only process package outputs - staging outputs are not converted to recipes
+            if let crate::stage0::Output::Package(pkg_output) = output {
+                context_with_vars.clear_accessed();
+
+                let mut recipe = evaluate_package_output_to_recipe(
+                    pkg_output.as_ref(),
+                    self,
+                    &context_with_vars,
+                    &staging_caches,
+                )?;
+                recipe.context = evaluated_context.clone();
+
+                // Set staging_caches and inherits_from based on the inherit field
+                match &pkg_output.inherit {
+                    crate::stage0::Inherit::CacheName(cache_name_value) => {
+                        let cache_name =
+                            evaluate_string_value(cache_name_value, &context_with_vars)?;
+                        if let Some(cache) = staging_caches.get(&cache_name) {
+                            recipe.staging_caches = vec![cache.clone()];
+                            recipe.inherits_from =
+                                Some(crate::stage1::InheritsFrom::new(cache_name));
+                        } else {
+                            return Err(ParseError::invalid_value(
+                                "inherit",
+                                format!(
+                                    "Staging cache '{}' not found. Available caches: {}",
+                                    cache_name,
+                                    if staging_caches.is_empty() {
+                                        "none".to_string()
+                                    } else {
+                                        staging_caches
+                                            .keys()
+                                            .map(|k| k.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    }
+                                ),
+                                cache_name_value
+                                    .span()
+                                    .copied()
+                                    .unwrap_or_else(Span::new_blank),
+                            ));
+                        }
+                    }
+                    crate::stage0::Inherit::CacheWithOptions(cache_inherit) => {
+                        let cache_name =
+                            evaluate_string_value(&cache_inherit.from, &context_with_vars)?;
+                        if let Some(cache) = staging_caches.get(&cache_name) {
+                            recipe.staging_caches = vec![cache.clone()];
+                            recipe.inherits_from =
+                                Some(crate::stage1::InheritsFrom::with_run_exports(
+                                    cache_name,
+                                    cache_inherit.run_exports,
+                                ));
+                        } else {
+                            return Err(ParseError::invalid_value(
+                                "inherit.from",
+                                format!(
+                                    "Staging cache '{}' not found. Available caches: {}",
+                                    cache_name,
+                                    if staging_caches.is_empty() {
+                                        "none".to_string()
+                                    } else {
+                                        staging_caches
+                                            .keys()
+                                            .map(|k| k.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    }
+                                ),
+                                cache_inherit
+                                    .from
+                                    .span()
+                                    .copied()
+                                    .unwrap_or_else(Span::new_blank),
+                            ));
+                        }
+                    }
+                    crate::stage0::Inherit::TopLevel => {
+                        // No staging cache dependency
+                        recipe.staging_caches = Vec::new();
+                        recipe.inherits_from = None;
+                    }
+                }
+
+                evaluated_outputs.push(recipe);
+            }
+        }
+
+        Ok(evaluated_outputs)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use minijinja::UndefinedBehavior;
-    use rattler_build_jinja::JinjaConfig;
+    use rattler_build_jinja::{JinjaConfig, Variable};
 
     use super::*;
     use crate::stage0::types::{
@@ -1588,7 +2693,8 @@ mod tests {
     #[test]
     fn test_evaluate_condition_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("unix".to_string()).unwrap();
         assert!(evaluate_condition(&expr, &ctx).unwrap());
@@ -1600,7 +2706,8 @@ mod tests {
     #[test]
     fn test_evaluate_condition_not() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("not unix".to_string()).unwrap();
         assert!(!evaluate_condition(&expr, &ctx).unwrap());
@@ -1612,17 +2719,17 @@ mod tests {
     #[test]
     fn test_render_template_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let result = render_template(template, &ctx, None).unwrap();
         assert_eq!(result, "foo-1.0.0");
     }
 
     #[test]
     fn test_evaluate_string_value_concrete() {
-        let value = Value::new_concrete("hello".to_string(), Span::unknown());
+        let value = Value::new_concrete("hello".to_string(), None);
         let ctx = EvaluationContext::new();
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
@@ -1633,12 +2740,12 @@ mod tests {
     fn test_evaluate_string_value_template() {
         let value = Value::new_template(
             JinjaTemplate::new("${{ greeting }}, ${{ name }}!".to_string()).unwrap(),
-            Span::unknown(),
+            None,
         );
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("greeting".to_string(), "Hello".to_string());
-        ctx.insert("name".to_string(), "World".to_string());
+        ctx.insert("greeting".to_string(), Variable::from_string("Hello"));
+        ctx.insert("name".to_string(), Variable::from_string("World"));
 
         let result = evaluate_string_value(&value, &ctx).unwrap();
         assert_eq!(result, "Hello, World!");
@@ -1647,8 +2754,8 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_simple() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::new_concrete("gcc".to_string(), Span::unknown())),
-            Item::Value(Value::new_concrete("make".to_string(), Span::unknown())),
+            Item::Value(Value::new_concrete("gcc".to_string(), None)),
+            Item::Value(Value::new_concrete("make".to_string(), None)),
         ]);
 
         let ctx = EvaluationContext::new();
@@ -1659,28 +2766,26 @@ mod tests {
     #[test]
     fn test_evaluate_string_list_with_conditional() {
         let list = ConditionalList::new(vec![
-            Item::Value(Value::new_concrete("python".to_string(), Span::unknown())),
+            Item::Value(Value::new_concrete("python".to_string(), None)),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
-                then: ListOrItem::new(vec![Value::new_concrete(
-                    "gcc".to_string(),
-                    Span::unknown(),
-                )]),
+                then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
                 else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                     "msvc".to_string(),
-                    Span::unknown(),
+                    None,
                 )])),
             }),
         ]);
 
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
+        ctx.insert("unix".to_string(), Variable::from(true));
 
         let result = evaluate_string_list(&list, &ctx).unwrap();
         assert_eq!(result, vec!["python", "gcc"]);
 
-        // Test with unix not set
-        let ctx2 = EvaluationContext::new();
+        // Test with unix set to false
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(false));
         let result2 = evaluate_string_list(&list, &ctx2).unwrap();
         assert_eq!(result2, vec!["python", "msvc"]);
     }
@@ -1688,16 +2793,16 @@ mod tests {
     #[test]
     fn test_variable_tracking_simple() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
-        ctx.insert("unused".to_string(), "bar".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
+        ctx.insert("unused".to_string(), Variable::from_string("bar"));
 
         // Before rendering, no variables should be accessed
         assert!(ctx.accessed_variables().is_empty());
 
         // Render a template that uses name and version
         let template = "${{ name }}-${{ version }}";
-        let result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let result = render_template(template, &ctx, None).unwrap();
         assert_eq!(result, "foo-1.0.0");
 
         // After rendering, name and version should be tracked, but not unused
@@ -1711,19 +2816,16 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_conditionals() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), "true".to_string());
-        ctx.insert("unix_var".to_string(), "gcc".to_string());
-        ctx.insert("win_var".to_string(), "msvc".to_string());
+        ctx.insert("unix".to_string(), Variable::from_string("true"));
+        ctx.insert("unix_var".to_string(), Variable::from_string("gcc"));
+        ctx.insert("win_var".to_string(), Variable::from_string("msvc"));
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
-            then: ListOrItem::new(vec![Value::new_concrete(
-                "gcc".to_string(),
-                Span::unknown(),
-            )]),
+            then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
             else_value: Some(ListOrItem::new(vec![Value::new_concrete(
                 "msvc".to_string(),
-                Span::unknown(),
+                None,
             )])),
         })]);
 
@@ -1741,22 +2843,19 @@ mod tests {
     #[test]
     fn test_variable_tracking_with_template() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("compiler".to_string(), "gcc".to_string());
-        ctx.insert("version".to_string(), "1.0.0".to_string());
+        ctx.insert("compiler".to_string(), Variable::from_string("gcc"));
+        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
 
         // Create a list with templates that will be evaluated
         let list = ConditionalList::new(vec![
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
-            Item::Value(Value::new_concrete(
-                "static-dep".to_string(),
-                Span::unknown(),
-            )),
+            Item::Value(Value::new_concrete("static-dep".to_string(), None)),
             Item::Value(Value::new_template(
                 JinjaTemplate::new("${{ version }}".to_string()).unwrap(),
-                Span::unknown(),
+                None,
             )),
         ]);
 
@@ -1772,11 +2871,11 @@ mod tests {
     #[test]
     fn test_variable_tracking_clear() {
         let mut ctx = EvaluationContext::new();
-        ctx.insert("name".to_string(), "foo".to_string());
+        ctx.insert("name".to_string(), Variable::from_string("foo"));
 
         // Render a template
         let template = "${{ name }}";
-        let _result = render_template(template, &ctx, &Span::unknown()).unwrap();
+        let _result = render_template(template, &ctx, None).unwrap();
 
         // Variable should be tracked
         assert!(ctx.accessed_variables().contains("name"));
@@ -1794,7 +2893,7 @@ mod tests {
         // No variables set
 
         let template = "${{ platform }} for ${{ arch }}";
-        let result = render_template(template, &ctx, &Span::unknown());
+        let result = render_template(template, &ctx, None);
 
         assert!(result.is_err());
 
@@ -1819,7 +2918,7 @@ mod tests {
         // No variables set
 
         let template = "${{ platform }} for ${{ arch }}";
-        let result = render_template(template, &ctx, &Span::unknown());
+        let result = render_template(template, &ctx, None);
 
         assert!(result.is_ok());
         assert!(result.unwrap() == " for ");
@@ -1834,5 +2933,553 @@ mod tests {
         assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("platform"));
         assert!(accessed.contains("arch"));
+    }
+
+    #[test]
+    fn test_multi_output_staging_cache_populated() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    requirements:
+      build:
+        - gcc
+        - cmake
+      host:
+        - zlib
+    build:
+      script:
+        - echo "Building"
+
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: build-cache
+    requirements:
+      run:
+        - libgcc
+    about:
+      summary: My library
+      license: MIT
+
+  - package:
+      name: mylib-dev
+      version: 1.0.0
+    inherit:
+      from: build-cache
+      run_exports: false
+    requirements:
+      run:
+        - mylib
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+
+                // Should have 2 outputs: only package outputs (staging is not converted to recipe)
+                assert_eq!(recipes.len(), 2);
+
+                // First output is mylib (inherits from build-cache with short form)
+                let mylib_recipe = &recipes[0];
+                assert_eq!(mylib_recipe.package.name.as_normalized(), "mylib");
+                assert_eq!(mylib_recipe.staging_caches.len(), 1); // Should have the staging cache
+                assert_eq!(mylib_recipe.staging_caches[0].name, "build-cache");
+                assert!(mylib_recipe.inherits_from.is_some());
+                let inherits = mylib_recipe.inherits_from.as_ref().unwrap();
+                assert_eq!(inherits.cache_name, "build-cache");
+                assert!(inherits.inherit_run_exports); // Default is true
+
+                // Second output is mylib-dev (inherits with run_exports: false)
+                let mylib_dev_recipe = &recipes[1];
+                assert_eq!(mylib_dev_recipe.package.name.as_normalized(), "mylib-dev");
+                assert_eq!(mylib_dev_recipe.staging_caches.len(), 1);
+                assert_eq!(mylib_dev_recipe.staging_caches[0].name, "build-cache");
+                assert!(mylib_dev_recipe.inherits_from.is_some());
+                let inherits_dev = mylib_dev_recipe.inherits_from.as_ref().unwrap();
+                assert_eq!(inherits_dev.cache_name, "build-cache");
+                assert!(!inherits_dev.inherit_run_exports); // Explicitly set to false
+
+                // Verify staging cache structure (from mylib's staging_caches)
+                let staging_cache = &mylib_recipe.staging_caches[0];
+                assert_eq!(staging_cache.name, "build-cache");
+                assert!(!staging_cache.requirements.build.is_empty()); // Should have gcc, cmake
+                assert!(!staging_cache.requirements.host.is_empty()); // Should have zlib
+                assert!(staging_cache.requirements.run.is_empty()); // Staging has no run requirements
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_top_level_inherit() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: ~
+    about:
+      summary: My library
+      license: MIT
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+
+                assert_eq!(recipes.len(), 1);
+                let recipe = &recipes[0];
+
+                // Top-level inheritance should have no staging caches
+                assert!(recipe.staging_caches.is_empty());
+                assert!(recipe.inherits_from.is_none());
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_build_field_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  number: 5
+  noarch: python
+  skip:
+    - win
+  always_copy_files:
+    - "*.txt"
+
+outputs:
+  - package:
+      name: output-with-defaults
+      version: 1.0.0
+
+  - package:
+      name: output-with-overrides
+      version: 1.0.0
+    build:
+      number: 10
+      skip:
+        - osx
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits everything from top-level
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "output-with-defaults");
+                assert_eq!(output1.build.number, 5); // Inherited
+                assert_eq!(
+                    output1.build.noarch,
+                    Some(rattler_conda_types::NoArchType::python())
+                ); // Inherited
+                assert_eq!(output1.build.skip, vec!["win"]); // Inherited
+                assert!(!output1.build.always_copy_files.is_empty()); // Inherited
+
+                // Second output: overrides some fields
+                let output2 = &recipes[1];
+                assert_eq!(
+                    output2.package.name.as_normalized(),
+                    "output-with-overrides"
+                );
+                assert_eq!(output2.build.number, 10); // Overridden
+                assert_eq!(
+                    output2.build.noarch,
+                    Some(rattler_conda_types::NoArchType::python())
+                ); // Inherited
+                // Skip should combine with OR: ["win", "osx"]
+                assert_eq!(output2.build.skip.len(), 2);
+                assert!(output2.build.skip.contains(&"win".to_string()));
+                assert!(output2.build.skip.contains(&"osx".to_string()));
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_source_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+source:
+  - url: https://example.com/top-level.tar.gz
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+
+outputs:
+  - staging:
+      name: build-cache
+    source:
+      - url: https://example.com/staging.tar.gz
+        sha256: 1111111111111111111111111111111111111111111111111111111111111111
+
+  - package:
+      name: pkg-inherit-toplevel
+      version: 1.0.0
+    source:
+      - url: https://example.com/output.tar.gz
+        sha256: 2222222222222222222222222222222222222222222222222222222222222222
+
+  - package:
+      name: pkg-inherit-cache
+      version: 1.0.0
+    inherit: build-cache
+    source:
+      - url: https://example.com/cache-output.tar.gz
+        sha256: 3333333333333333333333333333333333333333333333333333333333333333
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2); // Only package outputs
+
+                // First package output: inherits from top-level (prepends top-level sources)
+                let pkg1 = &recipes[0];
+                assert_eq!(pkg1.package.name.as_normalized(), "pkg-inherit-toplevel");
+                assert_eq!(pkg1.source.len(), 2); // top-level + output
+                if let crate::stage1::Source::Url(url_src) = &pkg1.source[0] {
+                    assert!(url_src.url[0].to_string().contains("top-level.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                if let crate::stage1::Source::Url(url_src) = &pkg1.source[1] {
+                    assert!(url_src.url[0].to_string().contains("output.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                // pkg1 doesn't inherit from cache, so no staging_caches
+                assert_eq!(pkg1.staging_caches.len(), 0);
+
+                // Second package output: inherits from cache (NO top-level sources in the output itself)
+                let pkg2 = &recipes[1];
+                assert_eq!(pkg2.package.name.as_normalized(), "pkg-inherit-cache");
+                assert_eq!(pkg2.source.len(), 1); // Only output source (cache already has top-level)
+                if let crate::stage1::Source::Url(url_src) = &pkg2.source[0] {
+                    assert!(url_src.url[0].to_string().contains("cache-output.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+
+                // pkg2 inherits from cache, so it should have the staging cache
+                assert_eq!(pkg2.staging_caches.len(), 1);
+                // Check that the staging cache has top-level + staging sources
+                let staging_sources = &pkg2.staging_caches[0].source;
+                assert_eq!(staging_sources.len(), 2); // top-level + staging
+                if let crate::stage1::Source::Url(url_src) = &staging_sources[0] {
+                    assert!(url_src.url[0].to_string().contains("top-level.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+                if let crate::stage1::Source::Url(url_src) = &staging_sources[1] {
+                    assert!(url_src.url[0].to_string().contains("staging.tar.gz"));
+                } else {
+                    panic!("Expected URL source");
+                }
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_tests_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+tests:
+  - script:
+      - echo "Top-level test"
+
+outputs:
+  - package:
+      name: output1
+      version: 1.0.0
+    tests:
+      - script:
+          - echo "Output test"
+
+  - package:
+      name: output2
+      version: 1.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: should have both top-level and output tests
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "output1");
+                assert_eq!(output1.tests.len(), 2); // top-level + output
+                // First test is from top-level
+                if let crate::stage1::TestType::Commands(cmd_test) = &output1.tests[0] {
+                    // Script could be in various forms
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Top-level test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+                // Second test is from output
+                if let crate::stage1::TestType::Commands(cmd_test) = &output1.tests[1] {
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Output test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Output test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Output test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+
+                // Second output: should have only top-level test
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "output2");
+                assert_eq!(output2.tests.len(), 1); // Only top-level
+                if let crate::stage1::TestType::Commands(cmd_test) = &output2.tests[0] {
+                    match &cmd_test.script.content {
+                        rattler_build_script::ScriptContent::Commands(commands) => {
+                            assert!(commands.join(" ").contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::Command(command) => {
+                            assert!(command.contains("Top-level test"));
+                        }
+                        rattler_build_script::ScriptContent::CommandOrPath(cmd) => {
+                            assert!(cmd.contains("Top-level test"));
+                        }
+                        other => panic!("Unexpected script content type: {:?}", other),
+                    }
+                } else {
+                    panic!("Expected script test");
+                }
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_version_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: output-inherits-version
+      # No version specified, should inherit from recipe
+
+  - package:
+      name: output-overrides-version
+      version: 2.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits version from recipe
+                let output1 = &recipes[0];
+                assert_eq!(
+                    output1.package.name.as_normalized(),
+                    "output-inherits-version"
+                );
+                assert_eq!(output1.package.version().to_string(), "1.0.0");
+
+                // Second output: uses its own version
+                let output2 = &recipes[1];
+                assert_eq!(
+                    output2.package.name.as_normalized(),
+                    "output-overrides-version"
+                );
+                assert_eq!(output2.package.version().to_string(), "2.0.0");
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_about_inheritance() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+about:
+  homepage: https://example.com
+  license: MIT
+  summary: Top-level summary
+
+outputs:
+  - package:
+      name: output-full-inherit
+      version: 1.0.0
+
+  - package:
+      name: output-partial-override
+      version: 1.0.0
+    about:
+      summary: Custom output summary
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: inherits all about fields
+                let output1 = &recipes[0];
+                // URL parser adds a trailing slash
+                assert!(
+                    output1
+                        .about
+                        .homepage
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://example.com")
+                );
+                assert_eq!(output1.about.summary.as_ref().unwrap(), "Top-level summary");
+                assert!(output1.about.license.is_some());
+
+                // Second output: overrides summary but inherits homepage and license
+                let output2 = &recipes[1];
+                assert!(
+                    output2
+                        .about
+                        .homepage
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://example.com")
+                ); // Inherited
+                assert_eq!(
+                    output2.about.summary.as_ref().unwrap(),
+                    "Custom output summary"
+                ); // Overridden
+                assert!(output2.about.license.is_some()); // Inherited
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
     }
 }

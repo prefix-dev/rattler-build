@@ -1,0 +1,9 @@
+---
+source: crates/rattler_build_types/src/glob/glob_vec.rs
+expression: "&yaml"
+---
+exists:
+- foo
+- bar
+not_exists:
+- baz/**/qux

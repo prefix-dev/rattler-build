@@ -1,19 +1,20 @@
 //! Parser for multi-output recipes with staging support
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_jinja::JinjaTemplate;
+use rattler_build_yaml_parser::{ParseMapping, parse_value};
 
 use crate::{
     error::{ParseError, ParseResult},
-    span::SpannedString,
     stage0::{
-        Requirements,
+        Requirements, Value,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
             StagingBuild, StagingMetadata, StagingOutput,
         },
         parser::{
             get_span, parse_about, parse_build, parse_extra, parse_requirements, parse_source,
-            parse_tests, parse_value,
+            parse_tests,
         },
     },
 };
@@ -32,22 +33,18 @@ pub fn parse_multi_output_recipe(
         })?;
         let version_str = scalar.as_str();
         let version: u32 = version_str.parse().map_err(|_| {
-            ParseError::invalid_value(
-                "schema_version",
-                "not a valid integer",
-                (*scalar.span()).into(),
-            )
+            ParseError::invalid_value("schema_version", "not a valid integer", *scalar.span())
         })?;
 
         // Only version 1 is supported
         if version != 1 {
             return Err(ParseError::invalid_value(
                 "schema_version",
-                &format!(
+                format!(
                     "unsupported schema version {} (only version 1 is supported)",
                     version
                 ),
-                (*scalar.span()).into(),
+                *scalar.span(),
             ));
         }
         Some(version)
@@ -101,6 +98,12 @@ pub fn parse_multi_output_recipe(
         crate::stage0::Extra::default()
     };
 
+    let tests = if let Some(tests_node) = mapping.get("tests") {
+        parse_tests(tests_node)?
+    } else {
+        Vec::new()
+    };
+
     // Parse outputs (required)
     let outputs_node = mapping.get("outputs").ok_or_else(|| {
         ParseError::missing_field("outputs", get_span(&MarkedNode::Mapping(mapping.clone())))
@@ -116,31 +119,23 @@ pub fn parse_multi_output_recipe(
         ));
     }
 
-    // Check for unknown top-level fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "recipe"
-                | "version"
-                | "build"
-                | "about"
-                | "extra"
-                | "source"
-                | "outputs"
-                | "schema_version"
-                | "context"
-        ) {
-            return Err(ParseError::invalid_value(
-                "multi-output recipe",
-                &format!("unknown top-level field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion(
-                "valid top-level fields for multi-output recipes are: recipe, version, build, about, extra, source, outputs, schema_version, context",
-            ));
-        }
-    }
+    // Validate field names
+    let node = MarkedNode::Mapping(mapping.clone());
+    node.validate_keys(
+        "multi-output recipe",
+        &[
+            "recipe",
+            "version",
+            "build",
+            "about",
+            "extra",
+            "source",
+            "tests",
+            "outputs",
+            "schema_version",
+            "context",
+        ],
+    )?;
 
     Ok(MultiOutputRecipe {
         schema_version,
@@ -150,42 +145,43 @@ pub fn parse_multi_output_recipe(
         build,
         about,
         extra,
+        tests,
         outputs,
     })
 }
 
 /// Parse recipe metadata (name optional, version required)
 fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
+    // Validate field names first
+    yaml.validate_keys("recipe", &["name", "version"])?;
+
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("recipe must be a mapping")
     })?;
 
-    // Parse optional name
+    // Parse optional name (needs special handling for PackageName)
     let name = if let Some(name_node) = mapping.get("name") {
         let scalar = name_node.as_scalar().ok_or_else(|| {
             ParseError::expected_type("scalar", "non-scalar", get_span(name_node))
                 .with_message("recipe name must be a scalar")
         })?;
 
-        let spanned = SpannedString::from(scalar);
-        let name_str = spanned.as_str();
+        let name_str = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it's a template
         if name_str.contains("${{") && name_str.contains("}}") {
-            let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            Some(crate::stage0::types::Value::new_template(
-                template,
-                spanned.span(),
-            ))
+            let template = JinjaTemplate::new(name_str.to_string())
+                .map_err(|e| ParseError::jinja_error(e, span))?;
+            Some(Value::new_template(template, Some(span)))
         } else {
             // Parse as PackageName
             let package_name = rattler_conda_types::PackageName::try_from(name_str)
-                .map_err(|e| ParseError::invalid_value("name", &e.to_string(), spanned.span()))?;
-            Some(crate::stage0::types::Value::new_concrete(
+                .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
+            Some(Value::new_concrete(
                 crate::stage0::package::PackageName(package_name),
-                spanned.span(),
+                Some(span),
             ))
         }
     } else {
@@ -198,19 +194,6 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
     } else {
         None
     };
-
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "name" | "version") {
-            return Err(ParseError::invalid_value(
-                "recipe",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion("valid fields are: name, version"));
-        }
-    }
 
     Ok(RecipeMetadata { name, version })
 }
@@ -279,34 +262,26 @@ fn parse_staging_output(
         StagingBuild::default()
     };
 
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "staging" | "source" | "requirements" | "build") {
-            return Err(ParseError::invalid_value(
-                "staging output",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion(
-                "valid fields for staging outputs are: staging, source, requirements, build",
-            ));
-        }
-    }
+    // Validate field names
+    let node = MarkedNode::Mapping(mapping.clone());
+    node.validate_keys(
+        "staging output",
+        &["staging", "source", "requirements", "build"],
+    )?;
 
     // Validate: staging outputs cannot have about or tests
     if mapping.get("about").is_some() {
         return Err(ParseError::invalid_value(
             "staging output",
             "staging outputs cannot have an 'about' section",
-            (*mapping.get("about").unwrap().span()).into(),
+            *mapping.get("about").unwrap().span(),
         ));
     }
     if mapping.get("tests").is_some() {
         return Err(ParseError::invalid_value(
             "staging output",
             "staging outputs cannot have a 'tests' section",
-            (*mapping.get("tests").unwrap().span()).into(),
+            *mapping.get("tests").unwrap().span(),
         ));
     }
 
@@ -331,18 +306,9 @@ fn parse_staging_metadata(yaml: &MarkedNode) -> ParseResult<StagingMetadata> {
         .ok_or_else(|| ParseError::missing_field("name", get_span(yaml)))?;
     let name = parse_value(name_node)?;
 
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if key_str != "name" {
-            return Err(ParseError::invalid_value(
-                "staging",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion("only 'name' field is allowed in staging metadata"));
-        }
-    }
+    // Validate field names
+    let node = MarkedNode::Mapping(mapping.clone());
+    node.validate_keys("staging", &["name"])?;
 
     Ok(StagingMetadata { name })
 }
@@ -354,31 +320,26 @@ fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
             .with_message("requirements must be a mapping")
     })?;
 
-    // First validate that only allowed fields are present
+    // Check for disallowed run-time fields with helpful error message
     for (key_node, _) in mapping.iter() {
         let key = key_node.as_str();
-        match key {
-            "build" | "host" | "ignore_run_exports" => {}
-            "run" | "run_constraints" | "run_exports" => {
-                return Err(ParseError::invalid_value(
-                    "staging requirements",
-                    &format!("'{}' is not allowed in staging requirements", key),
-                    (*key_node.span()).into(),
-                )
-                .with_suggestion(
-                    "staging outputs can only have 'build', 'host', and 'ignore_run_exports' requirements",
-                ));
-            }
-            _ => {
-                return Err(ParseError::invalid_value(
-                    "staging requirements",
-                    &format!("unknown field '{}'", key),
-                    (*key_node.span()).into(),
-                )
-                .with_suggestion("valid fields are: build, host, ignore_run_exports"));
-            }
+        if matches!(key, "run" | "run_constraints" | "run_exports") {
+            return Err(ParseError::invalid_value(
+                "staging requirements",
+                format!("'{}' is not allowed in staging requirements", key),
+                *key_node.span(),
+            )
+            .with_suggestion(
+                "staging outputs can only have 'build', 'host', and 'ignore_run_exports' requirements",
+            ));
         }
     }
+
+    // Validate field names
+    yaml.validate_keys(
+        "staging requirements",
+        &["build", "host", "ignore_run_exports"],
+    )?;
 
     // Parse using the regular parse_requirements function
     parse_requirements(yaml)
@@ -403,11 +364,11 @@ fn parse_staging_build(yaml: &MarkedNode) -> ParseResult<StagingBuild> {
             _ => {
                 return Err(ParseError::invalid_value(
                     "staging build",
-                    &format!(
+                    format!(
                         "unknown field '{}' - only 'script' is allowed in staging builds",
                         key
                     ),
-                    (*key_node.span()).into(),
+                    *key_node.span(),
                 )
                 .with_suggestion(
                     "staging outputs can only have a 'script' field in the build section",
@@ -436,21 +397,21 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
             .with_message("package name must be a scalar")
     })?;
 
-    let spanned = SpannedString::from(scalar);
-    let name_str = spanned.as_str();
+    let name_str = scalar.as_str();
+    let span = *scalar.span();
 
     // Check if it's a template
     let name = if name_str.contains("${{") && name_str.contains("}}") {
-        let template = crate::stage0::types::JinjaTemplate::new(name_str.to_string())
-            .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-        crate::stage0::types::Value::new_template(template, spanned.span())
+        let template = JinjaTemplate::new(name_str.to_string())
+            .map_err(|e| ParseError::jinja_error(e, span))?;
+        Value::new_template(template, Some(span))
     } else {
         // Parse as PackageName
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
-            .map_err(|e| ParseError::invalid_value("name", &e.to_string(), spanned.span()))?;
-        crate::stage0::types::Value::new_concrete(
+            .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
+        Value::new_concrete(
             crate::stage0::package::PackageName(package_name),
-            spanned.span(),
+            Some(span),
         )
     };
 
@@ -461,18 +422,8 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
         None
     };
 
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(key_str, "name" | "version") {
-            return Err(ParseError::invalid_value(
-                "package",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion("valid fields are: name, version"));
-        }
-    }
+    // Validate field names
+    yaml.validate_keys("package", &["name", "version"])?;
 
     Ok(crate::stage0::PackageMetadata { name, version })
 }
@@ -529,23 +480,20 @@ fn parse_package_output(
         Vec::new()
     };
 
-    // Check for unknown fields
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "package" | "inherit" | "source" | "requirements" | "build" | "about" | "tests"
-        ) {
-            return Err(ParseError::invalid_value(
-                "package output",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion(
-                "valid fields for package outputs are: package, inherit, source, requirements, build, about, tests",
-            ));
-        }
-    }
+    // Validate field names
+    let node = MarkedNode::Mapping(mapping.clone());
+    node.validate_keys(
+        "package output",
+        &[
+            "package",
+            "inherit",
+            "source",
+            "requirements",
+            "build",
+            "about",
+            "tests",
+        ],
+    )?;
 
     Ok(PackageOutput {
         package,
@@ -562,8 +510,8 @@ fn parse_package_output(
 fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
     // Check for string (short form - just the cache name) or null
     if let Some(scalar) = yaml.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let s = spanned.as_str();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check for null values (null, ~, or empty string)
         if s == "null" || s == "~" || s.is_empty() {
@@ -572,21 +520,26 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
 
         // Check if it's a template
         if s.contains("${{") && s.contains("}}") {
-            let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            return Ok(Inherit::CacheName(
-                crate::stage0::types::Value::new_template(template, spanned.span()),
-            ));
+            let template =
+                JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
+            return Ok(Inherit::CacheName(Value::new_template(
+                template,
+                Some(span),
+            )));
         }
 
         // Plain string
-        return Ok(Inherit::CacheName(
-            crate::stage0::types::Value::new_concrete(s.to_string(), spanned.span()),
-        ));
+        return Ok(Inherit::CacheName(Value::new_concrete(
+            s.to_string(),
+            Some(span),
+        )));
     }
 
     // Check for mapping (long form with options)
     if let Some(mapping) = yaml.as_mapping() {
+        // Validate field names first
+        yaml.validate_keys("inherit", &["from", "run_exports"])?;
+
         let mut from = None;
         let mut run_exports = true; // default
 
@@ -609,20 +562,13 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
                         _ => {
                             return Err(ParseError::invalid_value(
                                 "run_exports",
-                                &format!("not a valid boolean value (found '{}')", bool_str),
-                                (*scalar.span()).into(),
+                                format!("not a valid boolean value (found '{}')", bool_str),
+                                *scalar.span(),
                             ));
                         }
                     };
                 }
-                _ => {
-                    return Err(ParseError::invalid_value(
-                        "inherit",
-                        &format!("unknown field '{}'", key),
-                        (*key_node.span()).into(),
-                    )
-                    .with_suggestion("valid fields are: from, run_exports"));
-                }
+                _ => unreachable!("validated by validate_keys"),
             }
         }
 

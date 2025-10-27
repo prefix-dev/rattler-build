@@ -1,13 +1,13 @@
 //! Parser for the About section
 
 use marked_yaml::Node as MarkedNode;
+use rattler_build_yaml_parser::{ParseMapping, parse_conditional_list};
 
 use crate::{
     error::{ParseError, ParseResult},
-    span::SpannedString,
     stage0::{
         about::About,
-        parser::{helpers::get_span, list::parse_conditional_list, value::parse_value},
+        parser::helpers::get_span,
         types::{ConditionalList, Item, JinjaTemplate, Value},
     },
 };
@@ -21,22 +21,19 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
 
     // Try parsing as a single scalar string
     if let Some(scalar) = yaml.as_scalar() {
-        let spanned = SpannedString::from(scalar);
-        let s = spanned.as_str();
+        let s = scalar.as_str();
+        let span = *scalar.span();
 
         // Check if it's a template
         if s.contains("${{") && s.contains("}}") {
-            let template = JinjaTemplate::new(s.to_string())
-                .map_err(|e| ParseError::jinja_error(e, spanned.span()))?;
-            let items = vec![Item::Value(Value::new_template(template, spanned.span()))];
+            let template =
+                JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
+            let items = vec![Item::Value(Value::new_template(template, Some(span)))];
             return Ok(ConditionalList::new(items));
         }
 
         // Plain string
-        let items = vec![Item::Value(Value::new_concrete(
-            s.to_string(),
-            spanned.span(),
-        ))];
+        let items = vec![Item::Value(Value::new_concrete(s.to_string(), Some(span)))];
         return Ok(ConditionalList::new(items));
     }
 
@@ -65,69 +62,35 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
 ///   repository: https://github.com/example/repo
 /// ```
 pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
-    let mapping = yaml.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
-            .with_message("About section must be a mapping")
-    })?;
+    // Validate field names first
+    yaml.validate_keys(
+        "about",
+        &[
+            "homepage",
+            "license",
+            "license_file",
+            "license_family",
+            "summary",
+            "description",
+            "documentation",
+            "repository",
+        ],
+    )?;
 
-    let mut about = About::default();
+    let mut about = About {
+        homepage: yaml.try_get_field("homepage")?,
+        license: yaml.try_get_field("license")?,
+        license_family: yaml.try_get_field("license_family")?,
+        summary: yaml.try_get_field("summary")?,
+        description: yaml.try_get_field("description")?,
+        documentation: yaml.try_get_field("documentation")?,
+        repository: yaml.try_get_field("repository")?,
+        license_file: Default::default(),
+    };
 
-    // Parse each optional field
-    if let Some(homepage) = mapping.get("homepage") {
-        about.homepage = Some(parse_value(homepage)?);
-    }
-
-    if let Some(license) = mapping.get("license") {
-        about.license = Some(parse_value(license)?);
-    }
-
-    if let Some(license_file) = mapping.get("license_file") {
-        about.license_file = parse_license_file(license_file)?;
-    }
-
-    if let Some(license_family) = mapping.get("license_family") {
-        about.license_family = Some(parse_value(license_family)?);
-    }
-
-    if let Some(summary) = mapping.get("summary") {
-        about.summary = Some(parse_value(summary)?);
-    }
-
-    if let Some(description) = mapping.get("description") {
-        about.description = Some(parse_value(description)?);
-    }
-
-    if let Some(documentation) = mapping.get("documentation") {
-        about.documentation = Some(parse_value(documentation)?);
-    }
-
-    if let Some(repository) = mapping.get("repository") {
-        about.repository = Some(parse_value(repository)?);
-    }
-
-    // Check for unknown fields to provide helpful error messages
-    for (key, _) in mapping.iter() {
-        let key_str = key.as_str();
-        if !matches!(
-            key_str,
-            "homepage"
-                | "license"
-                | "license_file"
-                | "license_family"
-                | "summary"
-                | "description"
-                | "documentation"
-                | "repository"
-        ) {
-            return Err(ParseError::invalid_value(
-                "about",
-                &format!("unknown field '{}'", key_str),
-                (*key.span()).into(),
-            )
-            .with_suggestion(
-                "valid fields are: homepage, license, license_file, license_family, summary, description, documentation, repository"
-            ));
-        }
+    // Handle license_file specially since it can be a single value or list
+    if let Some(license_file_node) = yaml.as_mapping().and_then(|m| m.get("license_file")) {
+        about.license_file = parse_license_file(license_file_node)?;
     }
 
     Ok(about)
@@ -167,18 +130,16 @@ mod tests {
         assert!(about.summary.is_some());
 
         // Verify concrete values
-        match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete { value: url, .. } => {
-                assert_eq!(url.as_str(), "https://example.com/");
-            }
-            _ => panic!("Expected concrete value"),
+        if let Some(url) = about.homepage.as_ref().unwrap().as_concrete() {
+            assert_eq!(url.as_str(), "https://example.com/");
+        } else {
+            panic!("Expected concrete value");
         }
 
-        match about.license.as_ref().unwrap() {
-            crate::stage0::types::Value::Concrete { value: license, .. } => {
-                assert_eq!(license.0.as_ref(), "MIT");
-            }
-            _ => panic!("Expected concrete value"),
+        if let Some(license) = about.license.as_ref().unwrap().as_concrete() {
+            assert_eq!(license.0.as_ref(), "MIT");
+        } else {
+            panic!("Expected concrete value");
         }
     }
 
@@ -192,20 +153,18 @@ mod tests {
         let about = parse_about(&yaml).unwrap();
 
         // Verify templates
-        match about.homepage.as_ref().unwrap() {
-            crate::stage0::types::Value::Template { template: t, .. } => {
-                assert_eq!(t.used_variables(), &["homepage"]);
-            }
-            _ => panic!("Expected template value"),
+        if let Some(t) = about.homepage.as_ref().unwrap().as_template() {
+            assert_eq!(t.used_variables(), &["homepage"]);
+        } else {
+            panic!("Expected template value");
         }
 
-        match about.summary.as_ref().unwrap() {
-            crate::stage0::types::Value::Template { template: t, .. } => {
-                let mut vars = t.used_variables().to_vec();
-                vars.sort();
-                assert_eq!(vars, vec!["name", "summary"]);
-            }
-            _ => panic!("Expected template value"),
+        if let Some(t) = about.summary.as_ref().unwrap().as_template() {
+            let mut vars = t.used_variables().to_vec();
+            vars.sort();
+            assert_eq!(vars, vec!["name", "summary"]);
+        } else {
+            panic!("Expected template value");
         }
     }
 
@@ -241,7 +200,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("unknown field"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
     }
 
     #[test]
@@ -254,7 +214,8 @@ mod tests {
         let result = parse_about(yaml);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.as_ref().unwrap().contains("must be a mapping"));
+        let err_string = err.to_string();
+        assert!(err_string.contains("mapping") || err_string.contains("expected"));
     }
 
     #[test]

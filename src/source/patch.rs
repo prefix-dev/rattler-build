@@ -10,10 +10,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy::{Diff, Patch};
 use fs_err::File;
 use fs_err::read;
 use itertools::Itertools;
+use rattler_build_diffy::{
+    ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
+    Patch, apply_bytes_with_config, patch_from_bytes_with_config,
+};
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
@@ -78,21 +81,21 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchError> {
-    diffy::patch_from_bytes_with_config(
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError> {
+    patch_from_bytes_with_config(
         input,
-        diffy::ParserConfig {
-            hunk_strategy: diffy::HunkRangeStrategy::Recount,
+        ParserConfig {
+            hunk_strategy: HunkRangeStrategy::Recount,
         },
     )
 }
 
-fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
-    diffy::apply_bytes_with_config(
+fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
+    apply_bytes_with_config(
         base_image,
         diff,
-        &diffy::ApplyConfig {
-            fuzzy_config: diffy::FuzzyConfig {
+        &ApplyConfig {
+            fuzzy_config: FuzzyConfig {
                 max_fuzz: 2,
                 ignore_whitespace: true,
                 ignore_case: false,

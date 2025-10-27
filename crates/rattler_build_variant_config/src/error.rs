@@ -10,9 +10,13 @@ use miette::Diagnostic;
 #[derive(Debug, Error)]
 #[cfg_attr(feature = "miette", derive(Diagnostic))]
 pub enum VariantConfigError {
-    /// Failed to parse YAML file
-    #[error("Could not parse variant config file ({0}): {1}")]
-    ParseError(PathBuf, String),
+    /// Failed to parse YAML file with detailed span information
+    #[error("Could not parse variant config file {}: {source}", path.display())]
+    ParseError {
+        path: PathBuf,
+        #[source]
+        source: rattler_build_yaml_parser::ParseError,
+    },
 
     /// Failed to read file from disk
     #[error("Could not open file ({0}): {1}")]
@@ -54,6 +58,7 @@ pub enum VariantExpandError {
 pub enum VariantError {
     /// Configuration error
     #[error(transparent)]
+    #[cfg_attr(feature = "miette", diagnostic(transparent))]
     Config(#[from] VariantConfigError),
 
     /// Expansion error

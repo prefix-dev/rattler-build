@@ -9,9 +9,8 @@ use fs_err::create_dir_all;
 
 use globset::Glob;
 use ignore::{WalkBuilder, overrides::OverrideBuilder};
+use rattler_build_recipe::stage1::{GlobVec, GlobWithSource};
 use rayon::iter::{ParallelBridge, ParallelIterator};
-
-use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
 
@@ -81,49 +80,49 @@ pub(crate) fn create_symlink(
     Ok(())
 }
 
-/// Copy a file or directory, or symlink to another location.
-/// Use reflink if possible.
-pub(crate) fn copy_file(
-    from: impl AsRef<Path>,
-    to: impl AsRef<Path>,
-    paths_created: &mut HashSet<PathBuf>,
-    options: &CopyOptions,
-) -> Result<(), SourceError> {
-    let path = from.as_ref();
-    let dest_path = to.as_ref();
+// /// Copy a file or directory, or symlink to another location.
+// /// Use reflink if possible.
+// pub(crate) fn copy_file(
+//     from: impl AsRef<Path>,
+//     to: impl AsRef<Path>,
+//     paths_created: &mut HashSet<PathBuf>,
+//     options: &CopyOptions,
+// ) -> Result<(), SourceError> {
+//     let path = from.as_ref();
+//     let dest_path = to.as_ref();
 
-    // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
-    if path.is_symlink() {
-        let link_target = fs_err::read_link(path)?;
+//     // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
+//     if path.is_symlink() {
+//         let link_target = fs_err::read_link(path)?;
 
-        if let Some(parent) = dest_path.parent() {
-            create_dir_all_cached(parent, paths_created)?;
-        }
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
 
-        create_symlink(link_target, dest_path)?;
-        Ok(())
-    } else if path.is_dir() {
-        create_dir_all_cached(dest_path, paths_created)?;
-        Ok(())
-    } else {
-        // create dir if parent does not exist
-        if let Some(parent) = dest_path.parent() {
-            create_dir_all_cached(parent, paths_created)?;
-        }
+//         create_symlink(link_target, dest_path)?;
+//         Ok(())
+//     } else if path.is_dir() {
+//         create_dir_all_cached(dest_path, paths_created)?;
+//         Ok(())
+//     } else {
+//         // create dir if parent does not exist
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
 
-        if dest_path.exists() {
-            if !(options.overwrite || options.skip_exist) {
-                tracing::error!("File already exists: {:?}", dest_path);
-            } else if options.skip_exist {
-                tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
-            } else if options.overwrite {
-                tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
-            }
-        }
-        reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
-        Ok(())
-    }
-}
+//         if dest_path.exists() {
+//             if !(options.overwrite || options.skip_exist) {
+//                 tracing::error!("File already exists: {:?}", dest_path);
+//             } else if options.skip_exist {
+//                 tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
+//             } else if options.overwrite {
+//                 tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+//             }
+//         }
+//         reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
+//         Ok(())
+//     }
+// }
 
 /// The copy_dir function accepts additionally a list of globs to ignore or include in the copy process.
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
@@ -545,15 +544,15 @@ impl Match {
 #[cfg(test)]
 mod test {
     use fs_err::{self as fs, File};
-    use std::collections::HashSet;
 
-    use crate::recipe::parser::GlobVec;
+    use super::GlobVec;
+    use std::collections::HashSet;
 
     #[test]
     fn test_copy_dir() {
         let tmp_dir = tempfile::TempDir::new().unwrap();
-        let tmp_dir_path = tmp_dir.keep();
-        let dir = tmp_dir_path.as_path().join("test_copy_dir");
+        let tmp_dir_path = tmp_dir.path().to_path_buf();
+        let dir = tmp_dir_path.join("test_copy_dir");
 
         fs_err::create_dir_all(&dir).unwrap();
 
@@ -566,7 +565,7 @@ mod test {
         fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
         fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
 
-        let dest_dir = tmp_dir_path.as_path().join("test_copy_dir_dest");
+        let dest_dir = tmp_dir_path.join("test_copy_dir_dest");
         let _copy_dir = super::CopyDir::new(&dir, &dest_dir)
             .use_gitignore(false)
             .run()
@@ -579,8 +578,8 @@ mod test {
         assert!(dest_dir.join("test_dir").join("test.md").exists());
         assert!(dest_dir.join("test_dir").join("test_dir2").exists());
 
-        let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
-        // ignore all txt files
+        let dest_dir_2 = tmp_dir_path.join("test_copy_dir_dest_2");
+        // include only txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
             .with_globvec(&GlobVec::from_vec(vec!["*.txt"], None))
             .use_gitignore(false)
@@ -590,9 +589,9 @@ mod test {
         assert_eq!(copy_dir.copied_paths().len(), 1);
         assert_eq!(copy_dir.copied_paths()[0], dest_dir_2.join("test.txt"));
 
-        let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
+        let dest_dir_3 = tmp_dir_path.join("test_copy_dir_dest_3");
 
-        // ignore all txt files
+        // exclude all txt files (match everything except txt)
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_3)
             .with_globvec(&GlobVec::from_vec(vec![], Some(vec!["*.txt"])))
             .use_gitignore(false)
