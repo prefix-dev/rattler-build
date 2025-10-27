@@ -155,7 +155,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@e43a5023a747770bfcb71ae048541a681714b951 # v2
+        uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
         with:
           tool: cross
 
@@ -237,7 +237,7 @@ jobs:
           echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: ${{ steps.package.outputs.pkg-name }}
           path: ${{ steps.package.outputs.pkg-path }}
@@ -293,7 +293,7 @@ jobs:
           submodules: recursive
 
       - name: Download rattler-build artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4
         with:
           name: rattler-build-x86_64-unknown-linux-musl.tar.gz
           path: ./
