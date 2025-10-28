@@ -356,7 +356,7 @@ impl Output {
             subdir: Some(self.build_configuration.target_platform.to_string()),
             license: recipe.about().license.as_ref().map(|l| l.to_string()),
             license_family: recipe.about().license_family.clone(),
-            timestamp: Some(self.build_configuration.timestamp),
+            timestamp: Some(self.build_configuration.timestamp.into()),
             depends: finalized_dependencies
                 .run
                 .depends
