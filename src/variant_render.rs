@@ -13,7 +13,7 @@ use crate::{
     recipe::{
         Jinja, ParsingError, Recipe,
         custom_yaml::Node,
-        parser::{BuildString, Dependency},
+        parser::{BuildString, CacheOutput, Dependency},
         variable::Variable,
     },
     selectors::SelectorConfig,
@@ -23,6 +23,73 @@ use crate::{
         ParseErrors, VariantConfig, VariantConfigError, VariantError, VariantExpandError,
     },
 };
+
+fn inherit_flags_from_output(output: &Node) -> (bool, bool) {
+    let inherit_node = output.as_mapping().and_then(|m| {
+        m.get("package")
+            .and_then(|p| p.as_mapping().and_then(|pm| pm.get("inherit")))
+            .or_else(|| m.get("inherit"))
+    });
+
+    let Some(node) = inherit_node else {
+        return (true, false);
+    };
+
+    if node.as_scalar().is_some() {
+        return (true, false);
+    }
+
+    let Some(mapping) = node.as_mapping() else {
+        return (true, false);
+    };
+
+    let parse_flag = |key: &str, default| {
+        mapping
+            .get(key)
+            .and_then(|node| node.as_scalar())
+            .and_then(|scalar| scalar.as_bool())
+            .unwrap_or(default)
+    };
+
+    let run_exports = parse_flag("run_exports", true);
+    let requirements = parse_flag("requirements", false);
+
+    (run_exports, requirements)
+}
+
+/// Extract normalized names from unversioned dependency specs (specs without version or build constraints)
+fn collect_unversioned_deps<'a>(
+    deps: impl Iterator<Item = &'a Dependency> + 'a,
+) -> impl Iterator<Item = NormalizedKey> + 'a {
+    deps.filter_map(|dep| match dep {
+        Dependency::Spec(spec) if spec.version.is_none() && spec.build.is_none() => {
+            spec.name.as_ref().map(|n| n.as_normalized().into())
+        }
+        _ => None,
+    })
+}
+
+/// Apply cache inheritance to a parsed recipe from a cache output
+fn apply_cache_inheritance(
+    recipe: &mut Recipe,
+    cache: &CacheOutput,
+    inherit_run_exports: bool,
+    inherit_requirements: bool,
+) {
+    let reqs = &mut recipe.requirements;
+
+    if inherit_requirements {
+        reqs.build.extend(cache.requirements.build.iter().cloned());
+        reqs.host.extend(cache.requirements.host.iter().cloned());
+    }
+
+    if inherit_run_exports {
+        reqs.run_exports.extend_from(&cache.run_exports);
+        if let Some(ignore) = &cache.ignore_run_exports {
+            reqs.ignore_run_exports = reqs.ignore_run_exports(Some(ignore));
+        }
+    }
+}
 
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
@@ -55,6 +122,8 @@ pub(crate) fn stage_0_render<S: SourceCode>(
     source: S,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
+    cache_outputs: &[CacheOutput],
+    inheritance_relationships: &HashMap<String, Vec<String>>,
 ) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
     let used_vars = outputs
         .iter()
@@ -98,7 +167,7 @@ pub(crate) fn stage_0_render<S: SourceCode>(
             let config_with_variant =
                 selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
-            let parsed_recipe = Recipe::from_node(output, config_with_variant)
+            let mut parsed_recipe = Recipe::from_output_node(output, config_with_variant)
                 .map_err(|err| {
                     let errs: ParseErrors<_> = err
                         .into_iter()
@@ -108,6 +177,32 @@ pub(crate) fn stage_0_render<S: SourceCode>(
                     errs
                 })
                 .map_err(VariantConfigError::from)?;
+
+            let package_name = parsed_recipe.package.name.as_normalized().to_string();
+            let (inherit_run_exports, inherit_requirements) = inherit_flags_from_output(output);
+
+            if let Some(caches) = inheritance_relationships.get(&package_name) {
+                let mut cache_list = Vec::new();
+                for cache_name in caches {
+                    if let Some(cache_output) = cache_outputs
+                        .iter()
+                        .find(|c| c.name.as_normalized() == cache_name.as_str())
+                    {
+                        cache_list.push(cache_output.clone());
+                        apply_cache_inheritance(
+                            &mut parsed_recipe,
+                            cache_output,
+                            inherit_run_exports,
+                            inherit_requirements,
+                        );
+                    }
+                }
+                parsed_recipe.cache_outputs = cache_list;
+            }
+
+            if let Some(synthetic) = parsed_recipe.synthetic_cache_output() {
+                parsed_recipe.cache_outputs.push(synthetic);
+            }
 
             rendered_outputs.push(parsed_recipe);
         }
@@ -316,7 +411,6 @@ pub(crate) fn stage_1_render<S: SourceCode>(
 ) -> Result<Vec<Stage1Render<S>>, VariantError<S>> {
     let mut stage_1_renders = Vec::new();
 
-    // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
         let mut exact_pins_per_output: Vec<HashSet<PackageName>> = Vec::new();
@@ -324,16 +418,37 @@ pub(crate) fn stage_1_render<S: SourceCode>(
             let mut additional_variables = HashSet::<NormalizedKey>::new();
             let mut exact_pins = HashSet::<PackageName>::new();
             // Add in variants from the dependencies as we find them
-            for dep in output.build_time_requirements() {
-                if let Dependency::Spec(spec) = dep {
-                    let is_simple = spec.version.is_none() && spec.build.is_none();
-                    // add in the variant key for this dependency that has no version specifier
-                    if is_simple {
-                        if let Some(ref name) = spec.name {
-                            additional_variables.insert(name.as_normalized().into());
-                        }
-                    }
-                }
+            additional_variables.extend(collect_unversioned_deps(output.build_time_requirements()));
+
+            // Add variant keys from cache build if present (for top-level cache)
+            if let Some(cache) = &output.cache {
+                let cache_use_keys = cache
+                    .build
+                    .variant()
+                    .use_keys
+                    .iter()
+                    .map(|k| k.as_str().into())
+                    .collect::<Vec<NormalizedKey>>();
+                additional_variables.extend(cache_use_keys);
+            }
+
+            // Add variant keys from specific cache outputs referenced via inherit
+            for cache_output in &output.cache_outputs {
+                additional_variables.extend(collect_unversioned_deps(
+                    cache_output
+                        .requirements
+                        .build
+                        .iter()
+                        .chain(cache_output.requirements.host.iter()),
+                ));
+                additional_variables.extend(
+                    cache_output
+                        .build
+                        .variant
+                        .use_keys
+                        .iter()
+                        .map(|k| k.as_str().into()),
+                );
             }
 
             // We want to add something to packages that are requiring a subpackage
@@ -413,16 +528,33 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
 
-                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
-                    .map_err(|err| {
-                        let errs: ParseErrors<_> = err
-                            .into_iter()
-                            .map(|err| ParsingError::from_partial(r.source.clone(), err))
-                            .collect::<Vec<_>>()
-                            .into();
-                        errs
-                    })
-                    .map_err(VariantConfigError::from)?;
+                let mut parsed_recipe =
+                    Recipe::from_output_node(output, config_with_variant.clone())
+                        .map_err(|err| {
+                            let errs: ParseErrors<_> = err
+                                .into_iter()
+                                .map(|err| ParsingError::from_partial(r.source.clone(), err))
+                                .collect::<Vec<_>>()
+                                .into();
+                            errs
+                        })
+                        .map_err(VariantConfigError::from)?;
+
+                // Preserve cache_outputs and inherited requirements from stage 0
+                let stage0_output = &r.rendered_outputs[idx];
+                parsed_recipe.cache_outputs = stage0_output.cache_outputs.clone();
+
+                // Re-apply inheritance from cache outputs (run_exports, requirements, ignore)
+                // This is needed because we re-parsed from the raw node
+                let (inherit_run_exports, inherit_requirements) = inherit_flags_from_output(output);
+                for cache_output in &parsed_recipe.cache_outputs.clone() {
+                    apply_cache_inheritance(
+                        &mut parsed_recipe,
+                        cache_output,
+                        inherit_run_exports,
+                        inherit_requirements,
+                    );
+                }
 
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),

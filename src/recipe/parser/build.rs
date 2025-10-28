@@ -82,6 +82,7 @@ pub struct Build {
     pub skip: Skip,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
+    /// When using multi-output recipes, the default script is not automatically inferred; you must set it explicitly.
     #[serde(default, skip_serializing_if = "Script::is_default")]
     pub script: Script,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
@@ -207,6 +208,64 @@ pub struct PostProcess {
 }
 
 impl Build {
+    fn merge_when<T, P>(target: &mut T, source: &T, should_replace: P)
+    where
+        T: Clone,
+        P: Fn(&T) -> bool,
+    {
+        if should_replace(target) && !should_replace(source) {
+            *target = source.clone();
+        }
+    }
+
+    /// Deep merge another Build into this one.
+    /// Values in self take precedence over values in other.
+    ///
+    /// Merged fields: python, dynamic_linking, prefix_detection, variant,
+    /// post_process, merge_build_and_host_envs, noarch, files,
+    /// always_include_files, always_copy_files
+    ///
+    /// Excluded fields (preserved from self): number, string, skip, script
+    /// These fields are treated as identity fields specific to each output.
+    pub fn merge_from(&mut self, other: &Build) {
+        Self::merge_when(&mut self.python, &other.python, Python::is_default);
+        Self::merge_when(
+            &mut self.dynamic_linking,
+            &other.dynamic_linking,
+            DynamicLinking::is_default,
+        );
+        Self::merge_when(
+            &mut self.prefix_detection,
+            &other.prefix_detection,
+            PrefixDetection::is_default,
+        );
+        Self::merge_when(
+            &mut self.variant,
+            &other.variant,
+            VariantKeyUsage::is_default,
+        );
+        Self::merge_when(
+            &mut self.post_process,
+            &other.post_process,
+            |v: &Vec<PostProcess>| v.is_empty(),
+        );
+
+        self.merge_build_and_host_envs |= other.merge_build_and_host_envs;
+
+        Self::merge_when(&mut self.noarch, &other.noarch, NoArchType::is_none);
+        Self::merge_when(&mut self.files, &other.files, GlobVec::is_empty);
+        Self::merge_when(
+            &mut self.always_include_files,
+            &other.always_include_files,
+            GlobVec::is_empty,
+        );
+        Self::merge_when(
+            &mut self.always_copy_files,
+            &other.always_copy_files,
+            GlobVec::is_empty,
+        );
+    }
+
     /// Get the merge build host flag.
     pub const fn merge_build_and_host_envs(&self) -> bool {
         self.merge_build_and_host_envs

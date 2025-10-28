@@ -543,8 +543,8 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
         let message = String::from_utf8_lossy(&message);
 
         match *metadata.level() {
-            Level::ERROR => println!("::error ::{}", message),
-            Level::WARN => println!("::warning ::{}", message),
+            Level::ERROR => eprintln!("::error ::{}", message),
+            Level::WARN => eprintln!("::warning ::{}", message),
             _ => {}
         }
     }

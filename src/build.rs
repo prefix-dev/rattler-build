@@ -124,35 +124,77 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
-    } else {
-        output
-            .fetch_sources(tool_configuration, apply_patch_custom)
-            .await
-            .into_diagnostic()?
+    // Handle cache outputs first
+    let mut output = output;
+    let warn_additional_sources = |output: &Output| {
+        if !output.recipe.sources().is_empty() && output.finalized_cache_sources.is_some() {
+            tracing::warn!(
+                "Output defines sources in addition to cache sources. \
+                 This may overwrite files from the cache. \
+                 Consider using 'target_directory' in source definitions to avoid conflicts."
+            );
+        }
     };
+
+    match (
+        output.recipe.cache.is_some(),
+        output.cache_outputs_to_build.is_empty(),
+    ) {
+        (true, _) => {
+            output = output.build_or_fetch_cache(tool_configuration).await?;
+            warn_additional_sources(&output);
+        }
+        (false, false) => {
+            let cache_outputs = output.cache_outputs_to_build.clone();
+            for cache_output in cache_outputs.iter() {
+                output = output
+                    .build_or_fetch_cache_output(cache_output, tool_configuration)
+                    .await?;
+            }
+            warn_additional_sources(&output);
+        }
+        (false, true) => {
+            output = output
+                .fetch_sources(tool_configuration, apply_patch_custom)
+                .await
+                .into_diagnostic()?;
+        }
+    }
 
     let output = output
         .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
         .await
         .into_diagnostic()?;
 
-    output
-        .install_environments(tool_configuration)
-        .await
-        .into_diagnostic()?;
+    // Fast-path optimization: When an output inherits from a cache and has no explicit build script,
+    // we can skip environment installation and script execution entirely. This is a key benefit
+    // of the outputs-based cache approach as it allows for significant performance
+    // improvements when building multiple outputs that depend on the same intermediate artifacts.
+    match (
+        output.finalized_cache_dependencies.is_some(),
+        output.recipe.build().script().is_default(),
+    ) {
+        (true, true) => tracing::info!(
+            "Using fast-path optimization: output inherited cache and has no build.script; skipping environment setup and script execution for improved performance."
+        ),
+        _ => {
+            output
+                .install_environments(tool_configuration)
+                .await
+                .into_diagnostic()?;
 
-    match output.run_build_script().await {
-        Ok(_) => {}
-        Err(InterpreterError::Debug(info)) => {
-            tracing::info!("{}", info);
-            return Err(miette::miette!(
-                "Script not executed because debug mode is enabled"
-            ));
-        }
-        Err(InterpreterError::ExecutionFailed(_)) => {
-            return Err(miette::miette!("Script failed to execute"));
+            match output.run_build_script().await {
+                Ok(_) => {}
+                Err(InterpreterError::Debug(info)) => {
+                    tracing::info!("{}", info);
+                    return Err(miette::miette!(
+                        "Script not executed because debug mode is enabled"
+                    ));
+                }
+                Err(InterpreterError::ExecutionFailed(_)) => {
+                    return Err(miette::miette!("Script failed to execute"));
+                }
+            }
         }
     }
 

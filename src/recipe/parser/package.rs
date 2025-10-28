@@ -55,6 +55,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
                 match key_str {
                     "name" => name_val = value.try_convert(key_str)?,
                     "version" => version = value.try_convert(key_str)?,
+                    "inherit" => {}
                     invalid => {
                         return Err(vec![_partialerror!(
                             *key.span(),

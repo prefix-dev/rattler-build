@@ -18,13 +18,17 @@ use std::{
 use crate::{
     NormalizedKey,
     console_utils::github_integration_enabled,
-    recipe::{Recipe, parser::Source, variable::Variable},
+    recipe::{
+        Recipe,
+        parser::{CacheOutput, Source},
+        variable::Variable,
+    },
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
 };
 
-/// A output. This is the central element that is passed to the `run_build`
+/// An output. This is the central element that is passed to the `run_build`
 /// function and fully specifies all the options and settings to run the build.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildOutput {
@@ -48,6 +52,17 @@ pub struct BuildOutput {
     /// The finalized sources from the cache (if there is a cache instruction)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finalized_cache_sources: Option<Vec<Source>>,
+
+    /// Files restored from cache prefix
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored_cache_prefix_files: Option<Vec<std::path::PathBuf>>,
+    /// Files restored from cache work dir
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored_cache_work_dir_files: Option<Vec<std::path::PathBuf>>,
+
+    /// Cache outputs that need to be built before this package output
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub cache_outputs_to_build: Vec<CacheOutput>,
 
     /// Summary of the build
     #[serde(skip)]
@@ -128,6 +143,11 @@ impl BuildOutput {
     /// Shorthand to retrieve the host prefix for this output
     pub fn prefix(&self) -> &Path {
         &self.build_configuration.directories.host_prefix
+    }
+
+    /// Check if this output has restored cache files
+    pub fn has_restored_cache_files(&self) -> bool {
+        self.restored_cache_prefix_files.is_some() || self.restored_cache_work_dir_files.is_some()
     }
 
     /// Shorthand to retrieve the build prefix for this output
