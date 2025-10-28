@@ -161,6 +161,20 @@ impl<S: SourceCode> Stage1Render<S> {
 
         all_vars.extend(used_vars_jinja.iter().cloned());
 
+        // Get recipe once to use throughout
+        let recipe = &self.inner[idx].recipe;
+
+        // Filter out any ignore keys
+        let ignore_keys: HashSet<NormalizedKey> = recipe
+            .build()
+            .variant()
+            .ignore_keys
+            .iter()
+            .map(|k| k.as_str().into())
+            .collect();
+
+        all_vars.retain(|var| !ignore_keys.contains(var));
+
         // extract variant
         let mut variant = BTreeMap::new();
         for var in all_vars {
@@ -170,7 +184,6 @@ impl<S: SourceCode> Stage1Render<S> {
         }
 
         // Add in virtual packages
-        let recipe = &self.inner[idx].recipe;
         for run_requirement in recipe.requirements().run() {
             if let Dependency::Spec(spec) = run_requirement
                 && let Some(ref name) = spec.name
