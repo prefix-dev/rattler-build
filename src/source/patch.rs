@@ -446,18 +446,16 @@ mod tests {
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
-        assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("text.md")));
 
         let patch_file_content =
             fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
-        assert!(patched_paths.contains(&PathBuf::from("b/CMakeLists.txt")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("CMakeLists.txt")));
     }
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
@@ -675,6 +673,77 @@ mod tests {
         let text_md = tempdir.path().join("workdir/text.md");
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_pure_rename_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch with pure renames (100% similarity, no content changes)
+        apply_patches(
+            &[PathBuf::from("test_pure_rename.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Pure rename patch should apply successfully");
+
+        // Check that the __init__.py file was deleted
+        let init_file = tempdir.path().join("workdir/tinygrad/frontend/__init__.py");
+        assert!(
+            !init_file.exists(),
+            "frontend/__init__.py should be deleted"
+        );
+
+        // Check that onnx.py was renamed from frontend to nn
+        let old_onnx = tempdir.path().join("workdir/tinygrad/frontend/onnx.py");
+        let new_onnx = tempdir.path().join("workdir/tinygrad/nn/onnx.py");
+        assert!(!old_onnx.exists(), "frontend/onnx.py should not exist");
+        assert!(new_onnx.exists(), "nn/onnx.py should exist");
+        let onnx_content = fs_err::read_to_string(&new_onnx).unwrap();
+        assert_eq!(
+            onnx_content, "# onnx code\n",
+            "onnx.py content should be preserved"
+        );
+
+        // Check that torch.py was renamed from frontend to nn
+        let old_torch = tempdir.path().join("workdir/tinygrad/frontend/torch.py");
+        let new_torch = tempdir.path().join("workdir/tinygrad/nn/torch.py");
+        assert!(!old_torch.exists(), "frontend/torch.py should not exist");
+        assert!(new_torch.exists(), "nn/torch.py should exist");
+        let torch_content = fs_err::read_to_string(&new_torch).unwrap();
+        assert_eq!(
+            torch_content, "# torch code\n",
+            "torch.py content should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_apply_create_delete_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Create the file that will be deleted
+        let to_delete = tempdir.path().join("workdir/to_be_deleted.txt");
+        fs_err::write(&to_delete, "This file will be deleted\nby the patch\n").unwrap();
+
+        // Apply patch with creation and deletion
+        apply_patches(
+            &[PathBuf::from("test_create_delete.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Create/delete patch should apply successfully");
+
+        // Check that the file was deleted
+        assert!(!to_delete.exists(), "to_be_deleted.txt should be deleted");
+
+        // Check that the new file was created with correct content
+        let created_file = tempdir.path().join("workdir/newly_created.txt");
+        assert!(created_file.exists(), "newly_created.txt should exist");
+        let content = fs_err::read_to_string(&created_file).unwrap();
+        assert!(content.contains("This is a newly created file"));
+        assert!(content.contains("via patch application"));
     }
 
     #[test]
