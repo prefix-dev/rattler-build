@@ -67,8 +67,7 @@ def build_recipes(
     variant_config: Union[List[str], None] = None,
     variant_overrides: Union[Dict[str, List[str]], None] = None,
     ignore_recipe_variants: bool = False,
-    render_only: bool = False,
-    with_solve: bool = False,
+    render_mode: str = "build",
     keep_build: bool = False,
     no_build_id: bool = False,
     package_format: Union[str, None] = None,
@@ -105,8 +104,7 @@ def build_recipes(
         variant_config: Variant configuration files for the build.
         variant_overrides: A dictionary of variant key-value pairs to override. Keys are strings, values are lists of strings.
         ignore_recipe_variants: Do not read the `variants.yaml` file next to a recipe.
-        render_only: Render the recipe files without executing the build.
-        with_solve: Render the recipe files with solving dependencies.
+        render_mode: Rendering mode: "build" (default), "render-only", or "render-with-solve".
         keep_build: Keep intermediate build artifacts after the build.
         no_build_id: Don't use build id(timestamp) when creating build directory name.
         package_format: The package format to use for the build. Can be one of `tar-bz2` or `conda`. You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
@@ -144,8 +142,7 @@ def build_recipes(
         variant_config,
         variant_overrides,
         ignore_recipe_variants,
-        render_only,
-        with_solve,
+        render_mode,
         keep_build,
         no_build_id,
         package_format,

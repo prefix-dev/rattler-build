@@ -388,7 +388,7 @@ fn parse_recipe_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_mode="build", keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -400,8 +400,7 @@ fn build_recipes_py(
     variant_config: Option<Vec<PathBuf>>,
     variant_overrides: Option<HashMap<String, Vec<String>>>,
     ignore_recipe_variants: bool,
-    render_only: bool,
-    with_solve: bool,
+    render_mode: String,
     keep_build: bool,
     no_build_id: bool,
     package_format: Option<String>,
@@ -479,6 +478,16 @@ fn build_recipes_py(
         ),
     };
 
+    let render_mode = match render_mode.to_lowercase().as_str() {
+        "build" => ::rattler_build::opt::RenderMode::Build,
+        "render-only" | "render_only" => ::rattler_build::opt::RenderMode::RenderOnly,
+        "render-with-solve" | "render_with_solve" => ::rattler_build::opt::RenderMode::RenderWithSolve,
+        _ => return Err(RattlerBuildError::Other(format!(
+            "Invalid render mode '{}'. Must be one of: build, render-only, render-with-solve",
+            render_mode
+        )).into()),
+    };
+
     let build_data = BuildData::new(
         up_to,
         build_platform,
@@ -488,8 +497,7 @@ fn build_recipes_py(
         variant_config,
         variant_overrides.unwrap_or_default(),
         ignore_recipe_variants,
-        render_only,
-        with_solve,
+        render_mode,
         keep_build,
         no_build_id,
         package_format,

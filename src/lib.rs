@@ -526,7 +526,7 @@ pub async fn get_build_output(
                     &build_name,
                     recipe_path,
                     &output_dir,
-                    build_data.no_build_id,
+                    build_data.use_build_id.disabled(),
                     &timestamp,
                     recipe.build().merge_build_and_host_envs,
                 )
@@ -540,7 +540,7 @@ pub async fn get_build_output(
                     build_data.package_format.archive_type,
                     build_data.package_format.compression_level,
                 ),
-                store_recipe: !build_data.no_include_recipe,
+                store_recipe: build_data.include_recipe.enabled(),
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
@@ -1188,8 +1188,8 @@ pub async fn build_recipes(
         outputs.extend(output);
     }
 
-    if build_data.render_only {
-        let outputs = if build_data.with_solve {
+    if build_data.render_mode.is_render_only() {
+        let outputs = if build_data.render_mode.should_solve() {
             let mut updated_outputs = Vec::new();
             for output in outputs {
                 updated_outputs.push(
@@ -1240,16 +1240,15 @@ pub async fn debug_recipe(
         variant_config: Vec::new(),
         variant_overrides: HashMap::new(),
         ignore_recipe_variants: false,
-        render_only: false,
-        with_solve: true,
-        no_build_id: false,
+        render_mode: opt::RenderMode::Build,
+        use_build_id: opt::UseBuildId::default(),
         package_format: PackageFormatAndCompression {
             archive_type: ArchiveType::Conda,
             compression_level: CompressionLevel::Default,
         },
         compression_threads: None,
         io_concurrency_limit: num_cpus::get(),
-        no_include_recipe: false,
+        include_recipe: opt::IncludeRecipe::default(),
         color_build_log: true,
         tui: false,
         skip_existing: SkipExisting::None,

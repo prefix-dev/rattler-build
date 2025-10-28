@@ -340,6 +340,96 @@ impl FromStr for ChannelPriorityWrapper {
     }
 }
 
+/// Rendering mode for recipes
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
+pub enum RenderMode {
+    /// Build packages (normal mode)
+    #[default]
+    Build,
+    /// Only render recipes without solving dependencies
+    RenderOnly,
+    /// Render recipes and solve dependencies
+    RenderWithSolve,
+}
+
+impl RenderMode {
+    /// Returns true if we should only render without building
+    pub fn is_render_only(self) -> bool {
+        matches!(self, RenderMode::RenderOnly | RenderMode::RenderWithSolve)
+    }
+
+    /// Returns true if we should solve dependencies during rendering
+    pub fn should_solve(self) -> bool {
+        matches!(self, RenderMode::RenderWithSolve)
+    }
+}
+
+/// Whether to use build id (timestamp) when creating build directory name
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UseBuildId(bool);
+
+impl UseBuildId {
+    /// Create a new UseBuildId with the given value
+    pub fn new(value: bool) -> Self {
+        Self(value)
+    }
+
+    /// Returns true if build id should be used
+    pub fn enabled(self) -> bool {
+        self.0
+    }
+
+    /// Returns true if build id should not be used
+    pub fn disabled(self) -> bool {
+        !self.0
+    }
+}
+
+impl Default for UseBuildId {
+    fn default() -> Self {
+        Self(true) // By default, use build id
+    }
+}
+
+impl From<bool> for UseBuildId {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}
+
+/// Whether to include the recipe in the final package
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IncludeRecipe(bool);
+
+impl IncludeRecipe {
+    /// Create a new IncludeRecipe with the given value
+    pub fn new(value: bool) -> Self {
+        Self(value)
+    }
+
+    /// Returns true if recipe should be included
+    pub fn enabled(self) -> bool {
+        self.0
+    }
+
+    /// Returns true if recipe should not be included
+    pub fn disabled(self) -> bool {
+        !self.0
+    }
+}
+
+impl Default for IncludeRecipe {
+    fn default() -> Self {
+        Self(true) // By default, include recipe
+    }
+}
+
+impl From<bool> for IncludeRecipe {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}
+
 /// Build options.
 #[derive(Parser, Clone, Default)]
 pub struct BuildOpts {
@@ -392,13 +482,9 @@ pub struct BuildOpts {
     #[arg(long)]
     pub ignore_recipe_variants: bool,
 
-    /// Render the recipe files without executing the build.
-    #[arg(long)]
-    pub render_only: bool,
-
-    /// Render the recipe files with solving dependencies.
-    #[arg(long, requires("render_only"))]
-    pub with_solve: bool,
+    /// Rendering mode: build (default), render-only, or render-with-solve
+    #[arg(long, value_enum, default_value = "build")]
+    pub render_mode: RenderMode,
 
     /// Keep intermediate build artifacts after the build.
     #[arg(long)]
@@ -493,6 +579,8 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
+
+
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
@@ -504,14 +592,13 @@ pub struct BuildData {
     pub variant_config: Vec<PathBuf>,
     pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
-    pub render_only: bool,
-    pub with_solve: bool,
+    pub render_mode: RenderMode,
     pub keep_build: bool,
-    pub no_build_id: bool,
+    pub use_build_id: UseBuildId,
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
     pub io_concurrency_limit: usize,
-    pub no_include_recipe: bool,
+    pub include_recipe: IncludeRecipe,
     pub test: TestStrategy,
     pub color_build_log: bool,
     pub common: CommonData,
@@ -539,8 +626,7 @@ impl BuildData {
         variant_config: Option<Vec<PathBuf>>,
         variant_overrides: HashMap<String, Vec<String>>,
         ignore_recipe_variants: bool,
-        render_only: bool,
-        with_solve: bool,
+        render_mode: RenderMode,
         keep_build: bool,
         no_build_id: bool,
         package_format: Option<PackageFormatAndCompression>,
@@ -573,17 +659,16 @@ impl BuildData {
             variant_config: variant_config.unwrap_or_default(),
             variant_overrides,
             ignore_recipe_variants,
-            render_only,
-            with_solve,
+            render_mode,
             keep_build,
-            no_build_id,
+            use_build_id: UseBuildId::from(!no_build_id),
             package_format: package_format.unwrap_or(PackageFormatAndCompression {
                 archive_type: ArchiveType::Conda,
                 compression_level: CompressionLevel::Default,
             }),
             compression_threads,
             io_concurrency_limit: io_concurrency_limit.unwrap_or(num_cpus::get() * 8),
-            no_include_recipe,
+            include_recipe: IncludeRecipe::from(!no_include_recipe),
             test: test.unwrap_or_default(),
             color_build_log: true,
             common,
@@ -618,8 +703,7 @@ impl BuildData {
             opts.variant_config,
             opts.variant_overrides.into_iter().collect(),
             opts.ignore_recipe_variants,
-            opts.render_only,
-            opts.with_solve,
+            opts.render_mode,
             opts.keep_build,
             opts.no_build_id,
             opts.package_format.or_else(|| {

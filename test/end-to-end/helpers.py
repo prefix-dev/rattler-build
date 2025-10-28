@@ -130,19 +130,18 @@ class RattlerBuild:
             extra_args=extra_args,
             extra_meta=extra_meta,
         )
-        if with_solve:
-            args += ["--with-solve"]
+        render_mode = "render-with-solve" if with_solve else "render-only"
+        args += ["--render-mode", render_mode]
         if raw:
             return self(
                 *args,
-                "--render-only",
                 need_result_object=True,
                 text=True,
                 capture_output=True,
                 **kwargs,
             )
         else:
-            output = self(*args, "--render-only", **kwargs)
+            output = self(*args, **kwargs)
             print(output)
             return json.loads(output)
 
