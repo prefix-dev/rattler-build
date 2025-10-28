@@ -580,7 +580,6 @@ pub struct BuildOpts {
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
