@@ -1,11 +1,17 @@
 # New test case: Mix of staging inheritance and top-level inheritance
 # Tests that package outputs can choose to inherit from staging or from top-level
+context:
+  foobar: latest
 
 schema_version: 1
 
 recipe:
   name: mixed-inheritance
   version: 2.0.0
+
+source:
+  url: https://example.com/mixed-inheritance-2.0.0.tar.gz
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 build:
   number: 0
@@ -20,10 +26,16 @@ build:
         echo Top-level build script
         mkdir %PREFIX%\share
         echo data.txt > %PREFIX%\share\data.txt
+  dynamic_linking:
+    rpaths:
+      - lib/
+      - abc/
 
 about:
   summary: Project with mixed inheritance
   license: Apache-2.0
+  license_file: LICENSE
+  repository: https://github.com/foobar/repo
 
 outputs:
   # Staging output for compiled code
