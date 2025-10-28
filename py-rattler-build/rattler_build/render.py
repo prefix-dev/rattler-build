@@ -1,0 +1,370 @@
+"""
+Recipe rendering functionality for converting Stage0 to Stage1 recipes with variants.
+
+This module provides the ability to render Stage0 recipes (parsed but unevaluated)
+into Stage1 recipes (fully evaluated and ready to build) using variant configurations.
+"""
+
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    # For type checking, use Any placeholders
+    _RenderConfig = Any
+    _RenderedVariant = Any
+    _HashInfo = Any
+    _PinSubpackageInfo = Any
+    _render_recipe = Any
+else:
+    # At runtime, import from the Rust module
+    from . import rattler_build as _rb
+
+    _render = _rb.render
+    _RenderConfig = _render.RenderConfig
+    _RenderedVariant = _render.RenderedVariant
+    _HashInfo = _render.HashInfo
+    _PinSubpackageInfo = _render.PinSubpackageInfo
+    _render_recipe = _render.render_recipe
+
+
+class HashInfo:
+    """
+    Hash information for a rendered variant.
+
+    This class wraps the Rust HashInfo type and provides convenient access
+    to hash information computed during recipe rendering.
+
+    Attributes:
+        hash: The hash string (first 7 letters of the sha1sum)
+        prefix: The hash prefix (e.g., 'py38' or 'np111')
+
+    Example:
+        >>> hash_info = variant.hash_info()
+        >>> if hash_info:
+        ...     print(f"Hash: {hash_info.hash}")
+        ...     print(f"Prefix: {hash_info.prefix}")
+    """
+
+    def __init__(self, inner: _HashInfo):
+        """Create a HashInfo from the Rust object."""
+        self._inner = inner
+
+    @property
+    def hash(self) -> str:
+        """Get the hash string (first 7 letters of sha1sum)."""
+        return self._inner.hash
+
+    @property
+    def prefix(self) -> str:
+        """Get the hash prefix (e.g., 'py38' or 'np111')."""
+        return self._inner.prefix
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+    def __str__(self) -> str:
+        return f"HashInfo(hash={self.hash!r}, prefix={self.prefix!r})"
+
+
+class PinSubpackageInfo:
+    """
+    Information about a pin_subpackage dependency.
+
+    This class wraps the Rust PinSubpackageInfo type and provides information
+    about packages pinned via the pin_subpackage() Jinja function.
+
+    Attributes:
+        name: The name of the pinned subpackage
+        version: The version of the pinned subpackage
+        build_string: The build string of the pinned subpackage (if known)
+        exact: Whether this is an exact pin
+
+    Example:
+        >>> pins = variant.pin_subpackages()
+        >>> for name, info in pins.items():
+        ...     print(f"{name}: {info.version} (exact={info.exact})")
+    """
+
+    def __init__(self, inner: _PinSubpackageInfo):
+        """Create a PinSubpackageInfo from the Rust object."""
+        self._inner = inner
+
+    @property
+    def name(self) -> str:
+        """Get the package name."""
+        return self._inner.name
+
+    @property
+    def version(self) -> str:
+        """Get the package version."""
+        return self._inner.version
+
+    @property
+    def build_string(self) -> Optional[str]:
+        """Get the build string if available."""
+        return self._inner.build_string
+
+    @property
+    def exact(self) -> bool:
+        """Check if this is an exact pin."""
+        return self._inner.exact
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+    def __str__(self) -> str:
+        return (
+            f"PinSubpackageInfo(name={self.name!r}, version={self.version!r}, "
+            f"build_string={self.build_string!r}, exact={self.exact})"
+        )
+
+
+class RenderConfig:
+    """Configuration for rendering recipes with variants.
+
+    This class configures how recipes are rendered, including platform settings,
+    experimental features, and additional Jinja context variables.
+
+    Args:
+        target_platform: Target platform (e.g., "linux-64", "osx-arm64")
+        build_platform: Build platform (where the build runs)
+        host_platform: Host platform (for cross-compilation)
+        experimental: Enable experimental features
+        recipe_path: Path to the recipe file (for relative path resolution)
+
+    Example:
+        >>> config = RenderConfig(
+        ...     target_platform="linux-64",
+        ...     experimental=True
+        ... )
+        >>> config.set_context("custom_var", "value")
+    """
+
+    def __init__(
+        self,
+        target_platform: Optional[str] = None,
+        build_platform: Optional[str] = None,
+        host_platform: Optional[str] = None,
+        experimental: bool = False,
+        recipe_path: Optional[str] = None,
+    ):
+        """Create a new render configuration."""
+        self._config = _RenderConfig(
+            target_platform=target_platform,
+            build_platform=build_platform,
+            host_platform=host_platform,
+            experimental=experimental,
+            recipe_path=recipe_path,
+        )
+
+    def set_context(self, key: str, value: Any) -> None:
+        """Add an extra context variable for Jinja rendering.
+
+        Args:
+            key: Variable name
+            value: Variable value (can be string, bool, int, float, or list)
+        """
+        self._config.set_context(key, value)
+
+    def get_context(self, key: str) -> Optional[Any]:
+        """Get an extra context variable.
+
+        Args:
+            key: Variable name
+
+        Returns:
+            The variable value, or None if not found
+        """
+        return self._config.get_context(key)
+
+    def get_all_context(self) -> Dict[str, Any]:
+        """Get all extra context variables as a dictionary."""
+        return self._config.get_all_context()
+
+    @property
+    def target_platform(self) -> str:
+        """Get the target platform."""
+        return self._config.target_platform()
+
+    @target_platform.setter
+    def target_platform(self, value: str) -> None:
+        """Set the target platform."""
+        self._config.set_target_platform(value)
+
+    @property
+    def build_platform(self) -> str:
+        """Get the build platform."""
+        return self._config.build_platform()
+
+    @build_platform.setter
+    def build_platform(self, value: str) -> None:
+        """Set the build platform."""
+        self._config.set_build_platform(value)
+
+    @property
+    def host_platform(self) -> str:
+        """Get the host platform."""
+        return self._config.host_platform()
+
+    @host_platform.setter
+    def host_platform(self, value: str) -> None:
+        """Set the host platform."""
+        self._config.set_host_platform(value)
+
+    @property
+    def experimental(self) -> bool:
+        """Get whether experimental features are enabled."""
+        return self._config.experimental()
+
+    @experimental.setter
+    def experimental(self, value: bool) -> None:
+        """Set whether experimental features are enabled."""
+        self._config.set_experimental(value)
+
+    @property
+    def recipe_path(self) -> Optional[str]:
+        """Get the recipe path."""
+        return self._config.recipe_path()
+
+    @recipe_path.setter
+    def recipe_path(self, value: Optional[str]) -> None:
+        """Set the recipe path."""
+        self._config.set_recipe_path(value)
+
+    def __repr__(self) -> str:
+        return repr(self._config)
+
+
+class RenderedVariant:
+    """Result of rendering a recipe with a specific variant combination.
+
+    Each RenderedVariant represents one specific variant of a recipe after
+    all Jinja templates have been evaluated and variant values applied.
+
+    Attributes:
+        variant: The variant combination used (variable name -> value)
+        recipe: The rendered Stage1 recipe
+        hash_info: Build string hash information
+        pin_subpackages: Pin subpackage dependencies
+
+    Example:
+        >>> for variant in rendered_variants:
+        ...     print(f"Package: {variant.recipe().package().name()}")
+        ...     print(f"Variant: {variant.variant()}")
+        ...     print(f"Build string: {variant.recipe().build().string()}")
+    """
+
+    def __init__(self, inner: Any):
+        """Create a RenderedVariant from the Rust object."""
+        self._inner = inner
+
+    def variant(self) -> Dict[str, str]:
+        """Get the variant combination used for this render.
+
+        Returns:
+            Dictionary mapping variable names to their values
+        """
+        return self._inner.variant()
+
+    def recipe(self) -> Any:  # Returns Stage1Recipe
+        """Get the rendered Stage1 recipe.
+
+        Returns:
+            The fully evaluated Stage1 recipe ready for building
+        """
+        return self._inner.recipe()
+
+    def hash_info(self) -> Optional[HashInfo]:
+        """Get hash info if available.
+
+        Returns:
+            HashInfo object with 'hash' and 'prefix' attributes, or None
+
+        Example:
+            >>> rendered = render_recipe(recipe, variant_config)[0]
+            >>> hash_info = rendered.hash_info()
+            >>> if hash_info:
+            ...     print(f"Hash: {hash_info.hash}")
+            ...     print(f"Prefix: {hash_info.prefix}")
+        """
+        inner = self._inner.hash_info()
+        return HashInfo(inner) if inner else None
+
+    def pin_subpackages(self) -> Dict[str, PinSubpackageInfo]:
+        """Get pin_subpackage information.
+
+        Returns:
+            Dictionary mapping package names to PinSubpackageInfo objects
+
+        Example:
+            >>> rendered = render_recipe(recipe, variant_config)[0]
+            >>> for name, info in rendered.pin_subpackages().items():
+            ...     print(f"{name}: version={info.version}, exact={info.exact}")
+        """
+        inner_dict = self._inner.pin_subpackages()
+        return {name: PinSubpackageInfo(info) for name, info in inner_dict.items()}
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+
+def render_recipe(
+    recipe: Any,  # Stage0 Recipe
+    variant_config: Any,  # VariantConfig
+    render_config: Optional[RenderConfig] = None,
+) -> List[RenderedVariant]:
+    """Render a Stage0 recipe with a variant configuration into Stage1 recipes.
+
+    This function takes a parsed Stage0 recipe and evaluates all Jinja templates
+    with different variant combinations to produce ready-to-build Stage1 recipes.
+
+    Args:
+        recipe: The Stage0 recipe to render (from stage0.Recipe.from_yaml())
+        variant_config: The variant configuration (from variant_config.VariantConfig)
+        render_config: Optional render configuration (defaults to current platform)
+
+    Returns:
+        List of RenderedVariant objects, one for each variant combination
+
+    Example:
+        >>> from rattler_build.stage0 import Recipe
+        >>> from rattler_build.variant_config import VariantConfig
+        >>> from rattler_build.render import render_recipe, RenderConfig
+        >>>
+        >>> # Parse stage0 recipe
+        >>> recipe = Recipe.from_yaml('''
+        ... package:
+        ...   name: my-package
+        ...   version: 1.0.0
+        ... requirements:
+        ...   host:
+        ...     - python ${{ python }}
+        ... ''')
+        >>>
+        >>> # Create variant config
+        >>> variant_config = VariantConfig.from_yaml('''
+        ... python:
+        ...   - "3.9"
+        ...   - "3.10"
+        ...   - "3.11"
+        ... ''')
+        >>>
+        >>> # Render with all variants
+        >>> rendered = render_recipe(recipe, variant_config)
+        >>> print(f"Generated {len(rendered)} variants")
+        Generated 3 variants
+    """
+    config_inner = render_config._config if render_config else None
+    # Unwrap the Recipe and VariantConfig to get the inner Rust objects
+    recipe_inner = recipe._inner if hasattr(recipe, "_inner") else recipe
+    variant_config_inner = variant_config._inner if hasattr(variant_config, "_inner") else variant_config
+    rendered = _render_recipe(recipe_inner, variant_config_inner, config_inner)
+    return [RenderedVariant(r) for r in rendered]
+
+
+__all__ = [
+    "RenderConfig",
+    "RenderedVariant",
+    "HashInfo",
+    "PinSubpackageInfo",
+    "render_recipe",
+]

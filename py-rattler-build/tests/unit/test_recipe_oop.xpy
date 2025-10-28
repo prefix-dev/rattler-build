@@ -1,6 +1,6 @@
 from pathlib import Path
-from rattler_build import Recipe, SelectorConfig
-from rattler_build.rattler_build import parse_recipe_py
+from rattler_build import Recipe, JinjaConfig
+# from rattler_build.rattler_build import parse_recipe_py
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "test-package"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"
@@ -87,16 +87,16 @@ def test_recipe_representations() -> None:
 
 
 def test_selector_config_with_variants() -> None:
-    """Test SelectorConfig with variant configuration"""
-    config = SelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+    """Test JinjaConfig with variant configuration"""
+    config = JinjaConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
     assert config.target_platform == "linux-64"
     assert config.variant["python"] == "3.11"
     assert config.variant["build_number"] == 1
 
 
 def test_selector_config_setters() -> None:
-    """Test SelectorConfig property setters"""
-    config = SelectorConfig()
+    """Test JinjaConfig property setters"""
+    config = JinjaConfig()
 
     initial_target = config.target_platform  # Store initial value (may have default)
     config.target_platform = "win-64"
@@ -139,8 +139,8 @@ def test_selector_config_setters() -> None:
 
 def test_parse_recipe_with_selectors() -> None:
     """Test parsing recipe with platform selectors using existing test data"""
-    linux_config = SelectorConfig(target_platform="linux-64")
-    windows_config = SelectorConfig(target_platform="win-64")
+    linux_config = JinjaConfig(target_platform="linux-64")
+    windows_config = JinjaConfig(target_platform="win-64")
 
     recipe_linux = parse_recipe_py(TEST_RECIPE_FILE.read_text(), linux_config.config)
     recipe_windows = parse_recipe_py(TEST_RECIPE_FILE.read_text(), windows_config.config)
@@ -149,9 +149,9 @@ def test_parse_recipe_with_selectors() -> None:
     assert recipe_linux["package"]["name"] == "test-package"
     assert recipe_windows["package"]["name"] == "test-package"
 
-    # Check that we can parse both successfully - the main point is that SelectorConfig works
+    # Check that we can parse both successfully - the main point is that JinjaConfig works
     # However, as @wolf noted, the "intermediate recipe" in pixi-build will be migrating to rattler-build at some point.
-    # This would improve SelectorConfig to parse and validate while resolving selectors for different operating systems.
+    # This would improve JinjaConfig to parse and validate while resolving selectors for different operating systems.
     # For example, linux: selectors could potentially be validated on Windows.
     # But for now, this is all we can do.
     assert "requirements" in recipe_linux
@@ -162,7 +162,7 @@ def test_parse_recipe_with_selectors() -> None:
 
 def test_recipe_with_variants() -> None:
     """Test recipe parsing with variant substitution using existing test data"""
-    config = SelectorConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
+    config = JinjaConfig(target_platform="linux-64", variant={"python": "3.11", "build_number": 1})
 
     recipe = parse_recipe_py(TEST_RECIPE_FILE.read_text(), config.config)
 
