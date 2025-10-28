@@ -3623,7 +3623,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.48.1"
+version = "0.49.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3932,7 +3932,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.48.1"
+version = "0.49.0"
 dependencies = [
  "anyhow",
  "async-once-cell",

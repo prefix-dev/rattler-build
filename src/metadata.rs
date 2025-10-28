@@ -51,7 +51,7 @@ mod test {
                     ),
                     size: Some(123123),
                     subdir: "linux-64".into(),
-                    timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
+                    timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap().into()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
                     purls: None,
