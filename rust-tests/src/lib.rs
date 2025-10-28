@@ -167,10 +167,10 @@ mod tests {
     }
 
     fn rattler() -> RattlerBuild {
-        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
-            if let Some(ret) = RattlerBuild::with_binary(path) {
-                return ret;
-            }
+        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH")
+            && let Some(ret) = RattlerBuild::with_binary(path)
+        {
+            return ret;
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
