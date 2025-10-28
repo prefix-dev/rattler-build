@@ -24,7 +24,7 @@ patchelf = "~=0.17.2"
 
 [feature.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.86.0,<1.87"
+rust = ">=1.89.0,<1.90"
 ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]

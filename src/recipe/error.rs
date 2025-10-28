@@ -78,7 +78,7 @@ impl<S: SourceCode> ParsingError<S> {
 pub enum ErrorKind {
     /// Error while parsing YAML.
     #[diagnostic(code(error::yaml_parsing))]
-    YamlParsing(#[from] marked_yaml::LoadError),
+    YamlParsing(Box<marked_yaml::LoadError>),
 
     /// Error when expected mapping but got something else.
     #[diagnostic(code(error::expected_mapping))]
@@ -126,7 +126,7 @@ pub enum ErrorKind {
 
     /// Error rendering a Jinja expression.
     #[diagnostic(code(error::jinja_rendering))]
-    JinjaRendering(#[from] minijinja::Error),
+    JinjaRendering(Box<minijinja::Error>),
 
     /// Error processing the condition of a if-selector.
     #[diagnostic(code(error::if_selector_condition_not_bool))]
@@ -220,30 +220,32 @@ impl fmt::Display for ErrorKind {
         use std::error::Error;
 
         match self {
-            ErrorKind::YamlParsing(LoadError::TopLevelMustBeMapping(_)) => {
-                write!(f, "failed to parse YAML: top level must be a mapping.")
-            }
-            ErrorKind::YamlParsing(LoadError::UnexpectedAnchor(_)) => {
-                write!(f, "failed to parse YAML: unexpected definition of anchor.")
-            }
-            ErrorKind::YamlParsing(LoadError::MappingKeyMustBeScalar(_)) => {
-                write!(f, "failed to parse YAML: keys in mappings must be scalar.")
-            }
-            ErrorKind::YamlParsing(LoadError::UnexpectedTag(_)) => {
-                write!(f, "failed to parse YAML: unexpected use of YAML tag.")
-            }
-            ErrorKind::YamlParsing(LoadError::ScanError(_, e)) => {
-                // e.description() is deprecated but it's the only way to get
-                // the exact info we want out of yaml-rust
+            ErrorKind::YamlParsing(e) => match e.as_ref() {
+                LoadError::TopLevelMustBeMapping(_) => {
+                    write!(f, "failed to parse YAML: top level must be a mapping.")
+                }
+                LoadError::UnexpectedAnchor(_) => {
+                    write!(f, "failed to parse YAML: unexpected definition of anchor.")
+                }
+                LoadError::MappingKeyMustBeScalar(_) => {
+                    write!(f, "failed to parse YAML: keys in mappings must be scalar.")
+                }
+                LoadError::UnexpectedTag(_) => {
+                    write!(f, "failed to parse YAML: unexpected use of YAML tag.")
+                }
+                LoadError::ScanError(_, e) => {
+                    // e.description() is deprecated but it's the only way to get
+                    // the exact info we want out of yaml-rust
 
-                write!(f, "failed to parse YAML: {}", e.description())
-            }
-            ErrorKind::YamlParsing(LoadError::DuplicateKey(_)) => {
-                write!(f, "failed to parse YAML: duplicate key.")
-            }
-            ErrorKind::YamlParsing(_) => {
-                write!(f, "failed to parse YAML.")
-            }
+                    write!(f, "failed to parse YAML: {}", e.description())
+                }
+                LoadError::DuplicateKey(_) => {
+                    write!(f, "failed to parse YAML: duplicate key.")
+                }
+                _ => {
+                    write!(f, "failed to parse YAML.")
+                }
+            },
             ErrorKind::ExpectedMapping => write!(f, "expected a mapping."),
             ErrorKind::ExpectedScalar => write!(f, "expected a scalar value."),
             ErrorKind::ExpectedSequence => write!(f, "expected a sequence."),
@@ -260,7 +262,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::InvalidValue((key, s)) => write!(f, "invalid value for `{key}`: `{s}`."),
             ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
-                write!(f, "failed to render Jinja expression: {}", err)
+                write!(f, "failed to render Jinja expression: {}", err.as_ref())
             }
             ErrorKind::IfSelectorConditionNotBool(err) => {
                 write!(f, "condition in `if` selector must be a boolean: {}", err)
@@ -310,6 +312,18 @@ impl fmt::Display for ErrorKind {
 impl From<Infallible> for ErrorKind {
     fn from(_: Infallible) -> Self {
         Self::Other
+    }
+}
+
+impl From<marked_yaml::LoadError> for ErrorKind {
+    fn from(e: marked_yaml::LoadError) -> Self {
+        Self::YamlParsing(Box::new(e))
+    }
+}
+
+impl From<minijinja::Error> for ErrorKind {
+    fn from(e: minijinja::Error) -> Self {
+        Self::JinjaRendering(Box::new(e))
     }
 }
 
@@ -403,17 +417,18 @@ pub(super) fn load_error_handler<S: SourceCode>(
     err: marked_yaml::LoadError,
 ) -> ParsingError<S> {
     let span = marker_to_span(src.as_ref(), marker(&err));
+    let label = Cow::Borrowed(match &err {
+        marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
+        marked_yaml::LoadError::UnexpectedAnchor(_) => "unexpected anchor here",
+        marked_yaml::LoadError::UnexpectedTag(_) => "unexpected tag here",
+        marked_yaml::LoadError::DuplicateKey(_) => "duplicate key here",
+        _ => "here",
+    });
     _error!(
         src,
         span,
-        ErrorKind::YamlParsing(err),
-        label = Cow::Borrowed(match err {
-            marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
-            marked_yaml::LoadError::UnexpectedAnchor(_) => "unexpected anchor here",
-            marked_yaml::LoadError::UnexpectedTag(_) => "unexpected tag here",
-            marked_yaml::LoadError::DuplicateKey(_) => "duplicate key here",
-            _ => "here",
-        })
+        ErrorKind::YamlParsing(Box::new(err)),
+        label = label
     )
 }
 
@@ -492,13 +507,12 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
 
     // FIXME: Implement `"`, `'` and `[` open and close detection.
     while let Some((i, c)) = iter.next() {
-        if c == ':' {
-            if let Some((_, c)) = iter.next() {
-                if c == '\n' || c == '\r' || c == '\t' || c == ' ' {
-                    end += i;
-                    break;
-                }
-            }
+        if c == ':'
+            && let Some((_, c)) = iter.next()
+            && (c == '\n' || c == '\r' || c == '\t' || c == ' ')
+        {
+            end += i;
+            break;
         }
 
         if c == '\n' || c == '\r' || c == '\t' {

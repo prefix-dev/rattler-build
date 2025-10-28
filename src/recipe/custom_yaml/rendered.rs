@@ -86,6 +86,7 @@ impl RenderedNode {
     /// type here is the generic Node enumeration to make it potentially easier
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
+    #[allow(clippy::result_large_err)]
     pub fn parse_yaml<S: SourceCode>(
         init_span_index: usize,
         src: S,
@@ -663,10 +664,11 @@ impl Render<RenderedNode> for Node {
 impl Render<RenderedNode> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            let label = jinja_error_to_label(&err);
             vec![_partialerror!(
                 *self.span(),
-                ErrorKind::JinjaRendering(err),
-                label = jinja_error_to_label(&err),
+                ErrorKind::JinjaRendering(Box::new(err)),
+                label = label,
             )]
         })?;
         // unsure whether this should be allowed to coerce // check if it's quoted?
@@ -692,10 +694,11 @@ impl Render<Option<RenderedNode>> for ScalarNode {
         _name: &str,
     ) -> Result<Option<RenderedNode>, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            let label = format!("Rendering error: {}", err.kind());
             vec![_partialerror!(
                 *self.span(),
-                ErrorKind::JinjaRendering(err),
-                label = format!("Rendering error: {}", err.kind())
+                ErrorKind::JinjaRendering(Box::new(err)),
+                label = label
             )]
         })?;
 

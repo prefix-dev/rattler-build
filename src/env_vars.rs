@@ -54,12 +54,11 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         .variant()
         .get(&"python".into())
         .map(|s| s.to_string());
-    if python_version.is_none() {
-        if let Some((record, requested)) = output.find_resolved_package("python") {
-            if requested {
-                python_version = Some(record.package_record.version.to_string());
-            }
-        }
+    if python_version.is_none()
+        && let Some((record, requested)) = output.find_resolved_package("python")
+        && requested
+    {
+        python_version = Some(record.package_record.version.to_string());
     }
 
     if let Some(py_ver) = python_version {

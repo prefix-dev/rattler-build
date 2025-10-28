@@ -12,12 +12,22 @@ use std::{
 
 use diffy::{Diff, Patch};
 use fs_err::File;
-use fs_err::read;
 use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
     trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
+}
+
+/// Summarize a single patch file by reading and parsing it.
+pub fn summarize_single_patch(
+    patch_path: &Path,
+    work_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let data = fs_err::read(patch_path).map_err(SourceError::Io)?;
+    let patch = patch_from_bytes(&data)
+        .map_err(|_| SourceError::PatchParseFailed(patch_path.to_path_buf()))?;
+    summarize_patch(&patch, work_dir)
 }
 
 /// Normalizes backup file paths (.orig/.bak) to their actual file paths
@@ -36,13 +46,13 @@ fn normalize_backup_paths(
     }
 
     // Check if original file is a backup of the modified file
-    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
-        if let Some(mod_filename) = modified.file_name() {
-            if matches!(orig_ext.to_str(), Some("orig" | "bak")) && orig_stem == mod_filename {
-                // Original is a backup of modified file, treat as modifying the actual file
-                return (Some(modified.clone()), Some(modified.clone()));
-            }
-        }
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension())
+        && let Some(mod_filename) = modified.file_name()
+        && matches!(orig_ext.to_str(), Some("orig" | "bak"))
+        && orig_stem == mod_filename
+    {
+        // Original is a backup of modified file, treat as modifying the actual file
+        return (Some(modified.clone()), Some(modified.clone()));
     }
 
     (original_path, modified_path)
@@ -363,26 +373,6 @@ pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats
         }
     }
     Ok(stats)
-}
-
-/// Summarize multiple patch files by reading and parsing each patch.
-pub fn summarize_patches(
-    patches: &[PathBuf],
-    work_dir: &Path,
-    patch_dir: &Path,
-) -> Result<PatchStats, SourceError> {
-    let mut total = PatchStats::default();
-    for patch_file in patches {
-        let full_path = patch_dir.join(patch_file);
-        let data = read(&full_path)?;
-        let patch = patch_from_bytes(&data)
-            .map_err(|_| SourceError::PatchParseFailed(full_path.clone()))?;
-        let stats = summarize_patch(&patch, work_dir)?;
-        total.changed.extend(stats.changed);
-        total.added.extend(stats.added);
-        total.removed.extend(stats.removed);
-    }
-    Ok(total)
 }
 
 #[cfg(test)]

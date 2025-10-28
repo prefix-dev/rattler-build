@@ -296,11 +296,11 @@ impl Relinker for Dylib {
             }
         };
 
-        if let Some(id) = &self.id {
-            if let Some(new_dylib) = exchange_dylib(id) {
-                changes.change_id = Some(new_dylib);
-                modified = true;
-            }
+        if let Some(id) = &self.id
+            && let Some(new_dylib) = exchange_dylib(id)
+        {
+            changes.change_id = Some(new_dylib);
+            modified = true;
         }
 
         for lib in &self.libraries {

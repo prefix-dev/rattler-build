@@ -48,7 +48,7 @@ readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
-rust-version = "1.86.0"
+rust-version = "1.89.0"
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3']
@@ -75,10 +75,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-s3 = [
-  'rattler_networking/s3',
-  'rattler_upload/s3',
-]
+s3 = ['rattler_networking/s3', 'rattler_upload/s3']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }

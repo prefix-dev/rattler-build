@@ -126,7 +126,7 @@ fn find_new_files(
             })
             .collect();
 
-        let current_files = current_files
+        current_files
             .clone()
             .into_iter()
             .filter(|p| {
@@ -135,9 +135,7 @@ fn find_new_files(
                     p.strip_prefix(prefix).expect("File should be in prefix"),
                 ))
             })
-            .collect::<HashSet<_>>();
-
-        current_files
+            .collect::<HashSet<_>>()
     }
 }
 

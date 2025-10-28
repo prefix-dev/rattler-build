@@ -210,10 +210,10 @@ fn recipe_paths(
         if let Some(recipe_dir) = &recipe_dir {
             for entry in ignore::Walk::new(recipe_dir) {
                 let entry = entry.into_diagnostic()?;
-                if entry.path().is_dir() {
-                    if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                        recipe_paths.push(recipe_path);
-                    }
+                if entry.path().is_dir()
+                    && let Ok(recipe_path) = get_recipe_path(entry.path())
+                {
+                    recipe_paths.push(recipe_path);
                 }
             }
         }

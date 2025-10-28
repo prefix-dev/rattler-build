@@ -172,12 +172,11 @@ impl<S: SourceCode> Stage1Render<S> {
         // Add in virtual packages
         let recipe = &self.inner[idx].recipe;
         for run_requirement in recipe.requirements().run() {
-            if let Dependency::Spec(spec) = run_requirement {
-                if let Some(ref name) = spec.name {
-                    if name.as_normalized().starts_with("__") {
-                        variant.insert(name.as_normalized().into(), spec.to_string().into());
-                    }
-                }
+            if let Dependency::Spec(spec) = run_requirement
+                && let Some(ref name) = spec.name
+                && name.as_normalized().starts_with("__")
+            {
+                variant.insert(name.as_normalized().into(), spec.to_string().into());
             }
         }
 
@@ -243,10 +242,10 @@ impl<S: SourceCode> Stage1Render<S> {
 
             // Helper closure to add edges for dependencies
             let mut add_edge = |req_name: &PackageName| {
-                if req_name != output_name {
-                    if let Some(&req_idx) = name_to_idx.get(req_name) {
-                        graph.add_edge(req_idx, current_node, ());
-                    }
+                if req_name != output_name
+                    && let Some(&req_idx) = name_to_idx.get(req_name)
+                {
+                    graph.add_edge(req_idx, current_node, ());
                 }
             };
 
@@ -328,10 +327,8 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 if let Dependency::Spec(spec) = dep {
                     let is_simple = spec.version.is_none() && spec.build.is_none();
                     // add in the variant key for this dependency that has no version specifier
-                    if is_simple {
-                        if let Some(ref name) = spec.name {
-                            additional_variables.insert(name.as_normalized().into());
-                        }
+                    if is_simple && let Some(ref name) = spec.name {
+                        additional_variables.insert(name.as_normalized().into());
                     }
                 }
             }

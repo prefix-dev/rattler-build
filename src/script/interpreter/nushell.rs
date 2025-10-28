@@ -132,8 +132,7 @@ impl Interpreter for NuShellInterpreter {
             let status_code = output.status.code().unwrap_or(1);
             tracing::error!("Script failed with status {}", status_code);
             tracing::error!("Work directory: '{}'", args.work_dir.display());
-            return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
                 "Script failed".to_string(),
             )));
         }

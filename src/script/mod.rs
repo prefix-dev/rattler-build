@@ -231,10 +231,10 @@ impl Script {
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
                     let rendered = jinja_context.render_str(&script).map_err(|e| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("Failed to render jinja template in build `script`: {}", e),
-                        )
+                        std::io::Error::other(format!(
+                            "Failed to render jinja template in build `script`: {}",
+                            e
+                        ))
                     })?;
                     Ok(ResolvedScriptContents::Inline(rendered))
                 }
@@ -328,10 +328,10 @@ impl Script {
             "ruby" => RubyInterpreter.run(exec_args).await?,
             "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
             _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Unsupported interpreter: {}", self.interpreter()),
-                )
+                return Err(std::io::Error::other(format!(
+                    "Unsupported interpreter: {}",
+                    self.interpreter()
+                ))
                 .into());
             }
         };

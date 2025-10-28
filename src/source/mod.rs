@@ -270,10 +270,10 @@ pub(crate) async fn fetch_source(
                     src_path.display(),
                     dest.display()
                 );
-                if let Some(checksum) = Checksum::from_path_source(src) {
-                    if !checksum.validate(&src_path) {
-                        return Err(SourceError::ValidationFailed);
-                    }
+                if let Some(checksum) = Checksum::from_path_source(src)
+                    && !checksum.validate(&src_path)
+                {
+                    return Err(SourceError::ValidationFailed);
                 }
                 fs::copy(&src_path, dest)?;
             } else {
