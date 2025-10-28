@@ -1465,16 +1465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diffy"
-version = "0.4.2"
-source = "git+https://github.com/prefix-dev/diffy.git?branch=master#f916e25c31a8d9e7483116c9e8aa6a36e20f947a"
-dependencies = [
- "nu-ansi-term",
- "strsim",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,7 +2243,8 @@ dependencies = [
 [[package]]
 name = "http-range-client"
 version = "0.9.1"
-source = "git+https://github.com/pka/http-range-client.git#fccfa852dbe7e875a50802c55ee6c5f69c634827"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5f72a73344fc9576e74e42a0f1d7a05d7c6c50950a15f44faea133a91f622b"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -3320,6 +3311,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "ordered-float"
+version = "2.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "ordered-multimap"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3645,11 +3645,17 @@ version = "0.48.1"
 dependencies = [
  "chrono",
  "clap",
+ "fs-err",
+ "indexmap 2.11.4",
  "miette",
  "pyo3",
  "pyo3-build-config",
  "pythonize",
  "rattler-build",
+ "rattler_build_jinja",
+ "rattler_build_recipe",
+ "rattler_build_types",
+ "rattler_build_variant_config",
  "rattler_conda_types",
  "rattler_config",
  "rattler_networking",
@@ -3951,7 +3957,6 @@ dependencies = [
 name = "rattler-build"
 version = "0.48.1"
 dependencies = [
- "anyhow",
  "async-once-cell",
  "async-recursion",
  "base64",
@@ -3965,7 +3970,6 @@ dependencies = [
  "console",
  "content_inspector",
  "dialoguer",
- "diffy",
  "dunce",
  "flate2",
  "fs-err",
@@ -3980,7 +3984,6 @@ dependencies = [
  "itertools 0.14.0",
  "lazy_static",
  "line-ending",
- "marked-yaml",
  "memchr",
  "memmap2",
  "miette",
@@ -3990,10 +3993,12 @@ dependencies = [
  "pathdiff",
  "petgraph",
  "rattler",
+ "rattler_build_diffy",
  "rattler_build_jinja",
  "rattler_build_networking",
  "rattler_build_recipe",
  "rattler_build_recipe_generator",
+ "rattler_build_script",
  "rattler_build_source_cache",
  "rattler_build_types",
  "rattler_build_variant_config",
@@ -4006,6 +4011,7 @@ dependencies = [
  "rattler_menuinst",
  "rattler_networking",
  "rattler_package_streaming",
+ "rattler_prefix_guard",
  "rattler_redaction",
  "rattler_repodata_gateway",
  "rattler_shell",
@@ -4050,6 +4056,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_diffy"
+version = "0.4.2"
+dependencies = [
+ "nu-ansi-term",
+ "strsim",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "rattler_build_jinja"
 version = "0.1.0"
 dependencies = [
@@ -4091,15 +4106,21 @@ dependencies = [
  "miette",
  "minijinja",
  "pathdiff",
+ "petgraph",
  "rattler_build_jinja",
+ "rattler_build_script",
  "rattler_build_types",
+ "rattler_build_variant_config",
+ "rattler_build_yaml_parser",
  "rattler_conda_types",
  "rattler_digest",
  "regex",
  "serde",
+ "serde-value",
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "sha1",
  "spdx",
  "thiserror 2.0.17",
  "url",
@@ -4132,6 +4153,27 @@ dependencies = [
  "tracing",
  "url",
  "zip 6.0.0",
+]
+
+[[package]]
+name = "rattler_build_script"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "console",
+ "fs-err",
+ "futures",
+ "indexmap 2.11.4",
+ "itertools 0.14.0",
+ "minijinja",
+ "rattler_conda_types",
+ "rattler_shell",
+ "serde",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "which",
 ]
 
 [[package]]
@@ -4174,6 +4216,7 @@ dependencies = [
 name = "rattler_build_types"
 version = "0.1.0"
 dependencies = [
+ "globset",
  "itertools 0.14.0",
  "rattler_conda_types",
  "serde",
@@ -4193,11 +4236,23 @@ dependencies = [
  "minijinja",
  "rattler_build_jinja",
  "rattler_build_types",
+ "rattler_build_yaml_parser",
  "rattler_conda_types",
  "serde",
  "serde_yaml",
  "thiserror 2.0.17",
  "tracing",
+]
+
+[[package]]
+name = "rattler_build_yaml_parser"
+version = "0.1.0"
+dependencies = [
+ "marked-yaml",
+ "miette",
+ "rattler_build_jinja",
+ "serde",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -5293,6 +5348,16 @@ dependencies = [
  "serde",
  "serde_core",
  "typeid",
+]
+
+[[package]]
+name = "serde-value"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
+dependencies = [
+ "ordered-float",
+ "serde",
 ]
 
 [[package]]

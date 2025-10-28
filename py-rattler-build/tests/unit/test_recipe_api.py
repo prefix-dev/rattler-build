@@ -5,7 +5,6 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 """
 
 from pathlib import Path
-import pytest
 from rattler_build.stage0 import Recipe as Stage0Recipe
 from rattler_build.variant_config import VariantConfig
 from rattler_build.render import render_recipe, RenderConfig
@@ -151,20 +150,12 @@ def test_parse_recipe_with_platform_selectors() -> None:
     variant_config = VariantConfig()
 
     # Render for Linux
-    linux_config = RenderConfig(
-        target_platform="linux-64",
-        build_platform="linux-64",
-        host_platform="linux-64"
-    )
+    linux_config = RenderConfig(target_platform="linux-64", build_platform="linux-64", host_platform="linux-64")
     rendered_linux = render_recipe(stage0, variant_config, linux_config)
     stage1_linux = rendered_linux[0].recipe()
 
     # Render for Windows
-    windows_config = RenderConfig(
-        target_platform="win-64",
-        build_platform="win-64",
-        host_platform="win-64"
-    )
+    windows_config = RenderConfig(target_platform="win-64", build_platform="win-64", host_platform="win-64")
     rendered_windows = render_recipe(stage0, variant_config, windows_config)
     stage1_windows = rendered_windows[0].recipe()
 
@@ -375,22 +366,10 @@ build:
 def test_recipe_from_dict_api() -> None:
     """Test creating recipes from Python dictionaries."""
     recipe_dict = {
-        "package": {
-            "name": "dict-api-test",
-            "version": "4.5.6"
-        },
-        "build": {
-            "number": 0,
-            "script": "echo 'Building'"
-        },
-        "requirements": {
-            "host": ["python"],
-            "run": ["python"]
-        },
-        "about": {
-            "summary": "Created from dict",
-            "license": "Apache-2.0"
-        }
+        "package": {"name": "dict-api-test", "version": "4.5.6"},
+        "build": {"number": 0, "script": "echo 'Building'"},
+        "requirements": {"host": ["python"], "run": ["python"]},
+        "about": {"summary": "Created from dict", "license": "Apache-2.0"},
     }
 
     # Create Stage0 from dict
