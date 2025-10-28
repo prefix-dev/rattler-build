@@ -234,6 +234,7 @@ fn find_jinja<S: SourceCode>(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
 fn variables_from_raw_expr<S: SourceCode>(
     expr: &str,
     src: S,

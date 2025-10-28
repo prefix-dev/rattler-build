@@ -608,12 +608,12 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function("load_from_file", move |path: String| {
         check_experimental(experimental)?;
 
-        if let Some(recipe_path) = recipe_path.as_ref() {
-            if let Some(parent) = recipe_path.parent() {
-                let relative_path = parent.join(&path);
-                if let Ok(value) = read_and_parse_file(&relative_path) {
-                    return Ok(value);
-                }
+        if let Some(recipe_path) = recipe_path.as_ref()
+            && let Some(parent) = recipe_path.parent()
+        {
+            let relative_path = parent.join(&path);
+            if let Ok(value) = read_and_parse_file(&relative_path) {
+                return Ok(value);
             }
         }
 

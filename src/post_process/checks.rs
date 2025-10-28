@@ -131,10 +131,10 @@ fn resolved_run_dependencies(
         })
         .flat_map(|dep| {
             if let Some(package_name) = &dep.spec().name {
-                if let Some(nature) = package_to_nature_map.get(package_name) {
-                    if nature != &PackageNature::DSOLibrary {
-                        return None;
-                    }
+                if let Some(nature) = package_to_nature_map.get(package_name)
+                    && nature != &PackageNature::DSOLibrary
+                {
+                    return None;
                 }
                 dep.spec().name.to_owned().map(|v| v.as_source().to_owned())
             } else {
@@ -208,10 +208,10 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         let record = PrefixRecord::from_path(sysroot_path).unwrap();
         let so_glob = Glob::new("*.so*")?.compile_matcher();
         for file in record.files {
-            if let Some(file_name) = file.file_name() {
-                if so_glob.is_match(file_name) {
-                    system_libs.add(Glob::new(&file_name.to_string_lossy())?);
-                }
+            if let Some(file_name) = file.file_name()
+                && so_glob.is_match(file_name)
+            {
+                system_libs.add(Glob::new(&file_name.to_string_lossy())?);
             }
         }
     }
@@ -253,17 +253,15 @@ pub fn perform_linking_checks(
                         }
 
                         let lib = resolved.as_ref().unwrap_or(lib);
-                        if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                            if let Some(package) = prefix_info
+                        if let Ok(libpath) = lib.strip_prefix(host_prefix)
+                            && let Some(package) = prefix_info
                                 .path_to_package
                                 .get(&libpath.to_path_buf().into())
-                            {
-                                if let Some(nature) = prefix_info.package_to_nature.get(package) {
-                                    // Only take shared libraries into account.
-                                    if nature == &PackageNature::DSOLibrary {
-                                        file_dsos.push((libpath.to_path_buf(), package.clone()));
-                                    }
-                                }
+                            && let Some(nature) = prefix_info.package_to_nature.get(package)
+                        {
+                            // Only take shared libraries into account.
+                            if nature == &PackageNature::DSOLibrary {
+                                file_dsos.push((libpath.to_path_buf(), package.clone()));
                             }
                         }
                     }

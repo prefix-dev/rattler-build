@@ -145,13 +145,10 @@ fn get_core_modules_from_perl() -> Result<HashSet<String>, std::io::Error> {
         .output()?;
 
     if !output.status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "Perl command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        ));
+        return Err(std::io::Error::other(format!(
+            "Perl command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
     }
 
     let modules_text = String::from_utf8_lossy(&output.stdout);
@@ -562,21 +559,20 @@ make install"#
         }
 
         // Add bugtracker URL if available
-        if let Some(bugtracker) = &resources.bugtracker {
-            if recipe.about.repository.is_none() {
-                recipe.about.repository = bugtracker.web.clone();
-            }
+        if let Some(bugtracker) = &resources.bugtracker
+            && recipe.about.repository.is_none()
+        {
+            recipe.about.repository = bugtracker.web.clone();
         }
     }
 
     // Add author information
-    if let Some(metadata) = &metadata.release.metadata {
-        if let Some(authors) = &metadata.author {
-            if !authors.is_empty() {
-                let authors_str = authors.join(", ");
-                recipe.about.description = Some(format!("By {}", authors_str));
-            }
-        }
+    if let Some(metadata) = &metadata.release.metadata
+        && let Some(authors) = &metadata.author
+        && !authors.is_empty()
+    {
+        let authors_str = authors.join(", ");
+        recipe.about.description = Some(format!("By {}", authors_str));
     }
 
     // Add additional metadata from modules if not already set

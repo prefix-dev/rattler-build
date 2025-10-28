@@ -12,12 +12,22 @@ use std::{
 
 use diffy::{Diff, Patch};
 use fs_err::File;
-use fs_err::read;
 use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
     trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
+}
+
+/// Summarize a single patch file by reading and parsing it.
+pub fn summarize_single_patch(
+    patch_path: &Path,
+    work_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let data = fs_err::read(patch_path).map_err(SourceError::Io)?;
+    let patch = patch_from_bytes(&data)
+        .map_err(|_| SourceError::PatchParseFailed(patch_path.to_path_buf()))?;
+    summarize_patch(&patch, work_dir)
 }
 
 /// Normalizes backup file paths (.orig/.bak) to their actual file paths
@@ -36,13 +46,13 @@ fn normalize_backup_paths(
     }
 
     // Check if original file is a backup of the modified file
-    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
-        if let Some(mod_filename) = modified.file_name() {
-            if matches!(orig_ext.to_str(), Some("orig" | "bak")) && orig_stem == mod_filename {
-                // Original is a backup of modified file, treat as modifying the actual file
-                return (Some(modified.clone()), Some(modified.clone()));
-            }
-        }
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension())
+        && let Some(mod_filename) = modified.file_name()
+        && matches!(orig_ext.to_str(), Some("orig" | "bak"))
+        && orig_stem == mod_filename
+    {
+        // Original is a backup of modified file, treat as modifying the actual file
+        return (Some(modified.clone()), Some(modified.clone()));
     }
 
     (original_path, modified_path)
@@ -365,26 +375,6 @@ pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats
     Ok(stats)
 }
 
-/// Summarize multiple patch files by reading and parsing each patch.
-pub fn summarize_patches(
-    patches: &[PathBuf],
-    work_dir: &Path,
-    patch_dir: &Path,
-) -> Result<PatchStats, SourceError> {
-    let mut total = PatchStats::default();
-    for patch_file in patches {
-        let full_path = patch_dir.join(patch_file);
-        let data = read(&full_path)?;
-        let patch = patch_from_bytes(&data)
-            .map_err(|_| SourceError::PatchParseFailed(full_path.clone()))?;
-        let stats = summarize_patch(&patch, work_dir)?;
-        total.changed.extend(stats.changed);
-        total.added.extend(stats.added);
-        total.removed.extend(stats.removed);
-    }
-    Ok(total)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::source::copy_dir::CopyDir;
@@ -446,18 +436,16 @@ mod tests {
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
-        assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("text.md")));
 
         let patch_file_content =
             fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
-        assert!(patched_paths.contains(&PathBuf::from("b/CMakeLists.txt")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("CMakeLists.txt")));
     }
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
@@ -675,6 +663,77 @@ mod tests {
         let text_md = tempdir.path().join("workdir/text.md");
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_pure_rename_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch with pure renames (100% similarity, no content changes)
+        apply_patches(
+            &[PathBuf::from("test_pure_rename.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Pure rename patch should apply successfully");
+
+        // Check that the __init__.py file was deleted
+        let init_file = tempdir.path().join("workdir/tinygrad/frontend/__init__.py");
+        assert!(
+            !init_file.exists(),
+            "frontend/__init__.py should be deleted"
+        );
+
+        // Check that onnx.py was renamed from frontend to nn
+        let old_onnx = tempdir.path().join("workdir/tinygrad/frontend/onnx.py");
+        let new_onnx = tempdir.path().join("workdir/tinygrad/nn/onnx.py");
+        assert!(!old_onnx.exists(), "frontend/onnx.py should not exist");
+        assert!(new_onnx.exists(), "nn/onnx.py should exist");
+        let onnx_content = fs_err::read_to_string(&new_onnx).unwrap();
+        assert_eq!(
+            onnx_content, "# onnx code\n",
+            "onnx.py content should be preserved"
+        );
+
+        // Check that torch.py was renamed from frontend to nn
+        let old_torch = tempdir.path().join("workdir/tinygrad/frontend/torch.py");
+        let new_torch = tempdir.path().join("workdir/tinygrad/nn/torch.py");
+        assert!(!old_torch.exists(), "frontend/torch.py should not exist");
+        assert!(new_torch.exists(), "nn/torch.py should exist");
+        let torch_content = fs_err::read_to_string(&new_torch).unwrap();
+        assert_eq!(
+            torch_content, "# torch code\n",
+            "torch.py content should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_apply_create_delete_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Create the file that will be deleted
+        let to_delete = tempdir.path().join("workdir/to_be_deleted.txt");
+        fs_err::write(&to_delete, "This file will be deleted\nby the patch\n").unwrap();
+
+        // Apply patch with creation and deletion
+        apply_patches(
+            &[PathBuf::from("test_create_delete.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Create/delete patch should apply successfully");
+
+        // Check that the file was deleted
+        assert!(!to_delete.exists(), "to_be_deleted.txt should be deleted");
+
+        // Check that the new file was created with correct content
+        let created_file = tempdir.path().join("workdir/newly_created.txt");
+        assert!(created_file.exists(), "newly_created.txt should exist");
+        let content = fs_err::read_to_string(&created_file).unwrap();
+        assert!(content.contains("This is a newly created file"));
+        assert!(content.contains("via patch application"));
     }
 
     #[test]

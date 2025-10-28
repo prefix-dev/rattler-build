@@ -75,12 +75,12 @@ impl Output {
                 .requirements
                 .build_time()
                 .filter_map(|x| {
-                    if let Dependency::Spec(spec) = x {
-                        if spec.version.is_none() && spec.build.is_none() {
-                            if let Some(name) = spec.name.as_ref() {
-                                return Some(name.as_normalized().to_string());
-                            }
-                        }
+                    if let Dependency::Spec(spec) = x
+                        && spec.version.is_none()
+                        && spec.build.is_none()
+                        && let Some(name) = spec.name.as_ref()
+                    {
+                        return Some(name.as_normalized().to_string());
                     }
                     None
                 })

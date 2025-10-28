@@ -1,0 +1,15 @@
+diff --git a/tinygrad/frontend/__init__.py b/tinygrad/frontend/__init__.py
+deleted file mode 100644
+index 9d2492e..0000000
+--- a/tinygrad/frontend/__init__.py
++++ /dev/null
+@@ -1 +0,0 @@
+-# frontend init
+diff --git a/tinygrad/frontend/onnx.py b/tinygrad/nn/onnx.py
+similarity index 100%
+rename from tinygrad/frontend/onnx.py
+rename to tinygrad/nn/onnx.py
+diff --git a/tinygrad/frontend/torch.py b/tinygrad/nn/torch.py
+similarity index 100%
+rename from tinygrad/frontend/torch.py
+rename to tinygrad/nn/torch.py

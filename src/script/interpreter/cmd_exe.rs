@@ -76,8 +76,7 @@ impl Interpreter for CmdExeInterpreter {
             let status_code = output.status.code().unwrap_or(1);
             tracing::error!("Script failed with status {}", status_code);
             tracing::error!("{}", print_debug_info(&args));
-            return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
                 "Script failed".to_string(),
             )));
         }
@@ -91,10 +90,10 @@ impl Interpreter for CmdExeInterpreter {
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
         // check if COMSPEC is set to cmd.exe
-        if let Ok(comspec) = std::env::var("COMSPEC") {
-            if comspec.to_lowercase().contains("cmd.exe") {
-                return Ok(Some(PathBuf::from(comspec)));
-            }
+        if let Ok(comspec) = std::env::var("COMSPEC")
+            && comspec.to_lowercase().contains("cmd.exe")
+        {
+            return Ok(Some(PathBuf::from(comspec)));
         }
 
         // check if cmd.exe is in PATH

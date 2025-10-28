@@ -145,13 +145,12 @@ async fn get_actual_filename(
             SourceError::UnknownError(format!("HEAD request failed: {}", e))
         })?;
 
-    if let Some(content_disposition) = response.headers().get("content-disposition") {
-        if let Ok(header_str) = content_disposition.to_str() {
-            if let Some(filename) = extract_filename_from_content_disposition(header_str) {
-                tracing::info!("Found filename from Content-Disposition: {}", filename);
-                return Ok(Some(filename));
-            }
-        }
+    if let Some(content_disposition) = response.headers().get("content-disposition")
+        && let Ok(header_str) = content_disposition.to_str()
+        && let Some(filename) = extract_filename_from_content_disposition(header_str)
+    {
+        tracing::info!("Found filename from Content-Disposition: {}", filename);
+        return Ok(Some(filename));
     }
 
     Ok(None)
@@ -402,21 +401,18 @@ pub(crate) async fn url_src(
         let filename_from_header = actual_filename.is_some() && url.scheme() != "file";
 
         if url.scheme() == "file" {
-            let local_path = url.to_file_path().map_err(|_| {
-                SourceError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Invalid local file path",
-                ))
-            })?;
+            let local_path = url
+                .to_file_path()
+                .map_err(|_| SourceError::Io(std::io::Error::other("Invalid local file path")))?;
 
             if !local_path.is_file() {
                 return Err(SourceError::FileNotFound(local_path));
             }
 
-            if let Some(checksum) = &checksum {
-                if !checksum.validate(&local_path) {
-                    return Err(SourceError::ValidationFailed);
-                }
+            if let Some(checksum) = &checksum
+                && !checksum.validate(&local_path)
+            {
+                return Err(SourceError::ValidationFailed);
             }
 
             // copy file to cache
@@ -440,12 +436,12 @@ pub(crate) async fn url_src(
                     Ok(_) => {
                         tracing::info!("Downloaded file from {}", url);
 
-                        if let Some(checksum) = &checksum {
-                            if !checksum.validate(&cache_name) {
-                                tracing::error!("Checksum validation failed!");
-                                fs::remove_file(&cache_name)?;
-                                return Err(SourceError::ValidationFailed);
-                            }
+                        if let Some(checksum) = &checksum
+                            && !checksum.validate(&cache_name)
+                        {
+                            tracing::error!("Checksum validation failed!");
+                            fs::remove_file(&cache_name)?;
+                            return Err(SourceError::ValidationFailed);
                         }
 
                         // Save download metadata

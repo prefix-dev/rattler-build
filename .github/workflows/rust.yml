@@ -35,7 +35,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
-          toolchain: "1.86.0"
+          toolchain: "1.89.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
@@ -142,7 +142,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
-          toolchain: "1.86.0"
+          toolchain: "1.89.0"
           target: ${{ matrix.target }}
 
       - name: Install musl-gcc

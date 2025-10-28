@@ -506,29 +506,30 @@ pub fn apply_variant(
             match s {
                 Dependency::Spec(m) => {
                     let m = m.clone();
-                    if build_time && m.version.is_none() && m.build.is_none() {
-                        if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
-                                // if the variant starts with an alphanumeric character,
-                                // we have to add a '=' to the version spec
-                                let mut spec = version.to_string();
+                    if build_time
+                        && m.version.is_none()
+                        && m.build.is_none()
+                        && let Some(name) = &m.name
+                        && let Some(version) = variant.get(&name.into())
+                    {
+                        // if the variant starts with an alphanumeric character,
+                        // we have to add a '=' to the version spec
+                        let mut spec = version.to_string();
 
-                                // check if all characters are alphanumeric or ., in that case add
-                                // a '=' to get "startswith" behavior
-                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={spec}");
-                                }
-
-                                let variant = name.as_normalized().to_string();
-                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
-                                    ResolveError::VariantSpecParseError(variant.clone(), e)
-                                })?;
-
-                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
-
-                                return Ok(VariantDependency { spec, variant }.into());
-                            }
+                        // check if all characters are alphanumeric or ., in that case add
+                        // a '=' to get "startswith" behavior
+                        if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                            spec = format!("={spec}");
                         }
+
+                        let variant = name.as_normalized().to_string();
+                        let spec: NamelessMatchSpec = spec
+                            .parse()
+                            .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
+
+                        let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                        return Ok(VariantDependency { spec, variant }.into());
                     }
                     Ok(SourceDependency { spec: m }.into())
                 }
@@ -830,19 +831,19 @@ pub(crate) async fn resolve_dependencies(
     let output_ignore_run_exports = requirements.ignore_run_exports(None);
     let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_build_env) = &cache.build {
-            let cache_build_run_exports = cache_build_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_build_run_exports, "cache-build")?;
-            build_run_exports.extend(&filtered);
-        }
+    if let Some(cache) = &output.finalized_cache_dependencies
+        && let Some(cache_build_env) = &cache.build
+    {
+        let cache_build_run_exports = cache_build_env.run_exports(true);
+        let filtered = output
+            .recipe
+            .cache
+            .as_ref()
+            .expect("recipe should have cache section")
+            .requirements
+            .ignore_run_exports(Some(&output_ignore_run_exports))
+            .filter(&cache_build_run_exports, "cache-build")?;
+        build_run_exports.extend(&filtered);
     }
 
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
@@ -970,19 +971,19 @@ pub(crate) async fn resolve_dependencies(
     // And filter the run exports
     let mut host_run_exports = output_ignore_run_exports.filter(&host_run_exports, "host")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_host_env) = &cache.host {
-            let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
-            host_run_exports.extend(&filtered);
-        }
+    if let Some(cache) = &output.finalized_cache_dependencies
+        && let Some(cache_host_env) = &cache.host
+    {
+        let cache_host_run_exports = cache_host_env.run_exports(true);
+        let filtered = output
+            .recipe
+            .cache
+            .as_ref()
+            .expect("recipe should have cache section")
+            .requirements
+            .ignore_run_exports(Some(&output_ignore_run_exports))
+            .filter(&cache_host_run_exports, "cache-host")?;
+        host_run_exports.extend(&filtered);
     }
 
     // add the host run exports to the run dependencies
