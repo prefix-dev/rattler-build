@@ -715,4 +715,17 @@ requirements:
         assert!(output.contains("No license files were copied"));
         assert!(output.contains("The following license files were not found: *.license"));
     }
+
+    #[test]
+    fn test_sourceforge_redirects() {
+        let tmp = tmp("test_sourceforge_redirects");
+        let rattler_build = rattler().build(
+            recipes().join("sourceforge-redirects"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(rattler_build.status.success());
+    }
 }
