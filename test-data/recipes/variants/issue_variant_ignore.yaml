@@ -33,6 +33,16 @@ outputs:
       - script:
           - echo "This is a metapackage, no test is necessary."
 
+  - package:
+      name: eigen-abi-other
+      version: ${{ version }}
+    build:
+      variant:
+        use_keys:
+          - some_key
+        ignore_keys:
+          - eigen_abi_profile
+
 about:
   homepage: http://eigen.tuxfamily.org/
   license: MPL-2.0

@@ -176,7 +176,7 @@ def test_eigen_abi_profile_ignore_keys(rattler_build: RattlerBuild, recipes: Pat
     - The 'eigen-abi' package version should include the abi profile (e.g., 3.4.0.100)
     """
     recipe_path = recipes / "variants" / "issue_variant_ignore.yaml"
-    variant_config = recipes / "used-vars" / "variants.yaml"
+    variant_config = recipes / "variants" / "variant_config.yaml"
 
     # Render the recipe to get all variants
     rendered = rattler_build.render(
@@ -188,6 +188,7 @@ def test_eigen_abi_profile_ignore_keys(rattler_build: RattlerBuild, recipes: Pat
     # Separate the outputs by package name
     eigen_outputs = []
     eigen_abi_outputs = []
+    eigen_abi_other_outputs = []
 
     for item in rendered:
         package_name = item["recipe"]["package"]["name"]
@@ -201,25 +202,42 @@ def test_eigen_abi_profile_ignore_keys(rattler_build: RattlerBuild, recipes: Pat
                 "version": version,
                 "build_string": build_string,
                 "variant": variant,
-                "abi_profile": variant.get("eigen_abi_profile", "none")
+                "abi_profile": variant.get("eigen_abi_profile", "none"),
+                "some_key": variant.get("some_key", "none")
             })
         elif package_name == "eigen-abi":
             eigen_abi_outputs.append({
                 "version": version,
                 "build_string": build_string,
                 "variant": variant,
-                "abi_profile": variant.get("eigen_abi_profile", "none")
+                "abi_profile": variant.get("eigen_abi_profile", "none"),
+                "some_key": variant.get("some_key", "none")
+            })
+        elif package_name == "eigen-abi-other":
+            eigen_abi_other_outputs.append({
+                "version": version,
+                "build_string": build_string,
+                "variant": variant,
+                "abi_profile": variant.get("eigen_abi_profile", "none"),
+                "some_key": variant.get("some_key", "none")
             })
 
     # Verify we have the expected number of outputs
-    # Since eigen ignores eigen_abi_profile, it should only be built ONCE (same hash for all profiles)
-    # eigen-abi does NOT ignore it, so should be built TWICE (once per profile)
+    # eigen: ignores eigen_abi_profile -> 1 build (same hash for all abi profiles)
+    # eigen-abi: does NOT ignore eigen_abi_profile -> 2 builds (one per abi profile: 100, 80)
+    # eigen-abi-other: uses use_keys: [some_key] and ignore_keys: [eigen_abi_profile]
+    #   use_keys forces some_key into the variant -> 2 builds (one per some_key: 1, 2)
+    #   ignore_keys excludes eigen_abi_profile from hash
     assert len(eigen_outputs) == 1, (
         f"Expected 1 eigen output (since ignore_keys makes all abi_profile variants identical), "
         f"got {len(eigen_outputs)}"
     )
     assert len(eigen_abi_outputs) == 2, (
         f"Expected 2 eigen-abi outputs (one per abi_profile), got {len(eigen_abi_outputs)}"
+    )
+    assert len(eigen_abi_other_outputs) == 2, (
+        f"Expected 2 eigen-abi-other outputs (one per some_key via use_keys), "
+        f"got {len(eigen_abi_other_outputs)}"
     )
 
     # Test 1: eigen output should only be built once (all abi profiles produce same hash)
@@ -293,7 +311,47 @@ def test_eigen_abi_profile_ignore_keys(rattler_build: RattlerBuild, recipes: Pat
         f"but both have: {hash_100}"
     )
 
+    # Test 6: eigen-abi-other validates that use_keys and ignore_keys work together
+    # use_keys forces some_key into variant even though it's not referenced
+    # ignore_keys prevents eigen_abi_profile from affecting the hash
+    some_keys_found = set()
+    eigen_abi_other_by_some_key = {}
+
+    for output in eigen_abi_other_outputs:
+        variant = output["variant"]
+
+        # Should have some_key (via use_keys)
+        assert "some_key" in variant, (
+            f"eigen-abi-other variant should include some_key (via use_keys), but variant is: {variant}"
+        )
+
+        # Should NOT have eigen_abi_profile (via ignore_keys)
+        assert "eigen_abi_profile" not in variant or variant.get("eigen_abi_profile") is None, (
+            f"eigen-abi-other variant should not include eigen_abi_profile (it's ignored), "
+            f"but variant is: {variant}"
+        )
+
+        some_key_value = variant["some_key"]
+        some_keys_found.add(str(some_key_value))
+        eigen_abi_other_by_some_key[str(some_key_value)] = output
+
+    # Verify we saw both some_key values
+    assert some_keys_found == {"1", "2"}, (
+        f"Expected to find some_key values 1 and 2, but found: {some_keys_found}"
+    )
+
+    # Verify different some_key values produce different hashes
+    hash_1 = eigen_abi_other_by_some_key["1"]["build_string"].split('_')[0]
+    hash_2 = eigen_abi_other_by_some_key["2"]["build_string"].split('_')[0]
+
+    assert hash_1 != hash_2, (
+        f"eigen-abi-other outputs for different some_key values should have different hashes, "
+        f"but both have: {hash_1}"
+    )
+
     print("\n✓ Test passed!")
     print(f"  eigen (ignores abi_profile): {eigen_build_string}")
     print(f"  eigen-abi-100: {eigen_abi_100['build_string']}")
     print(f"  eigen-abi-80: {eigen_abi_80['build_string']}")
+    print(f"  eigen-abi-other (some_key=1, ignores abi_profile): {eigen_abi_other_by_some_key['1']['build_string']}")
+    print(f"  eigen-abi-other (some_key=2, ignores abi_profile): {eigen_abi_other_by_some_key['2']['build_string']}")
