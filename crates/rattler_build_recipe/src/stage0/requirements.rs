@@ -87,10 +87,11 @@ impl Requirements {
                         let matchspec = &val.0;
 
                         // A spec is "free" if it has no version and no build constraints
-                        if matchspec.version.is_none() && matchspec.build.is_none() {
-                            if let Some(name) = &matchspec.name {
-                                specs.push(name.clone());
-                            }
+                        if matchspec.version.is_none()
+                            && matchspec.build.is_none()
+                            && let Some(name) = &matchspec.name
+                        {
+                            specs.push(name.clone());
                         }
                     }
                 }
@@ -101,10 +102,11 @@ impl Requirements {
                             let matchspec = &val.0;
 
                             // A spec is "free" if it has no version and no build constraints
-                            if matchspec.version.is_none() && matchspec.build.is_none() {
-                                if let Some(name) = &matchspec.name {
-                                    specs.push(name.clone());
-                                }
+                            if matchspec.version.is_none()
+                                && matchspec.build.is_none()
+                                && let Some(name) = &matchspec.name
+                            {
+                                specs.push(name.clone());
                             }
                         }
                     }
@@ -114,10 +116,11 @@ impl Requirements {
                                 let matchspec = &val.0;
 
                                 // A spec is "free" if it has no version and no build constraints
-                                if matchspec.version.is_none() && matchspec.build.is_none() {
-                                    if let Some(name) = &matchspec.name {
-                                        specs.push(name.clone());
-                                    }
+                                if matchspec.version.is_none()
+                                    && matchspec.build.is_none()
+                                    && let Some(name) = &matchspec.name
+                                {
+                                    specs.push(name.clone());
                                 }
                             }
                         }

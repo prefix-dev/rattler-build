@@ -113,10 +113,10 @@ impl BaseClient {
 
     /// Returns true if SSL verification should be disabled for the given URL
     fn disable_ssl(&self, url: &Url) -> bool {
-        if let Some(hosts) = &self.allow_insecure_host {
-            if let Some(host) = url.host_str() {
-                return hosts.iter().any(|h| h == host);
-            }
+        if let Some(hosts) = &self.allow_insecure_host
+            && let Some(host) = url.host_str()
+        {
+            return hosts.iter().any(|h| h == host);
         }
         false
     }

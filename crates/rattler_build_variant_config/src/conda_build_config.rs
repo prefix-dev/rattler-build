@@ -149,11 +149,9 @@ pub fn load_conda_build_config(
         .into_iter()
         .filter(|(k, v)| {
             // Emit warning for pin_run_as_build
-            if let Some(key_str) = k.as_str() {
-                if key_str == "pin_run_as_build" {
+            if let Some(key_str) = k.as_str() && key_str == "pin_run_as_build" {
                     tracing::warn!("Found 'pin_run_as_build' in conda_build_config.yaml - this is currently not supported and will be ignored");
                     return false;
-                }
             }
             !v.is_null()
         })

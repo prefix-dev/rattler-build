@@ -291,10 +291,10 @@ fn collect_variables_from_call(
             "pin_compatible" => {
                 // pin_compatible(name) expands to the name variable (unless it's a string literal)
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
-                        if !matches!(expr, Expr::Const(_)) {
-                            collect_variables_from_expr(expr, variables);
-                        }
+                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg
+                        && !matches!(expr, Expr::Const(_))
+                    {
+                        collect_variables_from_expr(expr, variables);
                     }
                 }
             }
@@ -329,10 +329,10 @@ fn collect_variables_from_call(
 fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Option<String> {
     use minijinja::machinery::ast::{CallArg, Expr};
 
-    if let Some(CallArg::Pos(Expr::Const(c))) = args.first() {
-        if let Some(s) = c.value.as_str() {
-            return Some(s.to_string());
-        }
+    if let Some(CallArg::Pos(Expr::Const(c))) = args.first()
+        && let Some(s) = c.value.as_str()
+    {
+        return Some(s.to_string());
     }
     None
 }

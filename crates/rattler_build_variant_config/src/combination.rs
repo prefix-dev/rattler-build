@@ -112,10 +112,10 @@ pub fn compute_combinations(
     let variant_keys = used_vars
         .iter()
         .filter_map(|key| {
-            if let Some(values) = variants.get(key) {
-                if !zip_keys.iter().any(|zip| zip.contains(key)) {
-                    return Some(VariantKey::Key(key.clone(), values.clone()));
-                }
+            if let Some(values) = variants.get(key)
+                && !zip_keys.iter().any(|zip| zip.contains(key))
+            {
+                return Some(VariantKey::Key(key.clone(), values.clone()));
             }
             None
         })
@@ -168,10 +168,10 @@ fn validate_zip_keys(
                 Some(value) => value,
             };
 
-            if let Some(l) = prev_len {
-                if l != value.len() {
-                    return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
-                }
+            if let Some(l) = prev_len
+                && l != value.len()
+            {
+                return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
             }
             prev_len = Some(value.len());
         }

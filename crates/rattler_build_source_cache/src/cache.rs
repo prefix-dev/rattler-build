@@ -236,15 +236,15 @@ impl SourceCache {
             let cache_path = self.index.get_cache_path(&entry);
 
             // If extraction was done, return extracted path
-            if let Some(extracted_path) = self.index.get_extracted_path(&entry) {
-                if extracted_path.exists() {
-                    self.index.touch(&key).await?;
-                    tracing::info!(
-                        "Found extracted source in cache: {}",
-                        extracted_path.display()
-                    );
-                    return Ok(extracted_path);
-                }
+            if let Some(extracted_path) = self.index.get_extracted_path(&entry)
+                && extracted_path.exists()
+            {
+                self.index.touch(&key).await?;
+                tracing::info!(
+                    "Found extracted source in cache: {}",
+                    extracted_path.display()
+                );
+                return Ok(extracted_path);
             }
 
             // Otherwise return the archive file
@@ -272,11 +272,11 @@ impl SourceCache {
         let (cache_path, actual_filename) = self.download_url(url, &key).await?;
 
         // Validate checksum
-        if let Some(cs) = checksum {
-            if !cs.validate(&cache_path) {
-                tokio::fs::remove_file(&cache_path).await?;
-                return Err(CacheError::ValidationFailed { path: cache_path });
-            }
+        if let Some(cs) = checksum
+            && !cs.validate(&cache_path)
+        {
+            tokio::fs::remove_file(&cache_path).await?;
+            return Err(CacheError::ValidationFailed { path: cache_path });
         }
 
         // Extract if needed and no explicit filename was provided

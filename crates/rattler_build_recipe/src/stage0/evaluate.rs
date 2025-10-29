@@ -2099,15 +2099,14 @@ impl Evaluate for Stage0Recipe {
         // Add virtual packages from run requirements to the variant
         // Virtual packages (starting with '__') should be included in the hash
         for dep in &requirements.run {
-            if let crate::stage1::Dependency::Spec(spec) = dep {
-                if let Some(ref name) = spec.name {
-                    if name.as_normalized().starts_with("__") {
-                        actual_variant.insert(
-                            NormalizedKey::from(name.as_normalized()),
-                            Variable::from(spec.to_string()),
-                        );
-                    }
-                }
+            if let crate::stage1::Dependency::Spec(spec) = dep
+                && let Some(ref name) = spec.name
+                && name.as_normalized().starts_with("__")
+            {
+                actual_variant.insert(
+                    NormalizedKey::from(name.as_normalized()),
+                    Variable::from(spec.to_string()),
+                );
             }
         }
 
@@ -2509,15 +2508,14 @@ fn evaluate_package_output_to_recipe(
     // Add virtual packages from run requirements to the variant
     // Virtual packages (starting with '__') should be included in the hash
     for dep in &requirements.run {
-        if let crate::stage1::Dependency::Spec(spec) = dep {
-            if let Some(ref name) = spec.name {
-                if name.as_normalized().starts_with("__") {
-                    actual_variant.insert(
-                        NormalizedKey::from(name.as_normalized()),
-                        Variable::from(spec.to_string()),
-                    );
-                }
-            }
+        if let crate::stage1::Dependency::Spec(spec) = dep
+            && let Some(ref name) = spec.name
+            && name.as_normalized().starts_with("__")
+        {
+            actual_variant.insert(
+                NormalizedKey::from(name.as_normalized()),
+                Variable::from(spec.to_string()),
+            );
         }
     }
 

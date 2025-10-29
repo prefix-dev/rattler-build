@@ -95,23 +95,23 @@ impl CacheIndex {
 
         let mut dir = tokio::fs::read_dir(&self.metadata_dir).await?;
         while let Some(entry) = dir.next_entry().await? {
-            if let Some(filename) = entry.file_name().to_str() {
-                if filename.ends_with(".json") {
-                    let key = filename.trim_end_matches(".json");
-                    let metadata_path = self.metadata_dir.join(filename);
+            if let Some(filename) = entry.file_name().to_str()
+                && filename.ends_with(".json")
+            {
+                let key = filename.trim_end_matches(".json");
+                let metadata_path = self.metadata_dir.join(filename);
 
-                    match tokio::fs::read_to_string(&metadata_path).await {
-                        Ok(content) => match serde_json::from_str::<CacheEntry>(&content) {
-                            Ok(cache_entry) => {
-                                entries.insert(key.to_string(), cache_entry);
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to parse cache metadata {}: {}", key, e);
-                            }
-                        },
-                        Err(e) => {
-                            tracing::warn!("Failed to read cache metadata {}: {}", key, e);
+                match tokio::fs::read_to_string(&metadata_path).await {
+                    Ok(content) => match serde_json::from_str::<CacheEntry>(&content) {
+                        Ok(cache_entry) => {
+                            entries.insert(key.to_string(), cache_entry);
                         }
+                        Err(e) => {
+                            tracing::warn!("Failed to parse cache metadata {}: {}", key, e);
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!("Failed to read cache metadata {}: {}", key, e);
                     }
                 }
             }
@@ -232,10 +232,10 @@ impl CacheIndex {
                         }
 
                         // Remove extracted directory
-                        if let Some(extracted_path) = self.get_extracted_path(&entry) {
-                            if extracted_path.exists() {
-                                let _ = tokio::fs::remove_dir_all(&extracted_path).await;
-                            }
+                        if let Some(extracted_path) = self.get_extracted_path(&entry)
+                            && extracted_path.exists()
+                        {
+                            let _ = tokio::fs::remove_dir_all(&extracted_path).await;
                         }
                     }
                     SourceType::Git => {

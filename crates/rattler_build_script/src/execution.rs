@@ -423,11 +423,9 @@ pub async fn run_script(
         "ruby" => RubyInterpreter.run(exec_args).await?,
         "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
         _ => {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Unsupported interpreter: {}", interpreter),
-            )
-            .into());
+            return Err(
+                std::io::Error::other(format!("Unsupported interpreter: {}", interpreter)).into(),
+            );
         }
     };
 
