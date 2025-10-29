@@ -127,10 +127,16 @@ pub fn compile_pyc(
                 .arg(f)
                 .output();
 
-            if command.is_err() {
-                let stderr = String::from_utf8_lossy(&command.as_ref().unwrap().stderr);
-                tracing::error!("Error compiling .py files to .pyc: {}", stderr);
-                return Err(PackagingError::PythonCompileError(stderr.to_string()));
+            if let Err(err) = command {
+                tracing::error!(
+                    "Error compiling .py files to .pyc! Command could not spawn ({:?})",
+                    err
+                );
+                return Err(PackagingError::PythonCompileError(format!(
+                    "Could not spawn python compiler for file {}: {:?}",
+                    f.display(),
+                    err
+                )));
             }
 
             let command = command.unwrap();

@@ -140,11 +140,11 @@ impl Relinker for Dll {
             let path = encoded_prefix.join(path_in_prefix);
             let same_dir = path.parent().map(|p| p.join(dll_name));
 
-            if let Some(path) = same_dir {
-                if path.exists() {
-                    result.insert(lib.clone(), Some(path));
-                    continue;
-                }
+            if let Some(path) = same_dir
+                && path.exists()
+            {
+                result.insert(lib.clone(), Some(path));
+                continue;
             }
 
             // 2. Check all directories in the search path

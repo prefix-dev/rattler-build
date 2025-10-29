@@ -163,19 +163,16 @@ async fn extract_build_requirements(
 
             // Try different build system specs
             return Ok(match toml.get("build-system") {
-                Some(build) => {
-                    let reqs = build
-                        .get("requires")
-                        .and_then(|r| r.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str())
-                                .map(|s| s.to_string())
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    reqs
-                }
+                Some(build) => build
+                    .get("requires")
+                    .and_then(|r| r.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 None => Vec::new(),
             });
         }
@@ -317,11 +314,11 @@ async fn map_requirement(
         return req.to_string();
     }
     // Get base package name without markers/version
-    if let Some(base_name) = req.split([' ', ';']).next() {
-        if let Some(mapped_name) = mapping.get(base_name) {
-            // Replace the package name but keep version and markers
-            return req.replacen(base_name, mapped_name, 1).to_string();
-        }
+    if let Some(base_name) = req.split([' ', ';']).next()
+        && let Some(mapped_name) = mapping.get(base_name)
+    {
+        // Replace the package name but keep version and markers
+        return req.replacen(base_name, mapped_name, 1).to_string();
     }
     req.to_string()
 }

@@ -336,10 +336,10 @@ impl Script {
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
                     let rendered = renderer(&script).map_err(|e| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("Failed to render jinja template in build `script`: {}", e),
-                        )
+                        std::io::Error::other(format!(
+                            "Failed to render jinja template in build `script`: {}",
+                            e
+                        ))
                     })?;
                     Ok(ResolvedScriptContents::Inline(rendered))
                 }

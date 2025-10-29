@@ -6,3 +6,5 @@ Cargo.lock merge=binary linguist-generated=true
 crates/rattler_build_diffy/src/patch/test-data/*.patch text eol=lf
 # Keep one file with CRLF endings to test Windows-style line ending handling
 crates/rattler_build_diffy/src/patch/test-data/define_byteswap.patch text eol=crlf
+# Test data files should always use LF line endings for cross-platform consistency
+test-data/patch_application/**/*.py text eol=lf

@@ -24,12 +24,7 @@ impl io::Write for TuiOutputHandler {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.log_sender
             .send(Event::BuildLog(buf.to_vec()))
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("could not send TUI event: {e}"),
-                )
-            })?;
+            .map_err(|e| io::Error::other(format!("could not send TUI event: {e}")))?;
         Ok(buf.len())
     }
 

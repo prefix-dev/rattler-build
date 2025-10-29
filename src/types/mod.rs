@@ -192,7 +192,7 @@ pub async fn build_reindexed_channels(
     // Reindex the output channel from the files on disk
     index_fs(index_config)
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
     Ok(iter::once(output_channel.base_url)
         .chain(build_configuration.channels.iter().cloned())

@@ -40,10 +40,10 @@ mod unix {
 
     impl Drop for PermissionGuard {
         fn drop(&mut self) {
-            if self.path.exists() {
-                if let Err(e) = fs::set_permissions(&self.path, self.original_permissions.clone()) {
-                    eprintln!("Failed to restore file permissions: {}", e);
-                }
+            if self.path.exists()
+                && let Err(e) = fs::set_permissions(&self.path, self.original_permissions.clone())
+            {
+                eprintln!("Failed to restore file permissions: {}", e);
             }
         }
     }

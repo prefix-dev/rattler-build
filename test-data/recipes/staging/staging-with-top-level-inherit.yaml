@@ -10,8 +10,7 @@ recipe:
   version: 2.0.0
 
 source:
-  url: https://example.com/mixed-inheritance-2.0.0.tar.gz
-  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  path: ./staging-with-deps.yaml
 
 build:
   number: 0
@@ -34,7 +33,8 @@ build:
 about:
   summary: Project with mixed inheritance
   license: Apache-2.0
-  license_file: LICENSE
+  # just a random file for testing
+  license_file: basic-staging.yaml
   repository: https://github.com/foobar/repo
 
 outputs:

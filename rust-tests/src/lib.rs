@@ -167,10 +167,10 @@ mod tests {
     }
 
     fn rattler() -> RattlerBuild {
-        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
-            if let Some(ret) = RattlerBuild::with_binary(path) {
-                return ret;
-            }
+        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH")
+            && let Some(ret) = RattlerBuild::with_binary(path)
+        {
+            return ret;
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
@@ -714,5 +714,18 @@ requirements:
         let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("No license files were copied"));
         assert!(output.contains("The following license files were not found: *.license"));
+    }
+
+    #[test]
+    fn test_sourceforge_redirects() {
+        let tmp = tmp("test_sourceforge_redirects");
+        let rattler_build = rattler().build(
+            recipes().join("sourceforge-redirects"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(rattler_build.status.success());
     }
 }

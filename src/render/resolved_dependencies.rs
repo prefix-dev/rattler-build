@@ -505,29 +505,30 @@ pub fn apply_variant(
             match s {
                 Dependency::Spec(m) => {
                     let m = m.clone();
-                    if build_time && m.version.is_none() && m.build.is_none() {
-                        if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
-                                // if the variant starts with an alphanumeric character,
-                                // we have to add a '=' to the version spec
-                                let mut spec = version.to_string();
+                    if build_time
+                        && m.version.is_none()
+                        && m.build.is_none()
+                        && let Some(name) = &m.name
+                        && let Some(version) = variant.get(&name.into())
+                    {
+                        // if the variant starts with an alphanumeric character,
+                        // we have to add a '=' to the version spec
+                        let mut spec = version.to_string();
 
-                                // check if all characters are alphanumeric or ., in that case add
-                                // a '=' to get "startswith" behavior
-                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={spec}");
-                                }
-
-                                let variant = name.as_normalized().to_string();
-                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
-                                    ResolveError::VariantSpecParseError(variant.clone(), e)
-                                })?;
-
-                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
-
-                                return Ok(VariantDependency { spec, variant }.into());
-                            }
+                        // check if all characters are alphanumeric or ., in that case add
+                        // a '=' to get "startswith" behavior
+                        if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                            spec = format!("={spec}");
                         }
+
+                        let variant = name.as_normalized().to_string();
+                        let spec: NamelessMatchSpec = spec
+                            .parse()
+                            .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
+
+                        let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                        return Ok(VariantDependency { spec, variant }.into());
                     }
                     Ok(SourceDependency { spec: *m }.into())
                 }

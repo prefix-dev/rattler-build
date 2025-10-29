@@ -259,6 +259,7 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
+        #[cfg(feature = "s3")]
         build_data.common.s3_config.clone(),
         build_data.common.mirror_config.clone(),
         build_data.common.allow_insecure_host.clone(),
@@ -332,20 +333,20 @@ pub async fn get_build_output(
         consts::VARIANTS_CONFIG_FILE,
         consts::CONDA_BUILD_CONFIG_FILE,
     ] {
-        if let Some(variant_path) = recipe_path.parent().map(|parent| parent.join(file)) {
-            if variant_path.is_file() {
-                if !build_data.ignore_recipe_variants {
-                    let mut configs = build_data.variant_config.clone();
-                    configs.push(variant_path);
-                    detected_variant_config = Some(configs);
-                } else {
-                    tracing::debug!(
-                        "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
-                        variant_path.display()
-                    );
-                }
-                break;
+        if let Some(variant_path) = recipe_path.parent().map(|parent| parent.join(file))
+            && variant_path.is_file()
+        {
+            if !build_data.ignore_recipe_variants {
+                let mut configs = build_data.variant_config.clone();
+                configs.push(variant_path);
+                detected_variant_config = Some(configs);
+            } else {
+                tracing::debug!(
+                    "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
+                    variant_path.display()
+                );
             }
+            break;
         };
     }
 
@@ -573,15 +574,15 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
         if spec.name.as_ref() != Some(output.name()) {
             return false;
         }
-        if let Some(version_spec) = &spec.version {
-            if !version_spec.matches(output.recipe.package().version()) {
-                return false;
-            }
+        if let Some(version_spec) = &spec.version
+            && !version_spec.matches(output.recipe.package().version())
+        {
+            return false;
         }
-        if let Some(build_string_spec) = &spec.build {
-            if !build_string_spec.matches(&output.build_string()) {
-                return false;
-            }
+        if let Some(build_string_spec) = &spec.build
+            && !build_string_spec.matches(&output.build_string())
+        {
+            return false;
         }
         true
     };
@@ -845,6 +846,7 @@ pub async fn run_test(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 test_data.common.auth_file,
+                #[cfg(feature = "s3")]
                 test_data.common.s3_config,
                 test_data.common.mirror_config,
                 test_data.common.allow_insecure_host.clone(),
@@ -903,6 +905,7 @@ pub async fn rebuild(
 ) -> miette::Result<()> {
     let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
         rebuild_data.common.auth_file,
+        #[cfg(feature = "s3")]
         rebuild_data.common.s3_config.clone(),
         rebuild_data.common.mirror_config.clone(),
         rebuild_data.common.allow_insecure_host.clone(),

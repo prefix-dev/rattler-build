@@ -210,13 +210,13 @@ fn write_recipe_folder(
     let mut files = Vec::from(copy_result.copied_paths());
 
     // Make sure that the recipe file is "recipe.yaml" in `info/recipe/`
-    if recipe_path.file_name() != Some("recipe.yaml".as_ref()) {
-        if let Some(name) = recipe_path.file_name() {
-            fs::rename(recipe_folder.join(name), recipe_folder.join("recipe.yaml"))?;
-            // Update the existing entry with the new recipe file.
-            if let Some(pos) = files.iter().position(|x| x == &recipe_folder.join(name)) {
-                files[pos] = recipe_folder.join("recipe.yaml");
-            }
+    if recipe_path.file_name() != Some("recipe.yaml".as_ref())
+        && let Some(name) = recipe_path.file_name()
+    {
+        fs::rename(recipe_folder.join(name), recipe_folder.join("recipe.yaml"))?;
+        // Update the existing entry with the new recipe file.
+        if let Some(pos) = files.iter().position(|x| x == &recipe_folder.join(name)) {
+            files[pos] = recipe_folder.join("recipe.yaml");
         }
     }
 

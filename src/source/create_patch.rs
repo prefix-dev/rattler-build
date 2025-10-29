@@ -16,7 +16,7 @@ use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::source::patch::{apply_patch_custom, apply_patches, summarize_patches};
+use crate::source::patch::{apply_patch_custom, apply_patches, summarize_single_patch};
 use crate::source::{SourceError, SourceInformation};
 
 /// Error type for generating patches
@@ -252,7 +252,7 @@ fn create_directory_diff(
     // Build a map from file paths to their patches
     let mut file_patch_map: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
     for patch in existing_patches {
-        let stats = summarize_patches(&[patch.clone()], original_dir, patch_output_dir)
+        let stats = summarize_single_patch(&patch_output_dir.join(patch), original_dir)
             .map_err(GeneratePatchError::SourceError)?;
         for path in stats
             .changed
@@ -515,7 +515,7 @@ fn get_patched_content_for_file(
     }
 
     for patch in existing_patches {
-        let stats = summarize_patches(&[patch.clone()], original_dir, patch_output_dir)
+        let stats = summarize_single_patch(&patch_output_dir.join(patch), original_dir)
             .map_err(GeneratePatchError::SourceError)?;
 
         let touched = stats
@@ -527,7 +527,7 @@ fn get_patched_content_for_file(
 
         if touched {
             apply_patches(
-                &[patch.clone()],
+                std::slice::from_ref(&patch.clone()),
                 tmp_path,
                 patch_output_dir,
                 apply_patch_custom,
