@@ -715,4 +715,23 @@ requirements:
         assert!(output.contains("No license files were copied"));
         assert!(output.contains("The following license files were not found: *.license"));
     }
+
+    #[test]
+    fn test_absolute_path_license() {
+        let tmp = tmp("test_absolute_path_license");
+        let rattler_build = rattler().build(
+            recipes().join("absolute_path_license"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        // This should now succeed with absolute path support
+        assert!(rattler_build.status.success());
+
+        // Verify both the relative and absolute path license files were copied
+        let pkg = get_extracted_package(tmp.as_dir(), "absolute-path-license");
+        assert!(pkg.join("info/licenses/LICENSE").exists());
+        assert!(pkg.join("info/licenses/external_license.txt").exists());
+    }
 }
