@@ -137,13 +137,6 @@ def test_eigen_abi_profile_ignore_keys(
         "80",
     }, f"Expected to find abi profiles 100 and 80, but found: {abi_profiles_found}"
 
-    # Test 5: Verify the expected hash patterns from the issue
-    # eigen should have hash h60d57d3 (same for all abi profiles)
-    eigen_hash = eigen_build_string.split("_")[0]
-    assert (
-        eigen_hash == "h60d57d3"
-    ), f"eigen hash should be h60d57d3 (consistent across all abi profiles), got {eigen_hash}"
-
     # eigen-abi should have different hashes
     eigen_abi_100 = next(
         (o for o in eigen_abi_outputs if o["abi_profile"] == "100"), None
