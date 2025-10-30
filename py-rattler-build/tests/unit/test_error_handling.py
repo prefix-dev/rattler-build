@@ -217,6 +217,7 @@ def test_from_dict_valid_minimal_recipe() -> None:
     stage0 = Stage0Recipe.from_dict(recipe_dict)
     assert isinstance(stage0, SingleOutputRecipe)
 
+
 def test_from_dict_with_schema_version() -> None:
     """Test that schema_version is accepted."""
     recipe_dict = {"schema_version": 1, "package": {"name": "versioned-package", "version": "1.0.0"}}

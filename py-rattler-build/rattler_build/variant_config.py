@@ -6,7 +6,7 @@ which manages variant matrices for building packages with different configuratio
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, ItemsView, Iterator, List, Optional, Union, ValuesView
 from .rattler_build import VariantConfig as _VariantConfig, PyJinjaConfig
 from .jinja_config import JinjaConfig
 
@@ -400,7 +400,7 @@ class VariantConfig:
         """
         raise NotImplementedError("Deletion of variant keys is not supported")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         """
         Iterate over variant keys.
 
@@ -414,7 +414,7 @@ class VariantConfig:
         """
         return iter(self.keys())
 
-    def items(self):
+    def items(self) -> ItemsView[str, List[str]]:
         """
         Get all variant key-value pairs.
 
@@ -428,7 +428,7 @@ class VariantConfig:
         """
         return self.to_dict().items()
 
-    def values(self):
+    def values(self) -> ValuesView[List[str]]:
         """
         Get all variant value lists.
 

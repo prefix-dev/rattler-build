@@ -7,7 +7,55 @@ This module provides a Pythonic API for configuring the build tool.
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    _ToolConfiguration = object
+    # Type stub for the Rust ToolConfiguration
+    class _ToolConfiguration:
+        def __init__(
+            self,
+            keep_build: bool = ...,
+            compression_threads: Optional[int] = ...,
+            io_concurrency_limit: Optional[int] = ...,
+            test_strategy: Optional[str] = ...,
+            skip_existing: Optional[str] = ...,
+            continue_on_failure: bool = ...,
+            noarch_build_platform: Optional[str] = ...,
+            channel_priority: Optional[str] = ...,
+            allow_insecure_host: Optional[List[str]] = ...,
+            error_prefix_in_binary: bool = ...,
+            allow_symlinks_on_windows: bool = ...,
+            use_zstd: bool = ...,
+            use_bz2: bool = ...,
+            use_sharded: bool = ...,
+            use_jlap: bool = ...,
+        ) -> None: ...
+        @property
+        def keep_build(self) -> bool: ...
+        def set_keep_build(self, value: bool) -> None: ...
+        @property
+        def test_strategy(self) -> str: ...
+        @property
+        def skip_existing(self) -> str: ...
+        @property
+        def continue_on_failure(self) -> bool: ...
+        @property
+        def channel_priority(self) -> str: ...
+        @property
+        def use_zstd(self) -> bool: ...
+        @property
+        def use_bz2(self) -> bool: ...
+        @property
+        def use_sharded(self) -> bool: ...
+        @property
+        def use_jlap(self) -> bool: ...
+        @property
+        def compression_threads(self) -> Optional[int]: ...
+        @property
+        def io_concurrency_limit(self) -> Optional[int]: ...
+        @property
+        def allow_insecure_host(self) -> Optional[List[str]]: ...
+        @property
+        def error_prefix_in_binary(self) -> bool: ...
+        @property
+        def allow_symlinks_on_windows(self) -> bool: ...
 else:
     from . import rattler_build as _rb
 

@@ -43,13 +43,18 @@ def test_render_config_set_context() -> None:
     config.set_context("my_number", 42)
     config.set_context("my_list", [1, 2, 3])
 
+    # TODO: This should actually error as mixed types are not allowed
+    config.set_context("error_list", [1, "string", 3])
+
     assert config.get_context("my_var") == "value"
     assert config.get_context("my_bool")
     assert isinstance(config.get_context("my_bool"), bool)
     assert config.get_context("my_number") == 42
+    assert config.get_context("my_list") == [1, 2, 3]
+    assert config.get_context("error_list") == [1, "string", 3]
 
     context = config.get_all_context()
-    assert context.keys() == {"my_var", "my_bool", "my_number"}
+    assert context.keys() == {"my_var", "my_bool", "my_number", "my_list", "error_list"}
 
 
 def test_render_config_platform_setters() -> None:

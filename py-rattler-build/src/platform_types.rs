@@ -29,7 +29,9 @@ impl PyPlatformWithVirtualPackages {
             platform,
             &rattler_virtual_packages::VirtualPackageOverrides::from_env(),
         )
-        .map_err(|e| RattlerBuildError::Other(format!("Failed to detect virtual packages: {}", e)))?;
+        .map_err(|e| {
+            RattlerBuildError::Other(format!("Failed to detect virtual packages: {}", e))
+        })?;
 
         Ok(Self { inner })
     }
@@ -120,7 +122,10 @@ impl PyPlatform {
 }
 
 /// Register the platform_types module with Python
-pub fn register_platform_types_module(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn register_platform_types_module(
+    py: Python<'_>,
+    parent: &Bound<'_, PyModule>,
+) -> PyResult<()> {
     let m = PyModule::new(py, "platform_types")?;
     m.add_class::<PyPlatformWithVirtualPackages>()?;
     m.add_class::<PyPlatform>()?;

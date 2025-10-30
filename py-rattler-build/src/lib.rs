@@ -16,11 +16,13 @@ mod build_types;
 mod error;
 mod jinja_config;
 mod platform_types;
+mod progress_callback;
 mod recipe_generation;
 mod render;
 mod stage0;
 mod stage1;
 mod tool_config;
+mod tracing_subscriber;
 mod upload;
 mod variant_config;
 
@@ -197,13 +199,15 @@ fn build_recipes_py(
 ///
 /// If tool_config is provided, it will be used instead of the individual parameters.
 #[pyfunction]
-#[pyo3(signature = (rendered_variants, tool_config=None, output_dir=None, channel=None, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, auth_file=None, channel_priority=None, skip_existing=None, allow_insecure_host=None, continue_on_failure=false, debug=false, _error_prefix_in_binary=false, _allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[pyo3(signature = (rendered_variants, tool_config=None, output_dir=None, channel=None, progress_callback=None, recipe_path=None, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, auth_file=None, channel_priority=None, skip_existing=None, allow_insecure_host=None, continue_on_failure=false, debug=false, _error_prefix_in_binary=false, _allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
 fn build_from_rendered_variants_py(
     rendered_variants: Vec<render::PyRenderedVariant>,
     tool_config: Option<tool_config::PyToolConfiguration>,
     output_dir: Option<PathBuf>,
     channel: Option<Vec<String>>,
+    progress_callback: Option<Py<PyAny>>,
+    recipe_path: Option<PathBuf>,
     keep_build: bool,
     no_build_id: bool,
     package_format: Option<String>,
@@ -268,8 +272,18 @@ fn build_from_rendered_variants_py(
         let test_strategy = test.map(|t| TestStrategy::from_str(&t, false).unwrap());
         let skip_existing = skip_existing.map(|s| SkipExisting::from_str(&s, false).unwrap());
 
+        // Use a hidden multi-progress if Python callback is provided to suppress Rust progress bars
+        let log_handler = if progress_callback.is_some() {
+            use indicatif::MultiProgress;
+            // Create a hidden MultiProgress that doesn't render to terminal
+            let mp = MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+            LoggingOutputHandler::default().with_multi_progress(mp)
+        } else {
+            LoggingOutputHandler::default()
+        };
+
         Configuration::builder()
-            .with_logging_output_handler(LoggingOutputHandler::default())
+            .with_logging_output_handler(log_handler)
             .with_channel_config(channel_config.clone())
             .with_compression_threads(compression_threads)
             .with_io_concurrency_limit(io_concurrency_limit)
@@ -330,6 +344,15 @@ fn build_from_rendered_variants_py(
             },
         );
     }
+
+    // If recipe_path is None, we should not include the recipe in the package
+    let effective_no_include_recipe = no_include_recipe || recipe_path.is_none();
+
+    // Create a safe fallback recipe path when None is provided
+    // We use a subdirectory in output_dir to avoid copying unrelated files
+    let safe_recipe_path = recipe_path.clone().unwrap_or_else(|| {
+        output_dir.join("_no_recipe").join("recipe.yaml")
+    });
 
     // Second pass: create Output objects
     for rendered_variant in rendered_variants {
@@ -393,7 +416,7 @@ fn build_from_rendered_variants_py(
                 variant,
                 directories: Directories::setup(
                     &build_name,
-                    &output_dir,
+                    &safe_recipe_path,
                     &output_dir,
                     no_build_id,
                     &timestamp,
@@ -417,7 +440,7 @@ fn build_from_rendered_variants_py(
                             rattler_conda_types::compression_level::CompressionLevel::Default,
                         ),
                 ),
-                store_recipe: !no_include_recipe,
+                store_recipe: !effective_no_include_recipe,
                 force_colors: false, // Set to false for Python API
                 sandbox_config: None,
                 debug: ::rattler_build::metadata::Debug::new(debug),
@@ -435,8 +458,10 @@ fn build_from_rendered_variants_py(
         outputs.push(output);
     }
 
-    // Run the build
-    run_async_task(async { run_build_from_args(outputs, tool_config).await })
+    // Run the build with optional tracing subscriber
+    tracing_subscriber::with_python_tracing(progress_callback, || {
+        run_async_task(async { run_build_from_args(outputs, tool_config).await })
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -536,6 +561,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     tool_config::register_tool_config_module(_py, &m)?;
     build_types::register_build_types_module(_py, &m)?;
     platform_types::register_platform_types_module(_py, &m)?;
+    progress_callback::register_progress_types(_py, &m)?;
 
     Ok(())
 }

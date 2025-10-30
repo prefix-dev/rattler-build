@@ -55,6 +55,7 @@ pytest-xprocess = "1.0.*"
 inline-snapshot = ">=0.31.0"
 # used in examples
 typer = "*"
+rich = ">=14.2.0,<15"
 
 [feature.test.pypi-dependencies]
 types-networkx = "*"

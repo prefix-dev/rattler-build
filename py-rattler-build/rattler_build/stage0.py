@@ -269,7 +269,7 @@ class SingleOutputRecipe:
         rendered_variants = self.render(variant_config)
 
         # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if hasattr(tool_config, "_inner") else tool_config
+        tool_config_inner = tool_config._inner if tool_config else None
 
         # Build from the rendered variants
         _rb.build_from_rendered_variants_py(
@@ -401,7 +401,7 @@ class MultiOutputRecipe:
         rendered_variants = self.render(variant_config)
 
         # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if hasattr(tool_config, "_inner") else tool_config
+        tool_config_inner = tool_config._inner if tool_config else None
 
         # Build from the rendered variants
         _rb.build_from_rendered_variants_py(

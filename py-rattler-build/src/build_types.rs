@@ -77,14 +77,14 @@ impl PyPackagingSettings {
                     "Invalid archive type: {}. Must be 'conda' or 'tar-bz2'",
                     archive_type
                 ))
-                .into())
+                .into());
             }
         };
 
         // Default compression levels
         let compression_level = compression_level.unwrap_or_else(|| match archive_type {
-            ArchiveType::Conda => 22,   // zstd default
-            ArchiveType::TarBz2 => 9,   // bzip2 default
+            ArchiveType::Conda => 22, // zstd default
+            ArchiveType::TarBz2 => 9, // bzip2 default
         });
 
         Ok(Self {
@@ -121,7 +121,7 @@ impl PyPackagingSettings {
                     "Invalid archive type: {}. Must be 'conda' or 'tar-bz2'",
                     archive_type
                 ))
-                .into())
+                .into());
             }
         };
         Ok(())

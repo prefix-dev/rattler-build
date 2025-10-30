@@ -338,7 +338,9 @@ fn variable_to_python(py: Python<'_>, var: &Variable) -> PyResult<Py<PyAny>> {
         let json_val = serde_json::Value::Bool(b);
         return pythonize::pythonize(py, &json_val)
             .map(|obj| obj.into())
-            .map_err(|e| RattlerBuildError::Other(format!("Failed to convert bool: {}", e)).into());
+            .map_err(|e| {
+                RattlerBuildError::Other(format!("Failed to convert bool: {}", e)).into()
+            });
     }
 
     // Try to extract as integer
@@ -354,7 +356,9 @@ fn variable_to_python(py: Python<'_>, var: &Variable) -> PyResult<Py<PyAny>> {
         let json_val = serde_json::Value::String(s.to_string());
         return pythonize::pythonize(py, &json_val)
             .map(|obj| obj.into())
-            .map_err(|e| RattlerBuildError::Other(format!("Failed to convert string: {}", e)).into());
+            .map_err(|e| {
+                RattlerBuildError::Other(format!("Failed to convert string: {}", e)).into()
+            });
     }
 
     // Try to extract as list/sequence

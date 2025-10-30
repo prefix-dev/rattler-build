@@ -326,6 +326,8 @@ class RenderedVariant:
         tool_config: Optional["ToolConfiguration"] = None,
         output_dir: Optional[Union[str, Path]] = None,
         channel: Optional[List[str]] = None,
+        progress_callback: Optional[Any] = None,
+        recipe_path: Optional[Union[str, Path]] = None,
         **kwargs: Any,
     ) -> None:
         """Build this rendered variant.
@@ -337,6 +339,8 @@ class RenderedVariant:
             tool_config: Optional ToolConfiguration to use for the build.
             output_dir: Directory to store the built package. Defaults to current directory.
             channel: List of channels to use for resolving dependencies.
+            progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
+            recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
             **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
 
         Example:
@@ -352,7 +356,7 @@ class RenderedVariant:
         from . import rattler_build as _rb
 
         # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if (tool_config and hasattr(tool_config, "_inner")) else tool_config
+        tool_config_inner = tool_config._inner if tool_config else None
 
         # Build this single variant
         _rb.build_from_rendered_variants_py(
@@ -360,6 +364,8 @@ class RenderedVariant:
             tool_config=tool_config_inner,
             output_dir=Path(output_dir) if output_dir else None,
             channel=channel,
+            progress_callback=progress_callback,
+            recipe_path=Path(recipe_path) if recipe_path else None,
             **kwargs,
         )
 
@@ -488,6 +494,8 @@ def build_rendered_variants(
     tool_config: Optional["ToolConfiguration"] = None,
     output_dir: Optional[Union[str, Path]] = None,
     channel: Optional[List[str]] = None,
+    progress_callback: Optional[Any] = None,
+    recipe_path: Optional[Union[str, Path]] = None,
     **kwargs: Any,
 ) -> None:
     """Build multiple rendered variants.
@@ -500,6 +508,8 @@ def build_rendered_variants(
         tool_config: Optional ToolConfiguration to use for the build.
         output_dir: Directory to store the built packages. Defaults to current directory.
         channel: List of channels to use for resolving dependencies.
+        progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
+        recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
         **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
 
     Example:
@@ -526,7 +536,7 @@ def build_rendered_variants(
     from . import rattler_build as _rb
 
     # Extract the inner ToolConfiguration if provided
-    tool_config_inner = tool_config._inner if (tool_config and hasattr(tool_config, "_inner")) else tool_config
+    tool_config_inner = tool_config._inner if tool_config else None
 
     # Build all variants
     _rb.build_from_rendered_variants_py(
@@ -534,6 +544,8 @@ def build_rendered_variants(
         tool_config=tool_config_inner,
         output_dir=Path(output_dir) if output_dir else None,
         channel=channel,
+        progress_callback=progress_callback,
+        recipe_path=Path(recipe_path) if recipe_path else None,
         **kwargs,
     )
 
