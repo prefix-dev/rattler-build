@@ -5,7 +5,7 @@ Tests the complete flow: Stage0 Recipe -> Render -> Stage1 Recipe
 """
 
 import pytest
-from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
 from rattler_build.variant_config import VariantConfig
 from rattler_build.render import render_recipe, RenderConfig
 
@@ -29,7 +29,7 @@ requirements:
 
     # Step 1: Parse to Stage0
     stage0 = Stage0Recipe.from_yaml(yaml_content)
-    assert stage0.is_single_output()
+    assert isinstance(stage0, SingleOutputRecipe)
 
     # Step 2: Create variant config
     variant_config = VariantConfig()
@@ -49,21 +49,14 @@ requirements:
 def test_pipeline_from_dict_to_stage1() -> None:
     """Test complete pipeline from Python dict to Stage1 recipe."""
     recipe_dict = {
-        "package": {
-            "name": "dict-package",
-            "version": "2.0.0"
-        },
-        "build": {
-            "number": 0
-        },
-        "requirements": {
-            "run": ["numpy"]
-        }
+        "package": {"name": "dict-package", "version": "2.0.0"},
+        "build": {"number": 0},
+        "requirements": {"run": ["numpy"]},
     }
 
     # Step 1: Create Stage0 from dict
     stage0 = Stage0Recipe.from_dict(recipe_dict)
-    assert stage0.is_single_output()
+    assert isinstance(stage0, SingleOutputRecipe)
 
     # Step 2: Render
     variant_config = VariantConfig()
@@ -130,7 +123,7 @@ outputs:
 
     # Parse Stage0
     stage0 = Stage0Recipe.from_yaml(yaml_content)
-    assert stage0.is_multi_output()
+    assert isinstance(stage0, MultiOutputRecipe)
 
     # Render
     variant_config = VariantConfig()
@@ -342,9 +335,9 @@ package:
     stage0 = Stage0Recipe.from_yaml(yaml_content)
 
     # Check Stage0 context
-    single = stage0.as_single_output()
-    assert single is not None
-    stage0_context = single.context
+    stage0_context = stage0.context
+
+    assert isinstance(stage0, SingleOutputRecipe)
     assert "my_var" in stage0_context
     assert stage0_context["my_var"] == "custom_value"
 
@@ -384,11 +377,7 @@ package:
 
 def test_pipeline_from_dict_error_missing_package() -> None:
     """Test that creating recipe from dict with missing package field gives good error."""
-    recipe_dict = {
-        "build": {
-            "number": 0
-        }
-    }
+    recipe_dict = {"build": {"number": 0}}
 
     with pytest.raises(Exception) as exc_info:
         Stage0Recipe.from_dict(recipe_dict)
@@ -401,12 +390,7 @@ def test_pipeline_from_dict_error_wrong_type() -> None:
     """Test that creating recipe from dict accepts numeric version (gets converted to string)."""
     # Note: Version 123 gets converted to "123" automatically by serde
     # This is actually valid behavior
-    recipe_dict = {
-        "package": {
-            "name": "test",
-            "version": 123
-        }
-    }
+    recipe_dict = {"package": {"name": "test", "version": 123}}
 
     # This should actually work - numeric values get stringified
     recipe = Stage0Recipe.from_dict(recipe_dict)
@@ -415,10 +399,7 @@ def test_pipeline_from_dict_error_wrong_type() -> None:
 
 def test_pipeline_from_dict_error_invalid_structure() -> None:
     """Test that creating recipe from dict with invalid structure gives good error."""
-    recipe_dict = {
-        "invalid_key": "value",
-        "another_invalid": 123
-    }
+    recipe_dict = {"invalid_key": "value", "another_invalid": 123}
 
     with pytest.raises(Exception) as exc_info:
         Stage0Recipe.from_dict(recipe_dict)

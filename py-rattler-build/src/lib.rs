@@ -12,14 +12,17 @@ use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 
+mod build_types;
 mod error;
 mod jinja_config;
+mod platform_types;
+mod recipe_generation;
 mod render;
 mod stage0;
 mod stage1;
+mod tool_config;
 mod upload;
 mod variant_config;
-mod recipe_generation;
 
 use error::RattlerBuildError;
 use jinja_config::PyJinjaConfig;
@@ -187,6 +190,255 @@ fn build_recipes_py(
     })
 }
 
+/// Build from already-rendered variants (Stage1 recipes)
+///
+/// This function takes RenderedVariant objects (from recipe.render()) and builds them
+/// directly without needing to write temporary files.
+///
+/// If tool_config is provided, it will be used instead of the individual parameters.
+#[pyfunction]
+#[pyo3(signature = (rendered_variants, tool_config=None, output_dir=None, channel=None, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, auth_file=None, channel_priority=None, skip_existing=None, allow_insecure_host=None, continue_on_failure=false, debug=false, _error_prefix_in_binary=false, _allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[allow(clippy::too_many_arguments)]
+fn build_from_rendered_variants_py(
+    rendered_variants: Vec<render::PyRenderedVariant>,
+    tool_config: Option<tool_config::PyToolConfiguration>,
+    output_dir: Option<PathBuf>,
+    channel: Option<Vec<String>>,
+    keep_build: bool,
+    no_build_id: bool,
+    package_format: Option<String>,
+    compression_threads: Option<u32>,
+    io_concurrency_limit: Option<usize>,
+    no_include_recipe: bool,
+    test: Option<String>,
+    auth_file: Option<String>,
+    channel_priority: Option<String>,
+    skip_existing: Option<String>,
+    allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: bool,
+    debug: bool,
+    _error_prefix_in_binary: bool,
+    _allow_symlinks_on_windows: bool,
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    use_bz2: bool,
+    use_zstd: bool,
+    use_jlap: bool,
+    use_sharded: bool,
+) -> PyResult<()> {
+    use ::rattler_build::{
+        console_utils::LoggingOutputHandler,
+        metadata::{BuildConfiguration, Output, PlatformWithVirtualPackages},
+        run_build_from_args,
+        system_tools::SystemTools,
+        tool_configuration::Configuration,
+        types::{BuildSummary, Directories, PackageIdentifier, PackagingSettings},
+    };
+    use rattler_build_recipe::stage1::HashInfo;
+    use rattler_build_types::NormalizedKey;
+    use rattler_solve::SolveStrategy;
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, Mutex},
+    };
+
+    // Use provided tool_config or build one from parameters
+    let tool_config = if let Some(config) = tool_config {
+        config.inner
+    } else {
+        let channel_priority = channel_priority
+            .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
+            .transpose()
+            .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
+
+        let config = ConfigBase::<()>::default();
+        let channel_config = config.channel_config.clone();
+        let _common = CommonData::new(
+            output_dir.clone(),
+            false,
+            auth_file.map(|a| a.into()),
+            config,
+            channel_priority,
+            allow_insecure_host.clone(),
+            use_bz2,
+            use_zstd,
+            use_jlap,
+            use_sharded,
+        );
+
+        let test_strategy = test.map(|t| TestStrategy::from_str(&t, false).unwrap());
+        let skip_existing = skip_existing.map(|s| SkipExisting::from_str(&s, false).unwrap());
+
+        Configuration::builder()
+            .with_logging_output_handler(LoggingOutputHandler::default())
+            .with_channel_config(channel_config.clone())
+            .with_compression_threads(compression_threads)
+            .with_io_concurrency_limit(io_concurrency_limit)
+            .with_keep_build(keep_build)
+            .with_test_strategy(test_strategy.unwrap_or(TestStrategy::Skip))
+            .with_zstd_repodata_enabled(use_zstd)
+            .with_bz2_repodata_enabled(use_bz2)
+            .with_sharded_repodata_enabled(use_sharded)
+            .with_jlap_enabled(use_jlap)
+            .with_skip_existing(skip_existing.unwrap_or(SkipExisting::None))
+            .with_channel_priority(channel_priority.unwrap_or_default())
+            .with_continue_on_failure(ContinueOnFailure::from(continue_on_failure))
+            .with_allow_insecure_host(allow_insecure_host)
+            .finish()
+    };
+
+    let package_format = package_format
+        .map(|p| PackageFormatAndCompression::from_str(&p))
+        .transpose()
+        .map_err(|e| RattlerBuildError::PackageFormat(e.to_string()))?;
+
+    let channels = match channel {
+        None => vec![NamedChannelOrUrl::Name("conda-forge".to_string())],
+        Some(channel) => channel
+            .iter()
+            .map(|c| {
+                NamedChannelOrUrl::from_str(c)
+                    .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))
+                    .map_err(|e| e.into())
+            })
+            .collect::<PyResult<_>>()?,
+    };
+
+    // Convert rendered variants to Output objects
+    let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("."));
+    let timestamp = chrono::Utc::now();
+    let virtual_package_override = rattler_virtual_packages::VirtualPackageOverrides::from_env();
+
+    let mut outputs = Vec::new();
+    let mut subpackages = BTreeMap::new();
+
+    // First pass: collect all subpackage identifiers
+    for rendered_variant in &rendered_variants {
+        let recipe = &rendered_variant.inner.recipe;
+        subpackages.insert(
+            recipe.package.name.clone(),
+            PackageIdentifier {
+                name: recipe.package.name.clone(),
+                version: recipe.package.version.clone(),
+                build_string: recipe
+                    .build
+                    .string
+                    .as_resolved()
+                    .ok_or_else(|| {
+                        RattlerBuildError::Other("Build string not resolved".to_string())
+                    })?
+                    .to_string(),
+            },
+        );
+    }
+
+    // Second pass: create Output objects
+    for rendered_variant in rendered_variants {
+        let recipe = rendered_variant.inner.recipe;
+        let variant = rendered_variant.inner.variant;
+
+        // Extract platforms from variant or use current platform
+        let target_platform = variant
+            .get(&NormalizedKey("target_platform".to_string()))
+            .and_then(|v| v.to_string().parse::<Platform>().ok())
+            .unwrap_or_else(Platform::current);
+
+        let build_platform = variant
+            .get(&NormalizedKey("build_platform".to_string()))
+            .and_then(|v| v.to_string().parse::<Platform>().ok())
+            .unwrap_or_else(Platform::current);
+
+        let host_platform = variant
+            .get(&NormalizedKey("host_platform".to_string()))
+            .and_then(|v| v.to_string().parse::<Platform>().ok())
+            .unwrap_or_else(Platform::current);
+
+        // Convert channels to base URLs
+        let channels_urls = channels
+            .iter()
+            .map(|c| c.clone().into_base_url(&tool_config.channel_config))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| RattlerBuildError::Other(format!("Channel error: {}", e)))?;
+
+        // Create hash info - use default if not available
+        let hash_info = rendered_variant
+            .inner
+            .hash_info
+            .clone()
+            .unwrap_or_else(|| HashInfo {
+                hash: String::new(),
+                prefix: String::new(),
+            });
+
+        let build_name = recipe.package.name.as_normalized().to_string();
+
+        let output = Output {
+            recipe,
+            build_configuration: BuildConfiguration {
+                target_platform,
+                host_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    host_platform,
+                    &virtual_package_override,
+                )
+                .map_err(|e| {
+                    RattlerBuildError::Other(format!("Platform detection error: {}", e))
+                })?,
+                build_platform: PlatformWithVirtualPackages::detect_for_platform(
+                    build_platform,
+                    &virtual_package_override,
+                )
+                .map_err(|e| {
+                    RattlerBuildError::Other(format!("Platform detection error: {}", e))
+                })?,
+                hash: hash_info,
+                variant,
+                directories: Directories::setup(
+                    &build_name,
+                    &output_dir,
+                    &output_dir,
+                    no_build_id,
+                    &timestamp,
+                    false, // merge_build_and_host_envs - we can infer from recipe if needed
+                )
+                .map_err(|e| RattlerBuildError::Other(format!("Directory setup error: {}", e)))?,
+                channels: channels_urls.clone(),
+                channel_priority: tool_config.channel_priority,
+                solve_strategy: SolveStrategy::Highest,
+                timestamp,
+                subpackages: subpackages.clone(),
+                packaging_settings: PackagingSettings::from_args(
+                    package_format
+                        .as_ref()
+                        .map(|p| p.archive_type)
+                        .unwrap_or(rattler_conda_types::package::ArchiveType::Conda),
+                    package_format
+                        .as_ref()
+                        .map(|p| p.compression_level)
+                        .unwrap_or(
+                            rattler_conda_types::compression_level::CompressionLevel::Default,
+                        ),
+                ),
+                store_recipe: !no_include_recipe,
+                force_colors: false, // Set to false for Python API
+                sandbox_config: None,
+                debug: ::rattler_build::metadata::Debug::new(debug),
+                exclude_newer,
+            },
+            finalized_dependencies: None,
+            finalized_sources: None,
+            finalized_cache_dependencies: None,
+            finalized_cache_sources: None,
+            build_summary: Arc::new(Mutex::new(BuildSummary::default())),
+            system_tools: SystemTools::default(),
+            extra_meta: None,
+        };
+
+        outputs.push(output);
+    }
+
+    // Run the build
+    run_async_task(async { run_build_from_args(outputs, tool_config).await })
+}
+
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
@@ -254,13 +506,20 @@ fn test_package_py(
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     error::register_exceptions(_py, &m)?;
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
-    m.add_function(wrap_pyfunction!(recipe_generation::generate_pypi_recipe_string_py, &m).unwrap())?;
+    m.add_function(
+        wrap_pyfunction!(recipe_generation::generate_pypi_recipe_string_py, &m).unwrap(),
+    )?;
     m.add_function(wrap_pyfunction!(recipe_generation::generate_r_recipe_string_py, &m).unwrap())?;
-    m.add_function(wrap_pyfunction!(recipe_generation::generate_cpan_recipe_string_py, &m).unwrap())?;
-    m.add_function(wrap_pyfunction!(recipe_generation::generate_luarocks_recipe_string_py, &m).unwrap())?;
+    m.add_function(
+        wrap_pyfunction!(recipe_generation::generate_cpan_recipe_string_py, &m).unwrap(),
+    )?;
+    m.add_function(
+        wrap_pyfunction!(recipe_generation::generate_luarocks_recipe_string_py, &m).unwrap(),
+    )?;
     // parse_recipe_py is deprecated - use stage0.Recipe.from_yaml() instead
     // m.add_function(wrap_pyfunction!(parse_recipe_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(build_from_rendered_variants_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_quetz_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_artifactory_py, &m).unwrap())?;
@@ -269,11 +528,14 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload::upload_packages_to_conda_forge_py, &m).unwrap())?;
     m.add_class::<PyJinjaConfig>()?;
 
-    // Register stage0, stage1, variant_config, and render submodules
+    // Register all submodules
     stage0::register_stage0_module(_py, &m)?;
     stage1::register_stage1_module(_py, &m)?;
     variant_config::register_variant_config_module(_py, &m)?;
     render::register_render_module(_py, &m)?;
+    tool_config::register_tool_config_module(_py, &m)?;
+    build_types::register_build_types_module(_py, &m)?;
+    platform_types::register_platform_types_module(_py, &m)?;
 
     Ok(())
 }

@@ -1,13 +1,10 @@
-use ::rattler_build::{
-    recipe_generator::{
-        CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
-        generate_pypi_recipe_string, generate_r_recipe_string,
-    },
+use ::rattler_build::recipe_generator::{
+    CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_luarocks_recipe_string,
+    generate_pypi_recipe_string, generate_r_recipe_string,
 };
 use pyo3::prelude::*;
 
 use crate::run_async_task;
-
 
 /// Generate a PyPI recipe and return the YAML as a string.
 #[pyfunction]
@@ -38,7 +35,10 @@ pub fn generate_r_recipe_string_py(package: String, universe: Option<String>) ->
 /// Generate a CPAN (Perl) recipe and return the YAML as a string.
 #[pyfunction]
 #[pyo3(signature = (package, version=None))]
-pub fn generate_cpan_recipe_string_py(package: String, version: Option<String>) -> PyResult<String> {
+pub fn generate_cpan_recipe_string_py(
+    package: String,
+    version: Option<String>,
+) -> PyResult<String> {
     let opts = CpanOpts {
         package,
         version,

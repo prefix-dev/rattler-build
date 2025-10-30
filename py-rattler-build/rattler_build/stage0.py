@@ -73,18 +73,32 @@ class Recipe:
         self._inner = inner
 
     @classmethod
-    def from_yaml(cls, yaml: str) -> "Recipe":
-        """Parse a recipe from YAML string."""
-        return cls(_Stage0Recipe.from_yaml(yaml))
+    def from_yaml(cls, yaml: str) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+        """
+        Parse a recipe from YAML string.
+
+        Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
+        """
+        wrapper = _Stage0Recipe.from_yaml(yaml)
+        if wrapper.is_single_output():
+            single_inner = wrapper.as_single_output()
+            return SingleOutputRecipe(single_inner, wrapper)
+        else:
+            multi_inner = wrapper.as_multi_output()
+            return MultiOutputRecipe(multi_inner, wrapper)
 
     @classmethod
-    def from_file(cls, path: Union[str, Path]) -> "Recipe":
-        """Parse a recipe from a YAML file."""
+    def from_file(cls, path: Union[str, Path]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+        """
+        Parse a recipe from a YAML file.
+
+        Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
+        """
         with open(path, "r", encoding="utf-8") as f:
             return cls.from_yaml(f.read())
 
     @classmethod
-    def from_dict(cls, recipe_dict: Dict[str, Any]) -> "Recipe":
+    def from_dict(cls, recipe_dict: Dict[str, Any]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
         """
         Create a recipe from a Python dictionary.
 
@@ -95,7 +109,7 @@ class Recipe:
             recipe_dict: Dictionary containing recipe data (must match recipe schema)
 
         Returns:
-            A new Recipe instance
+            SingleOutputRecipe or MultiOutputRecipe depending on the recipe type
 
         Raises:
             PyRecipeParseError: If the dictionary structure is invalid or types don't match
@@ -112,7 +126,13 @@ class Recipe:
             ... }
             >>> recipe = Recipe.from_dict(recipe_dict)
         """
-        return cls(_Stage0Recipe.from_dict(recipe_dict))
+        wrapper = _Stage0Recipe.from_dict(recipe_dict)
+        if wrapper.is_single_output():
+            single_inner = wrapper.as_single_output()
+            return SingleOutputRecipe(single_inner, wrapper)
+        else:
+            multi_inner = wrapper.as_multi_output()
+            return MultiOutputRecipe(multi_inner, wrapper)
 
     def is_single_output(self) -> bool:
         """Check if this is a single output recipe."""
@@ -143,8 +163,10 @@ class Recipe:
 class SingleOutputRecipe:
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _SingleOutputRecipe):
+    def __init__(self, inner: _SingleOutputRecipe, wrapper: Any = None):
         self._inner = inner
+        # Keep reference to the original Rust Stage0Recipe wrapper for render()
+        self._wrapper = wrapper
 
     @property
     def schema_version(self) -> int:
@@ -176,6 +198,86 @@ class SingleOutputRecipe:
         """Get the about metadata."""
         return About(self._inner.about)
 
+    def render(self, variant_config: Any = None, render_config: Any = None) -> List[Any]:
+        """
+        Render this recipe with variant configuration.
+
+        This is a convenience method that calls render.render_recipe() internally.
+        Always returns a list of RenderedVariant objects.
+
+        Args:
+            variant_config: Optional VariantConfig to use. If None, creates an empty config.
+            render_config: Optional RenderConfig to use. If None, uses default config.
+
+        Returns:
+            List of RenderedVariant objects (one for each variant combination)
+
+        Example:
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> variants = recipe.render(variant_config)
+            >>> for variant in variants:
+            ...     print(variant.recipe().package.name)
+        """
+        # Import here to avoid circular dependency
+        from . import render as render_module
+        from . import variant_config as vc_module
+
+        # Create empty variant config if not provided
+        if variant_config is None:
+            variant_config = vc_module.VariantConfig()
+
+        # Pass self (the Python wrapper) to render_recipe, not the raw Rust object
+        return render_module.render_recipe(self, variant_config, render_config)
+
+    def run_build(
+        self,
+        variant_config: Any = None,
+        tool_config: Any = None,
+        output_dir: Union[str, Path, None] = None,
+        channel: Optional[List[str]] = None,
+        **kwargs: Any
+    ) -> None:
+        """
+        Build this recipe.
+
+        This method renders the recipe with variants and then builds the rendered outputs
+        directly without writing temporary files.
+
+        Args:
+            variant_config: Optional VariantConfig to use for building variants.
+            tool_config: Optional ToolConfiguration to use for the build. If provided, individual
+                        parameters like keep_build, test, etc. will be ignored.
+            output_dir: Directory to store the built packages. Defaults to current directory.
+            channel: List of channels to use for resolving dependencies.
+            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+                     These are ignored if tool_config is provided.
+
+        Example:
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> recipe.run_build(output_dir="./output")
+
+            >>> # Or with custom tool configuration
+            >>> from rattler_build import ToolConfiguration
+            >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
+            >>> recipe.run_build(tool_config=config, output_dir="./output")
+        """
+        from . import rattler_build as _rb
+
+        # Render the recipe to get Stage1 variants
+        rendered_variants = self.render(variant_config)
+
+        # Extract the inner ToolConfiguration if provided
+        tool_config_inner = tool_config._inner if hasattr(tool_config, '_inner') else tool_config
+
+        # Build from the rendered variants
+        _rb.build_from_rendered_variants_py(
+            rendered_variants=[v._inner for v in rendered_variants],
+            tool_config=tool_config_inner,
+            output_dir=Path(output_dir) if output_dir else None,
+            channel=channel,
+            **kwargs
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
@@ -187,8 +289,10 @@ class SingleOutputRecipe:
 class MultiOutputRecipe:
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _MultiOutputRecipe):
+    def __init__(self, inner: _MultiOutputRecipe, wrapper: Any = None):
         self._inner = inner
+        # Keep reference to the original Rust Stage0Recipe wrapper for render()
+        self._wrapper = wrapper
 
     @property
     def schema_version(self) -> int:
@@ -226,6 +330,86 @@ class MultiOutputRecipe:
                 result.append(StagingOutput(output))
         return result
 
+    def render(self, variant_config: Any = None, render_config: Any = None) -> List[Any]:
+        """
+        Render this recipe with variant configuration.
+
+        This is a convenience method that calls render.render_recipe() internally.
+        Always returns a list of RenderedVariant objects.
+
+        Args:
+            variant_config: Optional VariantConfig to use. If None, creates an empty config.
+            render_config: Optional RenderConfig to use. If None, uses default config.
+
+        Returns:
+            List of RenderedVariant objects (one for each variant combination and output)
+
+        Example:
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> variants = recipe.render(variant_config)
+            >>> for variant in variants:
+            ...     print(variant.recipe().package.name)
+        """
+        # Import here to avoid circular dependency
+        from . import render as render_module
+        from . import variant_config as vc_module
+
+        # Create empty variant config if not provided
+        if variant_config is None:
+            variant_config = vc_module.VariantConfig()
+
+        # Pass self (the Python wrapper) to render_recipe, not the raw Rust object
+        return render_module.render_recipe(self, variant_config, render_config)
+
+    def run_build(
+        self,
+        variant_config: Any = None,
+        tool_config: Any = None,
+        output_dir: Union[str, Path, None] = None,
+        channel: Optional[List[str]] = None,
+        **kwargs: Any
+    ) -> None:
+        """
+        Build this multi-output recipe.
+
+        This method renders the recipe with variants and then builds the rendered outputs
+        directly without writing temporary files.
+
+        Args:
+            variant_config: Optional VariantConfig to use for building variants.
+            tool_config: Optional ToolConfiguration to use for the build. If provided, individual
+                        parameters like keep_build, test, etc. will be ignored.
+            output_dir: Directory to store the built packages. Defaults to current directory.
+            channel: List of channels to use for resolving dependencies.
+            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+                     These are ignored if tool_config is provided.
+
+        Example:
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> recipe.run_build(output_dir="./output")
+
+            >>> # Or with custom tool configuration
+            >>> from rattler_build import ToolConfiguration
+            >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
+            >>> recipe.run_build(tool_config=config, output_dir="./output")
+        """
+        from . import rattler_build as _rb
+
+        # Render the recipe to get Stage1 variants
+        rendered_variants = self.render(variant_config)
+
+        # Extract the inner ToolConfiguration if provided
+        tool_config_inner = tool_config._inner if hasattr(tool_config, '_inner') else tool_config
+
+        # Build from the rendered variants
+        _rb.build_from_rendered_variants_py(
+            rendered_variants=[v._inner for v in rendered_variants],
+            tool_config=tool_config_inner,
+            output_dir=Path(output_dir) if output_dir else None,
+            channel=channel,
+            **kwargs
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
@@ -239,6 +423,16 @@ class Package:
 
     def __init__(self, inner: _Stage0Package):
         self._inner = inner
+
+    @property
+    def name(self) -> Any:
+        """Get the package name (may be a template string like '${{ name }}')."""
+        return self._inner.name
+
+    @property
+    def version(self) -> Any:
+        """Get the package version (may be a template string like '${{ version }}')."""
+        return self._inner.version
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""
@@ -262,6 +456,26 @@ class Build:
     def __init__(self, inner: _Stage0Build):
         self._inner = inner
 
+    @property
+    def number(self) -> Any:
+        """Get the build number (may be a template)."""
+        return self._inner.number
+
+    @property
+    def string(self) -> Optional[Any]:
+        """Get the build string (may be a template or None for auto-generated)."""
+        return self._inner.string
+
+    @property
+    def script(self) -> Any:
+        """Get the build script configuration."""
+        return self._inner.script
+
+    @property
+    def noarch(self) -> Optional[Any]:
+        """Get the noarch type (may be a template or None)."""
+        return self._inner.noarch
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
@@ -273,6 +487,26 @@ class Requirements:
     def __init__(self, inner: _Stage0Requirements):
         self._inner = inner
 
+    @property
+    def build(self) -> List[Any]:
+        """Get build-time requirements (list of matchspecs or templates)."""
+        return self._inner.build
+
+    @property
+    def host(self) -> List[Any]:
+        """Get host-time requirements (list of matchspecs or templates)."""
+        return self._inner.host
+
+    @property
+    def run(self) -> List[Any]:
+        """Get run-time requirements (list of matchspecs or templates)."""
+        return self._inner.run
+
+    @property
+    def run_constraints(self) -> List[Any]:
+        """Get run-time constraints (list of matchspecs or templates)."""
+        return self._inner.run_constraints
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
@@ -283,6 +517,41 @@ class About:
 
     def __init__(self, inner: _Stage0About):
         self._inner = inner
+
+    @property
+    def homepage(self) -> Optional[Any]:
+        """Get the homepage URL (may be a template or None)."""
+        return self._inner.homepage
+
+    @property
+    def license(self) -> Optional[Any]:
+        """Get the license (may be a template or None)."""
+        return self._inner.license
+
+    @property
+    def license_family(self) -> Optional[Any]:
+        """Get the license family (deprecated, may be a template or None)."""
+        return self._inner.license_family
+
+    @property
+    def summary(self) -> Optional[Any]:
+        """Get the summary (may be a template or None)."""
+        return self._inner.summary
+
+    @property
+    def description(self) -> Optional[Any]:
+        """Get the description (may be a template or None)."""
+        return self._inner.description
+
+    @property
+    def documentation(self) -> Optional[Any]:
+        """Get the documentation URL (may be a template or None)."""
+        return self._inner.documentation
+
+    @property
+    def repository(self) -> Optional[Any]:
+        """Get the repository URL (may be a template or None)."""
+        return self._inner.repository
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to Python dictionary."""

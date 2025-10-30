@@ -124,7 +124,12 @@ impl PyVariantConfig {
     }
 
     /// Set values for a variant key
-    fn set_values(&mut self, key: &str, values: Vec<Bound<'_, PyAny>>, _py: Python<'_>) -> PyResult<()> {
+    fn set_values(
+        &mut self,
+        key: &str,
+        values: Vec<Bound<'_, PyAny>>,
+        _py: Python<'_>,
+    ) -> PyResult<()> {
         let normalized_key = NormalizedKey::from(key);
         let variables: Vec<Variable> = values
             .iter()
@@ -183,7 +188,9 @@ impl PyVariantConfig {
     fn combinations(&self, py: Python<'_>) -> PyResult<Vec<Py<PyDict>>> {
         // Use all keys for combinations
         let used_vars = self.inner.keys().cloned().collect();
-        let combos = self.inner.combinations(&used_vars)
+        let combos = self
+            .inner
+            .combinations(&used_vars)
             .map_err(|e| RattlerBuildError::Variant(format!("{:?}", e)))?;
         combos
             .into_iter()

@@ -2,7 +2,7 @@
 
 use crate::error::RattlerBuildError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict};
+use pyo3::types::PyDict;
 use rattler_build_recipe::stage1;
 
 /// Stage1 Recipe - The fully evaluated recipe ready for building
@@ -109,7 +109,8 @@ impl PyStage1Recipe {
     fn __repr__(&self) -> String {
         format!(
             "Stage1Recipe(package='{}', version='{}')",
-            self.inner.package.name.as_normalized(), self.inner.package.version
+            self.inner.package.name.as_normalized(),
+            self.inner.package.version
         )
     }
 }

@@ -5,7 +5,7 @@ These tests ensure that we get clear, helpful error messages when things go wron
 """
 
 import pytest
-from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.stage0 import Recipe as Stage0Recipe, SingleOutputRecipe
 from rattler_build.rattler_build import RecipeParseError
 
 
@@ -32,7 +32,7 @@ def test_from_dict_wrong_type_for_version() -> None:
     recipe_dict = {
         "package": {
             "name": "test-package",
-            "version": 123  # Should be string
+            "version": 123,  # Should be string
         }
     }
 
@@ -50,13 +50,10 @@ def test_from_dict_wrong_type_for_version() -> None:
 def test_from_dict_invalid_build_number() -> None:
     """Test that from_dict validates build number types."""
     recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
+        "package": {"name": "test-package", "version": "1.0.0"},
         "build": {
             "number": "not a number"  # Should be int
-        }
+        },
     }
 
     with pytest.raises(RecipeParseError) as exc_info:
@@ -76,13 +73,7 @@ def test_from_dict_invalid_structure() -> None:
 
 def test_from_dict_unknown_top_level_field() -> None:
     """Test error handling for unknown top-level fields."""
-    recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
-        "unknown_field": "should cause error"
-    }
+    recipe_dict = {"package": {"name": "test-package", "version": "1.0.0"}, "unknown_field": "should cause error"}
 
     with pytest.raises(RecipeParseError) as exc_info:
         Stage0Recipe.from_dict(recipe_dict)
@@ -95,13 +86,10 @@ def test_from_dict_unknown_top_level_field() -> None:
 def test_from_dict_invalid_requirements_structure() -> None:
     """Test error handling for invalid requirements structure."""
     recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
+        "package": {"name": "test-package", "version": "1.0.0"},
         "requirements": {
             "run": "should be a list"  # Should be list, not string
-        }
+        },
     }
 
     with pytest.raises(RecipeParseError) as exc_info:
@@ -151,16 +139,13 @@ def test_from_dict_empty_dict() -> None:
 def test_from_dict_nested_validation() -> None:
     """Test that nested field validation provides clear errors."""
     recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
+        "package": {"name": "test-package", "version": "1.0.0"},
         "build": {
             "number": 0,
             "python": {
                 "entry_points": "should be a list"  # Should be list
-            }
-        }
+            },
+        },
     }
 
     with pytest.raises(RecipeParseError) as exc_info:
@@ -176,7 +161,7 @@ def test_from_dict_provides_helpful_message() -> None:
     recipe_dict = {
         "package": {
             "name": 123,  # Will be converted to string
-            "version": "1.0.0"
+            "version": "1.0.0",
         }
     }
 
@@ -188,13 +173,10 @@ def test_from_dict_provides_helpful_message() -> None:
 def test_from_dict_list_of_strings_vs_object() -> None:
     """Test clear errors when expecting list but getting something else."""
     recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
+        "package": {"name": "test-package", "version": "1.0.0"},
         "requirements": {
             "host": {"not": "a list"}  # Should be list
-        }
+        },
     }
 
     with pytest.raises(RecipeParseError) as exc_info:
@@ -208,15 +190,12 @@ def test_from_dict_list_of_strings_vs_object() -> None:
 def test_error_includes_field_path() -> None:
     """Test that errors include the path to the problematic field."""
     recipe_dict = {
-        "package": {
-            "name": "test-package",
-            "version": "1.0.0"
-        },
+        "package": {"name": "test-package", "version": "1.0.0"},
         "build": {
             "dynamic_linking": {
                 "binary_relocation": "not a boolean"  # Should be bool
             }
-        }
+        },
     }
 
     with pytest.raises(RecipeParseError) as exc_info:
@@ -225,39 +204,22 @@ def test_error_includes_field_path() -> None:
     error_msg = str(exc_info.value)
     # Error should help locate the problem
     # It might mention the field name or path
-    assert any(word in error_msg.lower() for word in [
-        "dynamic_linking",
-        "binary_relocation",
-        "build",
-        "bool",
-        "boolean"
-    ])
+    assert any(
+        word in error_msg.lower() for word in ["dynamic_linking", "binary_relocation", "build", "bool", "boolean"]
+    )
 
 
 def test_from_dict_valid_minimal_recipe() -> None:
     """Test that a minimal valid recipe works."""
     # This should NOT raise an error
-    recipe_dict = {
-        "package": {
-            "name": "minimal-package",
-            "version": "1.0.0"
-        }
-    }
+    recipe_dict = {"package": {"name": "minimal-package", "version": "1.0.0"}}
 
     stage0 = Stage0Recipe.from_dict(recipe_dict)
-    assert stage0 is not None
-    assert stage0.is_single_output()
-
+    assert isinstance(stage0, SingleOutputRecipe)
 
 def test_from_dict_with_schema_version() -> None:
     """Test that schema_version is accepted."""
-    recipe_dict = {
-        "schema_version": 1,
-        "package": {
-            "name": "versioned-package",
-            "version": "1.0.0"
-        }
-    }
+    recipe_dict = {"schema_version": 1, "package": {"name": "versioned-package", "version": "1.0.0"}}
 
     stage0 = Stage0Recipe.from_dict(recipe_dict)
     assert stage0 is not None

@@ -36,8 +36,9 @@ impl PyRenderConfig {
     ) -> PyResult<Self> {
         let target_platform = target_platform
             .map(|p| {
-                p.parse::<Platform>()
-                    .map_err(|e| RattlerBuildError::Other(format!("Invalid target_platform: {}", e)))
+                p.parse::<Platform>().map_err(|e| {
+                    RattlerBuildError::Other(format!("Invalid target_platform: {}", e))
+                })
             })
             .transpose()?
             .unwrap_or_else(Platform::current);
@@ -290,25 +291,21 @@ pub fn render_recipe(
     variant_config: &PyVariantConfig,
     render_config: Option<PyRenderConfig>,
 ) -> PyResult<Vec<PyRenderedVariant>> {
-    let config = render_config.unwrap_or_else(|| {
-        PyRenderConfig {
-            inner: RustRenderConfig::default(),
-        }
+    let config = render_config.unwrap_or_else(|| PyRenderConfig {
+        inner: RustRenderConfig::default(),
     });
 
     // Try to extract the inner stage0 recipe
     let stage0_recipe = if let Ok(r) = recipe.extract::<PyRef<PyStage0Recipe>>() {
         r.inner.clone()
     } else {
-        return Err(RattlerBuildError::Other(
-            "Expected a Stage0 Recipe".to_string(),
-        )
-        .into());
+        return Err(RattlerBuildError::Other("Expected a Stage0 Recipe".to_string()).into());
     };
 
     // Call the Rust render function
-    let rendered = render_recipe_with_variant_config(&stage0_recipe, &variant_config.inner, config.inner)
-        .map_err(|e| RattlerBuildError::Other(format!("Render error: {:?}", e)))?;
+    let rendered =
+        render_recipe_with_variant_config(&stage0_recipe, &variant_config.inner, config.inner)
+            .map_err(|e| RattlerBuildError::Other(format!("Render error: {:?}", e)))?;
 
     // Convert to Python objects
     Ok(rendered
@@ -326,10 +323,8 @@ fn python_to_variable(value: Bound<'_, PyAny>) -> PyResult<Variable> {
     } else if let Ok(s) = value.extract::<String>() {
         Ok(Variable::from(s))
     } else if let Ok(list) = value.downcast::<pyo3::types::PyList>() {
-        let items: PyResult<Vec<Variable>> = list
-            .iter()
-            .map(|item| python_to_variable(item))
-            .collect();
+        let items: PyResult<Vec<Variable>> =
+            list.iter().map(|item| python_to_variable(item)).collect();
         Ok(Variable::from(items?))
     } else {
         Ok(Variable::from(value.to_string()))

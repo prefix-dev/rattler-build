@@ -43,19 +43,13 @@ def test_render_config_set_context() -> None:
     config.set_context("my_number", 42)
 
     assert config.get_context("my_var") == "value"
-    assert config.get_context("my_bool") == "true"  # Note: converted to lowercase string
-    assert config.get_context("my_number") == "42"  # Note: converted to string
-
-
-def test_render_config_get_all_context() -> None:
-    """Test getting all context variables."""
-    config = RenderConfig()
-    config.set_context("var1", "value1")
-    config.set_context("var2", "value2")
+    # TODO: this should not get converted to a string!
+    assert config.get_context("my_bool") == "true"
+    # TODO: this should not get converted to a string!
+    assert config.get_context("my_number") == "42"
 
     context = config.get_all_context()
-    assert "var1" in context
-    assert "var2" in context
+    assert context.keys() == {"my_var", "my_bool", "my_number"}
 
 
 def test_render_config_platform_setters() -> None:
@@ -395,10 +389,112 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     assert rendered[0].recipe().package.name == "mixed-compiled"
     assert rendered[0].recipe().package.version == "1.2.3"
     assert len(rendered[0].recipe().staging_caches) == 1
-    assert rendered[0].recipe().about.to_dict() == snapshot({
-    "repository": "https://github.com/foobar/repo",
-    "license": "Apache-2.0",
-    "license_file": ["LICENSE"],
-    "summary": "Compiled library package",
-})
-    
+    assert rendered[0].recipe().about.to_dict() == snapshot(
+        {
+            "repository": "https://github.com/foobar/repo",
+            "license": "Apache-2.0",
+            "license_file": ["LICENSE"],
+            "summary": "Compiled library package",
+        }
+    )
+
+
+def test_render_recipe_from_yaml_string() -> None:
+    """Test rendering with recipe as YAML string."""
+    recipe_yaml = """
+package:
+  name: string-test
+  version: 1.0.0
+"""
+    variant_yaml = """
+python:
+  - "3.10"
+"""
+
+    # Pass recipe and variant_config as strings
+    rendered = render_recipe(recipe_yaml, variant_yaml)
+
+    assert len(rendered) >= 1
+    assert rendered[0].recipe().package.name == "string-test"
+
+
+def test_render_recipe_from_path(test_data_dir: Path) -> None:
+    """Test rendering with recipe as Path object."""
+    recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
+    variant_config = VariantConfig()
+
+    # Pass recipe as Path object
+    rendered = render_recipe(recipe_path, variant_config)
+
+    assert len(rendered) == 2
+    assert rendered[0].recipe().package.name == "mixed-compiled"
+
+
+def test_render_recipe_list() -> None:
+    """Test rendering with a list of recipes."""
+    recipe1_yaml = """
+package:
+  name: pkg1
+  version: 1.0.0
+"""
+    recipe2_yaml = """
+package:
+  name: pkg2
+  version: 2.0.0
+"""
+
+    # Parse recipes
+    recipe1 = Recipe.from_yaml(recipe1_yaml)
+    recipe2 = Recipe.from_yaml(recipe2_yaml)
+
+    variant_config = VariantConfig()
+
+    # Pass list of recipes
+    rendered = render_recipe([recipe1, recipe2], variant_config)
+
+    assert len(rendered) == 2
+    names = {variant.recipe().package.name for variant in rendered}
+    assert names == {"pkg1", "pkg2"}
+
+
+def test_render_variant_config_from_yaml_string() -> None:
+    """Test rendering with variant_config as YAML string."""
+    recipe_yaml = """
+package:
+  name: test-pkg
+  version: 1.0.0
+
+requirements:
+  host:
+    - python ${{ python }}.*
+"""
+
+    variant_yaml = """
+python:
+  - "3.9"
+  - "3.10"
+"""
+
+    # Pass variant_config as string
+    rendered = render_recipe(recipe_yaml, variant_yaml)
+
+    assert len(rendered) == 2
+    python_versions = {variant.variant().get("python") for variant in rendered}
+    assert python_versions == {"3.9", "3.10"}
+
+
+def test_render_invalid_recipe_type() -> None:
+    """Test that invalid recipe type raises TypeError."""
+    with pytest.raises(TypeError, match="Unsupported recipe type"):
+        render_recipe(123, VariantConfig())  # type: ignore[arg-type]
+
+
+def test_render_invalid_variant_config_type() -> None:
+    """Test that invalid variant_config type raises TypeError."""
+    recipe_yaml = """
+package:
+  name: test
+  version: 1.0.0
+"""
+    with pytest.raises(TypeError, match="Unsupported variant_config type"):
+        render_recipe(recipe_yaml, 123)  # type: ignore[arg-type]

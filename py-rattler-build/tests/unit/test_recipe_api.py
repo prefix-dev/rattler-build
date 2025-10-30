@@ -5,7 +5,7 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 """
 
 from pathlib import Path
-from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
 from rattler_build.variant_config import VariantConfig
 from rattler_build.render import render_recipe, RenderConfig
 
@@ -18,13 +18,11 @@ def test_recipe_all_sections() -> None:
     """Test accessing all recipe sections through Stage0 and Stage1."""
     # Parse to Stage0
     stage0 = Stage0Recipe.from_file(str(TEST_RECIPE_FILE))
-    assert stage0.is_single_output()
-
-    single = stage0.as_single_output()
-    assert single is not None
+    assert stage0 is not None
+    assert isinstance(stage0, SingleOutputRecipe)
 
     # Test Stage0 Package
-    package_dict = single.package.to_dict()
+    package_dict = stage0.package.to_dict()
     assert package_dict["name"] == "test-package"
     assert package_dict["version"] == "1.0.0"
 
@@ -224,13 +222,10 @@ def test_stage0_to_stage1_complete_flow() -> None:
     # Load from file
     stage0 = Stage0Recipe.from_file(str(TEST_RECIPE_FILE))
 
-    # Verify Stage0 structure
-    assert stage0.is_single_output()
-    single = stage0.as_single_output()
-    assert single is not None
+    assert stage0 is not None
 
     # Access Stage0 properties
-    stage0_dict = single.to_dict()
+    stage0_dict = stage0.to_dict()
     assert "package" in stage0_dict
     assert "build" in stage0_dict
     assert "requirements" in stage0_dict
@@ -292,11 +287,9 @@ about:
 
     # Parse Stage0
     stage0 = Stage0Recipe.from_yaml(yaml_content)
-    assert stage0.is_multi_output()
-
-    multi = stage0.as_multi_output()
-    assert multi is not None
-    assert len(multi.outputs) == 2
+    assert isinstance(stage0, MultiOutputRecipe)
+    assert stage0 is not None
+    assert len(stage0.outputs) == 2
 
     # Render to Stage1
     variant_config = VariantConfig()
@@ -339,11 +332,11 @@ build:
 
     # Parse Stage0
     stage0 = Stage0Recipe.from_yaml(yaml_content)
-    single = stage0.as_single_output()
-    assert single is not None
+    assert isinstance(stage0, SingleOutputRecipe)
+    assert stage0 is not None
 
     # Check Stage0 context is preserved
-    stage0_context = single.context
+    stage0_context = stage0.context
     assert "pkg_name" in stage0_context
     assert stage0_context["pkg_name"] == "jinja-test"
 
@@ -374,11 +367,10 @@ def test_recipe_from_dict_api() -> None:
 
     # Create Stage0 from dict
     stage0 = Stage0Recipe.from_dict(recipe_dict)
-    assert stage0.is_single_output()
 
     # Render to Stage1
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     stage1 = rendered[0].recipe()
 
     # Verify all properties

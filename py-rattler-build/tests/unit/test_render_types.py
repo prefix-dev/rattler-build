@@ -1,6 +1,5 @@
 """Tests for render module typed structures (HashInfo and PinSubpackageInfo)."""
 
-
 from rattler_build.render import (
     RenderConfig,
     render_recipe,

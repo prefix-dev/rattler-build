@@ -57,8 +57,8 @@ def test_recipe_from_yaml_single_output() -> None:
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     assert recipe is not None
-    assert recipe.is_single_output()
-    assert not recipe.is_multi_output()
+    assert isinstance(recipe, SingleOutputRecipe)
+    assert not isinstance(recipe, MultiOutputRecipe)
 
 
 def test_recipe_from_yaml_multi_output() -> None:
@@ -66,35 +66,8 @@ def test_recipe_from_yaml_multi_output() -> None:
     recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
 
     assert recipe is not None
-    assert recipe.is_multi_output()
-    assert not recipe.is_single_output()
-
-
-def test_recipe_as_single_output() -> None:
-    """Test getting a recipe as SingleOutputRecipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-
-    single = recipe.as_single_output()
-    assert single is not None
-    assert isinstance(single, SingleOutputRecipe)
-
-
-def test_recipe_as_multi_output() -> None:
-    """Test getting a recipe as MultiOutputRecipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-
-    multi = recipe.as_multi_output()
-    assert multi is not None
-    assert isinstance(multi, MultiOutputRecipe)
-
-
-def test_recipe_as_wrong_type() -> None:
-    """Test that converting to wrong type returns None."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-
-    # Single-output recipe should return None for as_multi_output
-    multi = recipe.as_multi_output()
-    assert multi is None
+    assert isinstance(recipe, MultiOutputRecipe)
+    assert not isinstance(recipe, SingleOutputRecipe)
 
 
 def test_recipe_to_dict() -> None:
@@ -170,60 +143,22 @@ def test_recipe_to_dict_snapshot() -> None:
 def test_single_output_recipe_package() -> None:
     """Test accessing package info from single-output recipe."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
 
-    assert single is not None
-    package = single.package
-    assert package is not None
+    assert isinstance(recipe, SingleOutputRecipe)
+    assert recipe.package is not None
+    assert recipe.build is not None
+    assert recipe.requirements is not None
+    assert recipe.about is not None
 
-
-def test_single_output_recipe_build() -> None:
-    """Test accessing build info from single-output recipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    build = single.build
-    assert build is not None
-
-
-def test_single_output_recipe_requirements() -> None:
-    """Test accessing requirements from single-output recipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    requirements = single.requirements
-    assert requirements is not None
-
-
-def test_single_output_recipe_about() -> None:
-    """Test accessing about metadata from single-output recipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    about = single.about
-    assert about is not None
-
-
-def test_single_output_recipe_context() -> None:
-    """Test accessing context from single-output recipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    context = single.context
+    # TODO: decide if we want to keep context a dictionary
+    context = recipe.context
     assert isinstance(context, dict)
 
 
 def test_single_output_recipe_to_dict() -> None:
     """Test converting single-output recipe to dict."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    recipe_dict = single.to_dict()
+    recipe_dict = recipe.to_dict()
     assert isinstance(recipe_dict, dict)
     assert "package" in recipe_dict
 
@@ -231,10 +166,7 @@ def test_single_output_recipe_to_dict() -> None:
 def test_single_output_recipe_to_dict_snapshot() -> None:
     """Test single-output recipe serialization with snapshot."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    recipe_dict = single.to_dict()
+    recipe_dict = recipe.to_dict()
 
     # Snapshot the full structure
     assert recipe_dict == snapshot(
@@ -292,64 +224,26 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
     )
 
 
-def test_multi_output_recipe_outputs() -> None:
-    """Test accessing outputs from multi-output recipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    outputs = multi.outputs
-    assert isinstance(outputs, list)
-    assert len(outputs) == 2
-
-
-def test_multi_output_recipe_recipe_metadata() -> None:
-    """Test accessing recipe metadata from multi-output recipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    recipe_metadata = multi.recipe
-    assert recipe_metadata is not None
-
-
-def test_multi_output_recipe_build() -> None:
-    """Test accessing build from multi-output recipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    build = multi.build
-    assert build is not None
-
-
 def test_multi_output_recipe_about() -> None:
     """Test accessing about from multi-output recipe."""
     recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
 
-    assert multi is not None
-    about = multi.about
-    assert about is not None
+    assert isinstance(recipe, MultiOutputRecipe)
+    assert isinstance(recipe.outputs, list)
+    assert len(recipe.outputs) == 2
 
+    assert recipe.recipe is not None
+    assert recipe.about is not None
+    assert recipe.build is not None
 
-def test_multi_output_recipe_context() -> None:
-    """Test accessing context from multi-output recipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    context = multi.context
+    context = recipe.context
     assert isinstance(context, dict)
 
 
 def test_multi_output_recipe_to_dict() -> None:
     """Test converting multi-output recipe to dict."""
     recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    recipe_dict = multi.to_dict()
+    recipe_dict = recipe.to_dict()
     assert isinstance(recipe_dict, dict)
     assert "recipe" in recipe_dict or "outputs" in recipe_dict
 
@@ -357,13 +251,9 @@ def test_multi_output_recipe_to_dict() -> None:
 def test_multi_output_recipe_to_dict_snapshot() -> None:
     """Test multi-output recipe serialization with snapshot."""
     recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    recipe_dict = multi.to_dict()
 
     # Snapshot the full structure including all outputs
-    assert recipe_dict == snapshot(
+    assert recipe.to_dict() == snapshot(
         {
             "recipe": {"name": "test-multi", "version": "1.0.0"},
             "build": {
@@ -524,10 +414,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
 def test_package_to_dict() -> None:
     """Test converting package to dict."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    package = single.package
+    assert isinstance(recipe, SingleOutputRecipe)
+    package = recipe.package
     package_dict = package.to_dict()
     assert isinstance(package_dict, dict)
 
@@ -535,34 +423,21 @@ def test_package_to_dict() -> None:
 def test_package_to_dict_snapshot() -> None:
     """Test package serialization with snapshot."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
+    assert isinstance(recipe, SingleOutputRecipe)
 
-    assert single is not None
-    package = single.package
+    package = recipe.package
     package_dict = package.to_dict()
 
     # Snapshot should capture name and version
     assert package_dict == snapshot({"name": "test-package", "version": "1.0.0"})
 
 
-def test_build_to_dict() -> None:
-    """Test converting build to dict."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    build = single.build
-    build_dict = build.to_dict()
-    assert isinstance(build_dict, dict)
-
-
 def test_build_to_dict_snapshot() -> None:
     """Test build serialization with snapshot."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
+    assert isinstance(recipe, SingleOutputRecipe)
 
-    assert single is not None
-    build = single.build
+    build = recipe.build
     build_dict = build.to_dict()
 
     # Snapshot should capture build number and other build settings
@@ -607,48 +482,24 @@ def test_build_to_dict_snapshot() -> None:
     )
 
 
-def test_requirements_to_dict() -> None:
-    """Test converting requirements to dict."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    requirements = single.requirements
-    requirements_dict = requirements.to_dict()
-    assert isinstance(requirements_dict, dict)
-
-
 def test_requirements_to_dict_snapshot() -> None:
     """Test requirements serialization with snapshot."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
+    assert isinstance(recipe, SingleOutputRecipe)
 
-    assert single is not None
-    requirements = single.requirements
+    requirements = recipe.requirements
     requirements_dict = requirements.to_dict()
 
     # Snapshot should capture host and run dependencies
     assert requirements_dict == snapshot({"host": ["python"], "run": ["python"]})
 
 
-def test_about_to_dict() -> None:
-    """Test converting about to dict."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    about = single.about
-    about_dict = about.to_dict()
-    assert isinstance(about_dict, dict)
-
-
 def test_about_to_dict_snapshot() -> None:
     """Test about serialization with snapshot."""
     recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
-    single = recipe.as_single_output()
+    assert isinstance(recipe, SingleOutputRecipe)
 
-    assert single is not None
-    about = single.about
+    about = recipe.about
     about_dict = about.to_dict()
 
     # Snapshot should capture summary and license
@@ -680,10 +531,7 @@ build:
 """
 
     recipe = Recipe.from_yaml(yaml_with_context)
-    single = recipe.as_single_output()
-
-    assert single is not None
-    context = single.context
+    context = recipe.context
     assert len(context) > 0
 
 
@@ -708,10 +556,8 @@ def test_recipe_repr() -> None:
 def test_multi_output_outputs_snapshot() -> None:
     """Test multi-output recipe outputs structure with snapshot."""
     recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
-    multi = recipe.as_multi_output()
-
-    assert multi is not None
-    outputs = multi.outputs
+    assert isinstance(recipe, MultiOutputRecipe)
+    outputs = recipe.outputs
 
     # Convert outputs to serializable format for snapshot
     outputs_data = []
@@ -854,16 +700,14 @@ build:
 """
 
     recipe = Recipe.from_yaml(yaml_with_context)
-    single = recipe.as_single_output()
-
-    assert single is not None
+    assert isinstance(recipe, SingleOutputRecipe)
 
     # Snapshot the context structure
-    assert single.context == snapshot({"version": "1.2.3", "name": "my-package"})
+    assert recipe.context == snapshot({"version": "1.2.3", "name": "my-package"})
     # Jinja should stay jinja in the stage0 recipe
-    assert single.package.to_dict() == snapshot({"name": "${{ name }}", "version": "${{ version }}"})
+    assert recipe.package.to_dict() == snapshot({"name": "${{ name }}", "version": "${{ version }}"})
 
-    assert single.requirements.to_dict() == snapshot(
+    assert recipe.requirements.to_dict() == snapshot(
         {
             "build": [
                 {"if": "win", "then": "vc2019", "else": "gcc"},

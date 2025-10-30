@@ -1,11 +1,14 @@
 // Python bindings for rattler-build stage0 types (parsed recipe)
 
 use crate::error::RattlerBuildError;
-use pyo3::{IntoPyObjectExt, prelude::*};
 use pyo3::types::PyDict;
+use pyo3::{IntoPyObjectExt, prelude::*};
 use rattler_build_recipe::stage0;
 
 /// Stage0 Recipe - The parsed recipe before evaluation
+///
+/// This is a union type that wraps either SingleOutputRecipe or MultiOutputRecipe.
+/// Most users should use `from_yaml()` which returns the specific type directly.
 #[pyclass(name = "Stage0Recipe")]
 #[derive(Clone)]
 pub struct PyStage0Recipe {
@@ -26,13 +29,15 @@ impl PyStage0Recipe {
     #[staticmethod]
     fn from_dict(dict: &Bound<'_, PyAny>) -> PyResult<Self> {
         // Convert Python dict to JSON value via pythonize
-        let json_value: serde_json::Value = pythonize::depythonize(dict)
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("Failed to convert Python dict to JSON: {}", e)))?;
+        let json_value: serde_json::Value = pythonize::depythonize(dict).map_err(|e| {
+            RattlerBuildError::RecipeParse(format!("Failed to convert Python dict to JSON: {}", e))
+        })?;
 
         // Convert to YAML string using the JSON value's serde repr
         // This is a simple approach: serialize to JSON and parse as YAML
-        let json_string = serde_json::to_string(&json_value)
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("Failed to serialize to JSON: {}", e)))?;
+        let json_string = serde_json::to_string(&json_value).map_err(|e| {
+            RattlerBuildError::RecipeParse(format!("Failed to serialize to JSON: {}", e))
+        })?;
 
         // Parse as YAML (YAML is a superset of JSON, so this works)
         let recipe = stage0::parse_recipe_or_multi_from_source(&json_string)
@@ -69,6 +74,76 @@ impl PyStage0Recipe {
             }),
             _ => None,
         }
+    }
+
+    /// Get the package information
+    /// For single-output recipes, returns the package directly.
+    /// For multi-output recipes, returns None (use .recipe.package on the multi-output recipe instead).
+    #[getter]
+    fn package(&self) -> Option<PyStage0Package> {
+        match &self.inner {
+            stage0::Recipe::SingleOutput(single) => Some(PyStage0Package {
+                inner: single.package.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Get the build configuration
+    #[getter]
+    fn build(&self) -> PyStage0Build {
+        match &self.inner {
+            stage0::Recipe::SingleOutput(single) => PyStage0Build {
+                inner: single.build.clone(),
+            },
+            stage0::Recipe::MultiOutput(multi) => PyStage0Build {
+                inner: multi.build.clone(),
+            },
+        }
+    }
+
+    /// Get the requirements
+    /// For single-output recipes, returns the requirements directly.
+    /// For multi-output recipes, returns None (requirements are per-output).
+    #[getter]
+    fn requirements(&self) -> Option<PyStage0Requirements> {
+        match &self.inner {
+            stage0::Recipe::SingleOutput(single) => Some(PyStage0Requirements {
+                inner: single.requirements.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Get the about metadata
+    #[getter]
+    fn about(&self) -> PyStage0About {
+        match &self.inner {
+            stage0::Recipe::SingleOutput(single) => PyStage0About {
+                inner: single.about.clone(),
+            },
+            stage0::Recipe::MultiOutput(multi) => PyStage0About {
+                inner: multi.about.clone(),
+            },
+        }
+    }
+
+    /// Get the context dictionary
+    #[getter]
+    fn context(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let context_map = match &self.inner {
+            stage0::Recipe::SingleOutput(single) => &single.context,
+            stage0::Recipe::MultiOutput(multi) => &multi.context,
+        };
+
+        let dict = PyDict::new(py);
+        for (key, value) in context_map {
+            let json_value = serde_json::to_value(value).map_err(RattlerBuildError::from)?;
+            let py_value = pythonize::pythonize(py, &json_value)
+                .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+            dict.set_item(key, py_value)?;
+        }
+        Ok(dict.into())
     }
 
     /// Convert to Python dictionary representation
@@ -254,6 +329,25 @@ pub struct PyStage0Package {
 
 #[pymethods]
 impl PyStage0Package {
+    /// Get the package name (may be a template string like "${{ name }}")
+    #[getter]
+    fn name(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.name).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get the package version (may be a template string like "${{ version }}")
+    #[getter]
+    fn version(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value =
+            serde_json::to_value(&self.inner.version).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
     fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
         pythonize::pythonize(py, &json_value)
@@ -271,6 +365,29 @@ pub struct PyStage0PackageMetadata {
 
 #[pymethods]
 impl PyStage0PackageMetadata {
+    /// Get the package name (may be a template string like "${{ name }}")
+    #[getter]
+    fn name(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.name).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get the package version (may be a template string like "${{ version }}", or None if inherited)
+    #[getter]
+    fn version(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.version {
+            Some(version) => {
+                let json_value = serde_json::to_value(version).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
     fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
         pythonize::pythonize(py, &json_value)
@@ -305,6 +422,54 @@ pub struct PyStage0Build {
 
 #[pymethods]
 impl PyStage0Build {
+    /// Get the build number (may be a template)
+    #[getter]
+    fn number(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value =
+            serde_json::to_value(&self.inner.number).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get the build string (may be a template or None for auto-generated)
+    #[getter]
+    fn string(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.string {
+            Some(string) => {
+                let json_value = serde_json::to_value(string).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the build script configuration
+    #[getter]
+    fn script(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value =
+            serde_json::to_value(&self.inner.script).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get the noarch type (may be a template or None)
+    #[getter]
+    fn noarch(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.noarch {
+            Some(noarch) => {
+                let json_value = serde_json::to_value(noarch).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
     fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
         pythonize::pythonize(py, &json_value)
@@ -322,6 +487,44 @@ pub struct PyStage0Requirements {
 
 #[pymethods]
 impl PyStage0Requirements {
+    /// Get build-time requirements (list of matchspecs or templates)
+    #[getter]
+    fn build(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value =
+            serde_json::to_value(&self.inner.build).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get host-time requirements (list of matchspecs or templates)
+    #[getter]
+    fn host(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.host).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get run-time requirements (list of matchspecs or templates)
+    #[getter]
+    fn run(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner.run).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    /// Get run-time constraints (list of matchspecs or templates)
+    #[getter]
+    fn run_constraints(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value =
+            serde_json::to_value(&self.inner.run_constraints).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
     fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
         pythonize::pythonize(py, &json_value)
@@ -339,6 +542,108 @@ pub struct PyStage0About {
 
 #[pymethods]
 impl PyStage0About {
+    /// Get the homepage URL (may be a template or None)
+    #[getter]
+    fn homepage(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.homepage {
+            Some(homepage) => {
+                let json_value = serde_json::to_value(homepage).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the license (may be a template or None)
+    #[getter]
+    fn license(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.license {
+            Some(license) => {
+                let json_value = serde_json::to_value(license).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the license family (deprecated, may be a template or None)
+    #[getter]
+    fn license_family(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.license_family {
+            Some(license_family) => {
+                let json_value =
+                    serde_json::to_value(license_family).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the summary (may be a template or None)
+    #[getter]
+    fn summary(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.summary {
+            Some(summary) => {
+                let json_value = serde_json::to_value(summary).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the description (may be a template or None)
+    #[getter]
+    fn description(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.description {
+            Some(description) => {
+                let json_value =
+                    serde_json::to_value(description).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the documentation URL (may be a template or None)
+    #[getter]
+    fn documentation(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.documentation {
+            Some(documentation) => {
+                let json_value =
+                    serde_json::to_value(documentation).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the repository URL (may be a template or None)
+    #[getter]
+    fn repository(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match &self.inner.repository {
+            Some(repository) => {
+                let json_value =
+                    serde_json::to_value(repository).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
     fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
         pythonize::pythonize(py, &json_value)

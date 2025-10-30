@@ -5,9 +5,19 @@ This module provides the ability to render Stage0 recipes (parsed but unevaluate
 into Stage1 recipes (fully evaluated and ready to build) using variant configurations.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+
+# Try to import TypeAlias for better type hint support
+try:
+    from typing import TypeAlias
+except ImportError:
+    from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
+    from rattler_build.variant_config import VariantConfig
     # For type checking, use Any placeholders
     _RenderConfig = Any
     _RenderedVariant = Any
@@ -307,9 +317,12 @@ class RenderedVariant:
         return repr(self._inner)
 
 
+RecipeInput: TypeAlias = Union[str, SingleOutputRecipe, MultiOutputRecipe, Path]
+
+
 def render_recipe(
-    recipe: Any,  # Stage0 Recipe
-    variant_config: Any,  # VariantConfig
+    recipe: Union[RecipeInput, List[RecipeInput]],
+    variant_config: Union["VariantConfig", Path, str],
     render_config: Optional[RenderConfig] = None,
 ) -> List[RenderedVariant]:
     """Render a Stage0 recipe with a variant configuration into Stage1 recipes.
@@ -353,12 +366,66 @@ def render_recipe(
         >>> print(f"Generated {len(rendered)} variants")
         Generated 3 variants
     """
+    from rattler_build.stage0 import Recipe
+    from rattler_build.variant_config import VariantConfig as VC
+
+    # Handle render_config parameter
     config_inner = render_config._config if render_config else None
-    # Unwrap the Recipe and VariantConfig to get the inner Rust objects
-    recipe_inner = recipe._inner if hasattr(recipe, "_inner") else recipe
-    variant_config_inner = variant_config._inner if hasattr(variant_config, "_inner") else variant_config
-    rendered = _render_recipe(recipe_inner, variant_config_inner, config_inner)
-    return [RenderedVariant(r) for r in rendered]
+
+    # Handle recipe parameter - convert str/Path to Recipe objects
+    recipes_to_render: List[Union[SingleOutputRecipe, MultiOutputRecipe]] = []
+
+    if isinstance(recipe, list):
+        # Handle list of recipes
+        for r in recipe:
+            if isinstance(r, (str, Path)):
+                parsed = Recipe.from_file(r)
+                recipes_to_render.append(parsed)
+            elif isinstance(r, (SingleOutputRecipe, MultiOutputRecipe)):
+                recipes_to_render.append(r)
+            else:
+                raise TypeError(f"Unsupported recipe type in list: {type(r)}")
+    elif isinstance(recipe, (str, Path)):
+        # Parse single recipe from file/string
+        if isinstance(recipe, Path):
+            # Definitely a file path
+            parsed = Recipe.from_file(recipe)
+        elif recipe.endswith('.yaml') or recipe.endswith('.yml') or '/' in recipe or '\\' in recipe:
+            # String that looks like a file path
+            parsed = Recipe.from_file(recipe)
+        else:
+            # Treat as YAML string
+            parsed = Recipe.from_yaml(recipe)
+        recipes_to_render.append(parsed)
+    elif isinstance(recipe, (SingleOutputRecipe, MultiOutputRecipe)):
+        recipes_to_render.append(recipe)
+    else:
+        raise TypeError(f"Unsupported recipe type: {type(recipe)}")
+
+    # Handle variant_config parameter - convert str/Path to VariantConfig
+    if isinstance(variant_config, (str, Path)):
+        if isinstance(variant_config, Path):
+            variant_config = VC.from_file(variant_config)
+        else:
+            # Check if it's a file path or YAML string
+            if variant_config.endswith('.yaml') or variant_config.endswith('.yml') or '/' in variant_config or '\\' in variant_config:
+                variant_config = VC.from_file(variant_config)
+            else:
+                variant_config = VC.from_yaml(variant_config)
+    elif not isinstance(variant_config, VC):
+        raise TypeError(f"Unsupported variant_config type: {type(variant_config)}")
+
+    # Now unwrap to get inner Rust objects
+    variant_config_inner = variant_config._inner
+
+    # Render all recipes and collect results
+    all_rendered: List[RenderedVariant] = []
+    for recipe_obj in recipes_to_render:
+        recipe_inner = recipe_obj._wrapper
+        rendered = _render_recipe(recipe_inner, variant_config_inner, config_inner)
+        all_rendered.extend([RenderedVariant(r) for r in rendered])
+
+    return all_rendered
 
 
 __all__ = [
