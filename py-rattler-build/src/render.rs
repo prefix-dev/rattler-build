@@ -333,9 +333,50 @@ fn python_to_variable(value: Bound<'_, PyAny>) -> PyResult<Variable> {
 
 /// Helper function to convert Variable to Python values
 fn variable_to_python(py: Python<'_>, var: &Variable) -> PyResult<Py<PyAny>> {
-    // Variable wraps minijinja::Value - we use Display to convert to string
+    // Try to extract as bool first (must be before number check)
+    if let Some(b) = var.as_bool() {
+        let json_val = serde_json::Value::Bool(b);
+        return pythonize::pythonize(py, &json_val)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::Other(format!("Failed to convert bool: {}", e)).into());
+    }
+
+    // Try to extract as integer
+    if let Some(i) = var.as_i64() {
+        let json_val = serde_json::Value::Number(i.into());
+        return pythonize::pythonize(py, &json_val)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::Other(format!("Failed to convert int: {}", e)).into());
+    }
+
+    // Try to extract as string
+    if let Some(s) = var.as_str() {
+        let json_val = serde_json::Value::String(s.to_string());
+        return pythonize::pythonize(py, &json_val)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::Other(format!("Failed to convert string: {}", e)).into());
+    }
+
+    // Try to extract as list/sequence
+    if var.is_sequence() {
+        let mut vec = Vec::new();
+        if let Ok(iter) = var.try_iter() {
+            for item in iter {
+                let item_var = Variable::from(item);
+                let py_item = variable_to_python(py, &item_var)?;
+                vec.push(py_item);
+            }
+            let list = pyo3::types::PyList::new(py, &vec)?;
+            return Ok(list.unbind().into());
+        }
+    }
+
+    // Fallback to string representation
     let s = var.to_string();
-    Ok(s.into_pyobject(py)?.into_any().unbind())
+    let json_val = serde_json::Value::String(s);
+    pythonize::pythonize(py, &json_val)
+        .map(|obj| obj.into())
+        .map_err(|e| RattlerBuildError::Other(format!("Failed to convert value: {}", e)).into())
 }
 
 /// Register the render module with Python

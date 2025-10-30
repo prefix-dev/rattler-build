@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from rattler_build.tool_config import ToolConfiguration
+
     # For type checking, use Any as placeholder since we don't have stubs
     _Stage0Recipe = Any
     _SingleOutputRecipe = Any
@@ -232,10 +234,10 @@ class SingleOutputRecipe:
     def run_build(
         self,
         variant_config: Any = None,
-        tool_config: Any = None,
+        tool_config: Optional["ToolConfiguration"] = None,
         output_dir: Union[str, Path, None] = None,
         channel: Optional[List[str]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Build this recipe.
@@ -267,7 +269,7 @@ class SingleOutputRecipe:
         rendered_variants = self.render(variant_config)
 
         # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if hasattr(tool_config, '_inner') else tool_config
+        tool_config_inner = tool_config._inner if hasattr(tool_config, "_inner") else tool_config
 
         # Build from the rendered variants
         _rb.build_from_rendered_variants_py(
@@ -275,7 +277,7 @@ class SingleOutputRecipe:
             tool_config=tool_config_inner,
             output_dir=Path(output_dir) if output_dir else None,
             channel=channel,
-            **kwargs
+            **kwargs,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -364,10 +366,10 @@ class MultiOutputRecipe:
     def run_build(
         self,
         variant_config: Any = None,
-        tool_config: Any = None,
+        tool_config: Optional["ToolConfiguration"] = None,
         output_dir: Union[str, Path, None] = None,
         channel: Optional[List[str]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Build this multi-output recipe.
@@ -399,7 +401,7 @@ class MultiOutputRecipe:
         rendered_variants = self.render(variant_config)
 
         # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if hasattr(tool_config, '_inner') else tool_config
+        tool_config_inner = tool_config._inner if hasattr(tool_config, "_inner") else tool_config
 
         # Build from the rendered variants
         _rb.build_from_rendered_variants_py(
@@ -407,7 +409,7 @@ class MultiOutputRecipe:
             tool_config=tool_config_inner,
             output_dir=Path(output_dir) if output_dir else None,
             channel=channel,
-            **kwargs
+            **kwargs,
         )
 
     def to_dict(self) -> Dict[str, Any]:

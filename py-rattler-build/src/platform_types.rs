@@ -1,8 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use rattler_build::types::PlatformWithVirtualPackages;
-use rattler_conda_types::{GenericVirtualPackage, Platform};
-use std::str::FromStr;
+use rattler_conda_types::Platform;
 
 use crate::error::RattlerBuildError;
 

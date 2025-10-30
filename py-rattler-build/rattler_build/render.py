@@ -10,6 +10,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 
+# Import for type hints only - avoid circular import
+if TYPE_CHECKING:
+    from rattler_build.tool_config import ToolConfiguration
+
+# Type for context values - can be strings, numbers, bools, or lists
+ContextValue = Union[str, int, float, bool, List[Union[str, int, float, bool]]]
+
 # Try to import TypeAlias for better type hint support
 try:
     from typing import TypeAlias
@@ -18,6 +25,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from rattler_build.variant_config import VariantConfig
+
     # For type checking, use Any placeholders
     _RenderConfig = Any
     _RenderedVariant = Any
@@ -166,7 +174,7 @@ class RenderConfig:
             recipe_path=recipe_path,
         )
 
-    def set_context(self, key: str, value: Any) -> None:
+    def set_context(self, key: str, value: ContextValue) -> None:
         """Add an extra context variable for Jinja rendering.
 
         Args:
@@ -175,7 +183,7 @@ class RenderConfig:
         """
         self._config.set_context(key, value)
 
-    def get_context(self, key: str) -> Optional[Any]:
+    def get_context(self, key: str) -> Optional[ContextValue]:
         """Get an extra context variable.
 
         Args:
@@ -186,7 +194,7 @@ class RenderConfig:
         """
         return self._config.get_context(key)
 
-    def get_all_context(self) -> Dict[str, Any]:
+    def get_all_context(self) -> Dict[str, ContextValue]:
         """Get all extra context variables as a dictionary."""
         return self._config.get_all_context()
 
@@ -263,7 +271,7 @@ class RenderedVariant:
         ...     print(f"Build string: {variant.recipe().build().string()}")
     """
 
-    def __init__(self, inner: Any):
+    def __init__(self, inner: _RenderedVariant):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
 
@@ -312,6 +320,48 @@ class RenderedVariant:
         """
         inner_dict = self._inner.pin_subpackages()
         return {name: PinSubpackageInfo(info) for name, info in inner_dict.items()}
+
+    def run_build(
+        self,
+        tool_config: Optional["ToolConfiguration"] = None,
+        output_dir: Optional[Union[str, Path]] = None,
+        channel: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Build this rendered variant.
+
+        This method builds a single rendered variant directly without needing
+        to go back through the Stage0 recipe.
+
+        Args:
+            tool_config: Optional ToolConfiguration to use for the build.
+            output_dir: Directory to store the built package. Defaults to current directory.
+            channel: List of channels to use for resolving dependencies.
+            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+
+        Example:
+            >>> from rattler_build.stage0 import Recipe
+            >>> from rattler_build.variant_config import VariantConfig
+            >>> from rattler_build.render import render_recipe
+            >>>
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> rendered = render_recipe(recipe, VariantConfig())
+            >>> # Build just the first variant
+            >>> rendered[0].run_build(output_dir="./output")
+        """
+        from . import rattler_build as _rb
+
+        # Extract the inner ToolConfiguration if provided
+        tool_config_inner = tool_config._inner if (tool_config and hasattr(tool_config, "_inner")) else tool_config
+
+        # Build this single variant
+        _rb.build_from_rendered_variants_py(
+            rendered_variants=[self._inner],
+            tool_config=tool_config_inner,
+            output_dir=Path(output_dir) if output_dir else None,
+            channel=channel,
+            **kwargs,
+        )
 
     def __repr__(self) -> str:
         return repr(self._inner)
@@ -390,7 +440,7 @@ def render_recipe(
         if isinstance(recipe, Path):
             # Definitely a file path
             parsed = Recipe.from_file(recipe)
-        elif recipe.endswith('.yaml') or recipe.endswith('.yml') or '/' in recipe or '\\' in recipe:
+        elif recipe.endswith(".yaml") or recipe.endswith(".yml") or "/" in recipe or "\\" in recipe:
             # String that looks like a file path
             parsed = Recipe.from_file(recipe)
         else:
@@ -408,7 +458,12 @@ def render_recipe(
             variant_config = VC.from_file(variant_config)
         else:
             # Check if it's a file path or YAML string
-            if variant_config.endswith('.yaml') or variant_config.endswith('.yml') or '/' in variant_config or '\\' in variant_config:
+            if (
+                variant_config.endswith(".yaml")
+                or variant_config.endswith(".yml")
+                or "/" in variant_config
+                or "\\" in variant_config
+            ):
                 variant_config = VC.from_file(variant_config)
             else:
                 variant_config = VC.from_yaml(variant_config)
@@ -428,10 +483,66 @@ def render_recipe(
     return all_rendered
 
 
+def build_rendered_variants(
+    rendered_variants: List[RenderedVariant],
+    tool_config: Optional["ToolConfiguration"] = None,
+    output_dir: Optional[Union[str, Path]] = None,
+    channel: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> None:
+    """Build multiple rendered variants.
+
+    This is a convenience function for building multiple rendered variants
+    in one call, useful when you want to build all variants from a recipe.
+
+    Args:
+        rendered_variants: List of RenderedVariant objects to build
+        tool_config: Optional ToolConfiguration to use for the build.
+        output_dir: Directory to store the built packages. Defaults to current directory.
+        channel: List of channels to use for resolving dependencies.
+        **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+
+    Example:
+        >>> from rattler_build.stage0 import Recipe
+        >>> from rattler_build.variant_config import VariantConfig
+        >>> from rattler_build.render import render_recipe, build_rendered_variants
+        >>>
+        >>> # Parse and render recipe
+        >>> recipe = Recipe.from_yaml(yaml_string)
+        >>> variant_config = VariantConfig.from_yaml('''
+        ... python:
+        ...   - "3.9"
+        ...   - "3.10"
+        ...   - "3.11"
+        ... ''')
+        >>> rendered = render_recipe(recipe, variant_config)
+        >>>
+        >>> # Build all variants at once
+        >>> build_rendered_variants(rendered, output_dir="./output")
+        >>>
+        >>> # Or build a subset
+        >>> build_rendered_variants(rendered[:2], output_dir="./output")
+    """
+    from . import rattler_build as _rb
+
+    # Extract the inner ToolConfiguration if provided
+    tool_config_inner = tool_config._inner if (tool_config and hasattr(tool_config, "_inner")) else tool_config
+
+    # Build all variants
+    _rb.build_from_rendered_variants_py(
+        rendered_variants=[v._inner for v in rendered_variants],
+        tool_config=tool_config_inner,
+        output_dir=Path(output_dir) if output_dir else None,
+        channel=channel,
+        **kwargs,
+    )
+
+
 __all__ = [
     "RenderConfig",
     "RenderedVariant",
     "HashInfo",
     "PinSubpackageInfo",
     "render_recipe",
+    "build_rendered_variants",
 ]

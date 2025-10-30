@@ -41,12 +41,12 @@ def test_render_config_set_context() -> None:
     config.set_context("my_var", "value")
     config.set_context("my_bool", True)
     config.set_context("my_number", 42)
+    config.set_context("my_list", [1, 2, 3])
 
     assert config.get_context("my_var") == "value"
-    # TODO: this should not get converted to a string!
-    assert config.get_context("my_bool") == "true"
-    # TODO: this should not get converted to a string!
-    assert config.get_context("my_number") == "42"
+    assert config.get_context("my_bool")
+    assert isinstance(config.get_context("my_bool"), bool)
+    assert config.get_context("my_number") == 42
 
     context = config.get_all_context()
     assert context.keys() == {"my_var", "my_bool", "my_number"}

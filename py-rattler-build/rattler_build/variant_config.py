@@ -20,21 +20,55 @@ class VariantConfig:
     Variants allow building the same recipe with different configurations,
     such as different Python versions, compilers, or other parameters.
 
+    This class provides a dict-like interface for managing variants.
+
     Example:
-        >>> config = VariantConfig()
-        >>> config.set_values("python", ["3.8", "3.9", "3.10"])
-        >>> config.set_values("numpy", ["1.21", "1.22"])
-        >>> combinations = config.combinations()
-        >>> len(combinations)  # 3 * 2 = 6 combinations
+        >>> # Create from dict
+        >>> config = VariantConfig({
+        ...     "python": ["3.8", "3.9", "3.10"],
+        ...     "numpy": ["1.21", "1.22"]
+        ... })
+        >>> len(config.combinations())  # 3 * 2 = 6 combinations
         6
+
+        >>> # Dict-like access
+        >>> config["python"] = ["3.9", "3.10"]
+        >>> print(config["python"])
+        ['3.9', '3.10']
+
+        >>> # Traditional method calls
+        >>> config.set_values("compiler", ["gcc", "clang"])
+        >>> print(config.get_values("compiler"))
+        ['gcc', 'clang']
 
         >>> # Load from YAML file
         >>> config = VariantConfig.from_file("variant_config.yaml")
         >>> print(config.keys())
     """
 
-    def __init__(self, inner: Optional[_VariantConfig] = None):
-        self._inner = inner if inner is not None else _VariantConfig()
+    def __init__(self, variants: Optional[Union[Dict[str, List[Any]], _VariantConfig]] = None):
+        """
+        Create a new VariantConfig.
+
+        Args:
+            variants: Either a dictionary mapping variant keys to value lists,
+                     or an existing _VariantConfig instance. If None, creates empty config.
+
+        Example:
+            >>> # Create from dict
+            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
+
+            >>> # Create empty
+            >>> config = VariantConfig()
+        """
+        if variants is None:
+            self._inner = _VariantConfig()
+        elif isinstance(variants, dict):
+            self._inner = _VariantConfig()
+            for key, values in variants.items():
+                self._inner.set_values(key, values)
+        else:
+            self._inner = variants
 
     @classmethod
     def from_file(cls, path: Union[str, Path]) -> "VariantConfig":
@@ -296,6 +330,159 @@ class VariantConfig:
     def __len__(self) -> int:
         """Get the number of variant keys."""
         return len(self._inner)
+
+    def __getitem__(self, key: str) -> List[Any]:
+        """
+        Get values for a variant key using dict-like access.
+
+        Args:
+            key: The variant key name
+
+        Returns:
+            List of values for the key
+
+        Raises:
+            KeyError: If the key doesn't exist
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
+            >>> config["python"]
+            ['3.9', '3.10']
+        """
+        values = self._inner.get_values(key)
+        if values is None:
+            raise KeyError(f"Variant key '{key}' not found")
+        return values
+
+    def __setitem__(self, key: str, values: List[Any]) -> None:
+        """
+        Set values for a variant key using dict-like access.
+
+        Args:
+            key: The variant key name
+            values: List of values for this key
+
+        Example:
+            >>> config = VariantConfig()
+            >>> config["python"] = ["3.9", "3.10"]
+            >>> config["numpy"] = ["1.21", "1.22"]
+        """
+        self._inner.set_values(key, values)
+
+    def __contains__(self, key: str) -> bool:
+        """
+        Check if a variant key exists.
+
+        Args:
+            key: The variant key name
+
+        Returns:
+            True if the key exists, False otherwise
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9"]})
+            >>> "python" in config
+            True
+            >>> "ruby" in config
+            False
+        """
+        return self._inner.get_values(key) is not None
+
+    def __delitem__(self, key: str) -> None:
+        """
+        Delete a variant key (not implemented - raises NotImplementedError).
+
+        Args:
+            key: The variant key name
+
+        Raises:
+            NotImplementedError: Deletion is not supported
+        """
+        raise NotImplementedError("Deletion of variant keys is not supported")
+
+    def __iter__(self):
+        """
+        Iterate over variant keys.
+
+        Returns:
+            Iterator over variant key names
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9"], "numpy": ["1.21"]})
+            >>> list(config)
+            ['numpy', 'python']
+        """
+        return iter(self.keys())
+
+    def items(self):
+        """
+        Get all variant key-value pairs.
+
+        Returns:
+            Iterator of (key, values) tuples
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
+            >>> dict(config.items())
+            {'python': ['3.9', '3.10']}
+        """
+        return self.to_dict().items()
+
+    def values(self):
+        """
+        Get all variant value lists.
+
+        Returns:
+            Iterator of value lists
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
+            >>> list(config.values())
+            [['3.9', '3.10']]
+        """
+        return self.to_dict().values()
+
+    def get(self, key: str, default: Optional[List[Any]] = None) -> Optional[List[Any]]:
+        """
+        Get values for a variant key with a default.
+
+        Args:
+            key: The variant key name
+            default: Default value if key doesn't exist
+
+        Returns:
+            List of values for the key, or default if key doesn't exist
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9"]})
+            >>> config.get("python")
+            ['3.9']
+            >>> config.get("ruby", ["2.7"])
+            ['2.7']
+        """
+        values = self._inner.get_values(key)
+        return values if values is not None else default
+
+    def update(self, other: Union["VariantConfig", Dict[str, List[Any]]]) -> None:
+        """
+        Update this config with values from another config or dict.
+
+        Args:
+            other: Another VariantConfig or dict to merge
+
+        Example:
+            >>> config = VariantConfig({"python": ["3.9"]})
+            >>> config.update({"numpy": ["1.21"]})
+            >>> config.keys()
+            ['numpy', 'python']
+        """
+        if isinstance(other, VariantConfig):
+            self.merge(other)
+        elif isinstance(other, dict):
+            for key, values in other.items():
+                self.set_values(key, values)
+        else:
+            raise TypeError(f"Expected VariantConfig or dict, got {type(other)}")
 
     def __repr__(self) -> str:
         return repr(self._inner)

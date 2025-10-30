@@ -36,6 +36,8 @@ tokio = { version = "1.47.1", features = [
 rattler_conda_types = "0.40.0"
 rattler_config = "0.2.11"
 rattler_networking = { version = "0.25.15" }
+rattler_solve = "3.0.9"
+rattler_virtual_packages = "2.2.5"
 clap = "4.5.48"
 url = "2.5.7"
 chrono = "0.4.42"
