@@ -1,0 +1,216 @@
+"""
+Tool configuration for rattler-build.
+
+This module provides a Pythonic API for configuring the build tool.
+"""
+
+from typing import List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Type stub for the Rust ToolConfiguration
+    class _ToolConfiguration:
+        def __init__(
+            self,
+            keep_build: bool = ...,
+            compression_threads: Optional[int] = ...,
+            io_concurrency_limit: Optional[int] = ...,
+            test_strategy: Optional[str] = ...,
+            skip_existing: Optional[str] = ...,
+            continue_on_failure: bool = ...,
+            noarch_build_platform: Optional[str] = ...,
+            channel_priority: Optional[str] = ...,
+            allow_insecure_host: Optional[List[str]] = ...,
+            error_prefix_in_binary: bool = ...,
+            allow_symlinks_on_windows: bool = ...,
+            use_zstd: bool = ...,
+            use_bz2: bool = ...,
+            use_sharded: bool = ...,
+            use_jlap: bool = ...,
+        ) -> None: ...
+        @property
+        def keep_build(self) -> bool: ...
+        def set_keep_build(self, value: bool) -> None: ...
+        @property
+        def test_strategy(self) -> str: ...
+        @property
+        def skip_existing(self) -> str: ...
+        @property
+        def continue_on_failure(self) -> bool: ...
+        @property
+        def channel_priority(self) -> str: ...
+        @property
+        def use_zstd(self) -> bool: ...
+        @property
+        def use_bz2(self) -> bool: ...
+        @property
+        def use_sharded(self) -> bool: ...
+        @property
+        def use_jlap(self) -> bool: ...
+        @property
+        def compression_threads(self) -> Optional[int]: ...
+        @property
+        def io_concurrency_limit(self) -> Optional[int]: ...
+        @property
+        def allow_insecure_host(self) -> Optional[List[str]]: ...
+        @property
+        def error_prefix_in_binary(self) -> bool: ...
+        @property
+        def allow_symlinks_on_windows(self) -> bool: ...
+else:
+    from . import rattler_build as _rb
+
+    _ToolConfiguration = _rb.tool_config.ToolConfiguration
+
+
+class ToolConfiguration:
+    """Configuration for the rattler-build tool.
+
+    This class wraps the Rust ToolConfiguration and provides a Pythonic interface
+    for configuring build behavior.
+
+    Args:
+        keep_build: Whether to keep the build directory after the build is done
+        compression_threads: Number of threads to use for compression (default: None - auto)
+        io_concurrency_limit: Maximum number of concurrent I/O operations (default: None)
+        test_strategy: Test strategy to use ("skip", "native", or "tests") (default: "skip")
+        skip_existing: Whether to skip packages that already exist ("none", "local", or "all") (default: "none")
+        continue_on_failure: Whether to continue building other recipes even if one fails (default: False)
+        noarch_build_platform: Platform to use for noarch builds (default: None)
+        channel_priority: Channel priority for solving ("strict" or "disabled") (default: "strict")
+        allow_insecure_host: List of hosts for which SSL certificate verification should be skipped
+        error_prefix_in_binary: Whether to error if the host prefix is detected in binary files (default: False)
+        allow_symlinks_on_windows: Whether to allow symlinks in packages on Windows (default: False)
+        use_zstd: Whether to use zstd compression when downloading repodata (default: True)
+        use_bz2: Whether to use bzip2 compression when downloading repodata (default: True)
+        use_sharded: Whether to use sharded repodata when downloading (default: True)
+        use_jlap: Whether to use JLAP when downloading repodata (default: False)
+
+    Example:
+        >>> config = ToolConfiguration(
+        ...     keep_build=True,
+        ...     test_strategy="native",
+        ...     compression_threads=4
+        ... )
+        >>> print(config.keep_build)
+        True
+        >>> print(config.test_strategy)
+        Native
+    """
+
+    def __init__(
+        self,
+        keep_build: bool = False,
+        compression_threads: Optional[int] = None,
+        io_concurrency_limit: Optional[int] = None,
+        test_strategy: Optional[str] = None,
+        skip_existing: Optional[str] = None,
+        continue_on_failure: bool = False,
+        noarch_build_platform: Optional[str] = None,
+        channel_priority: Optional[str] = None,
+        allow_insecure_host: Optional[List[str]] = None,
+        error_prefix_in_binary: bool = False,
+        allow_symlinks_on_windows: bool = False,
+        use_zstd: bool = True,
+        use_bz2: bool = True,
+        use_sharded: bool = True,
+        use_jlap: bool = False,
+    ):
+        """Create a new tool configuration."""
+        self._inner = _ToolConfiguration(
+            keep_build=keep_build,
+            compression_threads=compression_threads,
+            io_concurrency_limit=io_concurrency_limit,
+            test_strategy=test_strategy,
+            skip_existing=skip_existing,
+            continue_on_failure=continue_on_failure,
+            noarch_build_platform=noarch_build_platform,
+            channel_priority=channel_priority,
+            allow_insecure_host=allow_insecure_host,
+            error_prefix_in_binary=error_prefix_in_binary,
+            allow_symlinks_on_windows=allow_symlinks_on_windows,
+            use_zstd=use_zstd,
+            use_bz2=use_bz2,
+            use_sharded=use_sharded,
+            use_jlap=use_jlap,
+        )
+
+    @property
+    def keep_build(self) -> bool:
+        """Whether to keep the build directory after the build is done."""
+        return self._inner.keep_build
+
+    @keep_build.setter
+    def keep_build(self, value: bool) -> None:
+        """Set whether to keep the build directory."""
+        self._inner.set_keep_build(value)
+
+    @property
+    def test_strategy(self) -> str:
+        """The test strategy to use."""
+        return self._inner.test_strategy
+
+    @property
+    def skip_existing(self) -> str:
+        """Whether to skip existing packages."""
+        return self._inner.skip_existing
+
+    @property
+    def continue_on_failure(self) -> bool:
+        """Whether to continue building on failure."""
+        return self._inner.continue_on_failure
+
+    @property
+    def channel_priority(self) -> str:
+        """The channel priority to use in solving."""
+        return self._inner.channel_priority
+
+    @property
+    def use_zstd(self) -> bool:
+        """Whether to use zstd compression."""
+        return self._inner.use_zstd
+
+    @property
+    def use_bz2(self) -> bool:
+        """Whether to use bzip2 compression."""
+        return self._inner.use_bz2
+
+    @property
+    def use_sharded(self) -> bool:
+        """Whether to use sharded repodata."""
+        return self._inner.use_sharded
+
+    @property
+    def use_jlap(self) -> bool:
+        """Whether to use JLAP."""
+        return self._inner.use_jlap
+
+    @property
+    def compression_threads(self) -> Optional[int]:
+        """Number of compression threads."""
+        return self._inner.compression_threads
+
+    @property
+    def io_concurrency_limit(self) -> Optional[int]:
+        """IO concurrency limit."""
+        return self._inner.io_concurrency_limit
+
+    @property
+    def allow_insecure_host(self) -> Optional[List[str]]:
+        """List of hosts for which SSL certificate verification should be skipped."""
+        return self._inner.allow_insecure_host
+
+    @property
+    def error_prefix_in_binary(self) -> bool:
+        """Whether to error if the host prefix is detected in binary files."""
+        return self._inner.error_prefix_in_binary
+
+    @property
+    def allow_symlinks_on_windows(self) -> bool:
+        """Whether to allow symlinks in packages on Windows."""
+        return self._inner.allow_symlinks_on_windows
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+
+__all__ = ["ToolConfiguration"]

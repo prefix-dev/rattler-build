@@ -7,7 +7,7 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
 preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
-build-variants = { python = ["3.8"] }
+build-variants = { python = ["3.10"] }
 
 [package.build]
 backend = { name = "pixi-build-python", version = "*" }
@@ -42,26 +42,29 @@ lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
+ipykernel = "*"
 
 lua = "*"
 # Python 3.8 is the minimum supported version, so we use that for testing
-python = "3.8.*"
+python = "3.10.*"
 
 mypy = "~=1.5.1"
 
-pytest = "~=7.4.0"
-pytest-asyncio = "0.21.1.*"
-pytest-xprocess = ">=0.23.0,<0.24"
-
+pytest = ">=8.3"
+pytest-asyncio = "1.2.*"
+pytest-xprocess = "1.0.*"
+inline-snapshot = ">=0.31.0"
 # used in examples
 typer = "*"
+rich = ">=14.2.0,<15"
 
 [feature.test.pypi-dependencies]
 types-networkx = "*"
 
 [feature.test.tasks]
 check-cargo-lock = "cargo check --locked"
-test = { cmd = "pytest --doctest-modules", depends-on = ["type-check"] }
+test = { cmd = "pytest ./tests --doctest-modules", depends-on = ["type-check"] }
+# test = { cmd = "pytest ./tests -v -s", depends-on = ["type-check"] }
 type-check = { cmd = "mypy" }
 
 [feature.docs.dependencies]

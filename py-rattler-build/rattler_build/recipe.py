@@ -3,7 +3,7 @@
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from .rattler_build import parse_recipe_py, PySelectorConfig
+from . import stage0
 
 
 class TestTypeEnum(Enum):
@@ -320,98 +320,6 @@ class TestType:
         return f"TestType(type='{self.test_type}')"
 
 
-class SelectorConfig:
-    """Python wrapper for PySelectorConfig to provide a cleaner interface."""
-
-    _config: PySelectorConfig
-
-    def __init__(
-        self,
-        target_platform: Optional[str] = None,
-        host_platform: Optional[str] = None,
-        build_platform: Optional[str] = None,
-        experimental: Optional[bool] = None,
-        allow_undefined: Optional[bool] = None,
-        variant: Optional[Dict[str, Any]] = None,
-    ):
-        self._config = PySelectorConfig(
-            target_platform=target_platform,
-            host_platform=host_platform,
-            build_platform=build_platform,
-            experimental=experimental,
-            allow_undefined=allow_undefined,
-            variant=variant,
-        )
-
-    @property
-    def target_platform(self) -> Optional[str]:
-        """Get the target platform."""
-        return self._config.target_platform
-
-    @target_platform.setter
-    def target_platform(self, value: Optional[str]) -> None:
-        """Set the target platform."""
-        self._config.target_platform = value
-
-    @property
-    def host_platform(self) -> Optional[str]:
-        """Get the host platform."""
-        return self._config.host_platform
-
-    @host_platform.setter
-    def host_platform(self, value: Optional[str]) -> None:
-        """Set the host platform."""
-        self._config.host_platform = value
-
-    @property
-    def build_platform(self) -> Optional[str]:
-        """Get the build platform."""
-        return self._config.build_platform
-
-    @build_platform.setter
-    def build_platform(self, value: Optional[str]) -> None:
-        """Set the build platform."""
-        self._config.build_platform = value
-
-    @property
-    def experimental(self) -> Optional[bool]:
-        """Get whether experimental features are enabled."""
-        return self._config.experimental
-
-    @experimental.setter
-    def experimental(self, value: Optional[bool]) -> None:
-        """Set whether experimental features are enabled."""
-        self._config.experimental = value
-
-    @property
-    def allow_undefined(self) -> Optional[bool]:
-        """Get whether undefined variables are allowed."""
-        return self._config.allow_undefined
-
-    @allow_undefined.setter
-    def allow_undefined(self, value: Optional[bool]) -> None:
-        """Set whether undefined variables are allowed."""
-        self._config.allow_undefined = value
-
-    @property
-    def variant(self) -> Dict[str, Any]:
-        """Get the variant configuration."""
-        return self._config.variant
-
-    @variant.setter
-    def variant(self, value: Dict[str, Any]) -> None:
-        """Set the variant configuration."""
-        self._config.variant = value
-
-    def __repr__(self) -> str:
-        return f"SelectorConfig(target_platform={self.target_platform!r}, variant={self.variant!r})"
-
-    @property
-    def config(self) -> PySelectorConfig:
-        """Get the underlying PySelectorConfig object."""
-        return self._config
-
-
 class Recipe:
     """A parsed conda recipe with object-oriented access to all fields."""
 
@@ -441,16 +349,14 @@ class Recipe:
             experimental: Enable experimental features. Defaults to False.
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
             variant: Variant configuration as a dictionary. Defaults to empty.
+
+        NOTE: This method now uses the stage0 API. For more control, use stage0.Recipe.from_yaml() directly.
         """
-        selector_config = SelectorConfig(
-            target_platform=target_platform,
-            host_platform=host_platform,
-            build_platform=build_platform,
-            experimental=experimental,
-            allow_undefined=allow_undefined,
-            variant=variant,
-        )
-        data = parse_recipe_py(yaml_content, selector_config.config)
+        # Parse using the new stage0 API
+        stage0_recipe = stage0.Recipe.from_yaml(yaml_content)
+
+        # Convert to dictionary for the legacy API
+        data = stage0_recipe.to_dict()
         return cls(data)
 
     @classmethod

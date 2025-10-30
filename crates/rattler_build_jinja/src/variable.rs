@@ -62,6 +62,36 @@ impl Variable {
     pub fn from_string(value: &str) -> Self {
         Variable(Value::from_safe_string(value.to_string()))
     }
+
+    /// Try to extract as a boolean value using serde deserialization
+    pub fn as_bool(&self) -> Option<bool> {
+        bool::deserialize(self.0.clone()).ok()
+    }
+
+    /// Try to extract as an i64 value using serde deserialization
+    pub fn as_i64(&self) -> Option<i64> {
+        i64::deserialize(self.0.clone()).ok()
+    }
+
+    /// Check if this variable is a number
+    pub fn is_number(&self) -> bool {
+        self.0.is_number()
+    }
+
+    /// Try to extract as a string slice
+    pub fn as_str(&self) -> Option<&str> {
+        self.0.as_str()
+    }
+
+    /// Check if this is a sequence/list
+    pub fn is_sequence(&self) -> bool {
+        self.0.len().is_some() && self.0.as_str().is_none()
+    }
+
+    /// Try to iterate over the variable if it's a sequence
+    pub fn try_iter(&self) -> Result<impl Iterator<Item = Value> + '_, minijinja::Error> {
+        self.0.try_iter()
+    }
 }
 
 impl Display for Variable {
