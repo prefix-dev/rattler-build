@@ -42,6 +42,7 @@ lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
+ipykernel = "*"
 
 lua = "*"
 # Python 3.8 is the minimum supported version, so we use that for testing

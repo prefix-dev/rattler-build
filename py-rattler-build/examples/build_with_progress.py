@@ -14,6 +14,7 @@ Requirements:
 
 import sys
 from pathlib import Path
+import tempfile
 
 # Import rattler_build components
 from rattler_build.stage0 import Recipe
@@ -99,11 +100,9 @@ def build_recipe_with_simple_progress(recipe_path: Path):
         print(f"\n🔨 Building variant {i}/{len(rendered_variants)}")
 
         # Build with real progress callbacks!
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmpdir:
             variant.run_build(
-                progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_path=recipe_path
+                progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_dir=recipe_path.parent
             )
 
     print("\n✅ Build complete!")
