@@ -92,10 +92,11 @@ impl Output {
             .filter_map(|dep| {
                 if let rattler_build_recipe::stage1::Dependency::Spec(spec) = dep {
                     // Only include variables that appear in simple specs without version/build
-                    if spec.version.is_none() && spec.build.is_none() {
-                        if let Some(name) = spec.name.as_ref() {
-                            return Some(name.as_normalized().to_string());
-                        }
+                    if spec.version.is_none()
+                        && spec.build.is_none()
+                        && let Some(name) = spec.name.as_ref()
+                    {
+                        return Some(name.as_normalized().to_string());
                     }
                 }
                 None

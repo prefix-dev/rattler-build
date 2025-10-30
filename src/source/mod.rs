@@ -377,10 +377,10 @@ async fn fetch_source(
                         dest.display()
                     );
 
-                    if let Some(checksum) = convert_path_checksum(path_src) {
-                        if !checksum.validate(&src_path) {
-                            return Err(SourceError::ValidationFailed);
-                        }
+                    if let Some(checksum) = convert_path_checksum(path_src)
+                        && !checksum.validate(&src_path)
+                    {
+                        return Err(SourceError::ValidationFailed);
                     }
 
                     fs::copy(&src_path, dest)?;

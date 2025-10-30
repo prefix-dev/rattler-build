@@ -126,10 +126,7 @@ impl EventHandler {
         self.receiver
             .recv()
             .await
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "IO error occurred",
-            ))
+            .ok_or(std::io::Error::other("IO error occurred"))
             .into_diagnostic()
     }
 }

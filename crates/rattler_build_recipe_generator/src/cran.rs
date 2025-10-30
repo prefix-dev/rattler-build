@@ -337,10 +337,10 @@ async fn build_cran_recipe_and_deps(
     recipe.about.description = Some(package_info.Description.clone());
     (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
     recipe.about.repository = Some(package_info._upstream.clone());
-    if let Some(pkgdocs) = &package_info._pkgdocs {
-        if url::Url::parse(pkgdocs).is_ok() {
-            recipe.about.documentation = Some(pkgdocs.clone());
-        }
+    if let Some(pkgdocs) = &package_info._pkgdocs
+        && url::Url::parse(pkgdocs).is_ok()
+    {
+        recipe.about.documentation = Some(pkgdocs.clone());
     }
 
     recipe.tests.push(Test::Script(ScriptTest {

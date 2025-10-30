@@ -445,10 +445,10 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
 fn generate_require_test(spec: &LuarocksRockspec) -> Test {
     // Try to get module names from the build.modules field if present
     let mut modules = Vec::new();
-    if let Some(build) = &spec.build {
-        if let Some(mods) = &build.modules {
-            modules.extend(mods.keys().cloned());
-        }
+    if let Some(build) = &spec.build
+        && let Some(mods) = &build.modules
+    {
+        modules.extend(mods.keys().cloned());
     }
     // If no modules found, fall back to the package name
     if modules.is_empty() {

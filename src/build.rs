@@ -223,16 +223,16 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
     use rattler_conda_types::package::FileMode;
 
     for paths_entry in &paths_json.paths {
-        if let Some(prefix_placeholder) = &paths_entry.prefix_placeholder {
-            if prefix_placeholder.file_mode == FileMode::Binary {
-                return Err(miette::miette!(
-                    "Package {} contains Binary file {} which contains host prefix placeholder, which may cause issues when the package is installed to a different location. \
+        if let Some(prefix_placeholder) = &paths_entry.prefix_placeholder
+            && prefix_placeholder.file_mode == FileMode::Binary
+        {
+            return Err(miette::miette!(
+                "Package {} contains Binary file {} which contains host prefix placeholder, which may cause issues when the package is installed to a different location. \
                     Consider fixing the build process to avoid embedding the host prefix in binaries. \
                     To allow this, remove the --error-prefix-in-binary flag.",
-                    output.name().as_normalized(),
-                    paths_entry.relative_path.display()
-                ));
-            }
+                output.name().as_normalized(),
+                paths_entry.relative_path.display()
+            ));
         }
     }
 

@@ -165,10 +165,10 @@ impl Tests {
                 // copy all test files to a temporary directory and set it as the working
                 // directory
                 CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
-                    TestError::IoError(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Failed to copy test files: {}", e),
-                    ))
+                    TestError::IoError(std::io::Error::other(format!(
+                        "Failed to copy test files: {}",
+                        e
+                    )))
                 })?;
 
                 script
@@ -501,14 +501,15 @@ pub async fn run_test(
     if package_folder.join("info/tests/tests.yaml").exists() {
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
-        if let Some(test_index) = config.test_index {
-            if test_index >= tests.len() {
-                return Err(TestError::TestFailed(format!(
-                    "Test index {} out of range (0..{})",
-                    test_index,
-                    tests.len()
-                )));
-            }
+
+        if let Some(test_index) = config.test_index
+            && test_index >= tests.len()
+        {
+            return Err(TestError::TestFailed(format!(
+                "Test index {} out of range (0..{})",
+                test_index,
+                tests.len()
+            )));
         }
 
         let tests = if let Some(test_index) = config.test_index {
@@ -884,10 +885,10 @@ async fn run_commands_test(
     // directory
     let test_dir = test_directory.join("test");
     CopyDir::new(path, &test_dir).run().map_err(|e| {
-        TestError::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to copy test files: {}", e),
-        ))
+        TestError::IoError(std::io::Error::other(format!(
+            "Failed to copy test files: {}",
+            e
+        )))
     })?;
 
     tracing::info!("Testing commands:");

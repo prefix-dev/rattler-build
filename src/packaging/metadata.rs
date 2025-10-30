@@ -132,10 +132,10 @@ pub fn create_prefix_placeholder(
     prefix_detection: &PrefixDetection,
 ) -> Result<Option<PrefixPlaceholder>, PackagingError> {
     // exclude pyc and pyo files from prefix replacement
-    if let Some(ext) = file_path.extension() {
-        if ext == "pyc" || ext == "pyo" {
-            return Ok(None);
-        }
+    if let Some(ext) = file_path.extension()
+        && (ext == "pyc" || ext == "pyo")
+    {
+        return Ok(None);
     }
 
     let relative_path = file_path.strip_prefix(prefix)?;
@@ -256,7 +256,7 @@ impl Output {
     pub fn about_json(&self) -> AboutJson {
         let recipe = &self.recipe;
 
-        let about_json = AboutJson {
+        AboutJson {
             home: recipe
                 .about()
                 .homepage
@@ -288,9 +288,7 @@ impl Output {
                 .map(clean_url)
                 .collect(),
             extra: self.extra_meta.clone().unwrap_or_default(),
-        };
-
-        about_json
+        }
     }
 
     /// Create the contents of the index.json file for the given output.
@@ -361,7 +359,7 @@ impl Output {
             subdir: Some(self.build_configuration.target_platform.to_string()),
             license: recipe.about().license.as_ref().map(|l| l.to_string()),
             license_family: recipe.about().license_family.clone(),
-            timestamp: Some(self.build_configuration.timestamp),
+            timestamp: Some(self.build_configuration.timestamp.into()),
             depends: finalized_dependencies
                 .run
                 .depends

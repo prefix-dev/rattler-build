@@ -59,10 +59,10 @@ where
     C: NodeConverter<T>,
 {
     // Check if it's a mapping with "if" key (conditional)
-    if let Some(mapping) = yaml.as_mapping() {
-        if mapping.get("if").is_some() {
-            return parse_conditional_with_converter(yaml, converter);
-        }
+    if let Some(mapping) = yaml.as_mapping()
+        && mapping.get("if").is_some()
+    {
+        return parse_conditional_with_converter(yaml, converter);
     }
 
     // Otherwise, it's a simple value

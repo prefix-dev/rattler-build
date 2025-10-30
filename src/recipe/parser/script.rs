@@ -169,10 +169,10 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             cwd: None,
         };
 
-        if script.interpreter.is_none() {
-            if let ScriptContent::Path(path) = &script.content {
-                script.interpreter = determine_interpreter_from_path(path);
-            }
+        if script.interpreter.is_none()
+            && let ScriptContent::Path(path) = &script.content
+        {
+            script.interpreter = determine_interpreter_from_path(path);
         }
 
         Ok(script)

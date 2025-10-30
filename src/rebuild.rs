@@ -19,10 +19,10 @@ fn folder_from_tar_bz2(
         let path = entry.path()?;
         if let Ok(stripped_path) = path.strip_prefix(find_path) {
             let dest_file = dest_folder.join(stripped_path);
-            if let Some(parent_folder) = dest_file.parent() {
-                if !parent_folder.exists() {
-                    fs::create_dir_all(parent_folder)?;
-                }
+            if let Some(parent_folder) = dest_file.parent()
+                && !parent_folder.exists()
+            {
+                fs::create_dir_all(parent_folder)?;
             }
             entry.unpack(dest_file)?;
         }
@@ -52,10 +52,10 @@ fn folder_from_conda(
         let path = entry.path()?;
         if let Ok(stripped_path) = path.strip_prefix(find_path) {
             let dest_file = dest_folder.join(stripped_path);
-            if let Some(parent_folder) = dest_file.parent() {
-                if !parent_folder.exists() {
-                    fs::create_dir_all(parent_folder)?;
-                }
+            if let Some(parent_folder) = dest_file.parent()
+                && !parent_folder.exists()
+            {
+                fs::create_dir_all(parent_folder)?;
             }
             entry.unpack(dest_file)?;
         }

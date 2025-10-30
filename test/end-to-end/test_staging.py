@@ -276,6 +276,8 @@ def test_staging_with_top_level_inherit(
     pkg_data = get_extracted_package(tmp_path, "mixed-data")
     assert (pkg_data / "share/data.txt").exists()
     assert (pkg_data / "share/data.txt").read_text().strip() == "data.txt"
+    assert (pkg_data / "info/licenses/basic-staging.yaml").exists()
+    assert (pkg_compiled / "info/licenses/basic-staging.yaml").exists()
 
 
 def test_staging_no_inherit(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):

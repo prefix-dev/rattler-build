@@ -6,10 +6,12 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_networking::{
     AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
-    mirror_middleware, s3_middleware,
+    mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
@@ -164,7 +166,7 @@ pub fn get_auth_store(
 /// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-    s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {

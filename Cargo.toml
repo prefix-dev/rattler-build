@@ -1,3 +1,16 @@
+[package]
+name = "rattler-build"
+version = "0.49.0"
+authors = ["rattler-build contributors <hi@prefix.dev>"]
+repository = "https://github.com/prefix-dev/rattler-build"
+edition = "2024"
+license = "BSD-3-Clause"
+readme = "README.md"
+description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
+documentation = "https://prefix-dev.github.io/rattler-build"
+default-run = "rattler-build"
+rust-version = "1.89.0"
+
 [workspace]
 members = [
   "rust-tests",
@@ -35,7 +48,7 @@ flate2 = "1.1.2"
 fs-err = "3.1.1"
 futures = "0.3.31"
 globset = "0.4.17"
-indexmap = "2.11.4"
+indexmap = "2.12.0"
 indicatif = "0.18.0"
 insta = "1.41.1"
 itertools = "0.14.0"
@@ -90,21 +103,8 @@ rstest = "0.26.1"
 petgraph = { version = "0.8.2", default-features = false }
 sha1 = { version = "0.10.6" }
 
-[package]
-name = "rattler-build"
-version = "0.48.1"
-authors = ["rattler-build contributors <hi@prefix.dev>"]
-repository = "https://github.com/prefix-dev/rattler-build"
-edition = "2024"
-license = "BSD-3-Clause"
-readme = "README.md"
-description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
-documentation = "https://prefix-dev.github.io/rattler-build"
-default-run = "rattler-build"
-rust-version = "1.86.0"
-
 [features]
-default = ['rustls-tls', 'recipe-generation']
+default = ['rustls-tls', 'recipe-generation', 's3']
 native-tls = [
   'reqwest/native-tls',
   'rattler/native-tls',
@@ -128,6 +128,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
+s3 = ['rattler_networking/s3', 'rattler_upload/s3']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -221,30 +222,23 @@ reflink-copy = "0.1.26"
 rayon = "1.11.0"
 regex = { workspace = true }
 async-recursion = { workspace = true }
-opendal = { version = "0.54.0", default-features = false, features = [
-  "services-s3",
-] }
 # TODO: remove
 petgraph = { workspace = true }
 
-
 # Rattler crates
-rattler_config = { version = "0.2.11" }
-rattler = { version = "0.37.7", default-features = false, features = [
+rattler_config = { version = "0.2.15" }
+rattler = { version = "0.38.4", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.37", default-features = false }
+rattler_cache = { version = "0.4.1", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.25.5", default-features = false }
+rattler_index = { version = "0.27.0", default-features = false }
 rattler_networking = { version = "0.25.16", default-features = false, features = [
-  "s3",
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.4", default-features = false, features = [
-  "s3",
-] }
+rattler_upload = { version = "0.3.10", default-features = false }
 rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",
@@ -255,9 +249,9 @@ rattler_solve = { version = "3.0.5", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.2.1", default-features = false }
-rattler_package_streaming = { version = "0.23.7", default-features = false }
-rattler_menuinst = "0.2.29"
+rattler_virtual_packages = { version = "2.2.5", default-features = false }
+rattler_package_streaming = { version = "0.23.13", default-features = false }
+rattler_menuinst = "0.2.34"
 lazy_static = { workspace = true }
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"

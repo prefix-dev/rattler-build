@@ -421,6 +421,16 @@ fn render_with_empty_combinations(
         .map(|recipe| {
             let mut variant = recipe.used_variant.clone();
 
+            // Filter out ignore_keys from the variant
+            let ignore_keys: HashSet<NormalizedKey> = recipe
+                .build
+                .variant
+                .ignore_keys
+                .iter()
+                .map(|k| k.as_str().into())
+                .collect();
+            variant.retain(|key, _| !ignore_keys.contains(key));
+
             // For noarch packages, override target_platform
             if recipe.build.noarch.is_some() {
                 variant.insert("target_platform".into(), "noarch".into());
@@ -697,7 +707,18 @@ fn render_with_variants(
 
         // Convert each output to a RenderedVariant
         for recipe in outputs {
-            let variant = recipe.used_variant.clone();
+            let mut variant = recipe.used_variant.clone();
+
+            // Filter out ignore_keys from the variant
+            let ignore_keys: HashSet<NormalizedKey> = recipe
+                .build
+                .variant
+                .ignore_keys
+                .iter()
+                .map(|k| k.as_str().into())
+                .collect();
+            variant.retain(|key, _| !ignore_keys.contains(key));
+
             results.push(RenderedVariant {
                 variant,
                 recipe,

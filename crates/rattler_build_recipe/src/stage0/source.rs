@@ -250,10 +250,10 @@ impl GitSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(td) = target_directory {
-            if let Some(t) = td.as_template() {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(td) = target_directory
+            && let Some(t) = td.as_template()
+        {
+            vars.extend(t.used_variables().iter().cloned());
         }
         if let Some(lfs) = lfs {
             vars.extend(lfs.used_variables());
@@ -295,10 +295,10 @@ impl UrlSource {
                 vars.extend(v.used_variables());
             }
         }
-        if let Some(td) = target_directory {
-            if let Some(t) = td.as_template() {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(td) = target_directory
+            && let Some(t) = td.as_template()
+        {
+            vars.extend(t.used_variables().iter().cloned());
         }
         vars.sort();
         vars.dedup();
@@ -331,15 +331,15 @@ impl PathSource {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(td) = target_directory {
-            if let Some(t) = td.as_template() {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(td) = target_directory
+            && let Some(t) = td.as_template()
+        {
+            vars.extend(t.used_variables().iter().cloned());
         }
-        if let Some(fn_val) = file_name {
-            if let Some(t) = fn_val.as_template() {
-                vars.extend(t.used_variables().iter().cloned());
-            }
+        if let Some(fn_val) = file_name
+            && let Some(t) = fn_val.as_template()
+        {
+            vars.extend(t.used_variables().iter().cloned());
         }
         vars.extend(filter.used_variables());
         vars.sort();

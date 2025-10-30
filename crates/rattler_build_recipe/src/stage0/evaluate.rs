@@ -2099,15 +2099,14 @@ impl Evaluate for Stage0Recipe {
         // Add virtual packages from run requirements to the variant
         // Virtual packages (starting with '__') should be included in the hash
         for dep in &requirements.run {
-            if let crate::stage1::Dependency::Spec(spec) = dep {
-                if let Some(ref name) = spec.name {
-                    if name.as_normalized().starts_with("__") {
-                        actual_variant.insert(
-                            NormalizedKey::from(name.as_normalized()),
-                            Variable::from(spec.to_string()),
-                        );
-                    }
-                }
+            if let crate::stage1::Dependency::Spec(spec) = dep
+                && let Some(ref name) = spec.name
+                && name.as_normalized().starts_with("__")
+            {
+                actual_variant.insert(
+                    NormalizedKey::from(name.as_normalized()),
+                    Variable::from(spec.to_string()),
+                );
             }
         }
 
@@ -2337,28 +2336,63 @@ fn evaluate_package_output_to_recipe(
     let inherits_from_toplevel = matches!(output.inherit, crate::stage0::Inherit::TopLevel);
 
     // Evaluate build section
-    // If inheriting from top-level, merge top-level build with output build
+    // Merging strategy depends on what the output inherits from:
+    // - Top-level inheritance: merge everything including script
+    // - Cache inheritance: merge build settings (dynamic_linking, etc.) but NOT script
+    //   (the cache has its own script, and the output doesn't need one for filtering files)
     let build = if inherits_from_toplevel {
-        // First evaluate top-level build, then merge with output-specific build
+        // Full merge including script
         let toplevel_build = recipe.build.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
-
-        // Merge: output-specific settings take precedence, but use top-level script if output has none
         merge_stage1_build(toplevel_build, output_build)
     } else {
-        output.build.evaluate(context)?
+        // Cache inheritance: only merge non-script build settings
+        let toplevel_build = recipe.build.evaluate(context)?;
+        let mut output_build = output.build.evaluate(context)?;
+
+        // Only inherit specific build settings from top-level, not the script
+        if output_build.dynamic_linking.is_default() {
+            output_build.dynamic_linking = toplevel_build.dynamic_linking;
+        }
+        if output_build.prefix_detection.is_default() {
+            output_build.prefix_detection = toplevel_build.prefix_detection;
+        }
+        if output_build.variant.is_default() {
+            output_build.variant = toplevel_build.variant;
+        }
+        if output_build.noarch.is_none() {
+            output_build.noarch = toplevel_build.noarch;
+        }
+        if output_build.python.is_default() {
+            output_build.python = toplevel_build.python;
+        }
+        if output_build.always_copy_files.is_empty() {
+            output_build.always_copy_files = toplevel_build.always_copy_files;
+        }
+        if output_build.always_include_files.is_empty() {
+            output_build.always_include_files = toplevel_build.always_include_files;
+        }
+        if !toplevel_build.merge_build_and_host_envs && output_build.merge_build_and_host_envs {
+            output_build.merge_build_and_host_envs = toplevel_build.merge_build_and_host_envs;
+        }
+        if output_build.post_process.is_empty() {
+            output_build.post_process = toplevel_build.post_process;
+        }
+        // Combine skip conditions
+        output_build.skip.extend(toplevel_build.skip);
+
+        output_build
     };
 
     // Evaluate about section
-    // If inheriting from top-level, merge top-level about with output about
-    let about = if inherits_from_toplevel {
+    // Always merge top-level about with output about (output fields take precedence)
+    // This ensures that all outputs inherit package metadata like license and repository
+    let about = {
         let toplevel_about = recipe.about.evaluate(context)?;
         let output_about = output.about.evaluate(context)?;
 
         // Merge: output-specific fields take precedence
         merge_stage1_about(toplevel_about, output_about)
-    } else {
-        output.about.evaluate(context)?
     };
 
     // Evaluate requirements
@@ -2474,15 +2508,14 @@ fn evaluate_package_output_to_recipe(
     // Add virtual packages from run requirements to the variant
     // Virtual packages (starting with '__') should be included in the hash
     for dep in &requirements.run {
-        if let crate::stage1::Dependency::Spec(spec) = dep {
-            if let Some(ref name) = spec.name {
-                if name.as_normalized().starts_with("__") {
-                    actual_variant.insert(
-                        NormalizedKey::from(name.as_normalized()),
-                        Variable::from(spec.to_string()),
-                    );
-                }
-            }
+        if let crate::stage1::Dependency::Spec(spec) = dep
+            && let Some(ref name) = spec.name
+            && name.as_normalized().starts_with("__")
+        {
+            actual_variant.insert(
+                NormalizedKey::from(name.as_normalized()),
+                Variable::from(spec.to_string()),
+            );
         }
     }
 
@@ -3478,6 +3511,129 @@ outputs:
                     "Custom output summary"
                 ); // Overridden
                 assert!(output2.about.license.is_some()); // Inherited
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_staging_cache_inheritance_about_and_build() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+about:
+  homepage: https://example.com
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://github.com/example/repo
+
+build:
+  script: echo "Top-level script"
+  dynamic_linking:
+    rpaths:
+      - lib/
+      - custom/
+
+outputs:
+  - staging:
+      name: compile-stage
+    requirements:
+      build:
+        - cmake
+    build:
+      script: echo "Building cache"
+
+  - package:
+      name: cache-output
+      version: 1.0.0
+    inherit: compile-stage
+    build:
+      files:
+        - lib/**
+    about:
+      summary: Cache-inherited output
+
+  - package:
+      name: toplevel-output
+      version: 1.0.0
+    inherit: null
+    build:
+      files:
+        - share/**
+    about:
+      summary: Top-level inherited output
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2); // Only package outputs, not staging
+
+                // First output: inherits from cache
+                let cache_output = &recipes[0];
+                assert_eq!(cache_output.package.name.as_normalized(), "cache-output");
+
+                // About section: should merge cache output's about with top-level
+                assert_eq!(
+                    cache_output.about.summary.as_ref().unwrap(),
+                    "Cache-inherited output"
+                ); // From output
+                assert!(
+                    cache_output
+                        .about
+                        .homepage
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://example.com")
+                ); // Inherited from top-level
+                assert!(cache_output.about.license.is_some()); // Inherited from top-level
+                assert!(
+                    cache_output
+                        .about
+                        .repository
+                        .as_ref()
+                        .unwrap()
+                        .as_str()
+                        .starts_with("https://github.com/example/repo")
+                ); // Inherited from top-level
+
+                // Build section: should inherit dynamic_linking but NOT script
+                assert!(!cache_output.build.dynamic_linking.is_default()); // Inherited from top-level
+                assert!(!cache_output.build.dynamic_linking.rpaths.is_empty()); // Inherited from top-level
+                assert!(cache_output.build.script.is_default()); // NOT inherited (cache has its own script)
+
+                // Second output: inherits from top-level
+                let toplevel_output = &recipes[1];
+                assert_eq!(
+                    toplevel_output.package.name.as_normalized(),
+                    "toplevel-output"
+                );
+
+                // About section: should merge
+                assert_eq!(
+                    toplevel_output.about.summary.as_ref().unwrap(),
+                    "Top-level inherited output"
+                ); // From output
+                assert!(toplevel_output.about.license.is_some()); // Inherited from top-level
+
+                // Build section: should inherit everything including script
+                assert!(!toplevel_output.build.dynamic_linking.is_default()); // Inherited
+                assert!(!toplevel_output.build.script.is_default()); // Inherited (top-level has script)
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }

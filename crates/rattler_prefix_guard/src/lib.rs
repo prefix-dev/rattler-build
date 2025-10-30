@@ -45,7 +45,7 @@ impl AsyncWriteGuard {
                 Ok((state, file))
             })
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+            .map_err(io::Error::other)??;
 
         Ok(Self {
             file: Some(file),
@@ -64,7 +64,7 @@ impl AsyncWriteGuard {
             let mut file = self
                 .file
                 .take()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "File already consumed"))?;
+                .ok_or_else(|| io::Error::other("File already consumed"))?;
 
             // Write the installing state (in a blocking task)
             file = tokio::task::spawn_blocking(move || -> io::Result<File> {
@@ -76,7 +76,7 @@ impl AsyncWriteGuard {
                 Ok(file)
             })
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+            .map_err(io::Error::other)??;
 
             self.file = Some(file);
             self.state = GuardState::Installing;
@@ -88,20 +88,20 @@ impl AsyncWriteGuard {
     pub async fn finish(mut self) -> io::Result<()> {
         let status = self.state;
 
-        if status == GuardState::Installing {
-            if let Some(mut file) = self.file.take() {
-                // Write the ready state (in a blocking task)
-                tokio::task::spawn_blocking(move || -> io::Result<()> {
-                    file.seek(SeekFrom::Start(0))?;
-                    let bytes = serde_json::to_vec(&GuardState::Ready)?;
-                    file.write_all(&bytes)?;
-                    file.set_len(bytes.len() as u64)?;
-                    file.flush()?;
-                    Ok(())
-                })
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
-            }
+        if status == GuardState::Installing
+            && let Some(mut file) = self.file.take()
+        {
+            // Write the ready state (in a blocking task)
+            tokio::task::spawn_blocking(move || -> io::Result<()> {
+                file.seek(SeekFrom::Start(0))?;
+                let bytes = serde_json::to_vec(&GuardState::Ready)?;
+                file.write_all(&bytes)?;
+                file.set_len(bytes.len() as u64)?;
+                file.flush()?;
+                Ok(())
+            })
+            .await
+            .map_err(io::Error::other)??;
         }
         Ok(())
     }
@@ -150,7 +150,7 @@ impl AsyncPrefixGuard {
             Ok(file)
         })
         .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+        .map_err(io::Error::other)??;
 
         AsyncWriteGuard::new(file).await
     }
