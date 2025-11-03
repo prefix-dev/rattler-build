@@ -350,9 +350,9 @@ fn build_from_rendered_variants_py(
 
     // Create a safe fallback recipe path when None is provided
     // We use a subdirectory in output_dir to avoid copying unrelated files
-    let safe_recipe_path = recipe_path.clone().unwrap_or_else(|| {
-        output_dir.join("_no_recipe").join("recipe.yaml")
-    });
+    let safe_recipe_path = recipe_path
+        .clone()
+        .unwrap_or_else(|| output_dir.join("_no_recipe").join("recipe.yaml"));
 
     // Second pass: create Output objects
     for rendered_variant in rendered_variants {

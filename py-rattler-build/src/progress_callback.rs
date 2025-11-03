@@ -14,7 +14,10 @@ pub struct DownloadStartEvent {
 #[pymethods]
 impl DownloadStartEvent {
     fn __repr__(&self) -> String {
-        format!("DownloadStartEvent(url='{}', total_bytes={:?})", self.url, self.total_bytes)
+        format!(
+            "DownloadStartEvent(url='{}', total_bytes={:?})",
+            self.url, self.total_bytes
+        )
     }
 }
 
@@ -65,7 +68,10 @@ pub struct BuildStepEvent {
 #[pymethods]
 impl BuildStepEvent {
     fn __repr__(&self) -> String {
-        format!("BuildStepEvent(step_name='{}', message='{}')", self.step_name, self.message)
+        format!(
+            "BuildStepEvent(step_name='{}', message='{}')",
+            self.step_name, self.message
+        )
     }
 }
 
@@ -151,7 +157,10 @@ impl PyProgressCallback {
                 .call_method1("on_download_progress", (event_obj,))?;
             Ok::<(), PyErr>(())
         }) {
-            eprintln!("Error in Python progress callback on_download_progress: {}", e);
+            eprintln!(
+                "Error in Python progress callback on_download_progress: {}",
+                e
+            );
         }
     }
 
@@ -168,7 +177,10 @@ impl PyProgressCallback {
                 .call_method1("on_download_complete", (event_obj,))?;
             Ok::<(), PyErr>(())
         }) {
-            eprintln!("Error in Python progress callback on_download_complete: {}", e);
+            eprintln!(
+                "Error in Python progress callback on_download_complete: {}",
+                e
+            );
         }
     }
 

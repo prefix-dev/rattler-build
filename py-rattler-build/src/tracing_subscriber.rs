@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use tracing::{Level, Subscriber};
-use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::Layer;
+use tracing_subscriber::layer::{Context, SubscriberExt};
 
 use crate::progress_callback::PyProgressCallback;
 
@@ -20,11 +20,7 @@ impl<S> Layer<S> for PythonTracingLayer
 where
     S: Subscriber + for<'lookup> tracing_subscriber::registry::LookupSpan<'lookup>,
 {
-    fn on_event(
-        &self,
-        event: &tracing::Event<'_>,
-        _ctx: Context<'_, S>,
-    ) {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         let metadata = event.metadata();
         let level = match *metadata.level() {
             Level::ERROR => "error",
@@ -42,7 +38,8 @@ where
         let span = _ctx.event_span(event).map(|s| s.name().to_string());
 
         // Forward to Python callback
-        self.callback.on_log(level, &visitor.message, span.as_deref());
+        self.callback
+            .on_log(level, &visitor.message, span.as_deref());
     }
 }
 
@@ -71,10 +68,7 @@ impl tracing::field::Visit for MessageVisitor {
 }
 
 /// Install a Python tracing subscriber for the duration of the build
-pub fn with_python_tracing<F, R>(
-    callback: Option<Py<PyAny>>,
-    f: F,
-) -> R
+pub fn with_python_tracing<F, R>(callback: Option<Py<PyAny>>, f: F) -> R
 where
     F: FnOnce() -> R,
 {
