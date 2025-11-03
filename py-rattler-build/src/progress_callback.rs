@@ -105,6 +105,7 @@ pub struct PyProgressCallback {
     callback: Arc<Py<PyAny>>,
 }
 
+/// TODO actually implement progress callback methods and wire up with reporter interface(s)
 impl PyProgressCallback {
     /// Create a new Python progress callback wrapper
     pub fn new(callback: Py<PyAny>) -> Self {
@@ -114,16 +115,19 @@ impl PyProgressCallback {
     }
 
     /// Get the inner Arc for sharing across threads
+    #[allow(dead_code)]
     pub fn inner(&self) -> Arc<Py<PyAny>> {
         Arc::clone(&self.callback)
     }
 
     /// Get a clone of this callback wrapper
+    #[allow(dead_code)]
     pub fn clone_callback(&self) -> Arc<Self> {
         Arc::new(self.clone())
     }
 
     /// Call the on_download_start callback
+    #[allow(dead_code)]
     pub fn on_download_start(&self, url: &str, total_bytes: Option<u64>) {
         if let Err(e) = Python::attach(|py| {
             let event = DownloadStartEvent {
@@ -143,6 +147,7 @@ impl PyProgressCallback {
     }
 
     /// Call the on_download_progress callback
+    #[allow(dead_code)]
     pub fn on_download_progress(&self, url: &str, bytes_downloaded: u64, total_bytes: Option<u64>) {
         if let Err(e) = Python::attach(|py| {
             let event = DownloadProgressEvent {
@@ -165,6 +170,7 @@ impl PyProgressCallback {
     }
 
     /// Call the on_download_complete callback
+    #[allow(dead_code)]
     pub fn on_download_complete(&self, url: &str) {
         if let Err(e) = Python::attach(|py| {
             let event = DownloadCompleteEvent {
@@ -185,6 +191,7 @@ impl PyProgressCallback {
     }
 
     /// Call the on_build_step callback
+    #[allow(dead_code)]
     pub fn on_build_step(&self, step_name: &str, message: &str) {
         if let Err(e) = Python::attach(|py| {
             let event = BuildStepEvent {

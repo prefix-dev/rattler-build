@@ -36,6 +36,7 @@ impl PyToolConfiguration {
         use_sharded=true,
         use_jlap=false
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         keep_build: bool,
         compression_threads: Option<u32>,
