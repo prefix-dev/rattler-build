@@ -7,15 +7,71 @@ during recipe rendering and building. You can use the built-in implementations
 ProgressCallback.
 """
 
-from typing import Protocol, runtime_checkable
+from __future__ import annotations
 
-from rattler_build.rattler_build import (
-    DownloadStartEvent,
-    DownloadProgressEvent,
-    DownloadCompleteEvent,
-    BuildStepEvent,
-    LogEvent,
-)
+from typing import Any, Protocol, runtime_checkable
+
+# Try to import from Rust module, but provide Python fallbacks if not available yet
+try:
+    from rattler_build.rattler_build.progress import (
+        BuildStepEvent,
+        DownloadCompleteEvent,
+        DownloadProgressEvent,
+        DownloadStartEvent,
+        LogEvent,
+    )
+except (ImportError, AttributeError):
+    # Fallback Python implementations for when Rust bindings aren't ready
+    class DownloadStartEvent:
+        """Event fired when a download starts."""
+
+        def __init__(self, url: str, total_bytes: int | None = None):
+            self.url = url
+            self.total_bytes = total_bytes
+
+        def __repr__(self):
+            return f"DownloadStartEvent(url='{self.url}', total_bytes={self.total_bytes})"
+
+    class DownloadProgressEvent:
+        """Event fired during download progress."""
+
+        def __init__(self, url: str, bytes_downloaded: int, total_bytes: int | None = None):
+            self.url = url
+            self.bytes_downloaded = bytes_downloaded
+            self.total_bytes = total_bytes
+
+        def __repr__(self):
+            return f"DownloadProgressEvent(url='{self.url}', bytes_downloaded={self.bytes_downloaded}, total_bytes={self.total_bytes})"
+
+    class DownloadCompleteEvent:
+        """Event fired when a download completes."""
+
+        def __init__(self, url: str):
+            self.url = url
+
+        def __repr__(self):
+            return f"DownloadCompleteEvent(url='{self.url}')"
+
+    class BuildStepEvent:
+        """Event fired when a build step begins."""
+
+        def __init__(self, step_name: str, message: str):
+            self.step_name = step_name
+            self.message = message
+
+        def __repr__(self):
+            return f"BuildStepEvent(step_name='{self.step_name}', message='{self.message}')"
+
+    class LogEvent:
+        """Event fired for log messages."""
+
+        def __init__(self, level: str, message: str, span: str | None = None):
+            self.level = level
+            self.message = message
+            self.span = span
+
+        def __repr__(self):
+            return f"LogEvent(level='{self.level}', message='{self.message}', span={self.span})"
 
 
 __all__ = [
@@ -172,16 +228,17 @@ class RichProgressCallback:
             show_details: Whether to show detailed logs like index operations (default: False)
         """
         try:
+            from rich.console import Console
             from rich.progress import (
+                BarColumn,
                 Progress,
                 SpinnerColumn,
-                BarColumn,
+                TaskID,
                 TextColumn,
                 TimeElapsedColumn,
             )
-            from rich.console import Console
         except ImportError:
-            raise ImportError("Rich library is required for RichProgressCallback. " "Install it with: pip install rich")
+            raise ImportError("Rich library is required for RichProgressCallback. Install it with: pip install rich")
 
         self.show_logs = show_logs
         self.show_details = show_details
@@ -197,16 +254,17 @@ class RichProgressCallback:
             console=self.console,
         )
 
-        self.tasks = {}  # Download tasks
-        self.operation_tasks = {}  # Operation tasks (resolving, building, etc.)
-        self.current_operation = None
+        self.tasks: dict[str, TaskID] = {}  # Download tasks
+        self.operation_tasks: dict[str, TaskID] = {}  # Operation tasks (resolving, building, etc.)
+        self.current_operation: TaskID | None = None
+        self.step_task: TaskID | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> RichProgressCallback:
         """Context manager entry."""
         self.progress.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
         """Context manager exit."""
         self.progress.stop()
 
@@ -340,7 +398,7 @@ class RichProgressCallback:
             if event.level in ("error", "warn") or (self.show_logs and event.level == "info"):
                 self.console.print(formatted_msg)
 
-    def _complete_operation(self):
+    def _complete_operation(self) -> None:
         """Complete the current operation task."""
         if self.current_operation is not None:
             self.progress.update(self.current_operation, completed=100)
@@ -358,7 +416,7 @@ class RichProgressCallback:
 default_callback = SimpleProgressCallback()
 
 
-def create_callback(style: str = "simple", **kwargs) -> ProgressCallback:
+def create_callback(style: str = "simple", **kwargs: Any) -> ProgressCallback:
     """Create a progress callback of the specified style.
 
     Args:
@@ -387,19 +445,19 @@ def create_callback(style: str = "simple", **kwargs) -> ProgressCallback:
     elif style == "none":
         # Empty callback that does nothing
         class NoOpCallback:
-            def on_download_start(self, event):
+            def on_download_start(self, event: DownloadStartEvent) -> None:
                 pass
 
-            def on_download_progress(self, event):
+            def on_download_progress(self, event: DownloadProgressEvent) -> None:
                 pass
 
-            def on_download_complete(self, event):
+            def on_download_complete(self, event: DownloadCompleteEvent) -> None:
                 pass
 
-            def on_build_step(self, event):
+            def on_build_step(self, event: BuildStepEvent) -> None:
                 pass
 
-            def on_log(self, event):
+            def on_log(self, event: LogEvent) -> None:
                 pass
 
         return NoOpCallback()
