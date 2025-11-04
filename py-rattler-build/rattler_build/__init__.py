@@ -19,10 +19,22 @@ from .recipe import (
     Source,
     TestType,
     TestTypeEnum,
-    SelectorConfig,
 )
 
 from . import recipe_generation
+from . import stage0
+from . import stage1
+from . import render
+from . import tool_config
+from . import build_types
+from . import platform_types
+from . import progress
+from .variant_config import VariantConfig
+from .jinja_config import JinjaConfig
+from .tool_config import ToolConfiguration
+from .build_types import Directories, PackagingSettings
+from .platform_types import Platform, PlatformWithVirtualPackages
+from .render import RenderConfig
 
 
 from pathlib import Path
@@ -48,7 +60,21 @@ __all__ = [
     "Source",
     "TestType",
     "TestTypeEnum",
-    "SelectorConfig",
+    "JinjaConfig",
+    "stage0",
+    "stage1",
+    "render",
+    "tool_config",
+    "build_types",
+    "platform_types",
+    "progress",
+    "VariantConfig",
+    "ToolConfiguration",
+    "Directories",
+    "PackagingSettings",
+    "Platform",
+    "PlatformWithVirtualPackages",
+    "RenderConfig",
 ]
 
 
