@@ -46,23 +46,6 @@ fn get_rattler_build_version_py() -> PyResult<String> {
     Ok(get_rattler_build_version().to_string())
 }
 
-// Legacy parse_recipe_py function - now use the stage0/stage1 Python bindings instead
-// This function is commented out as the Recipe::from_yaml API has changed
-// Use the new Stage0Recipe.from_yaml() in the stage0 module
-/*
-/// Parse a recipe YAML string and return the parsed recipe as a Python dictionary.
-#[pyfunction]
-#[pyo3(signature = (yaml_content, selector_config))]
-fn parse_recipe_py(
-    yaml_content: String,
-    selector_config: &PySelectorConfig,
-) -> PyResult<Py<PyAny>> {
-    // This function needs to be updated to work with the new stage0/stage1 API
-    // For now, use the stage0.Recipe.from_yaml() method instead
-    unimplemented!("Use stage0.Recipe.from_yaml() instead")
-}
-*/
-
 #[pyfunction]
 #[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
@@ -541,8 +524,6 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(
         wrap_pyfunction!(recipe_generation::generate_luarocks_recipe_string_py, &m).unwrap(),
     )?;
-    // parse_recipe_py is deprecated - use stage0.Recipe.from_yaml() instead
-    // m.add_function(wrap_pyfunction!(parse_recipe_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_from_rendered_variants_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
