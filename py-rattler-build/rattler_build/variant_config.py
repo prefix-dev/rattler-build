@@ -88,9 +88,7 @@ class VariantConfig:
         return cls(_VariantConfig.from_file(Path(path)))
 
     @classmethod
-    def from_file_with_context(
-        cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig
-    ) -> "VariantConfig":
+    def from_file_with_context(cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a YAML file with a JinjaConfig context (variants.yaml format).
 
@@ -114,9 +112,7 @@ class VariantConfig:
         return cls(_VariantConfig.from_file_with_context(Path(path), py_config))
 
     @classmethod
-    def from_conda_build_config(
-        cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig
-    ) -> "VariantConfig":
+    def from_conda_build_config(cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a conda_build_config.yaml file.
 
