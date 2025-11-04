@@ -3,6 +3,7 @@
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
 from . import stage0
 
 
@@ -332,6 +333,7 @@ class Recipe:
     def from_yaml(
         cls,
         yaml_content: str,
+        # TODO: these args are currently unused
         target_platform: str | None = None,
         host_platform: str | None = None,
         build_platform: str | None = None,
