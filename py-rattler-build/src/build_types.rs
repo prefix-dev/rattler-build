@@ -82,7 +82,7 @@ impl PyPackagingSettings {
         };
 
         // Default compression levels
-        let compression_level = compression_level.unwrap_or_else(|| match archive_type {
+        let compression_level = compression_level.unwrap_or(match archive_type {
             ArchiveType::Conda => 22, // zstd default
             ArchiveType::TarBz2 => 9, // bzip2 default
         });
