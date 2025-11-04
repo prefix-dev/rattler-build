@@ -288,6 +288,54 @@ class SingleOutputRecipe:
         return repr(self._inner)
 
 
+class Package:
+    """Package metadata at stage0."""
+
+    def __init__(self, inner: _Stage0Package):
+        self._inner = inner
+
+    @property
+    def name(self) -> Any:
+        """Get the package name (may be a template string like '${{ name }}')."""
+        return self._inner.name
+
+    @property
+    def version(self) -> Any:
+        """Get the package version (may be a template string like '${{ version }}')."""
+        return self._inner.version
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to Python dictionary."""
+        return self._inner.to_dict()
+
+
+class PackageOutput:
+    """A package output in a multi-output recipe."""
+
+    def __init__(self, inner: _Stage0PackageOutput):
+        self._inner = inner
+
+    @property
+    def package(self) -> Package:
+        """Get the package metadata for this output."""
+        return Package(self._inner.package)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to Python dictionary."""
+        return self._inner.to_dict()
+
+
+class StagingOutput:
+    """A staging output in a multi-output recipe."""
+
+    def __init__(self, inner: _Stage0StagingOutput):
+        self._inner = inner
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to Python dictionary."""
+        return self._inner.to_dict()
+
+
 class MultiOutputRecipe:
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
@@ -322,7 +370,7 @@ class MultiOutputRecipe:
         return About(self._inner.about)
 
     @property
-    def outputs(self) -> list["PackageOutput" | "StagingOutput"]:
+    def outputs(self) -> list[PackageOutput | StagingOutput]:
         """Get all outputs (package and staging)."""
         result: list[PackageOutput | StagingOutput] = []
         for output in self._inner.outputs:
@@ -418,27 +466,6 @@ class MultiOutputRecipe:
 
     def __repr__(self) -> str:
         return repr(self._inner)
-
-
-class Package:
-    """Package metadata at stage0."""
-
-    def __init__(self, inner: _Stage0Package):
-        self._inner = inner
-
-    @property
-    def name(self) -> Any:
-        """Get the package name (may be a template string like '${{ name }}')."""
-        return self._inner.name
-
-    @property
-    def version(self) -> Any:
-        """Get the package version (may be a template string like '${{ version }}')."""
-        return self._inner.version
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to Python dictionary."""
-        return self._inner.to_dict()
 
 
 class RecipeMetadata:
@@ -554,33 +581,6 @@ class About:
     def repository(self) -> Any | None:
         """Get the repository URL (may be a template or None)."""
         return self._inner.repository
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to Python dictionary."""
-        return self._inner.to_dict()
-
-
-class PackageOutput:
-    """A package output in a multi-output recipe."""
-
-    def __init__(self, inner: _Stage0PackageOutput):
-        self._inner = inner
-
-    @property
-    def package(self) -> Package:
-        """Get the package metadata for this output."""
-        return Package(self._inner.package)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to Python dictionary."""
-        return self._inner.to_dict()
-
-
-class StagingOutput:
-    """A staging output in a multi-output recipe."""
-
-    def __init__(self, inner: _Stage0StagingOutput):
-        self._inner = inner
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
