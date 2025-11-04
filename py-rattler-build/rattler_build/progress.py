@@ -7,7 +7,7 @@ during recipe rendering and building. You can use the built-in implementations
 ProgressCallback.
 """
 
-from typing import Protocol, Optional, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 # Try to import from Rust module, but provide Python fallbacks if not available yet
 try:
@@ -23,7 +23,7 @@ except (ImportError, AttributeError):
     class DownloadStartEvent:
         """Event fired when a download starts."""
 
-        def __init__(self, url: str, total_bytes: Optional[int] = None):
+        def __init__(self, url: str, total_bytes: int | None = None):
             self.url = url
             self.total_bytes = total_bytes
 
@@ -33,7 +33,7 @@ except (ImportError, AttributeError):
     class DownloadProgressEvent:
         """Event fired during download progress."""
 
-        def __init__(self, url: str, bytes_downloaded: int, total_bytes: Optional[int] = None):
+        def __init__(self, url: str, bytes_downloaded: int, total_bytes: int | None = None):
             self.url = url
             self.bytes_downloaded = bytes_downloaded
             self.total_bytes = total_bytes
@@ -63,7 +63,7 @@ except (ImportError, AttributeError):
     class LogEvent:
         """Event fired for log messages."""
 
-        def __init__(self, level: str, message: str, span: Optional[str] = None):
+        def __init__(self, level: str, message: str, span: str | None = None):
             self.level = level
             self.message = message
             self.span = span

@@ -4,7 +4,7 @@ Tool configuration for rattler-build.
 This module provides a Pythonic API for configuring the build tool.
 """
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Type stub for the Rust ToolConfiguration
@@ -12,14 +12,14 @@ if TYPE_CHECKING:
         def __init__(
             self,
             keep_build: bool = ...,
-            compression_threads: Optional[int] = ...,
-            io_concurrency_limit: Optional[int] = ...,
-            test_strategy: Optional[str] = ...,
-            skip_existing: Optional[str] = ...,
+            compression_threads: int | None = ...,
+            io_concurrency_limit: int | None = ...,
+            test_strategy: str | None = ...,
+            skip_existing: str | None = ...,
             continue_on_failure: bool = ...,
-            noarch_build_platform: Optional[str] = ...,
-            channel_priority: Optional[str] = ...,
-            allow_insecure_host: Optional[List[str]] = ...,
+            noarch_build_platform: str | None = ...,
+            channel_priority: str | None = ...,
+            allow_insecure_host: list[str] | None = ...,
             error_prefix_in_binary: bool = ...,
             allow_symlinks_on_windows: bool = ...,
             use_zstd: bool = ...,
@@ -47,11 +47,11 @@ if TYPE_CHECKING:
         @property
         def use_jlap(self) -> bool: ...
         @property
-        def compression_threads(self) -> Optional[int]: ...
+        def compression_threads(self) -> int | None: ...
         @property
-        def io_concurrency_limit(self) -> Optional[int]: ...
+        def io_concurrency_limit(self) -> int | None: ...
         @property
-        def allow_insecure_host(self) -> Optional[List[str]]: ...
+        def allow_insecure_host(self) -> list[str] | None: ...
         @property
         def error_prefix_in_binary(self) -> bool: ...
         @property
@@ -100,14 +100,14 @@ class ToolConfiguration:
     def __init__(
         self,
         keep_build: bool = False,
-        compression_threads: Optional[int] = None,
-        io_concurrency_limit: Optional[int] = None,
-        test_strategy: Optional[str] = None,
-        skip_existing: Optional[str] = None,
+        compression_threads: int | None = None,
+        io_concurrency_limit: int | None = None,
+        test_strategy: str | None = None,
+        skip_existing: str | None = None,
         continue_on_failure: bool = False,
-        noarch_build_platform: Optional[str] = None,
-        channel_priority: Optional[str] = None,
-        allow_insecure_host: Optional[List[str]] = None,
+        noarch_build_platform: str | None = None,
+        channel_priority: str | None = None,
+        allow_insecure_host: list[str] | None = None,
         error_prefix_in_binary: bool = False,
         allow_symlinks_on_windows: bool = False,
         use_zstd: bool = True,
@@ -185,17 +185,17 @@ class ToolConfiguration:
         return self._inner.use_jlap
 
     @property
-    def compression_threads(self) -> Optional[int]:
+    def compression_threads(self) -> int | None:
         """Number of compression threads."""
         return self._inner.compression_threads
 
     @property
-    def io_concurrency_limit(self) -> Optional[int]:
+    def io_concurrency_limit(self) -> int | None:
         """IO concurrency limit."""
         return self._inner.io_concurrency_limit
 
     @property
-    def allow_insecure_host(self) -> Optional[List[str]]:
+    def allow_insecure_host(self) -> list[str] | None:
         """List of hosts for which SSL certificate verification should be skipped."""
         return self._inner.allow_insecure_host
 

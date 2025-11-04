@@ -96,9 +96,7 @@ def _(VariantConfig):
     print(f"Variant keys: {variant_config.keys()}")
     print(f"Python versions: {variant_config.get_values('python')}")
     print(f"Numpy versions: {variant_config.get_values('numpy')}")
-    print(
-        f"\nTotal combinations (without zip_keys): {len(variant_config.combinations())}"
-    )
+    print(f"\nTotal combinations (without zip_keys): {len(variant_config.combinations())}")
 
     # Show all combinations
     print("\nAll combinations:")
@@ -136,9 +134,7 @@ def _(VariantConfig):
     print(f"Number of combinations: {len(config.combinations())}")
     print("\nCombinations:")
     for combo_2 in config.combinations():
-        print(
-            f"  python={combo_2['python']}, numpy={combo_2['numpy']}, c_compiler={combo_2['c_compiler']}"
-        )
+        print(f"  python={combo_2['python']}, numpy={combo_2['numpy']}, c_compiler={combo_2['c_compiler']}")
     return
 
 
@@ -165,9 +161,7 @@ def _(Recipe, RenderConfig, VariantConfig):
     rendered_variants = recipe_1.render(variant_config_1, render_config)
     print(f"Generated {len(rendered_variants)} rendered variants:\n")
     for i_2, variant in enumerate(rendered_variants, 1):
-        print(
-            f"{i_2}. {variant.recipe().package.name}-{variant.recipe().package.version}"
-        )
+        print(f"{i_2}. {variant.recipe().package.name}-{variant.recipe().package.version}")
         print(f"   Build string: {variant.recipe().build.string}")
         print(f"   Variant: {variant.variant()}")
         print()
@@ -254,9 +248,7 @@ def _(JinjaConfig, VariantConfig):
     conditional_yaml = "\nc_compiler:\n  - if: unix\n    then: gcc\n  - if: win\n    then: msvc\ncxx_compiler:\n  - if: unix\n    then: gxx\n  - if: win\n    then: msvc\n"
     for platform in ["linux-64", "win-64", "osx-arm64"]:
         jinja_config = JinjaConfig(target_platform=platform)
-        config_1 = VariantConfig.from_yaml_with_context(
-            conditional_yaml, jinja_config
-        )
+        config_1 = VariantConfig.from_yaml_with_context(conditional_yaml, jinja_config)
         print(f"\nPlatform: {platform}")
         print(f"  c_compiler: {config_1.get_values('c_compiler')}")
         # Test on different platforms
@@ -279,9 +271,7 @@ def _(Recipe):
     from pathlib import Path
 
     # Look for example recipes
-    recipes_dir = Path(
-        "/Users/wolfv/Programs/rattler-build/py-rattler-build/tests/data/recipes"
-    )
+    recipes_dir = Path("/Users/wolfv/Programs/rattler-build/py-rattler-build/tests/data/recipes")
 
     if recipes_dir.exists():
         recipe_files = list(recipes_dir.rglob("recipe.yaml"))
@@ -338,9 +328,7 @@ def _(Recipe):
         "tests": [],
     }
     recipe_from_dict = Recipe.from_dict(recipe_dict_1)
-    print(
-        f"Created recipe: {recipe_from_dict.package.name} v{recipe_from_dict.package.version}"
-    )
+    print(f"Created recipe: {recipe_from_dict.package.name} v{recipe_from_dict.package.version}")
     print(f"Build number: {recipe_from_dict.build.number}")
     print(f"Host requirements: {recipe_from_dict.requirements.host}")
     print(f"Run requirements: {recipe_from_dict.requirements.run}")
@@ -359,13 +347,14 @@ app._unparsable_cell(
     # everything topologically sorted
     build([RenderedVariants...], options)
     """,
-    name="_"
+    name="_",
 )
 
 
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 

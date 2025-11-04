@@ -7,7 +7,7 @@ and conditional resolution.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     from rattler_build.tool_config import ToolConfiguration
@@ -90,17 +90,17 @@ class Recipe:
             return MultiOutputRecipe(multi_inner, wrapper)
 
     @classmethod
-    def from_file(cls, path: Union[str, Path]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+    def from_file(cls, path: str | Path) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
         """
         Parse a recipe from a YAML file.
 
         Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
         """
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return cls.from_yaml(f.read())
 
     @classmethod
-    def from_dict(cls, recipe_dict: Dict[str, Any]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+    def from_dict(cls, recipe_dict: dict[str, Any]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
         """
         Create a recipe from a Python dictionary.
 
@@ -154,7 +154,7 @@ class Recipe:
         inner = self._inner.as_multi_output()
         return MultiOutputRecipe(inner) if inner else None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -176,7 +176,7 @@ class SingleOutputRecipe:
         return self._inner.schema_version
 
     @property
-    def context(self) -> Dict[str, Any]:
+    def context(self) -> dict[str, Any]:
         """Get the context variables as a dictionary."""
         return self._inner.context
 
@@ -200,7 +200,7 @@ class SingleOutputRecipe:
         """Get the about metadata."""
         return About(self._inner.about)
 
-    def render(self, variant_config: Any = None, render_config: Any = None) -> List[Any]:
+    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
         """
         Render this recipe with variant configuration.
 
@@ -235,8 +235,8 @@ class SingleOutputRecipe:
         self,
         variant_config: Any = None,
         tool_config: Optional["ToolConfiguration"] = None,
-        output_dir: Union[str, Path, None] = None,
-        channel: Optional[List[str]] = None,
+        output_dir: str | Path | None = None,
+        channel: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -280,7 +280,7 @@ class SingleOutputRecipe:
             **kwargs,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -302,7 +302,7 @@ class MultiOutputRecipe:
         return self._inner.schema_version
 
     @property
-    def context(self) -> Dict[str, Any]:
+    def context(self) -> dict[str, Any]:
         """Get the context variables as a dictionary."""
         return self._inner.context
 
@@ -322,9 +322,9 @@ class MultiOutputRecipe:
         return About(self._inner.about)
 
     @property
-    def outputs(self) -> List[Union["PackageOutput", "StagingOutput"]]:
+    def outputs(self) -> list["PackageOutput" | "StagingOutput"]:
         """Get all outputs (package and staging)."""
-        result: List[Union["PackageOutput", "StagingOutput"]] = []
+        result: list[PackageOutput | StagingOutput] = []
         for output in self._inner.outputs:
             if isinstance(output, _Stage0PackageOutput):  # type: ignore[misc]
                 result.append(PackageOutput(output))
@@ -332,7 +332,7 @@ class MultiOutputRecipe:
                 result.append(StagingOutput(output))
         return result
 
-    def render(self, variant_config: Any = None, render_config: Any = None) -> List[Any]:
+    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
         """
         Render this recipe with variant configuration.
 
@@ -367,8 +367,8 @@ class MultiOutputRecipe:
         self,
         variant_config: Any = None,
         tool_config: Optional["ToolConfiguration"] = None,
-        output_dir: Union[str, Path, None] = None,
-        channel: Optional[List[str]] = None,
+        output_dir: str | Path | None = None,
+        channel: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -412,7 +412,7 @@ class MultiOutputRecipe:
             **kwargs,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -436,7 +436,7 @@ class Package:
         """Get the package version (may be a template string like '${{ version }}')."""
         return self._inner.version
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -447,7 +447,7 @@ class RecipeMetadata:
     def __init__(self, inner: _Stage0RecipeMetadata):
         self._inner = inner
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -464,7 +464,7 @@ class Build:
         return self._inner.number
 
     @property
-    def string(self) -> Optional[Any]:
+    def string(self) -> Any | None:
         """Get the build string (may be a template or None for auto-generated)."""
         return self._inner.string
 
@@ -474,11 +474,11 @@ class Build:
         return self._inner.script
 
     @property
-    def noarch(self) -> Optional[Any]:
+    def noarch(self) -> Any | None:
         """Get the noarch type (may be a template or None)."""
         return self._inner.noarch
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -490,26 +490,26 @@ class Requirements:
         self._inner = inner
 
     @property
-    def build(self) -> List[Any]:
+    def build(self) -> list[Any]:
         """Get build-time requirements (list of matchspecs or templates)."""
         return self._inner.build
 
     @property
-    def host(self) -> List[Any]:
+    def host(self) -> list[Any]:
         """Get host-time requirements (list of matchspecs or templates)."""
         return self._inner.host
 
     @property
-    def run(self) -> List[Any]:
+    def run(self) -> list[Any]:
         """Get run-time requirements (list of matchspecs or templates)."""
         return self._inner.run
 
     @property
-    def run_constraints(self) -> List[Any]:
+    def run_constraints(self) -> list[Any]:
         """Get run-time constraints (list of matchspecs or templates)."""
         return self._inner.run_constraints
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -521,41 +521,41 @@ class About:
         self._inner = inner
 
     @property
-    def homepage(self) -> Optional[Any]:
+    def homepage(self) -> Any | None:
         """Get the homepage URL (may be a template or None)."""
         return self._inner.homepage
 
     @property
-    def license(self) -> Optional[Any]:
+    def license(self) -> Any | None:
         """Get the license (may be a template or None)."""
         return self._inner.license
 
     @property
-    def license_family(self) -> Optional[Any]:
+    def license_family(self) -> Any | None:
         """Get the license family (deprecated, may be a template or None)."""
         return self._inner.license_family
 
     @property
-    def summary(self) -> Optional[Any]:
+    def summary(self) -> Any | None:
         """Get the summary (may be a template or None)."""
         return self._inner.summary
 
     @property
-    def description(self) -> Optional[Any]:
+    def description(self) -> Any | None:
         """Get the description (may be a template or None)."""
         return self._inner.description
 
     @property
-    def documentation(self) -> Optional[Any]:
+    def documentation(self) -> Any | None:
         """Get the documentation URL (may be a template or None)."""
         return self._inner.documentation
 
     @property
-    def repository(self) -> Optional[Any]:
+    def repository(self) -> Any | None:
         """Get the repository URL (may be a template or None)."""
         return self._inner.repository
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -571,7 +571,7 @@ class PackageOutput:
         """Get the package metadata for this output."""
         return Package(self._inner.package)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -582,6 +582,6 @@ class StagingOutput:
     def __init__(self, inner: _Stage0StagingOutput):
         self._inner = inner
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()

@@ -6,7 +6,7 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
     from rattler_build.tool_config import ToolConfiguration
 
 # Type for context values - can be strings, numbers, bools, or lists
-ContextValue = Union[str, int, float, bool, List[Union[str, int, float, bool]]]
+ContextValue = str | int | float | bool | list[str | int | float | bool]
 
 # Try to import TypeAlias for better type hint support
 try:
     from typing import TypeAlias
 except ImportError:
-    from typing_extensions import TypeAlias
+    from typing import TypeAlias
 
 if TYPE_CHECKING:
     from rattler_build.variant_config import VariantConfig
@@ -117,7 +117,7 @@ class PinSubpackageInfo:
         return self._inner.version
 
     @property
-    def build_string(self) -> Optional[str]:
+    def build_string(self) -> str | None:
         """Get the build string if available."""
         return self._inner.build_string
 
@@ -159,11 +159,11 @@ class RenderConfig:
 
     def __init__(
         self,
-        target_platform: Optional[str] = None,
-        build_platform: Optional[str] = None,
-        host_platform: Optional[str] = None,
+        target_platform: str | None = None,
+        build_platform: str | None = None,
+        host_platform: str | None = None,
         experimental: bool = False,
-        recipe_path: Optional[str] = None,
+        recipe_path: str | None = None,
     ):
         """Create a new render configuration."""
         self._config = _RenderConfig(
@@ -183,7 +183,7 @@ class RenderConfig:
         """
         self._config.set_context(key, value)
 
-    def get_context(self, key: str) -> Optional[ContextValue]:
+    def get_context(self, key: str) -> ContextValue | None:
         """Get an extra context variable.
 
         Args:
@@ -194,7 +194,7 @@ class RenderConfig:
         """
         return self._config.get_context(key)
 
-    def get_all_context(self) -> Dict[str, ContextValue]:
+    def get_all_context(self) -> dict[str, ContextValue]:
         """Get all extra context variables as a dictionary."""
         return self._config.get_all_context()
 
@@ -239,12 +239,12 @@ class RenderConfig:
         self._config.set_experimental(value)
 
     @property
-    def recipe_path(self) -> Optional[str]:
+    def recipe_path(self) -> str | None:
         """Get the recipe path."""
         return self._config.recipe_path()
 
     @recipe_path.setter
-    def recipe_path(self, value: Optional[str]) -> None:
+    def recipe_path(self, value: str | None) -> None:
         """Set the recipe path."""
         self._config.set_recipe_path(value)
 
@@ -275,7 +275,7 @@ class RenderedVariant:
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
 
-    def variant(self) -> Dict[str, str]:
+    def variant(self) -> dict[str, str]:
         """Get the variant combination used for this render.
 
         Returns:
@@ -291,7 +291,7 @@ class RenderedVariant:
         """
         return self._inner.recipe()
 
-    def hash_info(self) -> Optional[HashInfo]:
+    def hash_info(self) -> HashInfo | None:
         """Get hash info if available.
 
         Returns:
@@ -307,7 +307,7 @@ class RenderedVariant:
         inner = self._inner.hash_info()
         return HashInfo(inner) if inner else None
 
-    def pin_subpackages(self) -> Dict[str, PinSubpackageInfo]:
+    def pin_subpackages(self) -> dict[str, PinSubpackageInfo]:
         """Get pin_subpackage information.
 
         Returns:
@@ -324,10 +324,10 @@ class RenderedVariant:
     def run_build(
         self,
         tool_config: Optional["ToolConfiguration"] = None,
-        output_dir: Optional[Union[str, Path]] = None,
-        channel: Optional[List[str]] = None,
-        progress_callback: Optional[Any] = None,
-        recipe_path: Optional[Union[str, Path]] = None,
+        output_dir: str | Path | None = None,
+        channel: list[str] | None = None,
+        progress_callback: Any | None = None,
+        recipe_path: str | Path | None = None,
         **kwargs: Any,
     ) -> None:
         """Build this rendered variant.
@@ -373,14 +373,14 @@ class RenderedVariant:
         return repr(self._inner)
 
 
-RecipeInput: TypeAlias = Union[str, SingleOutputRecipe, MultiOutputRecipe, Path]
+RecipeInput: TypeAlias = str | SingleOutputRecipe | MultiOutputRecipe | Path
 
 
 def render_recipe(
-    recipe: Union[RecipeInput, List[RecipeInput]],
+    recipe: RecipeInput | list[RecipeInput],
     variant_config: Union["VariantConfig", Path, str],
-    render_config: Optional[RenderConfig] = None,
-) -> List[RenderedVariant]:
+    render_config: RenderConfig | None = None,
+) -> list[RenderedVariant]:
     """Render a Stage0 recipe with a variant configuration into Stage1 recipes.
 
     This function takes a parsed Stage0 recipe and evaluates all Jinja templates
@@ -429,19 +429,19 @@ def render_recipe(
     config_inner = render_config._config if render_config else None
 
     # Handle recipe parameter - convert str/Path to Recipe objects
-    recipes_to_render: List[Union[SingleOutputRecipe, MultiOutputRecipe]] = []
+    recipes_to_render: list[SingleOutputRecipe | MultiOutputRecipe] = []
 
     if isinstance(recipe, list):
         # Handle list of recipes
         for r in recipe:
-            if isinstance(r, (str, Path)):
+            if isinstance(r, str | Path):
                 parsed = Recipe.from_file(r)
                 recipes_to_render.append(parsed)
-            elif isinstance(r, (SingleOutputRecipe, MultiOutputRecipe)):
+            elif isinstance(r, SingleOutputRecipe | MultiOutputRecipe):
                 recipes_to_render.append(r)
             else:
                 raise TypeError(f"Unsupported recipe type in list: {type(r)}")
-    elif isinstance(recipe, (str, Path)):
+    elif isinstance(recipe, str | Path):
         # Parse single recipe from file/string
         if isinstance(recipe, Path):
             # Definitely a file path
@@ -453,13 +453,13 @@ def render_recipe(
             # Treat as YAML string
             parsed = Recipe.from_yaml(recipe)
         recipes_to_render.append(parsed)
-    elif isinstance(recipe, (SingleOutputRecipe, MultiOutputRecipe)):
+    elif isinstance(recipe, SingleOutputRecipe | MultiOutputRecipe):
         recipes_to_render.append(recipe)
     else:
         raise TypeError(f"Unsupported recipe type: {type(recipe)}")
 
     # Handle variant_config parameter - convert str/Path to VariantConfig
-    if isinstance(variant_config, (str, Path)):
+    if isinstance(variant_config, str | Path):
         if isinstance(variant_config, Path):
             variant_config = VC.from_file(variant_config)
         else:
@@ -480,7 +480,7 @@ def render_recipe(
     variant_config_inner = variant_config._inner
 
     # Render all recipes and collect results
-    all_rendered: List[RenderedVariant] = []
+    all_rendered: list[RenderedVariant] = []
     for recipe_obj in recipes_to_render:
         recipe_inner = recipe_obj._wrapper
         rendered = _render_recipe(recipe_inner, variant_config_inner, config_inner)
@@ -490,12 +490,12 @@ def render_recipe(
 
 
 def build_rendered_variants(
-    rendered_variants: List[RenderedVariant],
+    rendered_variants: list[RenderedVariant],
     tool_config: Optional["ToolConfiguration"] = None,
-    output_dir: Optional[Union[str, Path]] = None,
-    channel: Optional[List[str]] = None,
-    progress_callback: Optional[Any] = None,
-    recipe_path: Optional[Union[str, Path]] = None,
+    output_dir: str | Path | None = None,
+    channel: list[str] | None = None,
+    progress_callback: Any | None = None,
+    recipe_path: str | Path | None = None,
     **kwargs: Any,
 ) -> None:
     """Build multiple rendered variants.

@@ -6,7 +6,8 @@ which manages variant matrices for building packages with different configuratio
 """
 
 from pathlib import Path
-from typing import Any, Dict, ItemsView, Iterator, List, Optional, Union, ValuesView
+from typing import Any, Union
+from collections.abc import ItemsView, Iterator, ValuesView
 from .rattler_build import VariantConfig as _VariantConfig, PyJinjaConfig
 from .jinja_config import JinjaConfig
 
@@ -46,7 +47,7 @@ class VariantConfig:
         >>> print(config.keys())
     """
 
-    def __init__(self, variants: Optional[Union[Dict[str, List[Any]], _VariantConfig]] = None):
+    def __init__(self, variants: dict[str, list[Any]] | _VariantConfig | None = None):
         """
         Create a new VariantConfig.
 
@@ -71,7 +72,7 @@ class VariantConfig:
             self._inner = variants
 
     @classmethod
-    def from_file(cls, path: Union[str, Path]) -> "VariantConfig":
+    def from_file(cls, path: str | Path) -> "VariantConfig":
         """
         Load VariantConfig from a YAML file (variants.yaml format).
 
@@ -88,7 +89,7 @@ class VariantConfig:
 
     @classmethod
     def from_file_with_context(
-        cls, path: Union[str, Path], jinja_config: Union[PyJinjaConfig, JinjaConfig]
+        cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig
     ) -> "VariantConfig":
         """
         Load VariantConfig from a YAML file with a JinjaConfig context (variants.yaml format).
@@ -114,7 +115,7 @@ class VariantConfig:
 
     @classmethod
     def from_conda_build_config(
-        cls, path: Union[str, Path], jinja_config: Union[PyJinjaConfig, JinjaConfig]
+        cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig
     ) -> "VariantConfig":
         """
         Load VariantConfig from a conda_build_config.yaml file.
@@ -160,7 +161,7 @@ class VariantConfig:
         return cls(_VariantConfig.from_yaml(yaml))
 
     @classmethod
-    def from_yaml_with_context(cls, yaml: str, jinja_config: Union[PyJinjaConfig, JinjaConfig]) -> "VariantConfig":
+    def from_yaml_with_context(cls, yaml: str, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a YAML string with a JinjaConfig context (variants.yaml format).
 
@@ -190,7 +191,7 @@ class VariantConfig:
         py_config = jinja_config._config if isinstance(jinja_config, JinjaConfig) else jinja_config
         return cls(_VariantConfig.from_yaml_with_context(yaml, py_config))
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """
         Get all variant keys.
 
@@ -207,7 +208,7 @@ class VariantConfig:
         return self._inner.keys()
 
     @property
-    def zip_keys(self) -> Optional[List[List[str]]]:
+    def zip_keys(self) -> list[list[str]] | None:
         """
         Get zip_keys - groups of keys that should be zipped together.
 
@@ -229,7 +230,7 @@ class VariantConfig:
         return self._inner.zip_keys
 
     @zip_keys.setter
-    def zip_keys(self, value: Optional[List[List[str]]]) -> None:
+    def zip_keys(self, value: list[list[str]] | None) -> None:
         """
         Set zip_keys - groups of keys that should be zipped together.
 
@@ -242,7 +243,7 @@ class VariantConfig:
         """
         self._inner.zip_keys = value
 
-    def get_values(self, key: str) -> Optional[List[Any]]:
+    def get_values(self, key: str) -> list[Any] | None:
         """
         Get values for a specific variant key.
 
@@ -260,7 +261,7 @@ class VariantConfig:
         """
         return self._inner.get_values(key)
 
-    def set_values(self, key: str, values: List[Any]) -> None:
+    def set_values(self, key: str, values: list[Any]) -> None:
         """
         Set values for a variant key.
 
@@ -275,7 +276,7 @@ class VariantConfig:
         """
         self._inner.set_values(key, values)
 
-    def to_dict(self) -> Dict[str, List[Any]]:
+    def to_dict(self) -> dict[str, list[Any]]:
         """
         Get all variants as a dictionary.
 
@@ -308,7 +309,7 @@ class VariantConfig:
         """
         self._inner.merge(other._inner)
 
-    def combinations(self) -> List[Dict[str, Any]]:
+    def combinations(self) -> list[dict[str, Any]]:
         """
         Generate all combinations of variant values.
 
@@ -331,7 +332,7 @@ class VariantConfig:
         """Get the number of variant keys."""
         return len(self._inner)
 
-    def __getitem__(self, key: str) -> List[Any]:
+    def __getitem__(self, key: str) -> list[Any]:
         """
         Get values for a variant key using dict-like access.
 
@@ -354,7 +355,7 @@ class VariantConfig:
             raise KeyError(f"Variant key '{key}' not found")
         return values
 
-    def __setitem__(self, key: str, values: List[Any]) -> None:
+    def __setitem__(self, key: str, values: list[Any]) -> None:
         """
         Set values for a variant key using dict-like access.
 
@@ -414,7 +415,7 @@ class VariantConfig:
         """
         return iter(self.keys())
 
-    def items(self) -> ItemsView[str, List[str]]:
+    def items(self) -> ItemsView[str, list[str]]:
         """
         Get all variant key-value pairs.
 
@@ -428,7 +429,7 @@ class VariantConfig:
         """
         return self.to_dict().items()
 
-    def values(self) -> ValuesView[List[str]]:
+    def values(self) -> ValuesView[list[str]]:
         """
         Get all variant value lists.
 
@@ -442,7 +443,7 @@ class VariantConfig:
         """
         return self.to_dict().values()
 
-    def get(self, key: str, default: Optional[List[Any]] = None) -> Optional[List[Any]]:
+    def get(self, key: str, default: list[Any] | None = None) -> list[Any] | None:
         """
         Get values for a variant key with a default.
 
@@ -463,7 +464,7 @@ class VariantConfig:
         values = self._inner.get_values(key)
         return values if values is not None else default
 
-    def update(self, other: Union["VariantConfig", Dict[str, List[Any]]]) -> None:
+    def update(self, other: Union["VariantConfig", dict[str, list[Any]]]) -> None:
         """
         Update this config with values from another config or dict.
 

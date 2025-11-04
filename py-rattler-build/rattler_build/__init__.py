@@ -1,45 +1,34 @@
+from datetime import datetime
+from pathlib import Path
+
+from . import build_types, platform_types, progress, recipe_generation, render, stage0, stage1, tool_config
+from .build_types import Directories, PackagingSettings
+from .jinja_config import JinjaConfig
+from .platform_types import Platform, PlatformWithVirtualPackages
 from .rattler_build import (
-    get_rattler_build_version_py,
+    RattlerBuildError,
     build_recipes_py,
+    get_rattler_build_version_py,
     test_package_py,
-    upload_package_to_quetz_py,
+    upload_package_to_anaconda_py,
     upload_package_to_artifactory_py,
     upload_package_to_prefix_py,
-    upload_package_to_anaconda_py,
+    upload_package_to_quetz_py,
     upload_packages_to_conda_forge_py,
-    RattlerBuildError,
 )
-
 from .recipe import (
-    Recipe,
-    Package,
-    Build,
-    Requirements,
     About,
+    Build,
+    Package,
+    Recipe,
+    Requirements,
     Source,
     TestType,
     TestTypeEnum,
 )
-
-from . import recipe_generation
-from . import stage0
-from . import stage1
-from . import render
-from . import tool_config
-from . import build_types
-from . import platform_types
-from . import progress
-from .variant_config import VariantConfig
-from .jinja_config import JinjaConfig
-from .tool_config import ToolConfiguration
-from .build_types import Directories, PackagingSettings
-from .platform_types import Platform, PlatformWithVirtualPackages
 from .render import RenderConfig
-
-
-from pathlib import Path
-from typing import Dict, List, Union
-from datetime import datetime
+from .tool_config import ToolConfiguration
+from .variant_config import VariantConfig
 
 __all__ = [
     "rattler_build_version",
@@ -84,35 +73,35 @@ def rattler_build_version() -> str:
 
 
 def build_recipes(
-    recipes: List[Union[str, Path]],
-    up_to: Union[str, None] = None,
-    build_platform: Union[str, None] = None,
-    target_platform: Union[str, None] = None,
-    host_platform: Union[str, None] = None,
-    channel: Union[List[str], None] = None,
-    variant_config: Union[List[str], None] = None,
-    variant_overrides: Union[Dict[str, List[str]], None] = None,
+    recipes: list[str | Path],
+    up_to: str | None = None,
+    build_platform: str | None = None,
+    target_platform: str | None = None,
+    host_platform: str | None = None,
+    channel: list[str] | None = None,
+    variant_config: list[str] | None = None,
+    variant_overrides: dict[str, list[str]] | None = None,
     ignore_recipe_variants: bool = False,
     render_only: bool = False,
     with_solve: bool = False,
     keep_build: bool = False,
     no_build_id: bool = False,
-    package_format: Union[str, None] = None,
-    compression_threads: Union[int, None] = None,
-    io_concurrency_limit: Union[int, None] = None,
+    package_format: str | None = None,
+    compression_threads: int | None = None,
+    io_concurrency_limit: int | None = None,
     no_include_recipe: bool = False,
-    test: Union[str, None] = None,
-    output_dir: Union[str, Path, None] = None,
-    auth_file: Union[str, Path, None] = None,
-    channel_priority: Union[str, None] = None,
-    skip_existing: Union[str, None] = None,
-    noarch_build_platform: Union[str, None] = None,
-    allow_insecure_host: Union[List[str], None] = None,
+    test: str | None = None,
+    output_dir: str | Path | None = None,
+    auth_file: str | Path | None = None,
+    channel_priority: str | None = None,
+    skip_existing: str | None = None,
+    noarch_build_platform: str | None = None,
+    allow_insecure_host: list[str] | None = None,
     continue_on_failure: bool = False,
     debug: bool = False,
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
-    exclude_newer: Union[datetime, None] = None,
+    exclude_newer: datetime | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
     use_jlap: bool = False,
@@ -198,14 +187,14 @@ def build_recipes(
 
 
 def test_package(
-    package_file: Union[str, Path],
-    channel: Union[List[str], None] = None,
-    compression_threads: Union[int, None] = None,
-    auth_file: Union[str, Path, None] = None,
-    channel_priority: Union[str, None] = None,
-    allow_insecure_host: Union[List[str], None] = None,
+    package_file: str | Path,
+    channel: list[str] | None = None,
+    compression_threads: int | None = None,
+    auth_file: str | Path | None = None,
+    channel_priority: str | None = None,
+    allow_insecure_host: list[str] | None = None,
     debug: bool = False,
-    test_index: Union[int, None] = None,
+    test_index: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
     use_jlap: bool = False,
@@ -248,11 +237,11 @@ def test_package(
 
 
 def upload_package_to_quetz(
-    package_files: List[str],
+    package_files: list[str],
     url: str,
     channels: str,
-    api_key: Union[str, None] = None,
-    auth_file: Union[str, Path, None] = None,
+    api_key: str | None = None,
+    auth_file: str | Path | None = None,
 ) -> None:
     """
     Upload to a Quetz server. Authentication is used from the keychain / auth-file.
@@ -271,11 +260,11 @@ def upload_package_to_quetz(
 
 
 def upload_package_to_artifactory(
-    package_files: List[str],
+    package_files: list[str],
     url: str,
     channels: str,
-    token: Union[str, None] = None,
-    auth_file: Union[str, Path, None] = None,
+    token: str | None = None,
+    auth_file: str | Path | None = None,
 ) -> None:
     """
     Upload to an Artifactory channel. Authentication is used from the keychain / auth-file.
@@ -294,11 +283,11 @@ def upload_package_to_artifactory(
 
 
 def upload_package_to_prefix(
-    package_files: List[str],
+    package_files: list[str],
     url: str,
     channels: str,
-    api_key: Union[str, None] = None,
-    auth_file: Union[str, Path, None] = None,
+    api_key: str | None = None,
+    auth_file: str | Path | None = None,
     skip_existing: bool = False,
 ) -> None:
     """
@@ -319,13 +308,13 @@ def upload_package_to_prefix(
 
 
 def upload_package_to_anaconda(
-    package_files: List[str],
+    package_files: list[str],
     owner: str,
-    channel: Union[List[str], None] = None,
-    api_key: Union[str, None] = None,
-    url: Union[str, None] = None,
+    channel: list[str] | None = None,
+    api_key: str | None = None,
+    url: str | None = None,
     force: bool = False,
-    auth_file: Union[str, Path, None] = None,
+    auth_file: str | Path | None = None,
 ) -> None:
     """
     Upload to an Anaconda.org server.
@@ -346,14 +335,14 @@ def upload_package_to_anaconda(
 
 
 def upload_packages_to_conda_forge(
-    package_files: List[Union[str, Path]],
+    package_files: list[str | Path],
     staging_token: str,
     feedstock: str,
     feedstock_token: str,
-    staging_channel: Union[str, None] = None,
-    anaconda_url: Union[str, None] = None,
-    validation_endpoint: Union[str, None] = None,
-    provider: Union[str, None] = None,
+    staging_channel: str | None = None,
+    anaconda_url: str | None = None,
+    validation_endpoint: str | None = None,
+    provider: str | None = None,
     dry_run: bool = False,
 ) -> None:
     """

@@ -6,7 +6,7 @@ which represent the fully evaluated recipe with all Jinja templates resolved
 and conditionals evaluated.
 """
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     # For type checking, use Any as placeholder since we don't have stubs
@@ -82,31 +82,31 @@ class Recipe:
         return About(self._inner.about)
 
     @property
-    def context(self) -> Dict[str, Any]:
+    def context(self) -> dict[str, Any]:
         """Get the evaluation context."""
         return self._inner.context
 
     @property
-    def used_variant(self) -> Dict[str, Any]:
+    def used_variant(self) -> dict[str, Any]:
         """Get the variant values used in this build."""
         return self._inner.used_variant
 
     @property
-    def sources(self) -> List["Source"]:
+    def sources(self) -> list["Source"]:
         """Get all sources for this recipe."""
         return [Source(s) for s in self._inner.sources]
 
     @property
-    def staging_caches(self) -> List["StagingCache"]:
+    def staging_caches(self) -> list["StagingCache"]:
         """Get all staging caches."""
         return [StagingCache(s) for s in self._inner.staging_caches]
 
     @property
-    def inherits_from(self) -> Optional[Dict[str, Any]]:
+    def inherits_from(self) -> dict[str, Any] | None:
         """Get inheritance information if this output inherits from a cache."""
         return self._inner.inherits_from
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -130,7 +130,7 @@ class Package:
         """Get the package version."""
         return self._inner.version
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -163,11 +163,11 @@ class Build:
         return self._inner.script
 
     @property
-    def noarch(self) -> Optional[Any]:
+    def noarch(self) -> Any | None:
         """Get the noarch configuration if any."""
         return self._inner.noarch
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -182,21 +182,21 @@ class Requirements:
         self._inner = inner
 
     @property
-    def build(self) -> List[Any]:
+    def build(self) -> list[Any]:
         """Get build requirements."""
         return self._inner.build
 
     @property
-    def host(self) -> List[Any]:
+    def host(self) -> list[Any]:
         """Get host requirements."""
         return self._inner.host
 
     @property
-    def run(self) -> List[Any]:
+    def run(self) -> list[Any]:
         """Get run requirements."""
         return self._inner.run
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -211,36 +211,36 @@ class About:
         self._inner = inner
 
     @property
-    def homepage(self) -> Optional[str]:
+    def homepage(self) -> str | None:
         """Get the homepage URL."""
         return self._inner.homepage
 
     @property
-    def repository(self) -> Optional[str]:
+    def repository(self) -> str | None:
         """Get the repository URL."""
         return self._inner.repository
 
     @property
-    def documentation(self) -> Optional[str]:
+    def documentation(self) -> str | None:
         """Get the documentation URL."""
         return self._inner.documentation
 
     @property
-    def license(self) -> Optional[str]:
+    def license(self) -> str | None:
         """Get the license string."""
         return self._inner.license
 
     @property
-    def summary(self) -> Optional[str]:
+    def summary(self) -> str | None:
         """Get the summary."""
         return self._inner.summary
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Get the description."""
         return self._inner.description
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -254,7 +254,7 @@ class Source:
     def __init__(self, inner: _Stage1Source):
         self._inner = inner
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
@@ -280,7 +280,7 @@ class StagingCache:
         """Get the requirements for this cache."""
         return Requirements(self._inner.requirements)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
         return self._inner.to_dict()
 
