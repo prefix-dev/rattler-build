@@ -76,3 +76,6 @@ site/
 # Pyenv
 .python-version
 .ruff_cache
+
+# Marimo
+__marimo__
