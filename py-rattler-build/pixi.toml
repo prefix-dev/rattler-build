@@ -14,6 +14,7 @@ backend = { name = "pixi-build-python", version = "*" }
 
 [package.build.config]
 compilers = ["rust"]
+extra-input-globs = ["../src/*"]
 
 [package.host-dependencies]
 python = "*"
