@@ -43,9 +43,12 @@ def _():
     from rattler_build.render import RenderConfig, render_recipe
     import json
     import pprint
-
+    import yaml
+    import tempfile
+    from pathlib import Path
     return (
         MultiOutputRecipe,
+        Path,
         Recipe,
         RenderConfig,
         SingleOutputRecipe,
@@ -54,6 +57,8 @@ def _():
         mo,
         pprint,
         render_recipe,
+        tempfile,
+        yaml,
     )
 
 
@@ -69,7 +74,7 @@ def _(mo):
 
 @app.cell
 def _(MultiOutputRecipe, Recipe, SingleOutputRecipe, json):
-    # Define a simple recipe in YAML format
+    # Define a simple recipe in YAML format with Jinja templates
     simple_recipe_yaml = """
     package:
       name: my-simple-package
@@ -82,9 +87,11 @@ def _(MultiOutputRecipe, Recipe, SingleOutputRecipe, json):
 
     requirements:
       host:
-        - python
+        - python ${{ python }}.*
+        - numpy ${{ numpy }}.*
       run:
         - python
+        - numpy >=${{ numpy }}
 
     about:
       homepage: https://github.com/example/my-package
@@ -101,7 +108,7 @@ def _(MultiOutputRecipe, Recipe, SingleOutputRecipe, json):
     print(f"Is multi output: {isinstance(simple_recipe, MultiOutputRecipe)}")
     print("\nRecipe structure (as dict):")
     print(json.dumps(simple_recipe.to_dict(), indent=2))
-    return
+    return simple_recipe, simple_recipe_yaml
 
 
 @app.cell(hide_code=True)
@@ -109,45 +116,36 @@ def _(mo):
     mo.md(r"""
     ## Example 2: Creating a Recipe from a Python Dictionary
 
-    You can also create recipes programmatically using Python dictionaries. This is useful when generating recipes dynamically:
+    You can also create recipes from Python dictionaries. Let's verify that `Recipe.from_yaml()` and `Recipe.from_dict()` produce the same result when given the same data:
     """)
     return
 
 
 @app.cell
-def _(Recipe, json):
-    # Define the same recipe as a Python dictionary
-    recipe_dict = {
-        "package": {"name": "my-dict-package", "version": "2.0.0"},
-        "build": {"number": 1, "script": ["pip install ."]},
-        "requirements": {"host": ["python", "pip", "setuptools"], "run": ["python", "numpy"]},
-        "about": {
-            "homepage": "https://example.com",
-            "license": "Apache-2.0",
-            "summary": "A package created from a Python dict",
-        },
-    }
+def _(Recipe, simple_recipe, simple_recipe_yaml, yaml):
+    # Parse the same YAML as a Python dictionary
+    recipe_dict = yaml.safe_load(simple_recipe_yaml)
 
     # Create Recipe from dictionary
     dict_recipe = Recipe.from_dict(recipe_dict)
 
     print("Recipe created from dictionary!")
-    print(f"Package name: {dict_recipe.package.name}")
-    print(f"Package version: {dict_recipe.package.version}")
-    print(f"Build number: {dict_recipe.build.number}")
-    print(f"Host requirements: {dict_recipe.requirements.host}")
-    print(f"Run requirements: {dict_recipe.requirements.run}")
-    print("\nFull recipe:")
-    print(json.dumps(dict_recipe.to_dict(), indent=2))
+
+    # Assert that both recipes are the same
+    yaml_dict = simple_recipe.to_dict()
+    dict_dict = dict_recipe.to_dict()
+    assert yaml_dict == dict_dict, "Recipes should be identical!"
+
+    print("\n✅ Both recipes are identical!")
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Example 3: Understanding VariantConfig
+    ## Example 3: Understanding VariantConfig with Zip Keys
 
-    Variants allow you to build the same package with different configurations (e.g., different Python versions, compilers, or dependencies). Let's explore how VariantConfig works:
+    Variants allow you to build the same package with different configurations (e.g., different Python versions, compilers, or dependencies). By default, VariantConfig creates all possible combinations (Cartesian product), but we can use `zip_keys` to pair specific variants together:
     """)
     return
 
@@ -161,44 +159,30 @@ def _(VariantConfig, json, pprint):
     }
     variant_config = VariantConfig(variant_dict)
 
-    print("✨ Variant Configuration Created")
+    print("✨ Variant Configuration")
     print("=" * 60)
     print(f"Variant keys: {variant_config.keys()}")
     print(f"Python versions: {variant_config.get_values('python')}")
     print(f"Numpy versions: {variant_config.get_values('numpy')}")
-    print(f"\nTotal number of variant combinations: {len(variant_config.combinations())}")
+
+    print("\n📊 WITHOUT zip_keys (Cartesian product):")
+    print(f"Total combinations: {len(variant_config.combinations())} (3 × 3)")
     print("\nAll possible combinations:")
     pprint.pprint(variant_config.combinations())
-    print("\nVariant config as dict:")
-    print(json.dumps(variant_config.to_dict(), indent=2))
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Zip Keys: Synchronizing Variants
-
-    By default, VariantConfig creates all possible combinations (Cartesian product). But sometimes you want to pair specific variants together. That's what `zip_keys` is for:
-    """)
-    return
-
-
-@app.cell
-def _(VariantConfig, pprint):
-    # Create variant config with paired values
-    paired_variant = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.22", "1.23"]})
 
     # Zip python and numpy together (same index)
-    paired_variant.zip_keys = [["python", "numpy"]]
+    variant_config.zip_keys = [["python", "numpy"]]
 
-    print("🔗 Zipped Variants (python paired with numpy)")
-    print("=" * 60)
-    print("Without zip_keys: 3 × 3 = 9 combinations")
-    print("With zip_keys: 3 combinations (paired by index)")
+    print("\n" + "=" * 60)
+    print("🔗 WITH zip_keys (paired by index):")
+    print(f"Zip keys: {variant_config.zip_keys}")
+    print(f"Total combinations: {len(variant_config.combinations())} (paired)")
     print("\nPaired combinations:")
-    pprint.pprint(paired_variant.combinations())
-    return
+    pprint.pprint(variant_config.combinations())
+
+    print("\nVariant config as dict:")
+    print(json.dumps(variant_config.to_dict(), indent=2))
+    return (variant_config,)
 
 
 @app.cell(hide_code=True)
@@ -234,145 +218,115 @@ def _(RenderConfig, json):
     print(f"Experimental: {render_config.experimental}")
     print("\nCustom context variables:")
     print(json.dumps(render_config.get_all_context(), indent=2))
-    return
+    return (render_config,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Example 5: Stage0 vs Stage1 - Templates vs Evaluated Recipes
+    ## Example 5: Rendering Recipe with Variants
+
+    Now let's put it all together! We'll use the recipe from Example 1, the variant config from Example 3, and the render config from Example 4 to render our recipe with multiple variants.
 
     **Stage0** is the parsed recipe with Jinja templates still intact (e.g., `${{ python }}`).
     **Stage1** is the fully evaluated recipe with all templates resolved to actual values.
-
-    Let's see the difference:
     """)
     return
 
 
 @app.cell
-def _(Recipe, json):
-    # Create a recipe with Jinja templates
-    templated_recipe_yaml = """
-    context:
-      name: templated-package
-      version: "1.5.0"
-
-    package:
-      name: ${{ name }}
-      version: ${{ version }}
-
-    build:
-      number: 0
-
-    requirements:
-      host:
-        - python ${{ python }}.*
-      run:
-        - python
-        - numpy >=${{ numpy }}
-    """
-
-    # This is Stage0 - templates are NOT evaluated yet
-    stage0_recipe = Recipe.from_yaml(templated_recipe_yaml)
+def _(json, render_config, render_recipe, simple_recipe, variant_config):
+    # Render the recipe with all the configurations we've created
+    rendered_variants = render_recipe(simple_recipe, variant_config, render_config)
 
     print("📋 STAGE 0 (Parsed, templates intact)")
     print("=" * 60)
-    print(f"Package name (raw): {stage0_recipe.package.name}")
-    print(f"Package version (raw): {stage0_recipe.package.version}")
-    print(f"Host requirements (raw): {stage0_recipe.requirements.host}")
-    print("\nStage0 recipe structure:")
-    print(json.dumps(stage0_recipe.to_dict(), indent=2))
-    return (stage0_recipe,)
+    print(f"Package name (raw): {simple_recipe.package.name}")
+    print(f"Package version (raw): {simple_recipe.package.version}")
+    print(f"Host requirements (raw): {simple_recipe.requirements.host}")
 
+    print(f"\n🎯 Rendered {len(rendered_variants)} variant(s)")
+    print("=" * 60)
 
-@app.cell
-def _(RenderConfig, VariantConfig, json, render_recipe, stage0_recipe):
-    # Now let's render it with variants
-    stage0_variant = VariantConfig({"python": ["3.10"], "numpy": ["1.22"]})
-    stage0_render = RenderConfig()
+    for _i, _rendered_variant in enumerate(rendered_variants, 1):
+        _variant_values = _rendered_variant.variant()
+        _stage1_recipe = _rendered_variant.recipe()
 
-    rendered_variants = render_recipe(stage0_recipe, stage0_variant, stage0_render)
-
-    # Get the first (and only) variant
-    rendered = rendered_variants[0]
-    stage1_recipe = rendered.recipe()
+        print(f"\n📦 STAGE 1 - Variant {_i} (Rendered, templates evaluated)")
+        print("-" * 60)
+        print(f"  Variant config: {json.dumps(_variant_values, indent=4)}")
+        print(f"  Package name: {_stage1_recipe.package.name}")
+        print(f"  Package version: {_stage1_recipe.package.version}")
+        print(f"  Python: {_variant_values.get('python')}")
+        print(f"  Numpy: {_variant_values.get('numpy')}")
+        print(f"  Host requirements: {_stage1_recipe.requirements.host}")
+        print(f"  Run requirements: {_stage1_recipe.requirements.run}")
+        print(f"  Build string: {_stage1_recipe.build.string}")
 
     print("\n" + "=" * 60)
-    print("📦 STAGE 1 (Rendered, templates evaluated)")
-    print("=" * 60)
-    print(f"Package name (evaluated): {stage1_recipe.package.name}")
-    print(f"Package version (evaluated): {stage1_recipe.package.version}")
-    print(f"Host requirements (evaluated): {stage1_recipe.requirements.host}")
-    print(f"Run requirements (evaluated): {stage1_recipe.requirements.run}")
-    print(f"\nUsed variant: {stage1_recipe.used_variant}")
-    print("\nStage1 recipe structure:")
-    print(json.dumps(stage1_recipe.to_dict(), indent=2))
-    return
+    print("✅ Recipe rendering complete!")
+    return (rendered_variants,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Example 6: Rendering Multiple Variants
+    ## Example 6: Building the Package
 
-    Now let's put it all together and render a recipe with multiple variants to see how different configurations are generated:
+    Finally, let's actually build the package! We'll take the rendered variants and build them into conda packages:
     """)
     return
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
-    # Recipe with variant placeholders
-    multi_variant_yaml = """
-    context:
-      name: multi-variant-pkg
-      version: "3.0.0"
+def _(Path, rendered_variants, simple_recipe_yaml, tempfile):
+    import shutil
 
-    package:
-      name: ${{ name }}
-      version: ${{ version }}
+    # Create persistent temp directories (clean up from previous runs)
+    _recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_recipe"
+    _output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_output"
 
-    build:
-      number: 0
+    # Clean up from previous runs
+    if _recipe_tmpdir.exists():
+        shutil.rmtree(_recipe_tmpdir)
+    if _output_tmpdir.exists():
+        shutil.rmtree(_output_tmpdir)
 
-    requirements:
-      host:
-        - python ${{ python }}.*
-        - numpy ${{ numpy }}.*
-      run:
-        - python
-        - numpy >=${{ numpy }}
-    """
+    # Create the directories
+    _recipe_tmpdir.mkdir(parents=True, exist_ok=True)
+    _output_tmpdir.mkdir(parents=True, exist_ok=True)
 
-    mv_recipe = Recipe.from_yaml(multi_variant_yaml)
+    # Write recipe file
+    _recipe_path = _recipe_tmpdir / "recipe.yaml"
+    _recipe_path.write_text(simple_recipe_yaml)
 
-    # Create variant config with multiple python and numpy versions
-    mv_variants = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.22"]})
-
-    mv_render_config = RenderConfig(target_platform="linux-64")
-
-    # Render all variants
-    all_rendered = render_recipe(mv_recipe, mv_variants, mv_render_config)
-
-    print(f"🎯 Rendered {len(all_rendered)} variant(s)")
+    # Build each variant
+    print("🔨 Building packages...")
     print("=" * 60)
+    print(f"Recipe directory: {_recipe_tmpdir}")
+    print(f"Output directory: {_output_tmpdir}")
 
-    for i, rendered_variant in enumerate(all_rendered, 1):
-        variant_values = rendered_variant.variant()
-        stage1 = rendered_variant.recipe()
+    for _i, _variant in enumerate(rendered_variants, 1):
+        print(f"\n📦 Building variant {_i}/{len(rendered_variants)}")
+        _stage1_recipe = _variant.recipe()
+        _package = _stage1_recipe.package
+        _build = _stage1_recipe.build
 
-        print(f"\nVariant {i}:")
-        print(f"  Variant config: {json.dumps(variant_values, indent=4)}")
-        print(f"  Package name: {stage1.package.name}")
-        print(f"  Package version: {stage1.package.version}")
-        print(f"  Python: {variant_values.get('python')}")
-        print(f"  Numpy: {variant_values.get('numpy')}")
-        print(f"  Host requirements: {stage1.requirements.host}")
-        print(f"  Run requirements: {stage1.requirements.run}")
+        print(f"  Package: {_package.name}")
+        print(f"  Version: {_package.version}")
+        print(f"  Build string: {_build.string}")
+
+        _variant.run_build(
+            progress_callback=None,
+            keep_build=False,
+            output_dir=_output_tmpdir,
+            recipe_path=_recipe_path,
+        )
+        print("  ✅ Build complete!")
 
     print("\n" + "=" * 60)
-    print("✅ Recipe rendering complete!")
+    print("🎉 All builds completed successfully!")
+    print(f"\n📦 Built packages are available in: {_output_tmpdir}")
     return
 
 
@@ -388,6 +342,7 @@ def _(mo):
     - **RenderConfig**: Configure target platforms and add custom context variables
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes
     - **Rendering**: Use `render_recipe()` to transform Stage0 → Stage1 with variants
+    - **Building**: Use `variant.run_build()` to build conda packages
 
     Next, explore the other notebooks to learn about:
     - Advanced Jinja templating and conditional variants
