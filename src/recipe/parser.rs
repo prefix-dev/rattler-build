@@ -585,11 +585,13 @@ mod tests {
     }
 
     #[test]
-    fn test_noarch_null_value() {
+    fn test_noarch_conditional() {
         // Test that null/empty values for noarch are accepted and use the default (no noarch)
-        let raw_recipe = r#"
+        for (use_noarch, expected_is_python) in [(false, false), (true, true)] {
+            let raw_recipe = format!(
+                r#"
         context:
-          use_noarch: false
+          use_noarch: {use_noarch}
 
         package:
           name: test-conditional-noarch
@@ -597,44 +599,22 @@ mod tests {
 
         build:
           number: 0
-          noarch: ${{ "python" if use_noarch }}
+          noarch: ${{{{ "python" if use_noarch }}}}
 
         requirements:
           host:
             - python
           run:
             - python
-        "#;
+        "#
+            );
 
-        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default()).unwrap();
-        // noarch should be the default (None) when use_noarch is false
-        assert!(recipe.build.noarch().is_none());
-    }
-
-    #[test]
-    fn test_noarch_conditional_true() {
-        // Test that conditional noarch works when the condition is true
-        let raw_recipe = r#"
-        context:
-          use_noarch: true
-
-        package:
-          name: test-conditional-noarch
-          version: 1.0.0
-
-        build:
-          number: 0
-          noarch: ${{ "python" if use_noarch }}
-
-        requirements:
-          host:
-            - python
-          run:
-            - python
-        "#;
-
-        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default()).unwrap();
-        // noarch should be python when use_noarch is true
-        assert!(recipe.build.noarch().is_python());
+            let recipe = Recipe::from_yaml(raw_recipe.as_str(), SelectorConfig::default()).unwrap();
+            if expected_is_python {
+                assert!(recipe.build.noarch().is_python());
+            } else {
+                assert!(recipe.build.noarch().is_none());
+            }
+        }
     }
 }
