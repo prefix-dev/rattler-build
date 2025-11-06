@@ -607,6 +607,11 @@ impl TryConvertNode<RunExports> for RenderedScalarNode {
 
 impl TryConvertNode<NoArchType> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<NoArchType, Vec<PartialParsingError>> {
+        // Handle null values by returning the default (None)
+        if self.is_null() {
+            return Ok(NoArchType::default());
+        }
+
         self.as_scalar()
             .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar,)])?
             .try_convert(name)

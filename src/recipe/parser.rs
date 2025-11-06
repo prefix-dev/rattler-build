@@ -629,4 +629,38 @@ mod tests {
         let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
+    
+    #[test]
+    fn test_noarch_conditional() {
+        // Test that null/empty values for noarch are accepted and use the default (no noarch)
+        for (use_noarch, expected_is_python) in [(false, false), (true, true)] {
+            let raw_recipe = format!(
+                r#"
+        context:
+          use_noarch: {use_noarch}
+
+        package:
+          name: test-conditional-noarch
+          version: 1.0.0
+
+        build:
+          number: 0
+          noarch: ${{{{ "python" if use_noarch }}}}
+
+        requirements:
+          host:
+            - python
+          run:
+            - python
+        "#
+            );
+
+            let recipe = Recipe::from_yaml(raw_recipe.as_str(), SelectorConfig::default()).unwrap();
+            if expected_is_python {
+                assert!(recipe.build.noarch().is_python());
+            } else {
+                assert!(recipe.build.noarch().is_none());
+            }
+        }
+    }
 }
