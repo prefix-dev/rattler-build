@@ -3,7 +3,6 @@ from pathlib import Path
 
 from .rattler_build import (
     build_recipes_py,
-    get_rattler_build_version_py,
     test_package_py,
     upload_package_to_anaconda_py,
     upload_package_to_artifactory_py,
@@ -13,7 +12,6 @@ from .rattler_build import (
 )
 
 __all__ = [
-    "rattler_build_version",
     "build_recipes",
     "test_package",
     "upload_package_to_quetz",
@@ -22,11 +20,6 @@ __all__ = [
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
 ]
-
-
-def rattler_build_version() -> str:
-    """Get the version of the rattler-build package"""
-    return get_rattler_build_version_py()
 
 
 def build_recipes(

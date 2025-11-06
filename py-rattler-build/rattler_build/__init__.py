@@ -1,7 +1,6 @@
 from . import build_types, platform_types, progress, recipe_generation, render, stage0, stage1, tool_config
 from .cli_api import (
     build_recipes,
-    rattler_build_version,
     test_package,
     upload_package_to_anaconda,
     upload_package_to_artifactory,
@@ -9,6 +8,7 @@ from .cli_api import (
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
 )
+from .rattler_build import get_rattler_build_version_py
 from .build_types import Directories, PackagingSettings
 from .jinja_config import JinjaConfig
 from .platform_types import Platform, PlatformWithVirtualPackages
@@ -26,6 +26,12 @@ from .recipe import (
 from .render import RenderConfig
 from .tool_config import ToolConfiguration
 from .variant_config import VariantConfig
+
+
+def rattler_build_version() -> str:
+    """Get the version of the rattler-build package"""
+    return get_rattler_build_version_py()
+
 
 __all__ = [
     "rattler_build_version",
