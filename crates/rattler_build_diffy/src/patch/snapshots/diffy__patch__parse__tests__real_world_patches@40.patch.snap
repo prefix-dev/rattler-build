@@ -1,0 +1,1647 @@
+---
+source: src/patch/parse.rs
+expression: patches
+input_file: src/patch/test-data/40.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/__init__.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 1,
+                    },
+                    function_context: None,
+                    lines: [
+                        Insert(
+                            "# Scripts module for cvmfs utilities",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/big_catalogs.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 40,
+                    },
+                    function_context: None,
+                    lines: [
+                        Insert(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "import sys\n",
+                        ),
+                        Insert(
+                            "import cvmfs\n",
+                        ),
+                        Insert(
+                            "import os\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "def usage():\n",
+                        ),
+                        Insert(
+                            "    print(\"Usage: big_catalogs <local repo name | remote repo url> [BIGNUM [BIGMB]]\")\n",
+                        ),
+                        Insert(
+                            "    print(\"  Lists all catalogs of the provided CVMFS repository with more than BIGNUM\")\n",
+                        ),
+                        Insert(
+                            "    print(\"  files in them, default 100000, or more than BIGMB megabytes, default 50.\")\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "def main():\n",
+                        ),
+                        Insert(
+                            "    if len(sys.argv) < 2 or len(sys.argv) > 4:\n",
+                        ),
+                        Insert(
+                            "        usage()\n",
+                        ),
+                        Insert(
+                            "        sys.exit(1)\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "    repo_identifier = sys.argv[1]\n",
+                        ),
+                        Insert(
+                            "    bignum = 100000\n",
+                        ),
+                        Insert(
+                            "    bigmb = 50\n",
+                        ),
+                        Insert(
+                            "    if len(sys.argv) > 2:\n",
+                        ),
+                        Insert(
+                            "        bignum = int(sys.argv[2])\n",
+                        ),
+                        Insert(
+                            "    if len(sys.argv) > 3:\n",
+                        ),
+                        Insert(
+                            "        bigmb = int(sys.argv[3])\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "    repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Insert(
+                            "    revision = repo.get_current_revision()\n",
+                        ),
+                        Insert(
+                            "    for clg in revision.catalogs():\n",
+                        ),
+                        Insert(
+                            "        res = clg.run_sql('SELECT count(*) FROM catalog;')\n",
+                        ),
+                        Insert(
+                            "        num_entries = res[0][0]\n",
+                        ),
+                        Insert(
+                            "        uncomp_mb = clg.db_size() / (1024*1024)\n",
+                        ),
+                        Insert(
+                            "        if (num_entries > bignum) or (uncomp_mb >= bigmb):\n",
+                        ),
+                        Insert(
+                            "            print(clg.root_prefix, num_entries, 'files',  uncomp_mb, 'MB')\n",
+                        ),
+                        Insert(
+                            "        del res\n",
+                        ),
+                        Insert(
+                            "        del clg\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Insert(
+                            "    main()",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/catdirusage.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 44,
+                    },
+                    function_context: None,
+                    lines: [
+                        Insert(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "import sys\n",
+                        ),
+                        Insert(
+                            "import cvmfs\n",
+                        ),
+                        Insert(
+                            "import os\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "def usage():\n",
+                        ),
+                        Insert(
+                            "    print(\"Usage: catdirusage <local repo name | remote repo url> topdir\")\n",
+                        ),
+                        Insert(
+                            "    print(\"  Prints the number of files in the current catalog for each sub-directory\")\n",
+                        ),
+                        Insert(
+                            "    print(\"  under topdir, sorted smallest to largest.\")\n",
+                        ),
+                        Insert(
+                            "    sys.exit(1)\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "def main():\n",
+                        ),
+                        Insert(
+                            "    if len(sys.argv) != 3:\n",
+                        ),
+                        Insert(
+                            "        usage()\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "    repo_identifier = sys.argv[1]\n",
+                        ),
+                        Insert(
+                            "    toppath = sys.argv[2]\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "    repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Insert(
+                            "    revision = repo.get_current_revision()\n",
+                        ),
+                        Insert(
+                            "    clg = revision.retrieve_catalog_for_path(toppath)\n",
+                        ),
+                        Insert(
+                            "    counts = {}\n",
+                        ),
+                        Insert(
+                            "    pathlen = len(toppath)\n",
+                        ),
+                        Insert(
+                            "    for dirent in clg:\n",
+                        ),
+                        Insert(
+                            "        file = dirent[0]\n",
+                        ),
+                        Insert(
+                            "        if len(file) <= pathlen:\n",
+                        ),
+                        Insert(
+                            "            continue\n",
+                        ),
+                        Insert(
+                            "        if file[0:pathlen] != toppath:\n",
+                        ),
+                        Insert(
+                            "            continue\n",
+                        ),
+                        Insert(
+                            "        slash = file.find('/', pathlen+1)\n",
+                        ),
+                        Insert(
+                            "        if slash == -1:\n",
+                        ),
+                        Insert(
+                            "            counts[file] = 0\n",
+                        ),
+                        Insert(
+                            "        else:\n",
+                        ),
+                        Insert(
+                            "            counts[file[0:slash]] += 1\n",
+                        ),
+                        Insert(
+                            "    for dir in sorted(counts, key=counts.get):\n",
+                        ),
+                        Insert(
+                            "        if counts[dir] > 0:\n",
+                        ),
+                        Insert(
+                            "            print(str(counts[dir]) + '\\t' + dir)\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Insert(
+                            "    main()",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/utils/cvmfs_search",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/cvmfs_search.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 122,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 122,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "def search_cvmfs_repo(url, enable_index=True):\n",
+                    ),
+                    lines: [
+                        Context(
+                            "    return ret\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Insert(
+                            "def main():\n",
+                        ),
+                        Context(
+                            "    parser = argparse.ArgumentParser(\n",
+                        ),
+                        Context(
+                            "        description=\"Search CVMFS repositories for all files matching a given download URL.\"\n",
+                        ),
+                        Context(
+                            "    )\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 142,
+                        len: 3,
+                    },
+                    new_range: HunkRange {
+                        start: 142,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "def search_cvmfs_repo(url, enable_index=True):\n",
+                    ),
+                    lines: [
+                        Context(
+                            "    names = search_cvmfs_repo(args.url, args.db_index)\n",
+                        ),
+                        Context(
+                            "    for name in names:\n",
+                        ),
+                        Context(
+                            "        print(name)\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Insert(
+                            "    main()",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/pyproject.toml",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 50,
+                    },
+                    function_context: None,
+                    lines: [
+                        Insert(
+                            "[build-system]\n",
+                        ),
+                        Insert(
+                            "requires = [\"setuptools>=80\", \"setuptools-scm>=8\"]\n",
+                        ),
+                        Insert(
+                            "build-backend = \"setuptools.build_meta\"\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[project]\n",
+                        ),
+                        Insert(
+                            "name = \"python-cvmfsutils\"\n",
+                        ),
+                        Insert(
+                            "dynamic = [\"version\"]\n",
+                        ),
+                        Insert(
+                            "description = \"Inspect CernVM-FS repositories\"\n",
+                        ),
+                        Insert(
+                            "readme = \"README\"\n",
+                        ),
+                        Insert(
+                            "license = {text = \"(c) 2015 CERN - BSD License\"}\n",
+                        ),
+                        Insert(
+                            "authors = [\n",
+                        ),
+                        Insert(
+                            "    {name = \"Rene Meusel\", email = \"rene.meusel@cern.ch\"}\n",
+                        ),
+                        Insert(
+                            "]\n",
+                        ),
+                        Insert(
+                            "classifiers = [\n",
+                        ),
+                        Insert(
+                            "    \"Development Status :: 4 - Beta\",\n",
+                        ),
+                        Insert(
+                            "    \"Environment :: Console\",\n",
+                        ),
+                        Insert(
+                            "    \"Intended Audience :: Developers\",\n",
+                        ),
+                        Insert(
+                            "    \"Intended Audience :: System Administrators\",\n",
+                        ),
+                        Insert(
+                            "    \"License :: OSI Approved :: BSD License\",\n",
+                        ),
+                        Insert(
+                            "    \"Natural Language :: English\",\n",
+                        ),
+                        Insert(
+                            "    \"Operating System :: POSIX :: Linux\",\n",
+                        ),
+                        Insert(
+                            "    \"Operating System :: MacOS :: MacOS X\",\n",
+                        ),
+                        Insert(
+                            "    \"Topic :: Software Development\",\n",
+                        ),
+                        Insert(
+                            "    \"Topic :: Software Development :: Libraries :: Python Modules\",\n",
+                        ),
+                        Insert(
+                            "    \"Topic :: System :: Filesystems\",\n",
+                        ),
+                        Insert(
+                            "    \"Topic :: System :: Networking :: Monitoring\",\n",
+                        ),
+                        Insert(
+                            "    \"Topic :: System :: Systems Administration\"\n",
+                        ),
+                        Insert(
+                            "]\n",
+                        ),
+                        Insert(
+                            "dependencies = [\n",
+                        ),
+                        Insert(
+                            "    \"python-dateutil >= 1.4.1\",\n",
+                        ),
+                        Insert(
+                            "    \"requests >= 1.1.0\",\n",
+                        ),
+                        Insert(
+                            "    \"M2Crypto >= 0.20.0\"\n",
+                        ),
+                        Insert(
+                            "]\n",
+                        ),
+                        Insert(
+                            "requires-python = \">=3.6\"\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[project.urls]\n",
+                        ),
+                        Insert(
+                            "Homepage = \"http://cernvm.cern.ch\"\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[project.optional-dependencies]\n",
+                        ),
+                        Insert(
+                            "test = [\"xmlrunner\"]\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[project.scripts]\n",
+                        ),
+                        Insert(
+                            "big_catalogs = \"cvmfs.scripts.big_catalogs:main\"\n",
+                        ),
+                        Insert(
+                            "catdirusage = \"cvmfs.scripts.catdirusage:main\"\n",
+                        ),
+                        Insert(
+                            "cvmfs_search = \"cvmfs.scripts.cvmfs_search:main\"\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[tool.setuptools.packages.find]\n",
+                        ),
+                        Insert(
+                            "exclude = [\"*.test*\"]\n",
+                        ),
+                        Insert(
+                            "\n",
+                        ),
+                        Insert(
+                            "[tool.setuptools_scm]\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/setup.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 44,
+                    },
+                    new_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    function_context: None,
+                    lines: [
+                        Delete(
+                            "# -*- coding: utf-8 -*-\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "from setuptools import setup, find_packages\n",
+                        ),
+                        Delete(
+                            "from os         import path\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "readme_path = path.join(path.dirname(__file__), 'README')\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "setup(\n",
+                        ),
+                        Delete(
+                            "  name='python-cvmfsutils',\n",
+                        ),
+                        Delete(
+                            "  version='0.5.0',\n",
+                        ),
+                        Delete(
+                            "  url='http://cernvm.cern.ch',\n",
+                        ),
+                        Delete(
+                            "  author='Rene Meusel',\n",
+                        ),
+                        Delete(
+                            "  author_email='rene.meusel@cern.ch',\n",
+                        ),
+                        Delete(
+                            "  license='(c) 2015 CERN - BSD License',\n",
+                        ),
+                        Delete(
+                            "  description='Inspect CernVM-FS repositories',\n",
+                        ),
+                        Delete(
+                            "  # read the first paragraph\n",
+                        ),
+                        Delete(
+                            "  long_description=open(readme_path).read().split(\"\\n\\n\")[0],\n",
+                        ),
+                        Delete(
+                            "  classifiers= [\n",
+                        ),
+                        Delete(
+                            "    'Development Status :: 4 - Beta',\n",
+                        ),
+                        Delete(
+                            "    'Environment :: Console',\n",
+                        ),
+                        Delete(
+                            "    'Intended Audience :: Developers',\n",
+                        ),
+                        Delete(
+                            "    'Intended Audience :: System Administrators',\n",
+                        ),
+                        Delete(
+                            "    'License :: OSI Approved :: BSD License',\n",
+                        ),
+                        Delete(
+                            "    'Natural Language :: English',\n",
+                        ),
+                        Delete(
+                            "    'Operating System :: POSIX :: Linux',\n",
+                        ),
+                        Delete(
+                            "    'Operating System :: MacOS :: MacOS X',\n",
+                        ),
+                        Delete(
+                            "    'Topic :: Software Development',\n",
+                        ),
+                        Delete(
+                            "    'Topic :: Software Development :: Libraries :: Python Modules',\n",
+                        ),
+                        Delete(
+                            "    'Topic :: System :: Filesystems',\n",
+                        ),
+                        Delete(
+                            "    'Topic :: System :: Networking :: Monitoring',\n",
+                        ),
+                        Delete(
+                            "    'Topic :: System :: Systems Administration'\n",
+                        ),
+                        Delete(
+                            "  ],\n",
+                        ),
+                        Delete(
+                            "  packages=find_packages(),\n",
+                        ),
+                        Delete(
+                            "  scripts=['utils/big_catalogs', 'utils/catdirusage', 'utils/cvmfs_search'],\n",
+                        ),
+                        Delete(
+                            "  zip_safe=False,\n",
+                        ),
+                        Delete(
+                            "  test_suite='cvmfs.test',\n",
+                        ),
+                        Delete(
+                            "  tests_require='xmlrunner',\n",
+                        ),
+                        Delete(
+                            "  install_requires=[ # for pip; don't forget the similar RPM dependencies!\n",
+                        ),
+                        Delete(
+                            "    'python-dateutil >= 1.4.1',\n",
+                        ),
+                        Delete(
+                            "    'requests >= 1.1.0',\n",
+                        ),
+                        Delete(
+                            "    'M2Crypto >= 0.20.0'\n",
+                        ),
+                        Delete(
+                            "  ]\n",
+                        ),
+                        Delete(
+                            ")\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/utils/big_catalogs",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 33,
+                    },
+                    new_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    function_context: None,
+                    lines: [
+                        Delete(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "import sys\n",
+                        ),
+                        Delete(
+                            "import cvmfs\n",
+                        ),
+                        Delete(
+                            "import os\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "def usage():\n",
+                        ),
+                        Delete(
+                            "    print(\"Usage: big_catalogs <local repo name | remote repo url> [BIGNUM [BIGMB]]\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  Lists all catalogs of the provided CVMFS repository with more than BIGNUM\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  files in them, default 100000, or more than BIGMB megabytes, default 50.\")\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "if len(sys.argv) < 2 or len(sys.argv) > 4:\n",
+                        ),
+                        Delete(
+                            "    usage();\n",
+                        ),
+                        Delete(
+                            "    sys.exit(1)\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "repo_identifier = sys.argv[1]\n",
+                        ),
+                        Delete(
+                            "bignum = 100000\n",
+                        ),
+                        Delete(
+                            "bigmb = 50\n",
+                        ),
+                        Delete(
+                            "if len(sys.argv) > 2:\n",
+                        ),
+                        Delete(
+                            "  bignum=int(sys.argv[2])\n",
+                        ),
+                        Delete(
+                            "if len(sys.argv) > 3:\n",
+                        ),
+                        Delete(
+                            "  bigmb=int(sys.argv[3])\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Delete(
+                            "revision = repo.get_current_revision()\n",
+                        ),
+                        Delete(
+                            "for clg in revision.catalogs():\n",
+                        ),
+                        Delete(
+                            "    res = clg.run_sql('SELECT count(*) FROM catalog;')\n",
+                        ),
+                        Delete(
+                            "    num_entries = res[0][0]\n",
+                        ),
+                        Delete(
+                            "    uncomp_mb = clg.db_size() / (1024*1024)\n",
+                        ),
+                        Delete(
+                            "    if (num_entries > bignum) or (uncomp_mb >= bigmb):\n",
+                        ),
+                        Delete(
+                            "        print(clg.root_prefix, num_entries, 'files',  uncomp_mb, 'MB')\n",
+                        ),
+                        Delete(
+                            "    del res\n",
+                        ),
+                        Delete(
+                            "    del clg\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/utils/catdirusage",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "/dev/null",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 37,
+                    },
+                    new_range: HunkRange {
+                        start: 0,
+                        len: 0,
+                    },
+                    function_context: None,
+                    lines: [
+                        Delete(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "import sys\n",
+                        ),
+                        Delete(
+                            "import cvmfs\n",
+                        ),
+                        Delete(
+                            "import os\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "def usage():\n",
+                        ),
+                        Delete(
+                            "    print(\"Usage: catdirusage <local repo name | remote repo url> topdir\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  Prints the number of files in the current catalog for each sub-directory\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  under topdir, sorted smallest to largest.\")\n",
+                        ),
+                        Delete(
+                            "    sys.exit(1)\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "if len(sys.argv) != 3:\n",
+                        ),
+                        Delete(
+                            "    usage();\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "repo_identifier = sys.argv[1]\n",
+                        ),
+                        Delete(
+                            "toppath = sys.argv[2]\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Delete(
+                            "revision = repo.get_current_revision()\n",
+                        ),
+                        Delete(
+                            "clg = revision.retrieve_catalog_for_path(toppath)\n",
+                        ),
+                        Delete(
+                            "counts = {}\n",
+                        ),
+                        Delete(
+                            "pathlen = len(toppath)\n",
+                        ),
+                        Delete(
+                            "for dirent in clg:\n",
+                        ),
+                        Delete(
+                            "    file = dirent[0]\n",
+                        ),
+                        Delete(
+                            "    if len(file) <= pathlen:\n",
+                        ),
+                        Delete(
+                            "        continue\n",
+                        ),
+                        Delete(
+                            "    if file[0:pathlen] != toppath:\n",
+                        ),
+                        Delete(
+                            "        continue\n",
+                        ),
+                        Delete(
+                            "    slash = file.find('/', pathlen+1)\n",
+                        ),
+                        Delete(
+                            "    if slash == -1:\n",
+                        ),
+                        Delete(
+                            "        counts[file] = 0\n",
+                        ),
+                        Delete(
+                            "    else:\n",
+                        ),
+                        Delete(
+                            "        counts[file[0:slash]] += 1\n",
+                        ),
+                        Delete(
+                            "for dir in sorted(counts, key=counts.get):\n",
+                        ),
+                        Delete(
+                            "    if counts[dir] > 0:\n",
+                        ),
+                        Delete(
+                            "        print(str(counts[dir]) + '\\t' + dir)\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/__init__.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/__init__.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 36,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 36,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "def __init__(self, input_string):\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "def __extract_version_string(input_str):\n",
+                        ),
+                        Delete(
+                            "    match = re.search('.*([0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*).*', input_str)\n",
+                        ),
+                        Insert(
+                            "    match = re.search(r'.*([0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*).*', input_str)\n",
+                        ),
+                        Context(
+                            "    if not match or len(match.groups()) != 1:\n",
+                        ),
+                        Context(
+                            "        raise VersionNotDetected(input_str)\n",
+                        ),
+                        Context(
+                            "    return match.groups()[0]\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/big_catalogs.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/big_catalogs.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 28,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 38,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "import sys\n",
+                        ),
+                        Insert(
+                            "import argparse\n",
+                        ),
+                        Context(
+                            "import cvmfs\n",
+                        ),
+                        Context(
+                            "import os\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "def usage():\n",
+                        ),
+                        Delete(
+                            "    print(\"Usage: big_catalogs <local repo name | remote repo url> [BIGNUM [BIGMB]]\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  Lists all catalogs of the provided CVMFS repository with more than BIGNUM\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  files in them, default 100000, or more than BIGMB megabytes, default 50.\")\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Context(
+                            "def main():\n",
+                        ),
+                        Delete(
+                            "    if len(sys.argv) < 2 or len(sys.argv) > 4:\n",
+                        ),
+                        Delete(
+                            "        usage()\n",
+                        ),
+                        Delete(
+                            "        sys.exit(1)\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "    repo_identifier = sys.argv[1]\n",
+                        ),
+                        Delete(
+                            "    bignum = 100000\n",
+                        ),
+                        Delete(
+                            "    bigmb = 50\n",
+                        ),
+                        Delete(
+                            "    if len(sys.argv) > 2:\n",
+                        ),
+                        Delete(
+                            "        bignum = int(sys.argv[2])\n",
+                        ),
+                        Delete(
+                            "    if len(sys.argv) > 3:\n",
+                        ),
+                        Delete(
+                            "        bigmb = int(sys.argv[3])\n",
+                        ),
+                        Insert(
+                            "    parser = argparse.ArgumentParser(\n",
+                        ),
+                        Insert(
+                            "        description=\"Lists all catalogs of the provided CVMFS repository with more than BIGNUM files in them or more than BIGMB megabytes.\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\n",
+                        ),
+                        Insert(
+                            "        \"repo_identifier\",\n",
+                        ),
+                        Insert(
+                            "        help=\"Local repo name or remote repo url\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\n",
+                        ),
+                        Insert(
+                            "        \"bignum\",\n",
+                        ),
+                        Insert(
+                            "        type=int,\n",
+                        ),
+                        Insert(
+                            "        nargs=\"?\",\n",
+                        ),
+                        Insert(
+                            "        default=100000,\n",
+                        ),
+                        Insert(
+                            "        help=\"Minimum number of files in catalog (default: 100000)\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\n",
+                        ),
+                        Insert(
+                            "        \"bigmb\",\n",
+                        ),
+                        Insert(
+                            "        type=int,\n",
+                        ),
+                        Insert(
+                            "        nargs=\"?\",\n",
+                        ),
+                        Insert(
+                            "        default=50,\n",
+                        ),
+                        Insert(
+                            "        help=\"Minimum size in MB (default: 50)\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    \n",
+                        ),
+                        Insert(
+                            "    args = parser.parse_args()\n",
+                        ),
+                        Insert(
+                            "    \n",
+                        ),
+                        Insert(
+                            "    repo_identifier = args.repo_identifier\n",
+                        ),
+                        Insert(
+                            "    bignum = args.bignum\n",
+                        ),
+                        Insert(
+                            "    bigmb = args.bigmb\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Context(
+                            "    revision = repo.get_current_revision()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/catdirusage.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/catdirusage.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 23,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 27,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "#!/usr/bin/env python3\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "import sys\n",
+                        ),
+                        Insert(
+                            "import argparse\n",
+                        ),
+                        Context(
+                            "import cvmfs\n",
+                        ),
+                        Context(
+                            "import os\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Delete(
+                            "def usage():\n",
+                        ),
+                        Delete(
+                            "    print(\"Usage: catdirusage <local repo name | remote repo url> topdir\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  Prints the number of files in the current catalog for each sub-directory\")\n",
+                        ),
+                        Delete(
+                            "    print(\"  under topdir, sorted smallest to largest.\")\n",
+                        ),
+                        Delete(
+                            "    sys.exit(1)\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Context(
+                            "def main():\n",
+                        ),
+                        Delete(
+                            "    if len(sys.argv) != 3:\n",
+                        ),
+                        Delete(
+                            "        usage()\n",
+                        ),
+                        Delete(
+                            "\n",
+                        ),
+                        Delete(
+                            "    repo_identifier = sys.argv[1]\n",
+                        ),
+                        Delete(
+                            "    toppath = sys.argv[2]\n",
+                        ),
+                        Insert(
+                            "    parser = argparse.ArgumentParser(\n",
+                        ),
+                        Insert(
+                            "        description=\"Prints the number of files in the current catalog for each sub-directory under topdir, sorted smallest to largest.\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\n",
+                        ),
+                        Insert(
+                            "        \"repo_identifier\",\n",
+                        ),
+                        Insert(
+                            "        help=\"Local repo name or remote repo url\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\n",
+                        ),
+                        Insert(
+                            "        \"topdir\",\n",
+                        ),
+                        Insert(
+                            "        help=\"Top directory to analyze\"\n",
+                        ),
+                        Insert(
+                            "    )\n",
+                        ),
+                        Insert(
+                            "    \n",
+                        ),
+                        Insert(
+                            "    args = parser.parse_args()\n",
+                        ),
+                        Insert(
+                            "    \n",
+                        ),
+                        Insert(
+                            "    repo_identifier = args.repo_identifier\n",
+                        ),
+                        Insert(
+                            "    toppath = args.topdir\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    repo = cvmfs.open_repository(repo_identifier)\n",
+                        ),
+                        Context(
+                            "    revision = repo.get_current_revision()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/cvmfs_search.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/cvmfs_search.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 126,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 126,
+                        len: 7,
+                    },
+                    function_context: Some(
+                        "def main():\n",
+                    ),
+                    lines: [
+                        Context(
+                            "    parser = argparse.ArgumentParser(\n",
+                        ),
+                        Context(
+                            "        description=\"Search CVMFS repositories for all files matching a given download URL.\"\n",
+                        ),
+                        Context(
+                            "    )\n",
+                        ),
+                        Delete(
+                            "    parser.add_argument(\"url\", type=str, help=\"A CVMFS URL to print the paths for.\")\n",
+                        ),
+                        Insert(
+                            "    parser.add_argument(\"url\", help=\"A CVMFS URL to print the paths for.\")\n",
+                        ),
+                        Context(
+                            "    parser.add_argument(\n",
+                        ),
+                        Context(
+                            "        \"--no-db-index\",\n",
+                        ),
+                        Context(
+                            "        dest=\"db_index\",\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/__init__.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/__init__.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 1,
+                        len: 1,
+                    },
+                    new_range: HunkRange {
+                        start: 1,
+                        len: 1,
+                    },
+                    function_context: None,
+                    lines: [
+                        Delete(
+                            "# Scripts module for cvmfs utilities",
+                        ),
+                        Insert(
+                            "# Scripts module for cvmfs utilities\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/big_catalogs.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/big_catalogs.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 47,
+                        len: 4,
+                    },
+                    new_range: HunkRange {
+                        start: 47,
+                        len: 4,
+                    },
+                    function_context: Some(
+                        "def main():\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Delete(
+                            "    main()",
+                        ),
+                        Insert(
+                            "    main()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/catdirusage.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/catdirusage.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 45,
+                        len: 4,
+                    },
+                    new_range: HunkRange {
+                        start: 45,
+                        len: 4,
+                    },
+                    function_context: Some(
+                        "def main():\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Delete(
+                            "    main()",
+                        ),
+                        Insert(
+                            "    main()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Patch {
+            original: Some(
+                Filename(
+                    "a/cvmfs/scripts/cvmfs_search.py",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "b/cvmfs/scripts/cvmfs_search.py",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 145,
+                        len: 4,
+                    },
+                    new_range: HunkRange {
+                        start: 145,
+                        len: 4,
+                    },
+                    function_context: Some(
+                        "def main():\n",
+                    ),
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "if __name__ == \"__main__\":\n",
+                        ),
+                        Delete(
+                            "    main()",
+                        ),
+                        Insert(
+                            "    main()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

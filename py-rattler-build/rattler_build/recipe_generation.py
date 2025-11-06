@@ -4,7 +4,6 @@ This module provides a clean Python API for generating conda recipes
 from PyPI, CRAN, CPAN, and LuaRocks packages.
 """
 
-from typing import Optional
 from .rattler_build import (
     generate_pypi_recipe_string_py,
     generate_r_recipe_string_py,
@@ -20,7 +19,7 @@ __all__ = [
 ]
 
 
-def pypi(package: str, version: Optional[str] = None, use_mapping: bool = True) -> str:
+def pypi(package: str, version: str | None = None, use_mapping: bool = True) -> str:
     """Generate a conda recipe from a PyPI package.
 
     Args:
@@ -50,7 +49,7 @@ def pypi(package: str, version: Optional[str] = None, use_mapping: bool = True) 
     return generate_pypi_recipe_string_py(package, version, use_mapping)
 
 
-def cran(package: str, universe: Optional[str] = None) -> str:
+def cran(package: str, universe: str | None = None) -> str:
     """Generate a conda recipe from a CRAN (R) package.
 
     Args:
@@ -79,7 +78,7 @@ def cran(package: str, universe: Optional[str] = None) -> str:
     return generate_r_recipe_string_py(package, universe)
 
 
-def cpan(package: str, version: Optional[str] = None) -> str:
+def cpan(package: str, version: str | None = None) -> str:
     """Generate a conda recipe from a CPAN (Perl) package.
 
     Args:

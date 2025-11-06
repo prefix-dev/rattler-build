@@ -1,0 +1,18 @@
+diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+index 1c6856a..eb5f647 100644
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -128,10 +128,8 @@ target_include_directories(openjph PUBLIC common)
+ target_compile_definitions(openjph PUBLIC _FILE_OFFSET_BITS=64)
+ 
+ if (MSVC)
+-  set(OJPH_LIB_NAME_STRING "openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}")
+-  set_target_properties(openjph
+-    PROPERTIES
+-      OUTPUT_NAME "openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}")
++  set(OJPH_LIB_NAME_STRING "openjph")
++  set_target_properties(openjph PROPERTIES OUTPUT_NAME "openjph")
+ else()
+   set(OJPH_LIB_NAME_STRING "openjph.${OPENJPH_VERSION_MAJOR}.${OPENJPH_VERSION_MINOR}")
+   set_target_properties(openjph
+

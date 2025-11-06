@@ -2,8 +2,9 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-from .rattler_build import parse_recipe_py, PySelectorConfig
+from typing import Any
+
+from . import stage0
 
 
 class TestTypeEnum(Enum):
@@ -22,9 +23,9 @@ class TestTypeEnum(Enum):
 class Build:
     """Build configuration for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
@@ -33,12 +34,12 @@ class Build:
         return self._data.get("number", 0)
 
     @property
-    def string(self) -> Optional[str]:
+    def string(self) -> str | None:
         """Get the build string."""
         return self._data.get("string")
 
     @property
-    def noarch(self) -> Optional[str]:
+    def noarch(self) -> str | None:
         """Get the noarch type if any."""
         noarch_data = self._data.get("noarch")
         if noarch_data is None:
@@ -50,7 +51,7 @@ class Build:
         return "generic"
 
     @property
-    def noarch_type(self) -> Optional[str]:
+    def noarch_type(self) -> str | None:
         """Get the noarch type if any (alias for noarch property)."""
         return self.noarch
 
@@ -60,7 +61,7 @@ class Build:
         return self.noarch is not None
 
     @property
-    def script(self) -> Optional[str]:
+    def script(self) -> str | None:
         """Get the build script if defined."""
         return self._data.get("script")
 
@@ -76,9 +77,9 @@ class Build:
 class Package:
     """Package information for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
@@ -101,33 +102,33 @@ class Package:
 class Requirements:
     """Requirements for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
-    def build(self) -> List[str]:
+    def build(self) -> list[str]:
         """Get build requirements."""
         return self._data.get("build", [])
 
     @property
-    def host(self) -> List[str]:
+    def host(self) -> list[str]:
         """Get host requirements."""
         return self._data.get("host", [])
 
     @property
-    def run(self) -> List[str]:
+    def run(self) -> list[str]:
         """Get run requirements."""
         return self._data.get("run", [])
 
     @property
-    def run_constrained(self) -> List[str]:
+    def run_constrained(self) -> list[str]:
         """Get run constraints."""
         return self._data.get("run_constrained", [])
 
     @property
-    def run_exports(self) -> Optional[List[str]]:
+    def run_exports(self) -> list[str] | None:
         """Get run exports."""
         exports = self._data.get("run_exports")
         if exports:
@@ -148,43 +149,43 @@ class Requirements:
 class About:
     """About information for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data or {}
 
     @property
-    def homepage(self) -> Optional[str]:
+    def homepage(self) -> str | None:
         """Get the homepage URL."""
         return self._data.get("homepage")
 
     @property
-    def repository(self) -> Optional[str]:
+    def repository(self) -> str | None:
         """Get the repository URL."""
         return self._data.get("repository")
 
     @property
-    def documentation(self) -> Optional[str]:
+    def documentation(self) -> str | None:
         """Get the documentation URL."""
         return self._data.get("documentation")
 
     @property
-    def license(self) -> Optional[str]:
+    def license(self) -> str | None:
         """Get the license string."""
         return self._data.get("license")
 
     @property
-    def license_file(self) -> Optional[str]:
+    def license_file(self) -> str | None:
         """Get the license file."""
         return self._data.get("license_file")
 
     @property
-    def summary(self) -> Optional[str]:
+    def summary(self) -> str | None:
         """Get the summary."""
         return self._data.get("summary")
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Get the description."""
         return self._data.get("description")
 
@@ -195,13 +196,13 @@ class About:
 class Source:
     """Source information for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
-    def url(self) -> Optional[str]:
+    def url(self) -> str | None:
         """Get source URL if available."""
         url = self._data.get("url")
         if isinstance(url, list) and url:
@@ -220,32 +221,32 @@ class Source:
         return "unknown"
 
     @property
-    def sha256(self) -> Optional[str]:
+    def sha256(self) -> str | None:
         """Get SHA256 hash if available."""
         return self._data.get("sha256")
 
     @property
-    def md5(self) -> Optional[str]:
+    def md5(self) -> str | None:
         """Get MD5 hash if available."""
         return self._data.get("md5")
 
     @property
-    def git_rev(self) -> Optional[str]:
+    def git_rev(self) -> str | None:
         """Get git revision if it's a git source."""
         return self._data.get("rev")
 
     @property
-    def path(self) -> Optional[str]:
+    def path(self) -> str | None:
         """Get path if it's a path source."""
         return self._data.get("path")
 
     @property
-    def filename(self) -> Optional[str]:
+    def filename(self) -> str | None:
         """Get filename for URL source."""
         return self._data.get("file_name")
 
     @property
-    def patches(self) -> List[str]:
+    def patches(self) -> list[str]:
         """Get patches list."""
         return self._data.get("patches", [])
 
@@ -262,9 +263,9 @@ class Source:
 class TestType:
     """Test type for a recipe."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
@@ -287,14 +288,14 @@ class TestType:
         return TestTypeEnum.UNKNOWN
 
     @property
-    def commands(self) -> Optional[List[str]]:
+    def commands(self) -> list[str] | None:
         """Get test commands if this is a commands test."""
         if "Command" in self._data:
             return [f"Command test: {self._data['Command']}"]
         return None
 
     @property
-    def python_imports(self) -> Optional[List[str]]:
+    def python_imports(self) -> list[str] | None:
         """Get Python imports if this is a Python test."""
         if "Python" in self._data:
             python_data = self._data["Python"]
@@ -303,14 +304,14 @@ class TestType:
         return None
 
     @property
-    def files(self) -> Optional[List[str]]:
+    def files(self) -> list[str] | None:
         """Get files list if this is a package contents test."""
         if "PackageContents" in self._data:
             return [f"Package contents test: {self._data['PackageContents']}"]
         return None
 
     @property
-    def downstream_packages(self) -> Optional[List[str]]:
+    def downstream_packages(self) -> list[str] | None:
         """Get downstream packages if this is a downstream test."""
         if "Downstream" in self._data:
             return [self._data["Downstream"]]
@@ -320,116 +321,25 @@ class TestType:
         return f"TestType(type='{self.test_type}')"
 
 
-class SelectorConfig:
-    """Python wrapper for PySelectorConfig to provide a cleaner interface."""
-
-    _config: PySelectorConfig
-
-    def __init__(
-        self,
-        target_platform: Optional[str] = None,
-        host_platform: Optional[str] = None,
-        build_platform: Optional[str] = None,
-        experimental: Optional[bool] = None,
-        allow_undefined: Optional[bool] = None,
-        variant: Optional[Dict[str, Any]] = None,
-    ):
-        self._config = PySelectorConfig(
-            target_platform=target_platform,
-            host_platform=host_platform,
-            build_platform=build_platform,
-            experimental=experimental,
-            allow_undefined=allow_undefined,
-            variant=variant,
-        )
-
-    @property
-    def target_platform(self) -> Optional[str]:
-        """Get the target platform."""
-        return self._config.target_platform
-
-    @target_platform.setter
-    def target_platform(self, value: Optional[str]) -> None:
-        """Set the target platform."""
-        self._config.target_platform = value
-
-    @property
-    def host_platform(self) -> Optional[str]:
-        """Get the host platform."""
-        return self._config.host_platform
-
-    @host_platform.setter
-    def host_platform(self, value: Optional[str]) -> None:
-        """Set the host platform."""
-        self._config.host_platform = value
-
-    @property
-    def build_platform(self) -> Optional[str]:
-        """Get the build platform."""
-        return self._config.build_platform
-
-    @build_platform.setter
-    def build_platform(self, value: Optional[str]) -> None:
-        """Set the build platform."""
-        self._config.build_platform = value
-
-    @property
-    def experimental(self) -> Optional[bool]:
-        """Get whether experimental features are enabled."""
-        return self._config.experimental
-
-    @experimental.setter
-    def experimental(self, value: Optional[bool]) -> None:
-        """Set whether experimental features are enabled."""
-        self._config.experimental = value
-
-    @property
-    def allow_undefined(self) -> Optional[bool]:
-        """Get whether undefined variables are allowed."""
-        return self._config.allow_undefined
-
-    @allow_undefined.setter
-    def allow_undefined(self, value: Optional[bool]) -> None:
-        """Set whether undefined variables are allowed."""
-        self._config.allow_undefined = value
-
-    @property
-    def variant(self) -> Dict[str, Any]:
-        """Get the variant configuration."""
-        return self._config.variant
-
-    @variant.setter
-    def variant(self, value: Dict[str, Any]) -> None:
-        """Set the variant configuration."""
-        self._config.variant = value
-
-    def __repr__(self) -> str:
-        return f"SelectorConfig(target_platform={self.target_platform!r}, variant={self.variant!r})"
-
-    @property
-    def config(self) -> PySelectorConfig:
-        """Get the underlying PySelectorConfig object."""
-        return self._config
-
-
 class Recipe:
     """A parsed conda recipe with object-oriented access to all fields."""
 
-    _data: Dict[str, Any]
+    _data: dict[str, Any]
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @classmethod
     def from_yaml(
         cls,
         yaml_content: str,
-        target_platform: Optional[str] = None,
-        host_platform: Optional[str] = None,
-        build_platform: Optional[str] = None,
-        experimental: Optional[bool] = None,
-        allow_undefined: Optional[bool] = None,
-        variant: Optional[Dict[str, Any]] = None,
+        # TODO: these args are currently unused
+        target_platform: str | None = None,
+        host_platform: str | None = None,
+        build_platform: str | None = None,
+        experimental: bool | None = None,
+        allow_undefined: bool | None = None,
+        variant: dict[str, Any] | None = None,
     ) -> "Recipe":
         """Create a Recipe from a YAML string.
 
@@ -441,28 +351,26 @@ class Recipe:
             experimental: Enable experimental features. Defaults to False.
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
             variant: Variant configuration as a dictionary. Defaults to empty.
+
+        NOTE: This method now uses the stage0 API. For more control, use stage0.Recipe.from_yaml() directly.
         """
-        selector_config = SelectorConfig(
-            target_platform=target_platform,
-            host_platform=host_platform,
-            build_platform=build_platform,
-            experimental=experimental,
-            allow_undefined=allow_undefined,
-            variant=variant,
-        )
-        data = parse_recipe_py(yaml_content, selector_config.config)
+        # Parse using the new stage0 API
+        stage0_recipe = stage0.Recipe.from_yaml(yaml_content)
+
+        # Convert to dictionary for the legacy API
+        data = stage0_recipe.to_dict()
         return cls(data)
 
     @classmethod
     def from_file(
         cls,
-        path: Union[str, Path],
-        target_platform: Optional[str] = None,
-        host_platform: Optional[str] = None,
-        build_platform: Optional[str] = None,
-        experimental: Optional[bool] = None,
-        allow_undefined: Optional[bool] = None,
-        variant: Optional[Dict[str, Any]] = None,
+        path: str | Path,
+        target_platform: str | None = None,
+        host_platform: str | None = None,
+        build_platform: str | None = None,
+        experimental: bool | None = None,
+        allow_undefined: bool | None = None,
+        variant: dict[str, Any] | None = None,
     ) -> "Recipe":
         """Create a Recipe from a YAML file path.
 
@@ -475,7 +383,7 @@ class Recipe:
             allow_undefined: Allow undefined variables in Jinja templates. Defaults to False.
             variant: Variant configuration as a dictionary. Defaults to empty.
         """
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         return cls.from_yaml(
             content,
@@ -493,7 +401,7 @@ class Recipe:
         return self._data.get("schema_version", 1)
 
     @property
-    def context(self) -> Dict[str, Any]:
+    def context(self) -> dict[str, Any]:
         """Get the context values as a Python dictionary."""
         return self._data.get("context", {})
 
@@ -503,7 +411,7 @@ class Recipe:
         return Package(self._data.get("package", {}))
 
     @property
-    def source(self) -> List[Source]:
+    def source(self) -> list[Source]:
         """Get the source information."""
         sources = self._data.get("source", [])
         if isinstance(sources, dict):
@@ -521,7 +429,7 @@ class Recipe:
         return Requirements(self._data.get("requirements", {}))
 
     @property
-    def tests(self) -> List[TestType]:
+    def tests(self) -> list[TestType]:
         """Get the tests information."""
         tests = self._data.get("tests", [])
         return [TestType(t) for t in tests]
@@ -532,7 +440,7 @@ class Recipe:
         return About(self._data.get("about", {}))
 
     @property
-    def extra(self) -> Dict[str, Any]:
+    def extra(self) -> dict[str, Any]:
         """Get extra information as a Python dictionary."""
         return self._data.get("extra", {})
 

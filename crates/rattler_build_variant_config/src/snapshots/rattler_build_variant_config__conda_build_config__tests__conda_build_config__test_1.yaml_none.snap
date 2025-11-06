@@ -1,0 +1,10 @@
+---
+source: crates/rattler_build_variant_config/src/conda_build_config.rs
+expression: config
+---
+c_compiler:
+  - clang
+c_compiler_version:
+  - "18"
+other_stuff:
+  - "123"

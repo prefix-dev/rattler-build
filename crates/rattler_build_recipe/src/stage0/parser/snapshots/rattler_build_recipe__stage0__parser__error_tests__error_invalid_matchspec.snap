@@ -1,0 +1,11 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: error_with_source
+---
+  × invalid value for 'item': unable to parse version spec: ><1234
+   ╭─[error_matchspec.yaml:8:7]
+ 7 │     - python
+ 8 │     - foobar ><1234 # error in parsing
+   ·       ───┬──
+   ·          ╰── invalid value for 'item': unable to parse version spec: ><1234
+   ╰────

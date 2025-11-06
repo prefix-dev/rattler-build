@@ -1,0 +1,35 @@
+diff --git a/src/Makefile b/src/Makefile
+index 372a6dc..e662e98 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -11,6 +11,9 @@ CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS)
+ LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
+ LIBS= -lm $(SYSLIBS) $(MYLIBS)
+ 
++# Sets the default path for lua modules
++INSTALL_TOP=/usr/local
++
+ AR= ar rcu
+ RANLIB= ranlib
+ RM= rm -f
+@@ -20,7 +23,7 @@ SYSCFLAGS=
+ SYSLDFLAGS=
+ SYSLIBS=
+ 
+-MYCFLAGS=
++MYCFLAGS= -DLUA_USER_DEFAULT_PATH='"$(INSTALL_TOP)/"'
+ MYLDFLAGS=
+ MYLIBS=
+ MYOBJS=
+@@ -128,10 +131,10 @@ linux-noreadline:
+ 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -ldl"
+ 
+ linux-readline:
+-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_READLINE" SYSLIBS="-Wl,-E -ldl -lreadline"
++	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_READLINE" SYSLIBS="-Wl,-E -ldl -lreadline -lhistory -lncursesw"
+ 
+ Darwin macos macosx:
+-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_READLINE" SYSLIBS="-lreadline"
++	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_READLINE -fno-common" SYSLIBS="-lreadline"
+
+

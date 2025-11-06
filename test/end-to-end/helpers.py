@@ -43,9 +43,20 @@ class RattlerBuild:
                 # Otherwise, it's bytes and needs decoding (but we added encoding, so this won't happen)
                 return output
             except CalledProcessError as e:
-                if kwds.get("stderr") is None:
+                print("\n" + "=" * 80)
+                print("RATTLER-BUILD COMMAND FAILED")
+                print("=" * 80)
+                print(f"Command: {' '.join(str(x) for x in e.cmd)}")
+                print(f"Return code: {e.returncode}")
+                print("-" * 80)
+                if e.output:
+                    print("OUTPUT:")
                     print(e.output)
+                if e.stderr:
+                    print("-" * 80)
+                    print("STDERR:")
                     print(e.stderr)
+                print("=" * 80 + "\n")
                 raise e
 
     def build_args(
@@ -176,7 +187,9 @@ def setup_patch_test_environment(
     work_dir.mkdir(parents=True, exist_ok=True)
     recipe_dir.mkdir(parents=True, exist_ok=True)
 
-    orig_dir_name = "example_01234567"
+    # Use a simple directory name ending with _extracted
+    # The Rust code will find any directory with this suffix
+    orig_dir_name = "test_source_extracted"
     orig_dir = cache_dir / orig_dir_name
     orig_dir.mkdir(parents=True, exist_ok=True)
 
@@ -199,6 +212,9 @@ def setup_patch_test_environment(
         "recipe_path": str(recipe_path),
         "source_cache": str(cache_dir),
         "sources": [source_entry],
+        "extracted_paths": {
+            "0": orig_dir_name  # Map source index 0 to the extracted directory name
+        },
     }
     (work_dir / ".source_info.json").write_text(json.dumps(source_info))
 
@@ -207,6 +223,7 @@ def setup_patch_test_environment(
         "work_dir": work_dir,
         "recipe_dir": recipe_dir,
         "recipe_path": recipe_path,
+        "orig_dir": orig_dir,
     }
 
 

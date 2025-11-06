@@ -9,6 +9,7 @@ use std::{
 use fs_err as fs;
 use fs_err::File;
 use metadata::clean_url;
+use rattler_build_types::GlobVec;
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
@@ -28,7 +29,6 @@ use crate::{
     metadata::Output,
     package_test::write_test_files,
     post_process,
-    recipe::parser::GlobVec,
     source::{self, copy_dir},
     tool_configuration,
 };
@@ -116,7 +116,6 @@ fn copy_license_files(
         .run()?;
 
         let copied_files_work_dir = copy_dir_work.copied_paths();
-
         let copy_dir_recipe = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
@@ -432,7 +431,7 @@ pub fn package_conda(
 
     tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
-    if output.recipe.build().is_python_version_independent() {
+    if output.is_python_version_independent() {
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);
@@ -574,8 +573,8 @@ impl Output {
         let _enter = span.enter();
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
-            self.recipe.build().always_include_files(),
-            self.recipe.build().files(),
+            &self.recipe.build().always_include_files,
+            &self.recipe.build().files,
         )?;
 
         package_conda(self, tool_configuration, &files_after)
