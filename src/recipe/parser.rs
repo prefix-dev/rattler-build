@@ -55,6 +55,22 @@ pub use self::{
 
 use crate::recipe::{custom_yaml::Node, variable::Variable};
 
+/// Valid top-level fields in a recipe (non-experimental mode)
+static ALLOWED_FIELDS: [&str; 9] = [
+    "schema_version",
+    "package",
+    "context",
+    "source",
+    "build",
+    "requirements",
+    "tests",
+    "about",
+    "extra",
+];
+
+/// Additional field allowed in experimental mode
+static EXPERIMENTAL_FIELD: &str = "cache";
+
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
@@ -295,9 +311,21 @@ impl Recipe {
                                         })
                                         .and_then(|m| m.try_convert(key_str))?,
                     invalid_key => {
+                        let mut valid_fields = ALLOWED_FIELDS
+                            .iter()
+                            .map(|f| format!("`{}`", f))
+                            .collect::<Vec<_>>();
+
+                        if experimental {
+                            valid_fields.push(format!("`{}`", EXPERIMENTAL_FIELD));
+                        }
+
+                        let help_message = format!("valid fields are {}", valid_fields.join(", "));
+
                         return Err(vec![_partialerror!(
                             *key.span(),
                             ErrorKind::InvalidField(invalid_key.to_string().into()),
+                            help = help_message
                         )])
                     }
                 }
@@ -582,5 +610,23 @@ mod tests {
         let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
         let recipe = Recipe::from_yaml(recipe, selector_config).unwrap();
         assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
+    }
+
+    #[test]
+    fn invalid_root_field() {
+        let raw_recipe = r#"
+        package:
+          name: test
+          version: 0.1.0
+
+        test:
+          - python:
+              imports:
+                - numpy
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
     }
 }
