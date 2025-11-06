@@ -246,6 +246,19 @@ source:
   lfs: true # note: defaults to false
 ```
 
+##### Verifying commit hash with `expected-commit`
+
+For security and reproducibility, you can specify an `expected-commit` field to verify that the checked out commit matches the expected SHA hash. This is useful to detect if a tag or branch has been moved to point to a different commit:
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
+  expected-commit: 50a1f7ed6c168eb0815d424cba2df62790f168f0
+```
+
+If the actual commit does not match the expected commit, the build will fail with an error message indicating the mismatch. This feature is inspired by [Wolfi/Melange](https://github.com/wolfi-dev/wolfi-os) and provides an additional layer of security for your builds.
+
 #### Source from a local path
 
 If the path is relative, it is taken relative to the recipe directory. The

@@ -307,6 +307,18 @@ pub fn git_src(
         .trim()
         .to_owned();
 
+    // Verify expected commit if specified
+    if let Some(expected) = source.expected_commit() {
+        if ref_git != expected {
+            return Err(SourceError::GitCommitMismatch {
+                expected: expected.to_string(),
+                actual: ref_git,
+                rev: rev.to_string(),
+            });
+        }
+        tracing::info!("Verified expected commit: {}", expected);
+    }
+
     // only do lfs pull if a requirement!
     if source.lfs() {
         git_lfs_pull(&ref_git)?;
@@ -417,6 +429,116 @@ mod tests {
                 res.0.to_string_lossy(),
                 cache_dir.join(repo_name).to_string_lossy()
             );
+        }
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_expected_commit_success() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("rattler-build-test-expected-commit");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
+        let system_tools = crate::system_tools::SystemTools::new();
+
+        // First, fetch without expected commit to find out what the actual commit is
+        let source_without_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: None,
+        };
+
+        let (_, actual_commit) = git_src(
+            &system_tools,
+            &source_without_expected,
+            &cache_dir,
+            &recipe_dir,
+        )
+        .unwrap();
+
+        // Now test with the correct expected commit
+        let source_with_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: Some(actual_commit.clone()),
+        };
+
+        let result = git_src(
+            &system_tools,
+            &source_with_expected,
+            &cache_dir,
+            &recipe_dir,
+        );
+        assert!(result.is_ok());
+        let (_, commit) = result.unwrap();
+        assert_eq!(commit, actual_commit);
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_expected_commit_mismatch() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir
+            .path()
+            .join("rattler-build-test-expected-commit-mismatch");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
+        let system_tools = crate::system_tools::SystemTools::new();
+
+        // Test with an incorrect expected commit
+        let source_with_wrong_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: Some("0000000000000000000000000000000000000000".to_string()),
+        };
+
+        let result = git_src(
+            &system_tools,
+            &source_with_wrong_expected,
+            &cache_dir,
+            &recipe_dir,
+        );
+        assert!(result.is_err());
+
+        // Verify the error is specifically a GitCommitMismatch
+        let err = result.unwrap_err();
+        match err {
+            crate::source::SourceError::GitCommitMismatch {
+                expected,
+                actual,
+                rev,
+            } => {
+                assert_eq!(expected, "0000000000000000000000000000000000000000");
+                assert!(!actual.is_empty());
+                assert_eq!(rev, "refs/tags/v0.1.0");
+            }
+            _ => panic!("Expected GitCommitMismatch error, got: {:?}", err),
         }
     }
 }
