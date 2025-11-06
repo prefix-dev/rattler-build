@@ -172,6 +172,66 @@ cdt('package-name') # outputs: package-name-cos6-x86_64
 cdt('package-name') # outputs: package-name-cos6-aarch64
 ```
 
+### The `match` function
+
+The `match` function allows you to perform version comparisons using conda's version matching syntax. This is particularly useful for conditionally including dependencies or skipping builds based on package versions.
+
+**Syntax:** `match(version, version_spec)`
+
+**Parameters:**
+- `version`: A version string (typically from a variant variable like `python`)
+- `version_spec`: A conda version specification string supporting operators like `==`, `!=`, `<`, `<=`, `>`, `>=`, wildcards (`*`), and comma-separated combinations (e.g., `">=3.8"`, `"3.14.*"`, `">=3.7,<3.9"`)
+
+The function returns `true` if the version matches the specification, `false` otherwise.
+
+#### Usage examples
+
+Using `match` to conditionally skip builds:
+
+```yaml title="recipe.yaml"
+build:
+  skip: ${{ match(python, "<3.8") }}  # skip builds for Python < 3.8
+```
+
+Using `match` with conditional dependencies:
+
+```yaml title="recipe.yaml"
+requirements:
+  host:
+    - if: match(python, ">=3.9")
+      then: some-package
+```
+
+!!! note
+    When using `match` for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.
+
+Checking exact version matches:
+
+```yaml title="recipe.yaml"
+build:
+  skip: ${{ match(root_base, "<6.36") }}  # skip if root_base is older than 6.36
+```
+
+Using version ranges:
+
+```yaml title="recipe.yaml"
+requirements:
+  run:
+    - if: match(python, ">=3.8,<3.11")
+      then: backport-package
+```
+
+Using wildcard patterns:
+
+```yaml title="recipe.yaml"
+requirements:
+  run:
+    - if: match(python, "3.14.*")
+      then: python-3.14-specific-package
+```
+
+**Note:** The `match` function follows conda's standard version matching rules, making it more reliable than manual string parsing or comparison operations.
+
 ### The `hash` variable
 
 - `${{ hash }}` is the variant hash and is useful in the build string
