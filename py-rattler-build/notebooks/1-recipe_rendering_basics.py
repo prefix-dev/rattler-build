@@ -46,6 +46,7 @@ def _():
     import yaml
     import tempfile
     from pathlib import Path
+
     return (
         MultiOutputRecipe,
         Path,
