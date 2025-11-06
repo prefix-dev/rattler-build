@@ -279,7 +279,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, rendered_variants, simple_recipe_yaml, tempfile):
+def _(Path, rendered_variants, tempfile):
     import shutil
 
     # Create persistent temp directories (clean up from previous runs)
@@ -293,12 +293,11 @@ def _(Path, rendered_variants, simple_recipe_yaml, tempfile):
         shutil.rmtree(_output_tmpdir)
 
     # Create the directories
-    _recipe_tmpdir.mkdir(parents=True, exist_ok=True)
-    _output_tmpdir.mkdir(parents=True, exist_ok=True)
+    _recipe_tmpdir.mkdir(parents=True)
+    _output_tmpdir.mkdir(parents=True)
 
-    # Write recipe file
+    # Define dummy recipe path
     _recipe_path = _recipe_tmpdir / "recipe.yaml"
-    _recipe_path.write_text(simple_recipe_yaml)
 
     # Build each variant
     print("🔨 Building packages...")
