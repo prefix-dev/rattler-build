@@ -583,4 +583,58 @@ mod tests {
         let recipe = Recipe::from_yaml(recipe, selector_config).unwrap();
         assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
     }
+
+    #[test]
+    fn test_noarch_null_value() {
+        // Test that null/empty values for noarch are accepted and use the default (no noarch)
+        let raw_recipe = r#"
+        context:
+          use_noarch: false
+
+        package:
+          name: test-conditional-noarch
+          version: 1.0.0
+
+        build:
+          number: 0
+          noarch: ${{ "python" if use_noarch }}
+
+        requirements:
+          host:
+            - python
+          run:
+            - python
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default()).unwrap();
+        // noarch should be the default (None) when use_noarch is false
+        assert!(recipe.build.noarch().is_none());
+    }
+
+    #[test]
+    fn test_noarch_conditional_true() {
+        // Test that conditional noarch works when the condition is true
+        let raw_recipe = r#"
+        context:
+          use_noarch: true
+
+        package:
+          name: test-conditional-noarch
+          version: 1.0.0
+
+        build:
+          number: 0
+          noarch: ${{ "python" if use_noarch }}
+
+        requirements:
+          host:
+            - python
+          run:
+            - python
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default()).unwrap();
+        // noarch should be python when use_noarch is true
+        assert!(recipe.build.noarch().is_python());
+    }
 }
