@@ -509,6 +509,7 @@ fn test_package_py(
 }
 
 #[pymodule]
+#[pyo3(name = "_rattler_build")]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     error::register_exceptions(_py, &m)?;
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     _Stage0StagingOutput = Any
 else:
     # At runtime, import the Rust submodule
-    from . import rattler_build as _rb
+    from . import _rattler_build as _rb
 
     # Get the stage0 submodule
     _stage0 = _rb.stage0
@@ -263,7 +263,7 @@ class SingleOutputRecipe:
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
             >>> recipe.run_build(tool_config=config, output_dir="./output")
         """
-        from . import rattler_build as _rb
+        from . import _rattler_build as _rb
 
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)
@@ -443,7 +443,7 @@ class MultiOutputRecipe:
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
             >>> recipe.run_build(tool_config=config, output_dir="./output")
         """
-        from . import rattler_build as _rb
+        from . import _rattler_build as _rb
 
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)

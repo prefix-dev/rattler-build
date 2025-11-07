@@ -9,7 +9,7 @@ from .cli_api import (
     upload_packages_to_conda_forge,
 )
 from .jinja_config import JinjaConfig
-from .rattler_build import RattlerBuildError, get_rattler_build_version_py
+from ._rattler_build import RattlerBuildError, get_rattler_build_version_py
 from .recipe import (
     About,
     Build,

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     _Stage1StagingCache = Any
 else:
     # At runtime, import the Rust submodule
-    from . import rattler_build as _rb
+    from . import _rattler_build as _rb
 
     # Get the stage1 submodule
     _stage1 = _rb.stage1

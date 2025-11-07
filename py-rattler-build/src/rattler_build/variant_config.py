@@ -8,7 +8,7 @@ which manages variant matrices for building packages with different configuratio
 from pathlib import Path
 from typing import Any
 from collections.abc import ItemsView, Iterator, ValuesView
-from .rattler_build import VariantConfig as _VariantConfig
+from ._rattler_build import VariantConfig as _VariantConfig
 from .jinja_config import JinjaConfig
 
 __all__ = ["VariantConfig"]

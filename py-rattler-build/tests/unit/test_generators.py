@@ -1,7 +1,7 @@
 from urllib.request import urlopen
 
 import pytest
-import rattler_build.rattler_build as _rb
+import rattler_build._rattler_build as _rb
 import rattler_build.recipe_generation as rg
 
 

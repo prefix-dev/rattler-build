@@ -1,6 +1,6 @@
 from typing import Any
 
-from .rattler_build import PyJinjaConfig
+from ._rattler_build import PyJinjaConfig
 
 
 class JinjaConfig:

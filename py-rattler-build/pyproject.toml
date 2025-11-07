@@ -28,7 +28,7 @@ Issues = "https://github.com/prefix-dev/rattler-build/labels/python-bindings"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 manifest-path = "rust/Cargo.toml"
-module-name = "rattler_build.rattler_build"
+module-name = "rattler_build._rattler_build"
 python-source = "src"
 
 [tool.ruff]
@@ -44,7 +44,7 @@ enable_error_code = ["redundant-expr", "truthy-bool", "ignore-without-code"]
 disable_error_code = ["empty-body"]
 
 [[tool.mypy.overrides]]
-module = ["rattler_build.rattler_build"]
+module = ["rattler_build._rattler_build"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
