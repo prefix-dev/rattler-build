@@ -4,9 +4,7 @@ Tool configuration for rattler-build.
 This module provides a Pythonic API for configuring the build tool.
 """
 
-from rattler_build import _rattler_build as _rb
-
-_ToolConfiguration = _rb.tool_config.ToolConfiguration
+from rattler_build._rattler_build import tool_config as _tool_config
 
 
 class ToolConfiguration:
@@ -63,7 +61,7 @@ class ToolConfiguration:
         use_jlap: bool = False,
     ):
         """Create a new tool configuration."""
-        self._inner = _ToolConfiguration(
+        self._inner = _tool_config.ToolConfiguration(
             keep_build=keep_build,
             compression_threads=compression_threads,
             io_concurrency_limit=io_concurrency_limit,
