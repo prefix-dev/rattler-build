@@ -26,13 +26,14 @@ pub struct PyRenderConfig {
 impl PyRenderConfig {
     /// Create a new render configuration with default settings
     #[new]
-    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None))]
+    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None, extra_context=None))]
     fn new(
         target_platform: Option<String>,
         build_platform: Option<String>,
         host_platform: Option<String>,
         experimental: bool,
         recipe_path: Option<PathBuf>,
+        extra_context: Option<Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
             .map(|p| {
@@ -59,9 +60,22 @@ impl PyRenderConfig {
             .transpose()?
             .unwrap_or_else(Platform::current);
 
+        let extra_context = extra_context
+            .map(|dict| {
+                dict.iter()
+                    .map(|(key, value)| {
+                        let key_str = key.extract::<String>()?;
+                        let variable = python_to_variable(value)?;
+                        Ok((key_str, variable))
+                    })
+                    .collect::<PyResult<IndexMap<String, Variable>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
         Ok(Self {
             inner: RustRenderConfig {
-                extra_context: IndexMap::new(),
+                extra_context,
                 experimental,
                 recipe_path,
                 target_platform,
@@ -71,16 +85,6 @@ impl PyRenderConfig {
         })
     }
 
-    /// Add an extra context variable for Jinja rendering
-    ///
-    /// # Arguments
-    /// * `key` - The variable name
-    /// * `value` - The value (can be string, bool, int, float, or list)
-    fn set_context(&mut self, key: String, value: Bound<'_, PyAny>) -> PyResult<()> {
-        let variable = python_to_variable(value)?;
-        self.inner.extra_context.insert(key, variable);
-        Ok(())
-    }
 
     /// Get an extra context variable
     fn get_context(&self, py: Python<'_>, key: &str) -> PyResult<Option<Py<PyAny>>> {
@@ -100,39 +104,6 @@ impl PyRenderConfig {
         Ok(dict.into())
     }
 
-    /// Set the target platform
-    fn set_target_platform(&mut self, platform: String) -> PyResult<()> {
-        self.inner.target_platform = platform
-            .parse()
-            .map_err(|e| RattlerBuildError::Other(format!("Invalid platform: {}", e)))?;
-        Ok(())
-    }
-
-    /// Set the build platform
-    fn set_build_platform(&mut self, platform: String) -> PyResult<()> {
-        self.inner.build_platform = platform
-            .parse()
-            .map_err(|e| RattlerBuildError::Other(format!("Invalid platform: {}", e)))?;
-        Ok(())
-    }
-
-    /// Set the host platform
-    fn set_host_platform(&mut self, platform: String) -> PyResult<()> {
-        self.inner.host_platform = platform
-            .parse()
-            .map_err(|e| RattlerBuildError::Other(format!("Invalid platform: {}", e)))?;
-        Ok(())
-    }
-
-    /// Set whether experimental features are enabled
-    fn set_experimental(&mut self, experimental: bool) {
-        self.inner.experimental = experimental;
-    }
-
-    /// Set the recipe path for relative path resolution
-    fn set_recipe_path(&mut self, recipe_path: Option<PathBuf>) {
-        self.inner.recipe_path = recipe_path;
-    }
 
     /// Get the target platform as a string
     fn target_platform(&self) -> String {

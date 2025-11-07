@@ -39,14 +39,16 @@ def test_render_config_with_platforms() -> None:
 
 def test_render_config_set_context() -> None:
     """Test setting extra context variables."""
-    config = RenderConfig()
-    config.set_context("my_var", "value")
-    config.set_context("my_bool", True)
-    config.set_context("my_number", 42)
-    config.set_context("my_list", [1, 2, 3])
-
-    # TODO: This should actually error as mixed types are not allowed
-    config.set_context("error_list", [1, "string", 3])
+    config = RenderConfig(
+        extra_context={
+            "my_var": "value",
+            "my_bool": True,
+            "my_number": 42,
+            "my_list": [1, 2, 3],
+            # TODO: This should actually error as mixed types are not allowed
+            "error_list": [1, "string", 3],
+        }
+    )
 
     assert config.get_context("my_var") == "value"
     assert config.get_context("my_bool")

@@ -263,14 +263,17 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     custom_variants = VariantConfig()
 
     # Create render config with custom variables
-    custom_render = RenderConfig()
-    custom_render.set_context("custom_suffix", "special")
-    custom_render.set_context("build_number", 42)
-    custom_render.set_context("build_string", "custom_abc123")
-    custom_render.set_context("build_date", "2024-01-15")
-    custom_render.set_context("builder_name", "CI Pipeline")
-    custom_render.set_context("build_config", "release")
-    custom_render.set_context("debug_mode", False)
+    custom_render = RenderConfig(
+        extra_context={
+            "custom_suffix": "special",
+            "build_number": 42,
+            "build_string": "custom_abc123",
+            "build_date": "2024-01-15",
+            "builder_name": "CI Pipeline",
+            "build_config": "release",
+            "debug_mode": False,
+        }
+    )
 
     print("🎨 Custom Context Variables")
     print("=" * 60)
@@ -450,7 +453,7 @@ def _(mo):
     - **Zip Keys**: Synchronize variants using `zip_keys` to pair specific combinations
     - **Multiple Zip Groups**: Create independent pairing groups (e.g., python↔numpy, c_compiler↔cxx_compiler)
     - **JinjaConfig**: Control platform-specific rendering with conditional selectors
-    - **Custom Context**: Add variables via `RenderConfig.set_context()` for use in templates
+    - **Custom Context**: Add variables via `RenderConfig(extra_context={...})` for use in templates
     - **Complex Variants**: Build realistic multi-variant packages with proper synchronization
     - **Variant Inspection**: Examine which variants were used via `variant.variant()` and `stage1.used_variant`
 

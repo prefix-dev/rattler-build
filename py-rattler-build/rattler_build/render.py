@@ -148,13 +148,14 @@ class RenderConfig:
         host_platform: Host platform (for cross-compilation)
         experimental: Enable experimental features
         recipe_path: Path to the recipe file (for relative path resolution)
+        extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
         >>> config = RenderConfig(
         ...     target_platform="linux-64",
-        ...     experimental=True
+        ...     experimental=True,
+        ...     extra_context={"custom_var": "value", "build_num": 42}
         ... )
-        >>> config.set_context("custom_var", "value")
     """
 
     def __init__(
@@ -164,6 +165,7 @@ class RenderConfig:
         host_platform: str | None = None,
         experimental: bool = False,
         recipe_path: str | None = None,
+        extra_context: dict[str, ContextValue] | None = None,
     ):
         """Create a new render configuration."""
         self._config = _RenderConfig(
@@ -172,16 +174,8 @@ class RenderConfig:
             host_platform=host_platform,
             experimental=experimental,
             recipe_path=recipe_path,
+            extra_context=extra_context,
         )
-
-    def set_context(self, key: str, value: ContextValue) -> None:
-        """Add an extra context variable for Jinja rendering.
-
-        Args:
-            key: Variable name
-            value: Variable value (can be string, bool, int, float, or list)
-        """
-        self._config.set_context(key, value)
 
     def get_context(self, key: str) -> ContextValue | None:
         """Get an extra context variable.

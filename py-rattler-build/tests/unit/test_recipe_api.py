@@ -98,12 +98,11 @@ def test_recipe_representations() -> None:
 
 def test_render_config_with_variants() -> None:
     """Test RenderConfig with variant configuration."""
-    render_config = RenderConfig(target_platform="linux-64")
+    render_config = RenderConfig(
+        target_platform="linux-64",
+        extra_context={"python": "3.11", "build_number": "1"},
+    )
     assert render_config.target_platform == "linux-64"
-
-    # Set extra context (similar to variants)
-    render_config.set_context("python", "3.11")
-    render_config.set_context("build_number", "1")
 
     assert render_config.get_context("python") == "3.11"
     assert render_config.get_context("build_number") == "1"
@@ -132,10 +131,9 @@ def test_render_config_setters() -> None:
     assert config_exp.experimental is True
 
     # Test context (variant-like values)
-    config.set_context("python", "3.9")
-    config.set_context("numpy", "1.21")
+    config_with_context = RenderConfig(extra_context={"python": "3.9", "numpy": "1.21"})
 
-    all_context = config.get_all_context()
+    all_context = config_with_context.get_all_context()
     assert "python" in all_context
     assert all_context["python"] == "3.9"
     assert "numpy" in all_context
@@ -198,8 +196,7 @@ build:
     variant_config = VariantConfig({"python": ["3.11"]})
 
     # Render with context for build_number
-    render_config = RenderConfig()
-    render_config.set_context("build_number", "1")
+    render_config = RenderConfig(extra_context={"build_number": "1"})
 
     rendered = render_recipe(stage0, variant_config, render_config)
     stage1 = rendered[0].recipe()

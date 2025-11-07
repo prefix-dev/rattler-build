@@ -204,12 +204,12 @@ def _(RenderConfig, json):
         build_platform="linux-64",
         host_platform="linux-64",
         experimental=False,
+        extra_context={
+            "custom_var": "custom_value",
+            "build_timestamp": "2024-01-01",
+            "my_number": 42,
+        },
     )
-
-    # Add custom context variables (available in Jinja templates)
-    render_config.set_context("custom_var", "custom_value")
-    render_config.set_context("build_timestamp", "2024-01-01")
-    render_config.set_context("my_number", 42)
 
     print("🔧 Render Configuration")
     print("=" * 60)
