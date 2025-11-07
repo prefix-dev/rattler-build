@@ -6,14 +6,12 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 """
 
 from pathlib import Path
-from typing import Any, Optional, Union
-
-from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
-from rattler_build.tool_config import ToolConfiguration
-from typing import TypeAlias
-from rattler_build.variant_config import VariantConfig
+from typing import Any, Optional, TypeAlias, Union
 
 from rattler_build._rattler_build import render as _render
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+from rattler_build.tool_config import ToolConfiguration
+from rattler_build.variant_config import VariantConfig
 
 ContextValue = str | int | float | bool | list[str | int | float | bool]
 
@@ -36,9 +34,14 @@ class HashInfo:
         ...     print(f"Prefix: {hash_info.prefix}")
     """
 
-    def __init__(self, inner: _render.HashInfo):
-        """Create a HashInfo from the Rust object."""
-        self._inner = inner
+    _inner: _render.HashInfo
+
+    @classmethod
+    def _from_inner(cls, inner: _render.HashInfo) -> "HashInfo":
+        """Create a HashInfo from the Rust object (internal use only)."""
+        instance = cls.__new__(cls)
+        instance._inner = inner
+        return instance
 
     @property
     def hash(self) -> str:
@@ -248,7 +251,7 @@ class RenderedVariant:
             ...     print(f"Prefix: {hash_info.prefix}")
         """
         inner = self._inner.hash_info()
-        return HashInfo(inner) if inner else None
+        return HashInfo._from_inner(inner) if inner else None
 
     def pin_subpackages(self) -> dict[str, PinSubpackageInfo]:
         """Get pin_subpackage information.
