@@ -242,7 +242,6 @@ class VariantConfig:
         """
         return self._inner.get_values(key)
 
-
     def to_dict(self) -> dict[str, list[Any]]:
         """
         Get all variants as a dictionary.

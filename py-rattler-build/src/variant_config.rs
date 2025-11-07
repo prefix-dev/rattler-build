@@ -178,11 +178,6 @@ impl PyVariantConfig {
         Ok(dict.into())
     }
 
-    /// Merge another VariantConfig into this one
-    fn merge(&mut self, other: &PyVariantConfig) {
-        self.inner.merge(other.inner.clone());
-    }
-
     /// Generate combinations of variants
     fn combinations(&self, py: Python<'_>) -> PyResult<Vec<Py<PyDict>>> {
         // Use all keys for combinations
