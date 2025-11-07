@@ -9,7 +9,7 @@ ProgressCallback.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 class DownloadStartEvent:
@@ -410,12 +410,17 @@ class RichProgressCallback:
 default_callback = SimpleProgressCallback()
 
 
-def create_callback(style: str = "simple", **kwargs: Any) -> ProgressCallback:
+def create_callback(
+    style: str = "simple",
+    show_logs: bool = True,
+    show_details: bool = False,
+) -> ProgressCallback:
     """Create a progress callback of the specified style.
 
     Args:
         style: Style of callback - "simple", "rich", or "none"
-        **kwargs: Additional arguments passed to the callback constructor
+        show_logs: Show logs in rich output (only used with style="rich")
+        show_details: Show detailed progress information (only used with style="rich")
 
     Returns:
         A progress callback instance
@@ -428,6 +433,9 @@ def create_callback(style: str = "simple", **kwargs: Any) -> ProgressCallback:
         # Rich terminal output
         callback = create_callback("rich", show_logs=True)
 
+        # Rich with details
+        callback = create_callback("rich", show_logs=True, show_details=True)
+
         # No output
         callback = create_callback("none")
         ```
@@ -435,7 +443,7 @@ def create_callback(style: str = "simple", **kwargs: Any) -> ProgressCallback:
     if style == "simple":
         return SimpleProgressCallback()
     elif style == "rich":
-        return RichProgressCallback(**kwargs)
+        return RichProgressCallback(show_logs=show_logs, show_details=show_details)
     elif style == "none":
         # Empty callback that does nothing
         class NoOpCallback:
