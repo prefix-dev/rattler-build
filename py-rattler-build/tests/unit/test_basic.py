@@ -12,7 +12,7 @@ def test_version_match_parent_cargo() -> None:
 
 
 def test_version_match_local_cargo() -> None:
-    local_cargo_toml = Path(__file__).parents[2].joinpath("Cargo.toml").read_text()
+    local_cargo_toml = Path(__file__).parents[2].joinpath("rust/Cargo.toml").read_text()
     local_version = tomllib.loads(local_cargo_toml)["package"]["version"]
     assert rattler_build.rattler_build_version() == local_version
 

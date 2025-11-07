@@ -15,11 +15,11 @@ native-tls = ["rattler-build/native-tls"]
 rustls-tls = ["rattler-build/rustls-tls"]
 
 [dependencies]
-rattler-build = { path = "../" }
-rattler_build_recipe = { path = "../crates/rattler_build_recipe" }
-rattler_build_jinja = { path = "../crates/rattler_build_jinja" }
-rattler_build_types = { path = "../crates/rattler_build_types" }
-rattler_build_variant_config = { path = "../crates/rattler_build_variant_config" }
+rattler-build = { path = "../../" }
+rattler_build_recipe = { path = "../../crates/rattler_build_recipe" }
+rattler_build_jinja = { path = "../../crates/rattler_build_jinja" }
+rattler_build_types = { path = "../../crates/rattler_build_types" }
+rattler_build_variant_config = { path = "../../crates/rattler_build_variant_config" }
 indexmap = "2.11.4"
 pyo3 = { version = "0.26.0", features = [
   "abi3-py38",

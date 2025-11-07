@@ -14,7 +14,7 @@ backend = { name = "pixi-build-python", version = "*" }
 
 [package.build.config]
 compilers = ["rust"]
-extra-input-globs = ["../src/*"]
+extra-input-globs = ["../rust/src/*"]
 
 [package.host-dependencies]
 python = "*"
@@ -30,16 +30,16 @@ ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]
 fmt = { depends-on = ["fmt-python", "fmt-rust"] }
-fmt-python = "ruff format rattler_build examples tests"
-fmt-rust = "cargo fmt --all"
+fmt-python = "ruff format src/rattler_build examples tests"
+fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
 # checks for the CI
-fmt-rust-check = "cargo fmt --all --check"
-fmt-python-check = "ruff format rattler_build examples tests --diff"
+fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
+fmt-python-check = "ruff format src/rattler_build examples tests --diff"
 fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
 
 lint = { depends-on = ["lint-python", "lint-rust"] }
 lint-python = "ruff check ."
-lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
+lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
@@ -63,7 +63,7 @@ rich = ">=14.2.0,<15"
 types-networkx = "*"
 
 [feature.test.tasks]
-check-cargo-lock = "cargo check --locked"
+check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
 test = { cmd = "pytest ./tests --doctest-modules", depends-on = ["type-check"] }
 type-check = { cmd = "mypy" }
 

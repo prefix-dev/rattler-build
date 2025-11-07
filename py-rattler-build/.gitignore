@@ -1,4 +1,5 @@
 /target
+/rust/target
 !Cargo.lock
 !pixi.lock
 
