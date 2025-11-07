@@ -6,6 +6,7 @@ elsewhere.
 """
 
 from inline_snapshot import snapshot
+
 from rattler_build import stage1
 
 
@@ -181,9 +182,6 @@ def test_stage1_module_structure_snapshot() -> None:
             "About",
             "Any",
             "Build",
-            "Dict",
-            "List",
-            "Optional",
             "Package",
             "Recipe",
             "Requirements",
