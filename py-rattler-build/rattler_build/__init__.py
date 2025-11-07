@@ -9,7 +9,6 @@ from .cli_api import (
     upload_packages_to_conda_forge,
 )
 from .rattler_build import get_rattler_build_version_py
-from .build_types import Directories, PackagingSettings
 from .jinja_config import JinjaConfig
 from .platform_types import Platform, PlatformWithVirtualPackages
 from .rattler_build import RattlerBuildError
@@ -62,8 +61,6 @@ __all__ = [
     "progress",
     "VariantConfig",
     "ToolConfiguration",
-    "Directories",
-    "PackagingSettings",
     "Platform",
     "PlatformWithVirtualPackages",
     "RenderConfig",
