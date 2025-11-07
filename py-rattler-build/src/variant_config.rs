@@ -21,7 +21,10 @@ impl PyVariantConfig {
     /// Create a new VariantConfig with optional variants and zip_keys
     #[new]
     #[pyo3(signature = (variants=None, zip_keys=None))]
-    fn new(variants: Option<Bound<'_, PyDict>>, zip_keys: Option<Vec<Vec<String>>>, py: Python<'_>) -> PyResult<Self> {
+    fn new(
+        variants: Option<Bound<'_, PyDict>>,
+        zip_keys: Option<Vec<Vec<String>>>,
+    ) -> PyResult<Self> {
         let mut inner = VariantConfig {
             zip_keys: zip_keys.map(|zk| {
                 zk.into_iter()
@@ -55,9 +58,10 @@ impl PyVariantConfig {
                                     Ok(Variable::from_string(&n.to_string()))
                                 }
                             }
-                            _ => {
-                                Err(RattlerBuildError::Variant("Unsupported value type".to_string()).into())
-                            }
+                            _ => Err(RattlerBuildError::Variant(
+                                "Unsupported value type".to_string(),
+                            )
+                            .into()),
                         }
                     })
                     .collect::<PyResult<_>>()?;
@@ -136,7 +140,6 @@ impl PyVariantConfig {
                 .collect()
         })
     }
-
 
     /// Get values for a specific variant key
     fn get_values(&self, key: &str, py: Python<'_>) -> PyResult<Option<Vec<Py<PyAny>>>> {
