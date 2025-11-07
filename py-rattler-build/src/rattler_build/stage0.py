@@ -7,42 +7,11 @@ and conditional resolution.
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
-if TYPE_CHECKING:
-    from rattler_build.tool_config import ToolConfiguration
+from rattler_build.tool_config import ToolConfiguration
 
-    # For type checking, use Any as placeholder since we don't have stubs
-    _Stage0Recipe = Any
-    _SingleOutputRecipe = Any
-    _MultiOutputRecipe = Any
-    _Stage0Package = Any
-    _Stage0PackageMetadata = Any
-    _Stage0RecipeMetadata = Any
-    _Stage0Build = Any
-    _Stage0Requirements = Any
-    _Stage0About = Any
-    _Stage0PackageOutput = Any
-    _Stage0StagingOutput = Any
-else:
-    # At runtime, import the Rust submodule
-    from rattler_build import _rattler_build as _rb
-
-    # Get the stage0 submodule
-    _stage0 = _rb.stage0
-
-    # Import classes from the stage0 submodule
-    _Stage0Recipe = _stage0.Stage0Recipe
-    _SingleOutputRecipe = _stage0.SingleOutputRecipe
-    _MultiOutputRecipe = _stage0.MultiOutputRecipe
-    _Stage0Package = _stage0.Stage0Package
-    _Stage0PackageMetadata = _stage0.Stage0PackageMetadata
-    _Stage0RecipeMetadata = _stage0.Stage0RecipeMetadata
-    _Stage0Build = _stage0.Stage0Build
-    _Stage0Requirements = _stage0.Stage0Requirements
-    _Stage0About = _stage0.Stage0About
-    _Stage0PackageOutput = _stage0.Stage0PackageOutput
-    _Stage0StagingOutput = _stage0.Stage0StagingOutput
+from rattler_build._rattler_build import stage0 as _stage0
 
 __all__ = [
     "Recipe",
@@ -71,7 +40,7 @@ class Recipe:
         ...     print(single.package.name)
     """
 
-    def __init__(self, inner: _Stage0Recipe):
+    def __init__(self, inner: _stage0.Stage0Recipe):
         self._inner = inner
 
     @classmethod
@@ -81,7 +50,7 @@ class Recipe:
 
         Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
         """
-        wrapper = _Stage0Recipe.from_yaml(yaml)
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
             return SingleOutputRecipe(single_inner, wrapper)
@@ -128,7 +97,7 @@ class Recipe:
             ... }
             >>> recipe = Recipe.from_dict(recipe_dict)
         """
-        wrapper = _Stage0Recipe.from_dict(recipe_dict)
+        wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
             return SingleOutputRecipe(single_inner, wrapper)
@@ -165,7 +134,7 @@ class Recipe:
 class SingleOutputRecipe:
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _SingleOutputRecipe, wrapper: Any = None):
+    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: Any = None):
         self._inner = inner
         # Keep reference to the original Rust Stage0Recipe wrapper for render()
         self._wrapper = wrapper
@@ -291,7 +260,7 @@ class SingleOutputRecipe:
 class Package:
     """Package metadata at stage0."""
 
-    def __init__(self, inner: _Stage0Package):
+    def __init__(self, inner: _stage0.Stage0Package):
         self._inner = inner
 
     @property
@@ -312,7 +281,7 @@ class Package:
 class PackageOutput:
     """A package output in a multi-output recipe."""
 
-    def __init__(self, inner: _Stage0PackageOutput):
+    def __init__(self, inner: _stage0.Stage0PackageOutput):
         self._inner = inner
 
     @property
@@ -328,7 +297,7 @@ class PackageOutput:
 class StagingOutput:
     """A staging output in a multi-output recipe."""
 
-    def __init__(self, inner: _Stage0StagingOutput):
+    def __init__(self, inner: _stage0.Stage0StagingOutput):
         self._inner = inner
 
     def to_dict(self) -> dict[str, Any]:
@@ -339,7 +308,7 @@ class StagingOutput:
 class MultiOutputRecipe:
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _MultiOutputRecipe, wrapper: Any = None):
+    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: Any = None):
         self._inner = inner
         # Keep reference to the original Rust Stage0Recipe wrapper for render()
         self._wrapper = wrapper
@@ -374,9 +343,9 @@ class MultiOutputRecipe:
         """Get all outputs (package and staging)."""
         result: list[PackageOutput | StagingOutput] = []
         for output in self._inner.outputs:
-            if isinstance(output, _Stage0PackageOutput):  # type: ignore[misc]
+            if isinstance(output, _stage0.Stage0PackageOutput):
                 result.append(PackageOutput(output))
-            elif isinstance(output, _Stage0StagingOutput):  # type: ignore[misc]
+            elif isinstance(output, _stage0.Stage0StagingOutput):
                 result.append(StagingOutput(output))
         return result
 
@@ -471,7 +440,7 @@ class MultiOutputRecipe:
 class RecipeMetadata:
     """Recipe metadata for multi-output recipes."""
 
-    def __init__(self, inner: _Stage0RecipeMetadata):
+    def __init__(self, inner: _stage0.Stage0RecipeMetadata):
         self._inner = inner
 
     def to_dict(self) -> dict[str, Any]:
@@ -482,7 +451,7 @@ class RecipeMetadata:
 class Build:
     """Build configuration at stage0."""
 
-    def __init__(self, inner: _Stage0Build):
+    def __init__(self, inner: _stage0.Stage0Build):
         self._inner = inner
 
     @property
@@ -513,7 +482,7 @@ class Build:
 class Requirements:
     """Requirements at stage0."""
 
-    def __init__(self, inner: _Stage0Requirements):
+    def __init__(self, inner: _stage0.Stage0Requirements):
         self._inner = inner
 
     @property
@@ -544,7 +513,7 @@ class Requirements:
 class About:
     """About metadata at stage0."""
 
-    def __init__(self, inner: _Stage0About):
+    def __init__(self, inner: _stage0.Stage0About):
         self._inner = inner
 
     @property
