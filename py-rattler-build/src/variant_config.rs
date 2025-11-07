@@ -18,17 +18,55 @@ pub struct PyVariantConfig {
 
 #[pymethods]
 impl PyVariantConfig {
-    /// Create a new VariantConfig with optional zip_keys
+    /// Create a new VariantConfig with optional variants and zip_keys
     #[new]
-    #[pyo3(signature = (zip_keys=None))]
-    fn new(zip_keys: Option<Vec<Vec<String>>>) -> Self {
-        let mut inner = VariantConfig::default();
-        inner.zip_keys = zip_keys.map(|zk| {
-            zk.into_iter()
-                .map(|group| group.into_iter().map(NormalizedKey::from).collect())
-                .collect()
-        });
-        PyVariantConfig { inner }
+    #[pyo3(signature = (variants=None, zip_keys=None))]
+    fn new(variants: Option<Bound<'_, PyDict>>, zip_keys: Option<Vec<Vec<String>>>, py: Python<'_>) -> PyResult<Self> {
+        let mut inner = VariantConfig {
+            zip_keys: zip_keys.map(|zk| {
+                zk.into_iter()
+                    .map(|group| group.into_iter().map(NormalizedKey::from).collect())
+                    .collect()
+            }),
+            ..Default::default()
+        };
+
+        // Process variants if provided
+        if let Some(variants_dict) = variants {
+            for (key, values) in variants_dict.iter() {
+                let key_str: String = key.extract()?;
+                let normalized_key = NormalizedKey::from(key_str.as_str());
+
+                // Extract the list of values
+                let values_list: Vec<Bound<'_, PyAny>> = values.extract()?;
+                let variables: Vec<Variable> = values_list
+                    .iter()
+                    .map(|v| {
+                        let json_value: serde_json::Value = pythonize::depythonize(v)
+                            .map_err(|e| RattlerBuildError::Variant(format!("{}", e)))?;
+
+                        match &json_value {
+                            serde_json::Value::String(s) => Ok(Variable::from_string(s)),
+                            serde_json::Value::Bool(b) => Ok(Variable::from(*b)),
+                            serde_json::Value::Number(n) => {
+                                if let Some(i) = n.as_i64() {
+                                    Ok(Variable::from(i))
+                                } else {
+                                    Ok(Variable::from_string(&n.to_string()))
+                                }
+                            }
+                            _ => {
+                                Err(RattlerBuildError::Variant("Unsupported value type".to_string()).into())
+                            }
+                        }
+                    })
+                    .collect::<PyResult<_>>()?;
+
+                inner.insert(normalized_key, variables);
+            }
+        }
+
+        Ok(PyVariantConfig { inner })
     }
 
     /// Load VariantConfig from a YAML file (variants.yaml format)
@@ -117,41 +155,6 @@ impl PyVariantConfig {
         } else {
             Ok(None)
         }
-    }
-
-    /// Set values for a variant key
-    fn set_values(
-        &mut self,
-        key: &str,
-        values: Vec<Bound<'_, PyAny>>,
-        _py: Python<'_>,
-    ) -> PyResult<()> {
-        let normalized_key = NormalizedKey::from(key);
-        let variables: Vec<Variable> = values
-            .iter()
-            .map(|v| {
-                let json_value: serde_json::Value = pythonize::depythonize(v)
-                    .map_err(|e| RattlerBuildError::Variant(format!("{}", e)))?;
-
-                match &json_value {
-                    serde_json::Value::String(s) => Ok(Variable::from_string(s)),
-                    serde_json::Value::Bool(b) => Ok(Variable::from(*b)),
-                    serde_json::Value::Number(n) => {
-                        if let Some(i) = n.as_i64() {
-                            Ok(Variable::from(i))
-                        } else {
-                            Ok(Variable::from_string(&n.to_string()))
-                        }
-                    }
-                    _ => {
-                        Err(RattlerBuildError::Variant("Unsupported value type".to_string()).into())
-                    }
-                }
-            })
-            .collect::<PyResult<_>>()?;
-
-        self.inner.insert(normalized_key, variables);
-        Ok(())
     }
 
     /// Get all variants as a dictionary

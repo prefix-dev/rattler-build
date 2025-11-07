@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+
 from rattler_build.variant_config import VariantConfig
 
 
@@ -11,26 +12,9 @@ def test_variant_config_creation() -> None:
     assert len(config) == 0
 
 
-def test_variant_config_set_values() -> None:
-    """Test setting variant values."""
-    config = VariantConfig()
-
-    # Set some variant values
-    config.set_values("python", ["3.8", "3.9", "3.10"])
-    config.set_values("numpy", ["1.21", "1.22"])
-
-    # Check that keys were added
-    keys = config.keys()
-    assert "python" in keys
-    assert "numpy" in keys
-    assert len(config) == 2
-
-
 def test_variant_config_get_values() -> None:
     """Test getting variant values."""
-    config = VariantConfig()
-
-    config.set_values("python", ["3.9", "3.10", "3.11"])
+    config = VariantConfig(variants={"python": ["3.9", "3.10", "3.11"]})
 
     values = config.get_values("python")
     assert values is not None
@@ -47,10 +31,7 @@ def test_variant_config_get_nonexistent_key() -> None:
 
 def test_variant_config_to_dict() -> None:
     """Test converting VariantConfig to dictionary."""
-    config = VariantConfig()
-
-    config.set_values("python", ["3.10", "3.11"])
-    config.set_values("rust", ["1.70", "1.71"])
+    config = VariantConfig({"python": ["3.10", "3.11"], "rust": ["1.70", "1.71"]})
 
     config_dict = config.to_dict()
     assert isinstance(config_dict, dict)
@@ -58,31 +39,9 @@ def test_variant_config_to_dict() -> None:
     assert "rust" in config_dict
 
 
-def test_variant_config_merge() -> None:
-    """Test merging two VariantConfigs."""
-    config1 = VariantConfig()
-    config1.set_values("python", ["3.9", "3.10"])
-
-    config2 = VariantConfig()
-    config2.set_values("numpy", ["1.21", "1.22"])
-    config2.set_values("cuda", ["11.8", "12.0"])
-
-    # Merge config2 into config1
-    config1.merge(config2)
-
-    # Check that config1 now has all keys
-    keys = config1.keys()
-    assert "python" in keys
-    assert "numpy" in keys
-    assert "cuda" in keys
-
-
 def test_variant_config_combinations() -> None:
     """Test generating variant combinations."""
-    config = VariantConfig()
-
-    config.set_values("python", ["3.9", "3.10"])
-    config.set_values("numpy", ["1.21", "1.22"])
+    config = VariantConfig({"python": ["3.9", "3.10"], "numpy": ["1.21", "1.22"]})
 
     combinations = config.combinations()
 
@@ -147,10 +106,8 @@ rust:
 
 def test_variant_config_with_different_types() -> None:
     """Test setting variant values with different types."""
-    config = VariantConfig()
-
     # Strings
-    config.set_values("version", ["1.0", "2.0"])
+    config = VariantConfig({"version": ["1.0", "2.0"]})
 
     # The values should be stored
     values = config.get_values("version")
@@ -163,17 +120,16 @@ def test_variant_config_len() -> None:
     config = VariantConfig()
     assert len(config) == 0
 
-    config.set_values("python", ["3.9"])
-    assert len(config) == 1
+    config_one = VariantConfig({"python": ["3.9"]})
+    assert len(config_one) == 1
 
-    config.set_values("numpy", ["1.21"])
-    assert len(config) == 2
+    config_two = VariantConfig({"python": ["3.9"], "numpy": ["1.21"]})
+    assert len(config_two) == 2
 
 
 def test_variant_config_repr() -> None:
     """Test the string representation."""
-    config = VariantConfig()
-    config.set_values("python", ["3.10"])
+    config = VariantConfig({"python": ["3.10"]})
 
     repr_str = repr(config)
     assert "VariantConfig" in repr_str
@@ -192,14 +148,10 @@ def test_variant_config_empty_combinations() -> None:
 
 def test_variant_config_zip_keys() -> None:
     """Test zip_keys functionality."""
-    config_without_zip = VariantConfig()
+    config_without_zip = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.20", "1.21", "1.22"]})
 
     # Initially, zip_keys should be None
     assert config_without_zip.zip_keys is None
-
-    # Set variant values
-    config_without_zip.set_values("python", ["3.9", "3.10", "3.11"])
-    config_without_zip.set_values("numpy", ["1.20", "1.21", "1.22"])
 
     # Without zip_keys, we get all combinations (3 * 3 = 9)
     combinations = config_without_zip.combinations()

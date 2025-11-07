@@ -83,8 +83,7 @@ requirements:
     stage0 = Stage0Recipe.from_yaml(yaml_content)
 
     # Create variant config with multiple python versions
-    variant_config = VariantConfig()
-    variant_config.set_values("python", ["3.9", "3.10", "3.11"])
+    variant_config = VariantConfig({"python": ["3.9", "3.10", "3.11"]})
 
     # Render with variants
     rendered = render_recipe(stage0, variant_config)
@@ -309,8 +308,7 @@ requirements:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
 
-    variant_config = VariantConfig()
-    variant_config.set_values("python", ["3.10"])
+    variant_config = VariantConfig({"python": ["3.10"]})
 
     rendered = render_recipe(stage0, variant_config)
     stage1 = rendered[0].recipe()

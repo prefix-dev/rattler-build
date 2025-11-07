@@ -1,4 +1,4 @@
-from . import platform_types, progress, recipe_generation, render, stage0, stage1, tool_config
+from . import progress, recipe_generation, render, stage0, stage1, tool_config
 from .cli_api import (
     build_recipes,
     test_package,
@@ -9,7 +9,6 @@ from .cli_api import (
     upload_packages_to_conda_forge,
 )
 from .jinja_config import JinjaConfig
-from .platform_types import Platform, PlatformWithVirtualPackages
 from .rattler_build import RattlerBuildError, get_rattler_build_version_py
 from .recipe import (
     About,
@@ -55,11 +54,8 @@ __all__ = [
     "stage1",
     "render",
     "tool_config",
-    "platform_types",
     "progress",
     "VariantConfig",
     "ToolConfiguration",
-    "Platform",
-    "PlatformWithVirtualPackages",
     "RenderConfig",
 ]

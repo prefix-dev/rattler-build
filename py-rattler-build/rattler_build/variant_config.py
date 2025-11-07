@@ -6,9 +6,9 @@ which manages variant matrices for building packages with different configuratio
 """
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 from collections.abc import ItemsView, Iterator, ValuesView
-from .rattler_build import VariantConfig as _VariantConfig, PyJinjaConfig
+from .rattler_build import VariantConfig as _VariantConfig
 from .jinja_config import JinjaConfig
 
 __all__ = ["VariantConfig"]
@@ -33,14 +33,12 @@ class VariantConfig:
         6
 
         >>> # Dict-like access
-        >>> config["python"] = ["3.9", "3.10"]
         >>> print(config["python"])
-        ['3.9', '3.10']
+        ['3.8', '3.9', '3.10']
 
-        >>> # Traditional method calls
-        >>> config.set_values("compiler", ["gcc", "clang"])
-        >>> print(config.get_values("compiler"))
-        ['gcc', 'clang']
+        >>> # Get values
+        >>> print(config.get_values("python"))
+        ['3.8', '3.9', '3.10']
 
         >>> # Load from YAML file
         >>> config = VariantConfig.from_file("variant_config.yaml")
@@ -49,15 +47,15 @@ class VariantConfig:
 
     def __init__(
         self,
-        variants: dict[str, list[Any]] | _VariantConfig | None = None,
+        variants: dict[str, list[Any]] | None = None,
         zip_keys: list[list[str]] | None = None,
     ):
         """
         Create a new VariantConfig.
 
         Args:
-            variants: Either a dictionary mapping variant keys to value lists,
-                     or an existing _VariantConfig instance. If None, creates empty config.
+            variants: A dictionary mapping variant keys to value lists.
+                     If None, creates empty config.
             zip_keys: Optional list of groups (each group is a list of keys) that should be
                      zipped together. Ensures that certain variant keys are synchronized.
 
@@ -74,14 +72,12 @@ class VariantConfig:
             >>> # Create empty
             >>> config = VariantConfig()
         """
-        if variants is None:
-            self._inner = _VariantConfig(zip_keys=zip_keys)
-        elif isinstance(variants, dict):
-            self._inner = _VariantConfig(zip_keys=zip_keys)
-            for key, values in variants.items():
-                self._inner.set_values(key, values)
-        else:
+        if isinstance(variants, _VariantConfig):
+            # Directly wrap existing Rust VariantConfig
             self._inner = variants
+        else:
+            # Create from dict with optional zip_keys (variants can be None)
+            self._inner = _VariantConfig(variants=variants, zip_keys=zip_keys)
 
     @classmethod
     def from_file(cls, path: str | Path) -> "VariantConfig":
@@ -100,7 +96,7 @@ class VariantConfig:
         return cls(_VariantConfig.from_file(Path(path)))
 
     @classmethod
-    def from_file_with_context(cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
+    def from_file_with_context(cls, path: str | Path, jinja_config: JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a YAML file with a JinjaConfig context (variants.yaml format).
 
@@ -119,12 +115,10 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
         """
-        # Convert JinjaConfig to PyJinjaConfig if needed
-        py_config = jinja_config._config if isinstance(jinja_config, JinjaConfig) else jinja_config
-        return cls(_VariantConfig.from_file_with_context(Path(path), py_config))
+        return cls(_VariantConfig.from_file_with_context(Path(path), jinja_config._config))
 
     @classmethod
-    def from_conda_build_config(cls, path: str | Path, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
+    def from_conda_build_config(cls, path: str | Path, jinja_config: JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a conda_build_config.yaml file.
 
@@ -143,9 +137,7 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
         """
-        # Convert JinjaConfig to PyJinjaConfig if needed
-        py_config = jinja_config._config if isinstance(jinja_config, JinjaConfig) else jinja_config
-        return cls(_VariantConfig.from_conda_build_config(Path(path), py_config))
+        return cls(_VariantConfig.from_conda_build_config(Path(path), jinja_config._config))
 
     @classmethod
     def from_yaml(cls, yaml: str) -> "VariantConfig":
@@ -169,7 +161,7 @@ class VariantConfig:
         return cls(_VariantConfig.from_yaml(yaml))
 
     @classmethod
-    def from_yaml_with_context(cls, yaml: str, jinja_config: PyJinjaConfig | JinjaConfig) -> "VariantConfig":
+    def from_yaml_with_context(cls, yaml: str, jinja_config: JinjaConfig) -> "VariantConfig":
         """
         Load VariantConfig from a YAML string with a JinjaConfig context (variants.yaml format).
 
@@ -195,9 +187,7 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
         """
-        # Convert JinjaConfig to PyJinjaConfig if needed
-        py_config = jinja_config._config if isinstance(jinja_config, JinjaConfig) else jinja_config
-        return cls(_VariantConfig.from_yaml_with_context(yaml, py_config))
+        return cls(_VariantConfig.from_yaml_with_context(yaml, jinja_config._config))
 
     def keys(self) -> list[str]:
         """
@@ -207,9 +197,7 @@ class VariantConfig:
             List of variant key names
 
         Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.8", "3.9"])
-            >>> config.set_values("numpy", ["1.21"])
+            >>> config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21"]})
             >>> config.keys()
             ['numpy', 'python']
         """
@@ -228,10 +216,10 @@ class VariantConfig:
             List of groups (each group is a list of keys), or None if no zip keys are defined
 
         Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.9", "3.10"])
-            >>> config.set_values("numpy", ["1.20", "1.21"])
-            >>> config.zip_keys = [["python", "numpy"]]
+            >>> config = VariantConfig(
+            ...     {"python": ["3.9", "3.10"], "numpy": ["1.20", "1.21"]},
+            ...     zip_keys=[["python", "numpy"]]
+            ... )
             >>> len(config.combinations())  # 2, not 4
             2
         """
@@ -248,27 +236,12 @@ class VariantConfig:
             List of values for the key, or None if key doesn't exist
 
         Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.8", "3.9", "3.10"])
+            >>> config = VariantConfig({"python": ["3.8", "3.9", "3.10"]})
             >>> config.get_values("python")
             ['3.8', '3.9', '3.10']
         """
         return self._inner.get_values(key)
 
-    def set_values(self, key: str, values: list[Any]) -> None:
-        """
-        Set values for a variant key.
-
-        Args:
-            key: The variant key name
-            values: List of values for this key
-
-        Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.8", "3.9", "3.10"])
-            >>> config.set_values("numpy", ["1.21", "1.22"])
-        """
-        self._inner.set_values(key, values)
 
     def to_dict(self) -> dict[str, list[Any]]:
         """
@@ -278,30 +251,11 @@ class VariantConfig:
             Dictionary mapping variant keys to their value lists
 
         Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.8", "3.9"])
+            >>> config = VariantConfig({"python": ["3.8", "3.9"]})
             >>> config.to_dict()
             {'python': ['3.8', '3.9']}
         """
         return self._inner.to_dict()
-
-    def merge(self, other: "VariantConfig") -> None:
-        """
-        Merge another VariantConfig into this one.
-
-        Args:
-            other: Another VariantConfig to merge
-
-        Example:
-            >>> config1 = VariantConfig()
-            >>> config1.set_values("python", ["3.8", "3.9"])
-            >>> config2 = VariantConfig()
-            >>> config2.set_values("numpy", ["1.21"])
-            >>> config1.merge(config2)
-            >>> config1.keys()
-            ['numpy', 'python']
-        """
-        self._inner.merge(other._inner)
 
     def combinations(self) -> list[dict[str, Any]]:
         """
@@ -311,9 +265,7 @@ class VariantConfig:
             List of dictionaries, each representing one variant combination
 
         Example:
-            >>> config = VariantConfig()
-            >>> config.set_values("python", ["3.8", "3.9"])
-            >>> config.set_values("numpy", ["1.21", "1.22"])
+            >>> config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21", "1.22"]})
             >>> combos = config.combinations()
             >>> len(combos)
             4
@@ -349,21 +301,6 @@ class VariantConfig:
             raise KeyError(f"Variant key '{key}' not found")
         return values
 
-    def __setitem__(self, key: str, values: list[Any]) -> None:
-        """
-        Set values for a variant key using dict-like access.
-
-        Args:
-            key: The variant key name
-            values: List of values for this key
-
-        Example:
-            >>> config = VariantConfig()
-            >>> config["python"] = ["3.9", "3.10"]
-            >>> config["numpy"] = ["1.21", "1.22"]
-        """
-        self._inner.set_values(key, values)
-
     def __contains__(self, key: str) -> bool:
         """
         Check if a variant key exists.
@@ -382,18 +319,6 @@ class VariantConfig:
             False
         """
         return self._inner.get_values(key) is not None
-
-    def __delitem__(self, key: str) -> None:
-        """
-        Delete a variant key (not implemented - raises NotImplementedError).
-
-        Args:
-            key: The variant key name
-
-        Raises:
-            NotImplementedError: Deletion is not supported
-        """
-        raise NotImplementedError("Deletion of variant keys is not supported")
 
     def __iter__(self) -> Iterator[str]:
         """
@@ -457,27 +382,6 @@ class VariantConfig:
         """
         values = self._inner.get_values(key)
         return values if values is not None else default
-
-    def update(self, other: Union["VariantConfig", dict[str, list[Any]]]) -> None:
-        """
-        Update this config with values from another config or dict.
-
-        Args:
-            other: Another VariantConfig or dict to merge
-
-        Example:
-            >>> config = VariantConfig({"python": ["3.9"]})
-            >>> config.update({"numpy": ["1.21"]})
-            >>> config.keys()
-            ['numpy', 'python']
-        """
-        if isinstance(other, VariantConfig):
-            self.merge(other)
-        elif isinstance(other, dict):
-            for key, values in other.items():
-                self.set_values(key, values)
-        else:
-            raise TypeError(f"Expected VariantConfig or dict, got {type(other)}")
 
     def __repr__(self) -> str:
         return repr(self._inner)
