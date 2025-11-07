@@ -1,5 +1,5 @@
-from . import progress, recipe_generation, render, stage0, stage1, tool_config
-from .cli_api import (
+from rattler_build import progress, recipe_generation, render, stage0, stage1, tool_config
+from rattler_build.cli_api import (
     build_recipes,
     test_package,
     upload_package_to_anaconda,
@@ -8,9 +8,9 @@ from .cli_api import (
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
 )
-from .jinja_config import JinjaConfig
-from ._rattler_build import RattlerBuildError, get_rattler_build_version_py
-from .recipe import (
+from rattler_build.jinja_config import JinjaConfig
+from rattler_build._rattler_build import RattlerBuildError, get_rattler_build_version_py
+from rattler_build.recipe import (
     About,
     Build,
     Package,
@@ -20,9 +20,9 @@ from .recipe import (
     TestType,
     TestTypeEnum,
 )
-from .render import RenderConfig
-from .tool_config import ToolConfiguration
-from .variant_config import VariantConfig
+from rattler_build.render import RenderConfig
+from rattler_build.tool_config import ToolConfiguration
+from rattler_build.variant_config import VariantConfig
 
 
 def rattler_build_version() -> str:

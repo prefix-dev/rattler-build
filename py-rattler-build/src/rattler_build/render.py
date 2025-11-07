@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     _render_recipe = Any
 else:
     # At runtime, import from the Rust module
-    from . import _rattler_build as _rb
+    from rattler_build import _rattler_build as _rb
 
     _render = _rb.render
     _RenderConfig = _render.RenderConfig
@@ -322,7 +322,7 @@ class RenderedVariant:
             >>> # Build just the first variant
             >>> rendered[0].run_build(output_dir="./output")
         """
-        from . import _rattler_build as _rb
+        from rattler_build import _rattler_build as _rb
 
         # Extract the inner ToolConfiguration if provided
         tool_config_inner = tool_config._inner if tool_config else None
@@ -502,7 +502,7 @@ def build_rendered_variants(
         >>> # Or build a subset
         >>> build_rendered_variants(rendered[:2], output_dir="./output")
     """
-    from . import _rattler_build as _rb
+    from rattler_build import _rattler_build as _rb
 
     # Extract the inner ToolConfiguration if provided
     tool_config_inner = tool_config._inner if tool_config else None

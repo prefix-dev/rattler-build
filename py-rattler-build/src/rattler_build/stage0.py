@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     _Stage0StagingOutput = Any
 else:
     # At runtime, import the Rust submodule
-    from . import _rattler_build as _rb
+    from rattler_build import _rattler_build as _rb
 
     # Get the stage0 submodule
     _stage0 = _rb.stage0
@@ -221,8 +221,8 @@ class SingleOutputRecipe:
             ...     print(variant.recipe().package.name)
         """
         # Import here to avoid circular dependency
-        from . import render as render_module
-        from . import variant_config as vc_module
+        from rattler_build import render as render_module
+        from rattler_build import variant_config as vc_module
 
         # Create empty variant config if not provided
         if variant_config is None:
@@ -263,7 +263,7 @@ class SingleOutputRecipe:
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
             >>> recipe.run_build(tool_config=config, output_dir="./output")
         """
-        from . import _rattler_build as _rb
+        from rattler_build import _rattler_build as _rb
 
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)
@@ -401,8 +401,8 @@ class MultiOutputRecipe:
             ...     print(variant.recipe().package.name)
         """
         # Import here to avoid circular dependency
-        from . import render as render_module
-        from . import variant_config as vc_module
+        from rattler_build import render as render_module
+        from rattler_build import variant_config as vc_module
 
         # Create empty variant config if not provided
         if variant_config is None:
@@ -443,7 +443,7 @@ class MultiOutputRecipe:
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
             >>> recipe.run_build(tool_config=config, output_dir="./output")
         """
-        from . import _rattler_build as _rb
+        from rattler_build import _rattler_build as _rb
 
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)

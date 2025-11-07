@@ -4,7 +4,7 @@ Tool configuration for rattler-build.
 This module provides a Pythonic API for configuring the build tool.
 """
 
-from . import _rattler_build as _rb
+from rattler_build import _rattler_build as _rb
 
 _ToolConfiguration = _rb.tool_config.ToolConfiguration
 

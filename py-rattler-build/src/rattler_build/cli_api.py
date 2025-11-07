@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from ._rattler_build import (
+from rattler_build._rattler_build import (
     build_recipes_py,
     test_package_py,
     upload_package_to_anaconda_py,

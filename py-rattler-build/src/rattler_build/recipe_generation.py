@@ -4,7 +4,7 @@ This module provides a clean Python API for generating conda recipes
 from PyPI, CRAN, CPAN, and LuaRocks packages.
 """
 
-from ._rattler_build import (
+from rattler_build._rattler_build import (
     generate_pypi_recipe_string_py,
     generate_r_recipe_string_py,
     generate_cpan_recipe_string_py,

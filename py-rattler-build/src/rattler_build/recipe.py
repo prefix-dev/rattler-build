@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from . import stage0
+from rattler_build import stage0
 
 
 class TestTypeEnum(Enum):
