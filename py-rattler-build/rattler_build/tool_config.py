@@ -4,62 +4,9 @@ Tool configuration for rattler-build.
 This module provides a Pythonic API for configuring the build tool.
 """
 
-from typing import TYPE_CHECKING
+from . import rattler_build as _rb
 
-if TYPE_CHECKING:
-    # Type stub for the Rust ToolConfiguration
-    class _ToolConfiguration:
-        def __init__(
-            self,
-            keep_build: bool = ...,
-            compression_threads: int | None = ...,
-            io_concurrency_limit: int | None = ...,
-            test_strategy: str | None = ...,
-            skip_existing: str | None = ...,
-            continue_on_failure: bool = ...,
-            noarch_build_platform: str | None = ...,
-            channel_priority: str | None = ...,
-            allow_insecure_host: list[str] | None = ...,
-            error_prefix_in_binary: bool = ...,
-            allow_symlinks_on_windows: bool = ...,
-            use_zstd: bool = ...,
-            use_bz2: bool = ...,
-            use_sharded: bool = ...,
-            use_jlap: bool = ...,
-        ) -> None: ...
-        @property
-        def keep_build(self) -> bool: ...
-        def set_keep_build(self, value: bool) -> None: ...
-        @property
-        def test_strategy(self) -> str: ...
-        @property
-        def skip_existing(self) -> str: ...
-        @property
-        def continue_on_failure(self) -> bool: ...
-        @property
-        def channel_priority(self) -> str: ...
-        @property
-        def use_zstd(self) -> bool: ...
-        @property
-        def use_bz2(self) -> bool: ...
-        @property
-        def use_sharded(self) -> bool: ...
-        @property
-        def use_jlap(self) -> bool: ...
-        @property
-        def compression_threads(self) -> int | None: ...
-        @property
-        def io_concurrency_limit(self) -> int | None: ...
-        @property
-        def allow_insecure_host(self) -> list[str] | None: ...
-        @property
-        def error_prefix_in_binary(self) -> bool: ...
-        @property
-        def allow_symlinks_on_windows(self) -> bool: ...
-else:
-    from . import rattler_build as _rb
-
-    _ToolConfiguration = _rb.tool_config.ToolConfiguration
+_ToolConfiguration = _rb.tool_config.ToolConfiguration
 
 
 class ToolConfiguration:
