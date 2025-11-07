@@ -187,7 +187,6 @@ def test_stage1_module_structure_snapshot() -> None:
             "Requirements",
             "Source",
             "StagingCache",
-            "TYPE_CHECKING",
         ]
     )
 

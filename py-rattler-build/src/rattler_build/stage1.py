@@ -6,32 +6,9 @@ which represent the fully evaluated recipe with all Jinja templates resolved
 and conditionals evaluated.
 """
 
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    # For type checking, use Any as placeholder since we don't have stubs
-    _Stage1Recipe = Any
-    _Stage1Package = Any
-    _Stage1Build = Any
-    _Stage1Requirements = Any
-    _Stage1About = Any
-    _Stage1Source = Any
-    _Stage1StagingCache = Any
-else:
-    # At runtime, import the Rust submodule
-    from rattler_build import _rattler_build as _rb
-
-    # Get the stage1 submodule
-    _stage1 = _rb.stage1
-
-    # Import classes from the stage1 submodule
-    _Stage1Recipe = _stage1.Stage1Recipe
-    _Stage1Package = _stage1.Stage1Package
-    _Stage1Build = _stage1.Stage1Build
-    _Stage1Requirements = _stage1.Stage1Requirements
-    _Stage1About = _stage1.Stage1About
-    _Stage1Source = _stage1.Stage1Source
-    _Stage1StagingCache = _stage1.Stage1StagingCache
+from rattler_build._rattler_build import stage1 as _stage1
 
 __all__ = [
     "Recipe",
@@ -58,7 +35,7 @@ class Recipe:
         >>> print(stage1_recipe.package.version)
     """
 
-    def __init__(self, inner: _Stage1Recipe):
+    def __init__(self, inner: _stage1.Stage1Recipe):
         self._inner = inner
 
     @property
@@ -117,7 +94,7 @@ class Recipe:
 class Package:
     """Package metadata at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1Package):
+    def __init__(self, inner: _stage1.Stage1Package):
         self._inner = inner
 
     @property
@@ -144,7 +121,7 @@ class Package:
 class Build:
     """Build configuration at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1Build):
+    def __init__(self, inner: _stage1.Stage1Build):
         self._inner = inner
 
     @property
@@ -178,7 +155,7 @@ class Build:
 class Requirements:
     """Requirements at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1Requirements):
+    def __init__(self, inner: _stage1.Stage1Requirements):
         self._inner = inner
 
     @property
@@ -207,7 +184,7 @@ class Requirements:
 class About:
     """About metadata at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1About):
+    def __init__(self, inner: _stage1.Stage1About):
         self._inner = inner
 
     @property
@@ -251,7 +228,7 @@ class About:
 class Source:
     """Source information at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1Source):
+    def __init__(self, inner: _stage1.Stage1Source):
         self._inner = inner
 
     def to_dict(self) -> dict[str, Any]:
@@ -262,7 +239,7 @@ class Source:
 class StagingCache:
     """Staging cache information at stage1 (fully evaluated)."""
 
-    def __init__(self, inner: _Stage1StagingCache):
+    def __init__(self, inner: _stage1.Stage1StagingCache):
         self._inner = inner
 
     @property
