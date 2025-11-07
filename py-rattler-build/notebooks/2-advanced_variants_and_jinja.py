@@ -74,17 +74,19 @@ def _(mo):
 @app.cell
 def _(VariantConfig, pprint):
     # Create variants that should be paired
-    synced_variants = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"]})
+    synced_variants_without_zip = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"]})
 
     print("❌ WITHOUT zip_keys (Cartesian product)")
     print("=" * 60)
-    combinations_before = synced_variants.combinations()
+    combinations_before = synced_variants_without_zip.combinations()
     print(f"Total combinations: {len(combinations_before)}")
     pprint.pprint(combinations_before[:6])  # Show first 6
     print("...")
 
     # Now synchronize python and numpy
-    synced_variants.zip_keys = [["python", "numpy"]]
+    synced_variants = VariantConfig(
+        {"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"]}, zip_keys=[["python", "numpy"]]
+    )
 
     print("\n✅ WITH zip_keys (synchronized)")
     print("=" * 60)
@@ -118,11 +120,9 @@ def _(VariantConfig, pprint):
             "numpy": ["1.21", "1.23", "1.24"],
             "c_compiler": ["gcc", "clang", "msvc"],
             "cxx_compiler": ["g++", "clang++", "msvc"],
-        }
+        },
+        zip_keys=[["python", "numpy"], ["c_compiler", "cxx_compiler"]],
     )
-
-    # Zip python with numpy, AND c_compiler with cxx_compiler
-    multi_zip.zip_keys = [["python", "numpy"], ["c_compiler", "cxx_compiler"]]
 
     print("🔗 Multiple Zip Groups")
     print("=" * 60)
@@ -344,9 +344,9 @@ def _(Recipe, RenderConfig, VariantConfig, render_recipe):
 
     # Create variant config with synced python/numpy
     realistic_variants = VariantConfig(
-        {"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"], "python_impl": ["cpython"]}
+        {"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"], "python_impl": ["cpython"]},
+        zip_keys=[["python", "numpy"]],
     )
-    realistic_variants.zip_keys = [["python", "numpy"]]
 
     # Render for Linux
     realistic_render = RenderConfig(target_platform="linux-64")
@@ -406,8 +406,9 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
 
     inspect_recipe = Recipe.from_yaml(inspect_yaml)
 
-    inspect_variants = VariantConfig({"python": ["3.10", "3.11"], "numpy": ["1.23", "1.24"], "build_number": ["0"]})
-    inspect_variants.zip_keys = [["python", "numpy"]]
+    inspect_variants = VariantConfig(
+        {"python": ["3.10", "3.11"], "numpy": ["1.23", "1.24"], "build_number": ["0"]}, zip_keys=[["python", "numpy"]]
+    )
 
     inspect_render = RenderConfig()
     inspect_results = render_recipe(inspect_recipe, inspect_variants, inspect_render)

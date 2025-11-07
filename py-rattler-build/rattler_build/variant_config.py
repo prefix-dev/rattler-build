@@ -47,25 +47,37 @@ class VariantConfig:
         >>> print(config.keys())
     """
 
-    def __init__(self, variants: dict[str, list[Any]] | _VariantConfig | None = None):
+    def __init__(
+        self,
+        variants: dict[str, list[Any]] | _VariantConfig | None = None,
+        zip_keys: list[list[str]] | None = None,
+    ):
         """
         Create a new VariantConfig.
 
         Args:
             variants: Either a dictionary mapping variant keys to value lists,
                      or an existing _VariantConfig instance. If None, creates empty config.
+            zip_keys: Optional list of groups (each group is a list of keys) that should be
+                     zipped together. Ensures that certain variant keys are synchronized.
 
         Example:
             >>> # Create from dict
             >>> config = VariantConfig({"python": ["3.9", "3.10"]})
 
+            >>> # Create with zip_keys
+            >>> config = VariantConfig(
+            ...     {"python": ["3.9", "3.10"], "numpy": ["1.21", "1.22"]},
+            ...     zip_keys=[["python", "numpy"]]
+            ... )
+
             >>> # Create empty
             >>> config = VariantConfig()
         """
         if variants is None:
-            self._inner = _VariantConfig()
+            self._inner = _VariantConfig(zip_keys=zip_keys)
         elif isinstance(variants, dict):
-            self._inner = _VariantConfig()
+            self._inner = _VariantConfig(zip_keys=zip_keys)
             for key, values in variants.items():
                 self._inner.set_values(key, values)
         else:
@@ -224,20 +236,6 @@ class VariantConfig:
             2
         """
         return self._inner.zip_keys
-
-    @zip_keys.setter
-    def zip_keys(self, value: list[list[str]] | None) -> None:
-        """
-        Set zip_keys - groups of keys that should be zipped together.
-
-        Args:
-            value: List of groups (each group is a list of keys), or None to clear
-
-        Example:
-            >>> config = VariantConfig()
-            >>> config.zip_keys = [["python", "numpy"], ["c_compiler", "cxx_compiler"]]
-        """
-        self._inner.zip_keys = value
 
     def get_values(self, key: str) -> list[Any] | None:
         """

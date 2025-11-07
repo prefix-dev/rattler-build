@@ -18,12 +18,17 @@ pub struct PyVariantConfig {
 
 #[pymethods]
 impl PyVariantConfig {
-    /// Create a new empty VariantConfig
+    /// Create a new VariantConfig with optional zip_keys
     #[new]
-    fn new() -> Self {
-        PyVariantConfig {
-            inner: VariantConfig::default(),
-        }
+    #[pyo3(signature = (zip_keys=None))]
+    fn new(zip_keys: Option<Vec<Vec<String>>>) -> Self {
+        let mut inner = VariantConfig::default();
+        inner.zip_keys = zip_keys.map(|zk| {
+            zk.into_iter()
+                .map(|group| group.into_iter().map(NormalizedKey::from).collect())
+                .collect()
+        });
+        PyVariantConfig { inner }
     }
 
     /// Load VariantConfig from a YAML file (variants.yaml format)
@@ -94,15 +99,6 @@ impl PyVariantConfig {
         })
     }
 
-    /// Set zip_keys - groups of keys that should be zipped together
-    #[setter]
-    fn set_zip_keys(&mut self, zip_keys: Option<Vec<Vec<String>>>) {
-        self.inner.zip_keys = zip_keys.map(|zk| {
-            zk.into_iter()
-                .map(|group| group.into_iter().map(NormalizedKey::from).collect())
-                .collect()
-        });
-    }
 
     /// Get values for a specific variant key
     fn get_values(&self, key: &str, py: Python<'_>) -> PyResult<Option<Vec<Py<PyAny>>>> {

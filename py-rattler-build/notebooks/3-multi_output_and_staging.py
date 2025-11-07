@@ -526,8 +526,9 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     multi_var_recipe = Recipe.from_yaml(multi_variant_yaml)
 
     # Create variants
-    multi_var_variants = VariantConfig({"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"]})
-    multi_var_variants.zip_keys = [["python", "numpy"]]
+    multi_var_variants = VariantConfig(
+        {"python": ["3.9", "3.10", "3.11"], "numpy": ["1.21", "1.23", "1.24"]}, zip_keys=[["python", "numpy"]]
+    )
 
     multi_var_render = RenderConfig()
     multi_var_results = render_recipe(multi_var_recipe, multi_var_variants, multi_var_render)

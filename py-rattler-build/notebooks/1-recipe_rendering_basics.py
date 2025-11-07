@@ -158,21 +158,21 @@ def _(VariantConfig, json, pprint):
         "python": ["3.9", "3.10", "3.11"],
         "numpy": ["1.21", "1.22", "1.23"],
     }
-    variant_config = VariantConfig(variant_dict)
+    variant_config_without_zip = VariantConfig(variant_dict)
 
     print("✨ Variant Configuration")
     print("=" * 60)
-    print(f"Variant keys: {variant_config.keys()}")
-    print(f"Python versions: {variant_config.get_values('python')}")
-    print(f"Numpy versions: {variant_config.get_values('numpy')}")
+    print(f"Variant keys: {variant_config_without_zip.keys()}")
+    print(f"Python versions: {variant_config_without_zip.get_values('python')}")
+    print(f"Numpy versions: {variant_config_without_zip.get_values('numpy')}")
 
     print("\n📊 WITHOUT zip_keys (Cartesian product):")
-    print(f"Total combinations: {len(variant_config.combinations())} (3 × 3)")
+    print(f"Total combinations: {len(variant_config_without_zip.combinations())} (3 × 3)")
     print("\nAll possible combinations:")
-    pprint.pprint(variant_config.combinations())
+    pprint.pprint(variant_config_without_zip.combinations())
 
-    # Zip python and numpy together (same index)
-    variant_config.zip_keys = [["python", "numpy"]]
+    # Create a new VariantConfig with zip_keys (python and numpy zipped together by index)
+    variant_config = VariantConfig(variant_dict, zip_keys=[["python", "numpy"]])
 
     print("\n" + "=" * 60)
     print("🔗 WITH zip_keys (paired by index):")

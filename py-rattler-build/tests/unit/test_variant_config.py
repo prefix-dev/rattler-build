@@ -192,21 +192,23 @@ def test_variant_config_empty_combinations() -> None:
 
 def test_variant_config_zip_keys() -> None:
     """Test zip_keys functionality."""
-    config = VariantConfig()
+    config_without_zip = VariantConfig()
 
     # Initially, zip_keys should be None
-    assert config.zip_keys is None
+    assert config_without_zip.zip_keys is None
 
     # Set variant values
-    config.set_values("python", ["3.9", "3.10", "3.11"])
-    config.set_values("numpy", ["1.20", "1.21", "1.22"])
+    config_without_zip.set_values("python", ["3.9", "3.10", "3.11"])
+    config_without_zip.set_values("numpy", ["1.20", "1.21", "1.22"])
 
     # Without zip_keys, we get all combinations (3 * 3 = 9)
-    combinations = config.combinations()
+    combinations = config_without_zip.combinations()
     assert len(combinations) == 9
 
-    # Set zip_keys to synchronize python and numpy
-    config.zip_keys = [["python", "numpy"]]
+    # Create new config with zip_keys to synchronize python and numpy
+    config = VariantConfig(
+        {"python": ["3.9", "3.10", "3.11"], "numpy": ["1.20", "1.21", "1.22"]}, zip_keys=[["python", "numpy"]]
+    )
     assert config.zip_keys == [["python", "numpy"]]
 
     # With zip_keys, we get only synchronized combinations (3)
@@ -380,16 +382,15 @@ c_compiler:
 
 def test_variant_config_multiple_zip_key_groups() -> None:
     """Test multiple zip_key groups."""
-    config = VariantConfig()
-
-    # Set variant values
-    config.set_values("python", ["3.9", "3.10"])
-    config.set_values("numpy", ["1.20", "1.21"])
-    config.set_values("c_compiler", ["gcc", "clang"])
-    config.set_values("cxx_compiler", ["gxx", "clangxx"])
-
-    # Set multiple zip_key groups
-    config.zip_keys = [["python", "numpy"], ["c_compiler", "cxx_compiler"]]
+    config = VariantConfig(
+        {
+            "python": ["3.9", "3.10"],
+            "numpy": ["1.20", "1.21"],
+            "c_compiler": ["gcc", "clang"],
+            "cxx_compiler": ["gxx", "clangxx"],
+        },
+        zip_keys=[["python", "numpy"], ["c_compiler", "cxx_compiler"]],
+    )
 
     # Should get 2 * 2 = 4 combinations (not 2 * 2 * 2 * 2 = 16)
     combinations = config.combinations()

@@ -134,23 +134,9 @@ impl PyJinjaConfig {
         self.inner.target_platform.to_string()
     }
 
-    #[setter]
-    fn set_target_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
-        self.inner.target_platform = platform;
-        Ok(())
-    }
-
     #[getter]
     fn host_platform(&self) -> String {
         self.inner.host_platform.to_string()
-    }
-
-    #[setter]
-    fn set_host_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
-        self.inner.host_platform = platform;
-        Ok(())
     }
 
     #[getter]
@@ -158,21 +144,9 @@ impl PyJinjaConfig {
         self.inner.build_platform.to_string()
     }
 
-    #[setter]
-    fn set_build_platform(&mut self, value: String) -> PyResult<()> {
-        let platform = Platform::from_str(&value).map_err(RattlerBuildError::from)?;
-        self.inner.build_platform = platform;
-        Ok(())
-    }
-
     #[getter]
     fn experimental(&self) -> bool {
         self.inner.experimental
-    }
-
-    #[setter]
-    fn set_experimental(&mut self, value: bool) {
-        self.inner.experimental = value;
     }
 
     #[getter]
@@ -180,23 +154,9 @@ impl PyJinjaConfig {
         matches!(self.inner.undefined_behavior, UndefinedBehavior::Lenient)
     }
 
-    #[setter]
-    fn set_allow_undefined(&mut self, value: bool) {
-        self.inner.undefined_behavior = if value {
-            UndefinedBehavior::Lenient
-        } else {
-            UndefinedBehavior::SemiStrict
-        };
-    }
-
     #[getter]
     fn recipe_path(&self) -> Option<PathBuf> {
         self.inner.recipe_path.clone()
-    }
-
-    #[setter]
-    fn set_recipe_path(&mut self, value: Option<PathBuf>) {
-        self.inner.recipe_path = value;
     }
 
     #[getter]
@@ -211,55 +171,5 @@ impl PyJinjaConfig {
             .map_err(|e| {
                 RattlerBuildError::Variant(format!("Failed to convert variant to Python: {}", e))
             })?)
-    }
-
-    #[setter]
-    fn set_variant(&mut self, py: Python<'_>, value: HashMap<String, Py<PyAny>>) -> PyResult<()> {
-        let mut map = BTreeMap::new();
-        for (key, py_value) in value {
-            let normalized_key = NormalizedKey::from(key);
-            let json_val: serde_json::Value =
-                pythonize::depythonize(py_value.bind(py)).map_err(|e| {
-                    RattlerBuildError::Variant(format!("Failed to convert variant value: {}", e))
-                })?;
-            let variable = match &json_val {
-                JsonValue::String(s) => Variable::from_string(s),
-                JsonValue::Bool(b) => Variable::from(*b),
-                JsonValue::Number(n) => {
-                    if let Some(i) = n.as_i64() {
-                        Variable::from(i)
-                    } else {
-                        Variable::from_string(&n.to_string())
-                    }
-                }
-                JsonValue::Array(arr) => {
-                    let vars: Result<Vec<Variable>, RattlerBuildError> = arr
-                        .iter()
-                        .map(|v| match v {
-                            JsonValue::String(s) => Ok(Variable::from_string(s)),
-                            JsonValue::Bool(b) => Ok(Variable::from(*b)),
-                            JsonValue::Number(n) => Ok(if let Some(i) = n.as_i64() {
-                                Variable::from(i)
-                            } else {
-                                Variable::from_string(&n.to_string())
-                            }),
-                            _ => Err(RattlerBuildError::Variant(
-                                "Complex array elements not supported".to_string(),
-                            )),
-                        })
-                        .collect();
-                    Variable::from(vars?)
-                }
-                _ => {
-                    return Err(RattlerBuildError::Variant(
-                        "Object and null variants not supported".to_string(),
-                    )
-                    .into());
-                }
-            };
-            map.insert(normalized_key, variable);
-        }
-        self.inner.variant = map;
-        Ok(())
     }
 }

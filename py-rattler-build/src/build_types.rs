@@ -110,29 +110,6 @@ impl PyPackagingSettings {
         self.inner.compression_level
     }
 
-    /// Set the archive type
-    #[setter]
-    fn set_archive_type(&mut self, archive_type: &str) -> PyResult<()> {
-        self.inner.archive_type = match archive_type.to_lowercase().as_str() {
-            "conda" => ArchiveType::Conda,
-            "tar-bz2" | "tar.bz2" | "tarbz2" => ArchiveType::TarBz2,
-            _ => {
-                return Err(RattlerBuildError::Other(format!(
-                    "Invalid archive type: {}. Must be 'conda' or 'tar-bz2'",
-                    archive_type
-                ))
-                .into());
-            }
-        };
-        Ok(())
-    }
-
-    /// Set the compression level
-    #[setter]
-    fn set_compression_level(&mut self, level: i32) {
-        self.inner.compression_level = level;
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PackagingSettings(archive_type='{}', compression_level={})",

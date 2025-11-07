@@ -132,12 +132,6 @@ impl PyToolConfiguration {
         self.inner.no_clean
     }
 
-    /// Set whether to keep the build directory
-    #[setter]
-    fn set_keep_build(&mut self, value: bool) {
-        self.inner.no_clean = value;
-    }
-
     /// The test strategy to use
     #[getter]
     fn test_strategy(&self) -> String {

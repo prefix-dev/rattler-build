@@ -24,36 +24,31 @@ def test_jinja_config_with_platforms() -> None:
     assert config.build_platform == "linux-64"
 
 
-def test_jinja_config_platform_setters() -> None:
-    """Test setting platforms after creation."""
-    config = JinjaConfig()
+def test_jinja_config_platform_constructor() -> None:
+    """Test creating JinjaConfig with specific platforms."""
+    config = JinjaConfig(target_platform="win-64", host_platform="osx-arm64", build_platform="linux-aarch64")
 
-    config.target_platform = "win-64"
     assert config.target_platform == "win-64"
-
-    config.host_platform = "osx-arm64"
     assert config.host_platform == "osx-arm64"
-
-    config.build_platform = "linux-aarch64"
     assert config.build_platform == "linux-aarch64"
 
 
 def test_selector_config_experimental() -> None:
     """Test experimental flag."""
-    config = JinjaConfig(experimental=True)
-    assert config.experimental is True
+    config_true = JinjaConfig(experimental=True)
+    assert config_true.experimental is True
 
-    config.experimental = False
-    assert config.experimental is False
+    config_false = JinjaConfig(experimental=False)
+    assert config_false.experimental is False
 
 
 def test_selector_config_allow_undefined() -> None:
     """Test allow_undefined flag."""
-    config = JinjaConfig(allow_undefined=True)
-    assert config.allow_undefined is True
+    config_true = JinjaConfig(allow_undefined=True)
+    assert config_true.allow_undefined is True
 
-    config.allow_undefined = False
-    assert config.allow_undefined is False
+    config_false = JinjaConfig(allow_undefined=False)
+    assert config_false.allow_undefined is False
 
 
 def test_selector_config_with_variant() -> None:
@@ -66,12 +61,10 @@ def test_selector_config_with_variant() -> None:
     assert isinstance(config.variant, dict)
 
 
-def test_selector_config_variant_setter() -> None:
-    """Test setting variant after creation."""
-    config = JinjaConfig()
-
+def test_selector_config_variant_constructor() -> None:
+    """Test creating JinjaConfig with variant."""
     variant = {"python": "3.10", "build_number": 1}
-    config.variant = variant
+    config = JinjaConfig(variant=variant)
 
     assert config.variant is not None
     assert isinstance(config.variant, dict)
