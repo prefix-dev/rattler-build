@@ -38,7 +38,7 @@ def build_recipe_with_rich_progress(recipe_path: Path):
     # Configure variant rendering
     variant_config = VariantConfig()
     # Set recipe_path so the build can find license files, etc.
-    render_config = RenderConfig(recipe_path=str(recipe_path.parent))
+    render_config = RenderConfig(recipe_path=str(recipe_path))
 
     print("\n📋 Rendering recipe variants...")
     rendered_variants = render_recipe(recipe, variant_config, render_config)
@@ -102,7 +102,7 @@ def build_recipe_with_simple_progress(recipe_path: Path):
         # Build with real progress callbacks!
         with tempfile.TemporaryDirectory() as tmpdir:
             variant.run_build(
-                progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_dir=recipe_path.parent
+                progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_path=recipe_path
             )
 
     print("\n✅ Build complete!")

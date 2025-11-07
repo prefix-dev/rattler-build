@@ -542,7 +542,6 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     tool_config::register_tool_config_module(_py, &m)?;
     build_types::register_build_types_module(_py, &m)?;
     platform_types::register_platform_types_module(_py, &m)?;
-    progress_callback::register_progress_types(_py, &m)?;
 
     Ok(())
 }

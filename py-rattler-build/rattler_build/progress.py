@@ -11,67 +11,61 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-# Try to import from Rust module, but provide Python fallbacks if not available yet
-try:
-    from rattler_build.rattler_build.progress import (
-        BuildStepEvent,
-        DownloadCompleteEvent,
-        DownloadProgressEvent,
-        DownloadStartEvent,
-        LogEvent,
-    )
-except (ImportError, AttributeError):
-    # Fallback Python implementations for when Rust bindings aren't ready
-    class DownloadStartEvent:
-        """Event fired when a download starts."""
 
-        def __init__(self, url: str, total_bytes: int | None = None):
-            self.url = url
-            self.total_bytes = total_bytes
+class DownloadStartEvent:
+    """Event fired when a download starts."""
 
-        def __repr__(self):
-            return f"DownloadStartEvent(url='{self.url}', total_bytes={self.total_bytes})"
+    def __init__(self, url: str, total_bytes: int | None = None):
+        self.url = url
+        self.total_bytes = total_bytes
 
-    class DownloadProgressEvent:
-        """Event fired during download progress."""
+    def __repr__(self) -> str:
+        return f"DownloadStartEvent(url='{self.url}', total_bytes={self.total_bytes})"
 
-        def __init__(self, url: str, bytes_downloaded: int, total_bytes: int | None = None):
-            self.url = url
-            self.bytes_downloaded = bytes_downloaded
-            self.total_bytes = total_bytes
 
-        def __repr__(self):
-            return f"DownloadProgressEvent(url='{self.url}', bytes_downloaded={self.bytes_downloaded}, total_bytes={self.total_bytes})"
+class DownloadProgressEvent:
+    """Event fired during download progress."""
 
-    class DownloadCompleteEvent:
-        """Event fired when a download completes."""
+    def __init__(self, url: str, bytes_downloaded: int, total_bytes: int | None = None):
+        self.url = url
+        self.bytes_downloaded = bytes_downloaded
+        self.total_bytes = total_bytes
 
-        def __init__(self, url: str):
-            self.url = url
+    def __repr__(self) -> str:
+        return f"DownloadProgressEvent(url='{self.url}', bytes_downloaded={self.bytes_downloaded}, total_bytes={self.total_bytes})"
 
-        def __repr__(self):
-            return f"DownloadCompleteEvent(url='{self.url}')"
 
-    class BuildStepEvent:
-        """Event fired when a build step begins."""
+class DownloadCompleteEvent:
+    """Event fired when a download completes."""
 
-        def __init__(self, step_name: str, message: str):
-            self.step_name = step_name
-            self.message = message
+    def __init__(self, url: str):
+        self.url = url
 
-        def __repr__(self):
-            return f"BuildStepEvent(step_name='{self.step_name}', message='{self.message}')"
+    def __repr__(self) -> str:
+        return f"DownloadCompleteEvent(url='{self.url}')"
 
-    class LogEvent:
-        """Event fired for log messages."""
 
-        def __init__(self, level: str, message: str, span: str | None = None):
-            self.level = level
-            self.message = message
-            self.span = span
+class BuildStepEvent:
+    """Event fired when a build step begins."""
 
-        def __repr__(self):
-            return f"LogEvent(level='{self.level}', message='{self.message}', span={self.span})"
+    def __init__(self, step_name: str, message: str):
+        self.step_name = step_name
+        self.message = message
+
+    def __repr__(self) -> str:
+        return f"BuildStepEvent(step_name='{self.step_name}', message='{self.message}')"
+
+
+class LogEvent:
+    """Event fired for log messages."""
+
+    def __init__(self, level: str, message: str, span: str | None = None):
+        self.level = level
+        self.message = message
+        self.span = span
+
+    def __repr__(self) -> str:
+        return f"LogEvent(level='{self.level}', message='{self.message}', span={self.span})"
 
 
 __all__ = [
