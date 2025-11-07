@@ -1,6 +1,7 @@
 """Tests for JinjaConfig (JinjaConfig) Python bindings."""
 
 import pytest
+
 from rattler_build.jinja_config import JinjaConfig
 
 
@@ -68,18 +69,6 @@ def test_selector_config_variant_constructor() -> None:
 
     assert config.variant is not None
     assert isinstance(config.variant, dict)
-
-
-def test_selector_config_config_property() -> None:
-    """Test that the config property returns the underlying PyJinjaConfig."""
-    config = JinjaConfig(target_platform="linux-64")
-
-    # The config property should return the internal _config
-    underlying_config = config.config
-    assert underlying_config is not None
-
-    # It should be the same object
-    assert underlying_config is config._config
 
 
 def test_selector_config_repr() -> None:

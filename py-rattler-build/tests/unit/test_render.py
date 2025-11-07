@@ -3,11 +3,13 @@ Tests for the render module - converting Stage0 to Stage1 recipes with variants.
 """
 
 from pathlib import Path
-from inline_snapshot import snapshot
+
 import pytest
+from inline_snapshot import snapshot
+
+from rattler_build.render import RenderConfig, RenderedVariant, render_recipe
 from rattler_build.stage0 import Recipe
 from rattler_build.variant_config import VariantConfig
-from rattler_build.render import RenderConfig, RenderedVariant, render_recipe
 
 
 @pytest.fixture
@@ -59,10 +61,10 @@ def test_render_config_set_context() -> None:
 
 def test_render_config_platform_setters() -> None:
     """Test platform property setters."""
-    config = RenderConfig()
-    config.target_platform = "osx-arm64"
-    config.build_platform = "osx-64"
-    config.host_platform = "linux-64"
+    target_platform = "osx-arm64"
+    build_platform = "osx-64"
+    host_platform = "linux-64"
+    config = RenderConfig(target_platform, build_platform, host_platform)
 
     assert config.target_platform == "osx-arm64"
     assert config.build_platform == "osx-64"
@@ -74,7 +76,7 @@ def test_render_config_experimental() -> None:
     config = RenderConfig(experimental=True)
     assert config.experimental
 
-    config.experimental = False
+    config = RenderConfig(experimental=False)
     assert not config.experimental
 
 

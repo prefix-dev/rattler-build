@@ -139,11 +139,6 @@ class ToolConfiguration:
         """Whether to keep the build directory after the build is done."""
         return self._inner.keep_build
 
-    @keep_build.setter
-    def keep_build(self, value: bool) -> None:
-        """Set whether to keep the build directory."""
-        self._inner.set_keep_build(value)
-
     @property
     def test_strategy(self) -> str:
         """The test strategy to use."""

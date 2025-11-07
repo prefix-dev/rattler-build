@@ -203,50 +203,25 @@ class RenderConfig:
         """Get the target platform."""
         return self._config.target_platform()
 
-    @target_platform.setter
-    def target_platform(self, value: str) -> None:
-        """Set the target platform."""
-        self._config.set_target_platform(value)
-
     @property
     def build_platform(self) -> str:
         """Get the build platform."""
         return self._config.build_platform()
-
-    @build_platform.setter
-    def build_platform(self, value: str) -> None:
-        """Set the build platform."""
-        self._config.set_build_platform(value)
 
     @property
     def host_platform(self) -> str:
         """Get the host platform."""
         return self._config.host_platform()
 
-    @host_platform.setter
-    def host_platform(self, value: str) -> None:
-        """Set the host platform."""
-        self._config.set_host_platform(value)
-
     @property
     def experimental(self) -> bool:
         """Get whether experimental features are enabled."""
         return self._config.experimental()
 
-    @experimental.setter
-    def experimental(self, value: bool) -> None:
-        """Set whether experimental features are enabled."""
-        self._config.set_experimental(value)
-
     @property
     def recipe_path(self) -> str | None:
         """Get the recipe path."""
         return self._config.recipe_path()
-
-    @recipe_path.setter
-    def recipe_path(self, value: str | None) -> None:
-        """Set the recipe path."""
-        self._config.set_recipe_path(value)
 
     def __repr__(self) -> str:
         return repr(self._config)
