@@ -6,42 +6,16 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+from rattler_build.tool_config import ToolConfiguration
+from typing import TypeAlias
+from rattler_build.variant_config import VariantConfig
 
-# Import for type hints only - avoid circular import
-if TYPE_CHECKING:
-    from rattler_build.tool_config import ToolConfiguration
+from rattler_build._rattler_build import render as _render
 
-# Type for context values - can be strings, numbers, bools, or lists
 ContextValue = str | int | float | bool | list[str | int | float | bool]
-
-# Try to import TypeAlias for better type hint support
-try:
-    from typing import TypeAlias
-except ImportError:
-    from typing import TypeAlias
-
-if TYPE_CHECKING:
-    from rattler_build.variant_config import VariantConfig
-
-    # For type checking, use Any placeholders
-    _RenderConfig = Any
-    _RenderedVariant = Any
-    _HashInfo = Any
-    _PinSubpackageInfo = Any
-    _render_recipe = Any
-else:
-    # At runtime, import from the Rust module
-    from rattler_build import _rattler_build as _rb
-
-    _render = _rb.render
-    _RenderConfig = _render.RenderConfig
-    _RenderedVariant = _render.RenderedVariant
-    _HashInfo = _render.HashInfo
-    _PinSubpackageInfo = _render.PinSubpackageInfo
-    _render_recipe = _render.render_recipe
 
 
 class HashInfo:
@@ -62,7 +36,7 @@ class HashInfo:
         ...     print(f"Prefix: {hash_info.prefix}")
     """
 
-    def __init__(self, inner: _HashInfo):
+    def __init__(self, inner: _render.HashInfo):
         """Create a HashInfo from the Rust object."""
         self._inner = inner
 
@@ -102,7 +76,7 @@ class PinSubpackageInfo:
         ...     print(f"{name}: {info.version} (exact={info.exact})")
     """
 
-    def __init__(self, inner: _PinSubpackageInfo):
+    def __init__(self, inner: _render.PinSubpackageInfo):
         """Create a PinSubpackageInfo from the Rust object."""
         self._inner = inner
 
@@ -168,7 +142,7 @@ class RenderConfig:
         extra_context: dict[str, ContextValue] | None = None,
     ):
         """Create a new render configuration."""
-        self._config = _RenderConfig(
+        self._config = _render.RenderConfig(
             target_platform=target_platform,
             build_platform=build_platform,
             host_platform=host_platform,
@@ -240,7 +214,7 @@ class RenderedVariant:
         ...     print(f"Build string: {variant.recipe().build().string()}")
     """
 
-    def __init__(self, inner: _RenderedVariant):
+    def __init__(self, inner: _render.RenderedVariant):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
 
@@ -452,7 +426,7 @@ def render_recipe(
     all_rendered: list[RenderedVariant] = []
     for recipe_obj in recipes_to_render:
         recipe_inner = recipe_obj._wrapper
-        rendered = _render_recipe(recipe_inner, variant_config_inner, config_inner)
+        rendered = _render.render_recipe(recipe_inner, variant_config_inner, config_inner)
         all_rendered.extend([RenderedVariant(r) for r in rendered])
 
     return all_rendered
