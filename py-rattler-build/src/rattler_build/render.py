@@ -6,7 +6,7 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 """
 
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, Union
+from typing import Any, Optional, TypeAlias
 
 from rattler_build._rattler_build import render as _render
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
@@ -333,7 +333,7 @@ RecipeInput: TypeAlias = str | SingleOutputRecipe | MultiOutputRecipe | Path
 
 def render_recipe(
     recipe: RecipeInput | list[RecipeInput],
-    variant_config: Union["VariantConfig", Path, str],
+    variant_config: "VariantConfig",
     render_config: RenderConfig | None = None,
 ) -> list[RenderedVariant]:
     """Render a Stage0 recipe with a variant configuration into Stage1 recipes.
@@ -378,7 +378,6 @@ def render_recipe(
         Generated 3 variants
     """
     from rattler_build.stage0 import Recipe
-    from rattler_build.variant_config import VariantConfig as VC
 
     # Handle render_config parameter
     config_inner = render_config._config if render_config else None
@@ -413,25 +412,7 @@ def render_recipe(
     else:
         raise TypeError(f"Unsupported recipe type: {type(recipe)}")
 
-    # Handle variant_config parameter - convert str/Path to VariantConfig
-    if isinstance(variant_config, str | Path):
-        if isinstance(variant_config, Path):
-            variant_config = VC.from_file(variant_config)
-        else:
-            # Check if it's a file path or YAML string
-            if (
-                variant_config.endswith(".yaml")
-                or variant_config.endswith(".yml")
-                or "/" in variant_config
-                or "\\" in variant_config
-            ):
-                variant_config = VC.from_file(variant_config)
-            else:
-                variant_config = VC.from_yaml(variant_config)
-    elif not isinstance(variant_config, VC):
-        raise TypeError(f"Unsupported variant_config type: {type(variant_config)}")
-
-    # Now unwrap to get inner Rust objects
+    # Unwrap variant_config to get inner Rust object
     variant_config_inner = variant_config._inner
 
     # Render all recipes and collect results

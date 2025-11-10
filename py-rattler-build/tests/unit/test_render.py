@@ -420,8 +420,10 @@ python:
   - "3.10"
 """
 
+    variant_config = VariantConfig.from_yaml(variant_yaml)
+
     # Pass recipe and variant_config as strings
-    rendered = render_recipe(recipe_yaml, variant_yaml)
+    rendered = render_recipe(recipe_yaml, variant_config)
 
     assert len(rendered) >= 1
     assert rendered[0].recipe().package.name == "string-test"
@@ -483,9 +485,10 @@ python:
   - "3.9"
   - "3.10"
 """
+    variant_config = VariantConfig.from_yaml(variant_yaml)
 
     # Pass variant_config as string
-    rendered = render_recipe(recipe_yaml, variant_yaml)
+    rendered = render_recipe(recipe_yaml, variant_config)
 
     assert len(rendered) == 2
     python_versions = {variant.variant().get("python") for variant in rendered}
@@ -496,14 +499,3 @@ def test_render_invalid_recipe_type() -> None:
     """Test that invalid recipe type raises TypeError."""
     with pytest.raises(TypeError, match="Unsupported recipe type"):
         render_recipe(123, VariantConfig())  # type: ignore[arg-type]
-
-
-def test_render_invalid_variant_config_type() -> None:
-    """Test that invalid variant_config type raises TypeError."""
-    recipe_yaml = """
-package:
-  name: test
-  version: 1.0.0
-"""
-    with pytest.raises(TypeError, match="Unsupported variant_config type"):
-        render_recipe(recipe_yaml, 123)  # type: ignore[arg-type]
