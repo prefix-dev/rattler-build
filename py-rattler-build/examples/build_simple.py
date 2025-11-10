@@ -27,12 +27,12 @@ def build_recipe(recipe_path: Path):
     print(f"Loading recipe from {recipe_path}")
 
     # Load the recipe
-    recipe = Recipe.from_file(str(recipe_path))
+    recipe = Recipe.from_file(recipe_path)
     print(f"Loaded recipe: {recipe.package.name} {recipe.package.version}")
 
     # Configure variant rendering
     variant_config = VariantConfig()
-    render_config = RenderConfig(recipe_path=str(recipe_path.parent))
+    render_config = RenderConfig(recipe_path=str(recipe_path))
 
     print("\nRendering recipe variants...")
     rendered_variants = render_recipe(recipe, variant_config, render_config)
