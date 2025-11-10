@@ -8,7 +8,7 @@ and conditional resolution.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
@@ -199,70 +199,10 @@ class Recipe(ABC):
 
         return [RenderedVariant(r) for r in rendered]
 
-    @abstractmethod
     def run_build(
         self,
-        variant_config: Any = None,
-        tool_config: Optional["ToolConfiguration"] = None,
-        output_dir: str | Path | None = None,
-        channel: list[str] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Build this recipe.
-
-        Args:
-            variant_config: Optional VariantConfig to use for building variants.
-            tool_config: Optional ToolConfiguration to use for the build.
-            output_dir: Directory to store the built packages.
-            channel: List of channels to use for resolving dependencies.
-            **kwargs: Additional arguments passed to build.
-        """
-        ...
-
-
-class SingleOutputRecipe(Recipe):
-    """A single-output recipe at stage0 (parsed, not yet evaluated)."""
-
-    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: Any = None):
-        self._inner = inner
-        # Keep reference to the original Rust Stage0Recipe wrapper for render()
-        self._wrapper = wrapper
-
-    @property
-    def schema_version(self) -> int:
-        """Get the schema version."""
-        return self._inner.schema_version
-
-    @property
-    def context(self) -> dict[str, Any]:
-        """Get the context variables as a dictionary."""
-        return self._inner.context
-
-    @property
-    def package(self) -> "Package":
-        """Get the package metadata."""
-        return Package(self._inner.package)
-
-    @property
-    def build(self) -> "Build":
-        """Get the build configuration."""
-        return Build(self._inner.build)
-
-    @property
-    def requirements(self) -> "Requirements":
-        """Get the requirements."""
-        return Requirements(self._inner.requirements)
-
-    @property
-    def about(self) -> "About":
-        """Get the about metadata."""
-        return About(self._inner.about)
-
-    def run_build(
-        self,
-        variant_config: Any = None,
-        tool_config: Optional["ToolConfiguration"] = None,
+        variant_config: VariantConfig | None = None,
+        tool_config: ToolConfiguration | None = None,
         output_dir: str | Path | None = None,
         channel: list[str] | None = None,
         **kwargs: Any,
@@ -307,6 +247,45 @@ class SingleOutputRecipe(Recipe):
             channel=channel,
             **kwargs,
         )
+
+
+class SingleOutputRecipe(Recipe):
+    """A single-output recipe at stage0 (parsed, not yet evaluated)."""
+
+    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: Any = None):
+        self._inner = inner
+        # Keep reference to the original Rust Stage0Recipe wrapper for render()
+        self._wrapper = wrapper
+
+    @property
+    def schema_version(self) -> int:
+        """Get the schema version."""
+        return self._inner.schema_version
+
+    @property
+    def context(self) -> dict[str, Any]:
+        """Get the context variables as a dictionary."""
+        return self._inner.context
+
+    @property
+    def package(self) -> "Package":
+        """Get the package metadata."""
+        return Package(self._inner.package)
+
+    @property
+    def build(self) -> "Build":
+        """Get the build configuration."""
+        return Build(self._inner.build)
+
+    @property
+    def requirements(self) -> "Requirements":
+        """Get the requirements."""
+        return Requirements(self._inner.requirements)
+
+    @property
+    def about(self) -> "About":
+        """Get the about metadata."""
+        return About(self._inner.about)
 
 
 class Package:
@@ -400,55 +379,6 @@ class MultiOutputRecipe(Recipe):
             elif isinstance(output, _stage0.Stage0StagingOutput):
                 result.append(StagingOutput(output))
         return result
-
-    def run_build(
-        self,
-        variant_config: VariantConfig | None = None,
-        tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path | None = None,
-        channel: list[str] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Build this multi-output recipe.
-
-        This method renders the recipe with variants and then builds the rendered outputs
-        directly without writing temporary files.
-
-        Args:
-            variant_config: Optional VariantConfig to use for building variants.
-            tool_config: Optional ToolConfiguration to use for the build. If provided, individual
-                        parameters like keep_build, test, etc. will be ignored.
-            output_dir: Directory to store the built packages. Defaults to current directory.
-            channel: List of channels to use for resolving dependencies.
-            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
-                     These are ignored if tool_config is provided.
-
-        Example:
-            >>> recipe = Recipe.from_yaml(yaml_string)
-            >>> recipe.run_build(output_dir="./output")
-
-            >>> # Or with custom tool configuration
-            >>> from rattler_build import ToolConfiguration
-            >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
-            >>> recipe.run_build(tool_config=config, output_dir="./output")
-        """
-        from rattler_build import _rattler_build as _rb
-
-        # Render the recipe to get Stage1 variants
-        rendered_variants = self.render(variant_config)
-
-        # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if tool_config else None
-
-        # Build from the rendered variants
-        _rb.build_from_rendered_variants_py(
-            rendered_variants=[v._inner for v in rendered_variants],
-            tool_config=tool_config_inner,
-            output_dir=Path(output_dir) if output_dir else None,
-            channel=channel,
-            **kwargs,
-        )
 
 
 class RecipeMetadata:
