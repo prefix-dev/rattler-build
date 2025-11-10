@@ -276,7 +276,7 @@ class RenderedVariant:
 
     def run_build(
         self,
-        tool_config: Optional["ToolConfiguration"] = None,
+        tool_config: ToolConfiguration | None = None,
         output_dir: str | Path | None = None,
         channel: list[str] | None = None,
         progress_callback: Any | None = None,

@@ -44,8 +44,8 @@ class Recipe(ABC):
     """
 
     # Attributes set by concrete subclasses
-    _inner: Any
-    _wrapper: Any
+    _inner: _stage0.SingleOutputRecipe | _stage0.MultiOutputRecipe
+    _wrapper: _stage0.Stage0Recipe
 
     @classmethod
     def from_yaml(cls, yaml: str) -> "Recipe":
@@ -252,9 +252,8 @@ class Recipe(ABC):
 class SingleOutputRecipe(Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: Any = None):
+    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe):
         self._inner = inner
-        # Keep reference to the original Rust Stage0Recipe wrapper for render()
         self._wrapper = wrapper
 
     @property
@@ -339,9 +338,8 @@ class StagingOutput:
 class MultiOutputRecipe(Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: Any = None):
+    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe):
         self._inner = inner
-        # Keep reference to the original Rust Stage0Recipe wrapper for render()
         self._wrapper = wrapper
 
     @property
