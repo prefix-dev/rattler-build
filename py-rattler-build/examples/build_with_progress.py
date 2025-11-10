@@ -14,16 +14,16 @@ Requirements:
 
 import sys
 from pathlib import Path
-import tempfile
+
+from rattler_build.progress import RichProgressCallback
+from rattler_build.render import RenderConfig, render_recipe
 
 # Import rattler_build components
 from rattler_build.stage0 import Recipe
 from rattler_build.variant_config import VariantConfig
-from rattler_build.render import RenderConfig, render_recipe
-from rattler_build.progress import RichProgressCallback, SimpleProgressCallback
 
 
-def build_recipe_with_rich_progress(recipe_path: Path):
+def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     """Build a recipe with Rich progress display.
 
     Args:
@@ -32,8 +32,7 @@ def build_recipe_with_rich_progress(recipe_path: Path):
     print(f"🔍 Loading recipe from {recipe_path}")
 
     # Load the recipe
-    recipe = Recipe.from_file(str(recipe_path))
-    print(f"✅ Loaded recipe: {recipe.package.name} {recipe.package.version}")
+    recipe = Recipe.from_file(recipe_path)
 
     # Configure variant rendering
     variant_config = VariantConfig()
@@ -72,43 +71,7 @@ def build_recipe_with_rich_progress(recipe_path: Path):
     print("\n✅ Build complete!")
 
 
-def build_recipe_with_simple_progress(recipe_path: Path):
-    """Build a recipe with simple console progress display.
-
-    Args:
-        recipe_path: Path to the recipe YAML file
-    """
-    print(f"🔍 Loading recipe from {recipe_path}")
-
-    # Load the recipe
-    recipe = Recipe.from_file(str(recipe_path))
-    print(f"✅ Loaded recipe: {recipe.package.name} {recipe.package.version}")
-
-    # Configure and render
-    variant_config = VariantConfig()
-    # Set recipe_path so the build can find license files, etc.
-    render_config = RenderConfig(recipe_path=str(recipe_path.parent))
-
-    print("\n📋 Rendering recipe variants...")
-    rendered_variants = render_recipe(recipe, variant_config, render_config)
-    print(f"✅ Rendered {len(rendered_variants)} variant(s)")
-
-    # Build with simple callback
-    callback = SimpleProgressCallback()
-
-    for i, variant in enumerate(rendered_variants, 1):
-        print(f"\n🔨 Building variant {i}/{len(rendered_variants)}")
-
-        # Build with real progress callbacks!
-        with tempfile.TemporaryDirectory() as tmpdir:
-            variant.run_build(
-                progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_path=recipe_path
-            )
-
-    print("\n✅ Build complete!")
-
-
-def main():
+def main() -> None:
     """Main entry point."""
     if len(sys.argv) < 2:
         print("Usage: python build_with_progress.py <recipe.yaml> [--simple]")
@@ -124,18 +87,8 @@ def main():
         print(f"Error: Recipe file not found: {recipe_path}")
         sys.exit(1)
 
-    use_simple = "--simple" in sys.argv
-
     try:
-        if use_simple:
-            build_recipe_with_simple_progress(recipe_path)
-        else:
-            try:
-                build_recipe_with_rich_progress(recipe_path)
-            except ImportError as e:
-                print(f"Rich library not available: {e}")
-                print("Falling back to simple progress...")
-                build_recipe_with_simple_progress(recipe_path)
+        build_recipe_with_rich_progress(recipe_path)
 
     except Exception as e:
         print(f"❌ Error: {e}")
