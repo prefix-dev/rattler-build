@@ -458,7 +458,7 @@ class MultiOutputRecipe(Recipe):
 
     def run_build(
         self,
-        variant_config: Any = None,
+        variant_config: VariantConfig | None = None,
         tool_config: ToolConfiguration | None = None,
         output_dir: str | Path | None = None,
         channel: list[str] | None = None,
