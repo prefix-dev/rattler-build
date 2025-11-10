@@ -6,6 +6,8 @@ This module provides a Pythonic API for configuring the build tool.
 
 from rattler_build._rattler_build import tool_config as _tool_config
 
+__all__ = ["ToolConfiguration"]
+
 
 class ToolConfiguration:
     """Configuration for the rattler-build tool.
@@ -151,6 +153,3 @@ class ToolConfiguration:
 
     def __repr__(self) -> str:
         return repr(self._inner)
-
-
-__all__ = ["ToolConfiguration"]

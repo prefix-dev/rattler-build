@@ -13,6 +13,15 @@ from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
 
+__all__ = [
+    "RenderConfig",
+    "RenderedVariant",
+    "HashInfo",
+    "PinSubpackageInfo",
+    "render_recipe",
+    "build_rendered_variants",
+]
+
 ContextValue = str | int | float | bool | list[str | int | float | bool]
 
 
@@ -494,13 +503,3 @@ def build_rendered_variants(
         recipe_path=Path(recipe_path) if recipe_path else None,
         **kwargs,
     )
-
-
-__all__ = [
-    "RenderConfig",
-    "RenderedVariant",
-    "HashInfo",
-    "PinSubpackageInfo",
-    "render_recipe",
-    "build_rendered_variants",
-]

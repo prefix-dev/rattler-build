@@ -24,12 +24,6 @@ from rattler_build.render import RenderConfig
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
 
-
-def rattler_build_version() -> str:
-    """Get the version of the rattler-build package"""
-    return get_rattler_build_version_py()
-
-
 __all__ = [
     "rattler_build_version",
     "build_recipes",
@@ -59,3 +53,8 @@ __all__ = [
     "ToolConfiguration",
     "RenderConfig",
 ]
+
+
+def rattler_build_version() -> str:
+    """Get the version of the rattler-build package"""
+    return get_rattler_build_version_py()

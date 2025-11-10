@@ -11,6 +11,17 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+__all__ = [
+    "ProgressCallback",
+    "DownloadStartEvent",
+    "DownloadProgressEvent",
+    "DownloadCompleteEvent",
+    "BuildStepEvent",
+    "LogEvent",
+    "SimpleProgressCallback",
+    "RichProgressCallback",
+]
+
 
 class DownloadStartEvent:
     """Event fired when a download starts."""
@@ -66,18 +77,6 @@ class LogEvent:
 
     def __repr__(self) -> str:
         return f"LogEvent(level='{self.level}', message='{self.message}', span={self.span})"
-
-
-__all__ = [
-    "ProgressCallback",
-    "DownloadStartEvent",
-    "DownloadProgressEvent",
-    "DownloadCompleteEvent",
-    "BuildStepEvent",
-    "LogEvent",
-    "SimpleProgressCallback",
-    "RichProgressCallback",
-]
 
 
 @runtime_checkable
