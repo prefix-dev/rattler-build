@@ -441,33 +441,6 @@ def test_render_recipe_from_path(test_data_dir: Path) -> None:
     assert rendered[0].recipe().package.name == "mixed-compiled"
 
 
-def test_render_recipe_list() -> None:
-    """Test rendering with a list of recipes."""
-    recipe1_yaml = """
-package:
-  name: pkg1
-  version: 1.0.0
-"""
-    recipe2_yaml = """
-package:
-  name: pkg2
-  version: 2.0.0
-"""
-
-    # Parse recipes
-    recipe1 = Recipe.from_yaml(recipe1_yaml)
-    recipe2 = Recipe.from_yaml(recipe2_yaml)
-
-    variant_config = VariantConfig()
-
-    # Pass list of recipes
-    rendered = render_recipe([recipe1, recipe2], variant_config)
-
-    assert len(rendered) == 2
-    names = {variant.recipe().package.name for variant in rendered}
-    assert names == {"pkg1", "pkg2"}
-
-
 def test_render_variant_config_from_yaml_string() -> None:
     """Test rendering with variant_config as YAML string."""
     recipe_yaml = """

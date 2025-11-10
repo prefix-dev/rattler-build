@@ -332,8 +332,8 @@ RecipeInput: TypeAlias = str | Recipe | Path
 
 
 def render_recipe(
-    recipe: RecipeInput | list[RecipeInput],
-    variant_config: "VariantConfig",
+    recipe: RecipeInput,
+    variant_config: VariantConfig,
     render_config: RenderConfig | None = None,
 ) -> list[RenderedVariant]:
     """Render a Stage0 recipe with a variant configuration into Stage1 recipes.
@@ -380,47 +380,31 @@ def render_recipe(
     # Handle render_config parameter
     config_inner = render_config._config if render_config else None
 
-    # Handle recipe parameter - convert str/Path to Recipe objects
-    recipes_to_render: list[Recipe] = []
-
-    if isinstance(recipe, list):
-        # Handle list of recipes
-        for r in recipe:
-            if isinstance(r, str | Path):
-                parsed = Recipe.from_file(r)
-                recipes_to_render.append(parsed)
-            elif isinstance(r, Recipe):
-                recipes_to_render.append(r)
-            else:
-                raise TypeError(f"Unsupported recipe type in list: {type(r)}")
-    elif isinstance(recipe, str | Path):
+    # Handle recipe parameter - convert str/Path to Recipe object
+    if isinstance(recipe, str | Path):
         # Parse single recipe from file/string
         if isinstance(recipe, Path):
             # Definitely a file path
-            parsed = Recipe.from_file(recipe)
-        elif recipe.endswith(".yaml") or recipe.endswith(".yml") or "/" in recipe or "\\" in recipe:
+            recipe_obj = Recipe.from_file(recipe)
+        elif recipe.endswith(".yaml") or recipe.endswith(".yml"):
             # String that looks like a file path
-            parsed = Recipe.from_file(recipe)
+            recipe_obj = Recipe.from_file(recipe)
         else:
             # Treat as YAML string
-            parsed = Recipe.from_yaml(recipe)
-        recipes_to_render.append(parsed)
+            recipe_obj = Recipe.from_yaml(recipe)
     elif isinstance(recipe, Recipe):
-        recipes_to_render.append(recipe)
+        recipe_obj = recipe
     else:
         raise TypeError(f"Unsupported recipe type: {type(recipe)}")
 
     # Unwrap variant_config to get inner Rust object
     variant_config_inner = variant_config._inner
 
-    # Render all recipes and collect results
-    all_rendered: list[RenderedVariant] = []
-    for recipe_obj in recipes_to_render:
-        recipe_inner = recipe_obj._wrapper
-        rendered = _render.render_recipe(recipe_inner, variant_config_inner, config_inner)
-        all_rendered.extend([RenderedVariant(r) for r in rendered])
+    # Render the recipe
+    recipe_inner = recipe_obj._wrapper
+    rendered = _render.render_recipe(recipe_inner, variant_config_inner, config_inner)
 
-    return all_rendered
+    return [RenderedVariant(r) for r in rendered]
 
 
 def build_rendered_variants(
