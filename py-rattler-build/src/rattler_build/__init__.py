@@ -1,4 +1,5 @@
 from rattler_build import progress, recipe_generation, render, stage0, stage1, tool_config
+from rattler_build._rattler_build import RattlerBuildError, get_rattler_build_version_py
 from rattler_build.cli_api import (
     build_recipes,
     test_package,
@@ -9,17 +10,6 @@ from rattler_build.cli_api import (
     upload_packages_to_conda_forge,
 )
 from rattler_build.jinja_config import JinjaConfig
-from rattler_build._rattler_build import RattlerBuildError, get_rattler_build_version_py
-from rattler_build.recipe import (
-    About,
-    Build,
-    Package,
-    Recipe,
-    Requirements,
-    Source,
-    TestType,
-    TestTypeEnum,
-)
 from rattler_build.render import RenderConfig
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
@@ -34,15 +24,7 @@ __all__ = [
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
     "recipe_generation",
-    "Recipe",
-    "Package",
-    "Build",
-    "Requirements",
     "RattlerBuildError",
-    "About",
-    "Source",
-    "TestType",
-    "TestTypeEnum",
     "JinjaConfig",
     "stage0",
     "stage1",
