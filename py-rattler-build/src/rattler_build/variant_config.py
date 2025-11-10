@@ -5,9 +5,10 @@ This module provides Python bindings for rattler-build's VariantConfig,
 which manages variant matrices for building packages with different configurations.
 """
 
+from collections.abc import ItemsView, Iterator, ValuesView
 from pathlib import Path
 from typing import Any
-from collections.abc import ItemsView, Iterator, ValuesView
+
 from rattler_build._rattler_build import VariantConfig as _VariantConfig
 from rattler_build.jinja_config import JinjaConfig
 
@@ -72,12 +73,8 @@ class VariantConfig:
             >>> # Create empty
             >>> config = VariantConfig()
         """
-        if isinstance(variants, _VariantConfig):
-            # Directly wrap existing Rust VariantConfig
-            self._inner = variants
-        else:
-            # Create from dict with optional zip_keys (variants can be None)
-            self._inner = _VariantConfig(variants=variants, zip_keys=zip_keys)
+
+        self._inner = _VariantConfig(variants=variants, zip_keys=zip_keys)
 
     @classmethod
     def from_file(cls, path: str | Path) -> "VariantConfig":
@@ -93,7 +90,9 @@ class VariantConfig:
         Example:
             >>> config = VariantConfig.from_file("variants.yaml")
         """
-        return cls(_VariantConfig.from_file(Path(path)))
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_file(Path(path))
+        return variant_config
 
     @classmethod
     def from_file_with_context(cls, path: str | Path, jinja_config: JinjaConfig) -> "VariantConfig":
@@ -115,7 +114,9 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
         """
-        return cls(_VariantConfig.from_file_with_context(Path(path), jinja_config._config))
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_file_with_context(Path(path), jinja_config._config)
+        return variant_config
 
     @classmethod
     def from_conda_build_config(cls, path: str | Path, jinja_config: JinjaConfig) -> "VariantConfig":
@@ -137,7 +138,9 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
         """
-        return cls(_VariantConfig.from_conda_build_config(Path(path), jinja_config._config))
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_conda_build_config(Path(path), jinja_config._config)
+        return variant_config
 
     @classmethod
     def from_yaml(cls, yaml: str) -> "VariantConfig":
@@ -158,7 +161,9 @@ class VariantConfig:
             ... '''
             >>> config = VariantConfig.from_yaml(yaml_str)
         """
-        return cls(_VariantConfig.from_yaml(yaml))
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_yaml(yaml)
+        return variant_config
 
     @classmethod
     def from_yaml_with_context(cls, yaml: str, jinja_config: JinjaConfig) -> "VariantConfig":
@@ -187,7 +192,9 @@ class VariantConfig:
             >>> jinja_config = JinjaConfig(target_platform="linux-64")
             >>> config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
         """
-        return cls(_VariantConfig.from_yaml_with_context(yaml, jinja_config._config))
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_yaml_with_context(yaml, jinja_config._config)
+        return variant_config
 
     def keys(self) -> list[str]:
         """
