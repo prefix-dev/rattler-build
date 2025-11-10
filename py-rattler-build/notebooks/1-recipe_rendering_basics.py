@@ -40,7 +40,7 @@ def _():
         MultiOutputRecipe,
     )
     from rattler_build.variant_config import VariantConfig
-    from rattler_build.render import RenderConfig, render_recipe
+    from rattler_build.render import RenderConfig
     import json
     import pprint
     import yaml
@@ -57,7 +57,6 @@ def _():
         json,
         mo,
         pprint,
-        render_recipe,
         tempfile,
         yaml,
     )
@@ -236,9 +235,9 @@ def _(mo):
 
 
 @app.cell
-def _(json, render_config, render_recipe, simple_recipe, variant_config):
+def _(json, render_config, simple_recipe, variant_config):
     # Render the recipe with all the configurations we've created
-    rendered_variants = render_recipe(simple_recipe, variant_config, render_config)
+    rendered_variants = simple_recipe.render(variant_config, render_config)
 
     print("📋 STAGE 0 (Parsed, templates intact)")
     print("=" * 60)
@@ -341,7 +340,7 @@ def _(mo):
     - **VariantConfig**: Define build variants and use `zip_keys` to pair specific combinations
     - **RenderConfig**: Configure target platforms and add custom context variables
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes
-    - **Rendering**: Use `render_recipe()` to transform Stage0 → Stage1 with variants
+    - **Rendering**: Use `recipe.render()` to transform Stage0 → Stage1 with variants
     - **Building**: Use `variant.run_build()` to build conda packages
 
     Next, explore the other notebooks to learn about:

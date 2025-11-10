@@ -10,8 +10,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Optional
 
+from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
+from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
+from rattler_build.variant_config import VariantConfig
 
 __all__ = [
     "Recipe",
@@ -237,8 +240,8 @@ class SingleOutputRecipe(Recipe):
         """
         Render this recipe with variant configuration.
 
-        This is a convenience method that calls render.render_recipe() internally.
-        Always returns a list of RenderedVariant objects.
+        This method takes this Stage0 recipe and evaluates all Jinja templates
+        with different variant combinations to produce ready-to-build Stage1 recipes.
 
         Args:
             variant_config: Optional VariantConfig to use. If None, creates an empty config.
@@ -254,15 +257,24 @@ class SingleOutputRecipe(Recipe):
             ...     print(variant.recipe().package.name)
         """
         # Import here to avoid circular dependency
-        from rattler_build import render as render_module
         from rattler_build import variant_config as vc_module
+        from rattler_build._rattler_build import render as _render
+        from rattler_build.render import RenderedVariant
 
         # Create empty variant config if not provided
         if variant_config is None:
             variant_config = vc_module.VariantConfig()
 
-        # Pass self (the Python wrapper) to render_recipe, not the raw Rust object
-        return render_module.render_recipe(self, variant_config, render_config)
+        # Handle render_config parameter
+        config_inner = render_config._config if render_config else None
+
+        # Unwrap variant_config to get inner Rust object
+        variant_config_inner = variant_config._inner
+
+        # Render the recipe using the wrapper
+        rendered = _render.render_recipe(self._wrapper, variant_config_inner, config_inner)
+
+        return [RenderedVariant(r) for r in rendered]
 
     def run_build(
         self,
@@ -406,12 +418,14 @@ class MultiOutputRecipe(Recipe):
                 result.append(StagingOutput(output))
         return result
 
-    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
+    def render(
+        self, variant_config: VariantConfig | None = None, render_config: RenderConfig | None = None
+    ) -> list[RenderedVariant]:
         """
         Render this recipe with variant configuration.
 
-        This is a convenience method that calls render.render_recipe() internally.
-        Always returns a list of RenderedVariant objects.
+        This method takes this Stage0 recipe and evaluates all Jinja templates
+        with different variant combinations to produce ready-to-build Stage1 recipes.
 
         Args:
             variant_config: Optional VariantConfig to use. If None, creates an empty config.
@@ -426,21 +440,26 @@ class MultiOutputRecipe(Recipe):
             >>> for variant in variants:
             ...     print(variant.recipe().package.name)
         """
-        # Import here to avoid circular dependency
-        from rattler_build import render as render_module
-        from rattler_build import variant_config as vc_module
 
         # Create empty variant config if not provided
         if variant_config is None:
-            variant_config = vc_module.VariantConfig()
+            variant_config = VariantConfig()
 
-        # Pass self (the Python wrapper) to render_recipe, not the raw Rust object
-        return render_module.render_recipe(self, variant_config, render_config)
+        # Handle render_config parameter
+        render_config_inner = None if render_config is None else render_config._config
+
+        # Unwrap variant_config to get inner Rust object
+        variant_config_inner = variant_config._inner
+
+        # Render the recipe using the wrapper
+        rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
+
+        return [RenderedVariant(r) for r in rendered]
 
     def run_build(
         self,
         variant_config: Any = None,
-        tool_config: Optional["ToolConfiguration"] = None,
+        tool_config: ToolConfiguration | None = None,
         output_dir: str | Path | None = None,
         channel: list[str] | None = None,
         **kwargs: Any,

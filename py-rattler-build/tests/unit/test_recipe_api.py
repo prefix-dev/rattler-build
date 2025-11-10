@@ -7,7 +7,7 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 from pathlib import Path
 from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
 from rattler_build.variant_config import VariantConfig
-from rattler_build.render import render_recipe, RenderConfig, build_rendered_variants
+from rattler_build.render import RenderConfig, build_rendered_variants
 
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "comprehensive-test"
@@ -29,7 +29,7 @@ def test_recipe_all_sections() -> None:
     # Render to Stage1 for full access
     variant_config = VariantConfig()
     render_config = RenderConfig()
-    rendered = render_recipe(stage0, variant_config, render_config)
+    rendered = stage0.render(variant_config, render_config)
 
     assert len(rendered) == 1
     stage1 = rendered[0].recipe()
@@ -76,7 +76,7 @@ def test_recipe_representations() -> None:
 
     # Render to Stage1
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     stage1 = rendered[0].recipe()
 
     # Stage1 recipe repr
@@ -147,12 +147,12 @@ def test_parse_recipe_with_platform_selectors() -> None:
 
     # Render for Linux
     linux_config = RenderConfig(target_platform="linux-64", build_platform="linux-64", host_platform="linux-64")
-    rendered_linux = render_recipe(stage0, variant_config, linux_config)
+    rendered_linux = stage0.render(variant_config, linux_config)
     stage1_linux = rendered_linux[0].recipe()
 
     # Render for Windows
     windows_config = RenderConfig(target_platform="win-64", build_platform="win-64", host_platform="win-64")
-    rendered_windows = render_recipe(stage0, variant_config, windows_config)
+    rendered_windows = stage0.render(variant_config, windows_config)
     stage1_windows = rendered_windows[0].recipe()
 
     # Both should parse the same package
@@ -198,7 +198,7 @@ build:
     # Render with context for build_number
     render_config = RenderConfig(extra_context={"build_number": "1"})
 
-    rendered = render_recipe(stage0, variant_config, render_config)
+    rendered = stage0.render(variant_config, render_config)
     stage1 = rendered[0].recipe()
 
     assert stage1.package.name == "variant-test"
@@ -230,7 +230,7 @@ def test_stage0_to_stage1_complete_flow() -> None:
     # Render to Stage1
     variant_config = VariantConfig()
     render_config = RenderConfig(target_platform="linux-64")
-    rendered = render_recipe(stage0, variant_config, render_config)
+    rendered = stage0.render(variant_config, render_config)
 
     # Access Stage1
     variant = rendered[0]
@@ -289,7 +289,7 @@ about:
 
     # Render to Stage1
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Should have 2 outputs
     assert len(rendered) == 2
@@ -338,7 +338,7 @@ build:
 
     # Render to Stage1
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     stage1 = rendered[0].recipe()
 
     # Jinja should be evaluated
@@ -399,7 +399,7 @@ requirements:
     # Parse and render
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Verify that RenderedVariant has run_build method
     assert hasattr(rendered[0], "run_build")
@@ -428,7 +428,7 @@ requirements:
     # Parse and render with multiple variants
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig({"python": ["3.10.*", "3.11.*"]})
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Should have 2 variants
     assert len(rendered) == 2

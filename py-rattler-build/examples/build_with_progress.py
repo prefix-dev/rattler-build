@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from rattler_build.progress import RichProgressCallback
-from rattler_build.render import RenderConfig, render_recipe
+from rattler_build.render import RenderConfig
 
 # Import rattler_build components
 from rattler_build.stage0 import Recipe
@@ -40,7 +40,7 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     render_config = RenderConfig(recipe_path=str(recipe_path))
 
     print("\n📋 Rendering recipe variants...")
-    rendered_variants = render_recipe(recipe, variant_config, render_config)
+    rendered_variants = recipe.render(variant_config, render_config)
     print(f"✅ Rendered {len(rendered_variants)} variant(s)")
 
     # Build each variant with progress reporting

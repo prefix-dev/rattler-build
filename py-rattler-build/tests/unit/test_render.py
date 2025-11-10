@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from inline_snapshot import snapshot
 
-from rattler_build.render import RenderConfig, RenderedVariant, render_recipe
+from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.stage0 import Recipe
 from rattler_build.variant_config import VariantConfig
 
@@ -106,7 +106,7 @@ about:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 1
     assert isinstance(rendered[0], RenderedVariant)
@@ -136,7 +136,7 @@ python:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     # Should have 3 variants (one for each Python version)
     assert len(rendered) == 3
@@ -158,7 +158,7 @@ package:
     variant_config = VariantConfig()
     config = RenderConfig(target_platform="linux-64", experimental=True)
 
-    rendered = render_recipe(recipe, variant_config, config)
+    rendered = recipe.render(variant_config, config)
 
     assert len(rendered) >= 1
     # Verify the recipe was rendered
@@ -179,7 +179,7 @@ build:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
     variant = rendered[0]
 
     # Test variant() method
@@ -232,7 +232,7 @@ outputs:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     # Should have 2 outputs
     assert len(rendered) == 2
@@ -261,7 +261,7 @@ build:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 1
     # Jinja should have been evaluated
@@ -290,7 +290,7 @@ python:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     # Should create variants based on free spec "python"
     assert len(rendered) == 2
@@ -315,7 +315,7 @@ package:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
     repr_str = repr(rendered[0])
     assert "RenderedVariant" in repr_str
     assert "repr-test" in repr_str
@@ -354,7 +354,7 @@ outputs:
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
 
     # Should have 2 outputs
     assert len(rendered) == 2
@@ -391,7 +391,7 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     recipe_yaml = recipe_path.read_text()
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
-    rendered = render_recipe(recipe, variant_config)
+    rendered = recipe.render(variant_config)
     assert len(rendered) == 2
     assert isinstance(rendered[0], RenderedVariant)
 
@@ -420,10 +420,10 @@ python:
   - "3.10"
 """
 
+    recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
-    # Pass recipe and variant_config as strings
-    rendered = render_recipe(recipe_yaml, variant_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) >= 1
     assert rendered[0].recipe().package.name == "string-test"
@@ -432,10 +432,10 @@ python:
 def test_render_recipe_from_path(test_data_dir: Path) -> None:
     """Test rendering with recipe as Path object."""
     recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
+    recipe = Recipe.from_file(recipe_path)
     variant_config = VariantConfig()
 
-    # Pass recipe as Path object
-    rendered = render_recipe(recipe_path, variant_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 2
     assert rendered[0].recipe().package.name == "mixed-compiled"
@@ -458,17 +458,11 @@ python:
   - "3.9"
   - "3.10"
 """
+    recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
-    # Pass variant_config as string
-    rendered = render_recipe(recipe_yaml, variant_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 2
     python_versions = {variant.variant().get("python") for variant in rendered}
     assert python_versions == {"3.9", "3.10"}
-
-
-def test_render_invalid_recipe_type() -> None:
-    """Test that invalid recipe type raises TypeError."""
-    with pytest.raises(TypeError, match="Unsupported recipe type"):
-        render_recipe(123, VariantConfig())  # type: ignore[arg-type]

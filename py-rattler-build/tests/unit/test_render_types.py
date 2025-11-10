@@ -1,9 +1,6 @@
 """Tests for render module typed structures (HashInfo and PinSubpackageInfo)."""
 
-from rattler_build.render import (
-    RenderConfig,
-    render_recipe,
-)
+from rattler_build.render import RenderConfig
 from rattler_build.stage0 import Recipe
 from rattler_build.variant_config import VariantConfig
 
@@ -26,7 +23,7 @@ package:
 
     # Render recipe
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     assert len(rendered) == 1
     variant = rendered[0]
@@ -74,7 +71,7 @@ outputs:
 
     # Render recipe
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     # Find the test-app output (should have pin_subpackages)
     app_variant = None
@@ -127,7 +124,7 @@ package:
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     hash_info = rendered[0].hash_info()
     if hash_info is not None:
@@ -162,7 +159,7 @@ outputs:
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     # Find app output
     for variant in rendered:
@@ -192,7 +189,7 @@ package:
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     hash_info = rendered[0].hash_info()
     # Hash info is always present
@@ -214,7 +211,7 @@ package:
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
-    rendered = render_recipe(recipe, variant_config, render_config)
+    rendered = recipe.render(variant_config, render_config)
 
     pin_subpackages = rendered[0].pin_subpackages()
     assert isinstance(pin_subpackages, dict)

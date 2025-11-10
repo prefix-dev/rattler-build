@@ -42,7 +42,7 @@ def _():
     import marimo as mo
 
     from rattler_build import JinjaConfig
-    from rattler_build.render import RenderConfig, render_recipe
+    from rattler_build.render import RenderConfig
     from rattler_build.stage0 import Recipe
     from rattler_build.variant_config import VariantConfig
 
@@ -54,7 +54,6 @@ def _():
         json,
         mo,
         pprint,
-        render_recipe,
     )
 
 
@@ -146,7 +145,7 @@ def _(mo):
 
 
 @app.cell
-def _(JinjaConfig, Recipe, RenderConfig, VariantConfig, render_recipe):
+def _(JinjaConfig, Recipe, RenderConfig, VariantConfig):
     # Recipe with platform selectors
     platform_recipe_yaml = """
     context:
@@ -189,7 +188,7 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig, render_recipe):
     print("🐧 Rendering for LINUX")
     print("=" * 60)
     linux_render = RenderConfig(target_platform="linux-64")
-    linux_result = render_recipe(platform_recipe, variant_cfg, linux_render)
+    linux_result = platform_recipe.render(variant_cfg, linux_render)
     linux_stage1 = linux_result[0].recipe()
 
     print(f"Host requirements: {linux_stage1.requirements.host}")
@@ -200,7 +199,7 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig, render_recipe):
     print("\n🍎 Rendering for macOS")
     print("=" * 60)
     macos_render = RenderConfig(target_platform="osx-arm64")
-    macos_result = render_recipe(platform_recipe, variant_cfg, macos_render)
+    macos_result = platform_recipe.render(variant_cfg, macos_render)
     macos_stage1 = macos_result[0].recipe()
 
     print(f"Host requirements: {macos_stage1.requirements.host}")
@@ -211,7 +210,7 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig, render_recipe):
     print("\n🪟 Rendering for WINDOWS")
     print("=" * 60)
     windows_render = RenderConfig(target_platform="win-64")
-    windows_result = render_recipe(platform_recipe, variant_cfg, windows_render)
+    windows_result = platform_recipe.render(variant_cfg, windows_render)
     windows_stage1 = windows_result[0].recipe()
 
     print(f"Host requirements: {windows_stage1.requirements.host}")
@@ -231,7 +230,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Recipe using custom context variables
     custom_context_yaml = """
     context:
@@ -280,7 +279,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     print("Context variables set:")
     print(json.dumps(custom_render.get_all_context(), indent=2))
 
-    custom_result = render_recipe(custom_recipe, custom_variants, custom_render)
+    custom_result = custom_recipe.render(custom_variants, custom_render)
     custom_stage1 = custom_result[0].recipe()
 
     print("\n📦 Rendered Recipe")
@@ -304,7 +303,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig):
     # Realistic recipe with multiple variants
     realistic_yaml = """
     context:
@@ -353,7 +352,7 @@ def _(Recipe, RenderConfig, VariantConfig, render_recipe):
 
     # Render for Linux
     realistic_render = RenderConfig(target_platform="linux-64")
-    realistic_results = render_recipe(realistic_recipe, realistic_variants, realistic_render)
+    realistic_results = realistic_recipe.render(realistic_variants, realistic_render)
 
     print(f"🔬 Realistic Package Build: {len(realistic_results)} variant(s)")
     print("=" * 60)
@@ -384,7 +383,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Recipe that uses variants in multiple places
     inspect_yaml = """
     context:
@@ -414,7 +413,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     )
 
     inspect_render = RenderConfig()
-    inspect_results = render_recipe(inspect_recipe, inspect_variants, inspect_render)
+    inspect_results = inspect_recipe.render(inspect_variants, inspect_render)
 
     print("🔍 Variant Usage Inspector")
     print("=" * 60)

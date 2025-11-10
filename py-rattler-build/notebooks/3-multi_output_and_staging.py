@@ -39,7 +39,7 @@ def _():
     import marimo as mo
     from rattler_build.stage0 import Recipe, MultiOutputRecipe
     from rattler_build.variant_config import VariantConfig
-    from rattler_build.render import RenderConfig, render_recipe
+    from rattler_build.render import RenderConfig
     import json
 
     return (
@@ -49,7 +49,6 @@ def _():
         VariantConfig,
         json,
         mo,
-        render_recipe,
     )
 
 
@@ -66,7 +65,7 @@ def _(mo):
 
 
 @app.cell
-def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig, render_recipe):
+def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
     # Simple multi-output recipe
     multi_output_yaml = """
     schema_version: 1
@@ -118,7 +117,7 @@ def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig, render_recipe):
     # Render the recipe
     mo_variants = VariantConfig()
     mo_render = RenderConfig()
-    mo_results = render_recipe(multi_recipe, mo_variants, mo_render)
+    mo_results = multi_recipe.render(mo_variants, mo_render)
 
     print(f"\n✨ Rendered {len(mo_results)} package(s):")
     print("=" * 60)
@@ -144,7 +143,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Recipe with staging output
     staging_yaml = """
     schema_version: 1
@@ -221,7 +220,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     # Render the recipe
     staging_variants = VariantConfig()
     staging_render = RenderConfig()
-    staging_results = render_recipe(staging_recipe, staging_variants, staging_render)
+    staging_results = staging_recipe.render(staging_variants, staging_render)
 
     print(f"\n📦 Rendered {len(staging_results)} package(s)")
     print("(Staging outputs don't produce packages)")
@@ -256,7 +255,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig):
     # Recipe demonstrating inheritance
     inherit_yaml = """
     schema_version: 1
@@ -349,7 +348,7 @@ def _(Recipe, RenderConfig, VariantConfig, render_recipe):
 
     inherit_variants = VariantConfig()
     inherit_render = RenderConfig()
-    inherit_results = render_recipe(inherit_recipe, inherit_variants, inherit_render)
+    inherit_results = inherit_recipe.render(inherit_variants, inherit_render)
 
     print(f"\n📦 Rendered {len(inherit_results)} package(s):")
     print("=" * 60)
@@ -382,7 +381,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Recipe for inspection
     inspect_staging_yaml = """
     schema_version: 1
@@ -426,7 +425,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     inspect_staging_recipe = Recipe.from_yaml(inspect_staging_yaml)
     inspect_variants = VariantConfig()
     inspect_render = RenderConfig()
-    inspect_results = render_recipe(inspect_staging_recipe, inspect_variants, inspect_render)
+    inspect_results = inspect_staging_recipe.render(inspect_variants, inspect_render)
 
     # Get the package output (not the staging)
     package_result = inspect_results[0]
@@ -476,7 +475,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Multi-output with variants
     multi_variant_yaml = """
     schema_version: 1
@@ -531,7 +530,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     )
 
     multi_var_render = RenderConfig()
-    multi_var_results = render_recipe(multi_var_recipe, multi_var_variants, multi_var_render)
+    multi_var_results = multi_var_recipe.render(multi_var_variants, multi_var_render)
 
     print("🎯 Multi-Output × Variants")
     print("=" * 60)
@@ -587,7 +586,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
+def _(Recipe, RenderConfig, VariantConfig, json):
     # Comprehensive recipe
     complete_yaml = """
     schema_version: 1
@@ -678,7 +677,7 @@ def _(Recipe, RenderConfig, VariantConfig, json, render_recipe):
     # RENDERING: Stage0 → Stage1
     print("\n\n⚙️  RENDERING: Stage0 → Stage1")
     print("=" * 60)
-    complete_results = render_recipe(complete_stage0, complete_variants, complete_render)
+    complete_results = complete_stage0.render(complete_variants, complete_render)
     print(f"Rendered {len(complete_results)} package variant(s)")
 
     # STAGE 1: Examine rendered recipes

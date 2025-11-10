@@ -7,7 +7,7 @@ Tests the complete flow: Stage0 Recipe -> Render -> Stage1 Recipe
 import pytest
 from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
 from rattler_build.variant_config import VariantConfig
-from rattler_build.render import render_recipe, RenderConfig
+from rattler_build.render import RenderConfig
 
 
 def test_pipeline_from_yaml_to_stage1() -> None:
@@ -35,7 +35,7 @@ requirements:
     variant_config = VariantConfig()
 
     # Step 3: Render to get Stage1
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     assert len(rendered) == 1
 
     # Step 4: Access Stage1 recipe
@@ -60,7 +60,7 @@ def test_pipeline_from_dict_to_stage1() -> None:
 
     # Step 2: Render
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Step 3: Verify Stage1
     stage1 = rendered[0].recipe()
@@ -86,7 +86,7 @@ requirements:
     variant_config = VariantConfig({"python": ["3.9", "3.10", "3.11"]})
 
     # Render with variants
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Should have 3 variants
     assert len(rendered) == 3
@@ -126,7 +126,7 @@ outputs:
 
     # Render
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Should have 2 outputs
     assert len(rendered) == 2
@@ -151,7 +151,7 @@ package:
     render_config = RenderConfig(target_platform="linux-64")
 
     # Render with custom config
-    rendered = render_recipe(stage0, variant_config, render_config)
+    rendered = stage0.render(variant_config, render_config)
 
     assert len(rendered) == 1
     stage1 = rendered[0].recipe()
@@ -168,7 +168,7 @@ package:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Hash info should be available
     hash_info = rendered[0].hash_info()
@@ -198,7 +198,7 @@ outputs:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     # Find the pin-app output
     app_variant = None
@@ -241,7 +241,7 @@ build:
 
     # Just verify we can render the original
     variant_config = VariantConfig()
-    rendered_original = render_recipe(stage0_original, variant_config)
+    rendered_original = stage0_original.render(variant_config)
 
     assert len(rendered_original) == 1
     assert rendered_original[0].recipe().package.name == "roundtrip-package"
@@ -275,7 +275,7 @@ about:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
 
@@ -310,7 +310,7 @@ requirements:
 
     variant_config = VariantConfig({"python": ["3.10"]})
 
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     stage1 = rendered[0].recipe()
 
     # used_variant should contain python
@@ -341,7 +341,7 @@ package:
 
     # Render and check Stage1 context
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
     stage1 = rendered[0].recipe()
 
     stage1_context = stage1.context
@@ -362,8 +362,8 @@ package:
     variant_config = VariantConfig()
 
     # Render multiple times
-    rendered1 = render_recipe(stage0, variant_config)
-    rendered2 = render_recipe(stage0, variant_config)
+    rendered1 = stage0.render(variant_config)
+    rendered2 = stage0.render(variant_config)
 
     # Both should work
     assert len(rendered1) == 1
@@ -429,7 +429,7 @@ requirements:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
     reqs = stage1.requirements
@@ -468,7 +468,7 @@ about:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
     about = stage1.about
@@ -500,7 +500,7 @@ build:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
     build = stage1.build
@@ -524,7 +524,7 @@ source:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
 
@@ -543,7 +543,7 @@ package:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     variant = rendered[0]
     repr_str = repr(variant)
@@ -575,7 +575,7 @@ about:
 
     stage0 = Stage0Recipe.from_yaml(yaml_content)
     variant_config = VariantConfig()
-    rendered = render_recipe(stage0, variant_config)
+    rendered = stage0.render(variant_config)
 
     stage1 = rendered[0].recipe()
     stage1_dict = stage1.to_dict()
