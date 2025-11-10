@@ -8,6 +8,7 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 from pathlib import Path
 from typing import Any, Optional
 
+from rattler_build import stage1
 from rattler_build._rattler_build import render as _render
 from rattler_build.tool_config import ToolConfiguration
 
@@ -235,7 +236,7 @@ class RenderedVariant:
         """
         return self._inner.variant()
 
-    def recipe(self) -> Any:  # Returns Stage1Recipe
+    def recipe(self) -> stage1.Recipe:
         """Get the rendered Stage1 recipe.
 
         Returns:

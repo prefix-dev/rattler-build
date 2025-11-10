@@ -5,10 +5,11 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 """
 
 from pathlib import Path
-from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
-from rattler_build.variant_config import VariantConfig
-from rattler_build.render import RenderConfig, build_rendered_variants
 
+from rattler_build.render import RenderConfig, build_rendered_variants
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.variant_config import VariantConfig
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "comprehensive-test"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"
@@ -62,8 +63,8 @@ def test_recipe_all_sections() -> None:
     about = stage1.about
     assert about.summary == "A comprehensive test package"
     assert about.license == "MIT"
-    assert "https://example.com" in about.homepage
-    assert "https://github.com/example/test-package" in about.repository
+    assert "https://example.com/" == about.homepage
+    assert "https://github.com/example/test-package" == about.repository
 
 
 def test_recipe_representations() -> None:

@@ -5,9 +5,11 @@ Tests the complete flow: Stage0 Recipe -> Render -> Stage1 Recipe
 """
 
 import pytest
-from rattler_build.stage0 import MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe
-from rattler_build.variant_config import VariantConfig
+
 from rattler_build.render import RenderConfig
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.variant_config import VariantConfig
 
 
 def test_pipeline_from_yaml_to_stage1() -> None:
@@ -476,9 +478,9 @@ about:
     assert about.summary == "This is a detailed test"
     assert about.license == "Apache-2.0"
     # URLs may have trailing slash added
-    assert "https://example.com" in about.homepage
-    assert "https://github.com/example/repo" in about.repository
-    assert "https://docs.example.com" in about.documentation
+    assert "https://example.com/" == about.homepage
+    assert "https://github.com/example/repo" == about.repository
+    assert "https://docs.example.com/" == about.documentation
     assert about.description is not None
     assert "longer description" in about.description
 

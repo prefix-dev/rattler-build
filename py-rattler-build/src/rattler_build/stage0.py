@@ -162,19 +162,42 @@ class Recipe(ABC):
         """Get the about metadata."""
         ...
 
-    @abstractmethod
-    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
+    def render(
+        self, variant_config: VariantConfig | None = None, render_config: RenderConfig | None = None
+    ) -> list[RenderedVariant]:
         """
         Render this recipe with variant configuration.
+
+        This method takes this Stage0 recipe and evaluates all Jinja templates
+        with different variant combinations to produce ready-to-build Stage1 recipes.
 
         Args:
             variant_config: Optional VariantConfig to use. If None, creates an empty config.
             render_config: Optional RenderConfig to use. If None, uses default config.
 
         Returns:
-            List of RenderedVariant objects
+            List of RenderedVariant objects (one for each variant combination)
+
+        Example:
+            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> variants = recipe.render(variant_config)
+            >>> for variant in variants:
+            ...     print(variant.recipe().package.name)
         """
-        ...
+        # Create empty variant config if not provided
+        if variant_config is None:
+            variant_config = VariantConfig()
+
+        # Handle render_config parameter
+        render_config_inner = None if render_config is None else render_config._config
+
+        # Unwrap variant_config to get inner Rust object
+        variant_config_inner = variant_config._inner
+
+        # Render the recipe using the wrapper
+        rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
+
+        return [RenderedVariant(r) for r in rendered]
 
     @abstractmethod
     def run_build(
@@ -235,46 +258,6 @@ class SingleOutputRecipe(Recipe):
     def about(self) -> "About":
         """Get the about metadata."""
         return About(self._inner.about)
-
-    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
-        """
-        Render this recipe with variant configuration.
-
-        This method takes this Stage0 recipe and evaluates all Jinja templates
-        with different variant combinations to produce ready-to-build Stage1 recipes.
-
-        Args:
-            variant_config: Optional VariantConfig to use. If None, creates an empty config.
-            render_config: Optional RenderConfig to use. If None, uses default config.
-
-        Returns:
-            List of RenderedVariant objects (one for each variant combination)
-
-        Example:
-            >>> recipe = Recipe.from_yaml(yaml_string)
-            >>> variants = recipe.render(variant_config)
-            >>> for variant in variants:
-            ...     print(variant.recipe().package.name)
-        """
-        # Import here to avoid circular dependency
-        from rattler_build import variant_config as vc_module
-        from rattler_build._rattler_build import render as _render
-        from rattler_build.render import RenderedVariant
-
-        # Create empty variant config if not provided
-        if variant_config is None:
-            variant_config = vc_module.VariantConfig()
-
-        # Handle render_config parameter
-        config_inner = render_config._config if render_config else None
-
-        # Unwrap variant_config to get inner Rust object
-        variant_config_inner = variant_config._inner
-
-        # Render the recipe using the wrapper
-        rendered = _render.render_recipe(self._wrapper, variant_config_inner, config_inner)
-
-        return [RenderedVariant(r) for r in rendered]
 
     def run_build(
         self,
@@ -417,44 +400,6 @@ class MultiOutputRecipe(Recipe):
             elif isinstance(output, _stage0.Stage0StagingOutput):
                 result.append(StagingOutput(output))
         return result
-
-    def render(
-        self, variant_config: VariantConfig | None = None, render_config: RenderConfig | None = None
-    ) -> list[RenderedVariant]:
-        """
-        Render this recipe with variant configuration.
-
-        This method takes this Stage0 recipe and evaluates all Jinja templates
-        with different variant combinations to produce ready-to-build Stage1 recipes.
-
-        Args:
-            variant_config: Optional VariantConfig to use. If None, creates an empty config.
-            render_config: Optional RenderConfig to use. If None, uses default config.
-
-        Returns:
-            List of RenderedVariant objects (one for each variant combination and output)
-
-        Example:
-            >>> recipe = Recipe.from_yaml(yaml_string)
-            >>> variants = recipe.render(variant_config)
-            >>> for variant in variants:
-            ...     print(variant.recipe().package.name)
-        """
-
-        # Create empty variant config if not provided
-        if variant_config is None:
-            variant_config = VariantConfig()
-
-        # Handle render_config parameter
-        render_config_inner = None if render_config is None else render_config._config
-
-        # Unwrap variant_config to get inner Rust object
-        variant_config_inner = variant_config._inner
-
-        # Render the recipe using the wrapper
-        rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
-
-        return [RenderedVariant(r) for r in rendered]
 
     def run_build(
         self,
