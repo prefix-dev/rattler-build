@@ -6,12 +6,12 @@ which represent the parsed YAML recipe before Jinja template evaluation
 and conditional resolution.
 """
 
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Union
-
-from rattler_build.tool_config import ToolConfiguration
+from typing import Any, Optional
 
 from rattler_build._rattler_build import stage0 as _stage0
+from rattler_build.tool_config import ToolConfiguration
 
 __all__ = [
     "Recipe",
@@ -27,24 +27,25 @@ __all__ = [
 ]
 
 
-class Recipe:
+class Recipe(ABC):
     """
     A parsed conda recipe (stage0).
 
-    This can be either a single-output or multi-output recipe.
+    This is an abstract base class. Use from_yaml(), from_file(), or from_dict()
+    to create concrete instances (SingleOutputRecipe or MultiOutputRecipe).
 
     Example:
         >>> recipe = Recipe.from_yaml(yaml_string)
-        >>> if recipe.is_single_output():
-        ...     single = recipe.as_single_output()
-        ...     print(single.package.name)
+        >>> if isinstance(recipe, SingleOutputRecipe):
+        ...     print(recipe.package.name)
     """
 
-    def __init__(self, inner: _stage0.Stage0Recipe):
-        self._inner = inner
+    # Attributes set by concrete subclasses
+    _inner: Any
+    _wrapper: Any
 
     @classmethod
-    def from_yaml(cls, yaml: str) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+    def from_yaml(cls, yaml: str) -> "Recipe":
         """
         Parse a recipe from YAML string.
 
@@ -59,7 +60,7 @@ class Recipe:
             return MultiOutputRecipe(multi_inner, wrapper)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+    def from_file(cls, path: str | Path) -> "Recipe":
         """
         Parse a recipe from a YAML file.
 
@@ -69,7 +70,7 @@ class Recipe:
             return cls.from_yaml(f.read())
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any]) -> Union["SingleOutputRecipe", "MultiOutputRecipe"]:
+    def from_dict(cls, recipe_dict: dict[str, Any]) -> "Recipe":
         """
         Create a recipe from a Python dictionary.
 
@@ -105,23 +106,27 @@ class Recipe:
             multi_inner = wrapper.as_multi_output()
             return MultiOutputRecipe(multi_inner, wrapper)
 
-    def is_single_output(self) -> bool:
-        """Check if this is a single output recipe."""
-        return self._inner.is_single_output()
+    def as_single_output(self) -> "SingleOutputRecipe":
+        """
+        Get as a single output recipe.
 
-    def is_multi_output(self) -> bool:
-        """Check if this is a multi output recipe."""
-        return self._inner.is_multi_output()
+        Raises:
+            TypeError: If this is not a single-output recipe.
+        """
+        if not isinstance(self, SingleOutputRecipe):
+            raise TypeError(f"Recipe is not a single-output recipe, it's a {type(self).__name__}")
+        return self
 
-    def as_single_output(self) -> Optional["SingleOutputRecipe"]:
-        """Get as a single output recipe (None if multi-output)."""
-        inner = self._inner.as_single_output()
-        return SingleOutputRecipe(inner) if inner else None
+    def as_multi_output(self) -> "MultiOutputRecipe":
+        """
+        Get as a multi output recipe.
 
-    def as_multi_output(self) -> Optional["MultiOutputRecipe"]:
-        """Get as a multi output recipe (None if single-output)."""
-        inner = self._inner.as_multi_output()
-        return MultiOutputRecipe(inner) if inner else None
+        Raises:
+            TypeError: If this is not a multi-output recipe.
+        """
+        if not isinstance(self, MultiOutputRecipe):
+            raise TypeError(f"Recipe is not a multi-output recipe, it's a {type(self).__name__}")
+        return self
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Python dictionary."""
@@ -130,8 +135,67 @@ class Recipe:
     def __repr__(self) -> str:
         return repr(self._inner)
 
+    @property
+    @abstractmethod
+    def schema_version(self) -> int:
+        """Get the schema version."""
+        ...
 
-class SingleOutputRecipe:
+    @property
+    @abstractmethod
+    def context(self) -> dict[str, Any]:
+        """Get the context variables as a dictionary."""
+        ...
+
+    @property
+    @abstractmethod
+    def build(self) -> "Build":
+        """Get the build configuration."""
+        ...
+
+    @property
+    @abstractmethod
+    def about(self) -> "About":
+        """Get the about metadata."""
+        ...
+
+    @abstractmethod
+    def render(self, variant_config: Any = None, render_config: Any = None) -> list[Any]:
+        """
+        Render this recipe with variant configuration.
+
+        Args:
+            variant_config: Optional VariantConfig to use. If None, creates an empty config.
+            render_config: Optional RenderConfig to use. If None, uses default config.
+
+        Returns:
+            List of RenderedVariant objects
+        """
+        ...
+
+    @abstractmethod
+    def run_build(
+        self,
+        variant_config: Any = None,
+        tool_config: Optional["ToolConfiguration"] = None,
+        output_dir: str | Path | None = None,
+        channel: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Build this recipe.
+
+        Args:
+            variant_config: Optional VariantConfig to use for building variants.
+            tool_config: Optional ToolConfiguration to use for the build.
+            output_dir: Directory to store the built packages.
+            channel: List of channels to use for resolving dependencies.
+            **kwargs: Additional arguments passed to build.
+        """
+        ...
+
+
+class SingleOutputRecipe(Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
     def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: Any = None):
@@ -249,13 +313,6 @@ class SingleOutputRecipe:
             **kwargs,
         )
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to Python dictionary."""
-        return self._inner.to_dict()
-
-    def __repr__(self) -> str:
-        return repr(self._inner)
-
 
 class Package:
     """Package metadata at stage0."""
@@ -305,7 +362,7 @@ class StagingOutput:
         return self._inner.to_dict()
 
 
-class MultiOutputRecipe:
+class MultiOutputRecipe(Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
     def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: Any = None):
@@ -428,13 +485,6 @@ class MultiOutputRecipe:
             channel=channel,
             **kwargs,
         )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to Python dictionary."""
-        return self._inner.to_dict()
-
-    def __repr__(self) -> str:
-        return repr(self._inner)
 
 
 class RecipeMetadata:

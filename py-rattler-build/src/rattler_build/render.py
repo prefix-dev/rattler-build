@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Optional, TypeAlias
 
 from rattler_build._rattler_build import render as _render
-from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
+from rattler_build.stage0 import Recipe
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
 
@@ -328,7 +328,7 @@ class RenderedVariant:
         return repr(self._inner)
 
 
-RecipeInput: TypeAlias = str | SingleOutputRecipe | MultiOutputRecipe | Path
+RecipeInput: TypeAlias = str | Recipe | Path
 
 
 def render_recipe(
@@ -377,13 +377,11 @@ def render_recipe(
         >>> print(f"Generated {len(rendered)} variants")
         Generated 3 variants
     """
-    from rattler_build.stage0 import Recipe
-
     # Handle render_config parameter
     config_inner = render_config._config if render_config else None
 
     # Handle recipe parameter - convert str/Path to Recipe objects
-    recipes_to_render: list[SingleOutputRecipe | MultiOutputRecipe] = []
+    recipes_to_render: list[Recipe] = []
 
     if isinstance(recipe, list):
         # Handle list of recipes
@@ -391,7 +389,7 @@ def render_recipe(
             if isinstance(r, str | Path):
                 parsed = Recipe.from_file(r)
                 recipes_to_render.append(parsed)
-            elif isinstance(r, SingleOutputRecipe | MultiOutputRecipe):
+            elif isinstance(r, Recipe):
                 recipes_to_render.append(r)
             else:
                 raise TypeError(f"Unsupported recipe type in list: {type(r)}")
@@ -407,7 +405,7 @@ def render_recipe(
             # Treat as YAML string
             parsed = Recipe.from_yaml(recipe)
         recipes_to_render.append(parsed)
-    elif isinstance(recipe, SingleOutputRecipe | MultiOutputRecipe):
+    elif isinstance(recipe, Recipe):
         recipes_to_render.append(recipe)
     else:
         raise TypeError(f"Unsupported recipe type: {type(recipe)}")
