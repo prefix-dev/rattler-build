@@ -75,7 +75,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-s3 = ['rattler_networking/s3', 'rattler_upload/s3']
+s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'dep:rattler_s3']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -187,6 +187,7 @@ rattler_networking = { version = "0.25.16", default-features = false, features =
   "rattler_config",
 ] }
 rattler_upload = { version = "0.3.10", default-features = false }
+rattler_s3 = { version = "0.1.4", optional = true }
 rattler_redaction = { version = "0.1.12" }
 rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
   "gateway",

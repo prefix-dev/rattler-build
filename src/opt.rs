@@ -35,6 +35,10 @@ pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
 
+    /// Build a package into a channel.
+    /// This command builds, uploads and indexes the storage after a successful build.
+    BuildInto(BuildIntoOpts),
+
     /// Run a test for a single package
     ///
     /// This creates a temporary directory, copies the package file into it, and
@@ -513,7 +517,60 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
 }
+
+/// Build and upload options for the `build-into` command.
+///
+/// This command builds packages from recipes and then uploads them to a specified
+/// channel (local or remote), followed by running indexing on the channel.
+#[derive(Parser, Clone)]
+pub struct BuildIntoOpts {
+    /// The channel or URL to build the package into.
+    ///
+    /// Note: this is also picked as the highest priority channel when solving dependencies.
+    #[arg(long, help_heading = "Modifying result")]
+    pub into: NamedChannelOrUrl,
+
+    /// Build options.
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug)]
+pub struct BuildIntoData {
+    pub into: NamedChannelOrUrl,
+    pub build: BuildData,
+}
+
+impl BuildIntoData {
+    /// Generate a new BuildIntoData struct from BuildIntoOpts and an optional config.
+    pub fn from_opts_and_config(opts: BuildIntoOpts, config: Option<Config>) -> Self {
+        // Prepend the --into channel to the list of channels for dependency resolution
+        let mut build_opts = opts.build;
+        let into_channel = opts.into.clone();
+
+        // Add the into channel as the first channel (highest priority)
+        let channels = if let Some(mut channels) = build_opts.channels.take() {
+            channels.insert(0, into_channel.clone());
+            Some(channels)
+        } else {
+            Some(vec![into_channel.clone()])
+        };
+
+        build_opts.channels = channels;
+
+        Self {
+            into: opts.into,
+            build: BuildData::from_opts_and_config(build_opts, config),
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
@@ -546,6 +603,7 @@ pub struct BuildData {
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub build_num_override: Option<u64>,
 }
 
 impl BuildData {
@@ -580,6 +638,7 @@ impl BuildData {
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        build_num_override: Option<u64>,
     ) -> Self {
         Self {
             up_to,
@@ -618,6 +677,7 @@ impl BuildData {
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             exclude_newer,
+            build_num_override,
         }
     }
 }
@@ -667,6 +727,7 @@ impl BuildData {
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
             opts.exclude_newer,
+            opts.build_num,
         )
     }
 }

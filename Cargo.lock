@@ -4222,6 +4222,7 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "rattler_repodata_gateway",
+ "rattler_s3",
  "rattler_shell",
  "rattler_solve",
  "rattler_upload",

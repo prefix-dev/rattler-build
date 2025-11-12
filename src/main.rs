@@ -10,12 +10,12 @@ use std::{
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
-    build_recipes,
+    build_recipes, build_recipes_into,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
     opt::{
-        App, BuildData, DebugData, DebugShellOpts, RebuildData, ShellCompletion, SubCommands,
-        TestData,
+        App, BuildData, BuildIntoData, DebugData, DebugShellOpts, RebuildData, ShellCompletion,
+        SubCommands, TestData,
     },
     rebuild, run_test,
     source::create_patch,
@@ -274,6 +274,27 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
+
+        Some(SubCommands::BuildInto(build_into_args)) => {
+            let recipes = build_into_args.build.recipes.clone();
+            let recipe_dir = build_into_args.build.recipe_dir.clone();
+            let build_into_data = BuildIntoData::from_opts_and_config(build_into_args, config);
+
+            // Get all recipe paths and keep tempdir alive until end of the function
+            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
+
+            if recipe_paths.is_empty() {
+                if recipe_dir.is_some() {
+                    tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
+                    return Ok(());
+                } else {
+                    miette::bail!("Couldn't find recipe.")
+                }
+            }
+
+            build_recipes_into(recipe_paths, build_into_data, &log_handler).await
+        }
+
         Some(SubCommands::Test(test_args)) => {
             run_test(
                 TestData::from_opts_and_config(test_args, config),
