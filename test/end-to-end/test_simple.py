@@ -2325,7 +2325,7 @@ def test_pe_header_signature_error(
 
 def test_filter_file(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
-        recipes / "simple-nodejs-test/recipe.yaml",
+        recipes / "filter_file/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "filter_file")
