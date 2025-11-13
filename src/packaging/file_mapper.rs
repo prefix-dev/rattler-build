@@ -72,7 +72,7 @@ pub fn filter_file(relative_path: &Path) -> bool {
     // filter any paths with .DS_Store, .git*, or conda-meta in them
     if relative_path.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();
-        (s.starts_with(".git") && !s.starts_with(".github")) || s == ".DS_Store" || s == "conda-meta"
+        s == ".DS_Store" || s == "conda-meta"
     }) {
         return true;
     }
