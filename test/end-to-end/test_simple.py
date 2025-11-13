@@ -2321,3 +2321,13 @@ def test_pe_header_signature_error(
     rattler_build.build(recipe, tmp_path)
     pkg = get_extracted_package(tmp_path, "pe-test")
     assert (pkg / "info/index.json").exists()
+
+
+def test_filter_file(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-nodejs-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "filter_file")
+
+    assert (pkg / "info/index.json").exists()
