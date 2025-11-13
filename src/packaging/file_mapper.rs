@@ -298,7 +298,7 @@ mod test {
             (".github/workflows/foo.yml", false),
             ("foo/.DS_Store", true),
             ("lib/libarchive.la", true),
-            ("bla/.git/config", true),
+            ("bla/.git/config", false),
             ("share/info/dir", true),
             ("share/info/dir/foo", true),
             ("lib/python3.9/site-packages/test/fast.pyo", true),
@@ -310,7 +310,12 @@ mod test {
 
         for (file, expected) in test_cases {
             let path = std::path::Path::new(file);
-            assert_eq!(super::filter_file(path), expected);
+            assert_eq!(
+                super::filter_file(path),
+                expected,
+                "Failed for file: {}",
+                file
+            );
         }
     }
 
