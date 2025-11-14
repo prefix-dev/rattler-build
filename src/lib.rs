@@ -67,7 +67,7 @@ use rattler_conda_types::{
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
@@ -413,6 +413,34 @@ pub async fn get_build_output(
         };
 
         outputs.push(output);
+    }
+
+    // Override build numbers if --build-num was specified
+    if let Some(build_num_override) = build_data.build_num_override {
+        tracing::info!(
+            "Overriding build number to {} for all outputs",
+            build_num_override
+        );
+        for output in &mut outputs {
+            // Update the build number
+            output.recipe.build.number = build_num_override;
+
+            // Extract the hash from the current build string and recompute with new build number
+            // Build string format is: {hash}_{build_number}
+            let current_build_string = output
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .expect("Build string should be resolved at this point");
+
+            // Split on last '_' to separate hash from build number
+            if let Some(last_underscore) = current_build_string.rfind('_') {
+                let hash_part = &current_build_string[..last_underscore];
+                let new_build_string = format!("{}_{}", hash_part, build_num_override);
+                output.recipe.build.string = BuildString::Resolved(new_build_string);
+            }
+        }
     }
 
     Ok(outputs)
@@ -1068,6 +1096,340 @@ pub async fn build_recipes(
     Ok(())
 }
 
+/// Build all outputs and collect the package paths
+async fn build_and_collect_packages(
+    build_output: Vec<Output>,
+    tool_configuration: &Configuration,
+) -> miette::Result<Vec<PathBuf>> {
+    let mut package_paths = Vec::new();
+    let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
+
+    for output in outputs_to_build.iter() {
+        let (_output, archive) = match run_build(
+            output.clone(),
+            tool_configuration,
+            WorkingDirectoryBehavior::Cleanup,
+        )
+        .boxed_local()
+        .await
+        {
+            Ok((output, archive)) => {
+                output.record_build_end();
+                (output, archive)
+            }
+            Err(e) => {
+                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+
+        package_paths.push(archive);
+    }
+
+    Ok(package_paths)
+}
+
+/// Helper function to determine the package subdirectory (platform)
+fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
+    use rattler_conda_types::package::IndexJson;
+    use rattler_package_streaming::seek::read_package_file;
+
+    let index_json: IndexJson = read_package_file(package_path)
+        .map_err(|e| miette::miette!("Failed to read package file: {}", e))?;
+
+    Ok(index_json.subdir.unwrap_or_else(|| "noarch".to_string()))
+}
+
+/// Build recipes and upload them to a channel, then run indexing
+pub async fn build_recipes_into(
+    recipe_paths: Vec<std::path::PathBuf>,
+    build_into_data: BuildIntoData,
+    log_handler: &Option<console_utils::LoggingOutputHandler>,
+) -> Result<(), miette::Error> {
+    use rattler_index::{IndexFsConfig, index_fs};
+
+    // Check if the target is a local channel and create initial index if needed
+    let target_url = build_into_data.into.clone();
+    let (is_local, target_dir) = match &target_url {
+        NamedChannelOrUrl::Url(url) if url.scheme() == "file" => {
+            (true, Some(PathBuf::from(url.path())))
+        }
+        NamedChannelOrUrl::Path(path) => (true, Some(PathBuf::from(path.as_str()))),
+        NamedChannelOrUrl::Url(_) | NamedChannelOrUrl::Name(_) => (false, None),
+    };
+
+    // For local channels, create an initial empty index if it doesn't exist
+    if is_local {
+        if let Some(ref dir) = target_dir {
+            // Check if any repodata.json exists in the channel (either noarch or platform-specific)
+            let channel_exists = dir.exists()
+                && (dir.join("noarch").join("repodata.json").exists()
+                    || dir
+                        .read_dir()
+                        .ok()
+                        .map(|entries| {
+                            entries
+                                .filter_map(Result::ok)
+                                .any(|entry| entry.path().join("repodata.json").exists())
+                        })
+                        .unwrap_or(false));
+
+            if !channel_exists {
+                tracing::info!(
+                    "Creating initial index for local channel at {}",
+                    dir.display()
+                );
+
+                // Create the subdirectory structure
+                fs::create_dir_all(dir.join("noarch")).into_diagnostic()?;
+
+                // Run initial indexing to create empty repodata
+                let index_config = IndexFsConfig {
+                    channel: dir.clone(),
+                    target_platform: Some(build_into_data.build.target_platform),
+                    repodata_patch: None,
+                    write_zst: false,
+                    write_shards: false,
+                    force: false,
+                    max_parallel: num_cpus::get_physical(),
+                    multi_progress: None,
+                };
+
+                index_fs(index_config)
+                    .await
+                    .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
+            }
+        }
+    }
+
+    let tool_config = get_tool_config(&build_into_data.build, log_handler)?;
+    let mut outputs = Vec::new();
+    for recipe_path in &recipe_paths {
+        let output = get_build_output(&build_into_data.build, recipe_path, &tool_config).await?;
+        outputs.extend(output);
+    }
+
+    if build_into_data.build.render_only {
+        let outputs = if build_into_data.build.with_solve {
+            let mut updated_outputs = Vec::new();
+            for output in outputs {
+                updated_outputs.push(
+                    output
+                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                        .await
+                        .into_diagnostic()?,
+                );
+            }
+            updated_outputs
+        } else {
+            outputs
+        };
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&outputs).into_diagnostic()?
+        );
+        return Ok(());
+    }
+
+    // Skip noarch builds before the topological sort
+    outputs = skip_noarch(outputs, &tool_config).await?;
+
+    sort_build_outputs_topologically(&mut outputs, build_into_data.build.up_to.as_deref())?;
+
+    // Build all packages and collect the paths
+    let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
+
+    if built_packages.is_empty() {
+        tracing::info!("No packages were built");
+        return Ok(());
+    }
+
+    if is_local && target_dir.is_some() {
+        let target_dir = target_dir.unwrap();
+        // For local channels, just copy the packages and run rattler-index
+
+        tracing::info!(
+            "Copying packages to local channel: {}",
+            target_dir.display()
+        );
+
+        // Copy packages to the target directory organized by platform
+        for package_path in &built_packages {
+            // Extract platform from package filename or metadata
+            let package_name = package_path
+                .file_name()
+                .ok_or_else(|| miette::miette!("Invalid package path"))?;
+
+            // Determine subdir from package
+            let subdir = determine_package_subdir(package_path)?;
+            let target_subdir = target_dir.join(subdir);
+
+            fs::create_dir_all(&target_subdir).into_diagnostic()?;
+            let target_path = target_subdir.join(package_name);
+
+            tracing::info!(
+                "Copying {} to {}",
+                package_path.display(),
+                target_path.display()
+            );
+            fs::copy(package_path, &target_path).into_diagnostic()?;
+        }
+
+        // Run rattler-index on the local directory
+        tracing::info!("Indexing local channel at {}", target_dir.display());
+        let index_config = IndexFsConfig {
+            channel: target_dir.clone(),
+            target_platform: Some(build_into_data.build.target_platform),
+            repodata_patch: None,
+            write_zst: false,
+            write_shards: false,
+            force: false,
+            max_parallel: num_cpus::get_physical(),
+            multi_progress: None,
+        };
+
+        index_fs(index_config)
+            .await
+            .map_err(|e| miette::miette!("Failed to index channel: {}", e))?;
+        tracing::info!("Successfully indexed local channel");
+    } else {
+        // For remote channels (S3, named channels, etc.)
+        upload_to_remote_channel(&target_url, &built_packages, &build_into_data).await?;
+    }
+
+    Ok(())
+}
+
+/// Upload packages to a remote channel and run indexing
+async fn upload_to_remote_channel(
+    target_url: &NamedChannelOrUrl,
+    package_paths: &[PathBuf],
+    build_into_data: &BuildIntoData,
+) -> miette::Result<()> {
+    use rattler_index::{IndexS3Config, index_s3};
+
+    match target_url {
+        NamedChannelOrUrl::Url(url) if url.scheme() == "s3" => {
+            #[cfg(not(feature = "s3"))]
+            {
+                return Err(miette::miette!(
+                    "S3 support is not enabled. Please recompile with the 's3' feature."
+                ));
+            }
+
+            #[cfg(feature = "s3")]
+            {
+                use rattler_upload::upload::upload_package_to_s3;
+
+                tracing::info!("Uploading packages to S3 channel: {}", url);
+
+                // Extract S3 credentials from environment or config
+                let s3_credentials =
+                    extract_s3_credentials_from_config(&build_into_data.build.common)?;
+
+                // Get authentication storage
+                let auth_storage = tool_configuration::get_auth_store(
+                    build_into_data.build.common.auth_file.clone(),
+                )
+                .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+
+                // Upload packages to S3
+                upload_package_to_s3(
+                    &auth_storage,
+                    url.clone(),
+                    s3_credentials.clone(),
+                    &package_paths.to_vec(),
+                    false, // force
+                )
+                .await
+                .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
+
+                tracing::info!("Successfully uploaded packages to S3");
+
+                // Run S3 indexing
+                tracing::info!("Indexing S3 channel at {}", url);
+
+                // Convert S3Credentials to ResolvedS3Credentials
+                let resolved_credentials = s3_credentials_to_resolved(&s3_credentials).await?;
+
+                let index_config = IndexS3Config {
+                    channel: url.clone(),
+                    credentials: resolved_credentials,
+                    target_platform: Some(build_into_data.build.target_platform),
+                    repodata_patch: None,
+                    write_zst: false,
+                    write_shards: false,
+                    force: false,
+                    max_parallel: num_cpus::get_physical(),
+                    multi_progress: None,
+                    precondition_checks: Default::default(),
+                };
+
+                index_s3(index_config)
+                    .await
+                    .map_err(|e| miette::miette!("Failed to index S3 channel: {}", e))?;
+
+                tracing::info!("Successfully indexed S3 channel");
+                Ok(())
+            }
+        }
+        NamedChannelOrUrl::Name(name) => {
+            // For named channels like "conda-forge", we would need to determine
+            // the upload backend. This is typically not supported for build-into.
+            Err(miette::miette!(
+                "Cannot upload to named channel '{}'. Please use a direct URL instead.",
+                name
+            ))
+        }
+        NamedChannelOrUrl::Url(url) => {
+            // For other URLs (HTTP/HTTPS), we could potentially support Quetz, Prefix, etc.
+            Err(miette::miette!(
+                "Upload to URL '{}' is not yet supported. Currently only S3 and local file:// URLs are supported.",
+                url
+            ))
+        }
+        _ => Err(miette::miette!(
+            "Unsupported channel type for upload. Use a local file:// or s3:// URL."
+        )),
+    }
+}
+
+#[cfg(feature = "s3")]
+/// Extract S3 credentials from the common configuration
+fn extract_s3_credentials_from_config(
+    _common: &CommonData,
+) -> miette::Result<Option<rattler_s3::S3Credentials>> {
+    // Try to get credentials from environment variables or config
+    // For now, we'll return None to use default AWS credential chain
+    Ok(None)
+}
+
+#[cfg(feature = "s3")]
+/// Convert S3Credentials to ResolvedS3Credentials for rattler_index
+async fn s3_credentials_to_resolved(
+    credentials: &Option<rattler_s3::S3Credentials>,
+) -> miette::Result<rattler_s3::ResolvedS3Credentials> {
+    use rattler_s3::ResolvedS3Credentials;
+
+    match credentials {
+        Some(_creds) => {
+            // If credentials are provided, use them
+            // Note: The ResolvedS3Credentials type doesn't have a direct constructor
+            // so we use from_sdk() and let it resolve from environment
+            ResolvedS3Credentials::from_sdk().await.into_diagnostic()
+        }
+        None => {
+            // Use default AWS credential chain from SDK
+            ResolvedS3Credentials::from_sdk().await.into_diagnostic()
+        }
+    }
+}
+
 /// Debug a recipe by setting up the environment without running the build script
 pub async fn debug_recipe(
     debug_data: DebugData,
@@ -1108,6 +1470,7 @@ pub async fn debug_recipe(
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
         exclude_newer: None,
+        build_num_override: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
