@@ -91,6 +91,15 @@ pub enum SourceError {
     #[error("Failed to run git command: {0}")]
     GitErrorStr(&'static str),
 
+    #[error(
+        "Git commit mismatch: expected commit '{expected}' but got '{actual}' for revision '{rev}'"
+    )]
+    GitCommitMismatch {
+        expected: String,
+        actual: String,
+        rev: String,
+    },
+
     #[error("{0}")]
     UnknownError(String),
 
