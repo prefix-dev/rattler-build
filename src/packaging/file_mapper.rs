@@ -72,7 +72,7 @@ pub fn filter_file(relative_path: &Path) -> bool {
     // filter any paths with .DS_Store, .git*, or conda-meta in them
     if relative_path.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();
-        s.starts_with(".git") || s == ".DS_Store" || s == "conda-meta"
+        s == ".DS_Store" || s == "conda-meta"
     }) {
         return true;
     }
@@ -293,11 +293,12 @@ mod test {
             ("test.pyo", true),
             ("test.la", true),
             (".DS_Store", true),
-            (".gitignore", true),
-            (".git/HEAD", true),
+            (".gitignore", false),
+            (".git/HEAD", false),
+            (".github/workflows/foo.yml", false),
             ("foo/.DS_Store", true),
             ("lib/libarchive.la", true),
-            ("bla/.git/config", true),
+            ("bla/.git/config", false),
             ("share/info/dir", true),
             ("share/info/dir/foo", true),
             ("lib/python3.9/site-packages/test/fast.pyo", true),
@@ -309,7 +310,12 @@ mod test {
 
         for (file, expected) in test_cases {
             let path = std::path::Path::new(file);
-            assert_eq!(super::filter_file(path), expected);
+            assert_eq!(
+                super::filter_file(path),
+                expected,
+                "Failed for file: {}",
+                file
+            );
         }
     }
 
