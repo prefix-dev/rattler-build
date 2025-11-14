@@ -1,0 +1,17 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × invalid field `test`.
+   ╭─[6:9]
+ 5 │ 
+ 6 │         test:
+   ·         ──┬─
+   ·           ╰── here
+ 7 │           - python:
+   ╰────
+  help: valid fields are `schema_version`, `package`, `context`, `source`,
+        `build`, `requirements`, `tests`, `about`, `extra`
