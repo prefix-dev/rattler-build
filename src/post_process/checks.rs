@@ -372,6 +372,12 @@ pub fn perform_linking_checks(
         tracing::info!("{linked_package}");
     });
 
+    // If there are no binaries, skip the overdepending check.
+    // Packages without binaries can't link against libraries.
+    if package_files.is_empty() {
+        return Ok(());
+    }
+
     // If there are any unused run dependencies then it is "overdepending".
     for run_dependency in resolved_run_dependencies.iter() {
         if !package_files
