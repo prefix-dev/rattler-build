@@ -48,6 +48,8 @@ def test_create_patch_new_file(rattler_build: RattlerBuild, tmp_path: Path):
         str(paths["work_dir"]),
         "--name",
         "changes",
+        "--add",
+        "added.txt",
         "--overwrite",
     )
 
@@ -174,6 +176,81 @@ def test_create_patch_exclude(rattler_build: RattlerBuild, tmp_path: Path):
     # Ensure diff contains included.txt change but not ignored.txt
     assert "included.txt" in content
     assert "ignored.txt" not in content
+
+
+def test_create_patch_add_pattern(rattler_build: RattlerBuild, tmp_path: Path):
+    """Tests that --add patterns control which NEW files are included in the patch."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_add",
+        cache_files={},  # No files in cache - both files are new
+        work_files={
+            "allowed.txt": "this should be added\n",
+            "skipped.txt": "this should not be added\n",
+        },
+    )
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--add",
+        "allowed.txt",  # Only add files matching this pattern
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+
+    assert result.returncode == 0
+
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+
+    content = patch_path.read_text()
+    # Ensure only the new file matching --add pattern is included
+    assert "allowed.txt" in content
+    assert "this should be added" in content
+    assert "skipped.txt" not in content
+    assert "this should not be added" not in content
+
+
+def test_create_patch_include_pattern(rattler_build: RattlerBuild, tmp_path: Path):
+    """Tests that --include patterns control which MODIFIED files are included in the patch."""
+    paths = setup_patch_test_environment(
+        tmp_path,
+        "test_create_patch_include",
+        cache_files={
+            "included.txt": "original included\n",
+            "excluded.txt": "original excluded\n",
+        },
+        work_files={
+            "included.txt": "modified included\n",
+            "excluded.txt": "modified excluded\n",
+        },
+    )
+
+    result = rattler_build(
+        "create-patch",
+        "--directory",
+        str(paths["work_dir"]),
+        "--include",
+        "included.txt",  # Only include modified files matching this pattern
+        "--name",
+        "changes",
+        "--overwrite",
+    )
+
+    assert result.returncode == 0
+
+    patch_path = paths["recipe_dir"] / "changes.patch"
+    assert patch_path.exists()
+
+    content = patch_path.read_text()
+    # Ensure only the modified file matching --include pattern is in the patch
+    assert "included.txt" in content
+    assert "modified included" in content
+    assert "excluded.txt" not in content
+    assert "modified excluded" not in content
 
 
 def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):

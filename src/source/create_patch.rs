@@ -432,7 +432,7 @@ fn process_modified_files(
 
         // Check if this is a binary file using content inspection
         if is_binary_file(modified_file)? {
-            tracing::debug!("Skipping binary file: {}", modified_file.display());
+            tracing::warn!("Skipping binary file: {}", modified_file.display());
             continue;
         }
 
@@ -497,7 +497,7 @@ fn process_modified_files(
                 }
             }
             None => {
-                // New file - only include if it matches add patterns
+                // Add patterns specified - only include files that match
                 let should_add = filter_config.add.is_match(modified_file)
                     || filter_config.add.is_match(rel_path);
 
@@ -566,7 +566,7 @@ fn process_deleted_files(
                 .map(|sub| sub.join(rel_path))
                 .unwrap_or_else(|| rel_path.to_path_buf());
             if is_binary_file(original_file)? {
-                tracing::debug!("Skipping binary file deletion: {}", original_file.display());
+                tracing::warn!("Skipping binary file deletion: {}", original_file.display());
                 let patch = DiffOptions::default()
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
