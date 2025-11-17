@@ -75,6 +75,8 @@ pub fn create_patch<P: AsRef<Path>>(
     overwrite: bool,
     output_dir: Option<&Path>,
     exclude_patterns: &[String],
+    add_patterns: &[String],
+    include_patterns: &[String],
     dry_run: bool,
 ) -> Result<(), GeneratePatchError> {
     let work_dir = work_dir.as_ref();
@@ -105,8 +107,10 @@ pub fn create_patch<P: AsRef<Path>>(
         OsStr::new("build_env.bat"),     // Ignore build environment script for Windows
     ];
 
-    // compile glob patterns from user exclusions
-    let glob_set = build_globset(exclude_patterns)?;
+    // compile glob patterns from user exclusions, additions, and inclusions
+    let exclude_glob_set = build_globset(exclude_patterns)?;
+    let add_glob_set = build_globset(add_patterns)?;
+    let include_glob_set = build_globset(include_patterns)?;
 
     let mut updated_source_info = source_info.clone();
     let cache_dir = &source_info.source_cache;
@@ -124,7 +128,17 @@ pub fn create_patch<P: AsRef<Path>>(
                 if url_src.file_name().is_none() {
                     tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
                     // This was extracted, so find the extracted directory
-                    let original_dir = find_url_cache_dir(cache_dir, url_src)?;
+                    // First try to use the extracted folder from source_info, fall back to cache lookup
+                    let original_dir =
+                        if let Some(extracted_folders) = &source_info.extracted_folders {
+                            if let Some(Some(extracted)) = extracted_folders.get(source_idx) {
+                                extracted.clone()
+                            } else {
+                                find_url_cache_dir(cache_dir, url_src)?
+                            }
+                        } else {
+                            find_url_cache_dir(cache_dir, url_src)?
+                        };
                     let target_dir = if let Some(target) = url_src.target_directory() {
                         work_dir.join(target)
                     } else {
@@ -135,15 +149,26 @@ pub fn create_patch<P: AsRef<Path>>(
                     let recipe_dir = source_info.recipe_path.parent().unwrap();
                     let patch_output_dir = output_dir.unwrap_or(recipe_dir);
 
-                    let existing_patches = url_src.patches();
+                    // Filter out the patch we're currently creating/overwriting from the baseline
+                    // This prevents us from applying the old version of the patch and losing incremental changes
+                    let current_patch_name = PathBuf::from(format!("{}.patch", name));
+                    let existing_patches: Vec<PathBuf> = url_src
+                        .patches()
+                        .iter()
+                        .filter(|p| *p != &current_patch_name)
+                        .cloned()
+                        .collect();
+
                     // Always do a full-directory diff, applying patches per file
                     let diff = create_directory_diff(
                         &original_dir,
                         &target_dir,
                         url_src.target_directory(),
                         &ignored_files,
-                        &glob_set,
-                        existing_patches,
+                        &exclude_glob_set,
+                        &add_glob_set,
+                        &include_glob_set,
+                        &existing_patches,
                         patch_output_dir,
                     )?;
                     if !diff.is_empty() {
@@ -222,6 +247,7 @@ pub fn create_patch<P: AsRef<Path>>(
     }
 
     // Write updated source information back to .source_info.json if any patches were created
+    // Skip if --diff or --dry-run
     if !dry_run {
         let source_info_path = work_dir.join(".source_info.json");
         fs::write(
@@ -239,15 +265,41 @@ fn create_directory_diff(
     modified_dir: &Path,
     target_subdir: Option<&PathBuf>,
     ignored_files: &[&OsStr],
-    glob_set: &GlobSet,
+    exclude_glob_set: &GlobSet,
+    add_glob_set: &GlobSet,
+    include_glob_set: &GlobSet,
     existing_patches: &[PathBuf],
     patch_output_dir: &Path,
 ) -> Result<String, GeneratePatchError> {
     let mut patch_content = String::new();
 
+    // Filter out patches that don't exist
+    let valid_patches: Vec<_> = existing_patches
+        .iter()
+        .filter(|patch| {
+            let patch_path = patch_output_dir.join(patch);
+            if patch_path.exists() {
+                true
+            } else {
+                tracing::warn!("Patch file not found, skipping: {}", patch_path.display());
+                false
+            }
+        })
+        .collect();
+
+    if !valid_patches.is_empty() {
+        tracing::info!(
+            "Applying {} existing patches to determine baseline:",
+            valid_patches.len()
+        );
+        for patch in &valid_patches {
+            tracing::info!("  - {}", patch.display());
+        }
+    }
+
     // Build a map from file paths to their patches
     let mut file_patch_map: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
-    for patch in existing_patches {
+    for patch in &valid_patches {
         let stats = summarize_single_patch(&patch_output_dir.join(patch), original_dir)
             .map_err(GeneratePatchError::SourceError)?;
         for path in stats
@@ -259,7 +311,7 @@ fn create_directory_diff(
             file_patch_map
                 .entry(path.clone())
                 .or_default()
-                .push(patch.clone());
+                .push((*patch).clone());
         }
     }
 
@@ -273,7 +325,7 @@ fn create_directory_diff(
         if ignored_files
             .iter()
             .any(|f| modified_file.file_name().is_some_and(|n| n == *f))
-            || glob_set.is_match(modified_file)
+            || exclude_glob_set.is_match(modified_file)
         {
             tracing::debug!("Skipping ignored file: {}", modified_file.display());
             continue;
@@ -282,21 +334,33 @@ fn create_directory_diff(
         let patch_path = target_subdir
             .map(|sub| sub.join(rel_path))
             .unwrap_or_else(|| rel_path.to_path_buf());
+
         // Check if this is a binary file using content inspection
         if is_binary_file(modified_file)? {
-            tracing::warn!("Skipping binary file: {}", modified_file.display());
+            tracing::debug!("Skipping binary file: {}", modified_file.display());
             continue;
         }
 
+        // Try to read as UTF-8, treat as binary if it fails
         let modified_content = match fs::read_to_string(modified_file) {
             Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                // Not valid UTF-8, treat as binary
+                tracing::debug!(
+                    "Skipping binary file (invalid UTF-8): {}",
+                    modified_file.display()
+                );
+                continue;
+            }
             Err(e) => return Err(GeneratePatchError::IoError(e)),
         };
+
         // Determine only the patches relevant to this file
         let applicable_patches = file_patch_map
             .get(rel_path)
             .map(Vec::as_slice)
             .unwrap_or(&[]);
+
         match get_patched_content_for_file(
             rel_path,
             original_dir,
@@ -304,31 +368,69 @@ fn create_directory_diff(
             patch_output_dir,
         )? {
             Some(original_content) => {
+                // File existed in original directory - include if modified and matches include filter
                 if original_content != modified_content {
+                    // Check include filter if specified
+                    let should_include = if include_glob_set.is_empty() {
+                        // No include filter specified, include all modified files
+                        true
+                    } else {
+                        // Include filter specified, only include files that match
+                        include_glob_set.is_match(modified_file)
+                            || include_glob_set.is_match(rel_path)
+                    };
+
+                    if should_include {
+                        let patch = DiffOptions::default()
+                            .set_original_filename(format!(
+                                "a/{}",
+                                path_to_patch_format(&patch_path)
+                            ))
+                            .set_modified_filename(format!(
+                                "b/{}",
+                                path_to_patch_format(&patch_path)
+                            ))
+                            .create_patch(&original_content, &modified_content);
+                        let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
+                        patch_content.push_str(&formatted);
+                        tracing::info!(
+                            "{}",
+                            diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
+                        );
+                    } else {
+                        tracing::debug!(
+                            "Skipping modified file (not matched by --include patterns): {}",
+                            modified_file.display()
+                        );
+                    }
+                }
+            }
+            None => {
+                // New file - only include if it matches add patterns
+                let should_add =
+                    add_glob_set.is_match(modified_file) || add_glob_set.is_match(rel_path);
+
+                if should_add {
                     let patch = DiffOptions::default()
-                        .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
+                        .set_original_filename("/dev/null")
                         .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
-                        .create_patch(&original_content, &modified_content);
+                        .create_patch("", &modified_content);
                     let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
                     patch_content.push_str(&formatted);
+                    tracing::info!(
+                        "New file (matched --add pattern): {}",
+                        modified_file.display()
+                    );
                     tracing::info!(
                         "{}",
                         diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
                     );
+                } else {
+                    tracing::debug!(
+                        "Skipping new file (not matched by --add patterns): {}",
+                        modified_file.display()
+                    );
                 }
-            }
-            None => {
-                // New file
-                let patch = DiffOptions::default()
-                    .set_original_filename("/dev/null")
-                    .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
-                    .create_patch("", &modified_content);
-                let formatted = diffy::PatchFormatter::new().fmt_patch(&patch).to_string();
-                patch_content.push_str(&formatted);
-                tracing::info!(
-                    "{}",
-                    diffy::PatchFormatter::new().with_color().fmt_patch(&patch)
-                );
             }
         }
     }
@@ -344,7 +446,7 @@ fn create_directory_diff(
         if ignored_files
             .iter()
             .any(|f| original_file.file_name().is_some_and(|n| n == *f))
-            || glob_set.is_match(original_file)
+            || exclude_glob_set.is_match(original_file)
         {
             continue;
         }
@@ -359,7 +461,7 @@ fn create_directory_diff(
                 .map(|sub| sub.join(rel_path))
                 .unwrap_or_else(|| rel_path.to_path_buf());
             if is_binary_file(original_file)? {
-                tracing::warn!("Skipping binary file deletion: {}", original_file.display());
+                tracing::debug!("Skipping binary file deletion: {}", original_file.display());
                 let patch = DiffOptions::default()
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
@@ -470,7 +572,8 @@ fn get_patched_content_for_file(
     let tmp_dir = TempDir::new().map_err(GeneratePatchError::IoError)?;
     let tmp_path = tmp_dir.path();
 
-    if let Some(parent) = original_file.parent() {
+    // Create parent directory structure in temp dir (using relative path, not absolute)
+    if let Some(parent) = rel_path.parent() {
         fs::create_dir_all(tmp_path.join(parent))?;
     }
     match fs::copy(&original_file, tmp_path.join(rel_path)) {
@@ -480,7 +583,15 @@ fn get_patched_content_for_file(
     }
 
     for patch in existing_patches {
-        let stats = summarize_single_patch(&patch_output_dir.join(patch), original_dir)
+        let patch_path = patch_output_dir.join(patch);
+
+        // Skip missing patches with a warning (they may have been deleted)
+        if !patch_path.exists() {
+            tracing::debug!("Skipping missing patch file: {}", patch_path.display());
+            continue;
+        }
+
+        let stats = summarize_single_patch(&patch_path, original_dir)
             .map_err(GeneratePatchError::SourceError)?;
 
         let touched = stats
@@ -491,6 +602,11 @@ fn get_patched_content_for_file(
             .any(|p| p.as_path() == rel_path);
 
         if touched {
+            tracing::debug!(
+                "Applying patch {} to temp file {} to establish baseline",
+                patch.display(),
+                rel_path.display()
+            );
             apply_patches(
                 std::slice::from_ref(&patch.clone()),
                 tmp_path,

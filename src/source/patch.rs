@@ -334,12 +334,15 @@ pub(crate) fn apply_patches(
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
 
-        tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
-
         if !patch_file_path.exists() {
-            return Err(SourceError::PatchNotFound(patch_file_path));
+            tracing::warn!(
+                "Patch file not found, skipping: {}",
+                patch_file_path.display()
+            );
+            continue;
         }
 
+        tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
         apply_patch(work_dir, patch_file_path.as_path())?;
     }
     Ok(())
