@@ -5,7 +5,7 @@ package:
 source:
   - git: https://github.com/prefix-dev/rattler-build
     tag: v0.1.0
-    expected-commit: df83c1edf287a756b8fc995e03e9632af0344777
+    expected_commit: df83c1edf287a756b8fc995e03e9632af0344777
 
 build:
   script:

@@ -327,14 +327,16 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 "lfs" => {
                     lfs = v.try_convert("lfs")?;
                 }
-                "expected-commit" => {
-                    expected_commit = Some(v.try_convert("expected-commit")?);
+                "expected_commit" => {
+                    // Make sure that `--experimental` mode is enabled
+
+                    expected_commit = Some(v.try_convert("expected_commit")?);
                 }
                 _ => {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs`, `expected-commit` and `target_directory`"
+                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs`, `expected_commit` and `target_directory`"
                     )])
                 }
             }

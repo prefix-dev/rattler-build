@@ -296,7 +296,21 @@ impl Recipe {
                             )])
                         }
                     }
-                    "source" => source = value.try_convert(key_str)?,
+                    "source" => {
+                        source = value.try_convert(key_str)?;
+                        // Validate experimental features in sources
+                        if !experimental {
+                            for src in &source {
+                                if let crate::recipe::parser::Source::Git(git_src) = src && git_src.expected_commit().is_some() {
+                                    return Err(vec![_partialerror!(
+                                        *value.span(),
+                                        ErrorKind::ExperimentalOnly("expected_commit".to_string()),
+                                        help = "The `expected_commit` field in git sources is only allowed in experimental mode (`--experimental`)"
+                                    )]);
+                                }
+                            }
+                        }
+                    }
                     "build" => build = value.try_convert(key_str)?,
                     "requirements" => requirements = value.try_convert(key_str)?,
                     "tests" => tests = value.try_convert(key_str)?,
