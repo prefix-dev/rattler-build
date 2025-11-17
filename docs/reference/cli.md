@@ -17,6 +17,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
 * `create-patch` — Create a patch for a directory
+* `debug-shell` — Open a debug shell in the build environment
 
 ##### **Options:**
 
@@ -987,13 +988,13 @@ Debug a recipe by setting up the environment without running the build script
 
 Create a patch for a directory
 
-**Usage:** `rattler-build create-patch [OPTIONS] --directory <DIRECTORY>`
+**Usage:** `rattler-build create-patch [OPTIONS]`
 
 ##### **Options:**
 
 - `-d`, `--directory <DIRECTORY>`
 
-	Directory where we want to create the patch
+	Directory where we want to create the patch. Defaults to current directory if not specified
 
 
 - `--name <NAME>`
@@ -1017,10 +1018,42 @@ Create a patch for a directory
 	Comma-separated list of file names (or glob patterns) that should be excluded from the diff
 
 
+- `--add <ADD>`
+
+	Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+
+
+- `--include <INCLUDE>`
+
+	Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs") If not specified, all modified files are included (subject to --exclude)
+
+
 - `--dry-run`
 
-	Perform a dry-run: analyse changes and log the diff, but don't write the patch file
+	Perform a dry-run: analyze changes and log the diff, but don't write the patch file
 
+
+
+
+
+### `debug-shell`
+
+Open a debug shell in the build environment
+
+**Usage:** `rattler-build debug-shell [OPTIONS]`
+
+##### **Options:**
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `-o`, `--output-dir <OUTPUT_DIR>`
+
+	Output directory containing rattler-build-log.txt
+
+	- Default value: `./output`
 
 
 
