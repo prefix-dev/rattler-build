@@ -1469,6 +1469,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-match-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      The match function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-hash-variable" class="md-nav__link">
     <span class="md-ellipsis">
       The hash variable
@@ -1648,6 +1657,15 @@
   <a href="#the-cdt-function" class="md-nav__link">
     <span class="md-ellipsis">
       The cdt function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-match-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      The match function
     </span>
   </a>
   
@@ -1891,6 +1909,45 @@ example of how this function can be used:</p>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># on aarch64 system</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
 </span></code></pre></div>
+<h3 id="the-match-function">The <code>match</code> function<a class="headerlink" href="#the-match-function" title="Permanent link">#</a></h3>
+<p>The <code>match</code> function allows you to perform version comparisons using conda's version matching syntax. This is particularly useful for conditionally including dependencies or skipping builds based on variants.</p>
+<p><strong>Syntax:</strong> <code>match(version, version_spec)</code></p>
+<p><strong>Parameters:</strong>
+- <code>version</code>: A version string (typically from a variant variable like <code>python</code>)
+- <code>version_spec</code>: A conda version specification string supporting operators like <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, wildcards (<code>*</code>), and comma-separated combinations (e.g., <code>"&gt;=3.8"</code>, <code>"3.14.*"</code>, <code>"&gt;=3.7,&lt;3.9"</code>)</p>
+<p>The function returns <code>true</code> if the version matches the specification, <code>false</code> otherwise.</p>
+<h4 id="usage-examples">Usage examples<a class="headerlink" href="#usage-examples" title="Permanent link">#</a></h4>
+<p>Using <code>match</code> to conditionally skip builds:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w">  </span><span class="c1"># skip builds for Python &lt; 3.8</span>
+</span></code></pre></div>
+<p>Using <code>match</code> with conditional dependencies:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&gt;=3.9&quot;)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-package</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using <code>match</code> for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.</p>
+</div>
+<p>Checking exact version matches:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(root_base, &quot;&lt;6.36&quot;)</span><span class="w">  </span><span class="c1"># skip if root_base is older than 6.36</span>
+</span></code></pre></div>
+<p>Using version ranges:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&gt;=3.8,&lt;3.11&quot;)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">backport-package</span>
+</span></code></pre></div>
+<p>Using wildcard patterns:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;3.14.*&quot;)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python-3.14-specific-package</span>
+</span></code></pre></div>
+<p><strong>Note:</strong> The <code>match</code> function follows conda's standard version matching rules, making it more reliable than manual string parsing or comparison operations.</p>
 <h3 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h3>
 <ul>
 <li><code>${{ hash }}</code> is the variant hash and is useful in the build string
@@ -1996,11 +2053,11 @@ will return <code>1</code>) - <code>last</code>: return the last element of a li
   elements of the version).</li>
 </ul>
 <p>For example the following:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">cuda</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;11.2.0&quot;</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ hash }}_cuda${{ cuda_version | version_to_buildstring }}</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">cuda</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;11.2.0&quot;</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ hash }}_cuda${{ cuda_version | version_to_buildstring }}</span>
 </span></code></pre></div>
 <p>Would evaluate to a <code>abc123_cuda112</code> (assuming the hash was <code>abc123</code>).</p>
 <h3 id="various-remarks">Various remarks<a class="headerlink" href="#various-remarks" title="Permanent link">#</a></h3>
@@ -2010,24 +2067,24 @@ falsey, and no <code>else</code> branch exists, they will render to an empty str
 is, for example in a list or dictionary, equivalent to a YAML <code>null</code>).</p>
 <p>When a recipe is rendered, all values that are <code>null</code> must be filtered from the
 resulting YAML.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;numpy&quot; if cuda == &quot;yes&quot; }}</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;numpy&quot; if cuda == &quot;yes&quot; }}</span>
 </span></code></pre></div>
 <p>If <code>cuda</code> is not equal to yes, the first item of the host requirements will be
 empty (null) and thus filtered from the final list.</p>
 <p>This must also work for dictionary values. For example:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; }}</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="c1"># or an `else` branch can be used, of course</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; else 0 }}</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; }}</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="c1"># or an `else` branch can be used, of course</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; else 0 }}</span>
 </span></code></pre></div>
 <h4 id="slicing-lists">Slicing lists<a class="headerlink" href="#slicing-lists" title="Permanent link">#</a></h4>
 <p>Lists can be spliced using the regular Python <code>[i:j]</code> syntax.  Note that when
 lists are obtained through using filters such as <code>split</code>, the whole filter
 expression needs to be parenthesized.</p>
 <p>For example, to slice a version string from <code>x.y.z</code> to <code>x.y</code>:</p>
-<div class="language-jinja highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="x">$</span><span class="cp">{{</span> <span class="o">(</span><span class="nv">version</span> <span class="o">|</span> <span class="nf">split</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">))[:</span><span class="m">2</span><span class="o">]</span> <span class="o">|</span> <span class="nf">join</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">)</span> <span class="cp">}}</span>
+<div class="language-jinja highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="x">$</span><span class="cp">{{</span> <span class="o">(</span><span class="nv">version</span> <span class="o">|</span> <span class="nf">split</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">))[:</span><span class="m">2</span><span class="o">]</span> <span class="o">|</span> <span class="nf">join</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">)</span> <span class="cp">}}</span>
 </span></code></pre></div>
 
 
