@@ -57,7 +57,7 @@ pub(crate) async fn upload_to_remote_channel(
                     if host.contains("prefix.dev") {
                         upload_to_prefix(url, package_paths, build_into_data).await
                     } else if host.contains("anaconda.org") {
-                        upload_to_anaconda(url, package_paths, build_into_data).await
+                        upload_to_anaconda(url, package_paths, build_into_data, force_upload).await
                     } else if host.contains("quetz") {
                         upload_to_quetz(url, package_paths, build_into_data).await
                     } else {
@@ -291,6 +291,7 @@ async fn upload_to_anaconda(
     url: &url::Url,
     package_paths: &[PathBuf],
     build_into_data: &BuildIntoData,
+    force: bool,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::AnacondaData;
     use rattler_upload::upload::upload_package_to_anaconda;
@@ -325,10 +326,10 @@ async fn upload_to_anaconda(
     // Create AnacondaData with owner, optional channel, API key, URL, and force flag
     let anaconda_data = AnacondaData::new(
         owner,
-        channel,
-        None, // API key from auth storage
+        channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
+        None,                     // API key from auth storage
         Some(url.clone()),
-        false, // force
+        force,
     );
 
     // Upload packages
