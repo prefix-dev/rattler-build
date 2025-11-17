@@ -2321,3 +2321,210 @@ def test_pe_header_signature_error(
     rattler_build.build(recipe, tmp_path)
     pkg = get_extracted_package(tmp_path, "pe-test")
     assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Test uses Unix-style paths and commands")
+def test_corrupted_git_cache(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Test that corrupted git cache directories are detected and re-cloned.
+
+    This test verifies the fix that checks if a git cache directory is valid
+    using 'git rev-parse --git-dir' and removes/re-clones if corrupted.
+    """
+    # Create a git repository
+    repo_dir = tmp_path / "test_repo"
+    repo_dir.mkdir()
+
+    try:
+        subprocess.run(
+            ["git", "init", "--initial-branch=main"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("Git executable not found, skipping test")
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git init failed: {e.stderr}")
+
+    # Create a test file and commit it
+    test_file = repo_dir / "test.txt"
+    test_file.write_text("Hello from git repo!")
+
+    try:
+        subprocess.run(
+            ["git", "add", "test.txt"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git commit failed: {e.stderr}")
+
+    # Create a recipe that uses this git repository
+    recipe_dir = tmp_path / "recipe"
+    recipe_dir.mkdir()
+    recipe_path = recipe_dir / "recipe.yaml"
+    recipe_content = f"""
+package:
+  name: test-corrupted-git-cache
+  version: 1.0.0
+
+source:
+  git: {repo_dir}
+
+build:
+  script:
+    - cp test.txt $PREFIX/test.txt
+
+about:
+  summary: Test package for corrupted git cache detection
+"""
+    recipe_path.write_text(recipe_content)
+
+    # Build the package once - this will populate the git cache
+    build_output_dir = tmp_path / "build_output"
+    build_output_dir.mkdir()
+
+    # First build - populates the cache (using default cache directory)
+    rattler_build.build(
+        recipe_path,
+        build_output_dir,
+    )
+
+    # Verify first build succeeded
+    pkg1 = get_extracted_package(build_output_dir, "test-corrupted-git-cache")
+    assert (pkg1 / "test.txt").exists()
+    assert (pkg1 / "test.txt").read_text() == "Hello from git repo!"
+
+    # Find the git cache directory in the default rattler cache location
+    # The default cache is typically ~/.cache/rattler on Linux
+    import os
+
+    default_cache = Path(os.path.expanduser("~/.cache/rattler"))
+
+    # Look for git cache in the default location
+    # Git sources are cached in the src_cache directory under output
+    src_cache_locations = [
+        build_output_dir.parent / "output" / "src_cache",  # May be here
+        default_cache / "git",  # Or here
+    ]
+
+    # Find where the git cache actually is by looking for our test repo
+    git_cache_dir = None
+    for potential_cache in src_cache_locations:
+        if potential_cache.exists():
+            # Check if this directory contains our test repo
+            for item in potential_cache.iterdir():
+                if item.is_dir():
+                    # Check if this looks like our repo (has test.txt or is a git repo)
+                    if (item / ".git").exists() or (item / "test.txt").exists():
+                        git_cache_dir = potential_cache
+                        break
+        if git_cache_dir:
+            break
+
+    # If we still haven't found it, look in the output directory's src_cache
+    if git_cache_dir is None:
+        src_cache = build_output_dir / "src_cache"
+        if src_cache.exists():
+            git_cache_dir = src_cache
+
+    assert (
+        git_cache_dir is not None
+    ), f"Could not find git cache directory. Checked: {src_cache_locations}"
+    assert (
+        git_cache_dir.exists()
+    ), f"Git cache directory should exist after first build: {git_cache_dir}"
+
+    # Find the actual cached repo directory (should be named after the repo)
+    cached_repos = [d for d in git_cache_dir.iterdir() if d.is_dir()]
+    assert (
+        len(cached_repos) > 0
+    ), f"Should have at least one cached git repo in {git_cache_dir}"
+    cached_repo = cached_repos[0]
+
+    # Corrupt the cache by removing the .git directory
+    git_dir = cached_repo / ".git"
+    if git_dir.exists():
+        shutil.rmtree(git_dir)
+
+    # Verify the cache is now corrupted (git commands should fail)
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-dir"],
+        cwd=cached_repo,
+        capture_output=True,
+    )
+    assert result.returncode != 0, "Git command should fail on corrupted cache"
+
+    # Clean the build output directory for second build
+    shutil.rmtree(build_output_dir)
+    build_output_dir.mkdir()
+
+    # Second build - should detect corruption, remove cache, and re-clone
+    # The build should succeed despite the corrupted cache
+    args = rattler_build.build_args(
+        recipe_path,
+        build_output_dir,
+    )
+    output2 = check_output(
+        [str(rattler_build.path), *args],
+        stderr=STDOUT,
+        text=True,
+        encoding="utf-8",
+    )
+
+    # Verify the warning message about corrupted cache appears in output
+    assert (
+        "Detected corrupted git cache" in output2 or "corrupted" in output2.lower()
+    ), "Warning about corrupted git cache should appear in output"
+
+    # Verify second build succeeded
+    pkg2 = get_extracted_package(build_output_dir, "test-corrupted-git-cache")
+    assert (pkg2 / "test.txt").exists()
+    assert (pkg2 / "test.txt").read_text() == "Hello from git repo!"
+
+    # Verify the cache was re-created and is now valid
+    # The cache directory should still exist (may have been re-cloned)
+    cached_repos_after = [d for d in git_cache_dir.iterdir() if d.is_dir()]
+    assert (
+        len(cached_repos_after) > 0
+    ), "Should have at least one cached git repo after re-clone"
+
+    # Verify the cache is now valid
+    for repo in cached_repos_after:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=repo,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            # Found a valid repo, test passed
+            break
+    else:
+        pytest.fail("No valid git repository found in cache after re-clone")

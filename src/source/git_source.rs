@@ -219,7 +219,34 @@ pub fn git_src(
                 GitUrl::Ssh(url) => url.to_string(),
                 _ => unreachable!(),
             };
-            // If the cache_path exists, initialize the repo and fetch the specified revision.
+
+            // If the cache_path exists, validate it's a usable git repository before trying to fetch.
+            // We verify by running `git rev-parse --git-dir` which will fail if not a valid repo.
+            // This handles cases like empty directories, missing .git, or corrupted repositories.
+            if cache_path.exists() {
+                let is_valid_repo = Command::new("git")
+                    .args(["rev-parse", "--git-dir"])
+                    .current_dir(&cache_path)
+                    .output()
+                    .map(|output| output.status.success())
+                    .unwrap_or(false);
+
+                if !is_valid_repo {
+                    tracing::warn!(
+                        "Detected corrupted git cache at {} (not a valid git repository), removing and re-cloning",
+                        cache_path.display()
+                    );
+                    if let Err(remove_error) = fs_err::remove_dir_all(&cache_path) {
+                        tracing::error!(
+                            "Failed to remove corrupted cache directory: {}",
+                            remove_error
+                        );
+                        return Err(SourceError::FileSystemError(remove_error));
+                    }
+                }
+            }
+
+            // If the cache_path doesn't exist (or was just removed due to corruption), clone it.
             if !cache_path.exists() {
                 let mut command = git_command(system_tools, "clone")?;
                 command
