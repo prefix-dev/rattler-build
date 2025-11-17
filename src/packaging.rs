@@ -455,10 +455,11 @@ fn print_enhanced_file_listing(
     }
 
     // Print each file with enhanced information
-    for file in files {
+    for (index, file) in files.iter().enumerate() {
         let full_path = tmp.temp_dir.path().join(file);
         let is_info = file.components().next() == Some(Component::Normal("info".as_ref()));
         let normalized_path = normalize_path(file);
+        let is_last = index == files.len() - 1;
 
         // Get file size
         let size_info = if let Ok(metadata) = fs::metadata(&full_path) {
@@ -484,24 +485,30 @@ fn print_enhanced_file_listing(
             "".to_string()
         };
 
+        // Choose the appropriate tree character
+        let tree_char = if is_last { "└─" } else { "├─" };
+
         // Format the main file entry
         let file_entry = if is_info {
             format!(
-                "  - {}{}{}",
+                "  {} {}{}{}",
+                tree_char,
                 console::style(&normalized_path).dim(),
                 console::style(&size_info).dim(),
                 symlink_info
             )
         } else if full_path.is_symlink() {
             format!(
-                "  - {}{}{}",
+                "  {} {}{}{}",
+                tree_char,
                 console::style(&normalized_path).magenta(),
                 console::style(&size_info).dim(),
                 symlink_info
             )
         } else {
             format!(
-                "  - {}{}{}",
+                "  {} {}{}{}",
+                tree_char,
                 normalized_path,
                 console::style(&size_info).dim(),
                 symlink_info
@@ -513,7 +520,7 @@ fn print_enhanced_file_listing(
         // Print warnings for this file
         if let Some(warnings) = path_warnings.get(&file.to_path_buf()) {
             for warning in warnings {
-                tracing::warn!("    ╰─ ⚠  {}", console::style(warning).yellow());
+                tracing::warn!("    └─ {}", console::style(warning).yellow());
             }
         }
     }

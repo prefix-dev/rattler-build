@@ -798,6 +798,7 @@ impl Output {
 
     /// Print enhanced package statistics
     fn print_package_stats(&self, stats: &PackageStats) {
+        use std::fmt::Write;
         let compression_ratio = if stats.uncompressed_size > 0 {
             if stats.compressed_size <= stats.uncompressed_size {
                 ((stats.uncompressed_size - stats.compressed_size) as f64
@@ -813,19 +814,23 @@ impl Output {
             0.0
         };
 
-        tracing::info!("");
-        tracing::info!("{}", console::style("┌─ Package Statistics").bold().blue());
-        tracing::info!("│");
-        tracing::info!("├─ {}", console::style("File Size").bold().cyan());
-        tracing::info!(
+        let mut output = String::new();
+        writeln!(output, "\n");
+        writeln!(output, "┌─ {} for {}", console::style("Package Statistics").bold().blue(), self.identifier());
+        writeln!(output, "│");
+        writeln!(output, "├─ {}", console::style("File Size").bold().cyan());
+        writeln!(
+            output,
             "│  ├─ compressed size: {}",
             console::style(HumanBytes(stats.compressed_size)).green()
         );
-        tracing::info!(
+        writeln!(
+            output,
             "│  ├─ uncompressed size: {}",
             console::style(HumanBytes(stats.uncompressed_size)).green()
         );
-        tracing::info!(
+        writeln!(
+            output,
             "│  └─ compression space saving: {}",
             if compression_ratio >= 0.0 {
                 console::style(format!("{:.1}%", compression_ratio)).green()
@@ -833,21 +838,23 @@ impl Output {
                 console::style(format!("{:.1}%", compression_ratio)).red()
             }
         );
-        tracing::info!("│");
-        tracing::info!("├─ {}", console::style("Contents").bold().cyan());
-        tracing::info!(
+        writeln!(output, "│");
+        writeln!(output, "├─ {}", console::style("Contents").bold().cyan());
+        writeln!(
+            output,
             "│  ├─ directories: {}",
             console::style(stats.directory_count).yellow()
         );
-        tracing::info!(
+        writeln!(
+            output,
             "│  └─ files: {} ({} compiled)",
             console::style(stats.file_count).yellow(),
             console::style(stats.compiled_file_count).magenta()
         );
 
         if !stats.size_by_extension.is_empty() {
-            tracing::info!("│");
-            tracing::info!("├─ {}", console::style("Size by Extension").bold().cyan());
+            writeln!(output, "│");
+            writeln!(output, "├─ {}", console::style("Size by Extension").bold().cyan());
             let total_extensions = stats.size_by_extension.len();
             for (i, (extension, size, percentage)) in stats.size_by_extension.iter().enumerate() {
                 let display_ext = if extension == "no-extension" {
@@ -860,7 +867,8 @@ impl Output {
                 } else {
                     "├─"
                 };
-                tracing::info!(
+                writeln!(
+                    output,
                     "│  {} {} - {} ({})",
                     connector,
                     console::style(&display_ext).white(),
@@ -871,8 +879,8 @@ impl Output {
         }
 
         if !stats.largest_files.is_empty() {
-            tracing::info!("│");
-            tracing::info!("├─ {}", console::style("Largest Files").bold().cyan());
+            writeln!(output, "│");
+            writeln!(output, "├─ {}", console::style("Largest Files").bold().cyan());
             let total_files = stats.largest_files.len();
             for (i, (path, size)) in stats.largest_files.iter().enumerate() {
                 let connector = if i == total_files - 1 {
@@ -880,7 +888,8 @@ impl Output {
                 } else {
                     "├─"
                 };
-                tracing::info!(
+                writeln!(
+                    output,
                     "│  {} {} {}",
                     connector,
                     console::style(format!("({})", HumanBytes(*size))).green(),
@@ -889,8 +898,10 @@ impl Output {
             }
         }
 
-        tracing::info!("└─");
-        tracing::info!("");
+        writeln!(output, "└─");
+        writeln!(output, "\n");
+
+        tracing::info!("{}", output);
     }
 }
 

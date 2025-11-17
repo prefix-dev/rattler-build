@@ -32,7 +32,7 @@ pub fn perform_path_checks(output: &dyn WarningRecorder, paths_entries: &[PathsE
     check_spaces_in_paths(&all_paths, output);
 
     // Check path length (default limit: 255 characters)
-    check_path_length(&all_paths, 255, output);
+    check_path_length(&all_paths, 200, output);
 
     // Check for case-insensitive collisions
     check_case_collisions(&all_paths, output);
@@ -70,7 +70,7 @@ fn check_path_length(paths: &[&Path], max_length: usize, output: &dyn WarningRec
             let length = path_str.len();
             if length > max_length {
                 output.record_warning(&format!(
-                    "Path too long ({} > {}): '{}'",
+                    "Path is very long ({} > {}): '{}'",
                     length, max_length, path_str
                 ));
             }
