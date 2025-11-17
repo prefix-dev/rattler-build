@@ -9,8 +9,6 @@ else
     USESSL="--with-secure-transport"
 fi;
 
-exit 1
-
 ./configure \
     --prefix=${PREFIX} \
     --host=${HOST} \
