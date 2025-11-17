@@ -1490,6 +1490,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#debug-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      debug-shell
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1674,6 +1683,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#debug-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      debug-shell
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1718,6 +1736,7 @@
 <li><code>auth</code> — Handle authentication to external channels</li>
 <li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
 <li><code>create-patch</code> — Create a patch for a directory</li>
+<li><code>debug-shell</code> — Open a debug shell in the build environment</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -2494,12 +2513,12 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <h3 id="create-patch"><code>create-patch</code><a class="headerlink" href="#create-patch" title="Permanent link">#</a></h3>
 <p>Create a patch for a directory</p>
-<p><strong>Usage:</strong> <code>rattler-build create-patch [OPTIONS] --directory &lt;DIRECTORY&gt;</code></p>
+<p><strong>Usage:</strong> <code>rattler-build create-patch [OPTIONS]</code></p>
 <h5 id="options_17"><strong>Options:</strong><a class="headerlink" href="#options_17" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-d</code>, <code>--directory &lt;DIRECTORY&gt;</code></p>
-<p>Directory where we want to create the patch</p>
+<p>Directory where we want to create the patch. Defaults to current directory if not specified</p>
 </li>
 <li>
 <p><code>--name &lt;NAME&gt;</code></p>
@@ -2521,8 +2540,33 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Comma-separated list of file names (or glob patterns) that should be excluded from the diff</p>
 </li>
 <li>
+<p><code>--add &lt;ADD&gt;</code></p>
+<p>Include new files matching these glob patterns (e.g., "<em>.txt", "src/</em><em>/</em>.rs")</p>
+</li>
+<li>
+<p><code>--include &lt;INCLUDE&gt;</code></p>
+<p>Only include modified files matching these glob patterns (e.g., "<em>.c", "src/</em><em>/</em>.rs") If not specified, all modified files are included (subject to --exclude)</p>
+</li>
+<li>
 <p><code>--dry-run</code></p>
-<p>Perform a dry-run: analyse changes and log the diff, but don't write the patch file</p>
+<p>Perform a dry-run: analyze changes and log the diff, but don't write the patch file</p>
+</li>
+</ul>
+<h3 id="debug-shell"><code>debug-shell</code><a class="headerlink" href="#debug-shell" title="Permanent link">#</a></h3>
+<p>Open a debug shell in the build environment</p>
+<p><strong>Usage:</strong> <code>rattler-build debug-shell [OPTIONS]</code></p>
+<h5 id="options_18"><strong>Options:</strong><a class="headerlink" href="#options_18" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>-o</code>, <code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory containing rattler-build-log.txt</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
 </li>
 </ul>
 <hr/>
