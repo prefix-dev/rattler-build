@@ -420,7 +420,11 @@ pub async fn get_build_output(
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
     let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
-        if spec.name.as_ref() != Some(output.name()) {
+        if spec.name.as_ref()
+            != Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                output.name().clone(),
+            ))
+        {
             return false;
         }
         if let Some(version_spec) = &spec.version
@@ -439,10 +443,11 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
     // Check if any run dependencies are not built yet
     if let Some(ref deps) = output.finalized_dependencies {
         for dep in &deps.run.depends {
-            if all_output_names
-                .iter()
-                .any(|o| Some(*o) == dep.spec().name.as_ref())
-            {
+            if all_output_names.iter().any(|o| {
+                Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                    (*o).clone(),
+                )) == dep.spec().name.as_ref()
+            }) {
                 // this dependency might not be built yet
                 if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
                     return false;
@@ -461,10 +466,11 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
                 .chain(command.requirements.run.iter())
             {
                 let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-                if all_output_names
-                    .iter()
-                    .any(|o| Some(*o) == dep_spec.name.as_ref())
-                {
+                if all_output_names.iter().any(|o| {
+                    Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                        (*o).clone(),
+                    )) == dep_spec.name.as_ref()
+                }) {
                     // this dependency might not be built yet
                     if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
                         return false;
@@ -957,15 +963,23 @@ pub fn sort_build_outputs_topologically(
             .expect("We just inserted it");
         for dep in output.recipe.requirements().run_build_host() {
             let dep_name = match dep {
-                Dependency::Spec(spec) => spec
-                    .name
-                    .clone()
-                    .expect("MatchSpec should always have a name"),
-                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                Dependency::Spec(spec) => {
+                    match spec
+                        .name
+                        .clone()
+                        .expect("MatchSpec should always have a name")
+                    {
+                        rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+                        _ => None,
+                    }
+                }
+                Dependency::PinSubpackage(pin) => Some(pin.pin_value().name.clone()),
+                Dependency::PinCompatible(pin) => Some(pin.pin_value().name.clone()),
             };
 
-            if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+            if let Some(dep_name) = dep_name
+                && let Some(&dep_idx) = name_to_index.get(&dep_name)
+            {
                 // do not point to self (circular dependency) - this can happen with
                 // pin_subpackage in run_exports, for example.
                 if output_idx == dep_idx {

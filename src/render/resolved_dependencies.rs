@@ -272,10 +272,12 @@ impl ResolvedDependencies {
             .resolved
             .iter()
             .map(|r| {
-                let spec = self
-                    .specs
-                    .iter()
-                    .find(|s| s.spec().name.as_ref() == Some(&r.package_record.name));
+                let spec = self.specs.iter().find(|s| {
+                    s.spec().name.as_ref()
+                        == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                            r.package_record.name.clone(),
+                        ))
+                });
 
                 if let Some(s) = spec {
                     (r, Some(s))
@@ -342,7 +344,12 @@ impl ResolvedDependencies {
                     .iter()
                     // Run export dependencies are not direct dependencies
                     .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
-                    .any(|s| s.spec().name.as_ref() == Some(&record.package_record.name))
+                    .any(|s| {
+                        s.spec().name.as_ref()
+                            == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                                record.package_record.name.clone(),
+                            ))
+                    })
             {
                 continue;
             }
@@ -510,7 +517,7 @@ pub fn apply_variant(
                         && m.version.is_none()
                         && m.build.is_none()
                         && let Some(name) = &m.name
-                        && let Some(version) = variant.get(&name.into())
+                        && let Some(version) = variant.get(&name.to_string().into())
                     {
                         // if the variant starts with an alphanumeric character,
                         // we have to add a '=' to the version spec
@@ -522,7 +529,7 @@ pub fn apply_variant(
                             spec = format!("={spec}");
                         }
 
-                        let variant = name.as_normalized().to_string();
+                        let variant = name.to_string();
                         let spec: NamelessMatchSpec = spec
                             .parse()
                             .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
@@ -1012,7 +1019,12 @@ pub(crate) async fn resolve_dependencies(
 
                 let by_name = spec_name
                     .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
+                    .and_then(|n| match n {
+                        rattler_conda_types::PackageNameMatcher::Exact(name) => {
+                            Some(ignore_run_exports.by_name().contains(name))
+                        }
+                        _ => None,
+                    })
                     .unwrap_or(false);
                 let by_package = source_package
                     .map(|s| ignore_run_exports.from_package().contains(&s))
