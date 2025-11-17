@@ -1242,7 +1242,8 @@ pub async fn build_recipes_into(
         return Ok(());
     }
 
-    upload_to_remote_channel(&target_url, &built_packages, &build_into_data).await?;
+    let force_upload = false;
+    upload_to_remote_channel(&target_url, &built_packages, &build_into_data, force_upload).await?;
 
     Ok(())
 }

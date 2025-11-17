@@ -23,6 +23,7 @@ pub(crate) async fn upload_to_remote_channel(
     target_url: &NamedChannelOrUrl,
     package_paths: &[PathBuf],
     build_into_data: &BuildIntoData,
+    force_upload: bool,
 ) -> miette::Result<()> {
     match target_url {
         NamedChannelOrUrl::Url(url) => {
@@ -39,7 +40,7 @@ pub(crate) async fn upload_to_remote_channel(
 
                     #[cfg(feature = "s3")]
                     {
-                        upload_to_s3(url, package_paths, build_into_data).await
+                        upload_to_s3(url, package_paths, build_into_data, force_upload).await
                     }
                 }
                 "quetz" => upload_to_quetz(url, package_paths, build_into_data).await,
@@ -90,6 +91,7 @@ async fn upload_to_s3(
     url: &url::Url,
     package_paths: &[PathBuf],
     build_into_data: &BuildIntoData,
+    force: bool,
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, index_s3};
     use rattler_upload::upload::upload_package_to_s3;
@@ -107,7 +109,7 @@ async fn upload_to_s3(
         url.clone(),
         None, // Use default AWS credential chain
         &package_paths.to_vec(),
-        false, // force
+        force,
     )
     .await
     .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
