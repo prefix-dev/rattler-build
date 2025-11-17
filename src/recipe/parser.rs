@@ -643,7 +643,7 @@ mod tests {
         let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
-    
+
     #[test]
     fn test_noarch_conditional() {
         // Test that null/empty values for noarch are accepted and use the default (no noarch)
