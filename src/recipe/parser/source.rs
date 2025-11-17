@@ -328,8 +328,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     lfs = v.try_convert("lfs")?;
                 }
                 "expected_commit" => {
-                    // Make sure that `--experimental` mode is enabled
-
+                    // We are parsing here, but later validating that --experimental was enabled
                     expected_commit = Some(v.try_convert("expected_commit")?);
                 }
                 _ => {
