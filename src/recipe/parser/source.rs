@@ -192,6 +192,9 @@ pub struct GitSource {
     /// Optionally request the lfs pull in git source
     #[serde(default, skip_serializing_if = "should_not_serialize_lfs")]
     pub lfs: bool,
+    /// Optionally an expected commit hash to verify after checkout
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_commit: Option<String>,
 }
 
 /// A helper method to skip serializing the lfs flag if it is false.
@@ -217,6 +220,7 @@ impl GitSource {
             patches,
             target_directory,
             lfs,
+            expected_commit: None,
         }
     }
 
@@ -249,6 +253,11 @@ impl GitSource {
     pub const fn lfs(&self) -> bool {
         self.lfs
     }
+
+    /// Get the expected commit hash.
+    pub fn expected_commit(&self) -> Option<&str> {
+        self.expected_commit.as_deref()
+    }
 }
 
 impl TryConvertNode<GitSource> for RenderedMappingNode {
@@ -259,6 +268,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut patches = Vec::new();
         let mut target_directory = None;
         let mut lfs = false;
+        let mut expected_commit = None;
 
         self.iter().map(|(k, v)| {
             match k.as_str() {
@@ -317,11 +327,15 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 "lfs" => {
                     lfs = v.try_convert("lfs")?;
                 }
+                "expected_commit" => {
+                    // We are parsing here, but later validating that --experimental was enabled
+                    expected_commit = Some(v.try_convert("expected_commit")?);
+                }
                 _ => {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
+                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs`, `expected_commit` and `target_directory`"
                     )])
                 }
             }
@@ -354,6 +368,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             patches,
             target_directory,
             lfs,
+            expected_commit,
         })
     }
 }
@@ -652,6 +667,7 @@ mod tests {
             patches: Vec::new(),
             target_directory: None,
             lfs: false,
+            expected_commit: None,
         };
 
         let yaml = serde_yaml::to_string(&git).unwrap();
@@ -672,6 +688,7 @@ mod tests {
             patches: Vec::new(),
             target_directory: None,
             lfs: false,
+            expected_commit: None,
         };
 
         let yaml = serde_yaml::to_string(&git).unwrap();
@@ -700,5 +717,50 @@ mod tests {
 
         let json = serde_json::to_string(&path_source).unwrap();
         serde_json::from_str::<PathSource>(&json).unwrap();
+    }
+
+    #[test]
+    fn test_git_source_with_expected_commit() {
+        let git = GitSource {
+            url: GitUrl::Url(Url::parse("https://test.com/test.git").unwrap()),
+            rev: GitRev::Tag("v1.0.0".into()),
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+            expected_commit: Some("abc123def456".to_string()),
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+
+        insta::assert_snapshot!(yaml);
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.expected_commit, git.expected_commit);
+        assert_eq!(parsed_git.expected_commit(), Some("abc123def456"));
+    }
+
+    #[test]
+    fn test_git_source_without_expected_commit() {
+        let git = GitSource {
+            url: GitUrl::Url(Url::parse("https://test.com/test.git").unwrap()),
+            rev: GitRev::Tag("v1.0.0".into()),
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+            expected_commit: None,
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+
+        // expected_commit should not appear in serialized yaml when None
+        assert!(!yaml.contains("expected"));
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.expected_commit, None);
+        assert_eq!(parsed_git.expected_commit(), None);
     }
 }
