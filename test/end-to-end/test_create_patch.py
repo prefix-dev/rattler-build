@@ -189,11 +189,15 @@ def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
+        # "--include",
+        # "*",
         "--name",
         "changes",
         "--dry-run",
     )
 
+    print(result.stdout)
+    print(result.stderr)
     assert result.returncode == 0
 
     patch_path = paths["recipe_dir"] / "changes.patch"

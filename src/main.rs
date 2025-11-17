@@ -4,6 +4,7 @@ use std::{
     fs::File,
     io::{self, IsTerminal},
     path::PathBuf,
+    process::Command,
 };
 
 use clap::{CommandFactory, Parser};
@@ -25,8 +26,6 @@ use tempfile::{TempDir, tempdir};
 
 /// Open a debug shell in the build environment
 fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
-    use std::{fs, process::Command};
-
     // Parse the directories info from the log file
     let (work_dir, directories_json) = if let Some(dir) = opts.work_dir {
         (dir, None)
@@ -45,7 +44,7 @@ fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
             ));
         }
 
-        let content = fs::read_to_string(&log_file)?;
+        let content = fs_err::read_to_string(&log_file)?;
         let last_line = content.lines().last().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -154,10 +153,10 @@ fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
     let status = Command::new(&shell).arg("-c").arg(&shell_script).status()?;
 
     if !status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Shell exited with status: {}", status),
-        ));
+        return Err(std::io::Error::other(format!(
+            "Shell exited with status: {}",
+            status
+        )));
     }
 
     Ok(())
