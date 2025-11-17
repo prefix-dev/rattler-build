@@ -148,11 +148,11 @@ fn resolved_run_dependencies(
 fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
     let mut system_libs = GlobSetBuilder::new();
     if output.build_configuration.target_platform.is_osx() {
+        // Match conda-build behavior: allow any library found in sysroot directories
+        // See: https://github.com/conda/conda-build/blob/61e9bb24588d8b353321c11de5452d57aa2f85ca/conda_build/post.py#L1371-L1384
         let default_sysroot = vec![
+            "/usr/lib/**/*",
             "/opt/X11/**/*.dylib",
-            "/usr/lib/libSystem.B.dylib",
-            "/usr/lib/libcrypto.0.9.8.dylib",
-            "/usr/lib/libobjc.A.dylib",
             // e.g. /System/Library/Frameworks/AGL.framework/*
             "/System/Library/Frameworks/*.framework/*",
         ];
