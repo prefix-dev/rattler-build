@@ -174,7 +174,7 @@ cdt('package-name') # outputs: package-name-cos6-aarch64
 
 ### The `match` function
 
-The `match` function allows you to perform version comparisons using conda's version matching syntax. This is particularly useful for conditionally including dependencies or skipping builds based on package versions.
+The `match` function allows you to perform version comparisons using conda's version matching syntax. This is particularly useful for conditionally including dependencies or skipping builds based on variants.
 
 **Syntax:** `match(version, version_spec)`
 
@@ -190,7 +190,7 @@ Using `match` to conditionally skip builds:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: ${{ match(python, "<3.8") }}  # skip builds for Python < 3.8
+  skip: match(python, "<3.8")  # skip builds for Python < 3.8
 ```
 
 Using `match` with conditional dependencies:
@@ -209,7 +209,7 @@ Checking exact version matches:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: ${{ match(root_base, "<6.36") }}  # skip if root_base is older than 6.36
+  skip: match(root_base, "<6.36")  # skip if root_base is older than 6.36
 ```
 
 Using version ranges:
