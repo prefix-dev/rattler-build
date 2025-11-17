@@ -111,6 +111,9 @@ impl Directories {
             output_dir,
         };
 
+        // Log the build folder for debugging
+        directories.log_build_folder()?;
+
         Ok(directories)
     }
 
@@ -130,6 +133,33 @@ impl Directories {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Log the build folder to rattler-build-log.txt for debugging purposes
+    pub fn log_build_folder(&self) -> Result<(), std::io::Error> {
+        let log_file = self.output_dir.join("rattler-build-log.txt");
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)?;
+
+        use std::io::Write;
+
+        // Create a JSON object with all directory information
+        let log_entry = serde_json::json!({
+            "work_dir": self.work_dir,
+            "build_dir": self.build_dir,
+            "host_prefix": self.host_prefix,
+            "build_prefix": self.build_prefix,
+            "recipe_dir": self.recipe_dir,
+            "recipe_path": self.recipe_path,
+            "output_dir": self.output_dir,
+            "cache_dir": self.cache_dir,
+        });
+
+        // Write as a single JSON line
+        writeln!(file, "{}", serde_json::to_string(&log_entry)?)?;
         Ok(())
     }
 
@@ -158,6 +188,9 @@ impl Directories {
         fs::create_dir_all(&self.work_dir)?;
         fs::create_dir_all(&self.build_prefix)?;
         fs::create_dir_all(&self.host_prefix)?;
+
+        // Log the build folder for debugging
+        self.log_build_folder()?;
 
         Ok(())
     }

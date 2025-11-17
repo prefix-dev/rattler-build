@@ -199,6 +199,7 @@ def setup_patch_test_environment(
         "recipe_path": str(recipe_path),
         "source_cache": str(cache_dir),
         "sources": [source_entry],
+        "extracted_folders": [str(orig_dir)],  # Point to the actual extracted directory
     }
     (work_dir / ".source_info.json").write_text(json.dumps(source_info))
 

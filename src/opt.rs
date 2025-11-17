@@ -72,6 +72,21 @@ pub enum SubCommands {
 
     /// Create a patch for a directory
     CreatePatch(CreatePatchOpts),
+
+    /// Open a debug shell in the build environment
+    DebugShell(DebugShellOpts),
+}
+
+/// Options for the debug-shell command
+#[derive(Parser, Debug, Clone)]
+pub struct DebugShellOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Output directory containing rattler-build-log.txt
+    #[arg(short, long, default_value = "./output")]
+    pub output_dir: PathBuf,
 }
 
 /// Shell completion options.
@@ -946,9 +961,10 @@ impl DebugData {
 /// Options for the `create-patch` command.
 #[derive(Parser, Debug, Clone)]
 pub struct CreatePatchOpts {
-    /// Directory where we want to create the patch
+    /// Directory where we want to create the patch.
+    /// Defaults to current directory if not specified.
     #[arg(short, long)]
-    pub directory: PathBuf,
+    pub directory: Option<PathBuf>,
 
     /// The name for the patch file to create.
     #[arg(long, default_value = "changes")]
@@ -966,7 +982,16 @@ pub struct CreatePatchOpts {
     #[arg(long, value_delimiter = ',')]
     pub exclude: Option<Vec<String>>,
 
-    /// Perform a dry-run: analyse changes and log the diff, but don't write the patch file.
+    /// Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+    #[arg(long, value_delimiter = ',')]
+    pub add: Option<Vec<String>>,
+
+    /// Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs")
+    /// If not specified, all modified files are included (subject to --exclude)
+    #[arg(long, value_delimiter = ',')]
+    pub include: Option<Vec<String>>,
+
+    /// Perform a dry-run: analyze changes and log the diff, but don't write the patch file.
     #[arg(long, default_value = "false")]
     pub dry_run: bool,
 }
