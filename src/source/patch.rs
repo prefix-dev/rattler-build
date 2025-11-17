@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy::{Diff, Patch};
+use diffy::{ApplyStats, Diff, Patch};
 use fs_err::File;
 use itertools::Itertools;
 
@@ -97,7 +97,10 @@ fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchEr
     )
 }
 
-fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
+fn apply(
+    base_image: &[u8],
+    diff: &Diff<'_, [u8]>,
+) -> Result<(Vec<u8>, ApplyStats), diffy::ApplyError> {
     diffy::apply_bytes_with_config(
         base_image,
         diff,
@@ -287,7 +290,7 @@ pub(crate) fn apply_patch_custom(
             (None, None) => continue,
             (None, Some(m)) => {
                 let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
-                write_patch_content(&new_file_content, &m)?;
+                write_patch_content(&new_file_content.0, &m)?;
             }
             (Some(o), None) => {
                 fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
@@ -298,7 +301,7 @@ pub(crate) fn apply_patch_custom(
                 if !o.exists() {
                     let new_file_content =
                         apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
-                    write_patch_content(&new_file_content, &m)?;
+                    write_patch_content(&new_file_content.0, &m)?;
                 } else {
                     let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
@@ -309,7 +312,7 @@ pub(crate) fn apply_patch_custom(
                         fs_err::remove_file(&o).map_err(SourceError::Io)?;
                     }
 
-                    write_patch_content(&new_file_content, &m)?;
+                    write_patch_content(&new_file_content.0, &m)?;
                 }
             }
         }
