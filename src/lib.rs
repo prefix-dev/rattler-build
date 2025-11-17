@@ -36,6 +36,7 @@ pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
 mod unix;
+mod upload_and_index;
 mod windows;
 
 mod package_cache_reporter;
@@ -65,6 +66,7 @@ use rattler_conda_types::{
     package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
+use rattler_index::IndexFsConfig;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
@@ -82,7 +84,10 @@ use types::{
 };
 use variant_config::VariantConfig;
 
-use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::{
+    metadata::{Debug, Output, PlatformWithVirtualPackages},
+    upload_and_index::upload_to_remote_channel,
+};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -435,6 +440,7 @@ pub async fn get_build_output(
                 .expect("Build string should be resolved at this point");
 
             // Split on last '_' to separate hash from build number
+            // TODO should we fail if we do not have a "standard" build string with build number at the end?
             if let Some(last_underscore) = current_build_string.rfind('_') {
                 let hash_part = &current_build_string[..last_underscore];
                 let new_build_string = format!("{}_{}", hash_part, build_num_override);
@@ -1133,25 +1139,12 @@ async fn build_and_collect_packages(
     Ok(package_paths)
 }
 
-/// Helper function to determine the package subdirectory (platform)
-fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
-    use rattler_conda_types::package::IndexJson;
-    use rattler_package_streaming::seek::read_package_file;
-
-    let index_json: IndexJson = read_package_file(package_path)
-        .map_err(|e| miette::miette!("Failed to read package file: {}", e))?;
-
-    Ok(index_json.subdir.unwrap_or_else(|| "noarch".to_string()))
-}
-
 /// Build recipes and upload them to a channel, then run indexing
 pub async fn build_recipes_into(
     recipe_paths: Vec<std::path::PathBuf>,
     build_into_data: BuildIntoData,
     log_handler: &Option<console_utils::LoggingOutputHandler>,
 ) -> Result<(), miette::Error> {
-    use rattler_index::{IndexFsConfig, index_fs};
-
     // Check if the target is a local channel and create initial index if needed
     let target_url = build_into_data.into.clone();
     let (is_local, target_dir) = match &target_url {
@@ -1199,7 +1192,7 @@ pub async fn build_recipes_into(
                     multi_progress: None,
                 };
 
-                index_fs(index_config)
+                rattler_index::index_fs(index_config)
                     .await
                     .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
             }
@@ -1249,185 +1242,9 @@ pub async fn build_recipes_into(
         return Ok(());
     }
 
-    if is_local && target_dir.is_some() {
-        let target_dir = target_dir.unwrap();
-        // For local channels, just copy the packages and run rattler-index
-
-        tracing::info!(
-            "Copying packages to local channel: {}",
-            target_dir.display()
-        );
-
-        // Copy packages to the target directory organized by platform
-        for package_path in &built_packages {
-            // Extract platform from package filename or metadata
-            let package_name = package_path
-                .file_name()
-                .ok_or_else(|| miette::miette!("Invalid package path"))?;
-
-            // Determine subdir from package
-            let subdir = determine_package_subdir(package_path)?;
-            let target_subdir = target_dir.join(subdir);
-
-            fs::create_dir_all(&target_subdir).into_diagnostic()?;
-            let target_path = target_subdir.join(package_name);
-
-            tracing::info!(
-                "Copying {} to {}",
-                package_path.display(),
-                target_path.display()
-            );
-            fs::copy(package_path, &target_path).into_diagnostic()?;
-        }
-
-        // Run rattler-index on the local directory
-        tracing::info!("Indexing local channel at {}", target_dir.display());
-        let index_config = IndexFsConfig {
-            channel: target_dir.clone(),
-            target_platform: Some(build_into_data.build.target_platform),
-            repodata_patch: None,
-            write_zst: false,
-            write_shards: false,
-            force: false,
-            max_parallel: num_cpus::get_physical(),
-            multi_progress: None,
-        };
-
-        index_fs(index_config)
-            .await
-            .map_err(|e| miette::miette!("Failed to index channel: {}", e))?;
-        tracing::info!("Successfully indexed local channel");
-    } else {
-        // For remote channels (S3, named channels, etc.)
-        upload_to_remote_channel(&target_url, &built_packages, &build_into_data).await?;
-    }
+    upload_to_remote_channel(&target_url, &built_packages, &build_into_data).await?;
 
     Ok(())
-}
-
-/// Upload packages to a remote channel and run indexing
-async fn upload_to_remote_channel(
-    target_url: &NamedChannelOrUrl,
-    package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
-) -> miette::Result<()> {
-    use rattler_index::{IndexS3Config, index_s3};
-
-    match target_url {
-        NamedChannelOrUrl::Url(url) if url.scheme() == "s3" => {
-            #[cfg(not(feature = "s3"))]
-            {
-                return Err(miette::miette!(
-                    "S3 support is not enabled. Please recompile with the 's3' feature."
-                ));
-            }
-
-            #[cfg(feature = "s3")]
-            {
-                use rattler_upload::upload::upload_package_to_s3;
-
-                tracing::info!("Uploading packages to S3 channel: {}", url);
-
-                // Extract S3 credentials from environment or config
-                let s3_credentials =
-                    extract_s3_credentials_from_config(&build_into_data.build.common)?;
-
-                // Get authentication storage
-                let auth_storage = tool_configuration::get_auth_store(
-                    build_into_data.build.common.auth_file.clone(),
-                )
-                .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
-
-                // Upload packages to S3
-                upload_package_to_s3(
-                    &auth_storage,
-                    url.clone(),
-                    s3_credentials.clone(),
-                    &package_paths.to_vec(),
-                    false, // force
-                )
-                .await
-                .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
-
-                tracing::info!("Successfully uploaded packages to S3");
-
-                // Run S3 indexing
-                tracing::info!("Indexing S3 channel at {}", url);
-
-                // Convert S3Credentials to ResolvedS3Credentials
-                let resolved_credentials = s3_credentials_to_resolved(&s3_credentials).await?;
-
-                let index_config = IndexS3Config {
-                    channel: url.clone(),
-                    credentials: resolved_credentials,
-                    target_platform: Some(build_into_data.build.target_platform),
-                    repodata_patch: None,
-                    write_zst: false,
-                    write_shards: false,
-                    force: false,
-                    max_parallel: num_cpus::get_physical(),
-                    multi_progress: None,
-                    precondition_checks: Default::default(),
-                };
-
-                index_s3(index_config)
-                    .await
-                    .map_err(|e| miette::miette!("Failed to index S3 channel: {}", e))?;
-
-                tracing::info!("Successfully indexed S3 channel");
-                Ok(())
-            }
-        }
-        NamedChannelOrUrl::Name(name) => {
-            // For named channels like "conda-forge", we would need to determine
-            // the upload backend. This is typically not supported for build-into.
-            Err(miette::miette!(
-                "Cannot upload to named channel '{}'. Please use a direct URL instead.",
-                name
-            ))
-        }
-        NamedChannelOrUrl::Url(url) => {
-            // For other URLs (HTTP/HTTPS), we could potentially support Quetz, Prefix, etc.
-            Err(miette::miette!(
-                "Upload to URL '{}' is not yet supported. Currently only S3 and local file:// URLs are supported.",
-                url
-            ))
-        }
-        _ => Err(miette::miette!(
-            "Unsupported channel type for upload. Use a local file:// or s3:// URL."
-        )),
-    }
-}
-
-#[cfg(feature = "s3")]
-/// Extract S3 credentials from the common configuration
-fn extract_s3_credentials_from_config(
-    _common: &CommonData,
-) -> miette::Result<Option<rattler_s3::S3Credentials>> {
-    // Try to get credentials from environment variables or config
-    // For now, we'll return None to use default AWS credential chain
-    Ok(None)
-}
-
-#[cfg(feature = "s3")]
-/// Convert S3Credentials to ResolvedS3Credentials for rattler_index
-async fn s3_credentials_to_resolved(
-    credentials: &Option<rattler_s3::S3Credentials>,
-) -> miette::Result<rattler_s3::ResolvedS3Credentials> {
-    use rattler_s3::ResolvedS3Credentials;
-
-    match credentials {
-        Some(_creds) => {
-            // If credentials are provided, use them
-            // Note: The ResolvedS3Credentials type doesn't have a direct constructor
-            // so we use from_sdk() and let it resolve from environment
-            ResolvedS3Credentials::from_sdk().await.into_diagnostic()
-        }
-        None => {
-            // Use default AWS credential chain from SDK
-            ResolvedS3Credentials::from_sdk().await.into_diagnostic()
-        }
-    }
 }
 
 /// Debug a recipe by setting up the environment without running the build script
