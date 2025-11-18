@@ -35,9 +35,10 @@ pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
 
-    /// Build a package into a channel.
-    /// This command builds, uploads and indexes the storage after a successful build.
-    BuildInto(BuildIntoOpts),
+    /// Publish packages to a channel.
+    /// This command builds packages from recipes (or uses already built packages),
+    /// uploads them to a channel, and runs indexing.
+    Publish(PublishOpts),
 
     /// Run a test for a single package
     ///
@@ -523,17 +524,36 @@ pub struct BuildOpts {
     pub build_num: Option<u64>,
 }
 
-/// Build and upload options for the `build-into` command.
+/// Publish options for the `publish` command.
 ///
 /// This command builds packages from recipes and then uploads them to a specified
 /// channel (local or remote), followed by running indexing on the channel.
 #[derive(Parser, Clone)]
-pub struct BuildIntoOpts {
-    /// The channel or URL to build the package into.
+pub struct PublishOpts {
+    /// The channel or URL to publish the package to.
     ///
-    /// Note: this is also picked as the highest priority channel when solving dependencies.
-    #[arg(long, help_heading = "Modifying result")]
-    pub into: NamedChannelOrUrl,
+    /// Examples:
+    /// - prefix.dev: https://prefix.dev/my-channel
+    /// - anaconda.org: https://anaconda.org/my-org
+    /// - S3: s3://my-bucket
+    /// - Filesystem: file:///path/to/channel or /path/to/channel
+    /// - Quetz: quetz://server.company.com/channel
+    /// - Artifactory: artifactory://server.company.com/channel
+    ///
+    /// Note: This channel is also used as the highest priority channel when solving dependencies.
+    #[arg(long = "to", help_heading = "Publishing")]
+    pub to: NamedChannelOrUrl,
+
+    /// Override the build number for all outputs.
+    /// Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`).
+    /// When using a relative bump, the highest build number from the target channel is used as the base.
+    #[arg(long, help_heading = "Publishing")]
+    pub build_number: Option<String>,
+
+    /// Force upload even if the package already exists (not recommended - may break lockfiles).
+    /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
+    #[arg(long, help_heading = "Publishing")]
+    pub force: bool,
 
     /// Build options.
     #[clap(flatten)]
@@ -542,30 +562,34 @@ pub struct BuildIntoOpts {
 
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
-pub struct BuildIntoData {
-    pub into: NamedChannelOrUrl,
+pub struct PublishData {
+    pub to: NamedChannelOrUrl,
+    pub build_number: Option<String>,
+    pub force: bool,
     pub build: BuildData,
 }
 
-impl BuildIntoData {
-    /// Generate a new BuildIntoData struct from BuildIntoOpts and an optional config.
-    pub fn from_opts_and_config(opts: BuildIntoOpts, config: Option<Config>) -> Self {
-        // Prepend the --into channel to the list of channels for dependency resolution
+impl PublishData {
+    /// Generate a new PublishData struct from PublishOpts and an optional config.
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> Self {
+        // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
-        let into_channel = opts.into.clone();
+        let to_channel = opts.to.clone();
 
-        // Add the into channel as the first channel (highest priority)
+        // Add the to channel as the first channel (highest priority)
         let channels = if let Some(mut channels) = build_opts.channels.take() {
-            channels.insert(0, into_channel.clone());
+            channels.insert(0, to_channel.clone());
             Some(channels)
         } else {
-            Some(vec![into_channel.clone()])
+            Some(vec![to_channel.clone()])
         };
 
         build_opts.channels = channels;
 
         Self {
-            into: opts.into,
+            to: opts.to,
+            build_number: opts.build_number,
+            force: opts.force,
             build: BuildData::from_opts_and_config(build_opts, config),
         }
     }

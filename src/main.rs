@@ -10,14 +10,14 @@ use std::{
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
-    build_recipes, build_recipes_into,
+    build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
     opt::{
-        App, BuildData, BuildIntoData, DebugData, DebugShellOpts, RebuildData, ShellCompletion,
+        App, BuildData, DebugData, DebugShellOpts, PublishData, RebuildData, ShellCompletion,
         SubCommands, TestData,
     },
-    rebuild, run_test,
+    publish_packages, rebuild, run_test,
     source::create_patch,
 };
 use rattler_upload::upload::opt::Config;
@@ -275,10 +275,10 @@ async fn async_main() -> miette::Result<()> {
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
 
-        Some(SubCommands::BuildInto(build_into_args)) => {
-            let recipes = build_into_args.build.recipes.clone();
-            let recipe_dir = build_into_args.build.recipe_dir.clone();
-            let build_into_data = BuildIntoData::from_opts_and_config(build_into_args, config);
+        Some(SubCommands::Publish(publish_args)) => {
+            let recipes = publish_args.build.recipes.clone();
+            let recipe_dir = publish_args.build.recipe_dir.clone();
+            let publish_data = PublishData::from_opts_and_config(publish_args, config);
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
@@ -292,7 +292,7 @@ async fn async_main() -> miette::Result<()> {
                 }
             }
 
-            build_recipes_into(recipe_paths, build_into_data, &log_handler).await
+            publish_packages(recipe_paths, publish_data, &log_handler).await
         }
 
         Some(SubCommands::Test(test_args)) => {

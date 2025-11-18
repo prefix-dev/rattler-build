@@ -32,11 +32,11 @@ pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
+mod publish;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
 mod unix;
-mod upload_and_index;
 mod windows;
 
 mod package_cache_reporter;
@@ -86,7 +86,10 @@ use variant_config::VariantConfig;
 
 use crate::{
     metadata::{Debug, Output, PlatformWithVirtualPackages},
-    upload_and_index::upload_to_remote_channel,
+    publish::{
+        BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
+        upload_and_index_channel,
+    },
 };
 
 /// Returns the recipe path.
@@ -1139,14 +1142,17 @@ async fn build_and_collect_packages(
     Ok(package_paths)
 }
 
-/// Build recipes and upload them to a channel, then run indexing
-pub async fn build_recipes_into(
+/// Publish packages to a channel.
+///
+/// This function builds packages from recipes, uploads them to a specified channel,
+/// and runs indexing on the channel.
+pub async fn publish_packages(
     recipe_paths: Vec<std::path::PathBuf>,
-    build_into_data: BuildIntoData,
+    publish_data: PublishData,
     log_handler: &Option<console_utils::LoggingOutputHandler>,
 ) -> Result<(), miette::Error> {
     // Check if the target is a local channel and create initial index if needed
-    let target_url = build_into_data.into.clone();
+    let target_url = publish_data.to.clone();
     let (is_local, target_dir) = match &target_url {
         NamedChannelOrUrl::Url(url) if url.scheme() == "file" => {
             (true, Some(PathBuf::from(url.path())))
@@ -1156,58 +1162,80 @@ pub async fn build_recipes_into(
     };
 
     // For local channels, create an initial empty index if it doesn't exist
-    if is_local {
-        if let Some(ref dir) = target_dir {
-            // Check if any repodata.json exists in the channel (either noarch or platform-specific)
-            let channel_exists = dir.exists()
-                && (dir.join("noarch").join("repodata.json").exists()
-                    || dir
-                        .read_dir()
-                        .ok()
-                        .map(|entries| {
-                            entries
-                                .filter_map(Result::ok)
-                                .any(|entry| entry.path().join("repodata.json").exists())
-                        })
-                        .unwrap_or(false));
+    if is_local && let Some(ref dir) = target_dir {
+        // Check if any repodata.json exists in the channel (either noarch or platform-specific)
+        let channel_exists = dir.exists()
+            && (dir.join("noarch").join("repodata.json").exists()
+                || dir
+                    .read_dir()
+                    .ok()
+                    .map(|entries| {
+                        entries
+                            .filter_map(Result::ok)
+                            .any(|entry| entry.path().join("repodata.json").exists())
+                    })
+                    .unwrap_or(false));
 
-            if !channel_exists {
-                tracing::info!(
-                    "Creating initial index for local channel at {}",
-                    dir.display()
-                );
+        if !channel_exists {
+            tracing::info!(
+                "Creating initial index for local channel at {}",
+                dir.display()
+            );
 
-                // Create the subdirectory structure
-                fs::create_dir_all(dir.join("noarch")).into_diagnostic()?;
+            // Create the subdirectory structure
+            fs::create_dir_all(dir.join("noarch")).into_diagnostic()?;
 
-                // Run initial indexing to create empty repodata
-                let index_config = IndexFsConfig {
-                    channel: dir.clone(),
-                    target_platform: Some(build_into_data.build.target_platform),
-                    repodata_patch: None,
-                    write_zst: false,
-                    write_shards: false,
-                    force: false,
-                    max_parallel: num_cpus::get_physical(),
-                    multi_progress: None,
-                };
+            // Run initial indexing to create empty repodata
+            let index_config = IndexFsConfig {
+                channel: dir.clone(),
+                target_platform: Some(publish_data.build.target_platform),
+                repodata_patch: None,
+                write_zst: false,
+                write_shards: false,
+                force: false,
+                max_parallel: num_cpus::get_physical(),
+                multi_progress: None,
+            };
 
-                rattler_index::index_fs(index_config)
-                    .await
-                    .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
-            }
+            rattler_index::index_fs(index_config)
+                .await
+                .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
         }
     }
 
-    let tool_config = get_tool_config(&build_into_data.build, log_handler)?;
+    let tool_config = get_tool_config(&publish_data.build, log_handler)?;
     let mut outputs = Vec::new();
     for recipe_path in &recipe_paths {
-        let output = get_build_output(&build_into_data.build, recipe_path, &tool_config).await?;
+        let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
         outputs.extend(output);
     }
 
-    if build_into_data.build.render_only {
-        let outputs = if build_into_data.build.with_solve {
+    // Apply build number override if specified
+    if let Some(ref build_number_arg) = publish_data.build_number {
+        let build_number_override = BuildNumberOverride::parse(build_number_arg)?;
+
+        // For relative bumps, we need to fetch the highest build numbers from the target channel
+        let highest_build_numbers = match &build_number_override {
+            BuildNumberOverride::Relative(_) => {
+                fetch_highest_build_numbers(
+                    &target_url,
+                    &outputs,
+                    publish_data.build.target_platform,
+                    &tool_config,
+                )
+                .await?
+            }
+            BuildNumberOverride::Absolute(num) => {
+                tracing::info!("Setting build number to {} for all outputs", num);
+                HashMap::new()
+            }
+        };
+
+        apply_build_number_override(&mut outputs, &build_number_override, &highest_build_numbers);
+    }
+
+    if publish_data.build.render_only {
+        let outputs = if publish_data.build.with_solve {
             let mut updated_outputs = Vec::new();
             for output in outputs {
                 updated_outputs.push(
@@ -1232,7 +1260,7 @@ pub async fn build_recipes_into(
     // Skip noarch builds before the topological sort
     outputs = skip_noarch(outputs, &tool_config).await?;
 
-    sort_build_outputs_topologically(&mut outputs, build_into_data.build.up_to.as_deref())?;
+    sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
 
     // Build all packages and collect the paths
     let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
@@ -1242,8 +1270,7 @@ pub async fn build_recipes_into(
         return Ok(());
     }
 
-    let force_upload = false;
-    upload_to_remote_channel(&target_url, &built_packages, &build_into_data, force_upload).await?;
+    upload_and_index_channel(&target_url, &built_packages, &publish_data).await?;
 
     Ok(())
 }

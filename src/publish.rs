@@ -1,11 +1,210 @@
 use miette::IntoDiagnostic;
-use rattler_conda_types::NamedChannelOrUrl;
+use rattler_conda_types::{
+    Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
+};
 use rattler_index::{IndexFsConfig, index_fs};
-use std::fs;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::opt::BuildIntoData;
-use crate::tool_configuration;
+use crate::opt::PublishData;
+use crate::recipe::parser::BuildString;
+use crate::render::reporters::GatewayReporter;
+use crate::tool_configuration::{self, Configuration};
+use crate::types::Output;
+
+/// Represents a parsed build number argument
+#[derive(Debug, Clone)]
+pub(crate) enum BuildNumberOverride {
+    /// Absolute build number (e.g., "12")
+    Absolute(u64),
+    /// Relative bump (e.g., "+1")
+    Relative(i64),
+}
+
+impl BuildNumberOverride {
+    /// Parse a build number string into either absolute or relative form
+    pub(crate) fn parse(s: &str) -> miette::Result<Self> {
+        let s = s.trim();
+        if let Some(stripped) = s.strip_prefix('+') {
+            let bump: i64 = stripped
+                .parse()
+                .map_err(|e| miette::miette!("Invalid relative build number '{}': {}", s, e))?;
+            Ok(BuildNumberOverride::Relative(bump))
+        } else if let Some(stripped) = s.strip_prefix('-') {
+            let bump: i64 = stripped
+                .parse::<i64>()
+                .map_err(|e| miette::miette!("Invalid relative build number '{}': {}", s, e))?;
+            Ok(BuildNumberOverride::Relative(-bump))
+        } else {
+            let num: u64 = s
+                .parse()
+                .map_err(|e| miette::miette!("Invalid absolute build number '{}': {}", s, e))?;
+            Ok(BuildNumberOverride::Absolute(num))
+        }
+    }
+}
+
+/// Fetch the highest build number for packages from the target channel
+pub(crate) async fn fetch_highest_build_numbers(
+    target_url: &NamedChannelOrUrl,
+    outputs: &[Output],
+    target_platform: Platform,
+    tool_config: &Configuration,
+) -> miette::Result<HashMap<(PackageName, String), u64>> {
+    // Convert target URL to channel
+    let channel = match target_url {
+        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url.clone())),
+        NamedChannelOrUrl::Path(path) => {
+            let url = url::Url::from_file_path(path.as_str())
+                .map_err(|_| miette::miette!("Invalid path: {}", path))?;
+            Channel::from_url(ChannelUrl::from(url))
+        }
+        NamedChannelOrUrl::Name(name) => {
+            return Err(miette::miette!(
+                "Cannot fetch repodata from named channel '{}'. Please use a URL.",
+                name
+            ));
+        }
+    };
+
+    // Collect unique package names from outputs (we'll filter by version later)
+    let mut package_specs: Vec<MatchSpec> = Vec::new();
+    let mut versions_to_check: HashMap<PackageName, Vec<String>> = HashMap::new();
+
+    for output in outputs {
+        let name = output.name().clone();
+        let version = output.recipe.package().version().to_string();
+
+        // Track versions we're interested in
+        versions_to_check
+            .entry(name.clone())
+            .or_default()
+            .push(version);
+
+        // Create a matchspec that matches the package name (any version)
+        let spec = MatchSpec {
+            name: Some(name),
+            ..Default::default()
+        };
+        if !package_specs.iter().any(|s| s.name == spec.name) {
+            package_specs.push(spec);
+        }
+    }
+
+    if package_specs.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    tracing::info!(
+        "Fetching build numbers from target channel for {} package(s)",
+        package_specs.len()
+    );
+
+    // Query the repodata
+    let result = tool_config
+        .repodata_gateway
+        .query(
+            vec![channel],
+            [target_platform, Platform::NoArch],
+            package_specs,
+        )
+        .with_reporter(
+            GatewayReporter::builder()
+                .with_multi_progress(tool_config.fancy_log_handler.multi_progress().clone())
+                .with_progress_template(tool_config.fancy_log_handler.default_bytes_style())
+                .with_finish_template(tool_config.fancy_log_handler.finished_progress_style())
+                .finish(),
+        )
+        .recursive(false)
+        .await;
+
+    tool_config
+        .fancy_log_handler
+        .multi_progress()
+        .clear()
+        .unwrap();
+
+    // Process results to find highest build numbers
+    let mut highest_build_numbers: HashMap<(PackageName, String), u64> = HashMap::new();
+
+    match result {
+        Ok(repo_data) => {
+            for repo in repo_data {
+                for record in repo.iter() {
+                    let name = &record.package_record.name;
+                    let version = record.package_record.version.version().to_string();
+
+                    // Only track versions we're actually building
+                    if let Some(versions) = versions_to_check.get(name)
+                        && versions.contains(&version)
+                    {
+                        let key = (name.clone(), version);
+                        let build_number = record.package_record.build_number;
+                        highest_build_numbers
+                            .entry(key)
+                            .and_modify(|e| *e = (*e).max(build_number))
+                            .or_insert(build_number);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            // Log the error but don't fail - the channel might not exist yet or be empty
+            tracing::debug!("Could not fetch repodata from target channel: {}", e);
+        }
+    }
+
+    Ok(highest_build_numbers)
+}
+
+/// Apply build number override to outputs
+pub(crate) fn apply_build_number_override(
+    outputs: &mut [Output],
+    build_number_override: &BuildNumberOverride,
+    highest_build_numbers: &HashMap<(PackageName, String), u64>,
+) {
+    for output in outputs {
+        let name = output.name().clone();
+        let version = output.recipe.package().version().to_string();
+        let key = (name.clone(), version.clone());
+
+        let new_build_number = match build_number_override {
+            BuildNumberOverride::Absolute(num) => *num,
+            BuildNumberOverride::Relative(bump) => {
+                let current_highest = highest_build_numbers.get(&key).copied().unwrap_or(0);
+                let new_num = (current_highest as i64 + bump).max(0) as u64;
+                tracing::info!(
+                    "Package {} v{}: bumping build number from {} to {} ({}{})",
+                    name.as_normalized(),
+                    version,
+                    current_highest,
+                    new_num,
+                    if *bump >= 0 { "+" } else { "" },
+                    bump
+                );
+                new_num
+            }
+        };
+
+        // Update the build number
+        output.recipe.build.number = new_build_number;
+
+        // Extract the hash from the current build string and recompute with new build number
+        let current_build_string = output
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .expect("Build string should be resolved at this point");
+
+        // Split on last '_' to separate hash from build number
+        if let Some(last_underscore) = current_build_string.rfind('_') {
+            let hash_part = &current_build_string[..last_underscore];
+            let new_build_string = format!("{}_{}", hash_part, new_build_number);
+            output.recipe.build.string = BuildString::Resolved(new_build_string);
+        }
+    }
+}
 
 /// Helper function to determine the package subdirectory (platform)
 fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
@@ -18,12 +217,11 @@ fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
     Ok(index_json.subdir.unwrap_or_else(|| "noarch".to_string()))
 }
 
-/// Upload packages to a remote channel and run indexing
-pub(crate) async fn upload_to_remote_channel(
+/// Upload packages to a channel and run indexing
+pub(crate) async fn upload_and_index_channel(
     target_url: &NamedChannelOrUrl,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
-    force_upload: bool,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     match target_url {
         NamedChannelOrUrl::Url(url) => {
@@ -40,26 +238,26 @@ pub(crate) async fn upload_to_remote_channel(
 
                     #[cfg(feature = "s3")]
                     {
-                        upload_to_s3(url, package_paths, build_into_data, force_upload).await
+                        upload_to_s3(url, package_paths, publish_data).await
                     }
                 }
-                "quetz" => upload_to_quetz(url, package_paths, build_into_data).await,
-                "artifactory" => upload_to_artifactory(url, package_paths, build_into_data).await,
-                "prefix" => upload_to_prefix(url, package_paths, build_into_data).await,
+                "quetz" => upload_to_quetz(url, package_paths, publish_data).await,
+                "artifactory" => upload_to_artifactory(url, package_paths, publish_data).await,
+                "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
                 "file" => {
                     let path = PathBuf::from(url.path());
-                    upload_to_local_filesystem(&path, package_paths, build_into_data).await
+                    upload_to_local_filesystem(&path, package_paths, publish_data).await
                 }
                 "http" | "https" => {
                     // Detect backend from hostname
                     let host = url.host_str().unwrap_or("");
 
                     if host.contains("prefix.dev") {
-                        upload_to_prefix(url, package_paths, build_into_data).await
+                        upload_to_prefix(url, package_paths, publish_data).await
                     } else if host.contains("anaconda.org") {
-                        upload_to_anaconda(url, package_paths, build_into_data, force_upload).await
+                        upload_to_anaconda(url, package_paths, publish_data).await
                     } else if host.contains("quetz") {
-                        upload_to_quetz(url, package_paths, build_into_data).await
+                        upload_to_quetz(url, package_paths, publish_data).await
                     } else {
                         Err(miette::miette!(
                             "Cannot determine upload backend from URL '{}'. \n\
@@ -76,7 +274,7 @@ pub(crate) async fn upload_to_remote_channel(
         }
         NamedChannelOrUrl::Path(path) => {
             let path_buf = PathBuf::from(path.as_str());
-            upload_to_local_filesystem(&path_buf, package_paths, build_into_data).await
+            upload_to_local_filesystem(&path_buf, package_paths, publish_data).await
         }
         NamedChannelOrUrl::Name(name) => Err(miette::miette!(
             "Cannot upload to named channel '{}'. Please use a direct URL instead.",
@@ -90,8 +288,7 @@ pub(crate) async fn upload_to_remote_channel(
 async fn upload_to_s3(
     url: &url::Url,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
-    force: bool,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, index_s3};
     use rattler_upload::upload::upload_package_to_s3;
@@ -100,7 +297,7 @@ async fn upload_to_s3(
 
     // Get authentication storage
     let auth_storage =
-        tool_configuration::get_auth_store(build_into_data.build.common.auth_file.clone())
+        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Upload packages to S3 (credentials come from AWS SDK default chain)
@@ -109,7 +306,7 @@ async fn upload_to_s3(
         url.clone(),
         None, // Use default AWS credential chain
         &package_paths.to_vec(),
-        force,
+        publish_data.force,
     )
     .await
     .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
@@ -127,7 +324,7 @@ async fn upload_to_s3(
     let index_config = IndexS3Config {
         channel: url.clone(),
         credentials: resolved_credentials,
-        target_platform: Some(build_into_data.build.target_platform),
+        target_platform: Some(publish_data.build.target_platform),
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
@@ -149,7 +346,7 @@ async fn upload_to_s3(
 async fn upload_to_quetz(
     url: &url::Url,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::QuetzData;
     use rattler_upload::upload::upload_package_to_quetz;
@@ -158,13 +355,13 @@ async fn upload_to_quetz(
 
     // Get authentication storage
     let auth_storage =
-        tool_configuration::get_auth_store(build_into_data.build.common.auth_file.clone())
+        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
         .path_segments()
-        .and_then(|segments| segments.last())
+        .and_then(|mut segments| segments.next_back())
         .ok_or_else(|| miette::miette!("Invalid Quetz URL: missing channel name"))?
         .to_string();
 
@@ -196,7 +393,7 @@ async fn upload_to_quetz(
 async fn upload_to_artifactory(
     url: &url::Url,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::ArtifactoryData;
     use rattler_upload::upload::upload_package_to_artifactory;
@@ -205,13 +402,13 @@ async fn upload_to_artifactory(
 
     // Get authentication storage
     let auth_storage =
-        tool_configuration::get_auth_store(build_into_data.build.common.auth_file.clone())
+        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
         .path_segments()
-        .and_then(|segments| segments.last())
+        .and_then(|mut segments| segments.next_back())
         .ok_or_else(|| miette::miette!("Invalid Artifactory URL: missing repository name"))?
         .to_string();
 
@@ -243,7 +440,7 @@ async fn upload_to_artifactory(
 async fn upload_to_prefix(
     url: &url::Url,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::PrefixData;
     use rattler_upload::upload::upload_package_to_prefix;
@@ -252,13 +449,13 @@ async fn upload_to_prefix(
 
     // Get authentication storage
     let auth_storage =
-        tool_configuration::get_auth_store(build_into_data.build.common.auth_file.clone())
+        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
         .path_segments()
-        .and_then(|segments| segments.last())
+        .and_then(|mut segments| segments.next_back())
         .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?
         .to_string();
 
@@ -290,8 +487,7 @@ async fn upload_to_prefix(
 async fn upload_to_anaconda(
     url: &url::Url,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
-    force: bool,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::AnacondaData;
     use rattler_upload::upload::upload_package_to_anaconda;
@@ -300,7 +496,7 @@ async fn upload_to_anaconda(
 
     // Get authentication storage
     let auth_storage =
-        tool_configuration::get_auth_store(build_into_data.build.common.auth_file.clone())
+        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Parse URL path to extract owner and optional channel
@@ -329,7 +525,7 @@ async fn upload_to_anaconda(
         channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
         None,                     // API key from auth storage
         Some(url.clone()),
-        force,
+        publish_data.force,
     );
 
     // Upload packages
@@ -346,7 +542,7 @@ async fn upload_to_anaconda(
 async fn upload_to_local_filesystem(
     target_dir: &Path,
     package_paths: &[PathBuf],
-    build_into_data: &BuildIntoData,
+    publish_data: &PublishData,
 ) -> miette::Result<()> {
     tracing::info!(
         "Copying packages to local channel: {}",
@@ -364,7 +560,7 @@ async fn upload_to_local_filesystem(
         let subdir = determine_package_subdir(package_path)?;
         let target_subdir = target_dir.join(&subdir);
 
-        fs::create_dir_all(&target_subdir).into_diagnostic()?;
+        fs_err::create_dir_all(&target_subdir).into_diagnostic()?;
         let target_path = target_subdir.join(package_name);
 
         tracing::info!(
@@ -372,14 +568,14 @@ async fn upload_to_local_filesystem(
             package_path.display(),
             target_path.display()
         );
-        fs::copy(package_path, &target_path).into_diagnostic()?;
+        fs_err::copy(package_path, &target_path).into_diagnostic()?;
     }
 
     // Run rattler-index on the local directory
     tracing::info!("Indexing local channel at {}", target_dir.display());
     let index_config = IndexFsConfig {
         channel: target_dir.to_path_buf(),
-        target_platform: Some(build_into_data.build.target_platform),
+        target_platform: Some(publish_data.build.target_platform),
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
