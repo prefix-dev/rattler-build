@@ -235,24 +235,19 @@ class Recipe(ABC):
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
             >>> recipe.run_build(tool_config=config, output_dir="./output")
         """
-        from rattler_build import _rattler_build as _rb
-
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)
 
-        # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if tool_config else None
-
-        # Build from the rendered variants
-        _rb.build_from_rendered_variants_py(
-            rendered_variants=[v._inner for v in rendered_variants],
-            tool_config=tool_config_inner,
-            output_dir=Path(output_dir) if output_dir else None,
-            channel=channel,
-            progress_callback=progress_callback,
-            recipe_path=Path(recipe_path) if recipe_path else None,
-            **kwargs,
-        )
+        # Build each rendered variant using its run_build method
+        for variant in rendered_variants:
+            variant.run_build(
+                tool_config=tool_config,
+                output_dir=output_dir,
+                channel=channel,
+                progress_callback=progress_callback,
+                recipe_path=recipe_path,
+                **kwargs,
+            )
 
 
 class SingleOutputRecipe(Recipe):
