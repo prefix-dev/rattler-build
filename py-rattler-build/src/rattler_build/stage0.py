@@ -205,6 +205,8 @@ class Recipe(ABC):
         tool_config: ToolConfiguration | None = None,
         output_dir: str | Path | None = None,
         channel: list[str] | None = None,
+        progress_callback: Any | None = None,
+        recipe_path: str | Path | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -219,6 +221,8 @@ class Recipe(ABC):
                         parameters like keep_build, test, etc. will be ignored.
             output_dir: Directory to store the built packages. Defaults to current directory.
             channel: List of channels to use for resolving dependencies.
+            progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
+            recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
             **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
                      These are ignored if tool_config is provided.
 
@@ -245,6 +249,8 @@ class Recipe(ABC):
             tool_config=tool_config_inner,
             output_dir=Path(output_dir) if output_dir else None,
             channel=channel,
+            progress_callback=progress_callback,
+            recipe_path=Path(recipe_path) if recipe_path else None,
             **kwargs,
         )
 
