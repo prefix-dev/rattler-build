@@ -37,6 +37,20 @@ The `--to` option selects the channel to publish the package into. This channel 
 
 When using `publish` with a recipe, you can use the same options as when normally building packages.
 
+## Bumping the build number
+
+Sometimes you want to package the same package again, but rebuild it with the latest dependencies. There are two ways to achieve this:
+
+- By using a variant file, and updating it at certain times
+- By bumping the build number and re-publishing the package again
+
+The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. `--build-number=12`) or a _relative_ bump for all packages (e.g. `--build-number=+1` to add 1 to the _highest_ build number found in the publish channel). 
+When bumping by a relative amount, we download the repodata and determine for each subdir/package combination that you are building the highest build number.
+
+When the recipe does not specify a build number, the build number is automatically bumped on `publish` to the _next available build number_.
+
+If the recipe does specify a build number, you have to manually trigger an override using the `--build-number` CLI flag. Alternatively, you can use the `--force` upload option on S3, your local filesystem, Anaconda and prefix channels to forcibly replace the previous build. Please note that this is heavily discouraged as lockfiles will get out of date and the old build is irrevocably deleted.
+
 ## Authentication
 
 Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the `auth` subcommand: `rattler-build auth login`. Note: if you are already logged in with `pixi`, you are also logged in with `rattler-build` - they share credentials.
