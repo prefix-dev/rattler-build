@@ -6,7 +6,7 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 
 from pathlib import Path
 
-from rattler_build.render import RenderConfig, build_rendered_variants
+from rattler_build.render import RenderConfig
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 from rattler_build.stage0 import Recipe as Stage0Recipe
 from rattler_build.variant_config import VariantConfig
@@ -407,35 +407,4 @@ requirements:
     assert callable(rendered[0].run_build)
 
     # Note: We don't actually call run_build() in this test to avoid
-    # creating actual build artifacts during testing
-
-
-def test_build_rendered_variants_function() -> None:
-    """Test the build_rendered_variants() free function."""
-    yaml_content = """
-package:
-  name: multi-build-test
-  version: 2.0.0
-
-build:
-  number: 0
-
-requirements:
-  host:
-    - python ${{ python }}
-  run:
-    - python
-"""
-    # Parse and render with multiple variants
-    stage0 = Stage0Recipe.from_yaml(yaml_content)
-    variant_config = VariantConfig({"python": ["3.10.*", "3.11.*"]})
-    rendered = stage0.render(variant_config)
-
-    # Should have 2 variants
-    assert len(rendered) == 2
-
-    # Verify build_rendered_variants exists and is callable
-    assert callable(build_rendered_variants)
-
-    # Note: We don't actually call build_rendered_variants() to avoid
     # creating actual build artifacts during testing
