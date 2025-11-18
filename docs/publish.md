@@ -8,6 +8,7 @@ The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local fil
 Publishing a package is a convenience short hand for:
 
 1. Building the package from a recipe.yaml
+   1. Optionally, automatically increment the build number by passing in `--build-number=+1` to set a _relative_ value, or `--build-number=12` to set an absolute value for all packages being built.
 2. Uploading the package to a channel
 3. Running `rattler-index` for a S3 bucket or a filesystem channel to produce `repodata.json`.
 
