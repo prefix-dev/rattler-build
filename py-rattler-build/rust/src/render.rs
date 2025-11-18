@@ -85,7 +85,6 @@ impl PyRenderConfig {
         })
     }
 
-
     /// Get an extra context variable
     fn get_context(&self, py: Python<'_>, key: &str) -> PyResult<Option<Py<PyAny>>> {
         if let Some(var) = self.inner.extra_context.get(key) {
@@ -103,7 +102,6 @@ impl PyRenderConfig {
         }
         Ok(dict.into())
     }
-
 
     /// Get the target platform as a string
     fn target_platform(&self) -> String {

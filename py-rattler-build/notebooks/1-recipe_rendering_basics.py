@@ -33,19 +33,21 @@ def _(mo):
 
 @app.cell
 def _():
-    import marimo as mo
-    from rattler_build.stage0 import (
-        Recipe,
-        SingleOutputRecipe,
-        MultiOutputRecipe,
-    )
-    from rattler_build.variant_config import VariantConfig
-    from rattler_build.render import RenderConfig
     import json
     import pprint
-    import yaml
     import tempfile
     from pathlib import Path
+
+    import marimo as mo
+    import yaml
+
+    from rattler_build.render import RenderConfig
+    from rattler_build.stage0 import (
+        MultiOutputRecipe,
+        Recipe,
+        SingleOutputRecipe,
+    )
+    from rattler_build.variant_config import VariantConfig
 
     return (
         MultiOutputRecipe,
@@ -315,13 +317,18 @@ def _(Path, rendered_variants, tempfile):
         print(f"  Version: {_package.version}")
         print(f"  Build string: {_build.string}")
 
-        _variant.run_build(
+        _result = _variant.run_build(
             progress_callback=None,
             keep_build=False,
             output_dir=_output_tmpdir,
             recipe_path=_recipe_path,
         )
-        print("  ✅ Build complete!")
+
+        # Display build result information
+        print(f"  ✅ Build complete in {_result.build_time:.2f}s!")
+        print(f"  📦 Package: {_result.packages[0]}")
+        if _result.variant:
+            print(f"  🔧 Variant: {_result.variant}")
 
     print("\n" + "=" * 60)
     print("🎉 All builds completed successfully!")
@@ -341,7 +348,7 @@ def _(mo):
     - **RenderConfig**: Configure target platforms and add custom context variables
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes
     - **Rendering**: Use `recipe.render()` to transform Stage0 → Stage1 with variants
-    - **Building**: Use `variant.run_build()` to build conda packages
+    - **Building**: Use `variant.run_build()` to build conda packages, which returns a `BuildResult` with package paths, metadata, and timing information
 
     Next, explore the other notebooks to learn about:
     - Advanced Jinja templating and conditional variants

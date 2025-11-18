@@ -6,15 +6,20 @@ which represent the parsed YAML recipe before Jinja template evaluation
 and conditional resolution.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
+
+if TYPE_CHECKING:
+    from rattler_build.build_result import BuildResult
 
 __all__ = [
     "Recipe",
@@ -48,7 +53,7 @@ class Recipe(ABC):
     _wrapper: _stage0.Stage0Recipe
 
     @classmethod
-    def from_yaml(cls, yaml: str) -> "Recipe":
+    def from_yaml(cls, yaml: str) -> Recipe:
         """
         Parse a recipe from YAML string.
 
@@ -63,7 +68,7 @@ class Recipe(ABC):
             return MultiOutputRecipe(multi_inner, wrapper)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "Recipe":
+    def from_file(cls, path: str | Path) -> Recipe:
         """
         Parse a recipe from a YAML file.
 
@@ -73,7 +78,7 @@ class Recipe(ABC):
             return cls.from_yaml(f.read())
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any]) -> "Recipe":
+    def from_dict(cls, recipe_dict: dict[str, Any]) -> Recipe:
         """
         Create a recipe from a Python dictionary.
 
@@ -109,7 +114,7 @@ class Recipe(ABC):
             multi_inner = wrapper.as_multi_output()
             return MultiOutputRecipe(multi_inner, wrapper)
 
-    def as_single_output(self) -> "SingleOutputRecipe":
+    def as_single_output(self) -> SingleOutputRecipe:
         """
         Get as a single output recipe.
 
@@ -120,7 +125,7 @@ class Recipe(ABC):
             raise TypeError(f"Recipe is not a single-output recipe, it's a {type(self).__name__}")
         return self
 
-    def as_multi_output(self) -> "MultiOutputRecipe":
+    def as_multi_output(self) -> MultiOutputRecipe:
         """
         Get as a multi output recipe.
 
@@ -152,13 +157,13 @@ class Recipe(ABC):
 
     @property
     @abstractmethod
-    def build(self) -> "Build":
+    def build(self) -> Build:
         """Get the build configuration."""
         ...
 
     @property
     @abstractmethod
-    def about(self) -> "About":
+    def about(self) -> About:
         """Get the about metadata."""
         ...
 
@@ -208,7 +213,7 @@ class Recipe(ABC):
         progress_callback: Any | None = None,
         recipe_path: str | Path | None = None,
         **kwargs: Any,
-    ) -> None:
+    ) -> list[BuildResult]:
         """
         Build this recipe.
 
@@ -226,21 +231,29 @@ class Recipe(ABC):
             **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
                      These are ignored if tool_config is provided.
 
+        Returns:
+            list[BuildResult]: List of build results, one per variant built.
+
         Example:
             >>> recipe = Recipe.from_yaml(yaml_string)
-            >>> recipe.run_build(output_dir="./output")
+            >>> results = recipe.run_build(output_dir="./output")
+            >>> for result in results:
+            ...     print(f"Built {result.name} {result.version}")
+            ...     print(f"Package at: {result.packages[0]}")
 
             >>> # Or with custom tool configuration
             >>> from rattler_build import ToolConfiguration
             >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
-            >>> recipe.run_build(tool_config=config, output_dir="./output")
+            >>> results = recipe.run_build(tool_config=config, output_dir="./output")
         """
+
         # Render the recipe to get Stage1 variants
         rendered_variants = self.render(variant_config)
 
         # Build each rendered variant using its run_build method
+        results: list[BuildResult] = []
         for variant in rendered_variants:
-            variant.run_build(
+            result = variant.run_build(
                 tool_config=tool_config,
                 output_dir=output_dir,
                 channel=channel,
@@ -248,6 +261,9 @@ class Recipe(ABC):
                 recipe_path=recipe_path,
                 **kwargs,
             )
+            results.append(result)
+
+        return results
 
 
 class SingleOutputRecipe(Recipe):
@@ -268,22 +284,22 @@ class SingleOutputRecipe(Recipe):
         return self._inner.context
 
     @property
-    def package(self) -> "Package":
+    def package(self) -> Package:
         """Get the package metadata."""
         return Package(self._inner.package)
 
     @property
-    def build(self) -> "Build":
+    def build(self) -> Build:
         """Get the build configuration."""
         return Build(self._inner.build)
 
     @property
-    def requirements(self) -> "Requirements":
+    def requirements(self) -> Requirements:
         """Get the requirements."""
         return Requirements(self._inner.requirements)
 
     @property
-    def about(self) -> "About":
+    def about(self) -> About:
         """Get the about metadata."""
         return About(self._inner.about)
 
@@ -354,17 +370,17 @@ class MultiOutputRecipe(Recipe):
         return self._inner.context
 
     @property
-    def recipe(self) -> "RecipeMetadata":
+    def recipe(self) -> RecipeMetadata:
         """Get the top-level recipe metadata."""
         return RecipeMetadata(self._inner.recipe)
 
     @property
-    def build(self) -> "Build":
+    def build(self) -> Build:
         """Get the top-level build configuration."""
         return Build(self._inner.build)
 
     @property
-    def about(self) -> "About":
+    def about(self) -> About:
         """Get the top-level about metadata."""
         return About(self._inner.about)
 

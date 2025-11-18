@@ -1,5 +1,6 @@
 from rattler_build import progress, recipe_generation, render, stage0, stage1, tool_config
 from rattler_build._rattler_build import RattlerBuildError, get_rattler_build_version_py
+from rattler_build.build_result import BuildResult
 from rattler_build.cli_api import (
     build_recipes,
     test_package,
@@ -25,6 +26,7 @@ __all__ = [
     "upload_packages_to_conda_forge",
     "recipe_generation",
     "RattlerBuildError",
+    "BuildResult",
     "JinjaConfig",
     "stage0",
     "stage1",

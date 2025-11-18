@@ -5,12 +5,17 @@ This module provides the ability to render Stage0 recipes (parsed but unevaluate
 into Stage1 recipes (fully evaluated and ready to build) using variant configurations.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from rattler_build import stage1
 from rattler_build._rattler_build import render as _render
 from rattler_build.tool_config import ToolConfiguration
+
+if TYPE_CHECKING:
+    from rattler_build.build_result import BuildResult
 
 __all__ = [
     "RenderConfig",
@@ -44,7 +49,7 @@ class HashInfo:
     _inner: _render.HashInfo
 
     @classmethod
-    def _from_inner(cls, inner: _render.HashInfo) -> "HashInfo":
+    def _from_inner(cls, inner: _render.HashInfo) -> HashInfo:
         """Create a HashInfo from the Rust object (internal use only)."""
         instance = cls.__new__(cls)
         instance._inner = inner
@@ -282,7 +287,7 @@ class RenderedVariant:
         progress_callback: Any | None = None,
         recipe_path: str | Path | None = None,
         **kwargs: Any,
-    ) -> None:
+    ) -> BuildResult:
         """Build this rendered variant.
 
         This method builds a single rendered variant directly without needing
@@ -296,6 +301,9 @@ class RenderedVariant:
             recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
             **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
 
+        Returns:
+            BuildResult: Information about the built package including paths, metadata, and timing.
+
         Example:
             >>> from rattler_build.stage0 import Recipe
             >>> from rattler_build.variant_config import VariantConfig
@@ -304,16 +312,18 @@ class RenderedVariant:
             >>> recipe = Recipe.from_yaml(yaml_string)
             >>> rendered = render_recipe(recipe, VariantConfig())
             >>> # Build just the first variant
-            >>> rendered[0].run_build(output_dir="./output")
+            >>> result = rendered[0].run_build(output_dir="./output")
+            >>> print(f"Built package: {result.packages[0]}")
         """
         from rattler_build import _rattler_build as _rb
+        from rattler_build.build_result import BuildResult
 
         # Extract the inner ToolConfiguration if provided
         tool_config_inner = tool_config._inner if tool_config else None
 
         # Build this single variant
-        _rb.build_from_rendered_variants_py(
-            rendered_variants=[self._inner],
+        rust_result = _rb.build_rendered_variant_py(
+            rendered_variant=self._inner,
             tool_config=tool_config_inner,
             output_dir=Path(output_dir) if output_dir else None,
             channel=channel,
@@ -322,19 +332,22 @@ class RenderedVariant:
             **kwargs,
         )
 
+        # Convert Rust BuildResult to Python BuildResult
+        return BuildResult._from_inner(rust_result)
+
     def __repr__(self) -> str:
         return repr(self._inner)
 
 
 def build_rendered_variants(
     rendered_variants: list[RenderedVariant],
-    tool_config: Optional["ToolConfiguration"] = None,
+    tool_config: ToolConfiguration | None = None,
     output_dir: str | Path | None = None,
     channel: list[str] | None = None,
     progress_callback: Any | None = None,
     recipe_path: str | Path | None = None,
     **kwargs: Any,
-) -> None:
+) -> list[BuildResult]:
     """Build multiple rendered variants.
 
     This is a convenience function for building multiple rendered variants
@@ -348,6 +361,9 @@ def build_rendered_variants(
         progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
         recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
         **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+
+    Returns:
+        list[BuildResult]: List of build results, one per variant built.
 
     Example:
         >>> from rattler_build.stage0 import Recipe
@@ -365,23 +381,33 @@ def build_rendered_variants(
         >>> rendered = render_recipe(recipe, variant_config)
         >>>
         >>> # Build all variants at once
-        >>> build_rendered_variants(rendered, output_dir="./output")
+        >>> results = build_rendered_variants(rendered, output_dir="./output")
+        >>> for result in results:
+        ...     print(f"Built {result.name} {result.version} for {result.platform}")
         >>>
         >>> # Or build a subset
-        >>> build_rendered_variants(rendered[:2], output_dir="./output")
+        >>> results = build_rendered_variants(rendered[:2], output_dir="./output")
     """
     from rattler_build import _rattler_build as _rb
+    from rattler_build.build_result import BuildResult
 
     # Extract the inner ToolConfiguration if provided
     tool_config_inner = tool_config._inner if tool_config else None
 
-    # Build all variants
-    _rb.build_from_rendered_variants_py(
-        rendered_variants=[v._inner for v in rendered_variants],
-        tool_config=tool_config_inner,
-        output_dir=Path(output_dir) if output_dir else None,
-        channel=channel,
-        progress_callback=progress_callback,
-        recipe_path=Path(recipe_path) if recipe_path else None,
-        **kwargs,
-    )
+    # Build all variants by calling the single-variant function for each
+    results = []
+    for variant in rendered_variants:
+        rust_result = _rb.build_rendered_variant_py(
+            rendered_variant=variant._inner,
+            tool_config=tool_config_inner,
+            output_dir=Path(output_dir) if output_dir else None,
+            channel=channel,
+            progress_callback=progress_callback,
+            recipe_path=Path(recipe_path) if recipe_path else None,
+            **kwargs,
+        )
+
+        # Convert Rust BuildResult to Python BuildResult
+        results.append(BuildResult._from_inner(rust_result))
+
+    return results
