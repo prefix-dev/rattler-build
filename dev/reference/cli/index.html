@@ -895,6 +895,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../../debugging_builds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Debugging builds
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../tips_and_tricks/" class="md-nav__link">
         
   
@@ -2108,23 +2131,8 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h5 id="options_4"><strong>Options:</strong><a class="headerlink" href="#options_4" title="Permanent link">#</a></h5>
 <ul>
 <li>
-<p><code>--experimental</code></p>
-<p>Enable experimental features</p>
-</li>
-<li>
 <p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
 <p>List of hosts for which SSL certificate verification should be skipped</p>
-</li>
-<li>
-<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
-<p>Channel priority to use when solving</p>
-</li>
-</ul>
-<h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
-<ul>
-<li>
-<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
-<p>Output directory for build artifacts.</p>
 </li>
 </ul>
 <h4 id="quetz"><code>quetz</code><a class="headerlink" href="#quetz" title="Permanent link">#</a></h4>
@@ -2186,6 +2194,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--attestation &lt;ATTESTATION&gt;</code></p>
 <p>Upload one or more attestation files alongside the package Note: if you add an attestation, you can <em>only</em> upload a single package</p>
+</li>
+<li>
+<p><code>--generate-attestation</code></p>
+<p>Automatically generate attestations when using trusted publishing</p>
 </li>
 <li>
 <p><code>-s</code>, <code>--skip-existing</code></p>
@@ -2504,7 +2516,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Name of the specific output to debug</p>
 </li>
 </ul>
-<h6 id="modifying-result_4"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_4" title="Permanent link">#</a></h6>
+<h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
 <ul>
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
