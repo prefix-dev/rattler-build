@@ -450,26 +450,9 @@ Upload a package
 
 ##### **Options:**
 
-- `--experimental`
-
-	Enable experimental features
-
-
 - `--allow-insecure-host <ALLOW_INSECURE_HOST>`
 
 	List of hosts for which SSL certificate verification should be skipped
-
-
-- `--channel-priority <CHANNEL_PRIORITY>`
-
-	Channel priority to use when solving
-
-
-###### **Modifying result**
-
-- `--output-dir <OUTPUT_DIR>`
-
-	Output directory for build artifacts.
 
 
 
@@ -554,6 +537,11 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 - `--attestation <ATTESTATION>`
 
 	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
+
+
+- `--generate-attestation`
+
+	Automatically generate attestations when using trusted publishing
 
 
 - `-s`, `--skip-existing`
