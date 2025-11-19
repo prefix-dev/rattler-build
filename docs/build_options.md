@@ -141,8 +141,8 @@ build:
     # ignore all or specific files for prefix replacement`
     ignore: bool | [path] (defaults to false)
 
-    # whether to detect binary files with prefix or not
-    # defaults to true on Unix and (always) false on Windows
+    # whether to ignore binary files for prefix replacement
+    # defaults to false on Unix and (always) false on Windows
     ignore_binary_files: bool
 ```
 
