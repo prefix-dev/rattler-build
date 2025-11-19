@@ -72,9 +72,13 @@ Inside the debug shell, you have access to:
 
 ### Step 1: Build with --keep-build
 
+You can use `rattler-build debug` to setup the build environments without executing the build scripts for manual debugging.
 If your recipe succeeds, but you still want to enter the debug-shell, you can use `--keep-build` to prevent cleanup:
 
 ```bash
+# set up the build environment, but do not execute build script
+rattler-build debug --recipe recipe.yaml
+# build recipe normally, but keep build environments even if everything succeeds
 rattler-build build --recipe recipe.yaml --keep-build
 ```
 
