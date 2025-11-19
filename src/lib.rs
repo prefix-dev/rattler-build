@@ -614,6 +614,21 @@ pub async fn run_build_from_args(
                         fs::rename(archive, failed_dir.join(archive.file_name().unwrap()))
                             .into_diagnostic()?;
 
+                        // Reindex the output directory so that the broken package is no longer
+                        // listed in the repodata. This is important for --skip-existing to work
+                        // correctly on subsequent builds.
+                        if let Err(e) = build_reindexed_channels(
+                            &output.build_configuration,
+                            &tool_configuration,
+                        )
+                        .await
+                        {
+                            tracing::warn!(
+                                "Failed to reindex output directory after moving package to broken folder: {}",
+                                e
+                            );
+                        }
+
                         if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
                             tracing::error!("Test failed for {}: {}", output.identifier(), e);
                             output.record_warning(&format!("Test failed: {}", e));
