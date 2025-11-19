@@ -293,7 +293,9 @@ def upload_package_to_prefix(
     Returns:
         None
     """
-    upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file, skip_existing, generate_attestation, attestation_file)
+    upload_package_to_prefix_py(
+        package_files, url, channels, api_key, auth_file, skip_existing, generate_attestation, attestation_file
+    )
 
 
 def upload_package_to_anaconda(
