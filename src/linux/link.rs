@@ -233,7 +233,12 @@ impl Relinker for SharedObject {
                     },
                 )?;
 
-                tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
+                tracing::debug!(
+                    "Converted rpath {} to $ORIGIN/{} for {:?}",
+                    rpath.display(),
+                    relative_path.display(),
+                    self.path
+                );
                 final_rpaths.push(PathBuf::from(format!(
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
