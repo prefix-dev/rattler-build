@@ -20,6 +20,7 @@ class BuildResult:
         platform: Target platform (e.g., "linux-64", "noarch")
         variant: Dictionary of variant values used for this build
         build_time: Build duration in seconds
+        log: Captured build log messages (info level and above)
     """
 
     def __init__(
@@ -31,6 +32,7 @@ class BuildResult:
         platform: str,
         variant: dict[str, str],
         build_time: float,
+        log: list[str],
     ):
         self.packages = packages
         self.name = name
@@ -39,6 +41,7 @@ class BuildResult:
         self.platform = platform
         self.variant = variant
         self.build_time = build_time
+        self.log = log
 
     @classmethod
     def _from_inner(cls, inner: BuildResultPy) -> BuildResult:
@@ -51,6 +54,7 @@ class BuildResult:
             platform=inner.platform,
             variant=inner.variant,
             build_time=inner.build_time,
+            log=inner.log,
         )
 
     def __repr__(self) -> str:

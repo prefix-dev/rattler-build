@@ -52,6 +52,9 @@ pub struct BuildResultPy {
     /// Build duration in seconds
     #[pyo3(get)]
     pub build_time: f64,
+    /// Captured build log messages (info level and above)
+    #[pyo3(get)]
+    pub log: Vec<String>,
 }
 
 #[pymethods]
@@ -473,10 +476,29 @@ fn build_rendered_variant_py(
     // Capture start time for build duration calculation
     let start_time = std::time::Instant::now();
 
-    // Run the build with optional tracing subscriber
-    tracing_subscriber::with_python_tracing(progress_callback, || {
-        run_async_task(async { run_build_from_args(vec![output.clone()], tool_config).await })
-    })?;
+    // Run the build with log capture and optional tracing subscriber
+    let (build_result, log_buffer) =
+        tracing_subscriber::with_log_capture(progress_callback, || {
+            run_async_task(async { run_build_from_args(vec![output.clone()], tool_config).await })
+        });
+
+    // Extract captured logs
+    let captured_logs = log_buffer
+        .lock()
+        .map(|buffer| buffer.clone())
+        .unwrap_or_default();
+
+    // Check if build succeeded, if not enrich error with logs
+    if let Err(err) = build_result {
+        // Include logs in error message
+        let log_text = if captured_logs.is_empty() {
+            String::new()
+        } else {
+            format!("\n\nBuild log:\n{}", captured_logs.join("\n"))
+        };
+
+        return Err(RattlerBuildError::Other(format!("{}{}", err, log_text)).into());
+    }
 
     // Calculate build time
     let build_time = start_time.elapsed().as_secs_f64();
@@ -538,6 +560,7 @@ fn build_rendered_variant_py(
         platform: platform_str.to_string(),
         variant: variant_map,
         build_time,
+        log: captured_logs,
     })
 }
 

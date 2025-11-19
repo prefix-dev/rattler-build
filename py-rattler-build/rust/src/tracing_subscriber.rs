@@ -1,7 +1,8 @@
 use pyo3::prelude::*;
+use std::sync::{Arc, Mutex};
 use tracing::{Level, Subscriber};
 use tracing_subscriber::Layer;
-use tracing_subscriber::layer::{Context, SubscriberExt};
+use tracing_subscriber::layer::Context;
 
 use crate::progress_callback::PyProgressCallback;
 
@@ -67,26 +68,66 @@ impl tracing::field::Visit for MessageVisitor {
     }
 }
 
-/// Install a Python tracing subscriber for the duration of the build
-pub fn with_python_tracing<F, R>(callback: Option<Py<PyAny>>, f: F) -> R
+/// A tracing layer that captures log events into a Vec for later retrieval
+pub struct LogCaptureLayer {
+    log_buffer: Arc<Mutex<Vec<String>>>,
+}
+
+impl LogCaptureLayer {
+    pub fn new(log_buffer: Arc<Mutex<Vec<String>>>) -> Self {
+        Self { log_buffer }
+    }
+}
+
+impl<S> Layer<S> for LogCaptureLayer
+where
+    S: Subscriber + for<'lookup> tracing_subscriber::registry::LookupSpan<'lookup>,
+{
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
+        // Extract the message from the event
+        let mut visitor = MessageVisitor::default();
+        event.record(&mut visitor);
+
+        // Store in buffer
+        if let Ok(mut buffer) = self.log_buffer.lock() {
+            buffer.push(visitor.message);
+        }
+    }
+}
+
+/// Install a log capture subscriber with optional Python callback
+/// Returns the captured logs after the function completes
+pub fn with_log_capture<F, R>(callback: Option<Py<PyAny>>, f: F) -> (R, Arc<Mutex<Vec<String>>>)
 where
     F: FnOnce() -> R,
 {
-    if let Some(py_callback) = callback {
-        let callback = PyProgressCallback::new(py_callback);
-        let layer = PythonTracingLayer::new(callback);
+    use tracing_subscriber::filter::LevelFilter;
+    use tracing_subscriber::layer::SubscriberExt as _;
 
-        // Create a subscriber with the Python layer and filter
-        // Only capture info/warn/error, not debug/trace which are too noisy
-        use tracing_subscriber::filter::LevelFilter;
+    // Create log buffer (shared)
+    let log_buffer = Arc::new(Mutex::new(Vec::new()));
+    let log_buffer_clone = Arc::clone(&log_buffer);
+
+    // Run the function with the subscriber
+    let result = if let Some(py_callback) = callback {
+        let callback = PyProgressCallback::new(py_callback);
+        let python_layer = PythonTracingLayer::new(callback);
+        let capture_layer = LogCaptureLayer::new(log_buffer_clone);
+
         let subscriber = tracing_subscriber::registry()
-            .with(layer)
+            .with(capture_layer)
+            .with(python_layer)
             .with(LevelFilter::INFO);
 
-        // Set this subscriber for the duration of the closure
         tracing::subscriber::with_default(subscriber, f)
     } else {
-        // No callback provided, just run the function
-        f()
-    }
+        let capture_layer = LogCaptureLayer::new(log_buffer_clone);
+        let subscriber = tracing_subscriber::registry()
+            .with(capture_layer)
+            .with(LevelFilter::INFO);
+
+        tracing::subscriber::with_default(subscriber, f)
+    };
+
+    (result, log_buffer)
 }

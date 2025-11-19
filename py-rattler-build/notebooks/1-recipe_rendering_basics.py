@@ -335,6 +335,15 @@ def _(Path, rendered_variants, tempfile):
         if _result.variant:
             print(f"  🔧 Variant: {_result.variant}")
 
+        # Display build log
+        if _result.log:
+            print(f"  📋 Build log: {len(_result.log)} messages captured")
+            print("\n  Build log details:")
+            for _log_entry in _result.log[:10]:  # Show first 10 log entries
+                print(f"    {_log_entry}")
+            if len(_result.log) > 10:
+                print(f"    ... and {len(_result.log) - 10} more messages")
+
     print("\n" + "=" * 60)
     print("🎉 All builds completed successfully!")
     print(f"\n📦 Built packages are available in: {_output_tmpdir}")
@@ -353,7 +362,15 @@ def _(mo):
     - **RenderConfig**: Configure target platforms and add custom context variables
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes
     - **Rendering**: Use `recipe.render()` to transform Stage0 → Stage1 with variants
-    - **Building**: Use `variant.run_build()` to build conda packages, which returns a `BuildResult` with package paths, metadata, and timing information
+    - **Building**: Use `variant.run_build()` to build conda packages, which returns a `BuildResult` with package paths, metadata, timing information, and captured build logs
+
+    The `BuildResult` object includes:
+    - `packages`: List of built package file paths
+    - `name`, `version`, `build_string`: Package metadata
+    - `platform`: Target platform
+    - `variant`: Variant configuration used
+    - `build_time`: Build duration in seconds
+    - `log`: Captured build log messages (info level and above)
 
     Next, explore the other notebooks to learn about:
     - Advanced Jinja templating and conditional variants

@@ -4,9 +4,11 @@ Tests for error handling and type validation in the recipe pipeline.
 These tests ensure that we get clear, helpful error messages when things go wrong.
 """
 
+from pathlib import Path
+
 import pytest
+from rattler_build._rattler_build import RattlerBuildError, RecipeParseError
 from rattler_build.stage0 import Recipe as Stage0Recipe, SingleOutputRecipe
-from rattler_build._rattler_build import RecipeParseError
 
 
 def test_from_dict_missing_required_field() -> None:
@@ -224,3 +226,46 @@ def test_from_dict_with_schema_version() -> None:
 
     stage0 = Stage0Recipe.from_dict(recipe_dict)
     assert stage0 is not None
+
+
+def test_build_script_failure_error_message(tmp_path: Path) -> None:
+    """Test that build script failures provide helpful error messages."""
+    # Create a recipe with a failing build script (typo in command)
+    recipe_yaml = """
+recipe:
+  name: test-build-failure
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: test-build-failure
+      version: 1.0.0
+
+    build:
+      script:
+        - ech "This should fail because 'ech' is not a valid command"
+"""
+
+    # Build up the Stage0 Recipe from YAML
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
+    output_dir = tmp_path / "output"
+
+    # Expect a RattlerBuildError with helpful message
+    with pytest.raises(RattlerBuildError) as exc_info:
+        recipe.run_build(output_dir=output_dir)
+
+    error_msg = str(exc_info.value)
+    print(f"\n\nActual error message:\n{error_msg}\n\n")
+
+    # The error should mention:
+    # 1. That the command failed
+    # 2. The command that failed (ech)
+    # 3. Some context about what went wrong (exit code, stderr, etc.)
+
+    # Check for the failed command in the error message
+    assert "ech" in error_msg, f"Error message doesn't mention the failed command 'ech': {error_msg}"
+
+    # Check for some indication of what went wrong (exit code or error details)
+    assert any(
+        keyword in error_msg.lower() for keyword in ["exit", "status", "code", "not found", "stderr"]
+    ), f"Error message doesn't contain error details like exit code or stderr: {error_msg}"
