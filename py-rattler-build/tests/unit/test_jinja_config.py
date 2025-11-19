@@ -3,6 +3,7 @@
 import pytest
 
 from rattler_build.jinja_config import JinjaConfig
+from rattler_build.tool_config import PlatformConfig
 
 
 def test_jinja_config_creation() -> None:
@@ -18,7 +19,8 @@ def test_jinja_config_creation() -> None:
 
 def test_jinja_config_with_platforms() -> None:
     """Test creating a JinjaConfig with specific platforms."""
-    config = JinjaConfig(target_platform="linux-64", host_platform="linux-64", build_platform="linux-64")
+    platform = PlatformConfig("linux-64")
+    config = JinjaConfig(platform=platform)
 
     assert config.target_platform == "linux-64"
     assert config.host_platform == "linux-64"
@@ -27,7 +29,12 @@ def test_jinja_config_with_platforms() -> None:
 
 def test_jinja_config_platform_constructor() -> None:
     """Test creating JinjaConfig with specific platforms."""
-    config = JinjaConfig(target_platform="win-64", host_platform="osx-arm64", build_platform="linux-aarch64")
+    platform = PlatformConfig(
+        target_platform="win-64",
+        host_platform="osx-arm64",
+        build_platform="linux-aarch64",
+    )
+    config = JinjaConfig(platform=platform)
 
     assert config.target_platform == "win-64"
     assert config.host_platform == "osx-arm64"
@@ -36,10 +43,12 @@ def test_jinja_config_platform_constructor() -> None:
 
 def test_selector_config_experimental() -> None:
     """Test experimental flag."""
-    config_true = JinjaConfig(experimental=True)
+    platform_true = PlatformConfig("linux-64", experimental=True)
+    config_true = JinjaConfig(platform=platform_true)
     assert config_true.experimental is True
 
-    config_false = JinjaConfig(experimental=False)
+    platform_false = PlatformConfig("linux-64", experimental=False)
+    config_false = JinjaConfig(platform=platform_false)
     assert config_false.experimental is False
 
 
@@ -73,7 +82,8 @@ def test_selector_config_variant_constructor() -> None:
 
 def test_selector_config_repr() -> None:
     """Test the string representation."""
-    config = JinjaConfig(target_platform="osx-64")
+    platform_config = PlatformConfig("osx-64")
+    config = JinjaConfig(platform=platform_config)
     repr_str = repr(config)
 
     assert "JinjaConfig" in repr_str
@@ -83,4 +93,5 @@ def test_selector_config_repr() -> None:
 def test_selector_config_invalid_platform() -> None:
     """Test that invalid platforms are rejected."""
     with pytest.raises(Exception):  # Should raise some error
-        JinjaConfig(target_platform="invalid-platform-name-12345")
+        platform_config = PlatformConfig("invalid-platform-name-12345")
+        JinjaConfig(platform=platform_config)

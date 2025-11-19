@@ -9,6 +9,7 @@ import pytest
 from rattler_build.render import RenderConfig
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 
@@ -150,7 +151,8 @@ package:
     variant_config = VariantConfig()
 
     # Create custom render config for linux
-    render_config = RenderConfig(target_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+    render_config = RenderConfig(platform=platform_config)
 
     # Render with custom config
     rendered = stage0.render(variant_config, render_config)

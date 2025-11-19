@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 
+from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 
@@ -217,7 +218,9 @@ c_compiler:
 
     try:
         # Load with Linux context
-        jinja_config_linux = JinjaConfig(target_platform="linux-64")
+        platform_config = PlatformConfig("linux-64")
+
+        jinja_config_linux = JinjaConfig(platform=platform_config)
         config_linux = VariantConfig.from_file_with_context(temp_path, jinja_config_linux)
 
         values_linux = config_linux.get_values("c_compiler")
@@ -226,7 +229,9 @@ c_compiler:
         assert "msvc" not in values_linux
 
         # Load with Windows context
-        jinja_config_win = JinjaConfig(target_platform="win-64")
+        platform_config = PlatformConfig("win-64")
+
+        jinja_config_win = JinjaConfig(platform=platform_config)
         config_win = VariantConfig.from_file_with_context(temp_path, jinja_config_win)
 
         values_win = config_win.get_values("c_compiler")
@@ -256,7 +261,9 @@ cxx_compiler:
 """
 
     # Load with Linux context
-    jinja_config_linux = JinjaConfig(target_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+
+    jinja_config_linux = JinjaConfig(platform=platform_config)
     config_linux = VariantConfig.from_yaml_with_context(yaml_content, jinja_config_linux)
 
     c_values = config_linux.get_values("c_compiler")
@@ -290,7 +297,9 @@ c_compiler:
 
     try:
         # Load with Linux context
-        jinja_config_linux = JinjaConfig(target_platform="linux-64")
+        platform_config = PlatformConfig("linux-64")
+
+        jinja_config_linux = JinjaConfig(platform=platform_config)
         config_linux = VariantConfig.from_conda_build_config(temp_path, jinja_config_linux)
 
         python_values = config_linux.get_values("python")
@@ -304,7 +313,9 @@ c_compiler:
         assert "vs2019" not in c_compiler_values
 
         # Load with macOS context
-        jinja_config_osx = JinjaConfig(target_platform="osx-64")
+        platform_config = PlatformConfig("osx-64")
+
+        jinja_config_osx = JinjaConfig(platform=platform_config)
         config_osx = VariantConfig.from_conda_build_config(temp_path, jinja_config_osx)
 
         python_values_osx = config_osx.get_values("python")
@@ -317,7 +328,9 @@ c_compiler:
         assert "gcc" not in c_compiler_values_osx
 
         # Load with Windows context
-        jinja_config_win = JinjaConfig(target_platform="win-64")
+        platform_config = PlatformConfig("win-64")
+
+        jinja_config_win = JinjaConfig(platform=platform_config)
         config_win = VariantConfig.from_conda_build_config(temp_path, jinja_config_win)
 
         python_values_win = config_win.get_values("python")

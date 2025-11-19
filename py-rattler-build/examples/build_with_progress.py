@@ -20,6 +20,7 @@ from rattler_build.render import RenderConfig
 
 # Import rattler_build components
 from rattler_build.stage0 import Recipe
+from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 
@@ -37,7 +38,9 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     # Configure variant rendering
     variant_config = VariantConfig()
     # Set recipe_path so the build can find license files, etc.
-    render_config = RenderConfig(recipe_path=str(recipe_path))
+    # target_platform defaults to current platform if not specified
+    platform_config = PlatformConfig(recipe_path=str(recipe_path))
+    render_config = RenderConfig(platform=platform_config)
 
     print("\n📋 Rendering recipe variants...")
     rendered_variants = recipe.render(variant_config, render_config)

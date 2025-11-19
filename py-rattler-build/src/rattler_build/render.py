@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from rattler_build import stage1
 from rattler_build._rattler_build import render as _render
-from rattler_build.tool_config import ToolConfiguration
+from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
     from rattler_build.build_result import BuildResult
@@ -132,37 +132,33 @@ class RenderConfig:
     experimental features, and additional Jinja context variables.
 
     Args:
-        target_platform: Target platform (e.g., "linux-64", "osx-arm64")
-        build_platform: Build platform (where the build runs)
-        host_platform: Host platform (for cross-compilation)
-        experimental: Enable experimental features
-        recipe_path: Path to the recipe file (for relative path resolution)
+        platform: Platform configuration (target, build, host platforms, experimental flag, and recipe_path)
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
+        >>> from rattler_build.tool_config import PlatformConfig
+        >>> platform = PlatformConfig("linux-64")
         >>> config = RenderConfig(
-        ...     target_platform="linux-64",
-        ...     experimental=True,
+        ...     platform=platform,
         ...     extra_context={"custom_var": "value", "build_num": 42}
         ... )
     """
 
+    platform: PlatformConfig | None
+
     def __init__(
         self,
-        target_platform: str | None = None,
-        build_platform: str | None = None,
-        host_platform: str | None = None,
-        experimental: bool = False,
-        recipe_path: str | None = None,
+        platform: PlatformConfig | None = None,
         extra_context: dict[str, ContextValue] | None = None,
     ):
         """Create a new render configuration."""
+        self.platform = platform
         self._config = _render.RenderConfig(
-            target_platform=target_platform,
-            build_platform=build_platform,
-            host_platform=host_platform,
-            experimental=experimental,
-            recipe_path=recipe_path,
+            target_platform=platform.target_platform if platform else None,
+            build_platform=platform.build_platform if platform else None,
+            host_platform=platform.host_platform if platform else None,
+            experimental=platform.experimental if platform else False,
+            recipe_path=platform.recipe_path if platform else None,
             extra_context=extra_context,
         )
 

@@ -44,10 +44,12 @@ def _():
     from rattler_build import JinjaConfig
     from rattler_build.render import RenderConfig
     from rattler_build.stage0 import Recipe
+    from rattler_build.tool_config import PlatformConfig
     from rattler_build.variant_config import VariantConfig
 
     return (
         JinjaConfig,
+        PlatformConfig,
         Recipe,
         RenderConfig,
         VariantConfig,
@@ -145,7 +147,7 @@ def _(mo):
 
 
 @app.cell
-def _(JinjaConfig, Recipe, RenderConfig, VariantConfig):
+def _(JinjaConfig, PlatformConfig, Recipe, RenderConfig, VariantConfig):
     # Recipe with platform selectors
     platform_recipe_yaml = """
     context:
@@ -187,7 +189,8 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig):
     # Render for Linux
     print("🐧 Rendering for LINUX")
     print("=" * 60)
-    linux_render = RenderConfig(target_platform="linux-64")
+    linux_platform_config = PlatformConfig("linux-64")
+    linux_render = RenderConfig(platform=linux_platform_config)
     linux_result = platform_recipe.render(variant_cfg, linux_render)
     linux_stage1 = linux_result[0].recipe()
 
@@ -198,7 +201,8 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig):
     # Render for macOS
     print("\n🍎 Rendering for macOS")
     print("=" * 60)
-    macos_render = RenderConfig(target_platform="osx-arm64")
+    macos_platform_config = PlatformConfig("osx-arm64")
+    macos_render = RenderConfig(platform=macos_platform_config)
     macos_result = platform_recipe.render(variant_cfg, macos_render)
     macos_stage1 = macos_result[0].recipe()
 
@@ -209,7 +213,8 @@ def _(JinjaConfig, Recipe, RenderConfig, VariantConfig):
     # Render for Windows
     print("\n🪟 Rendering for WINDOWS")
     print("=" * 60)
-    windows_render = RenderConfig(target_platform="win-64")
+    windows_platform_config = PlatformConfig("win-64")
+    windows_render = RenderConfig(platform=windows_platform_config)
     windows_result = platform_recipe.render(variant_cfg, windows_render)
     windows_stage1 = windows_result[0].recipe()
 
@@ -303,7 +308,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig):
+def _(PlatformConfig, Recipe, RenderConfig, VariantConfig):
     # Realistic recipe with multiple variants
     realistic_yaml = """
     context:
@@ -351,7 +356,8 @@ def _(Recipe, RenderConfig, VariantConfig):
     )
 
     # Render for Linux
-    realistic_render = RenderConfig(target_platform="linux-64")
+    realistic_platform_config = PlatformConfig("linux-64")
+    realistic_render = RenderConfig(platform=realistic_platform_config)
     realistic_results = realistic_recipe.render(realistic_variants, realistic_render)
 
     print(f"🔬 Realistic Package Build: {len(realistic_results)} variant(s)")

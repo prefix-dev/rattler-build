@@ -36,14 +36,18 @@ def _(mo):
 
 @app.cell
 def _():
-    import marimo as mo
-    from rattler_build.stage0 import Recipe, MultiOutputRecipe
-    from rattler_build.variant_config import VariantConfig
-    from rattler_build.render import RenderConfig
     import json
+
+    import marimo as mo
+
+    from rattler_build.render import RenderConfig
+    from rattler_build.stage0 import MultiOutputRecipe, Recipe
+    from rattler_build.tool_config import PlatformConfig
+    from rattler_build.variant_config import VariantConfig
 
     return (
         MultiOutputRecipe,
+        PlatformConfig,
         Recipe,
         RenderConfig,
         VariantConfig,
@@ -586,7 +590,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json):
+def _(PlatformConfig, Recipe, RenderConfig, VariantConfig, json):
     # Comprehensive recipe
     complete_yaml = """
     schema_version: 1
@@ -668,7 +672,8 @@ def _(Recipe, RenderConfig, VariantConfig, json):
     print("\n\n🟡 CONFIGURATION: Variants and Render Config")
     print("=" * 60)
     complete_variants = VariantConfig({"python": ["3.10", "3.11"]})
-    complete_render = RenderConfig(target_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+    complete_render = RenderConfig(platform=platform_config)
 
     print(f"Variants: {complete_variants.to_dict()}")
     print(f"Target platform: {complete_render.target_platform}")
@@ -688,9 +693,9 @@ def _(Recipe, RenderConfig, VariantConfig, json):
         _variant = _result.variant()
         _stage1 = _result.recipe()
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Package {_idx}: {_stage1.package.name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         print("\n  Variant used:")
         print(f"    {json.dumps(_variant, indent=4)}")

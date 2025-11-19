@@ -198,13 +198,16 @@ def _(mo):
 
 
 @app.cell
-def _(RenderConfig, json):
+def _(PlatformConfig, RenderConfig, json):
     # Create a render config with custom settings
-    render_config = RenderConfig(
+    platform_config = PlatformConfig(
         target_platform="linux-64",
         build_platform="linux-64",
         host_platform="linux-64",
         experimental=False,
+    )
+    render_config = RenderConfig(
+        platform=platform_config,
         extra_context={
             "custom_var": "custom_value",
             "build_timestamp": "2024-01-01",

@@ -9,6 +9,7 @@ from inline_snapshot import snapshot
 
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.stage0 import Recipe
+from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 
@@ -31,7 +32,8 @@ def test_render_config_creation() -> None:
 
 def test_render_config_with_platforms() -> None:
     """Test RenderConfig with custom platforms."""
-    config = RenderConfig(target_platform="linux-64", build_platform="linux-64", host_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+    config = RenderConfig(platform=platform_config)
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
     assert config.host_platform == "linux-64"
@@ -61,24 +63,14 @@ def test_render_config_set_context() -> None:
     assert context.keys() == {"my_var", "my_bool", "my_number", "my_list", "error_list"}
 
 
-def test_render_config_platform_setters() -> None:
-    """Test platform property setters."""
-    target_platform = "osx-arm64"
-    build_platform = "osx-64"
-    host_platform = "linux-64"
-    config = RenderConfig(target_platform, build_platform, host_platform)
-
-    assert config.target_platform == "osx-arm64"
-    assert config.build_platform == "osx-64"
-    assert config.host_platform == "linux-64"
-
-
 def test_render_config_experimental() -> None:
     """Test experimental flag."""
-    config = RenderConfig(experimental=True)
+    platform_config = PlatformConfig("linux-64", experimental=True)
+    config = RenderConfig(platform=platform_config)
     assert config.experimental
 
-    config = RenderConfig(experimental=False)
+    platform_config_false = PlatformConfig("linux-64", experimental=False)
+    config = RenderConfig(platform=platform_config_false)
     assert not config.experimental
 
 
@@ -156,7 +148,8 @@ package:
 
     recipe = Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
-    config = RenderConfig(target_platform="linux-64", experimental=True)
+    platform_config = PlatformConfig("linux-64", experimental=True)
+    config = RenderConfig(platform=platform_config)
 
     rendered = recipe.render(variant_config, config)
 
@@ -298,7 +291,8 @@ python:
 
 def test_render_config_repr() -> None:
     """Test RenderConfig __repr__."""
-    config = RenderConfig(target_platform="linux-64", experimental=True)
+    platform_config = PlatformConfig("linux-64", experimental=True)
+    config = RenderConfig(platform=platform_config)
     repr_str = repr(config)
     assert "RenderConfig" in repr_str
     assert "linux-64" in repr_str
@@ -376,7 +370,8 @@ outputs:
 def test_render_invalid_platform() -> None:
     """Test that invalid platform raises error."""
     with pytest.raises(Exception):
-        RenderConfig(target_platform="invalid-platform-name")
+        platform_config = PlatformConfig("invalid-platform-name")
+        RenderConfig(platform=platform_config)
 
 
 def test_render_context_nonexistent_key() -> None:

@@ -9,6 +9,7 @@ from pathlib import Path
 from rattler_build.render import RenderConfig
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
 from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "comprehensive-test"
@@ -99,8 +100,9 @@ def test_recipe_representations() -> None:
 
 def test_render_config_with_variants() -> None:
     """Test RenderConfig with variant configuration."""
+    platform_config = PlatformConfig("linux-64")
     render_config = RenderConfig(
-        target_platform="linux-64",
+        platform=platform_config,
         extra_context={"python": "3.11", "build_number": "1"},
     )
     assert render_config.target_platform == "linux-64"
@@ -109,50 +111,20 @@ def test_render_config_with_variants() -> None:
     assert render_config.get_context("build_number") == "1"
 
 
-def test_render_config_setters() -> None:
-    """Test RenderConfig property setters."""
-    config = RenderConfig()
-
-    # Test target_platform - create new config to change it
-    initial_target = config.target_platform
-    config_win = RenderConfig(target_platform="win-64")
-    assert config_win.target_platform == "win-64"
-    assert config_win.target_platform != initial_target
-
-    # Test host_platform
-    config_host = RenderConfig(host_platform="win-64")
-    assert config_host.host_platform == "win-64"
-
-    # Test build_platform
-    config_build = RenderConfig(build_platform="win-64")
-    assert config_build.build_platform == "win-64"
-
-    # Test experimental
-    config_exp = RenderConfig(experimental=True)
-    assert config_exp.experimental is True
-
-    # Test context (variant-like values)
-    config_with_context = RenderConfig(extra_context={"python": "3.9", "numpy": "1.21"})
-
-    all_context = config_with_context.get_all_context()
-    assert "python" in all_context
-    assert all_context["python"] == "3.9"
-    assert "numpy" in all_context
-    assert all_context["numpy"] == "1.21"
-
-
 def test_parse_recipe_with_platform_selectors() -> None:
     """Test parsing recipe with platform selectors for different platforms."""
     stage0 = Stage0Recipe.from_file(str(TEST_RECIPE_FILE))
     variant_config = VariantConfig()
 
     # Render for Linux
-    linux_config = RenderConfig(target_platform="linux-64", build_platform="linux-64", host_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+    linux_config = RenderConfig(platform=platform_config)
     rendered_linux = stage0.render(variant_config, linux_config)
     stage1_linux = rendered_linux[0].recipe()
 
     # Render for Windows
-    windows_config = RenderConfig(target_platform="win-64", build_platform="win-64", host_platform="win-64")
+    platform_config = PlatformConfig("win-64")
+    windows_config = RenderConfig(platform=platform_config)
     rendered_windows = stage0.render(variant_config, windows_config)
     stage1_windows = rendered_windows[0].recipe()
 
@@ -230,7 +202,8 @@ def test_stage0_to_stage1_complete_flow() -> None:
 
     # Render to Stage1
     variant_config = VariantConfig()
-    render_config = RenderConfig(target_platform="linux-64")
+    platform_config = PlatformConfig("linux-64")
+    render_config = RenderConfig(platform=platform_config)
     rendered = stage0.render(variant_config, render_config)
 
     # Access Stage1

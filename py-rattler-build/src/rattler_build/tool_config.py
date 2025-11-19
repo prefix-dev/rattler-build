@@ -6,7 +6,62 @@ This module provides a Pythonic API for configuring the build tool.
 
 from rattler_build._rattler_build import tool_config as _tool_config
 
-__all__ = ["ToolConfiguration"]
+__all__ = ["PlatformConfig", "ToolConfiguration"]
+
+
+class PlatformConfig:
+    """Platform configuration for building packages.
+
+    This class provides platform settings that are shared across different
+    configuration objects (JinjaConfig, RenderConfig).
+
+    Args:
+        target_platform: Target platform (e.g., "linux-64", "osx-arm64").
+            If not specified, defaults to the current platform.
+        build_platform: Build platform (where the build runs).
+            If not specified, defaults to the current platform.
+        host_platform: Host platform (for cross-compilation).
+            If not specified, defaults to the current platform.
+        experimental: Enable experimental features
+        recipe_path: Path to the recipe file (for relative path resolution)
+
+    Example:
+        >>> # Create with default (current) platform
+        >>> config = PlatformConfig()
+        >>>
+        >>> # Create for a specific platform (build and host will default to target)
+        >>> config = PlatformConfig("linux-64")
+        >>>
+        >>> # Create with different platforms for cross-compilation
+        >>> config = PlatformConfig(
+        ...     target_platform="osx-arm64",
+        ...     build_platform="linux-64",
+        ...     host_platform="osx-arm64"
+        ... )
+    """
+
+    def __init__(
+        self,
+        target_platform: str | None = None,
+        build_platform: str | None = None,
+        host_platform: str | None = None,
+        experimental: bool = False,
+        recipe_path: str | None = None,
+    ):
+        """Create a new platform configuration."""
+        self.target_platform = target_platform
+        self.build_platform = build_platform if build_platform is not None else None
+        self.host_platform = host_platform if host_platform is not None else None
+        self.experimental = experimental
+        self.recipe_path = recipe_path
+
+    def __repr__(self) -> str:
+        return (
+            f"PlatformConfig(target_platform={self.target_platform!r}, "
+            f"build_platform={self.build_platform!r}, "
+            f"host_platform={self.host_platform!r}, "
+            f"experimental={self.experimental})"
+        )
 
 
 class ToolConfiguration:
