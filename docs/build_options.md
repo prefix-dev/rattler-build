@@ -142,7 +142,7 @@ build:
     ignore: bool | [path] (defaults to false)
 
     # whether to ignore binary files for prefix replacement
-    # defaults to false on Unix and (always) false on Windows
+    # defaults to false on Unix and (always) true on Windows
     ignore_binary_files: bool
 ```
 
