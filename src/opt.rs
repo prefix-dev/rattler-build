@@ -572,7 +572,7 @@ pub struct PublishData {
 
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
-    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
         // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
         let to_channel = opts.to.clone();

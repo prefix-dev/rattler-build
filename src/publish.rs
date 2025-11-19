@@ -83,7 +83,7 @@ pub(crate) async fn fetch_highest_build_numbers(
 
         // Create a matchspec that matches the package name (any version)
         let spec = MatchSpec {
-            name: Some(name),
+            name: Some(rattler_conda_types::PackageNameMatcher::Exact(name)),
             ..Default::default()
         };
         if !package_specs.iter().any(|s| s.name == spec.name) {
@@ -470,8 +470,9 @@ async fn upload_to_prefix(
         url.clone()
     };
 
-    // Create PrefixData with server URL, channel, optional API key, no attestation, and skip_existing=false
-    let prefix_data = PrefixData::new(server_url, channel, None, None, false);
+    // Create PrefixData with server URL, channel, optional API key, no attestation, attestation generation=false and skip_existing=false
+    // TODO: we should wire this up for attestation generation!
+    let prefix_data = PrefixData::new(server_url, channel, None, None, false, false);
 
     // Upload packages
     upload_package_to_prefix(&auth_storage, &package_paths.to_vec(), prefix_data)
