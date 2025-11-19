@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from inline_snapshot import snapshot
 
+from rattler_build._rattler_build import PlatformParseError
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.stage0 import Recipe
 from rattler_build.tool_config import PlatformConfig
@@ -368,8 +369,8 @@ outputs:
 
 
 def test_render_invalid_platform() -> None:
-    """Test that invalid platform raises error."""
-    with pytest.raises(Exception):
+    """Test that invalid platform raises PlatformParseError."""
+    with pytest.raises(PlatformParseError):
         platform_config = PlatformConfig("invalid-platform-name")
         RenderConfig(platform=platform_config)
 

@@ -2,6 +2,7 @@
 
 import pytest
 
+from rattler_build._rattler_build import PlatformParseError
 from rattler_build.jinja_config import JinjaConfig
 from rattler_build.tool_config import PlatformConfig
 
@@ -91,7 +92,7 @@ def test_selector_config_repr() -> None:
 
 
 def test_selector_config_invalid_platform() -> None:
-    """Test that invalid platforms are rejected."""
-    with pytest.raises(Exception):  # Should raise some error
+    """Test that invalid platforms raise PlatformParseError."""
+    with pytest.raises(PlatformParseError):
         platform_config = PlatformConfig("invalid-platform-name-12345")
         JinjaConfig(platform=platform_config)

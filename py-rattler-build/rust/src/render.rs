@@ -36,28 +36,21 @@ impl PyRenderConfig {
         extra_context: Option<Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
-            .map(|p| {
-                p.parse::<Platform>().map_err(|e| {
-                    RattlerBuildError::Other(format!("Invalid target_platform: {}", e))
-                })
-            })
-            .transpose()?
+            .map(|p| p.parse::<Platform>())
+            .transpose()
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         let build_platform = build_platform
-            .map(|p| {
-                p.parse::<Platform>()
-                    .map_err(|e| RattlerBuildError::Other(format!("Invalid build_platform: {}", e)))
-            })
-            .transpose()?
+            .map(|p| p.parse::<Platform>())
+            .transpose()
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         let host_platform = host_platform
-            .map(|p| {
-                p.parse::<Platform>()
-                    .map_err(|e| RattlerBuildError::Other(format!("Invalid host_platform: {}", e)))
-            })
-            .transpose()?
+            .map(|p| p.parse::<Platform>())
+            .transpose()
+            .map_err(RattlerBuildError::from)?
             .unwrap_or_else(Platform::current);
 
         let extra_context = extra_context
