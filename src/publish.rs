@@ -247,7 +247,7 @@ pub(crate) async fn upload_and_index_channel(
                 "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
                 "file" => {
                     let path = PathBuf::from(url.path());
-                    upload_to_local_filesystem(&path, package_paths).await
+                    upload_to_local_filesystem(&path, package_paths, publish_data.force).await
                 }
                 "http" | "https" => {
                     // Detect backend from hostname
@@ -275,7 +275,7 @@ pub(crate) async fn upload_and_index_channel(
         }
         NamedChannelOrUrl::Path(path) => {
             let path_buf = PathBuf::from(path.as_str());
-            upload_to_local_filesystem(&path_buf, package_paths).await
+            upload_to_local_filesystem(&path_buf, package_paths, publish_data.force).await
         }
         NamedChannelOrUrl::Name(name) => Err(miette::miette!(
             "Cannot upload to named channel '{}'. Please use a direct URL instead.",
@@ -558,6 +558,7 @@ async fn upload_to_anaconda(
 async fn upload_to_local_filesystem(
     target_dir: &Path,
     package_paths: &[PathBuf],
+    force: bool,
 ) -> miette::Result<()> {
     use std::collections::HashSet;
 
@@ -583,6 +584,14 @@ async fn upload_to_local_filesystem(
 
         fs_err::create_dir_all(&target_subdir).into_diagnostic()?;
         let target_path = target_subdir.join(package_name);
+
+        // Check if package already exists
+        if target_path.exists() && !force {
+            return Err(miette::miette!(
+                "Package already exists at {}. Use --force to overwrite.",
+                target_path.display()
+            ));
+        }
 
         tracing::info!(
             "Copying {} to {}",
