@@ -508,6 +508,8 @@ fn build_recipes_py(
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
+        // TODO: implement build number override!
+        None,
     );
 
     run_async_task(async {
