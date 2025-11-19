@@ -49,6 +49,7 @@ def _():
     )
     from rattler_build.tool_config import PlatformConfig
     from rattler_build.variant_config import VariantConfig
+
     return (
         MultiOutputRecipe,
         Path,
