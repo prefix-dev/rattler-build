@@ -95,10 +95,8 @@ pub(crate) async fn fetch_highest_build_numbers(
         return Ok(HashMap::new());
     }
 
-    tracing::info!(
-        "Fetching build numbers from target channel for {} package(s)",
-        package_specs.len()
-    );
+    let span = tracing::info_span!("Fetching build numbers from target channel",);
+    let _guard = span.enter();
 
     // Query the repodata
     let result = tool_config
@@ -223,6 +221,9 @@ pub(crate) async fn upload_and_index_channel(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
+    let span = tracing::info_span!("Publishing packages");
+    let _guard = span.enter();
+
     match target_url {
         NamedChannelOrUrl::Url(url) => {
             let scheme = url.scheme();
@@ -246,7 +247,7 @@ pub(crate) async fn upload_and_index_channel(
                 "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
                 "file" => {
                     let path = PathBuf::from(url.path());
-                    upload_to_local_filesystem(&path, package_paths, publish_data).await
+                    upload_to_local_filesystem(&path, package_paths).await
                 }
                 "http" | "https" => {
                     // Detect backend from hostname
@@ -274,7 +275,7 @@ pub(crate) async fn upload_and_index_channel(
         }
         NamedChannelOrUrl::Path(path) => {
             let path_buf = PathBuf::from(path.as_str());
-            upload_to_local_filesystem(&path_buf, package_paths, publish_data).await
+            upload_to_local_filesystem(&path_buf, package_paths).await
         }
         NamedChannelOrUrl::Name(name) => Err(miette::miette!(
             "Cannot upload to named channel '{}'. Please use a direct URL instead.",
@@ -292,6 +293,7 @@ async fn upload_to_s3(
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, index_s3};
     use rattler_upload::upload::upload_package_to_s3;
+    use std::collections::HashSet;
 
     tracing::info!("Uploading packages to S3 channel: {}", url);
 
@@ -299,6 +301,13 @@ async fn upload_to_s3(
     let auth_storage =
         tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+
+    // Collect unique subdirs from all packages
+    let mut subdirs = HashSet::new();
+    for package_path in package_paths {
+        let subdir = determine_package_subdir(package_path)?;
+        subdirs.insert(subdir);
+    }
 
     // Upload packages to S3 (credentials come from AWS SDK default chain)
     upload_package_to_s3(
@@ -313,30 +322,36 @@ async fn upload_to_s3(
 
     tracing::info!("Successfully uploaded packages to S3");
 
-    // Run S3 indexing
-    tracing::info!("Indexing S3 channel at {}", url);
-
     // Use default AWS credential chain
     let resolved_credentials = rattler_s3::ResolvedS3Credentials::from_sdk()
         .await
         .into_diagnostic()?;
 
-    let index_config = IndexS3Config {
-        channel: url.clone(),
-        credentials: resolved_credentials,
-        target_platform: Some(publish_data.build.target_platform),
-        repodata_patch: None,
-        write_zst: false,
-        write_shards: false,
-        force: false,
-        max_parallel: num_cpus::get_physical(),
-        multi_progress: None,
-        precondition_checks: Default::default(),
-    };
+    for subdir in subdirs {
+        // Run S3 indexing for each subdir
+        tracing::info!("Indexing S3 channel at {} / {}", url, subdir);
 
-    index_s3(index_config)
-        .await
-        .map_err(|e| miette::miette!("Failed to index S3 channel: {}", e))?;
+        let target_platform = subdir
+            .parse::<Platform>()
+            .map_err(|e| miette::miette!("Invalid platform subdir '{}': {}", subdir, e))?;
+
+        let index_config = IndexS3Config {
+            channel: url.clone(),
+            credentials: resolved_credentials.clone(),
+            target_platform: Some(target_platform),
+            repodata_patch: None,
+            write_zst: true,
+            write_shards: true,
+            force: false,
+            max_parallel: num_cpus::get_physical(),
+            multi_progress: None,
+            precondition_checks: rattler_index::PreconditionChecks::Enabled,
+        };
+
+        index_s3(index_config)
+            .await
+            .map_err(|e| miette::miette!("Failed to index S3 channel: {}", e))?;
+    }
 
     tracing::info!("Successfully indexed S3 channel");
     Ok(())
@@ -543,12 +558,16 @@ async fn upload_to_anaconda(
 async fn upload_to_local_filesystem(
     target_dir: &Path,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
 ) -> miette::Result<()> {
+    use std::collections::HashSet;
+
     tracing::info!(
         "Copying packages to local channel: {}",
         target_dir.display()
     );
+
+    // Collect unique subdirs from all packages
+    let mut subdirs = HashSet::new();
 
     // Copy packages to the target directory organized by platform
     for package_path in package_paths {
@@ -559,6 +578,7 @@ async fn upload_to_local_filesystem(
 
         // Determine subdir from package
         let subdir = determine_package_subdir(package_path)?;
+        subdirs.insert(subdir.clone());
         let target_subdir = target_dir.join(&subdir);
 
         fs_err::create_dir_all(&target_subdir).into_diagnostic()?;
@@ -572,22 +592,30 @@ async fn upload_to_local_filesystem(
         fs_err::copy(package_path, &target_path).into_diagnostic()?;
     }
 
-    // Run rattler-index on the local directory
+    // Run rattler-index on the local directory for each subdir
     tracing::info!("Indexing local channel at {}", target_dir.display());
-    let index_config = IndexFsConfig {
-        channel: target_dir.to_path_buf(),
-        target_platform: Some(publish_data.build.target_platform),
-        repodata_patch: None,
-        write_zst: false,
-        write_shards: false,
-        force: false,
-        max_parallel: num_cpus::get_physical(),
-        multi_progress: None,
-    };
 
-    index_fs(index_config)
-        .await
-        .map_err(|e| miette::miette!("Failed to index channel: {}", e))?;
+    for subdir in subdirs {
+        let target_platform = subdir
+            .parse::<Platform>()
+            .map_err(|e| miette::miette!("Invalid platform subdir '{}': {}", subdir, e))?;
+
+        let index_config = IndexFsConfig {
+            channel: target_dir.to_path_buf(),
+            target_platform: Some(target_platform),
+            repodata_patch: None,
+            write_zst: true,
+            write_shards: true,
+            force: false,
+            max_parallel: num_cpus::get_physical(),
+            multi_progress: None,
+        };
+
+        index_fs(index_config)
+            .await
+            .map_err(|e| miette::miette!("Failed to index channel: {}", e))?;
+    }
+
     tracing::info!("Successfully indexed local channel");
     Ok(())
 }
