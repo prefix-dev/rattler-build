@@ -589,7 +589,12 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
                 Ok(specs) => {
                     ignore_run_exports.by_name = specs
                         .into_iter()
-                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .filter_map(|ms: MatchSpec| {
+                            match ms.name.expect("MatchSpec must have a name") {
+                                rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+                                _ => None,
+                            }
+                        })
                         .collect();
                 }
                 Err(e) => errors.extend(e),
@@ -601,7 +606,12 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
                 Ok(specs) => {
                     ignore_run_exports.from_package = specs
                         .into_iter()
-                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .filter_map(|ms: MatchSpec| {
+                            match ms.name.expect("MatchSpec must have a name") {
+                                rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+                                _ => None,
+                            }
+                        })
                         .collect();
                 }
                 Err(e) => errors.extend(e),

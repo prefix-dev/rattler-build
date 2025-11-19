@@ -159,7 +159,7 @@ impl BuildOutput {
             s.spec()
                 .name
                 .as_ref()
-                .map(|n| n.as_normalized() == name)
+                .map(|n| n.to_string() == name)
                 .unwrap_or(false)
         });
 

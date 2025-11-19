@@ -914,7 +914,11 @@ impl DownstreamTest {
                 // package!
                 let downstream_package = solution
                     .iter()
-                    .find(|s| s.package_record.name == spec_name)
+                    .find(|s| {
+                        rattler_conda_types::PackageNameMatcher::Exact(
+                            s.package_record.name.clone(),
+                        ) == spec_name
+                    })
                     .ok_or_else(|| {
                         TestError::TestFailed(
                             "Could not find package in the resolved environment".to_string(),
