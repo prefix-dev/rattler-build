@@ -123,6 +123,7 @@ nav:
       - Sandbox: sandbox.md
       - Generating recipes: recipe_generation.md
       - Creating patches: create_patch.md
+      - Debugging builds: debugging_builds.md
       - Tips and tricks: tips_and_tricks.md
 
   - Testing:
