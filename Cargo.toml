@@ -31,8 +31,8 @@ indexmap = "2.12.0"
 insta = "1.41.1"
 itertools = "0.14.0"
 miette = "7.6.0"
-rattler_conda_types = { version = "0.40.0", default-features = false }
-rattler_digest = { version = "1.1.5", default-features = false, features = [
+rattler_conda_types = { version = "0.41.0", default-features = false }
+rattler_digest = { version = "1.2.0", default-features = false, features = [
   "serde",
 ] }
 regex = "1.11.1"
@@ -174,34 +174,34 @@ regex = { workspace = true }
 async-recursion = { workspace = true }
 
 # Rattler crates
-rattler_config = { version = "0.2.15" }
-rattler = { version = "0.38.4", default-features = false, features = [
+rattler_config = { version = "0.2.16" }
+rattler = { version = "0.39.0", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.4.1", default-features = false }
+rattler_cache = { version = "0.5.0", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.27.0", default-features = false }
-rattler_networking = { version = "0.25.16", default-features = false, features = [
+rattler_index = { version = "0.27.1", default-features = false }
+rattler_networking = { version = "0.25.22", default-features = false, features = [
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.10", default-features = false }
-rattler_s3 = { version = "0.1.4", optional = true }
+rattler_upload = { version = "0.4.0", default-features = false }
+rattler_s3 = { version = "0.1.11", optional = true }
 rattler_redaction = { version = "0.1.12" }
-rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.25.0", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.25.2", default-features = false, features = [
+rattler_shell = { version = "0.25.8", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "3.0.5", default-features = false, features = [
+rattler_solve = { version = "3.1.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
 rattler_virtual_packages = { version = "2.2.5", default-features = false }
-rattler_package_streaming = { version = "0.23.13", default-features = false }
-rattler_menuinst = "0.2.34"
+rattler_package_streaming = { version = "0.23.14", default-features = false }
+rattler_menuinst = "0.2.35"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.5.1"

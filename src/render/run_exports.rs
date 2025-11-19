@@ -52,7 +52,12 @@ impl IgnoreRunExports {
                         if spec
                             .name
                             .as_ref()
-                            .map(|n| !self.by_name().contains(n))
+                            .and_then(|n| match n {
+                                rattler_conda_types::PackageNameMatcher::Exact(name) => {
+                                    Some(!self.by_name().contains(name))
+                                }
+                                _ => None,
+                            })
                             .unwrap_or(false)
                         {
                             Some(Ok(spec))

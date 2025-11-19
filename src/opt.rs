@@ -10,12 +10,13 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
 };
+use rattler_config::config::ConfigBase;
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::mirror_middleware;
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;
 use rattler_solve::ChannelPriority;
-use rattler_upload::upload::opt::{Config, UploadOpts};
+use rattler_upload::upload::opt::UploadOpts;
 use serde_json::{Value, json};
 use url::Url;
 
@@ -270,7 +271,7 @@ impl CommonData {
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
-        config: Config,
+        config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
         use_zstd: bool,
@@ -327,7 +328,7 @@ impl CommonData {
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
+    fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -709,7 +710,7 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
@@ -841,7 +842,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -938,7 +939,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -1027,7 +1028,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: DebugOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<ConfigBase<()>>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),

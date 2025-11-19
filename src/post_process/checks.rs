@@ -130,13 +130,15 @@ fn resolved_run_dependencies(
             }
         })
         .flat_map(|dep| {
-            if let Some(package_name) = &dep.spec().name {
-                if let Some(nature) = package_to_nature_map.get(package_name)
+            if let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
+                &dep.spec().name
+            {
+                if let Some(nature) = package_to_nature_map.get(exact_name)
                     && nature != &PackageNature::DSOLibrary
                 {
                     return None;
                 }
-                dep.spec().name.to_owned().map(|v| v.as_source().to_owned())
+                Some(exact_name.as_source().to_owned())
             } else {
                 None
             }

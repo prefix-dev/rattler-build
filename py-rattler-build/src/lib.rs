@@ -618,8 +618,9 @@ fn upload_package_to_artifactory_py(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, attestation_file=None,))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, generate_attestation=false, attestation_file=None,))]
 fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
@@ -627,12 +628,20 @@ fn upload_package_to_prefix_py(
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
     skip_existing: bool,
+    generate_attestation: bool,
     attestation_file: Option<PathBuf>,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
-    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, skip_existing);
+    let prefix_data = PrefixData::new(
+        url,
+        channel,
+        api_key,
+        attestation_file,
+        skip_existing,
+        generate_attestation,
+    );
 
     run_async_task(async {
         upload::upload_package_to_prefix(&store, &package_files, prefix_data).await?;

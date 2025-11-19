@@ -80,7 +80,7 @@ impl Output {
                         && spec.build.is_none()
                         && let Some(name) = spec.name.as_ref()
                     {
-                        return Some(name.as_normalized().to_string());
+                        return Some(name.to_string());
                     }
                     None
                 })

@@ -187,9 +187,9 @@ impl<S: SourceCode> Stage1Render<S> {
         for run_requirement in recipe.requirements().run() {
             if let Dependency::Spec(spec) = run_requirement
                 && let Some(ref name) = spec.name
-                && name.as_normalized().starts_with("__")
+                && name.to_string().starts_with("__")
             {
-                variant.insert(name.as_normalized().into(), spec.to_string().into());
+                variant.insert(name.to_string().into(), spec.to_string().into());
             }
         }
 
@@ -264,9 +264,12 @@ impl<S: SourceCode> Stage1Render<S> {
 
             // If we find any keys that reference another output, add an edge
             for req in output.build_time_requirements() {
-                if let Dependency::Spec(spec) = req {
-                    add_edge(spec.name.as_ref().expect("Dependency should have a name"));
-                };
+                if let Dependency::Spec(spec) = req
+                    && let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) =
+                        spec.name.as_ref()
+                {
+                    add_edge(name);
+                }
             }
 
             for pin in output.requirements().all_pin_subpackage() {
@@ -341,7 +344,7 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                     let is_simple = spec.version.is_none() && spec.build.is_none();
                     // add in the variant key for this dependency that has no version specifier
                     if is_simple && let Some(ref name) = spec.name {
-                        additional_variables.insert(name.as_normalized().into());
+                        additional_variables.insert(name.to_string().into());
                     }
                 }
             }
