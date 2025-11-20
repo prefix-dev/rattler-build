@@ -161,6 +161,8 @@ pub(crate) fn apply_build_number_override(
     build_number_override: &BuildNumberOverride,
     highest_build_numbers: &HashMap<(PackageName, String), u64>,
 ) {
+    let span = tracing::info_span!("Applying build number overrides",);
+    let _guard = span.enter();
     for output in outputs {
         let name = output.name().clone();
         let version = output.recipe.package().version().to_string();
@@ -172,7 +174,7 @@ pub(crate) fn apply_build_number_override(
                 let current_highest = highest_build_numbers.get(&key).copied().unwrap_or(0);
                 let new_num = (current_highest as i64 + bump).max(0) as u64;
                 tracing::info!(
-                    "Package {} v{}: bumping build number from {} to {} ({}{})",
+                    "Packaging {} ({}): bumping build number from {} to {} ({}{})",
                     name.as_normalized(),
                     version,
                     current_highest,

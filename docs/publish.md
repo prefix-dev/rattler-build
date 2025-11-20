@@ -20,6 +20,9 @@ rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel
 rattler-build publish ./output/linux-64/my-package-0.1.2-h123_0.conda --to s3://my-bucket
 
 rattler-build publish ./some/recipe.yaml --to artifactory://my-secret.company.com/package-channel
+
+# on prefix.dev you can also automatically add a sigstore attestation
+rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel --create-attestation
 ```
 
 The following schema is used:

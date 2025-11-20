@@ -1161,7 +1161,6 @@ async fn build_and_collect_packages(
 /// This function builds packages from recipes, uploads them to a specified channel,
 /// and runs indexing on the channel.
 pub async fn publish_packages(
-    recipe_paths: Vec<std::path::PathBuf>,
     publish_data: PublishData,
     log_handler: &Option<console_utils::LoggingOutputHandler>,
 ) -> Result<(), miette::Error> {
@@ -1218,12 +1217,15 @@ pub async fn publish_packages(
     }
 
     // Check if we're publishing pre-built packages or building from recipes
-    let built_packages = if let Some(ref package_files) = publish_data.package_files {
+    let built_packages = if !publish_data.package_files.is_empty() {
         // Publish pre-built packages directly
-        tracing::info!("Publishing {} pre-built package(s)", package_files.len());
+        tracing::info!(
+            "Publishing {} pre-built package(s)",
+            publish_data.package_files.len()
+        );
 
         // Validate that all package files exist
-        for package_file in package_files {
+        for package_file in &publish_data.package_files {
             if !package_file.exists() {
                 return Err(miette::miette!(
                     "Package file does not exist: {}",
@@ -1232,12 +1234,33 @@ pub async fn publish_packages(
             }
         }
 
-        package_files.clone()
+        publish_data.package_files.clone()
     } else {
         // Build packages from recipes
         let tool_config = get_tool_config(&publish_data.build, log_handler)?;
         let mut outputs = Vec::new();
-        for recipe_path in &recipe_paths {
+
+        // Expand recipe paths (handles directories by finding all recipes within them)
+        let mut expanded_recipe_paths = Vec::new();
+        for recipe_path in &publish_data.recipe_paths {
+            if recipe_path.is_dir() {
+                // For directories, scan for all recipes
+                for entry in ignore::Walk::new(recipe_path) {
+                    let entry = entry.into_diagnostic()?;
+                    if entry.path().is_dir() {
+                        if let Ok(resolved_path) = get_recipe_path(entry.path()) {
+                            expanded_recipe_paths.push(resolved_path);
+                        }
+                    }
+                }
+            } else {
+                // For files, resolve directly (handles recipe.yaml in directory or direct yaml files)
+                let resolved_path = get_recipe_path(recipe_path)?;
+                expanded_recipe_paths.push(resolved_path);
+            }
+        }
+
+        for recipe_path in &expanded_recipe_paths {
             let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
             outputs.extend(output);
         }

@@ -276,23 +276,8 @@ async fn async_main() -> miette::Result<()> {
         }
 
         Some(SubCommands::Publish(publish_args)) => {
-            let recipes = publish_args.build.recipes.clone();
-            let recipe_dir = publish_args.build.recipe_dir.clone();
             let publish_data = PublishData::from_opts_and_config(publish_args, config);
-
-            // Get all recipe paths and keep tempdir alive until end of the function
-            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
-
-            if recipe_paths.is_empty() {
-                if recipe_dir.is_some() {
-                    tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
-                    return Ok(());
-                } else {
-                    miette::bail!("Couldn't find recipe.")
-                }
-            }
-
-            publish_packages(recipe_paths, publish_data, &log_handler).await
+            publish_packages(publish_data, &log_handler).await
         }
 
         Some(SubCommands::Test(test_args)) => {

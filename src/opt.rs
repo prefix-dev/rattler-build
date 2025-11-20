@@ -531,12 +531,13 @@ pub struct BuildOpts {
 /// then uploads them to a specified channel (local or remote), followed by running indexing.
 #[derive(Parser, Clone)]
 pub struct PublishOpts {
-    /// Pre-built package files to publish (alternative to building from recipes).
-    /// If specified, no building will occur - the packages will be uploaded directly.
-    /// Cannot be used together with recipe options.
-    /// Multiple files can be specified by repeating the flag (e.g., --package-files pkg1.conda --package-files pkg2.conda).
-    #[arg(long, conflicts_with_all = ["recipes", "recipe_dir"], help_heading = "Publishing", action = clap::ArgAction::Append)]
-    pub package_files: Option<Vec<PathBuf>>,
+    /// Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish.
+    /// If .conda or .tar.bz2 files are provided, they will be published directly without building.
+    /// If .yaml files are provided, they will be built first, then published.
+    /// Use --recipe-dir (from build options below) to scan a directory for recipes instead.
+    /// Defaults to "recipe.yaml" in the current directory if not specified.
+    #[arg(default_value = "recipe.yaml")]
+    pub package_or_recipe: Vec<PathBuf>,
 
     /// The channel or URL to publish the package to.
     ///
@@ -580,13 +581,44 @@ pub struct PublishData {
     pub build_number: Option<String>,
     pub force: bool,
     pub create_attestation: bool,
-    pub package_files: Option<Vec<PathBuf>>,
+    pub package_files: Vec<PathBuf>,
+    pub recipe_paths: Vec<PathBuf>,
     pub build: BuildData,
 }
 
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
     pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
+        // Separate package files from recipe paths based on file extension
+        let mut package_files = Vec::new();
+        let mut recipe_paths = Vec::new();
+
+        // If recipe_dir is specified (from BuildOpts), use it; otherwise use positional arguments
+        if let Some(ref recipe_dir) = opts.build.recipe_dir {
+            // Use recipe_dir - will be expanded later to find all recipes in the directory
+            recipe_paths.push(recipe_dir.clone());
+        } else {
+            // Process positional arguments
+            for path in opts.package_or_recipe {
+                if path.is_dir() && path.join("recipe.yaml").is_file() {
+                    // If it's a directory containing recipe.yaml, treat it as a recipe path
+                    recipe_paths.push(path);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy();
+                    if ext_str == "conda" || ext_str == "bz2" {
+                        package_files.push(path);
+                        continue;
+                    } else if ext_str == "yaml" || ext_str == "yml" {
+                        recipe_paths.push(path);
+                        continue;
+                    }
+                }
+            }
+        }
+
         // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
         let to_channel = opts.to.clone();
@@ -606,7 +638,8 @@ impl PublishData {
             build_number: opts.build_number,
             force: opts.force,
             create_attestation: opts.create_attestation,
-            package_files: opts.package_files,
+            package_files,
+            recipe_paths,
             build: BuildData::from_opts_and_config(build_opts, config),
         }
     }
