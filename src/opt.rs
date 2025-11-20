@@ -527,10 +527,17 @@ pub struct BuildOpts {
 
 /// Publish options for the `publish` command.
 ///
-/// This command builds packages from recipes and then uploads them to a specified
-/// channel (local or remote), followed by running indexing on the channel.
+/// This command either builds packages from recipes OR publishes pre-built packages,
+/// then uploads them to a specified channel (local or remote), followed by running indexing.
 #[derive(Parser, Clone)]
 pub struct PublishOpts {
+    /// Pre-built package files to publish (alternative to building from recipes).
+    /// If specified, no building will occur - the packages will be uploaded directly.
+    /// Cannot be used together with recipe options.
+    /// Multiple files can be specified by repeating the flag (e.g., --package-files pkg1.conda --package-files pkg2.conda).
+    #[arg(long, conflicts_with_all = ["recipes", "recipe_dir"], help_heading = "Publishing", action = clap::ArgAction::Append)]
+    pub package_files: Option<Vec<PathBuf>>,
+
     /// The channel or URL to publish the package to.
     ///
     /// Examples:
@@ -573,6 +580,7 @@ pub struct PublishData {
     pub build_number: Option<String>,
     pub force: bool,
     pub create_attestation: bool,
+    pub package_files: Option<Vec<PathBuf>>,
     pub build: BuildData,
 }
 
@@ -598,6 +606,7 @@ impl PublishData {
             build_number: opts.build_number,
             force: opts.force,
             create_attestation: opts.create_attestation,
+            package_files: opts.package_files,
             build: BuildData::from_opts_and_config(build_opts, config),
         }
     }

@@ -1217,72 +1217,97 @@ pub async fn publish_packages(
         }
     }
 
-    let tool_config = get_tool_config(&publish_data.build, log_handler)?;
-    let mut outputs = Vec::new();
-    for recipe_path in &recipe_paths {
-        let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
-        outputs.extend(output);
-    }
+    // Check if we're publishing pre-built packages or building from recipes
+    let built_packages = if let Some(ref package_files) = publish_data.package_files {
+        // Publish pre-built packages directly
+        tracing::info!("Publishing {} pre-built package(s)", package_files.len());
 
-    // Apply build number override if specified
-    if let Some(ref build_number_arg) = publish_data.build_number {
-        let build_number_override = BuildNumberOverride::parse(build_number_arg)?;
-
-        // For relative bumps, we need to fetch the highest build numbers from the target channel
-        let highest_build_numbers = match &build_number_override {
-            BuildNumberOverride::Relative(_) => {
-                fetch_highest_build_numbers(
-                    &target_url,
-                    &outputs,
-                    publish_data.build.target_platform,
-                    &tool_config,
-                )
-                .await?
+        // Validate that all package files exist
+        for package_file in package_files {
+            if !package_file.exists() {
+                return Err(miette::miette!(
+                    "Package file does not exist: {}",
+                    package_file.display()
+                ));
             }
-            BuildNumberOverride::Absolute(num) => {
-                tracing::info!("Setting build number to {} for all outputs", num);
-                HashMap::new()
-            }
-        };
+        }
 
-        apply_build_number_override(&mut outputs, &build_number_override, &highest_build_numbers);
-    }
+        package_files.clone()
+    } else {
+        // Build packages from recipes
+        let tool_config = get_tool_config(&publish_data.build, log_handler)?;
+        let mut outputs = Vec::new();
+        for recipe_path in &recipe_paths {
+            let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
+            outputs.extend(output);
+        }
 
-    if publish_data.build.render_only {
-        let outputs = if publish_data.build.with_solve {
-            let mut updated_outputs = Vec::new();
-            for output in outputs {
-                updated_outputs.push(
-                    output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
-                        .await
-                        .into_diagnostic()?,
-                );
-            }
-            updated_outputs
-        } else {
-            outputs
-        };
+        // Apply build number override if specified
+        if let Some(ref build_number_arg) = publish_data.build_number {
+            let build_number_override = BuildNumberOverride::parse(build_number_arg)?;
 
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&outputs).into_diagnostic()?
-        );
-        return Ok(());
-    }
+            // For relative bumps, we need to fetch the highest build numbers from the target channel
+            let highest_build_numbers = match &build_number_override {
+                BuildNumberOverride::Relative(_) => {
+                    fetch_highest_build_numbers(
+                        &target_url,
+                        &outputs,
+                        publish_data.build.target_platform,
+                        &tool_config,
+                    )
+                    .await?
+                }
+                BuildNumberOverride::Absolute(num) => {
+                    tracing::info!("Setting build number to {} for all outputs", num);
+                    HashMap::new()
+                }
+            };
 
-    // Skip noarch builds before the topological sort
-    outputs = skip_noarch(outputs, &tool_config).await?;
+            apply_build_number_override(
+                &mut outputs,
+                &build_number_override,
+                &highest_build_numbers,
+            );
+        }
 
-    sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+        if publish_data.build.render_only {
+            let outputs = if publish_data.build.with_solve {
+                let mut updated_outputs = Vec::new();
+                for output in outputs {
+                    updated_outputs.push(
+                        output
+                            .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                            .await
+                            .into_diagnostic()?,
+                    );
+                }
+                updated_outputs
+            } else {
+                outputs
+            };
 
-    // Build all packages and collect the paths
-    let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&outputs).into_diagnostic()?
+            );
+            return Ok(());
+        }
 
-    if built_packages.is_empty() {
-        tracing::info!("No packages were built");
-        return Ok(());
-    }
+        // Skip noarch builds before the topological sort
+        outputs = skip_noarch(outputs, &tool_config).await?;
+
+        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+
+        // Build all packages and collect the paths
+        let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
+
+        if built_packages.is_empty() {
+            tracing::info!("No packages were built");
+            return Ok(());
+        }
+
+        built_packages
+    };
 
     upload_and_index_channel(&target_url, &built_packages, &publish_data).await?;
 
