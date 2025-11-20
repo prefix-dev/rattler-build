@@ -485,9 +485,15 @@ async fn upload_to_prefix(
         url.clone()
     };
 
-    // Create PrefixData with server URL, channel, optional API key, no attestation, attestation generation=false and skip_existing=false
-    // TODO: we should wire this up for attestation generation!
-    let prefix_data = PrefixData::new(server_url, channel, None, None, false, false);
+    // Create PrefixData with server URL, channel, optional API key, no attestation, attestation generation from publish_data and skip_existing=false
+    let prefix_data = PrefixData::new(
+        server_url,
+        channel,
+        None,
+        None,
+        publish_data.create_attestation,
+        false,
+    );
 
     // Upload packages
     upload_package_to_prefix(&auth_storage, &package_paths.to_vec(), prefix_data)
