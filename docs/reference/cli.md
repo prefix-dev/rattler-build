@@ -309,7 +309,16 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing
 
-**Usage:** `rattler-build publish [OPTIONS] --to <TO>`
+**Usage:** `rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...`
+
+##### **Arguments:**
+
+- `<PACKAGE_OR_RECIPE>`
+
+	Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish. If .conda or .tar.bz2 files are provided, they will be published directly without building. If .yaml files are provided, they will be built first, then published. Use --recipe-dir (from build options below) to scan a directory for recipes instead. Defaults to "recipe.yaml" in the current directory if not specified
+
+	- Default value: `recipe.yaml`
+
 
 ##### **Options:**
 
@@ -519,6 +528,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--force`
 
 	Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels
+
+
+- `--create-attestation`
+
+	Automatically generate attestations when uploading to prefix.dev channels. Only works when uploading to prefix.dev channels with trusted publishing enabled
 
 
 ###### **Sandbox arguments**

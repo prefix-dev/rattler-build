@@ -1247,10 +1247,10 @@ pub async fn publish_packages(
                 // For directories, scan for all recipes
                 for entry in ignore::Walk::new(recipe_path) {
                     let entry = entry.into_diagnostic()?;
-                    if entry.path().is_dir() {
-                        if let Ok(resolved_path) = get_recipe_path(entry.path()) {
-                            expanded_recipe_paths.push(resolved_path);
-                        }
+                    if entry.path().is_dir()
+                        && let Ok(resolved_path) = get_recipe_path(entry.path())
+                    {
+                        expanded_recipe_paths.push(resolved_path);
                     }
                 }
             } else {
