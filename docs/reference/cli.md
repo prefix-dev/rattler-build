@@ -9,6 +9,7 @@ This document contains the help content for the `rattler-build` command-line pro
 ##### **Subcommands:**
 
 * `build` — Build a package from a recipe
+* `publish` — Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing
 * `test` — Run a test for a single package
 * `rebuild` — Rebuild a package from a package file instead of a recipe
 * `upload` — Upload a package
@@ -262,6 +263,276 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--exclude-newer <EXCLUDE_NEWER>`
 
 	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+
+
+- `--build-num <BUILD_NUM>`
+
+	Override the build number for all outputs (defaults to the build number in the recipe)
+
+
+###### **Sandbox arguments**
+
+- `--sandbox`
+
+	Enable the sandbox
+
+
+- `--allow-network`
+
+	Allow network access during build (default: false if sandbox is enabled)
+
+
+- `--allow-read <ALLOW_READ>`
+
+	Allow read access to the specified paths
+
+
+- `--allow-read-execute <ALLOW_READ_EXECUTE>`
+
+	Allow read and execute access to the specified paths
+
+
+- `--allow-read-write <ALLOW_READ_WRITE>`
+
+	Allow read and write access to the specified paths
+
+
+- `--overwrite-default-sandbox-config`
+
+	Overwrite the default sandbox configuration
+
+
+
+
+
+### `publish`
+
+Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing
+
+**Usage:** `rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...`
+
+##### **Arguments:**
+
+- `<PACKAGE_OR_RECIPE>`
+
+	Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish. If .conda or .tar.bz2 files are provided, they will be published directly without building. If .yaml files are provided, they will be built first, then published. Use --recipe-dir (from build options below) to scan a directory for recipes instead. Defaults to "recipe.yaml" in the current directory if not specified
+
+	- Default value: `recipe.yaml`
+
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPES>`
+
+	The recipe file or directory containing `recipe.yaml`. Defaults to the current directory
+
+	- Default value: `.`
+
+- `--recipe-dir <RECIPE_DIR>`
+
+	The directory that contains recipes
+
+
+- `--up-to <UP_TO>`
+
+	Build recipes up to the specified package
+
+
+- `--build-platform <BUILD_PLATFORM>`
+
+	The build platform to use for the build (e.g. for building with emulation, or rendering)
+
+
+- `--target-platform <TARGET_PLATFORM>`
+
+	The target platform for the build
+
+
+- `--host-platform <HOST_PLATFORM>`
+
+	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
+
+
+- `-c`, `--channel <CHANNELS>`
+
+	Add a channel to search for dependencies in
+
+
+- `-m`, `--variant-config <VARIANT_CONFIG>`
+
+	Variant configuration files for the build
+
+
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+
+
+- `--ignore-recipe-variants`
+
+	Do not read the `variants.yaml` file next to a recipe
+
+
+- `--render-only`
+
+	Render the recipe files without executing the build
+
+
+- `--with-solve`
+
+	Render the recipe files with solving dependencies
+
+
+- `--keep-build`
+
+	Keep intermediate build artifacts after the build
+
+
+- `--no-build-id`
+
+	Don't use build id(timestamp) when creating build directory name
+
+
+- `--compression-threads <COMPRESSION_THREADS>`
+
+	The number of threads to use for compression (only relevant when also using `--package-format conda`)
+
+
+- `--io-concurrency-limit <IO_CONCURRENCY_LIMIT>`
+
+	The maximum number of concurrent I/O operations to use when installing packages This can be controlled by the `RATTLER_IO_CONCURRENCY_LIMIT` environment variable Defaults to 8 times the number of CPUs
+
+
+- `--experimental`
+
+	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+- `--extra-meta <EXTRA_META>`
+
+	Extra metadata to include in about.json
+
+
+- `--continue-on-failure`
+
+	Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
+
+
+###### **Modifying result**
+
+- `--package-format <PACKAGE_FORMAT>`
+
+	The package format to use for the build. Can be one of `tar-bz2` or
+`conda`. You can also add a compression level to the package format,
+e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
+22).
+
+
+- `--no-include-recipe`
+
+	Don't store the recipe in the final package
+
+
+- `--test <TEST>`
+
+	The strategy to use for running tests
+
+	- Possible values:
+		- `skip`:
+			Skip the tests
+		- `native`:
+			Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed
+		- `native-and-emulated`:
+			Always run the tests
+
+
+- `--color-build-log`
+
+	Don't force colors in the output of the build script
+
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+
+- `--skip-existing <SKIP_EXISTING>`
+
+	Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
+
+	- Possible values:
+		- `none`:
+			Do not skip any packages
+		- `local`:
+			Skip packages that already exist locally
+		- `all`:
+			Skip packages that already exist in any channel
+
+
+- `--noarch-build-platform <NOARCH_BUILD_PLATFORM>`
+
+	Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
+
+
+- `--debug`
+
+	Enable debug output in build scripts
+
+
+- `--error-prefix-in-binary`
+
+	Error if the host prefix is detected in any binary files
+
+
+- `--allow-symlinks-on-windows`
+
+	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+
+
+- `--exclude-newer <EXCLUDE_NEWER>`
+
+	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+
+
+- `--build-num <BUILD_NUM>`
+
+	Override the build number for all outputs (defaults to the build number in the recipe)
+
+
+###### **Publishing**
+
+- `--to <TO>`
+
+	The channel or URL to publish the package to.
+	
+	Examples: - prefix.dev: https://prefix.dev/my-channel - anaconda.org: https://anaconda.org/my-org - S3: s3://my-bucket - Filesystem: file:///path/to/channel or /path/to/channel - Quetz: quetz://server.company.com/channel - Artifactory: artifactory://server.company.com/channel
+	
+	Note: This channel is also used as the highest priority channel when solving dependencies.
+
+
+- `--build-number <BUILD_NUMBER>`
+
+	Override the build number for all outputs. Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`). When using a relative bump, the highest build number from the target channel is used as the base
+
+
+- `--force`
+
+	Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels
+
+
+- `--create-attestation`
+
+	Automatically generate attestations when uploading to prefix.dev channels. Only works when uploading to prefix.dev channels with trusted publishing enabled
 
 
 ###### **Sandbox arguments**

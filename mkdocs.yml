@@ -133,6 +133,7 @@ nav:
   - User Experience:
       - Terminal User Interface (TUI): tui.md
       - Authentication & upload: authentication_and_upload.md
+      - Publishing packages: publish.md
       - Automatic recipe linting: automatic_linting.md
 
   - Package:

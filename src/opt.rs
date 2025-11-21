@@ -36,6 +36,11 @@ pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
 
+    /// Publish packages to a channel.
+    /// This command builds packages from recipes (or uses already built packages),
+    /// uploads them to a channel, and runs indexing.
+    Publish(PublishOpts),
+
     /// Run a test for a single package
     ///
     /// This creates a temporary directory, copies the package file into it, and
@@ -514,7 +519,132 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
 }
+
+/// Publish options for the `publish` command.
+///
+/// This command either builds packages from recipes OR publishes pre-built packages,
+/// then uploads them to a specified channel (local or remote), followed by running indexing.
+#[derive(Parser, Clone)]
+pub struct PublishOpts {
+    /// Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish.
+    /// If .conda or .tar.bz2 files are provided, they will be published directly without building.
+    /// If .yaml files are provided, they will be built first, then published.
+    /// Use --recipe-dir (from build options below) to scan a directory for recipes instead.
+    /// Defaults to "recipe.yaml" in the current directory if not specified.
+    #[arg(default_value = "recipe.yaml")]
+    pub package_or_recipe: Vec<PathBuf>,
+
+    /// The channel or URL to publish the package to.
+    ///
+    /// Examples:
+    /// - prefix.dev: https://prefix.dev/my-channel
+    /// - anaconda.org: https://anaconda.org/my-org
+    /// - S3: s3://my-bucket
+    /// - Filesystem: file:///path/to/channel or /path/to/channel
+    /// - Quetz: quetz://server.company.com/channel
+    /// - Artifactory: artifactory://server.company.com/channel
+    ///
+    /// Note: This channel is also used as the highest priority channel when solving dependencies.
+    #[arg(long = "to", help_heading = "Publishing")]
+    pub to: NamedChannelOrUrl,
+
+    /// Override the build number for all outputs.
+    /// Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`).
+    /// When using a relative bump, the highest build number from the target channel is used as the base.
+    #[arg(long, help_heading = "Publishing")]
+    pub build_number: Option<String>,
+
+    /// Force upload even if the package already exists (not recommended - may break lockfiles).
+    /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
+    #[arg(long, help_heading = "Publishing")]
+    pub force: bool,
+
+    /// Automatically generate attestations when uploading to prefix.dev channels.
+    /// Only works when uploading to prefix.dev channels with trusted publishing enabled.
+    #[arg(long, help_heading = "Publishing")]
+    pub create_attestation: bool,
+
+    /// Build options.
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug)]
+pub struct PublishData {
+    pub to: NamedChannelOrUrl,
+    pub build_number: Option<String>,
+    pub force: bool,
+    pub create_attestation: bool,
+    pub package_files: Vec<PathBuf>,
+    pub recipe_paths: Vec<PathBuf>,
+    pub build: BuildData,
+}
+
+impl PublishData {
+    /// Generate a new PublishData struct from PublishOpts and an optional config.
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
+        // Separate package files from recipe paths based on file extension
+        let mut package_files = Vec::new();
+        let mut recipe_paths = Vec::new();
+
+        // If recipe_dir is specified (from BuildOpts), use it; otherwise use positional arguments
+        if let Some(ref recipe_dir) = opts.build.recipe_dir {
+            // Use recipe_dir - will be expanded later to find all recipes in the directory
+            recipe_paths.push(recipe_dir.clone());
+        } else {
+            // Process positional arguments
+            for path in opts.package_or_recipe {
+                if path.is_dir() && path.join("recipe.yaml").is_file() {
+                    // If it's a directory containing recipe.yaml, treat it as a recipe path
+                    recipe_paths.push(path);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy();
+                    if ext_str == "conda" || ext_str == "bz2" {
+                        package_files.push(path);
+                        continue;
+                    } else if ext_str == "yaml" || ext_str == "yml" {
+                        recipe_paths.push(path);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Prepend the --to channel to the list of channels for dependency resolution
+        let mut build_opts = opts.build;
+        let to_channel = opts.to.clone();
+
+        // Add the to channel as the first channel (highest priority)
+        let channels = if let Some(mut channels) = build_opts.channels.take() {
+            channels.insert(0, to_channel.clone());
+            Some(channels)
+        } else {
+            Some(vec![to_channel.clone()])
+        };
+
+        build_opts.channels = channels;
+
+        Self {
+            to: opts.to,
+            build_number: opts.build_number,
+            force: opts.force,
+            create_attestation: opts.create_attestation,
+            package_files,
+            recipe_paths,
+            build: BuildData::from_opts_and_config(build_opts, config),
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
@@ -547,6 +677,7 @@ pub struct BuildData {
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub build_num_override: Option<u64>,
 }
 
 impl BuildData {
@@ -581,6 +712,7 @@ impl BuildData {
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        build_num_override: Option<u64>,
     ) -> Self {
         Self {
             up_to,
@@ -619,6 +751,7 @@ impl BuildData {
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             exclude_newer,
+            build_num_override,
         }
     }
 }
@@ -668,6 +801,7 @@ impl BuildData {
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
             opts.exclude_newer,
+            opts.build_num,
         )
     }
 }

@@ -14,10 +14,10 @@ use rattler_build::{
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
     opt::{
-        App, BuildData, DebugData, DebugShellOpts, RebuildData, ShellCompletion, SubCommands,
-        TestData,
+        App, BuildData, DebugData, DebugShellOpts, PublishData, RebuildData, ShellCompletion,
+        SubCommands, TestData,
     },
-    rebuild, run_test,
+    publish_packages, rebuild, run_test,
     source::create_patch,
 };
 use rattler_config::config::ConfigBase;
@@ -274,6 +274,12 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
+
+        Some(SubCommands::Publish(publish_args)) => {
+            let publish_data = PublishData::from_opts_and_config(publish_args, config);
+            publish_packages(publish_data, &log_handler).await
+        }
+
         Some(SubCommands::Test(test_args)) => {
             run_test(
                 TestData::from_opts_and_config(test_args, config),

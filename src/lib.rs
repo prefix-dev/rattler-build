@@ -32,6 +32,7 @@ pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
+mod publish;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
@@ -65,9 +66,10 @@ use rattler_conda_types::{
     package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
+use rattler_index::IndexFsConfig;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{Dependency, TestType, find_outputs_from_src};
+use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
 use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
 use selectors::SelectorConfig;
@@ -82,7 +84,13 @@ use types::{
 };
 use variant_config::VariantConfig;
 
-use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::{
+    metadata::{Debug, Output, PlatformWithVirtualPackages},
+    publish::{
+        BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
+        upload_and_index_channel,
+    },
+};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -413,6 +421,35 @@ pub async fn get_build_output(
         };
 
         outputs.push(output);
+    }
+
+    // Override build numbers if --build-num was specified
+    if let Some(build_num_override) = build_data.build_num_override {
+        tracing::info!(
+            "Overriding build number to {} for all outputs",
+            build_num_override
+        );
+        for output in &mut outputs {
+            // Update the build number
+            output.recipe.build.number = build_num_override;
+
+            // Extract the hash from the current build string and recompute with new build number
+            // Build string format is: {hash}_{build_number}
+            let current_build_string = output
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .expect("Build string should be resolved at this point");
+
+            // Split on last '_' to separate hash from build number
+            // TODO should we fail if we do not have a "standard" build string with build number at the end?
+            if let Some(last_underscore) = current_build_string.rfind('_') {
+                let hash_part = &current_build_string[..last_underscore];
+                let new_build_string = format!("{}_{}", hash_part, build_num_override);
+                output.recipe.build.string = BuildString::Resolved(new_build_string);
+            }
+        }
     }
 
     Ok(outputs)
@@ -1097,6 +1134,224 @@ pub async fn build_recipes(
     Ok(())
 }
 
+/// Build all outputs and collect the package paths
+async fn build_and_collect_packages(
+    build_output: Vec<Output>,
+    tool_configuration: &Configuration,
+) -> miette::Result<Vec<PathBuf>> {
+    let mut package_paths = Vec::new();
+    let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
+
+    for output in outputs_to_build.iter() {
+        let (_output, archive) = match run_build(
+            output.clone(),
+            tool_configuration,
+            WorkingDirectoryBehavior::Cleanup,
+        )
+        .boxed_local()
+        .await
+        {
+            Ok((output, archive)) => {
+                output.record_build_end();
+                (output, archive)
+            }
+            Err(e) => {
+                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+
+        package_paths.push(archive);
+    }
+
+    Ok(package_paths)
+}
+
+/// Publish packages to a channel.
+///
+/// This function builds packages from recipes, uploads them to a specified channel,
+/// and runs indexing on the channel.
+pub async fn publish_packages(
+    publish_data: PublishData,
+    log_handler: &Option<console_utils::LoggingOutputHandler>,
+) -> Result<(), miette::Error> {
+    // Check if the target is a local channel and create initial index if needed
+    let target_url = publish_data.to.clone();
+    let (is_local, target_dir) = match &target_url {
+        NamedChannelOrUrl::Url(url) if url.scheme() == "file" => {
+            (true, Some(PathBuf::from(url.path())))
+        }
+        NamedChannelOrUrl::Path(path) => (true, Some(PathBuf::from(path.as_str()))),
+        NamedChannelOrUrl::Url(_) | NamedChannelOrUrl::Name(_) => (false, None),
+    };
+
+    // For local channels, create an initial empty index if it doesn't exist
+    if is_local && let Some(ref dir) = target_dir {
+        // Check if any repodata.json exists in the channel (either noarch or platform-specific)
+        let channel_exists = dir.exists()
+            && (dir.join("noarch").join("repodata.json").exists()
+                || dir
+                    .read_dir()
+                    .ok()
+                    .map(|entries| {
+                        entries
+                            .filter_map(Result::ok)
+                            .any(|entry| entry.path().join("repodata.json").exists())
+                    })
+                    .unwrap_or(false));
+
+        if !channel_exists {
+            tracing::info!(
+                "Creating initial index for local channel at {}",
+                dir.display()
+            );
+
+            // Create the subdirectory structure
+            fs::create_dir_all(dir.join("noarch")).into_diagnostic()?;
+
+            // Run initial indexing to create empty repodata
+            let index_config = IndexFsConfig {
+                channel: dir.clone(),
+                target_platform: Some(publish_data.build.target_platform),
+                repodata_patch: None,
+                write_zst: false,
+                write_shards: false,
+                force: false,
+                max_parallel: num_cpus::get_physical(),
+                multi_progress: None,
+            };
+
+            rattler_index::index_fs(index_config)
+                .await
+                .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
+        }
+    }
+
+    // Check if we're publishing pre-built packages or building from recipes
+    let built_packages = if !publish_data.package_files.is_empty() {
+        // Publish pre-built packages directly
+        tracing::info!(
+            "Publishing {} pre-built package(s)",
+            publish_data.package_files.len()
+        );
+
+        // Validate that all package files exist
+        for package_file in &publish_data.package_files {
+            if !package_file.exists() {
+                return Err(miette::miette!(
+                    "Package file does not exist: {}",
+                    package_file.display()
+                ));
+            }
+        }
+
+        publish_data.package_files.clone()
+    } else {
+        // Build packages from recipes
+        let tool_config = get_tool_config(&publish_data.build, log_handler)?;
+        let mut outputs = Vec::new();
+
+        // Expand recipe paths (handles directories by finding all recipes within them)
+        let mut expanded_recipe_paths = Vec::new();
+        for recipe_path in &publish_data.recipe_paths {
+            if recipe_path.is_dir() {
+                // For directories, scan for all recipes
+                for entry in ignore::Walk::new(recipe_path) {
+                    let entry = entry.into_diagnostic()?;
+                    if entry.path().is_dir()
+                        && let Ok(resolved_path) = get_recipe_path(entry.path())
+                    {
+                        expanded_recipe_paths.push(resolved_path);
+                    }
+                }
+            } else {
+                // For files, resolve directly (handles recipe.yaml in directory or direct yaml files)
+                let resolved_path = get_recipe_path(recipe_path)?;
+                expanded_recipe_paths.push(resolved_path);
+            }
+        }
+
+        for recipe_path in &expanded_recipe_paths {
+            let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
+            outputs.extend(output);
+        }
+
+        // Apply build number override if specified
+        if let Some(ref build_number_arg) = publish_data.build_number {
+            let build_number_override = BuildNumberOverride::parse(build_number_arg)?;
+
+            // For relative bumps, we need to fetch the highest build numbers from the target channel
+            let highest_build_numbers = match &build_number_override {
+                BuildNumberOverride::Relative(_) => {
+                    fetch_highest_build_numbers(
+                        &target_url,
+                        &outputs,
+                        publish_data.build.target_platform,
+                        &tool_config,
+                    )
+                    .await?
+                }
+                BuildNumberOverride::Absolute(num) => {
+                    tracing::info!("Setting build number to {} for all outputs", num);
+                    HashMap::new()
+                }
+            };
+
+            apply_build_number_override(
+                &mut outputs,
+                &build_number_override,
+                &highest_build_numbers,
+            );
+        }
+
+        if publish_data.build.render_only {
+            let outputs = if publish_data.build.with_solve {
+                let mut updated_outputs = Vec::new();
+                for output in outputs {
+                    updated_outputs.push(
+                        output
+                            .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                            .await
+                            .into_diagnostic()?,
+                    );
+                }
+                updated_outputs
+            } else {
+                outputs
+            };
+
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&outputs).into_diagnostic()?
+            );
+            return Ok(());
+        }
+
+        // Skip noarch builds before the topological sort
+        outputs = skip_noarch(outputs, &tool_config).await?;
+
+        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+
+        // Build all packages and collect the paths
+        let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
+
+        if built_packages.is_empty() {
+            tracing::info!("No packages were built");
+            return Ok(());
+        }
+
+        built_packages
+    };
+
+    upload_and_index_channel(&target_url, &built_packages, &publish_data).await?;
+
+    Ok(())
+}
+
 /// Debug a recipe by setting up the environment without running the build script
 pub async fn debug_recipe(
     debug_data: DebugData,
@@ -1137,6 +1392,7 @@ pub async fn debug_recipe(
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
         exclude_newer: None,
+        build_num_override: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
