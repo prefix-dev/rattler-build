@@ -1133,6 +1133,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../../publish/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Publishing packages
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../automatic_linting/" class="md-nav__link">
         
   
@@ -1442,6 +1465,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#publish" class="md-nav__link">
+    <span class="md-ellipsis">
+      publish
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#test" class="md-nav__link">
     <span class="md-ellipsis">
       test
@@ -1635,6 +1667,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#publish" class="md-nav__link">
+    <span class="md-ellipsis">
+      publish
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#test" class="md-nav__link">
     <span class="md-ellipsis">
       test
@@ -1751,6 +1792,7 @@
 <h5 id="subcommands"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands" title="Permanent link">#</a></h5>
 <ul>
 <li><code>build</code> — Build a package from a recipe</li>
+<li><code>publish</code> — Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing</li>
 <li><code>test</code> — Run a test for a single package</li>
 <li><code>rebuild</code> — Rebuild a package from a package file instead of a recipe</li>
 <li><code>upload</code> — Upload a package</li>
@@ -1979,8 +2021,239 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--exclude-newer &lt;EXCLUDE_NEWER&gt;</code></p>
 <p>Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)</p>
 </li>
+<li>
+<p><code>--build-num &lt;BUILD_NUM&gt;</code></p>
+<p>Override the build number for all outputs (defaults to the build number in the recipe)</p>
+</li>
 </ul>
 <h6 id="sandbox-arguments"><strong>Sandbox arguments</strong><a class="headerlink" href="#sandbox-arguments" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--sandbox</code></p>
+<p>Enable the sandbox</p>
+</li>
+<li>
+<p><code>--allow-network</code></p>
+<p>Allow network access during build (default: false if sandbox is enabled)</p>
+</li>
+<li>
+<p><code>--allow-read &lt;ALLOW_READ&gt;</code></p>
+<p>Allow read access to the specified paths</p>
+</li>
+<li>
+<p><code>--allow-read-execute &lt;ALLOW_READ_EXECUTE&gt;</code></p>
+<p>Allow read and execute access to the specified paths</p>
+</li>
+<li>
+<p><code>--allow-read-write &lt;ALLOW_READ_WRITE&gt;</code></p>
+<p>Allow read and write access to the specified paths</p>
+</li>
+<li>
+<p><code>--overwrite-default-sandbox-config</code></p>
+<p>Overwrite the default sandbox configuration</p>
+</li>
+</ul>
+<h3 id="publish"><code>publish</code><a class="headerlink" href="#publish" title="Permanent link">#</a></h3>
+<p>Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing</p>
+<p><strong>Usage:</strong> <code>rattler-build publish [OPTIONS] --to &lt;TO&gt; [PACKAGE_OR_RECIPE]...</code></p>
+<h5 id="arguments"><strong>Arguments:</strong><a class="headerlink" href="#arguments" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE_OR_RECIPE&gt;</code></p>
+<p>Package files (<em>.conda, </em>.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish. If .conda or .tar.bz2 files are provided, they will be published directly without building. If .yaml files are provided, they will be built first, then published. Use --recipe-dir (from build options below) to scan a directory for recipes instead. Defaults to "recipe.yaml" in the current directory if not specified</p>
+<ul>
+<li>Default value: <code>recipe.yaml</code></li>
+</ul>
+</li>
+</ul>
+<h5 id="options_2"><strong>Options:</strong><a class="headerlink" href="#options_2" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-r</code>, <code>--recipe &lt;RECIPES&gt;</code></p>
+<p>The recipe file or directory containing <code>recipe.yaml</code>. Defaults to the current directory</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
+</li>
+<li>
+<p><code>--recipe-dir &lt;RECIPE_DIR&gt;</code></p>
+<p>The directory that contains recipes</p>
+</li>
+<li>
+<p><code>--up-to &lt;UP_TO&gt;</code></p>
+<p>Build recipes up to the specified package</p>
+</li>
+<li>
+<p><code>--build-platform &lt;BUILD_PLATFORM&gt;</code></p>
+<p>The build platform to use for the build (e.g. for building with emulation, or rendering)</p>
+</li>
+<li>
+<p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
+<p>The target platform for the build</p>
+</li>
+<li>
+<p><code>--host-platform &lt;HOST_PLATFORM&gt;</code></p>
+<p>The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
+<p>Add a channel to search for dependencies in</p>
+</li>
+<li>
+<p><code>-m</code>, <code>--variant-config &lt;VARIANT_CONFIG&gt;</code></p>
+<p>Variant configuration files for the build</p>
+</li>
+<li>
+<p><code>--variant &lt;VARIANT_OVERRIDES&gt;</code></p>
+<p>Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants</p>
+</li>
+<li>
+<p><code>--ignore-recipe-variants</code></p>
+<p>Do not read the <code>variants.yaml</code> file next to a recipe</p>
+</li>
+<li>
+<p><code>--render-only</code></p>
+<p>Render the recipe files without executing the build</p>
+</li>
+<li>
+<p><code>--with-solve</code></p>
+<p>Render the recipe files with solving dependencies</p>
+</li>
+<li>
+<p><code>--keep-build</code></p>
+<p>Keep intermediate build artifacts after the build</p>
+</li>
+<li>
+<p><code>--no-build-id</code></p>
+<p>Don't use build id(timestamp) when creating build directory name</p>
+</li>
+<li>
+<p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
+<p>The number of threads to use for compression (only relevant when also using <code>--package-format conda</code>)</p>
+</li>
+<li>
+<p><code>--io-concurrency-limit &lt;IO_CONCURRENCY_LIMIT&gt;</code></p>
+<p>The maximum number of concurrent I/O operations to use when installing packages This can be controlled by the <code>RATTLER_IO_CONCURRENCY_LIMIT</code> environment variable Defaults to 8 times the number of CPUs</p>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+</li>
+<li>
+<p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
+<p>List of hosts for which SSL certificate verification should be skipped</p>
+</li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+</li>
+<li>
+<p><code>--extra-meta &lt;EXTRA_META&gt;</code></p>
+<p>Extra metadata to include in about.json</p>
+</li>
+<li>
+<p><code>--continue-on-failure</code></p>
+<p>Continue building even if (one) of the packages fails to build. This is useful when building many packages with <code>--recipe-dir</code>.`</p>
+</li>
+</ul>
+<h6 id="modifying-result_1"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_1" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--package-format &lt;PACKAGE_FORMAT&gt;</code></p>
+<p>The package format to use for the build. Can be one of <code>tar-bz2</code> or
+<code>conda</code>. You can also add a compression level to the package format,
+e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number&gt;</code> (from -7 to
+22).</p>
+</li>
+<li>
+<p><code>--no-include-recipe</code></p>
+<p>Don't store the recipe in the final package</p>
+</li>
+<li>
+<p><code>--test &lt;TEST&gt;</code></p>
+<p>The strategy to use for running tests</p>
+<ul>
+<li>Possible values:<ul>
+<li><code>skip</code>:
+    Skip the tests</li>
+<li><code>native</code>:
+    Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed</li>
+<li><code>native-and-emulated</code>:
+    Always run the tests</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>--color-build-log</code></p>
+<p>Don't force colors in the output of the build script</p>
+</li>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+</li>
+<li>
+<p><code>--skip-existing &lt;SKIP_EXISTING&gt;</code></p>
+<p>Whether to skip packages that already exist in any channel If set to <code>none</code>, do not skip any packages, default when not specified. If set to <code>local</code>, only skip packages that already exist locally, default when using <code>--skip-existing. If set to</code>all`, skip packages that already exist in any channel</p>
+<ul>
+<li>Possible values:<ul>
+<li><code>none</code>:
+    Do not skip any packages</li>
+<li><code>local</code>:
+    Skip packages that already exist locally</li>
+<li><code>all</code>:
+    Skip packages that already exist in any channel</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>--noarch-build-platform &lt;NOARCH_BUILD_PLATFORM&gt;</code></p>
+<p>Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms</p>
+</li>
+<li>
+<p><code>--debug</code></p>
+<p>Enable debug output in build scripts</p>
+</li>
+<li>
+<p><code>--error-prefix-in-binary</code></p>
+<p>Error if the host prefix is detected in any binary files</p>
+</li>
+<li>
+<p><code>--allow-symlinks-on-windows</code></p>
+<p>Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)</p>
+</li>
+<li>
+<p><code>--exclude-newer &lt;EXCLUDE_NEWER&gt;</code></p>
+<p>Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)</p>
+</li>
+<li>
+<p><code>--build-num &lt;BUILD_NUM&gt;</code></p>
+<p>Override the build number for all outputs (defaults to the build number in the recipe)</p>
+</li>
+</ul>
+<h6 id="publishing"><strong>Publishing</strong><a class="headerlink" href="#publishing" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--to &lt;TO&gt;</code></p>
+<p>The channel or URL to publish the package to.</p>
+<p>Examples: - prefix.dev: https://prefix.dev/my-channel - anaconda.org: https://anaconda.org/my-org - S3: s3://my-bucket - Filesystem: file:///path/to/channel or /path/to/channel - Quetz: quetz://server.company.com/channel - Artifactory: artifactory://server.company.com/channel</p>
+<p>Note: This channel is also used as the highest priority channel when solving dependencies.</p>
+</li>
+<li>
+<p><code>--build-number &lt;BUILD_NUMBER&gt;</code></p>
+<p>Override the build number for all outputs. Use an absolute value (e.g., <code>--build-number=12</code>) or a relative bump (e.g., <code>--build-number=+1</code>). When using a relative bump, the highest build number from the target channel is used as the base</p>
+</li>
+<li>
+<p><code>--force</code></p>
+<p>Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels</p>
+</li>
+<li>
+<p><code>--create-attestation</code></p>
+<p>Automatically generate attestations when uploading to prefix.dev channels. Only works when uploading to prefix.dev channels with trusted publishing enabled</p>
+</li>
+</ul>
+<h6 id="sandbox-arguments_1"><strong>Sandbox arguments</strong><a class="headerlink" href="#sandbox-arguments_1" title="Permanent link">#</a></h6>
 <ul>
 <li>
 <p><code>--sandbox</code></p>
@@ -2016,7 +2289,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <p>These test files are written at "package creation time" and are part of the package.</p>
 <p><strong>Usage:</strong> <code>rattler-build test [OPTIONS] --package-file &lt;PACKAGE_FILE&gt;</code></p>
-<h5 id="options_2"><strong>Options:</strong><a class="headerlink" href="#options_2" title="Permanent link">#</a></h5>
+<h5 id="options_3"><strong>Options:</strong><a class="headerlink" href="#options_3" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
@@ -2051,7 +2324,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Channel priority to use when solving</p>
 </li>
 </ul>
-<h6 id="modifying-result_1"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_1" title="Permanent link">#</a></h6>
+<h6 id="modifying-result_2"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_2" title="Permanent link">#</a></h6>
 <ul>
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
@@ -2061,7 +2334,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="rebuild"><code>rebuild</code><a class="headerlink" href="#rebuild" title="Permanent link">#</a></h3>
 <p>Rebuild a package from a package file instead of a recipe</p>
 <p><strong>Usage:</strong> <code>rattler-build rebuild [OPTIONS] --package-file &lt;PACKAGE_FILE&gt;</code></p>
-<h5 id="options_3"><strong>Options:</strong><a class="headerlink" href="#options_3" title="Permanent link">#</a></h5>
+<h5 id="options_4"><strong>Options:</strong><a class="headerlink" href="#options_4" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-p</code>, <code>--package-file &lt;PACKAGE_FILE&gt;</code></p>
@@ -2088,7 +2361,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Channel priority to use when solving</p>
 </li>
 </ul>
-<h6 id="modifying-result_2"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_2" title="Permanent link">#</a></h6>
+<h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
 <ul>
 <li>
 <p><code>--test &lt;TEST&gt;</code></p>
@@ -2121,14 +2394,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li><code>anaconda</code> — Options for uploading to a Anaconda.org server</li>
 <li><code>s3</code> — Options for uploading to S3</li>
 </ul>
-<h5 id="arguments"><strong>Arguments:</strong><a class="headerlink" href="#arguments" title="Permanent link">#</a></h5>
+<h5 id="arguments_1"><strong>Arguments:</strong><a class="headerlink" href="#arguments_1" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE_FILES&gt;</code></p>
 <p>The package file to upload</p>
 </li>
 </ul>
-<h5 id="options_4"><strong>Options:</strong><a class="headerlink" href="#options_4" title="Permanent link">#</a></h5>
+<h5 id="options_5"><strong>Options:</strong><a class="headerlink" href="#options_5" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
@@ -2138,7 +2411,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="quetz"><code>quetz</code><a class="headerlink" href="#quetz" title="Permanent link">#</a></h4>
 <p>Upload to a Quetz server. Authentication is used from the keychain / auth-file</p>
 <p><strong>Usage:</strong> <code>rattler-build upload quetz [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNELS&gt;</code></p>
-<h5 id="options_5"><strong>Options:</strong><a class="headerlink" href="#options_5" title="Permanent link">#</a></h5>
+<h5 id="options_6"><strong>Options:</strong><a class="headerlink" href="#options_6" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
@@ -2156,7 +2429,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="artifactory"><code>artifactory</code><a class="headerlink" href="#artifactory" title="Permanent link">#</a></h4>
 <p>Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file</p>
 <p><strong>Usage:</strong> <code>rattler-build upload artifactory [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNELS&gt;</code></p>
-<h5 id="options_6"><strong>Options:</strong><a class="headerlink" href="#options_6" title="Permanent link">#</a></h5>
+<h5 id="options_7"><strong>Options:</strong><a class="headerlink" href="#options_7" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
@@ -2174,7 +2447,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="prefix"><code>prefix</code><a class="headerlink" href="#prefix" title="Permanent link">#</a></h4>
 <p>Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file</p>
 <p><strong>Usage:</strong> <code>rattler-build upload prefix [OPTIONS] --channel &lt;CHANNEL&gt;</code></p>
-<h5 id="options_7"><strong>Options:</strong><a class="headerlink" href="#options_7" title="Permanent link">#</a></h5>
+<h5 id="options_8"><strong>Options:</strong><a class="headerlink" href="#options_8" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
@@ -2207,7 +2480,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="anaconda"><code>anaconda</code><a class="headerlink" href="#anaconda" title="Permanent link">#</a></h4>
 <p>Options for uploading to a Anaconda.org server</p>
 <p><strong>Usage:</strong> <code>rattler-build upload anaconda [OPTIONS] --owner &lt;OWNER&gt;</code></p>
-<h5 id="options_8"><strong>Options:</strong><a class="headerlink" href="#options_8" title="Permanent link">#</a></h5>
+<h5 id="options_9"><strong>Options:</strong><a class="headerlink" href="#options_9" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-o</code>, <code>--owner &lt;OWNER&gt;</code></p>
@@ -2233,7 +2506,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="s3"><code>s3</code><a class="headerlink" href="#s3" title="Permanent link">#</a></h4>
 <p>Options for uploading to S3</p>
 <p><strong>Usage:</strong> <code>rattler-build upload s3 [OPTIONS] --channel &lt;CHANNEL&gt;</code></p>
-<h5 id="options_9"><strong>Options:</strong><a class="headerlink" href="#options_9" title="Permanent link">#</a></h5>
+<h5 id="options_10"><strong>Options:</strong><a class="headerlink" href="#options_10" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
@@ -2278,7 +2551,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="completion"><code>completion</code><a class="headerlink" href="#completion" title="Permanent link">#</a></h3>
 <p>Generate shell completion script</p>
 <p><strong>Usage:</strong> <code>rattler-build completion --shell &lt;SHELL&gt;</code></p>
-<h5 id="options_10"><strong>Options:</strong><a class="headerlink" href="#options_10" title="Permanent link">#</a></h5>
+<h5 id="options_11"><strong>Options:</strong><a class="headerlink" href="#options_11" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-s</code>, <code>--shell &lt;SHELL&gt;</code></p>
@@ -2315,14 +2588,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="pypi"><code>pypi</code><a class="headerlink" href="#pypi" title="Permanent link">#</a></h4>
 <p>Generate a recipe for a Python package from PyPI</p>
 <p><strong>Usage:</strong> <code>rattler-build generate-recipe pypi [OPTIONS] &lt;PACKAGE&gt;</code></p>
-<h5 id="arguments_1"><strong>Arguments:</strong><a class="headerlink" href="#arguments_1" title="Permanent link">#</a></h5>
+<h5 id="arguments_2"><strong>Arguments:</strong><a class="headerlink" href="#arguments_2" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE&gt;</code></p>
 <p>Name of the package to generate</p>
 </li>
 </ul>
-<h5 id="options_11"><strong>Options:</strong><a class="headerlink" href="#options_11" title="Permanent link">#</a></h5>
+<h5 id="options_12"><strong>Options:</strong><a class="headerlink" href="#options_12" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--version &lt;VERSION&gt;</code></p>
@@ -2344,14 +2617,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="cran"><code>cran</code><a class="headerlink" href="#cran" title="Permanent link">#</a></h4>
 <p>Generate a recipe for an R package from CRAN</p>
 <p><strong>Usage:</strong> <code>rattler-build generate-recipe cran [OPTIONS] &lt;PACKAGE&gt;</code></p>
-<h5 id="arguments_2"><strong>Arguments:</strong><a class="headerlink" href="#arguments_2" title="Permanent link">#</a></h5>
+<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE&gt;</code></p>
 <p>Name of the package to generate</p>
 </li>
 </ul>
-<h5 id="options_12"><strong>Options:</strong><a class="headerlink" href="#options_12" title="Permanent link">#</a></h5>
+<h5 id="options_13"><strong>Options:</strong><a class="headerlink" href="#options_13" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-u</code>, <code>--universe &lt;UNIVERSE&gt;</code></p>
@@ -2369,14 +2642,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="cpan"><code>cpan</code><a class="headerlink" href="#cpan" title="Permanent link">#</a></h4>
 <p>Generate a recipe for a Perl package from CPAN</p>
 <p><strong>Usage:</strong> <code>rattler-build generate-recipe cpan [OPTIONS] &lt;PACKAGE&gt;</code></p>
-<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
+<h5 id="arguments_4"><strong>Arguments:</strong><a class="headerlink" href="#arguments_4" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE&gt;</code></p>
 <p>Name of the package to generate</p>
 </li>
 </ul>
-<h5 id="options_13"><strong>Options:</strong><a class="headerlink" href="#options_13" title="Permanent link">#</a></h5>
+<h5 id="options_14"><strong>Options:</strong><a class="headerlink" href="#options_14" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--version &lt;VERSION&gt;</code></p>
@@ -2394,14 +2667,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="luarocks"><code>luarocks</code><a class="headerlink" href="#luarocks" title="Permanent link">#</a></h4>
 <p>Generate a recipe for a Lua package from LuaRocks</p>
 <p><strong>Usage:</strong> <code>rattler-build generate-recipe luarocks [OPTIONS] &lt;ROCK&gt;</code></p>
-<h5 id="arguments_4"><strong>Arguments:</strong><a class="headerlink" href="#arguments_4" title="Permanent link">#</a></h5>
+<h5 id="arguments_5"><strong>Arguments:</strong><a class="headerlink" href="#arguments_5" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;ROCK&gt;</code></p>
 <p>Luarocks package to generate recipe for. Can be specified as: - module (fetches latest version) - module/version - author/module/version - Direct rockspec URL</p>
 </li>
 </ul>
-<h5 id="options_14"><strong>Options:</strong><a class="headerlink" href="#options_14" title="Permanent link">#</a></h5>
+<h5 id="options_15"><strong>Options:</strong><a class="headerlink" href="#options_15" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-w</code>, <code>--write-to &lt;WRITE_TO&gt;</code></p>
@@ -2422,14 +2695,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="login"><code>login</code><a class="headerlink" href="#login" title="Permanent link">#</a></h4>
 <p>Store authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth login [OPTIONS] &lt;HOST&gt;</code></p>
-<h5 id="arguments_5"><strong>Arguments:</strong><a class="headerlink" href="#arguments_5" title="Permanent link">#</a></h5>
+<h5 id="arguments_6"><strong>Arguments:</strong><a class="headerlink" href="#arguments_6" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
 <p>The host to authenticate with (e.g. prefix.dev)</p>
 </li>
 </ul>
-<h5 id="options_15"><strong>Options:</strong><a class="headerlink" href="#options_15" title="Permanent link">#</a></h5>
+<h5 id="options_16"><strong>Options:</strong><a class="headerlink" href="#options_16" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--token &lt;TOKEN&gt;</code></p>
@@ -2463,7 +2736,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="logout"><code>logout</code><a class="headerlink" href="#logout" title="Permanent link">#</a></h4>
 <p>Remove authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth logout &lt;HOST&gt;</code></p>
-<h5 id="arguments_6"><strong>Arguments:</strong><a class="headerlink" href="#arguments_6" title="Permanent link">#</a></h5>
+<h5 id="arguments_7"><strong>Arguments:</strong><a class="headerlink" href="#arguments_7" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
@@ -2473,7 +2746,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="debug"><code>debug</code><a class="headerlink" href="#debug" title="Permanent link">#</a></h3>
 <p>Debug a recipe by setting up the environment without running the build script</p>
 <p><strong>Usage:</strong> <code>rattler-build debug [OPTIONS] --recipe &lt;RECIPE&gt;</code></p>
-<h5 id="options_16"><strong>Options:</strong><a class="headerlink" href="#options_16" title="Permanent link">#</a></h5>
+<h5 id="options_17"><strong>Options:</strong><a class="headerlink" href="#options_17" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
@@ -2516,7 +2789,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Name of the specific output to debug</p>
 </li>
 </ul>
-<h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
+<h6 id="modifying-result_4"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_4" title="Permanent link">#</a></h6>
 <ul>
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
@@ -2526,7 +2799,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="create-patch"><code>create-patch</code><a class="headerlink" href="#create-patch" title="Permanent link">#</a></h3>
 <p>Create a patch for a directory</p>
 <p><strong>Usage:</strong> <code>rattler-build create-patch [OPTIONS]</code></p>
-<h5 id="options_17"><strong>Options:</strong><a class="headerlink" href="#options_17" title="Permanent link">#</a></h5>
+<h5 id="options_18"><strong>Options:</strong><a class="headerlink" href="#options_18" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-d</code>, <code>--directory &lt;DIRECTORY&gt;</code></p>
@@ -2567,7 +2840,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h3 id="debug-shell"><code>debug-shell</code><a class="headerlink" href="#debug-shell" title="Permanent link">#</a></h3>
 <p>Open a debug shell in the build environment</p>
 <p><strong>Usage:</strong> <code>rattler-build debug-shell [OPTIONS]</code></p>
-<h5 id="options_18"><strong>Options:</strong><a class="headerlink" href="#options_18" title="Permanent link">#</a></h5>
+<h5 id="options_19"><strong>Options:</strong><a class="headerlink" href="#options_19" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--work-dir &lt;WORK_DIR&gt;</code></p>

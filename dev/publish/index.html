@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/recipe_generation/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/publish/">
       
       
-        <link rel="prev" href="../sandbox/">
+        <link rel="prev" href="../authentication_and_upload/">
       
       
-        <link rel="next" href="../create_patch/">
+        <link rel="next" href="../automatic_linting/">
       
       
       <link rel="icon" href="../assets/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Generating recipes - rattler-build</title>
+        <title>Publishing packages - rattler-build</title>
       
     
     
@@ -61,11 +61,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Generating recipes - rattler-build" >
+        <meta  property="og:title"  content="Publishing packages - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_generation.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/publish.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -73,15 +73,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/recipe_generation/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/publish/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Generating recipes - rattler-build" >
+        <meta  name="twitter:title"  content="Publishing packages - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_generation.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/publish.png" >
       
     
     
@@ -104,7 +104,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#generating-recipes-for-different-ecosystems" class="md-skip">
+        <a href="#publishing-packages-to-your-own-channel" class="md-skip">
           Skip to content
         </a>
       
@@ -143,7 +143,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Generating recipes
+              Publishing packages
             
           </span>
         </div>
@@ -596,8 +596,6 @@
       
   
   
-    
-  
   
   
     
@@ -610,11 +608,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -630,7 +628,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Build options
@@ -848,32 +846,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Generating recipes
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../recipe_generation/" class="md-nav__link">
         
   
   
@@ -884,35 +860,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#generating-recipes-for-r-packages" class="md-nav__link">
-    <span class="md-ellipsis">
-      Generating recipes for R packages
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1094,8 +1041,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1106,11 +1055,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
@@ -1126,7 +1075,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             User Experience
@@ -1183,10 +1132,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../publish/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Publishing packages
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1197,6 +1168,62 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bumping-the-build-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bumping the build number
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing S3 and Filesystem channels
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1543,9 +1570,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#generating-recipes-for-r-packages" class="md-nav__link">
+  <a href="#options" class="md-nav__link">
     <span class="md-ellipsis">
-      Generating recipes for R packages
+      Options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bumping-the-build-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bumping the build number
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authentication
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing S3 and Filesystem channels
     </span>
   </a>
   
@@ -1567,7 +1621,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/recipe_generation.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/publish.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -1575,120 +1629,54 @@
   
 
 
-<h1 id="generating-recipes-for-different-ecosystems">Generating recipes for different ecosystems<a class="headerlink" href="#generating-recipes-for-different-ecosystems" title="Permanent link">#</a></h1>
-<p>Rattler-build has some builtin functionality to generate recipes for different (existing) ecosystems.</p>
-<p>Currently we support the following ecosystems:</p>
+<h1 id="publishing-packages-to-your-own-channel">Publishing packages to your own channel<a class="headerlink" href="#publishing-packages-to-your-own-channel" title="Permanent link">#</a></h1>
+<p>Rattler-build comes with an intuitive <code>publish</code> subcommand, that will publish a package to a channel.</p>
+<p>You can either point to an already built package, or to a recipe and <code>publish</code> them into your channel.
+The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.</p>
+<p>Publishing a package is a convenience short hand for:</p>
+<ol>
+<li>Building the package from a recipe.yaml</li>
+<li>Optionally, automatically increment the build number by passing in <code>--build-number=+1</code> to set a <em>relative</em> value, or <code>--build-number=12</code> to set an absolute value for all packages being built.</li>
+<li>Uploading the package to a channel</li>
+<li>Running <code>rattler-index</code> for a S3 bucket or a filesystem channel to produce <code>repodata.json</code>.</li>
+</ol>
+<p>To publish a package you can use:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./output/linux-64/my-package-0.1.2-h123_0.conda<span class="w"> </span>--to<span class="w"> </span>s3://my-bucket
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./some/recipe.yaml<span class="w"> </span>--to<span class="w"> </span>artifactory://my-secret.company.com/package-channel
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># on prefix.dev you can also automatically add a sigstore attestation</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--create-attestation
+</span></code></pre></div>
+<p>The following schema is used:</p>
 <ul>
-<li><code>pypi</code> (Python) - generates a recipe for a Python package</li>
-<li><code>cran</code> (R) - generates a recipe for an R package</li>
+<li>prefix.dev: <code>https://prefix.dev/&lt;channel-name&gt;</code></li>
+<li>anaconda.org: <code>https://anaconda.org/&lt;owner&gt;/&lt;label (optional)&gt;</code> (e.g. https://anaconda.org/foobar)</li>
+<li>S3: <code>s3://bucket-name</code> (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)</li>
+<li>Filesystem: <code>file:///path/to/channel</code></li>
+<li>Quetz: <code>quetz://server.my-company.com/&lt;channel&gt;</code></li>
+<li>Articatory: <code>artifactory://server.my-company.com/&lt;channel&gt;</code></li>
 </ul>
-<p>To generate a recipe for a Python package, you can use the following command:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>pypi<span class="w"> </span>jinja2
-</span></code></pre></div>
-<p>This will generate a recipe for the <code>jinja2</code> package from PyPI and print it to the console. To turn it into a recipe, you can either pipe the stdout to a file or use the <code>-w</code> flag. The <code>-w</code> flag will create a new folder with the recipe in it.</p>
-<p>The generated recipe for <code>jinja2</code> will look something like:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jinja2</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.1.4</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://files.pythonhosted.org/packages/ed/55/39036716d19cab0747a5020fc7e907f362fbf48c984b14e62127f7e68e5d/jinja2-3.1.4.tar.gz</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4a3aee7acbbe7303aede8e9648d13b8bf88a429282aa6122a993f0ac800cb369</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python -m pip install .</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">flit_core &lt;4</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python &gt;=3.7</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python &gt;=3.7</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">markupsafe &gt;=2.0</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">  </span><span class="c1"># - babel &gt;=2.7  # extra == &#39;i18n&#39;</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="nt">tests</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="nt">about</span><span class="p">:</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A very fast and expressive template engine.</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://jinja.palletsprojects.com/</span>
-</span></code></pre></div>
-<h2 id="generating-recipes-for-r-packages">Generating recipes for R packages<a class="headerlink" href="#generating-recipes-for-r-packages" title="Permanent link">#</a></h2>
-<p>To generate a recipe for an R package, you can use the following command:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>cran<span class="w"> </span>dplyr
-</span></code></pre></div>
-<p>The <code>R</code> recipe generation supports some additional flags:</p>
+<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">#</a></h2>
+<p>The <code>--to</code> option selects the channel to publish the package into. This channel will also be used as the <em>highest priority</em> channel in the list of channels. Other channels can be added using the usual <code>-c conda-forge -c bioconda ...</code> syntax or configured using a <code>config.toml</code> file.</p>
+<p>When using <code>publish</code> with a recipe, you can use the same options as when normally building packages.</p>
+<h2 id="bumping-the-build-number">Bumping the build number<a class="headerlink" href="#bumping-the-build-number" title="Permanent link">#</a></h2>
+<p>Sometimes you want to package the same package again, but rebuild it with the latest dependencies. There are two ways to achieve this:</p>
 <ul>
-<li><code>-u/--universe</code> select an R universe to use (e.g. <code>bioconductor</code>)</li>
-<li><code>-t/--tree</code> generate multiple recipes, for every dependency as well</li>
+<li>By using a variant file, and updating it at certain times</li>
+<li>By bumping the build number and re-publishing the package again</li>
 </ul>
-<p>R packages will be prefixed with <code>r-</code> to avoid name conflicts with Python packages. The generated recipe for <code>dplyr</code> will look something like:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-dplyr</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.1.4</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://cran.r-project.org/src/contrib/dplyr_1.1.4.tar.gz</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">md5</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">e3066ea859b26e0d3b992c476ea3af2e</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">R CMD INSTALL --build .</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-base &gt;=3.5.0</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-cli &gt;=3.4.0</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-generics</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-glue &gt;=1.3.2</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-lifecycle &gt;=1.0.3</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-magrittr &gt;=1.5</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-methods</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-pillar &gt;=1.9.0</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-r6</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-rlang &gt;=1.1.0</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-tibble &gt;=3.2.0</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-tidyselect &gt;=1.2.0</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-utils</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-vctrs &gt;=0.6.4</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">  </span><span class="c1"># -  r-bench  # suggested</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">  </span><span class="c1"># -  r-broom  # suggested</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">  </span><span class="c1"># -  r-callr  # suggested</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">  </span><span class="c1"># -  r-covr  # suggested</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">  </span><span class="c1"># -  r-dbi  # suggested</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="w">  </span><span class="c1"># -  r-dbplyr &gt;=2.2.1  # suggested</span>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">  </span><span class="c1"># -  r-ggplot2  # suggested</span>
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">  </span><span class="c1"># -  r-knitr  # suggested</span>
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">  </span><span class="c1"># -  r-lahman  # suggested</span>
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">  </span><span class="c1"># -  r-lobstr  # suggested</span>
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">  </span><span class="c1"># -  r-microbenchmark  # suggested</span>
-</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="w">  </span><span class="c1"># -  r-nycflights13  # suggested</span>
-</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="w">  </span><span class="c1"># -  r-purrr  # suggested</span>
-</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="w">  </span><span class="c1"># -  r-rmarkdown  # suggested</span>
-</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a><span class="w">  </span><span class="c1"># -  r-rmysql  # suggested</span>
-</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="w">  </span><span class="c1"># -  r-rpostgresql  # suggested</span>
-</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a><span class="w">  </span><span class="c1"># -  r-rsqlite  # suggested</span>
-</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="w">  </span><span class="c1"># -  r-stringi &gt;=1.7.6  # suggested</span>
-</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="w">  </span><span class="c1"># -  r-testthat &gt;=3.1.5  # suggested</span>
-</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a><span class="w">  </span><span class="c1"># -  r-tidyr &gt;=1.3.0  # suggested</span>
-</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a><span class="w">  </span><span class="c1"># -  r-withr  # suggested</span>
-</span><span id="__span-3-51"><a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>
-</span><span id="__span-3-52"><a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a><span class="nt">about</span><span class="p">:</span>
-</span><span id="__span-3-53"><a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://dplyr.tidyverse.org, https://github.com/tidyverse/dplyr</span>
-</span><span id="__span-3-54"><a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A Grammar of Data Manipulation</span>
-</span><span id="__span-3-55"><a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|-</span>
-</span><span id="__span-3-56"><a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a><span class="w">    </span><span class="no">A fast, consistent tool for working with data frame like</span>
-</span><span id="__span-3-57"><a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a><span class="w">    </span><span class="no">objects, both in memory and out of memory.</span>
-</span><span id="__span-3-58"><a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MIT</span>
-</span><span id="__span-3-59"><a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
-</span><span id="__span-3-60"><a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/cran/dplyr</span>
-</span></code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>You can use the generated recipes to build your own "forge" with <code>rattler-build</code>. Read more about it in the <a href="../tips_and_tricks/#building-your-own-forge">Building your own forge</a> section.</p>
-</div>
+<p>The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. <code>--build-number=12</code>) or a <em>relative</em> bump for all packages (e.g. <code>--build-number=+1</code> to add 1 to the <em>highest</em> build number found in the publish channel). 
+When bumping by a relative amount, we download the repodata and determine for each subdir/package combination that you are building the highest build number.</p>
+<p>When the recipe does not specify a build number, the build number is automatically bumped on <code>publish</code> to the <em>next available build number</em>.</p>
+<p>If the recipe does specify a build number, you have to manually trigger an override using the <code>--build-number</code> CLI flag. Alternatively, you can use the <code>--force</code> upload option on S3, your local filesystem, Anaconda and prefix channels to forcibly replace the previous build. Please note that this is heavily discouraged as lockfiles will get out of date and the old build is irrevocably deleted.</p>
+<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">#</a></h2>
+<p>Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the <code>auth</code> subcommand: <code>rattler-build auth login</code>. Note: if you are already logged in with <code>pixi</code>, you are also logged in with <code>rattler-build</code> - they share credentials.</p>
+<p>Otherwise you can also use the same options as with <code>upload</code>, and supply tokens as environment variables or CLI arguments.</p>
+<h2 id="indexing-s3-and-filesystem-channels">Indexing S3 and Filesystem channels<a class="headerlink" href="#indexing-s3-and-filesystem-channels" title="Permanent link">#</a></h2>
+<p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
 
 
 
@@ -1760,9 +1748,9 @@
           
             
             <a
-              href="../sandbox/"
+              href="../authentication_and_upload/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Sandbox"
+              aria-label="Previous: Authentication &amp; upload"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1773,7 +1761,7 @@
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Sandbox
+                  Authentication & upload
                 </div>
               </div>
             </a>
@@ -1783,16 +1771,16 @@
           
             
             <a
-              href="../create_patch/"
+              href="../automatic_linting/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Creating patches"
+              aria-label="Next: Automatic recipe linting"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Creating patches
+                  Automatic recipe linting
                 </div>
               </div>
               <div class="md-footer__button md-icon">
