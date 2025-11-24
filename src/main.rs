@@ -14,10 +14,10 @@ use rattler_build::{
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
     opt::{
-        App, BuildData, DebugData, DebugShellOpts, PublishData, RebuildData, ShellCompletion,
-        SubCommands, TestData,
+        App, BuildData, DebugData, DebugShellOpts, PackageCommands, PublishData, RebuildData,
+        ShellCompletion, SubCommands, TestData,
     },
-    publish_packages, rebuild, run_test,
+    publish_packages, rebuild, run_test, show_package_info,
     source::create_patch,
 };
 use rattler_config::config::ConfigBase;
@@ -373,6 +373,9 @@ async fn async_main() -> miette::Result<()> {
             }
         }
         Some(SubCommands::DebugShell(opts)) => debug_shell(opts).into_diagnostic(),
+        Some(SubCommands::Package(cmd)) => match cmd {
+            PackageCommands::Inspect(opts) => show_package_info(opts),
+        },
         None => {
             _ = App::command().print_long_help();
             Ok(())
