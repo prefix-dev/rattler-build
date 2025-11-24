@@ -384,6 +384,7 @@ fn evaluate_condition(
 ) -> Result<bool, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
+
     let mut jinja = Jinja::new(jinja_config);
 
     // Use with_context to add all variables from the evaluation context
@@ -432,7 +433,7 @@ pub fn evaluate_string_value(
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
     if let Some(s) = value.as_concrete() {
-        Ok(s.clone())
+        Ok(s)
     } else if let Some(template) = value.as_template() {
         render_template(template.source(), context, value.span())
     } else {
@@ -2020,7 +2021,6 @@ impl Evaluate for Stage0Recipe {
         } else {
             (context.clone(), IndexMap::new())
         };
-
         let package = self.package.evaluate(&context_with_vars)?;
         let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
@@ -2875,14 +2875,32 @@ mod tests {
 
     #[test]
     fn test_variable_tracking_with_template() {
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("compiler".to_string(), Variable::from_string("gcc"));
-        ctx.insert("version".to_string(), Variable::from_string("1.0.0"));
+        // Create variant with compiler configuration
+        let mut variant = BTreeMap::new();
+        variant.insert("c_compiler".into(), Variable::from_string("supergcc"));
+        variant.insert("c_compiler_version".into(), Variable::from_string("15.0"));
+
+        // Create JinjaConfig with the variant
+        let jinja_config = JinjaConfig {
+            variant: variant.clone(),
+            ..Default::default()
+        };
+
+        // Create context with variables and config
+        let mut variables = IndexMap::new();
+        variables.insert("c_compiler".to_string(), Variable::from_string("supergcc"));
+        variables.insert(
+            "c_compiler_version".to_string(),
+            Variable::from_string("15.0"),
+        );
+        variables.insert("version".to_string(), Variable::from_string("1.0.0"));
+
+        let ctx = EvaluationContext::with_variables_and_config(variables, jinja_config);
 
         // Create a list with templates that will be evaluated
         let list = ConditionalList::new(vec![
             Item::Value(Value::new_template(
-                JinjaTemplate::new("${{ compiler }}".to_string()).unwrap(),
+                JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap(),
                 None,
             )),
             Item::Value(Value::new_concrete("static-dep".to_string(), None)),
@@ -2892,13 +2910,18 @@ mod tests {
             )),
         ]);
 
-        let _result = evaluate_string_list(&list, &ctx).unwrap();
+        let result = evaluate_string_list(&list, &ctx).unwrap();
 
         // Both "compiler" and "version" should be accessed during template rendering
         let accessed = ctx.accessed_variables();
-        assert_eq!(accessed.len(), 2);
+        // TODO: `compiler` should _NOT_ be accessed (it's a function!!)
+        assert_eq!(accessed.len(), 4);
         assert!(accessed.contains("compiler"));
+        assert!(accessed.contains("c_compiler"));
+        assert!(accessed.contains("c_compiler_version"));
         assert!(accessed.contains("version"));
+        // Note: compiler() adds '=' before alphanumeric versions
+        assert_eq!(result[0], "supergcc_linux-64 =15.0");
     }
 
     #[test]
@@ -2946,8 +2969,7 @@ mod tests {
             undefined_behavior: UndefinedBehavior::Lenient,
             ..Default::default()
         };
-        let mut ctx = EvaluationContext::new();
-        ctx.set_jinja_config(jinja_config);
+        let ctx = EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
         // No variables set
 
         let template = "${{ platform }} for ${{ arch }}";

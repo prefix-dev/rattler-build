@@ -128,16 +128,15 @@ fn main() -> Result<()> {
         println!("\n=== No template variables used in recipe ===");
     }
 
-    // Create evaluation context
-    let mut context = EvaluationContext::from_variables(variables.clone());
-
+    // Create evaluation context with JinjaConfig
     // Enable experimental features unless disabled
     let jinja_config = JinjaConfig {
         recipe_path: Some(args.recipe.clone()),
         experimental: !args.no_experimental,
+        // TODO: populate variant if needed for this example
         ..Default::default()
     };
-    context.set_jinja_config(jinja_config);
+    let context = EvaluationContext::with_variables_and_config(variables.clone(), jinja_config);
 
     // Evaluate and merge the recipe's context section
     if !stage0_recipe.context.is_empty() {

@@ -49,8 +49,7 @@ mod tests {
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Strict,
         };
 
-        let mut context = EvaluationContext::from_variables(variant);
-        context.set_jinja_config(jinja_config);
+        let context = EvaluationContext::with_variables_and_config(variant, jinja_config);
 
         let mut recipe = single.as_ref().evaluate(&context).unwrap();
 

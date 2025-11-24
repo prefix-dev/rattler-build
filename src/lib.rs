@@ -132,7 +132,6 @@ fn find_variants(
     experimental: bool,
 ) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
     // Parse the recipe
-    tracing::info!("Parsing recipe for variant expansion");
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
             // Use Source type which implements AsRef<str> for better span expansion
@@ -155,6 +154,7 @@ fn find_variants(
         .with_experimental(experimental)
         .with_recipe_path(recipe_path);
 
+    tracing::info!("All variants: {:#?}", variant_config.variants);
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
         render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)
@@ -432,18 +432,12 @@ pub async fn get_build_output(
     let mut outputs = Vec::new();
 
     // For multi-output recipes, all outputs (including staging caches) need to use the same
-    // build directory so that paths are consistent across outputs. We derive the build name
-    // from the recipe file name, or use the first package name as a fallback.
-    let global_build_name = recipe_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| {
-            outputs_and_variants
-                .first()
-                .map(|o| o.name.clone())
-                .unwrap_or_else(|| "recipe".to_string())
-        });
+    // build directory so that paths are consistent across outputs.
+    // TODO(refactor): use the top-level `recipe` name if available
+    let global_build_name = outputs_and_variants
+        .first()
+        .map(|o| o.name.clone())
+        .unwrap_or_else(|| "build".to_string());
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;

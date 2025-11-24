@@ -96,6 +96,20 @@ impl EvaluationContext {
         }
     }
 
+    /// Create an evaluation context with both variables and a JinjaConfig
+    /// This is the preferred constructor to ensure variant is properly set in JinjaConfig
+    pub fn with_variables_and_config(
+        variables: IndexMap<String, Variable>,
+        jinja_config: JinjaConfig,
+    ) -> Self {
+        Self {
+            variables,
+            jinja_config,
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
     /// Create an evaluation context with variables and Jinja config
     pub fn with_config(variables: IndexMap<String, String>, jinja_config: JinjaConfig) -> Self {
         Self {
@@ -107,11 +121,6 @@ impl EvaluationContext {
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
         }
-    }
-
-    /// Insert a variable into the context
-    pub fn insert(&mut self, key: String, value: Variable) {
-        self.variables.insert(key, value);
     }
 
     /// Get a variable from the context
@@ -132,11 +141,6 @@ impl EvaluationContext {
     /// Get the Jinja configuration
     pub fn jinja_config(&self) -> &JinjaConfig {
         &self.jinja_config
-    }
-
-    /// Set the Jinja configuration
-    pub fn set_jinja_config(&mut self, config: JinjaConfig) {
-        self.jinja_config = config;
     }
 
     /// Track that a variable was accessed

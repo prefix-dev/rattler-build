@@ -358,26 +358,23 @@ fn build_evaluation_context(
     stage0_recipe: &Stage0Recipe,
 ) -> Result<EvaluationContext, ParseError> {
     // Build context map from variant values and extra context
+    // Merge variant into the variables map for template rendering
     let mut context_map = config.extra_context.clone();
     for (key, value) in variant {
         context_map.insert(key.normalize(), value.clone());
     }
 
-    // Use from_variables to preserve Variable types (e.g., booleans)
-    let mut context = EvaluationContext::from_variables(context_map);
+    // Create JinjaConfig with the variant properly populated
+    let jinja_config = create_jinja_config(config, variant);
 
-    // Set the JinjaConfig with experimental and recipe_path
-    context.set_jinja_config(create_jinja_config(config));
+    // Create evaluation context with variables and config
+    let context = EvaluationContext::with_variables_and_config(context_map, jinja_config);
 
-    // Render actual context from recipe
-    match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => {
-            context.with_context(&recipe.context)?;
-        }
-        Stage0Recipe::MultiOutput(recipe) => {
-            context.with_context(&recipe.context)?;
-        }
-    }
+    // Evaluate and merge recipe context variables
+    let (context, _evaluated_context) = match stage0_recipe {
+        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
+        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
+    };
 
     Ok(context)
 }
@@ -398,19 +395,17 @@ fn render_with_empty_combinations(
     stage0_recipe: &Stage0Recipe,
     config: &RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    // Create context with just extra_context
-    let mut context = EvaluationContext::from_variables(config.extra_context.clone());
-    context.set_jinja_config(create_jinja_config(config));
+    // Create context with just extra_context (no variant for empty combinations)
+    let empty_variant = BTreeMap::new();
+    let jinja_config = create_jinja_config(config, &empty_variant);
+    let context =
+        EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config);
 
-    // Render actual context from recipe
-    match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => {
-            context.with_context(&recipe.context)?;
-        }
-        Stage0Recipe::MultiOutput(recipe) => {
-            context.with_context(&recipe.context)?;
-        }
-    }
+    // Evaluate and merge recipe context variables
+    let (context, _evaluated_context) = match stage0_recipe {
+        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
+        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
+    };
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -555,13 +550,17 @@ fn build_name_index(
 }
 
 /// Helper function to create a JinjaConfig from RenderConfig
-fn create_jinja_config(config: &RenderConfig) -> JinjaConfig {
+fn create_jinja_config(
+    config: &RenderConfig,
+    variant: &BTreeMap<NormalizedKey, Variable>,
+) -> JinjaConfig {
     JinjaConfig {
         experimental: config.experimental,
         recipe_path: config.recipe_path.clone(),
         target_platform: config.target_platform,
         build_platform: config.build_platform,
         host_platform: config.host_platform,
+        variant: variant.clone(),
         ..Default::default()
     }
 }
