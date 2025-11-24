@@ -38,12 +38,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
         with:
           workspaces: ". -> target-pixi"
           key: ${{ hashFiles('pixi.lock') }}
-      - uses: prefix-dev/setup-pixi@v0.9.2
+      - uses: prefix-dev/setup-pixi@v0.9.3
       # build in release mode so that it's reasonably fast to run the tests
       - run: pixi run build-release
       - run: pixi run test-ci
