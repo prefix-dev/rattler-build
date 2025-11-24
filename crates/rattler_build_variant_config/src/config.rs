@@ -244,6 +244,12 @@ numpy:
         let config = VariantConfig::from_yaml_str(yaml).unwrap();
         assert_eq!(config.variants.len(), 2);
         assert_eq!(config.get(&"python".into()).unwrap().len(), 2);
+
+        // Load from simple file
+        let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let path = crate_root.join("test-data/simple/variants.yaml");
+        let file_config = VariantConfig::from_file(&path).unwrap();
+        assert_eq!(file_config.variants.len(), 3);
     }
 
     #[test]
