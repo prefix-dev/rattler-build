@@ -31,6 +31,7 @@ mod env_vars;
 pub mod hash;
 mod linux;
 mod macos;
+mod package_info;
 mod post_process;
 mod publish;
 pub mod rebuild;
@@ -1485,4 +1486,9 @@ pub async fn debug_recipe(
     }
 
     Ok(())
+}
+
+/// Display information about a built package
+pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
+    package_info::package_info(args)
 }

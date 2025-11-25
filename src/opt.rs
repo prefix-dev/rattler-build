@@ -81,6 +81,10 @@ pub enum SubCommands {
 
     /// Open a debug shell in the build environment
     DebugShell(DebugShellOpts),
+
+    /// Package-related subcommands
+    #[command(subcommand)]
+    Package(PackageCommands),
 }
 
 /// Options for the debug-shell command
@@ -93,6 +97,13 @@ pub struct DebugShellOpts {
     /// Output directory containing rattler-build-log.txt
     #[arg(short, long, default_value = "./output")]
     pub output_dir: PathBuf,
+}
+
+/// Package-related subcommands.
+#[derive(Parser, Debug, Clone)]
+pub enum PackageCommands {
+    /// Inspect and display information about a built package
+    Inspect(InspectOpts),
 }
 
 /// Shell completion options.
@@ -1129,4 +1140,48 @@ pub struct CreatePatchOpts {
     /// Perform a dry-run: analyze changes and log the diff, but don't write the patch file.
     #[arg(long, default_value = "false")]
     pub dry_run: bool,
+}
+
+/// Options for the `package inspect` command.
+#[derive(Parser, Debug, Clone)]
+pub struct InspectOpts {
+    /// Path to the package file (.conda, .tar.bz2)
+    pub package_file: PathBuf,
+
+    /// Show detailed file listing with hashes and sizes
+    #[arg(long)]
+    pub paths: bool,
+
+    /// Show extended about information
+    #[arg(long)]
+    pub about: bool,
+
+    /// Show run exports
+    #[arg(long)]
+    pub run_exports: bool,
+
+    /// Show all available information
+    #[arg(long)]
+    pub all: bool,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl InspectOpts {
+    /// Check if paths should be shown (either explicitly or via --all)
+    pub fn show_paths(&self) -> bool {
+        self.paths || self.all
+    }
+
+    /// Check if about info should be shown (either explicitly or via --all)
+    pub fn show_about(&self) -> bool {
+        self.about || self.all
+    }
+
+    /// Check if run exports should be shown (either explicitly or via --all)
+    pub fn show_run_exports(&self) -> bool {
+        self.run_exports || self.all
+    }
 }
