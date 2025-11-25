@@ -2574,11 +2574,19 @@ def test_topological_sort_with_variants(
     first_c = next((i for i, name in enumerate(package_names) if name == "pkg-c"), -1)
 
     # Find last occurrence of each package
-    last_a = len(package_names) - 1 - next(
-        (i for i, name in enumerate(reversed(package_names)) if name == "pkg-a"), -1
+    last_a = (
+        len(package_names)
+        - 1
+        - next(
+            (i for i, name in enumerate(reversed(package_names)) if name == "pkg-a"), -1
+        )
     )
-    last_b = len(package_names) - 1 - next(
-        (i for i, name in enumerate(reversed(package_names)) if name == "pkg-b"), -1
+    last_b = (
+        len(package_names)
+        - 1
+        - next(
+            (i for i, name in enumerate(reversed(package_names)) if name == "pkg-b"), -1
+        )
     )
 
     # Verify correct ordering:
