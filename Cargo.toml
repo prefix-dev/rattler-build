@@ -111,7 +111,7 @@ content_inspector = "0.2.4"
 serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
-clap = { workspace = true, features = ["env", "cargo"] }
+clap = { workspace = true, features = ["env", "cargo", "suggestions"] }
 minijinja = { version = "2.11.0", features = [
   "unstable_machinery",
   "custom_syntax",
