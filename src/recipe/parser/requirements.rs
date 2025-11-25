@@ -243,6 +243,7 @@ impl Language {
 
 /// A combination of all possible dependencies.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Dependency {
     /// A regular matchspec
     Spec(MatchSpec),
