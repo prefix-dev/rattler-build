@@ -173,12 +173,6 @@ impl BuildOutput {
         let span = tracing::info_span!("Build summary for", recipe = identifier);
         let _enter = span.enter();
 
-        if let Some(artifact) = &summary.artifact {
-            let bytes = HumanBytes(fs::metadata(artifact).map(|m| m.len()).unwrap_or(0));
-            tracing::info!("Artifact: {} ({})", artifact.display(), bytes);
-        } else {
-            tracing::info!("No artifact was created");
-        }
         tracing::info!("{}", self);
 
         if !summary.warnings.is_empty() {
@@ -186,6 +180,13 @@ impl BuildOutput {
             for warning in &summary.warnings {
                 tracing::warn!("{}", warning);
             }
+        }
+
+        if let Some(artifact) = &summary.artifact {
+            let bytes = HumanBytes(fs::metadata(artifact).map(|m| m.len()).unwrap_or(0));
+            tracing::info!("Artifact: {} ({})", artifact.display(), bytes);
+        } else {
+            tracing::info!("No artifact was created");
         }
 
         if let Ok(github_summary) = std::env::var("GITHUB_STEP_SUMMARY") {
