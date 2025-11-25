@@ -1271,7 +1271,9 @@ impl Evaluate for Stage0About {
             license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
-            description: evaluate_optional_string_value(&self.description, context)?,
+            // we trim description to remove leading/trailing whitespace/newlines
+            description: evaluate_optional_string_value(&self.description, context)?
+                .map(|s| s.trim().to_string()),
         })
     }
 }

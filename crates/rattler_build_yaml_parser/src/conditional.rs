@@ -28,10 +28,10 @@ where
 
 /// Parse a ConditionalList<T> from YAML using a custom converter
 ///
-/// This handles sequences that may contain if/then/else conditionals
+/// This handles both single values and sequences that may contain if/then/else conditionals
 ///
 /// # Arguments
-/// * `yaml` - The YAML node to parse (must be a sequence)
+/// * `yaml` - The YAML node to parse (can be a single value or a sequence)
 /// * `converter` - The converter to use for parsing concrete values
 pub fn parse_conditional_list_with_converter<T, C>(
     yaml: &MarkedNode,
@@ -40,15 +40,18 @@ pub fn parse_conditional_list_with_converter<T, C>(
 where
     C: NodeConverter<T>,
 {
-    let sequence = yaml
-        .as_sequence()
-        .ok_or_else(|| ParseError::expected_type("sequence", "non-sequence", get_span(yaml)))?;
-
-    let mut items = Vec::new();
-    for item in sequence.iter() {
-        items.push(parse_item_with_converter(item, converter)?);
+    if let Some(sequence) = yaml.as_sequence() {
+        // It's a list
+        let mut items = Vec::new();
+        for item in sequence.iter() {
+            items.push(parse_item_with_converter(item, converter)?);
+        }
+        Ok(ConditionalList::new(items))
+    } else {
+        // It's a single value
+        let item = parse_item_with_converter(yaml, converter)?;
+        Ok(ConditionalList::new(vec![item]))
     }
-    Ok(ConditionalList::new(items))
 }
 
 /// Parse an Item<T> from YAML using a custom converter
@@ -115,6 +118,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_single_value() {
+        let yaml = marked_yaml::parse_yaml(0, "val: win").unwrap();
+        let node = yaml.as_mapping().unwrap().get("val").unwrap();
+        let list: ConditionalList<String> = parse_conditional_list(node).unwrap();
+        assert_eq!(list.len(), 1);
+        assert!(list.iter().all(|item| item.is_value()));
+    }
 
     #[test]
     fn test_parse_simple_list() {

@@ -342,10 +342,100 @@ impl<T: fmt::Display> fmt::Display for Item<T> {
 }
 
 /// A list that may contain conditionals
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct ConditionalList<T> {
     items: Vec<Item<T>>,
+}
+
+// Custom deserialization: accept either single value or array
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ConditionalList<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::marker::PhantomData;
+
+        struct ConditionalListVisitor<T>(PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ConditionalListVisitor<T> {
+            type Value = ConditionalList<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a single value or a list of values")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(ConditionalList { items })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::StrDeserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::StringDeserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                Item::<T>::deserialize(de::value::MapAccessDeserializer::new(map))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::BoolDeserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::I64Deserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::U64Deserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Item::<T>::deserialize(de::value::F64Deserializer::new(v))
+                    .map(|item| ConditionalList { items: vec![item] })
+            }
+        }
+
+        deserializer.deserialize_any(ConditionalListVisitor(PhantomData))
+    }
 }
 
 impl<T> ConditionalList<T> {
