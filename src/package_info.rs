@@ -1,14 +1,21 @@
 //! Display information about a built package
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use fs_err as fs;
 use indicatif::HumanBytes;
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::package::{AboutJson, IndexJson, PathType, PathsJson, RunExportsJson};
+use rattler_networking::{AuthenticationMiddleware, AuthenticationStorage};
 use rattler_package_streaming::seek::read_package_file;
+use reqwest::Client;
+use url::Url;
 
-use crate::opt::InspectOpts;
+use crate::opt::{ExtractOpts, InspectOpts, PackageSource};
+
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 
 /// Package metadata read from the archive
 struct PackageMetadata {
@@ -317,6 +324,143 @@ fn output_human_readable(
         let run_exports_str = serde_json::to_string_pretty(run_exports).into_diagnostic()?;
         tracing::info!("{}", run_exports_str);
     }
+
+    Ok(())
+}
+
+/// Strips package extensions (.tar.bz2 or .conda) from a filename
+fn strip_package_extension(filename: &str) -> String {
+    if let Some(stripped) = filename.strip_suffix(".tar.bz2") {
+        stripped.to_string()
+    } else if let Some(stripped) = filename.strip_suffix(".conda") {
+        stripped.to_string()
+    } else {
+        filename.to_string()
+    }
+}
+
+/// Creates an HTTP client with authentication middleware
+fn create_authenticated_client() -> miette::Result<reqwest_middleware::ClientWithMiddleware> {
+    let download_client = Client::builder()
+        .no_gzip()
+        .build()
+        .into_diagnostic()
+        .context("Failed to create HTTP client")?;
+
+    let authentication_storage =
+        AuthenticationStorage::from_env_and_defaults().into_diagnostic()?;
+
+    #[cfg(feature = "s3")]
+    let s3_middleware = s3_middleware::S3Middleware::new(
+        std::collections::HashMap::new(),
+        authentication_storage.clone(),
+    );
+
+    let client_builder = reqwest_middleware::ClientBuilder::new(download_client);
+
+    #[cfg(feature = "s3")]
+    let client_builder = client_builder.with(s3_middleware);
+
+    let client = client_builder
+        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+            authentication_storage,
+        )))
+        .with(rattler_networking::OciMiddleware)
+        .build();
+
+    Ok(client)
+}
+
+/// Determines the destination directory from a URL
+fn determine_destination_from_url(url: &Url) -> miette::Result<PathBuf> {
+    let filename = url
+        .path_segments()
+        .and_then(Iterator::last)
+        .ok_or_else(|| miette::miette!("Could not extract package name from URL"))?;
+
+    let package_name = strip_package_extension(filename);
+    Ok(PathBuf::from(package_name))
+}
+
+/// Determines the destination directory from a file path
+fn determine_destination_from_path(package_path: &Path) -> miette::Result<PathBuf> {
+    let filename = package_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| miette::miette!("Invalid package filename"))?;
+
+    let package_name = strip_package_extension(filename);
+    Ok(PathBuf::from(package_name))
+}
+
+/// Extracts a conda package from a URL
+async fn extract_from_url(
+    url: Url,
+    destination: Option<PathBuf>,
+    package_display: &str,
+) -> miette::Result<(PathBuf, rattler_package_streaming::ExtractResult)> {
+    let destination = destination.map_or_else(|| determine_destination_from_url(&url), Ok)?;
+
+    println!(
+        "Extracting {} to {}",
+        package_display,
+        destination.display()
+    );
+
+    let client = create_authenticated_client()?;
+
+    let result =
+        rattler_package_streaming::reqwest::tokio::extract(client, url, &destination, None, None)
+            .await
+            .into_diagnostic()
+            .with_context(|| format!("Failed to extract package from URL: {package_display}"))?;
+
+    Ok((destination, result))
+}
+
+/// Extracts a conda package from a local file path
+fn extract_from_path(
+    package_path: &Path,
+    destination: Option<PathBuf>,
+) -> miette::Result<(PathBuf, rattler_package_streaming::ExtractResult)> {
+    let destination =
+        destination.map_or_else(|| determine_destination_from_path(package_path), Ok)?;
+
+    println!(
+        "Extracting {} to {}",
+        package_path.display(),
+        destination.display()
+    );
+
+    let result = rattler_package_streaming::fs::extract(package_path, &destination)
+        .into_diagnostic()
+        .with_context(|| format!("Failed to extract package: {}", package_path.display()))?;
+
+    Ok((destination, result))
+}
+
+/// Extract a conda package to a directory
+pub async fn extract_package(args: ExtractOpts) -> miette::Result<()> {
+    let (destination, result) = match &args.package_file {
+        PackageSource::Url(url) => {
+            let url_str = url.to_string();
+            extract_from_url(url.clone(), args.dest.clone(), &url_str).await?
+        }
+        PackageSource::Path(path) => extract_from_path(path, args.dest.clone())?,
+    };
+
+    println!(
+        "{} Successfully extracted package",
+        console::style("✔").green(),
+    );
+    println!("  Destination: {}", destination.display());
+    println!("  SHA256: {:x}", result.sha256);
+    println!("  MD5: {:x}", result.md5);
+    println!(
+        "  Size: {} ({} bytes)",
+        HumanBytes(result.total_size),
+        result.total_size
+    );
 
     Ok(())
 }
