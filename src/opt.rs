@@ -104,6 +104,8 @@ pub struct DebugShellOpts {
 pub enum PackageCommands {
     /// Inspect and display information about a built package
     Inspect(InspectOpts),
+    /// Extract a conda package to a directory
+    Extract(ExtractOpts),
 }
 
 /// Shell completion options.
@@ -1184,4 +1186,15 @@ impl InspectOpts {
     pub fn show_run_exports(&self) -> bool {
         self.run_exports || self.all
     }
+}
+
+/// Options for the `package extract` command.
+#[derive(Parser, Debug, Clone)]
+pub struct ExtractOpts {
+    /// Path to the package file (.conda, .tar.bz2) or a URL to download from
+    pub package_file: PackageSource,
+
+    /// Destination directory for extraction (defaults to package name without extension)
+    #[arg(short = 'd', long)]
+    pub dest: Option<PathBuf>,
 }

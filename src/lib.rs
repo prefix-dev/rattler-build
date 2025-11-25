@@ -1492,3 +1492,8 @@ pub async fn debug_recipe(
 pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
     package_info::package_info(args)
 }
+
+/// Extract a conda package to a directory
+pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
+    package_info::extract_package(args).await
+}

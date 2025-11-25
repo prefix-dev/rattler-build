@@ -19,6 +19,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `debug` — Debug a recipe by setting up the environment without running the build script
 * `create-patch` — Create a patch for a directory
 * `debug-shell` — Open a debug shell in the build environment
+* `package` — Package-related subcommands
 
 ##### **Options:**
 
@@ -1313,6 +1314,87 @@ Open a debug shell in the build environment
 	Output directory containing rattler-build-log.txt
 
 	- Default value: `./output`
+
+
+
+
+### `package`
+
+Package-related subcommands
+
+**Usage:** `rattler-build package <COMMAND>`
+
+##### **Subcommands:**
+
+* `inspect` — Inspect and display information about a built package
+* `extract` — Extract a conda package to a directory
+
+
+
+#### `inspect`
+
+Inspect and display information about a built package
+
+**Usage:** `rattler-build package inspect [OPTIONS] <PACKAGE_FILE>`
+
+##### **Arguments:**
+
+- `<PACKAGE_FILE>`
+
+	Path to the package file (.conda, .tar.bz2)
+
+
+
+##### **Options:**
+
+- `--paths`
+
+	Show detailed file listing with hashes and sizes
+
+
+- `--about`
+
+	Show extended about information
+
+
+- `--run-exports`
+
+	Show run exports
+
+
+- `--all`
+
+	Show all available information
+
+
+- `--json`
+
+	Output as JSON
+
+
+
+
+
+#### `extract`
+
+Extract a conda package to a directory
+
+**Usage:** `rattler-build package extract [OPTIONS] <PACKAGE_FILE>`
+
+##### **Arguments:**
+
+- `<PACKAGE_FILE>`
+
+	Path to the package file (.conda, .tar.bz2) or a URL to download from
+
+
+
+##### **Options:**
+
+- `-d`, `--dest <DEST>`
+
+	Destination directory for extraction (defaults to package name without extension)
+
 
 
 

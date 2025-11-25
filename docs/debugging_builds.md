@@ -18,6 +18,49 @@ rattler-build debug-shell
 bash -x conda_build.sh
 ```
 
+## Inspecting and Extracting Packages
+
+The `rattler-build package` subcommand provides utilities for inspecting and extracting built packages, which is useful for debugging package contents.
+
+### Inspecting Packages
+
+Use `package inspect` to view package metadata without extracting:
+
+```bash
+# Basic package information
+rattler-build package inspect mypackage-1.0-h12345.conda
+
+# Show all information including file listing
+rattler-build package inspect mypackage-1.0-h12345.conda --all
+
+# Show specific sections
+rattler-build package inspect mypackage-1.0-h12345.conda --paths      # File listing with hashes
+rattler-build package inspect mypackage-1.0-h12345.conda --about      # Extended about info
+rattler-build package inspect mypackage-1.0-h12345.conda --run-exports # Run exports
+
+# Output as JSON for scripting
+rattler-build package inspect mypackage-1.0-h12345.conda --json
+```
+
+### Extracting Packages
+
+Use `package extract` to extract a package to a directory for inspection:
+
+```bash
+# Extract to a directory named after the package
+rattler-build package extract mypackage-1.0-h12345.conda
+
+# Extract to a custom destination
+rattler-build package extract mypackage-1.0-h12345.conda -d my-extracted
+
+# Extract directly from a URL (supports authenticated channels)
+rattler-build package extract https://conda.anaconda.org/conda-forge/linux-64/python-3.11.0-h12345.conda
+```
+
+After extraction, the command reports the SHA256/MD5 checksums and file size, which is useful for verifying package integrity.
+
+Both `.conda` and `.tar.bz2` package formats are supported.
+
 ## Build Directory Structure
 
 When rattler-build builds a package, it creates:
