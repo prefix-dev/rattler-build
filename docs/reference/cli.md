@@ -1374,6 +1374,7 @@ Inspect and display information about a built package
 
 
 
+
 #### `extract`
 
 Extract a conda package to a directory
@@ -1393,6 +1394,7 @@ Extract a conda package to a directory
 - `-d`, `--dest <DEST>`
 
 	Destination directory for extraction (defaults to package name without extension)
+
 
 
 
