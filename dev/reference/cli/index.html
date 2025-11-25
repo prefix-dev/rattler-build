@@ -1554,6 +1554,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#package" class="md-nav__link">
+    <span class="md-ellipsis">
+      package
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1756,6 +1765,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#package" class="md-nav__link">
+    <span class="md-ellipsis">
+      package
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1802,6 +1820,7 @@
 <li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
 <li><code>create-patch</code> — Create a patch for a directory</li>
 <li><code>debug-shell</code> — Open a debug shell in the build environment</li>
+<li><code>package</code> — Package-related subcommands</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -2852,6 +2871,64 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <ul>
 <li>Default value: <code>./output</code></li>
 </ul>
+</li>
+</ul>
+<h3 id="package"><code>package</code><a class="headerlink" href="#package" title="Permanent link">#</a></h3>
+<p>Package-related subcommands</p>
+<p><strong>Usage:</strong> <code>rattler-build package &lt;COMMAND&gt;</code></p>
+<h5 id="subcommands_4"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_4" title="Permanent link">#</a></h5>
+<ul>
+<li><code>inspect</code> — Inspect and display information about a built package</li>
+<li><code>extract</code> — Extract a conda package to a directory</li>
+</ul>
+<h4 id="inspect"><code>inspect</code><a class="headerlink" href="#inspect" title="Permanent link">#</a></h4>
+<p>Inspect and display information about a built package</p>
+<p><strong>Usage:</strong> <code>rattler-build package inspect [OPTIONS] &lt;PACKAGE_FILE&gt;</code></p>
+<h5 id="arguments_8"><strong>Arguments:</strong><a class="headerlink" href="#arguments_8" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE_FILE&gt;</code></p>
+<p>Path to the package file (.conda, .tar.bz2)</p>
+</li>
+</ul>
+<h5 id="options_20"><strong>Options:</strong><a class="headerlink" href="#options_20" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--paths</code></p>
+<p>Show detailed file listing with hashes and sizes</p>
+</li>
+<li>
+<p><code>--about</code></p>
+<p>Show extended about information</p>
+</li>
+<li>
+<p><code>--run-exports</code></p>
+<p>Show run exports</p>
+</li>
+<li>
+<p><code>--all</code></p>
+<p>Show all available information</p>
+</li>
+<li>
+<p><code>--json</code></p>
+<p>Output as JSON</p>
+</li>
+</ul>
+<h4 id="extract"><code>extract</code><a class="headerlink" href="#extract" title="Permanent link">#</a></h4>
+<p>Extract a conda package to a directory</p>
+<p><strong>Usage:</strong> <code>rattler-build package extract [OPTIONS] &lt;PACKAGE_FILE&gt;</code></p>
+<h5 id="arguments_9"><strong>Arguments:</strong><a class="headerlink" href="#arguments_9" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE_FILE&gt;</code></p>
+<p>Path to the package file (.conda, .tar.bz2) or a URL to download from</p>
+</li>
+</ul>
+<h5 id="options_21"><strong>Options:</strong><a class="headerlink" href="#options_21" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-d</code>, <code>--dest &lt;DEST&gt;</code></p>
+<p>Destination directory for extraction (defaults to package name without extension)</p>
 </li>
 </ul>
 <hr/>

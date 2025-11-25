@@ -956,6 +956,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#inspecting-and-extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inspecting and Extracting Packages
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inspecting and Extracting Packages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inspecting Packages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extracting Packages
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#build-directory-structure" class="md-nav__link">
     <span class="md-ellipsis">
       Build Directory Structure
@@ -1723,6 +1756,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#inspecting-and-extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inspecting and Extracting Packages
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inspecting and Extracting Packages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inspecting Packages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extracting Packages
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#build-directory-structure" class="md-nav__link">
     <span class="md-ellipsis">
       Build Directory Structure
@@ -1932,22 +1998,53 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Try running commands manually to see what&#39;s failing</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>bash<span class="w"> </span>-x<span class="w"> </span>conda_build.sh
 </span></code></pre></div>
+<h2 id="inspecting-and-extracting-packages">Inspecting and Extracting Packages<a class="headerlink" href="#inspecting-and-extracting-packages" title="Permanent link">#</a></h2>
+<p>The <code>rattler-build package</code> subcommand provides utilities for inspecting and extracting built packages, which is useful for debugging package contents.</p>
+<h3 id="inspecting-packages">Inspecting Packages<a class="headerlink" href="#inspecting-packages" title="Permanent link">#</a></h3>
+<p>Use <code>package inspect</code> to view package metadata without extracting:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Basic package information</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Show all information including file listing</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>--all
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Show specific sections</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>--paths<span class="w">      </span><span class="c1"># File listing with hashes</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>--about<span class="w">      </span><span class="c1"># Extended about info</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>--run-exports<span class="w"> </span><span class="c1"># Run exports</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># Output as JSON for scripting</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>inspect<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>--json
+</span></code></pre></div>
+<h3 id="extracting-packages">Extracting Packages<a class="headerlink" href="#extracting-packages" title="Permanent link">#</a></h3>
+<p>Use <code>package extract</code> to extract a package to a directory for inspection:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Extract to a directory named after the package</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>extract<span class="w"> </span>mypackage-1.0-h12345.conda
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Extract to a custom destination</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>extract<span class="w"> </span>mypackage-1.0-h12345.conda<span class="w"> </span>-d<span class="w"> </span>my-extracted
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Extract directly from a URL (supports authenticated channels)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>rattler-build<span class="w"> </span>package<span class="w"> </span>extract<span class="w"> </span>https://conda.anaconda.org/conda-forge/linux-64/python-3.11.0-h12345.conda
+</span></code></pre></div>
+<p>After extraction, the command reports the SHA256/MD5 checksums and file size, which is useful for verifying package integrity.</p>
+<p>Both <code>.conda</code> and <code>.tar.bz2</code> package formats are supported.</p>
 <h2 id="build-directory-structure">Build Directory Structure<a class="headerlink" href="#build-directory-structure" title="Permanent link">#</a></h2>
 <p>When rattler-build builds a package, it creates:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>output/
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>└─ rattler-build-log.txt            # Append-only log of build directories (latest at bottom)
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>└─ bld/                             # Build directories
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│   └─ rattler-build_&lt;name&gt;_&lt;timestamp&gt;/
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│       └─ work/                    # Source code and working directory
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│       │   └─ .source_info.json    # Source information (extracted folders, etc.)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│       │   └─ build_env.sh         # Environment setup script
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│       │   └─ conda_build.sh       # The actual build script (sources `build_env.sh`)
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│       │   └─ conda_build.log      # Complete build output
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│       └─ host_env_placehold_.../  # Host environment (runtime dependencies)
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│       └─ build_env/               # Build environment (build-time dependencies)
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>└─ src_cache/                       # Downloaded and extracted sources
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>└─ build_cache/                     # Staging cache - experimental feature
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>└─ &lt;platform&gt;/                      # Built packages
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>output/
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>└─ rattler-build-log.txt            # Append-only log of build directories (latest at bottom)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>└─ bld/                             # Build directories
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>│   └─ rattler-build_&lt;name&gt;_&lt;timestamp&gt;/
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│       └─ work/                    # Source code and working directory
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│       │   └─ .source_info.json    # Source information (extracted folders, etc.)
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│       │   └─ build_env.sh         # Environment setup script
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│       │   └─ conda_build.sh       # The actual build script (sources `build_env.sh`)
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│       │   └─ conda_build.log      # Complete build output
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│       └─ host_env_placehold_.../  # Host environment (runtime dependencies)
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│       └─ build_env/               # Build environment (build-time dependencies)
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>└─ src_cache/                       # Downloaded and extracted sources
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>└─ build_cache/                     # Staging cache - experimental feature
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>└─ &lt;platform&gt;/                      # Built packages
 </span></code></pre></div>
 <h2 id="the-debug-shell-command">The debug-shell Command<a class="headerlink" href="#the-debug-shell-command" title="Permanent link">#</a></h2>
 <p>The <code>debug-shell</code> command opens an interactive shell in the build environment, automatically:</p>
@@ -1957,8 +2054,8 @@
 <li>Sets additional environment variables for convenience</li>
 </ol>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Use the last build (reads from output/rattler-build-log.txt)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>rattler-build<span class="w"> </span>debug-shell
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Use the last build (reads from output/rattler-build-log.txt)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>rattler-build<span class="w"> </span>debug-shell
 </span></code></pre></div>
 <h3 id="environment-variables-available-in-debug-shell">Environment Variables Available in debug-shell<a class="headerlink" href="#environment-variables-available-in-debug-shell" title="Permanent link">#</a></h3>
 <p>Inside the debug shell, you have access to:</p>
@@ -2004,93 +2101,93 @@
 <h3 id="step-1-build-with-keep-build">Step 1: Build with --keep-build<a class="headerlink" href="#step-1-build-with-keep-build" title="Permanent link">#</a></h3>
 <p>You can use <code>rattler-build debug</code> to setup the build environments without executing the build scripts for manual debugging.
 If your recipe succeeds, but you still want to enter the debug-shell, you can use <code>--keep-build</code> to prevent cleanup:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># set up the build environment, but do not execute build script</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># build recipe normally, but keep build environments even if everything succeeds</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--keep-build
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># set up the build environment, but do not execute build script</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># build recipe normally, but keep build environments even if everything succeeds</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--keep-build
 </span></code></pre></div>
 <h3 id="step-2-enter-the-debug-shell">Step 2: Enter the Debug Shell<a class="headerlink" href="#step-2-enter-the-debug-shell" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-build<span class="w"> </span>debug-shell
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>rattler-build<span class="w"> </span>debug-shell
 </span></code></pre></div>
 <h3 id="step-3-debug-interactively">Step 3: Debug Interactively<a class="headerlink" href="#step-3-debug-interactively" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Run the full build script with tracing</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>bash<span class="w"> </span>-x<span class="w"> </span>conda_build.sh
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Or run individual commands</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>./configure<span class="w"> </span>--prefix<span class="o">=</span><span class="nv">$PREFIX</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>make<span class="w"> </span><span class="nv">VERBOSE</span><span class="o">=</span><span class="m">1</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>make<span class="w"> </span>install
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Run the full build script with tracing</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>bash<span class="w"> </span>-x<span class="w"> </span>conda_build.sh
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Or run individual commands</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>./configure<span class="w"> </span>--prefix<span class="o">=</span><span class="nv">$PREFIX</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>make<span class="w"> </span><span class="nv">VERBOSE</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>make<span class="w"> </span>install
 </span></code></pre></div>
 <h3 id="step-4-create-a-patch-for-fixes">Step 4: Create a Patch for Fixes<a class="headerlink" href="#step-4-create-a-patch-for-fixes" title="Permanent link">#</a></h3>
 <p>After fixing issues in the source code:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Create a patch from your changes</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>--exclude<span class="w"> </span><span class="s2">&quot;*.o,*.so,*.pyc&quot;</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Preview what would be included</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span>--dry-run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Create a patch from your changes</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>--exclude<span class="w"> </span><span class="s2">&quot;*.o,*.so,*.pyc&quot;</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Preview what would be included</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span>--dry-run
 </span></code></pre></div>
 <p>To include new files:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--add<span class="w"> </span><span class="s2">&quot;*.txt,src/new_file.c&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--directory<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--name<span class="w"> </span>my-fix<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--add<span class="w"> </span><span class="s2">&quot;*.txt,src/new_file.c&quot;</span>
 </span></code></pre></div>
 <h3 id="step-5-update-recipe-and-rebuild">Step 5: Update Recipe and Rebuild<a class="headerlink" href="#step-5-update-recipe-and-rebuild" title="Permanent link">#</a></h3>
 <p>Add the patch to your recipe:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/source.tar.gz</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">patches</span><span class="p">:</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="c1"># this needs to be manually added</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-fix.patch</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/source.tar.gz</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">patches</span><span class="p">:</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="c1"># this needs to be manually added</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-fix.patch</span>
 </span></code></pre></div>
 <p>Then rebuild:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
 </span></code></pre></div>
 <h2 id="common-debugging-scenarios">Common Debugging Scenarios<a class="headerlink" href="#common-debugging-scenarios" title="Permanent link">#</a></h2>
 <h3 id="compilation-failures">Compilation Failures<a class="headerlink" href="#compilation-failures" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>rattler-build<span class="w"> </span>debug-shell
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Run with verbose output</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>bash<span class="w"> </span>-x<span class="w"> </span>conda_build.sh<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>less
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="c1"># Or specific build commands</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>make<span class="w"> </span><span class="nv">VERBOSE</span><span class="o">=</span><span class="m">1</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--verbose
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>rattler-build<span class="w"> </span>debug-shell
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># Run with verbose output</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>bash<span class="w"> </span>-x<span class="w"> </span>conda_build.sh<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>less
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1"># Or specific build commands</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>make<span class="w"> </span><span class="nv">VERBOSE</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--verbose
 </span></code></pre></div>
 <h3 id="missing-files-or-dependencies">Missing Files or Dependencies<a class="headerlink" href="#missing-files-or-dependencies" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Check source information</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>cat<span class="w"> </span>.source_info.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># List what&#39;s in the work directory</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>find<span class="w"> </span>.<span class="w"> </span>-type<span class="w"> </span>f<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-30
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Check what&#39;s in the environments</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>ls<span class="w"> </span><span class="nv">$PREFIX</span>/lib/
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>ls<span class="w"> </span><span class="nv">$BUILD_PREFIX</span>/bin/
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Check source information</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>cat<span class="w"> </span>.source_info.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># List what&#39;s in the work directory</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>find<span class="w"> </span>.<span class="w"> </span>-type<span class="w"> </span>f<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-30
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Check what&#39;s in the environments</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>ls<span class="w"> </span><span class="nv">$PREFIX</span>/lib/
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>ls<span class="w"> </span><span class="nv">$BUILD_PREFIX</span>/bin/
 </span></code></pre></div>
 <h3 id="library-not-found-errors">Library Not Found Errors<a class="headerlink" href="#library-not-found-errors" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Check if the library exists in PREFIX</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>find<span class="w"> </span><span class="nv">$PREFIX</span><span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;lib*.so*&quot;</span><span class="w"> </span>-o<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;lib*.dylib*&quot;</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Check pkg-config paths</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nb">echo</span><span class="w"> </span><span class="nv">$PKG_CONFIG_PATH</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>pkg-config<span class="w"> </span>--libs<span class="w"> </span>--cflags<span class="w"> </span>libfoo
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check if the library exists in PREFIX</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>find<span class="w"> </span><span class="nv">$PREFIX</span><span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;lib*.so*&quot;</span><span class="w"> </span>-o<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;lib*.dylib*&quot;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Check pkg-config paths</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="nb">echo</span><span class="w"> </span><span class="nv">$PKG_CONFIG_PATH</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>pkg-config<span class="w"> </span>--libs<span class="w"> </span>--cflags<span class="w"> </span>libfoo
 </span></code></pre></div>
 <h3 id="build-log-analysis">Build Log Analysis<a class="headerlink" href="#build-log-analysis" title="Permanent link">#</a></h3>
 <p>All build output is saved to <code>conda_build.log</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># View the full log</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>less<span class="w"> </span>conda_build.log
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Search for errors</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>grep<span class="w"> </span>-i<span class="w"> </span>error<span class="w"> </span>conda_build.log
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">&quot;undefined reference&quot;</span><span class="w"> </span>conda_build.log
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># View the full log</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>less<span class="w"> </span>conda_build.log
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Search for errors</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>grep<span class="w"> </span>-i<span class="w"> </span>error<span class="w"> </span>conda_build.log
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">&quot;undefined reference&quot;</span><span class="w"> </span>conda_build.log
 </span></code></pre></div>
 <h2 id="understanding-relocatability">Understanding Relocatability<a class="headerlink" href="#understanding-relocatability" title="Permanent link">#</a></h2>
 <p>rattler-build makes packages relocatable through:</p>
@@ -2104,22 +2201,22 @@ If your recipe succeeds, but you still want to enter the debug-shell, you can us
 </ol>
 <p><strong>Important</strong>: The placeholder is a long string (<code>placehold_placehol_...</code>). If your code has small buffer optimization or assumes static string lengths for file paths, you may need to adjust it. The <code>$PREFIX</code> length will differ at installation time. The placeholder replacement in binary files will overwrite the placeholder string, move the remainder until <code>\0</code> is found in the original string, and pad with <code>\0</code> bytes.</p>
 <h2 id="useful-commands-reference">Useful Commands Reference<a class="headerlink" href="#useful-commands-reference" title="Permanent link">#</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Build commands</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--keep-build
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--channel<span class="w"> </span>conda-forge<span class="w"> </span>--no-test
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Debug commands</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>rattler-build<span class="w"> </span>debug-shell
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>rattler-build<span class="w"> </span>debug-shell<span class="w"> </span>--work-dir<span class="w"> </span>/path/to/build_folder
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w">  </span><span class="c1"># Set up environment without running build</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># Patch commands</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--include<span class="w"> </span><span class="s2">&quot;*.c&quot;</span>
-</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--exclude<span class="w"> </span><span class="s2">&quot;*.o&quot;</span>
-</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--add<span class="w"> </span><span class="s2">&quot;*.txt&quot;</span><span class="w"> </span>--dry-run
-</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>
-</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="c1"># Test commands</span>
-</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>rattler-build<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--package-file<span class="w"> </span>output/linux-64/mypackage-1.0.tar.bz2
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Build commands</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--keep-build
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w"> </span>--channel<span class="w"> </span>conda-forge<span class="w"> </span>--no-test
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Debug commands</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>rattler-build<span class="w"> </span>debug-shell
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>rattler-build<span class="w"> </span>debug-shell<span class="w"> </span>--work-dir<span class="w"> </span>/path/to/build_folder
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml<span class="w">  </span><span class="c1"># Set up environment without running build</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="c1"># Patch commands</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--include<span class="w"> </span><span class="s2">&quot;*.c&quot;</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--exclude<span class="w"> </span><span class="s2">&quot;*.o&quot;</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>.<span class="w"> </span>--name<span class="w"> </span>fix<span class="w"> </span>--add<span class="w"> </span><span class="s2">&quot;*.txt&quot;</span><span class="w"> </span>--dry-run
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="c1"># Test commands</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>rattler-build<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--package-file<span class="w"> </span>output/linux-64/mypackage-1.0.tar.bz2
 </span></code></pre></div>
 
 
