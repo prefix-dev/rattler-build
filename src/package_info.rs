@@ -340,6 +340,7 @@ fn strip_package_extension(filename: &str) -> String {
 }
 
 /// Creates an HTTP client with authentication middleware
+/// TODO: Refactor to use rattler-build-networking when its available.
 fn create_authenticated_client() -> miette::Result<reqwest_middleware::ClientWithMiddleware> {
     let download_client = Client::builder()
         .no_gzip()
