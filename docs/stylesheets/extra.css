@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Text:ital@0;1&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Text:ital@0;1&display=swap'); */
 
 .md-header__topic {
-  font-family: 'DM Serif Text', serif;
+  font-family: 'Moranga', serif;
 }
 
 [data-md-color-primary=prefix] {
@@ -54,7 +54,7 @@
 }
 
 .md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4, .md-typeset h5, .md-typeset h6 {
-  font-family: 'DM Serif Text', serif;
+  font-family: 'Moranga', serif;
   font-weight: 500;
   color: var(--md-accent-fg-color);
 }
