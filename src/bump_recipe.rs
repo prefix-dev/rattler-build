@@ -6,22 +6,24 @@
 //! - Update SHA256 checksums automatically
 
 use fs_err as fs;
+use indexmap::IndexMap;
+use minijinja::Value;
+use rattler_conda_types::Platform;
 use rattler_digest::Sha256Hash;
 use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
+use serde_yaml::Value as YamlValue;
+use std::collections::BTreeMap;
 use std::path::Path;
 use thiserror::Error;
 
-use crate::recipe_updater::{RecipeUpdater, RecipeUpdaterError};
+use crate::recipe::jinja::Jinja;
+use crate::selectors::SelectorConfig;
 
 /// Errors that can occur during recipe bumping
 #[derive(Debug, Error)]
 pub enum BumpRecipeError {
-    /// Recipe updater error
-    #[error("Recipe update failed: {0}")]
-    RecipeUpdater(#[from] RecipeUpdaterError),
-
     /// Failed to parse URL
     #[error("Failed to parse URL: {0}")]
     UrlParse(#[from] url::ParseError),
@@ -131,12 +133,14 @@ struct CrateInfo {
 /// Recipe context containing version and other variables
 #[derive(Debug, Default)]
 pub struct RecipeContext {
-    /// The version from the context section
+    /// The version from the context section (the raw, literal value)
     pub version: Option<String>,
-    /// The source URL(s)
+    /// The source URL(s) - these are the raw templates
     pub source_urls: Vec<String>,
     /// The SHA256 checksum(s)
     pub sha256_checksums: Vec<String>,
+    /// Raw context templates (key -> raw value, may contain Jinja expressions)
+    pub raw_context: IndexMap<String, String>,
 }
 
 impl RecipeContext {
@@ -146,39 +150,86 @@ impl RecipeContext {
         Self::from_yaml_content(&content)
     }
 
-    /// Parse recipe context from YAML content
+    /// Parse recipe context from YAML content using the YAML structure
     pub fn from_yaml_content(content: &str) -> Result<Self, BumpRecipeError> {
         let mut ctx = RecipeContext::default();
 
-        // Extract version from context section
-        let version_re = Regex::new(r#"(?m)^\s*version:\s*["']?([^"'\s\n]+)["']?"#)
-            .map_err(|e| BumpRecipeError::RecipeParse(e.to_string()))?;
+        // Parse as raw YAML (no Jinja rendering)
+        let yaml: YamlValue = serde_yaml::from_str(content)
+            .map_err(|e| BumpRecipeError::RecipeParse(format!("YAML parse error: {}", e)))?;
 
-        if let Some(caps) = version_re.captures(content) {
-            ctx.version = Some(caps[1].to_string());
+        // Extract context variables (store ALL values, including Jinja templates)
+        if let Some(context) = yaml.get("context").and_then(|v| v.as_mapping()) {
+            for (key, value) in context {
+                if let Some(key_str) = key.as_str() {
+                    // Get the string value, handling both quoted and unquoted
+                    let value_str = match value {
+                        YamlValue::String(s) => s.clone(),
+                        YamlValue::Number(n) => n.to_string(),
+                        YamlValue::Bool(b) => b.to_string(),
+                        _ => continue, // Skip complex values
+                    };
+
+                    // Store the raw value
+                    ctx.raw_context
+                        .insert(key_str.to_string(), value_str.clone());
+
+                    // Only set version if it's a literal value (not a Jinja template)
+                    if key_str == "version"
+                        && !value_str.starts_with('$')
+                        && !value_str.starts_with('{')
+                    {
+                        ctx.version = Some(value_str);
+                    }
+                }
+            }
         }
 
-        // Extract source URLs (handles both `url:` and `- url:` in lists)
-        // Match the entire URL value, which may contain Jinja2 templates
-        let url_re = Regex::new(r#"(?m)^\s*-?\s*url:\s*(.+)$"#)
-            .map_err(|e| BumpRecipeError::RecipeParse(e.to_string()))?;
-
-        for caps in url_re.captures_iter(content) {
-            let url = caps[1].trim();
-            // Remove surrounding quotes if present
-            let url = url.trim_matches('"').trim_matches('\'');
-            ctx.source_urls.push(url.to_string());
-        }
-
-        // Extract SHA256 checksums
-        let sha_re = Regex::new(r"(?m)^\s*sha256:\s*([a-fA-F0-9]{64})")
-            .map_err(|e| BumpRecipeError::RecipeParse(e.to_string()))?;
-
-        for caps in sha_re.captures_iter(content) {
-            ctx.sha256_checksums.push(caps[1].to_string());
-        }
+        // Extract source URLs from the source section
+        Self::extract_sources(&yaml, &mut ctx)?;
 
         Ok(ctx)
+    }
+
+    /// Extract source URLs and SHA256 checksums from the YAML structure
+    fn extract_sources(yaml: &YamlValue, ctx: &mut RecipeContext) -> Result<(), BumpRecipeError> {
+        let source = match yaml.get("source") {
+            Some(s) => s,
+            None => return Ok(()), // No source section
+        };
+
+        // Handle both single source and list of sources
+        let sources: Vec<&YamlValue> = if source.is_sequence() {
+            source.as_sequence().unwrap().iter().collect()
+        } else {
+            vec![source]
+        };
+
+        for src in sources {
+            // Extract URL(s) - can be a single string or a list
+            if let Some(url) = src.get("url") {
+                match url {
+                    YamlValue::String(s) => {
+                        ctx.source_urls.push(s.clone());
+                    }
+                    YamlValue::Sequence(urls) => {
+                        for u in urls {
+                            if let YamlValue::String(s) = u {
+                                ctx.source_urls.push(s.clone());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Extract SHA256 checksum
+            if let Some(YamlValue::String(sha)) = src.get("sha256") {
+                ctx.sha256_checksums.push(sha.clone());
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -415,14 +466,63 @@ pub async fn fetch_sha256(client: &Client, url: &str) -> Result<Sha256Hash, Bump
     Ok(hasher.finalize())
 }
 
-/// Build a URL with a specific version by replacing the version placeholder
-pub fn build_url_with_version(url_template: &str, version: &str) -> String {
-    // Replace Jinja2 version placeholders
-    url_template
-        .replace("${{ version }}", version)
-        .replace("${{version}}", version)
-        .replace("{{ version }}", version)
-        .replace("{{version}}", version)
+/// Build a URL with a specific version using proper Jinja rendering
+///
+/// This function uses the real Jinja rendering engine with the full context
+/// from the recipe, ensuring all variables (not just version) are properly
+/// substituted. It supports context variables that depend on other variables,
+/// such as `version_with_underscore: ${{ version | replace('.', '_') }}`.
+pub fn build_url_with_version(
+    url_template: &str,
+    version: &str,
+    raw_context: &IndexMap<String, String>,
+) -> Result<String, BumpRecipeError> {
+    // Create a SelectorConfig with default platform settings
+    let selector_config = SelectorConfig {
+        target_platform: Platform::current(),
+        host_platform: Platform::current(),
+        build_platform: Platform::current(),
+        hash: None,
+        variant: BTreeMap::new(),
+        experimental: false,
+        allow_undefined: true,
+        recipe_path: None,
+    };
+
+    // Create Jinja instance
+    let mut jinja = Jinja::new(selector_config);
+
+    // First, set the version (so other context vars can reference it)
+    jinja
+        .context_mut()
+        .insert("version".to_string(), Value::from(version));
+
+    // Render context variables in order, so templates can reference earlier vars
+    // This handles cases like: version_with_underscore: ${{ version | replace('.', '_') }}
+    for (key, raw_value) in raw_context {
+        // Skip version since we already set it with the new value
+        if key == "version" {
+            continue;
+        }
+
+        // Try to render the value (it might be a Jinja template)
+        let rendered_value = if raw_value.contains("${{") || raw_value.contains("{{") {
+            jinja
+                .render_str(raw_value)
+                .unwrap_or_else(|_| raw_value.clone())
+        } else {
+            raw_value.clone()
+        };
+
+        jinja
+            .context_mut()
+            .insert(key.clone(), Value::from(rendered_value));
+    }
+
+    // Render the URL template
+    jinja
+        .render_str(url_template)
+        .map_err(|e| BumpRecipeError::RecipeParse(format!("Failed to render URL: {}", e)))
 }
 
 /// Result of a recipe bump operation
@@ -456,13 +556,15 @@ pub async fn bump_recipe(
         .clone()
         .ok_or(BumpRecipeError::VersionNotFound)?;
 
-    // Detect provider from the first URL
-    let source_url = ctx
+    // Detect provider from the first URL (render it first to substitute variables)
+    let source_url_template = ctx
         .source_urls
         .first()
         .ok_or(BumpRecipeError::NoSourceUrl)?;
 
-    let provider = detect_provider(source_url)?;
+    // Render the URL with the current context to detect the provider
+    let rendered_url = build_url_with_version(source_url_template, &old_version, &ctx.raw_context)?;
+    let provider = detect_provider(&rendered_url)?;
     tracing::debug!("Detected version provider: {}", provider);
 
     // Determine the new version
@@ -482,32 +584,34 @@ pub async fn bump_recipe(
 
     // Build URLs with new version and fetch SHA256
     let mut new_sha256s = Vec::new();
-    let mut new_sha256_hashes = Vec::new();
 
     for url_template in &ctx.source_urls {
-        let new_url = build_url_with_version(url_template, &new_version);
+        let new_url = build_url_with_version(url_template, &new_version, &ctx.raw_context)?;
         tracing::debug!("Resolved URL: {}", new_url);
 
         tracing::info!("Fetching {}", new_url);
         let sha256 = fetch_sha256(client, &new_url).await?;
-        tracing::debug!("Fetched SHA256: {:x}", sha256);
+        let sha256_str = format!("{:x}", sha256);
+        tracing::debug!("Fetched SHA256: {}", sha256_str);
 
-        new_sha256s.push(format!("{:x}", sha256));
-        new_sha256_hashes.push(sha256);
+        new_sha256s.push(sha256_str);
     }
 
     if !dry_run {
-        // Load and update the recipe
-        let mut updater = RecipeUpdater::load(recipe_path)?;
+        // Read the recipe file content
+        let mut content = fs::read_to_string(recipe_path)?;
 
-        // Update version
-        updater.update_version(&new_version)?;
+        // Simple string replacement: replace old version with new version
+        // This preserves all formatting, comments, etc.
+        content = content.replace(&old_version, &new_version);
 
-        // Update SHA256 checksums in order (handles Jinja2 template URLs)
-        updater.update_sha256_in_order(&new_sha256_hashes)?;
+        // Replace SHA256 checksums in order
+        for (old_sha, new_sha) in ctx.sha256_checksums.iter().zip(new_sha256s.iter()) {
+            content = content.replacen(old_sha, new_sha, 1);
+        }
 
-        // Save the updated recipe
-        updater.save()?;
+        // Write the updated content back
+        fs::write(recipe_path, &content)?;
 
         tracing::info!("Updated {}", recipe_path.display());
     } else {
@@ -536,12 +640,15 @@ pub async fn check_for_updates(
         .clone()
         .ok_or(BumpRecipeError::VersionNotFound)?;
 
-    let source_url = ctx
+    let source_url_template = ctx
         .source_urls
         .first()
         .ok_or(BumpRecipeError::NoSourceUrl)?;
 
-    let provider = detect_provider(source_url)?;
+    // Render the URL with the current context to detect the provider
+    let rendered_url =
+        build_url_with_version(source_url_template, &current_version, &ctx.raw_context)?;
+    let provider = detect_provider(&rendered_url)?;
 
     match fetch_latest_version(client, &provider, include_prerelease).await {
         Ok(latest_version) => {
@@ -652,9 +759,45 @@ mod tests {
         ];
 
         for (template, version, expected) in test_cases {
-            let result = build_url_with_version(template, version);
+            let context = IndexMap::new();
+            let result = build_url_with_version(template, version, &context).unwrap();
             assert_eq!(result, expected, "Failed for template: {}", template);
         }
+    }
+
+    #[test]
+    fn test_build_url_with_full_context() {
+        // Test that other context variables are also rendered
+        let mut context = IndexMap::new();
+        context.insert("name".to_string(), "mypackage".to_string());
+        context.insert("version".to_string(), "1.0.0".to_string());
+
+        let template = "https://example.com/${{ name }}/${{ name }}-${{ version }}.tar.gz";
+        let result = build_url_with_version(template, "2.0.0", &context).unwrap();
+
+        // The version should be overridden to 2.0.0, but name should use context value
+        assert_eq!(
+            result,
+            "https://example.com/mypackage/mypackage-2.0.0.tar.gz"
+        );
+    }
+
+    #[test]
+    fn test_build_url_with_derived_context() {
+        // Test context variables that depend on other variables (like version_underscore)
+        let mut context = IndexMap::new();
+        context.insert("name".to_string(), "mypackage".to_string());
+        context.insert("version".to_string(), "1.0.0".to_string());
+        context.insert(
+            "version_underscore".to_string(),
+            "${{ version | replace('.', '_') }}".to_string(),
+        );
+
+        let template = "https://example.com/${{ name }}-${{ version_underscore }}.tar.gz";
+        let result = build_url_with_version(template, "2.0.0", &context).unwrap();
+
+        // The version_underscore should be derived from the new version (2.0.0 -> 2_0_0)
+        assert_eq!(result, "https://example.com/mypackage-2_0_0.tar.gz");
     }
 
     #[test]
