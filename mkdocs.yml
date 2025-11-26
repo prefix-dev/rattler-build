@@ -85,6 +85,8 @@ extra:
   social:
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/prefix_dev
+    - icon: fontawesome/brands/bluesky
+      link: https://bsky.app/profile/prefix.dev
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/prefix-dev
     - icon: fontawesome/brands/github
