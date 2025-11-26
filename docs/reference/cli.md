@@ -531,7 +531,7 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels
 
 
-- `--create-attestation`
+- `--generate-attestation`
 
 	Automatically generate attestations when uploading to prefix.dev channels. Only works when uploading to prefix.dev channels with trusted publishing enabled
 

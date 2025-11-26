@@ -580,7 +580,7 @@ pub struct PublishOpts {
     /// Automatically generate attestations when uploading to prefix.dev channels.
     /// Only works when uploading to prefix.dev channels with trusted publishing enabled.
     #[arg(long, help_heading = "Publishing")]
-    pub create_attestation: bool,
+    pub generate_attestation: bool,
 
     /// Build options.
     #[clap(flatten)]
@@ -593,7 +593,7 @@ pub struct PublishData {
     pub to: NamedChannelOrUrl,
     pub build_number: Option<String>,
     pub force: bool,
-    pub create_attestation: bool,
+    pub generate_attestation: bool,
     pub package_files: Vec<PathBuf>,
     pub recipe_paths: Vec<PathBuf>,
     pub build: BuildData,
@@ -650,7 +650,7 @@ impl PublishData {
             to: opts.to,
             build_number: opts.build_number,
             force: opts.force,
-            create_attestation: opts.create_attestation,
+            generate_attestation: opts.generate_attestation,
             package_files,
             recipe_paths,
             build: BuildData::from_opts_and_config(build_opts, config),

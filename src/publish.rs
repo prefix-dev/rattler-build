@@ -493,7 +493,7 @@ async fn upload_to_prefix(
         channel,
         None,
         None,
-        publish_data.create_attestation,
+        publish_data.generate_attestation,
         false,
     );
 
