@@ -3,6 +3,7 @@ use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
 };
 use rattler_index::{IndexFsConfig, index_fs};
+use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -217,14 +218,22 @@ fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
     Ok(index_json.subdir.unwrap_or_else(|| "noarch".to_string()))
 }
 
-/// Upload packages to a channel and run indexing
+/// Upload packages to a channel and run indexing.
+/// After the indexing, the repodata cache for the target channel is cleared.
 pub(crate) async fn upload_and_index_channel(
     target_url: &NamedChannelOrUrl,
     package_paths: &[PathBuf],
     publish_data: &PublishData,
+    repodata_gateway: &Gateway,
 ) -> miette::Result<()> {
     let span = tracing::info_span!("Publishing packages");
     let _guard = span.enter();
+
+    // Collect subdirs from packages for cache clearing later
+    let subdirs: std::collections::HashSet<String> = package_paths
+        .iter()
+        .filter_map(|p| determine_package_subdir(p).ok())
+        .collect();
 
     match target_url {
         NamedChannelOrUrl::Url(url) => {
@@ -283,7 +292,33 @@ pub(crate) async fn upload_and_index_channel(
             "Cannot upload to named channel '{}'. Please use a direct URL instead.",
             name
         )),
-    }
+    }?;
+
+    // Clear repodata cache for the target channel after publishing
+    let channel = match target_url {
+        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url.clone())),
+        NamedChannelOrUrl::Path(path) => {
+            let url = url::Url::from_file_path(path.as_str())
+                .map_err(|_| miette::miette!("Invalid path: {}", path))?;
+            Channel::from_url(ChannelUrl::from(url))
+        }
+        NamedChannelOrUrl::Name(_) => {
+            // Named channels are already rejected above, so this is unreachable
+            unreachable!()
+        }
+    };
+
+    repodata_gateway
+        .clear_repodata_cache(
+            &channel,
+            SubdirSelection::Some(subdirs),
+            CacheClearMode::InMemoryAndDisk,
+        )
+        .into_diagnostic()?;
+
+    tracing::debug!("Cleared repodata cache for target channel");
+
+    Ok(())
 }
 
 #[cfg(feature = "s3")]

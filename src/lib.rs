@@ -1249,6 +1249,9 @@ pub async fn publish_packages(
         }
     }
 
+    // Create tool configuration for cache clearing and building
+    let tool_config = get_tool_config(&publish_data.build, log_handler)?;
+
     // Check if we're publishing pre-built packages or building from recipes
     let built_packages = if !publish_data.package_files.is_empty() {
         // Publish pre-built packages directly
@@ -1270,7 +1273,6 @@ pub async fn publish_packages(
         publish_data.package_files.clone()
     } else {
         // Build packages from recipes
-        let tool_config = get_tool_config(&publish_data.build, log_handler)?;
         let mut outputs = Vec::new();
 
         // Expand recipe paths (handles directories by finding all recipes within them)
@@ -1365,7 +1367,13 @@ pub async fn publish_packages(
         built_packages
     };
 
-    upload_and_index_channel(&target_url, &built_packages, &publish_data).await?;
+    upload_and_index_channel(
+        &target_url,
+        &built_packages,
+        &publish_data,
+        &tool_config.repodata_gateway,
+    )
+    .await?;
 
     Ok(())
 }

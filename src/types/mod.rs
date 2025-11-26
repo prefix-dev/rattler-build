@@ -9,7 +9,7 @@ use rattler_conda_types::{
     package::{ArchiveType, PathsJson},
 };
 use rattler_index::{IndexFsConfig, index_fs};
-use rattler_repodata_gateway::SubdirSelection;
+use rattler_repodata_gateway::{CacheClearMode, SubdirSelection};
 use rattler_virtual_packages::{
     DetectVirtualPackageError, VirtualPackageOverrides, VirtualPackages,
 };
@@ -176,7 +176,9 @@ pub async fn build_reindexed_channels(
                 .map(ToString::to_string)
                 .collect(),
         ),
-    );
+        // In memory is enough because this is a "file" channel
+        CacheClearMode::InMemoryOnly,
+    )?;
 
     let index_config = IndexFsConfig {
         channel: output_dir.clone(),
