@@ -1,0 +1,14 @@
+package:
+  name: pkg-b
+  version: 1.0.0
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - python
+    - pkg-a
+  run:
+    - python
+    - pkg-a

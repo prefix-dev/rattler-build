@@ -44,7 +44,7 @@ mod package_cache_reporter;
 pub mod source_code;
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -61,7 +61,7 @@ use miette::{Context, IntoDiagnostic};
 pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
-use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use petgraph::{algo::toposort, graph::DiGraph, graph::NodeIndex, visit::DfsPostOrder};
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
     package::ArchiveType,
@@ -1001,19 +1001,24 @@ pub fn sort_build_outputs_topologically(
     up_to: Option<&str>,
 ) -> miette::Result<()> {
     let mut graph = DiGraph::<usize, ()>::new();
-    let mut name_to_index = HashMap::new();
+    // Store all node indices for each package name (multiple variants produce same name)
+    let mut name_to_indices: HashMap<PackageName, Vec<NodeIndex>> = HashMap::new();
+    // Also store direct mapping from output index to node index
+    let mut output_to_node: Vec<NodeIndex> = Vec::with_capacity(outputs.len());
 
     // Index outputs by their produced names for quick lookup
     for (idx, output) in outputs.iter().enumerate() {
-        let idx = graph.add_node(idx);
-        name_to_index.insert(output.name().clone(), idx);
+        let node_idx = graph.add_node(idx);
+        output_to_node.push(node_idx);
+        name_to_indices
+            .entry(output.name().clone())
+            .or_default()
+            .push(node_idx);
     }
 
     // Add edges based on dependencies
-    for output in outputs.iter() {
-        let output_idx = *name_to_index
-            .get(output.name())
-            .expect("We just inserted it");
+    for (output_idx, output) in outputs.iter().enumerate() {
+        let output_node = output_to_node[output_idx];
         for dep in output.recipe.requirements().run_build_host() {
             let dep_name = match dep {
                 Dependency::Spec(spec) => {
@@ -1031,30 +1036,39 @@ pub fn sort_build_outputs_topologically(
             };
 
             if let Some(dep_name) = dep_name
-                && let Some(&dep_idx) = name_to_index.get(&dep_name)
+                && let Some(dep_nodes) = name_to_indices.get(&dep_name)
             {
-                // do not point to self (circular dependency) - this can happen with
-                // pin_subpackage in run_exports, for example.
-                if output_idx == dep_idx {
-                    continue;
+                // Add edge to ALL variants of the dependency package
+                for &dep_node in dep_nodes {
+                    // do not point to self (circular dependency) - this can happen with
+                    // pin_subpackage in run_exports, for example.
+                    if output_node == dep_node {
+                        continue;
+                    }
+                    graph.add_edge(output_node, dep_node, ());
                 }
-                graph.add_edge(output_idx, dep_idx, ());
             }
         }
     }
 
     let sorted_indices = if let Some(up_to) = up_to {
-        // Find the node index for the "up-to" package
-        let up_to_index = name_to_index.get(up_to).copied().ok_or_else(|| {
+        // Find the node indices for the "up-to" package (may have multiple variants)
+        let up_to_name = PackageName::from_str(up_to)
+            .map_err(|_| miette::miette!("Invalid package name: '{}'", up_to))?;
+        let up_to_indices = name_to_indices.get(&up_to_name).ok_or_else(|| {
             miette::miette!("The package '{}' was not found in the outputs", up_to)
         })?;
 
-        // Perform a DFS post-order traversal from the "up-to" node to find all
-        // dependencies
-        let mut dfs = DfsPostOrder::new(&graph, up_to_index);
+        // Perform DFS post-order traversal from ALL variants of the "up-to" package
         let mut sorted_indices = Vec::new();
-        while let Some(nx) = dfs.next(&graph) {
-            sorted_indices.push(nx);
+        let mut visited = HashSet::new();
+        for &up_to_index in up_to_indices {
+            let mut dfs = DfsPostOrder::new(&graph, up_to_index);
+            while let Some(nx) = dfs.next(&graph) {
+                if visited.insert(nx) {
+                    sorted_indices.push(nx);
+                }
+            }
         }
 
         sorted_indices
@@ -1104,6 +1118,9 @@ pub async fn build_recipes(
     }
 
     if build_data.render_only {
+        // Sort outputs topologically even in render-only mode to show expected build order
+        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+
         let outputs = if build_data.with_solve {
             let mut updated_outputs = Vec::new();
             for output in outputs {

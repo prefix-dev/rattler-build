@@ -1,0 +1,12 @@
+package:
+  name: pkg-a
+  version: 1.0.0
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - python
+  run:
+    - python

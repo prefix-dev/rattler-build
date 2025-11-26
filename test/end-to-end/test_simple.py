@@ -2528,3 +2528,79 @@ about:
             break
     else:
         pytest.fail("No valid git repository found in cache after re-clone")
+
+
+def test_topological_sort_with_variants(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that topological sort correctly orders packages with multiple variants.
+
+    This test verifies that when multiple packages have variants (e.g., different
+    Python versions), the topological sort correctly orders ALL variants of
+    dependencies before ALL variants of packages that depend on them.
+
+    The test uses:
+    - pkg-a: no dependencies, 2 Python variants
+    - pkg-b: depends on pkg-a, 2 Python variants
+    - pkg-c: depends on pkg-b, 2 Python variants
+
+    Expected order: all pkg-a variants, then all pkg-b variants, then all pkg-c variants.
+    """
+    recipe_dir = recipes / "topological-sort-variants"
+
+    # Use render-only to get the sorted output order without actually building
+    args = ["build", "--recipe-dir", str(recipe_dir), "--render-only"]
+    output = check_output(
+        [str(rattler_build.path), *args],
+        stderr=STDOUT,
+        text=True,
+        encoding="utf-8",
+    )
+
+    # Parse the JSON output to get package names in order
+    # The output after the build variant messages is JSON
+    json_start = output.find("[")
+    if json_start == -1:
+        pytest.fail("Could not find JSON output in render-only response")
+
+    rendered = json.loads(output[json_start:])
+
+    # Extract package names in order
+    package_names = [r["recipe"]["package"]["name"] for r in rendered]
+
+    # Find first occurrence of each package
+    first_a = next((i for i, name in enumerate(package_names) if name == "pkg-a"), -1)
+    first_b = next((i for i, name in enumerate(package_names) if name == "pkg-b"), -1)
+    first_c = next((i for i, name in enumerate(package_names) if name == "pkg-c"), -1)
+
+    # Find last occurrence of each package
+    last_a = (
+        len(package_names)
+        - 1
+        - next(
+            (i for i, name in enumerate(reversed(package_names)) if name == "pkg-a"), -1
+        )
+    )
+    last_b = (
+        len(package_names)
+        - 1
+        - next(
+            (i for i, name in enumerate(reversed(package_names)) if name == "pkg-b"), -1
+        )
+    )
+
+    # Verify correct ordering:
+    # All pkg-a variants should come before any pkg-b variant
+    assert (
+        last_a < first_b
+    ), f"All pkg-a variants ({first_a}-{last_a}) should come before pkg-b ({first_b})"
+
+    # All pkg-b variants should come before any pkg-c variant
+    assert (
+        last_b < first_c
+    ), f"All pkg-b variants ({first_b}-{last_b}) should come before pkg-c ({first_c})"
+
+    # Verify we have the expected number of packages (2 variants each = 6 total)
+    assert (
+        len(package_names) == 6
+    ), f"Expected 6 packages (2 variants each), got {len(package_names)}"
