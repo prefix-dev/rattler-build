@@ -3,6 +3,7 @@
 //! rattler-build library.
 
 pub mod build;
+pub mod bump_recipe;
 pub mod cache;
 pub mod conda_build_config;
 pub mod console_utils;
@@ -12,6 +13,7 @@ pub mod opt;
 pub mod package_test;
 pub mod packaging;
 pub mod recipe;
+pub mod recipe_updater;
 pub mod render;
 pub mod script;
 pub mod selectors;

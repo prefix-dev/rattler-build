@@ -1,6 +1,6 @@
 context:
   name: xtensor
-  version: 0.24.6
+  version: 0.26.0
 
 package:
   name: ${{ name|lower }}
@@ -8,7 +8,7 @@ package:
 
 source:
   url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
+  sha256: f5f42267d850f781d71097b50567a480a82cd6875a5ec3e6238555e0ef987dc6
 build:
   number: 0
 

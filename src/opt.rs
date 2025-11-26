@@ -85,6 +85,13 @@ pub enum SubCommands {
     /// Package-related subcommands
     #[command(subcommand)]
     Package(PackageCommands),
+
+    /// Bump a recipe to a new version
+    ///
+    /// This command updates the version and SHA256 checksum(s) in a recipe file.
+    /// It can either use a specified version or auto-detect the latest version
+    /// from supported providers (GitHub, PyPI, crates.io).
+    BumpRecipe(BumpRecipeOpts),
 }
 
 /// Options for the debug-shell command
@@ -1197,4 +1204,29 @@ pub struct ExtractOpts {
     /// Destination directory for extraction (defaults to package name without extension)
     #[arg(short = 'd', long)]
     pub dest: Option<PathBuf>,
+}
+
+/// Options for the `bump-recipe` command.
+#[derive(Parser, Debug, Clone)]
+pub struct BumpRecipeOpts {
+    /// Path to the recipe file (recipe.yaml). Defaults to current directory.
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// The new version to bump to. If not specified, will auto-detect the latest
+    /// version from the source URL's provider (GitHub, PyPI, crates.io).
+    #[arg(long)]
+    pub version: Option<String>,
+
+    /// Include pre-release versions when auto-detecting (e.g., alpha, beta, rc).
+    #[arg(long, default_value = "false")]
+    pub include_prerelease: bool,
+
+    /// Only check for updates without modifying the recipe.
+    #[arg(long, default_value = "false")]
+    pub check_only: bool,
+
+    /// Perform a dry-run: show what would be changed without writing to the file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
 }
