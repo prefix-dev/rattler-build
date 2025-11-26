@@ -13,7 +13,6 @@ pub mod opt;
 pub mod package_test;
 pub mod packaging;
 pub mod recipe;
-pub mod recipe_updater;
 pub mod render;
 pub mod script;
 pub mod selectors;
