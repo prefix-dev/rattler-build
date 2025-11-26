@@ -1,22 +1,20 @@
-<h1>
-  <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/3bad9a38-939d-4513-8c61-dcc4ddb7fb51">
-  </a>
-</h1>
+<img style="max-width: 30%" src="assets/paxton-builder-mascot.svg" />
 
 # `rattler-build`: A Fast Conda Package Builder
 
-The `rattler-build` tooling and library creates cross-platform relocatable
-binaries / packages from a simple recipe format. The recipe format is heavily
-inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
-run is a package that can be installed using `mamba`, `rattler` or `conda`.
+The `rattler-build` tool creates cross-platform relocatable packages from a simple recipe format. 
+The recipe format is heavily inspired by `conda-build` and `boa`, and the output of `rattler-build`
+is a standard "conda" package that can be installed using [`pixi`](https://pixi.sh), 
+[`mamba`](https://github.com/mamba-org/mamba) or [`conda`](https://docs.conda.io).
 
 `rattler-build` does not have any dependencies on `conda-build` or Python and
 works as a standalone binary.
 
+You can use `rattler-build` to publish packages to prefix.dev, anaconda.org, JFrog Artifactory, S3 buckets, or Quetz Servers.
+
 ![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
 
-### Installation
+## Installation
 
 The recommended way of installing `rattler-build`, being a conda-package builder, is through a conda package manager.
 Next to `rattler-build` we are also building [`pixi`](https://pixi.sh).
@@ -28,6 +26,7 @@ pixi global install rattler-build
 ```
 
 Other options are:
+
 === "Conda"
     ```shell
     conda install rattler-build -c conda-forge
@@ -47,6 +46,7 @@ Other options are:
     ```shell
     pacman -S rattler-build
     ```
+
 === "Binary"
     ```shell
     # Download the latest release from the GitHub releases page, for example the linux x86 version with curl:
@@ -55,7 +55,7 @@ Other options are:
     You can grab version of `rattler-build` from the [Github
     Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
-### Completion
+## Completion
 
 When installing `rattler-build` you might want to enable shell completion.
 Afterwards, restart the shell or source the shell config file.
@@ -65,6 +65,7 @@ Afterwards, restart the shell or source the shell config file.
 ```bash
 echo 'eval "$(rattler-build completion --shell bash)"' >> ~/.bashrc
 ```
+
 ### Zsh (default on macOS)
 
 ```zsh
@@ -118,10 +119,6 @@ executed as subprocess. We plan to reduce the number of external dependencies
 over time by writing what we need in Rust to make `rattler-build` fully
 self-contained.
 
-* `tar` to unpack tarballs downloaded from the internet in a variety of formats.
-  `.gz`, `.bz2` and `.xz` are widely used and one might have to install the
-  compression packages as well (e.g. `gzip`, `bzip2`, ...)
-* `patch` to patch source code after downloading
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
@@ -130,10 +127,6 @@ self-contained.
   in the future)
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
-
-On Windows, to obtain these dependencies from conda-forge, one can install
-`m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
-
 
 ### GitHub Action
 
@@ -147,8 +140,6 @@ There is a GitHub Action for `rattler-build`. It can be used to install `rattler
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml
-
-
 context:
   name: xtensor
   version: 0.24.6

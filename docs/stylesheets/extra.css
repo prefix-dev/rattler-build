@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Text:ital@0;1&display=swap');
+
 .md-header__topic {
-  font-family: 'Dosis', sans-serif;
+  font-family: 'DM Serif Text', serif;
 }
 
 [data-md-color-primary=prefix] {
@@ -11,7 +13,7 @@
 }
 
 [data-md-color-accent=prefix] {
-  --md-accent-fg-color: #fa0;
+  --md-accent-fg-color: #CCC;
   --md-accent-fg-color--transparent: #ffaa001a;
   --md-accent-bg-color: #000000de;
   --md-accent-bg-color--light: #0000008a
@@ -38,10 +40,6 @@
   --md-accent-bg-color--light: #0000008a
 }
 
-[data-md-color-primary=prefix-light] .md-logo {
-  filter: invert(1);
-}
-
 .md-nav__item .md-nav__link--active, .md-nav__item .md-nav__link--active code {
   color: var(--md-accent-fg-color);
   font-weight: bold;
@@ -54,8 +52,9 @@
 .md-typeset h1 {
   color: var(--md-accent-fg-color);
 }
+
 .md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4, .md-typeset h5, .md-typeset h6 {
-  font-family: 'Dosis', sans-serif;
+  font-family: 'DM Serif Text', serif;
   font-weight: 500;
   color: var(--md-accent-fg-color);
 }

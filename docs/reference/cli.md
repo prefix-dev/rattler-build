@@ -20,6 +20,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `create-patch` — Create a patch for a directory
 * `debug-shell` — Open a debug shell in the build environment
 * `package` — Package-related subcommands
+* `bump-recipe` — Bump a recipe to a new version
 
 ##### **Options:**
 
@@ -1394,6 +1395,45 @@ Extract a conda package to a directory
 - `-d`, `--dest <DEST>`
 
 	Destination directory for extraction (defaults to package name without extension)
+
+
+
+
+
+### `bump-recipe`
+
+Bump a recipe to a new version
+
+This command updates the version and SHA256 checksum(s) in a recipe file. It can either use a specified version or auto-detect the latest version from supported providers (GitHub, PyPI, crates.io).
+
+**Usage:** `rattler-build bump-recipe [OPTIONS]`
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPE>`
+
+	Path to the recipe file (recipe.yaml). Defaults to current directory
+
+	- Default value: `.`
+
+- `--version <VERSION>`
+
+	The new version to bump to. If not specified, will auto-detect the latest version from the source URL's provider (GitHub, PyPI, crates.io)
+
+
+- `--include-prerelease`
+
+	Include pre-release versions when auto-detecting (e.g., alpha, beta, rc)
+
+
+- `--check-only`
+
+	Only check for updates without modifying the recipe
+
+
+- `--dry-run`
+
+	Perform a dry-run: show what would be changed without writing to the file
 
 
 
