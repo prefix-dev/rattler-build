@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.51.0"
+version = "0.52.0"
 edition = "2024"
 license = "BSD-3-Clause"
 publish = false
@@ -22,19 +22,19 @@ pyo3 = { version = "0.27.1", features = [
   "multiple-pymethods",
   "chrono",
 ] }
-tokio = { version = "1.47.1", features = [
+tokio = { version = "1.48.0", features = [
   "rt",
   "macros",
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.42.0"
-rattler_config = "0.2.19"
-rattler_networking = { version = "0.25.25" }
-clap = "4.5.48"
+rattler_conda_types = "0.42.1"
+rattler_config = "0.2.20"
+rattler_networking = { version = "0.25.26" }
+clap = "4.5.53"
 url = "2.5.7"
 chrono = "0.4.42"
-rattler_upload = "0.4.3"
+rattler_upload = "0.4.4"
 miette = "7.6.0"
 serde_json = "1.0.145"
 pythonize = "0.27.0"
