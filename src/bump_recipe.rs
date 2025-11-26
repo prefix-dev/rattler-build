@@ -233,71 +233,93 @@ impl RecipeContext {
     }
 }
 
-/// Detect the version provider from a URL
+/// Detect the version provider from a rendered URL
+///
+/// This function expects a fully-rendered URL (Jinja templates already resolved).
 pub fn detect_provider(url: &str) -> Result<VersionProvider, BumpRecipeError> {
-    // Try to parse as URL, handling Jinja2 templates
-    let clean_url = url
-        .replace("${{", "")
-        .replace("}}", "")
-        .replace("{{ ", "")
-        .replace(" }}", "");
-
     // GitHub patterns
-    let github_patterns = [
-        // https://github.com/owner/repo/archive/...
-        Regex::new(r"github\.com/([^/]+)/([^/]+)/archive").unwrap(),
-        // https://github.com/owner/repo/releases/download/...
-        Regex::new(r"github\.com/([^/]+)/([^/]+)/releases/download").unwrap(),
-        // https://api.github.com/repos/owner/repo/tarball/...
-        Regex::new(r"api\.github\.com/repos/([^/]+)/([^/]+)/tarball").unwrap(),
-        // Raw githubusercontent
-        Regex::new(r"raw\.githubusercontent\.com/([^/]+)/([^/]+)").unwrap(),
-    ];
-
-    for pattern in &github_patterns {
-        if let Some(caps) = pattern.captures(&clean_url) {
-            return Ok(VersionProvider::GitHub {
-                owner: caps[1].to_string(),
-                repo: caps[2].to_string(),
-            });
-        }
+    if let Some(caps) = Regex::new(r"github\.com/([^/]+)/([^/]+)/archive")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::GitHub {
+            owner: caps[1].to_string(),
+            repo: caps[2].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"github\.com/([^/]+)/([^/]+)/releases/download")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::GitHub {
+            owner: caps[1].to_string(),
+            repo: caps[2].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"api\.github\.com/repos/([^/]+)/([^/]+)/tarball")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::GitHub {
+            owner: caps[1].to_string(),
+            repo: caps[2].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"raw\.githubusercontent\.com/([^/]+)/([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::GitHub {
+            owner: caps[1].to_string(),
+            repo: caps[2].to_string(),
+        });
     }
 
     // PyPI patterns
-    let pypi_patterns = [
-        // https://pypi.io/packages/source/p/package/...
-        Regex::new(r"pypi\.io/packages/source/./([^/]+)").unwrap(),
-        // https://files.pythonhosted.org/packages/source/p/package/...
-        Regex::new(r"files\.pythonhosted\.org/packages/source/./([^/]+)").unwrap(),
-        // https://pypi.org/packages/source/p/package/...
-        Regex::new(r"pypi\.org/packages/source/./([^/]+)").unwrap(),
-    ];
-
-    for pattern in &pypi_patterns {
-        if let Some(caps) = pattern.captures(&clean_url) {
-            return Ok(VersionProvider::PyPI {
-                package: caps[1].to_string(),
-            });
-        }
+    if let Some(caps) = Regex::new(r"pypi\.io/packages/source/./([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::PyPI {
+            package: caps[1].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"files\.pythonhosted\.org/packages/source/./([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::PyPI {
+            package: caps[1].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"pypi\.org/packages/source/./([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::PyPI {
+            package: caps[1].to_string(),
+        });
     }
 
     // crates.io patterns
-    let crates_pattern = Regex::new(r"crates\.io/api/v1/crates/([^/]+)").unwrap();
-    if let Some(caps) = crates_pattern.captures(&clean_url) {
+    if let Some(caps) = Regex::new(r"crates\.io/api/v1/crates/([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
+        return Ok(VersionProvider::CratesIo {
+            crate_name: caps[1].to_string(),
+        });
+    }
+    if let Some(caps) = Regex::new(r"static\.crates\.io/crates/([^/]+)")
+        .unwrap()
+        .captures(url)
+    {
         return Ok(VersionProvider::CratesIo {
             crate_name: caps[1].to_string(),
         });
     }
 
-    // Also check for static.crates.io
-    let static_crates_pattern = Regex::new(r"static\.crates\.io/crates/([^/]+)").unwrap();
-    if let Some(caps) = static_crates_pattern.captures(&clean_url) {
-        return Ok(VersionProvider::CratesIo {
-            crate_name: caps[1].to_string(),
-        });
-    }
-
-    // Fall back to generic provider with the URL template
+    // Fall back to generic provider
     Ok(VersionProvider::Generic {
         url_template: url.to_string(),
     })
