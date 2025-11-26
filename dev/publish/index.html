@@ -1648,7 +1648,7 @@ The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local fil
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./some/recipe.yaml<span class="w"> </span>--to<span class="w"> </span>artifactory://my-secret.company.com/package-channel
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># on prefix.dev you can also automatically add a sigstore attestation</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--create-attestation
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
 </span></code></pre></div>
 <p>The following schema is used:</p>
 <ul>
