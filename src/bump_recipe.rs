@@ -135,12 +135,34 @@ struct CrateInfo {
 pub struct RecipeContext {
     /// The version from the context section (the raw, literal value)
     pub version: Option<String>,
+    /// The build number (from context or build.number)
+    pub build_number: Option<BuildNumber>,
     /// The source URL(s) - these are the raw templates
     pub source_urls: Vec<String>,
     /// The SHA256 checksum(s)
     pub sha256_checksums: Vec<String>,
     /// Raw context templates (key -> raw value, may contain Jinja expressions)
     pub raw_context: IndexMap<String, String>,
+}
+
+/// Location and value of the build number
+#[derive(Debug, Clone)]
+pub struct BuildNumber {
+    /// The current build number value
+    pub value: u64,
+    /// Where the build number is defined
+    pub location: BuildNumberLocation,
+}
+
+/// Where the build number is defined in the recipe
+#[derive(Debug, Clone, PartialEq)]
+pub enum BuildNumberLocation {
+    /// In context section as "number"
+    ContextNumber,
+    /// In context section as "build_number"
+    ContextBuildNumber,
+    /// In build.number
+    BuildSection,
 }
 
 impl RecipeContext {
@@ -181,8 +203,34 @@ impl RecipeContext {
                     {
                         ctx.version = Some(value_str);
                     }
+
+                    // Check for build number in context (number or build_number)
+                    if (key_str == "number" || key_str == "build_number")
+                        && let Some(num) = value.as_u64()
+                    {
+                        let location = if key_str == "number" {
+                            BuildNumberLocation::ContextNumber
+                        } else {
+                            BuildNumberLocation::ContextBuildNumber
+                        };
+                        ctx.build_number = Some(BuildNumber {
+                            value: num,
+                            location,
+                        });
+                    }
                 }
             }
+        }
+
+        // Extract build.number if not found in context
+        if ctx.build_number.is_none()
+            && let Some(build) = yaml.get("build").and_then(|v| v.as_mapping())
+            && let Some(num) = build.get("number").and_then(|v| v.as_u64())
+        {
+            ctx.build_number = Some(BuildNumber {
+                value: num,
+                location: BuildNumberLocation::BuildSection,
+            });
         }
 
         // Extract source URLs from the source section
@@ -488,6 +536,30 @@ pub async fn fetch_sha256(client: &Client, url: &str) -> Result<Sha256Hash, Bump
     Ok(hasher.finalize())
 }
 
+/// Reset the build number to 0 in the recipe content
+///
+/// Uses regex to find and replace the build number while preserving formatting.
+fn reset_build_number(content: &str, build_num: &BuildNumber) -> String {
+    let pattern = match build_num.location {
+        BuildNumberLocation::ContextNumber => {
+            // Match "number: <value>" in context section
+            format!(r"(\s+number:\s*){}", build_num.value)
+        }
+        BuildNumberLocation::ContextBuildNumber => {
+            // Match "build_number: <value>" in context section
+            format!(r"(\s+build_number:\s*){}", build_num.value)
+        }
+        BuildNumberLocation::BuildSection => {
+            // Match "number: <value>" in build section
+            format!(r"(\s+number:\s*){}", build_num.value)
+        }
+    };
+
+    Regex::new(&pattern)
+        .map(|re| re.replace(content, "${1}0").to_string())
+        .unwrap_or_else(|_| content.to_string())
+}
+
 /// Build a URL with a specific version using proper Jinja rendering
 ///
 /// This function uses the real Jinja rendering engine with the full context
@@ -569,6 +641,7 @@ pub async fn bump_recipe(
     client: &Client,
     include_prerelease: bool,
     dry_run: bool,
+    keep_build_number: bool,
 ) -> Result<BumpResult, BumpRecipeError> {
     // Parse the recipe to get current version and URLs
     let ctx = RecipeContext::from_recipe_file(recipe_path)?;
@@ -630,6 +703,15 @@ pub async fn bump_recipe(
         // Replace SHA256 checksums in order
         for (old_sha, new_sha) in ctx.sha256_checksums.iter().zip(new_sha256s.iter()) {
             content = content.replacen(old_sha, new_sha, 1);
+        }
+
+        // Reset build number to 0 (unless --keep-build-number is set)
+        if !keep_build_number
+            && let Some(build_num) = &ctx.build_number
+            && build_num.value != 0
+        {
+            content = reset_build_number(&content, build_num);
+            tracing::debug!("Reset build number from {} to 0", build_num.value);
         }
 
         // Write the updated content back
@@ -868,5 +950,83 @@ source:
         assert_eq!(ctx.version, Some("2.0.0".to_string()));
         assert_eq!(ctx.source_urls.len(), 2);
         assert_eq!(ctx.sha256_checksums.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_build_number_from_build_section() {
+        let yaml = r#"
+context:
+  version: "1.0.0"
+
+build:
+  number: 5
+"#;
+
+        let ctx = RecipeContext::from_yaml_content(yaml).unwrap();
+        assert!(ctx.build_number.is_some());
+        let build_num = ctx.build_number.unwrap();
+        assert_eq!(build_num.value, 5);
+        assert_eq!(build_num.location, BuildNumberLocation::BuildSection);
+    }
+
+    #[test]
+    fn test_parse_build_number_from_context() {
+        let yaml = r#"
+context:
+  version: "1.0.0"
+  build_number: 3
+
+build:
+  number: ${{ build_number }}
+"#;
+
+        let ctx = RecipeContext::from_yaml_content(yaml).unwrap();
+        assert!(ctx.build_number.is_some());
+        let build_num = ctx.build_number.unwrap();
+        assert_eq!(build_num.value, 3);
+        assert_eq!(build_num.location, BuildNumberLocation::ContextBuildNumber);
+    }
+
+    #[test]
+    fn test_reset_build_number() {
+        let content = r#"
+context:
+  version: "1.0.0"
+
+build:
+  number: 5
+"#;
+
+        let build_num = BuildNumber {
+            value: 5,
+            location: BuildNumberLocation::BuildSection,
+        };
+
+        let result = reset_build_number(content, &build_num);
+        assert!(result.contains("number: 0"));
+        assert!(!result.contains("number: 5"));
+    }
+
+    #[test]
+    fn test_reset_build_number_in_context() {
+        let content = r#"
+context:
+  version: "1.0.0"
+  build_number: 7
+
+build:
+  number: ${{ build_number }}
+"#;
+
+        let build_num = BuildNumber {
+            value: 7,
+            location: BuildNumberLocation::ContextBuildNumber,
+        };
+
+        let result = reset_build_number(content, &build_num);
+        assert!(result.contains("build_number: 0"));
+        assert!(!result.contains("build_number: 7"));
+        // The ${{ build_number }} reference should be preserved
+        assert!(result.contains("${{ build_number }}"));
     }
 }

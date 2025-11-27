@@ -194,6 +194,7 @@ async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
             &client,
             opts.include_prerelease,
             opts.dry_run,
+            opts.keep_build_number,
         )
         .await
         {

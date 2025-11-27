@@ -1229,4 +1229,8 @@ pub struct BumpRecipeOpts {
     /// Perform a dry-run: show what would be changed without writing to the file.
     #[arg(long, default_value = "false")]
     pub dry_run: bool,
+
+    /// Keep the current build number instead of resetting it to 0.
+    #[arg(long, default_value = "false")]
+    pub keep_build_number: bool,
 }
