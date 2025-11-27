@@ -68,6 +68,46 @@ struct FilterConfig {
     ignored_files: Vec<&'static OsStr>,
 }
 
+impl FilterConfig {
+    /// Check if a file should be skipped based on the filter configuration.
+    /// Returns `Some(reason)` if the file should be skipped, `None` if it should be processed.
+    fn should_skip(&self, file_path: &Path, rel_path: &Path, check_add_pattern: bool) -> bool {
+        // Skip ignored files
+        if self
+            .ignored_files
+            .iter()
+            .any(|f| file_path.file_name().is_some_and(|n| n == *f))
+        {
+            tracing::debug!("Skipping ignored file: {}", file_path.display());
+            return true;
+        }
+
+        // Skip excluded files
+        if self.exclude.is_match(file_path) {
+            tracing::debug!("Skipping excluded file: {}", file_path.display());
+            return true;
+        }
+
+        // If include patterns are specified, skip files that don't match
+        if !self.include.is_empty() {
+            let matches_include =
+                self.include.is_match(file_path) || self.include.is_match(rel_path);
+            let matches_add =
+                check_add_pattern && (self.add.is_match(file_path) || self.add.is_match(rel_path));
+
+            if !matches_include && !matches_add {
+                tracing::debug!(
+                    "Skipping file (not matched by filter patterns): {}",
+                    file_path.display()
+                );
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 // ============================================================================
 // Section 2: Helper utilities (path formatting, glob building, etc.)
 // ============================================================================
@@ -416,23 +456,20 @@ fn process_modified_files(
         .filter(|e| e.file_type().is_file())
     {
         let modified_file = entry.path();
-        if filter_config
-            .ignored_files
-            .iter()
-            .any(|f| modified_file.file_name().is_some_and(|n| n == *f))
-            || filter_config.exclude.is_match(modified_file)
-        {
-            tracing::debug!("Skipping ignored file: {}", modified_file.display());
+        let rel_path = modified_file.strip_prefix(modified_dir)?;
+
+        // Check all filter conditions (ignored, excluded, include/add patterns)
+        if filter_config.should_skip(modified_file, rel_path, true) {
             continue;
         }
-        let rel_path = modified_file.strip_prefix(modified_dir)?;
+
         let patch_path = target_subdir
             .map(|sub| sub.join(rel_path))
             .unwrap_or_else(|| rel_path.to_path_buf());
 
         // Check if this is a binary file using content inspection
         if is_binary_file(modified_file)? {
-            tracing::warn!("Skipping binary file: {}", modified_file.display());
+            tracing::info!("Skipping binary file: {}", modified_file.display());
             continue;
         }
 
@@ -547,14 +584,13 @@ fn process_deleted_files(
     {
         let original_file = entry.path();
         let rel_path = original_file.strip_prefix(original_dir)?;
-        if filter_config
-            .ignored_files
-            .iter()
-            .any(|f| original_file.file_name().is_some_and(|n| n == *f))
-            || filter_config.exclude.is_match(original_file)
-        {
+
+        // Check all filter conditions (ignored, excluded, include patterns)
+        // Note: check_add_pattern=false since deleted files can't match --add
+        if filter_config.should_skip(original_file, rel_path, false) {
             continue;
         }
+
         let modified_file = modified_dir.join(rel_path);
         if !modified_file.exists() {
             // Only apply patches for files that were actually touched
