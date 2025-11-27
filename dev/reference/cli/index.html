@@ -872,6 +872,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../../bump_recipe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Bumping versions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../create_patch/" class="md-nav__link">
         
   
@@ -1563,6 +1586,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#bump-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      bump-recipe
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1774,6 +1806,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#bump-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      bump-recipe
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1821,6 +1862,7 @@
 <li><code>create-patch</code> — Create a patch for a directory</li>
 <li><code>debug-shell</code> — Open a debug shell in the build environment</li>
 <li><code>package</code> — Package-related subcommands</li>
+<li><code>bump-recipe</code> — Bump a recipe to a new version</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -2929,6 +2971,40 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-d</code>, <code>--dest &lt;DEST&gt;</code></p>
 <p>Destination directory for extraction (defaults to package name without extension)</p>
+</li>
+</ul>
+<h3 id="bump-recipe"><code>bump-recipe</code><a class="headerlink" href="#bump-recipe" title="Permanent link">#</a></h3>
+<p>Bump a recipe to a new version</p>
+<p>This command updates the version and SHA256 checksum(s) in a recipe file. It can either use a specified version or auto-detect the latest version from supported providers (GitHub, PyPI, crates.io).</p>
+<p><strong>Usage:</strong> <code>rattler-build bump-recipe [OPTIONS]</code></p>
+<h5 id="options_22"><strong>Options:</strong><a class="headerlink" href="#options_22" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
+<p>Path to the recipe file (recipe.yaml). Defaults to current directory</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
+</li>
+<li>
+<p><code>--version &lt;VERSION&gt;</code></p>
+<p>The new version to bump to. If not specified, will auto-detect the latest version from the source URL's provider (GitHub, PyPI, crates.io)</p>
+</li>
+<li>
+<p><code>--include-prerelease</code></p>
+<p>Include pre-release versions when auto-detecting (e.g., alpha, beta, rc)</p>
+</li>
+<li>
+<p><code>--check-only</code></p>
+<p>Only check for updates without modifying the recipe</p>
+</li>
+<li>
+<p><code>--dry-run</code></p>
+<p>Perform a dry-run: show what would be changed without writing to the file</p>
+</li>
+<li>
+<p><code>--keep-build-number</code></p>
+<p>Keep the current build number instead of resetting it to 0</p>
 </li>
 </ul>
 <hr/>
