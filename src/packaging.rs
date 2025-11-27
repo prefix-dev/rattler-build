@@ -559,7 +559,7 @@ fn print_enhanced_file_listing(
         .filter(|f| f.components().next() != Some(Component::Normal("info".as_ref())))
         .count();
 
-    tracing::info!("");
+    tracing::info!("\n");
     tracing::info!(
         "Package statistics: {} files ({} content, {} metadata), total size: {}",
         file_count,
