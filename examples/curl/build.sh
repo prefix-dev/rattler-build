@@ -1,5 +1,5 @@
 #!/bin/bash
-
+exit 1;
 # Get an updated config.sub and config.guess
 cp $BUILD_PREFIX/share/libtool/build-aux/config.* .
 
@@ -8,6 +8,8 @@ if [[ $target_platform =~ linux.* ]]; then
 else
     USESSL="--with-secure-transport"
 fi;
+
+
 
 ./configure \
     --prefix=${PREFIX} \

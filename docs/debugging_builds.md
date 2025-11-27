@@ -113,7 +113,7 @@ Inside the debug shell, you have access to:
 
 ## Debugging Workflow
 
-### Step 1: Build with --keep-build
+### Step 1: Build with `debug`
 
 You can use `rattler-build debug` to setup the build environments without executing the build scripts for manual debugging.
 If your recipe succeeds, but you still want to enter the debug-shell, you can use `--keep-build` to prevent cleanup:
