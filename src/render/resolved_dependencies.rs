@@ -371,7 +371,10 @@ impl Display for ResolvedDependencies {
 
 /// Render dependencies as (name, rest) pairs, sorted by name.
 /// When multiple dependencies have the same name, they will be grouped together.
+/// Empty specs are filtered out if there's already a versioned one for the same package.
 fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(String, String)> {
+    use std::collections::HashSet;
+
     // Collect all dependencies as (name, rest) pairs
     // The rendered string format is "name spec (annotation)" so we split on first space
     let mut items: Vec<(String, String)> = deps
@@ -388,7 +391,17 @@ fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(Stri
         })
         .collect();
 
-    // Sort by name to group same packages together
+    // Find packages that have at least one versioned entry
+    let has_versioned: HashSet<String> = items
+        .iter()
+        .filter(|(_, rest)| !rest.is_empty())
+        .map(|(name, _)| name.clone())
+        .collect();
+
+    // Filter out empty specs if there's a versioned one for the same package
+    items.retain(|(name, rest)| !rest.is_empty() || !has_versioned.contains(name));
+
+    // Sort alphabetically by name
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
     items
