@@ -340,3 +340,9 @@ impl Display for BuildOutput {
         self.format_table_with_option(f, comfy_table::presets::UTF8_FULL, false)
     }
 }
+
+impl crate::post_process::path_checks::WarningRecorder for BuildOutput {
+    fn record_warning(&self, warning: &str) {
+        self.record_warning(warning);
+    }
+}
