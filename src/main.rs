@@ -10,12 +10,12 @@ use std::{
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
-    build_recipes,
+    build_recipes, bump_recipe,
     console_utils::init_logging,
     debug_recipe, extract_package, get_recipe_path,
     opt::{
-        App, BuildData, DebugData, DebugShellOpts, PackageCommands, PublishData, RebuildData,
-        ShellCompletion, SubCommands, TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugShellOpts, PackageCommands, PublishData,
+        RebuildData, ShellCompletion, SubCommands, TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
     source::create_patch,
@@ -157,6 +157,62 @@ fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
             "Shell exited with status: {}",
             status
         )));
+    }
+
+    Ok(())
+}
+
+/// Run the bump-recipe command
+async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
+    // Resolve recipe path
+    let recipe_path = get_recipe_path(&opts.recipe)?;
+
+    // Create a simple HTTP client
+    let client = reqwest::Client::builder()
+        .user_agent("rattler-build")
+        .build()
+        .into_diagnostic()?;
+
+    if opts.check_only {
+        // Only check for updates
+        match bump_recipe::check_for_updates(&recipe_path, &client, opts.include_prerelease).await {
+            Ok(Some(new_version)) => {
+                tracing::info!("New version available: {}", new_version);
+            }
+            Ok(None) => {
+                tracing::info!("No new version available");
+            }
+            Err(e) => {
+                return Err(miette::miette!("Failed to check for updates: {}", e));
+            }
+        }
+    } else {
+        // Bump the recipe
+        match bump_recipe::bump_recipe(
+            &recipe_path,
+            opts.version.as_deref(),
+            &client,
+            opts.include_prerelease,
+            opts.dry_run,
+            opts.keep_build_number,
+        )
+        .await
+        {
+            Ok(result) => {
+                tracing::debug!("Provider: {:?}", result.provider);
+                tracing::debug!(
+                    "SHA256 changes: {:?} -> {:?}",
+                    result.old_sha256,
+                    result.new_sha256
+                );
+            }
+            Err(bump_recipe::BumpRecipeError::NoNewVersion(v)) => {
+                tracing::info!("Recipe is already at the latest version ({})", v);
+            }
+            Err(e) => {
+                return Err(miette::miette!("Failed to bump recipe: {}", e));
+            }
+        }
     }
 
     Ok(())
@@ -377,6 +433,7 @@ async fn async_main() -> miette::Result<()> {
             PackageCommands::Inspect(opts) => show_package_info(opts),
             PackageCommands::Extract(opts) => extract_package(opts).await,
         },
+        Some(SubCommands::BumpRecipe(opts)) => run_bump_recipe(opts).await,
         None => {
             _ = App::command().print_long_help();
             Ok(())
