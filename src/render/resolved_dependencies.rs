@@ -371,6 +371,7 @@ impl Display for ResolvedDependencies {
 
 /// Render dependencies as (name, rest) pairs, sorted by name.
 /// When multiple dependencies have the same name, they will be grouped together.
+/// Empty specs are shown as "*" to indicate "any version".
 fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(String, String)> {
     // Collect all dependencies as (name, rest) pairs
     // The rendered string format is "name spec (annotation)" so we split on first space
@@ -388,7 +389,14 @@ fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(Stri
         })
         .collect();
 
-    // Sort by name to group same packages together
+    // Replace empty specs with "*" to indicate "any version"
+    for (_, rest) in &mut items {
+        if rest.is_empty() {
+            *rest = "*".to_string();
+        }
+    }
+
+    // Sort alphabetically by name
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
     items
