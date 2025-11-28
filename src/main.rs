@@ -1,5 +1,10 @@
 //! This is the main entry point for the `rattler-build` binary.
 
+// Use custom allocators for improved performance when the `performance` feature is enabled.
+// This must be at the crate root to set the global allocator.
+#[cfg(feature = "performance")]
+use rattler_build_allocator as _;
+
 use std::{
     fs::File,
     io::{self, IsTerminal},
