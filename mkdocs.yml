@@ -96,6 +96,7 @@ extra:
 
 nav:
   - Home: index.md
+  - Getting started: getting_started.md
   - High-level overview: highlevel.md
   # - Tutorials:
   #     - Writing a recipe: tutorials/writing_recipe.md
@@ -137,6 +138,7 @@ nav:
       - Terminal User Interface (TUI): tui.md
       - Authentication & upload: authentication_and_upload.md
       - Publishing packages: publish.md
+      - Publishing to conda-forge: conda_forge.md
       - Automatic recipe linting: automatic_linting.md
 
   - Package:
