@@ -1,14 +1,13 @@
 <img style="max-width: 30%" src="assets/paxton-builder-mascot.svg" />
 
-# `rattler-build`: A Fast Conda Package Builder
+## A fast conda package builder: `rattler-build`
 
 The `rattler-build` tool creates cross-platform relocatable packages from a simple recipe format. 
 The recipe format is heavily inspired by `conda-build` and `boa`, and the output of `rattler-build`
 is a standard "conda" package that can be installed using [`pixi`](https://pixi.sh), 
 [`mamba`](https://github.com/mamba-org/mamba) or [`conda`](https://docs.conda.io).
 
-`rattler-build` does not have any dependencies on `conda-build` or Python and
-works as a standalone binary.
+`rattler-build` is implemented in Rust, does not have any dependencies on `conda-build` or Python and works as a standalone binary.
 
 You can use `rattler-build` to publish packages to prefix.dev, anaconda.org, JFrog Artifactory, S3 buckets, or Quetz Servers.
 
@@ -28,7 +27,7 @@ pixi global install rattler-build
 Other options are:
 
 === "Conda"
-    ```shell
+    ```bash
     conda install rattler-build -c conda-forge
 
     mamba install rattler-build -c conda-forge
@@ -39,78 +38,70 @@ Other options are:
     ```
 
 === "Homebrew"
-    ```shell
+    ```bash
     brew install rattler-build
     ```
 === "Arch Linux"
-    ```shell
+    ```bash
     pacman -S rattler-build
     ```
 
 === "Binary"
-    ```shell
+    ```bash
     # Download the latest release from the GitHub releases page, for example the linux x86 version with curl:
     curl -SL --progress-bar https://github.com/prefix-dev/rattler-build/releases/latest/download/rattler-build-x86_64-unknown-linux-musl
     ```
     You can grab version of `rattler-build` from the [Github
     Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
-## Completion
+??? note "Shell Completion"
+    When installing `rattler-build` you might want to enable shell completion.
+    Afterwards, restart the shell or source the shell config file.
 
-When installing `rattler-build` you might want to enable shell completion.
-Afterwards, restart the shell or source the shell config file.
+    === "Bash"
+        ```bash
+        echo 'eval "$(rattler-build completion --shell bash)"' >> ~/.bashrc
+        ```
 
-### Bash (default on most Linux systems)
+    === "Zsh"
+        ```zsh
+        echo 'eval "$(rattler-build completion --shell zsh)"' >> ~/.zshrc
+        ```
 
-```bash
-echo 'eval "$(rattler-build completion --shell bash)"' >> ~/.bashrc
-```
+    === "PowerShell"
+        ```pwsh
+        Add-Content -Path $PROFILE -Value '(& rattler-build completion --shell powershell) | Out-String | Invoke-Expression'
+        ```
 
-### Zsh (default on macOS)
+        !!! tip "Failure because no profile file exists"
+            Make sure your profile file exists, otherwise create it with:
+            ```PowerShell
+            New-Item -Path $PROFILE -ItemType File -Force
+            ```
 
-```zsh
-echo 'eval "$(rattler-build completion --shell zsh)"' >> ~/.zshrc
-```
+    === "Fish"
+        ```fish
+        echo 'rattler-build completion --shell fish | source' >> ~/.config/fish/config.fish
+        ```
 
-### PowerShell (pre-installed on all Windows systems)
+    === "Nushell"
+        Add the following to the end of your Nushell env file (find it by running `$nu.env-path` in Nushell):
 
-```pwsh
-Add-Content -Path $PROFILE -Value '(& rattler-build completion --shell powershell) | Out-String | Invoke-Expression'
-```
+        ```nushell
+        mkdir ~/.cache/rattler-build
+        rattler-build completion --shell nushell | save -f ~/.cache/rattler-build/completions.nu
+        ```
 
-!!! tip "Failure because no profile file exists"
-    Make sure your profile file exists, otherwise create it with:
-    ```PowerShell
-    New-Item -Path $PROFILE -ItemType File -Force
-    ```
+        And add the following to the end of your Nushell configuration (find it by running `$nu.config-path`):
 
+        ```nushell
+        use ~/.cache/rattler-build/completions.nu *
+        ```
 
-### Fish
-
-```fish
-echo 'rattler-build completion --shell fish | source' >> ~/.config/fish/config.fish
-```
-
-### Nushell
-
-Add the following to the end of your Nushell env file (find it by running `$nu.env-path` in Nushell):
-
-```nushell
-mkdir ~/.cache/rattler-build
-rattler-build completion --shell nushell | save -f ~/.cache/rattler-build/completions.nu
-```
-
-And add the following to the end of your Nushell configuration (find it by running `$nu.config-path`):
-
-```nushell
-use ~/.cache/rattler-build/completions.nu *
-```
-
-### Elvish
-
-```elv
-echo 'eval (rattler-build completion --shell elvish | slurp)' >> ~/.elvish/rc.elv
-```
+    === "Elvish"
+        ```elv
+        echo 'eval (rattler-build completion --shell elvish | slurp)' >> ~/.elvish/rc.elv
+        ```
 
 ### Dependencies
 

@@ -50,7 +50,7 @@ theme:
     - navigation.instant
     - navigation.instant.progress
     - navigation.tracking
-    - navigation.sections
+    - navigation.indexes
     - navigation.top
     - navigation.footer
 
@@ -100,6 +100,7 @@ nav:
   # - Tutorials:
   #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
+      - tutorials/index.md
       - "Python": tutorials/python.md
       - "C++": tutorials/cpp.md
       - "Javascript": tutorials/javascript.md
