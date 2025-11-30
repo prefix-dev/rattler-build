@@ -9,7 +9,7 @@ theme:
   favicon: assets/favicon.png
   logo: assets/powerdrill.png
   font:
-    text: Red Hat Text
+    text: Inter
     code: JetBrains Mono
 
   palette:
