@@ -21,8 +21,9 @@ generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]
-build-docs = "mkdocs build --strict"
-docs = "mkdocs serve"
+download-font = "bash docs/layouts/download-font-to-cache.sh"
+build-docs = { cmd = "mkdocs build --strict", depends-on = ["download-font"] }
+docs = { cmd = "mkdocs serve", depends-on = ["download-font"] }
 deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
 deploy-dev = "mike deploy --push dev devel"
 
