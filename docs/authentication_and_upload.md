@@ -2,8 +2,38 @@
 
 ## Authenticating with a server
 
-You may want to use private channels for which you need to be authenticated. To
-do this ephemerally you can use the `RATTLER_AUTH_FILE` environment variable to
+You may want to use private channels for which you need to be authenticated.
+There are two ways to configure authentication: using the `rattler-build auth` command
+for persistent storage, or the `RATTLER_AUTH_FILE` environment variable for ephemeral use.
+
+### Using `rattler-build auth` (recommended)
+
+The `auth` command stores credentials securely in your system's keychain. This is the
+recommended approach for interactive use.
+
+```bash
+# Login to prefix.dev with a token
+rattler-build auth login prefix.dev --token <your_token>
+
+# Login to anaconda.org with a conda token
+rattler-build auth login anaconda.org --conda-token <your_token>
+
+# Login with basic HTTP authentication (e.g., Artifactory)
+rattler-build auth login my-artifactory.com --username <user> --password <pass>
+
+# Login to an S3 bucket
+rattler-build auth login s3://my-bucket --s3-access-key-id <key> --s3-secret-access-key <secret>
+
+# Remove stored credentials
+rattler-build auth logout prefix.dev
+```
+
+Once logged in, `rattler-build` will automatically use these credentials when accessing
+the corresponding hosts.
+
+### Using `RATTLER_AUTH_FILE` (ephemeral)
+
+For CI/CD or ephemeral environments, you can use the `RATTLER_AUTH_FILE` environment variable to
 point to a JSON file with the following structure:
 
 ```json
