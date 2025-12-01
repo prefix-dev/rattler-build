@@ -126,6 +126,7 @@ nav:
       - Multiple output cache: multiple_output_cache.md
       - Sandbox: sandbox.md
       - Generating recipes: recipe_generation.md
+      - Bumping versions: bump_recipe.md
       - Creating patches: create_patch.md
       - Debugging builds: debugging_builds.md
       - Tips and tricks: tips_and_tricks.md

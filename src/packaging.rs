@@ -8,11 +8,12 @@ use std::{
 
 use fs_err as fs;
 use fs_err::File;
+use indicatif::HumanBytes;
 use metadata::clean_url;
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
-    package::{ArchiveType, PackageFile, PathsJson},
+    package::{ArchiveType, PackageFile, PathType, PathsJson},
 };
 use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_package};
 use unicode_normalization::UnicodeNormalization;
@@ -377,6 +378,219 @@ where
     result
 }
 
+/// Print enhanced file listing with sizes, symlink targets, and warnings.
+fn print_enhanced_file_listing(
+    files: &[&Path],
+    tmp: &TempFiles,
+    output: &Output,
+) -> Result<(), PackagingError> {
+    use crate::post_process::path_checks::perform_path_checks;
+
+    let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
+
+    // Get all path entries for path checks
+    let path_entries: Vec<rattler_conda_types::package::PathsEntry> = files
+        .iter()
+        .map(|f| {
+            let full_path = tmp.temp_dir.path().join(f);
+            let metadata = fs::metadata(&full_path).unwrap_or_else(|_| {
+                // Create a dummy metadata for directories or if file doesn't exist
+                fs::metadata(".").unwrap()
+            });
+
+            let path_type = if full_path.is_symlink() {
+                PathType::SoftLink
+            } else if full_path.is_dir() {
+                PathType::Directory
+            } else {
+                PathType::HardLink
+            };
+
+            rattler_conda_types::package::PathsEntry {
+                relative_path: f.to_path_buf(),
+                path_type,
+                sha256: None,
+                prefix_placeholder: None,
+                no_link: false,
+                // Don't include size for directories or symlinks
+                size_in_bytes: if path_type == PathType::Directory
+                    || path_type == PathType::SoftLink
+                {
+                    None
+                } else {
+                    Some(metadata.len())
+                },
+            }
+        })
+        .collect();
+
+    // Run comprehensive path checks and record warnings to output
+    perform_path_checks(output, &path_entries);
+
+    // Collect per-file warnings for display purposes
+    let mut path_warnings: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    for entry in &path_entries {
+        let mut warnings = Vec::new();
+        let path = &entry.relative_path;
+
+        if let Some(path_str) = path.to_str() {
+            if !path_str.is_ascii() {
+                warnings.push("Contains non-ASCII characters".to_string());
+            }
+            if path_str.contains(' ') {
+                warnings.push("Contains spaces".to_string());
+            }
+            if path_str.len() > 200 {
+                warnings.push(format!("Path too long ({} > 200)", path_str.len()));
+            }
+        }
+
+        if !warnings.is_empty() {
+            path_warnings.insert(path.clone(), warnings);
+        }
+    }
+
+    // Helper to check if a file is executable
+    #[cfg(unix)]
+    fn is_executable(path: &Path) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(path) {
+            metadata.permissions().mode() & 0o111 != 0
+        } else {
+            false
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn is_executable(path: &Path) -> bool {
+        // On Windows, check for common executable file extensions
+        const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "bat", "cmd", "com", "ps1"];
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| EXECUTABLE_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+    }
+
+    // Print each file with enhanced information
+    for (index, file) in files.iter().enumerate() {
+        let full_path = tmp.temp_dir.path().join(file);
+        let is_info = file.components().next() == Some(Component::Normal("info".as_ref()));
+        let normalized_path = normalize_path(file);
+        let is_last = index == files.len() - 1;
+        let is_symlink = full_path.is_symlink();
+        let is_exec = !is_symlink && is_executable(&full_path);
+
+        // Get file size (don't show for symlinks)
+        let size_info = if is_symlink {
+            String::new()
+        } else if let Ok(metadata) = fs::metadata(&full_path) {
+            if full_path.is_dir() {
+                " (dir)".to_string()
+            } else {
+                format!(" ({})", HumanBytes(metadata.len()))
+            }
+        } else {
+            String::new()
+        };
+
+        // Check if it's a symlink and get target
+        let symlink_info = if is_symlink {
+            match fs::read_link(&full_path) {
+                Ok(target) => {
+                    let target_str = target.display().to_string();
+                    format!(" -> {}", console::style(target_str).cyan())
+                }
+                Err(_) => " -> <invalid symlink>".to_string(),
+            }
+        } else {
+            String::new()
+        };
+
+        // Choose the appropriate tree character
+        let tree_char = if is_last { "└─" } else { "├─" };
+
+        // Format the main file entry with appropriate styling
+        let file_entry = if is_info {
+            format!(
+                "  {} {}{}{}",
+                tree_char,
+                console::style(&normalized_path).dim(),
+                console::style(&size_info).dim(),
+                symlink_info
+            )
+        } else if is_symlink {
+            format!(
+                "  {} {}{}",
+                tree_char,
+                console::style(&normalized_path).magenta(),
+                symlink_info
+            )
+        } else if is_exec {
+            format!(
+                "  {} {}{}",
+                tree_char,
+                console::style(&normalized_path).green(),
+                console::style(&size_info).dim(),
+            )
+        } else {
+            format!(
+                "  {} {}{}{}",
+                tree_char,
+                normalized_path,
+                console::style(&size_info).dim(),
+                symlink_info
+            )
+        };
+
+        tracing::info!("{}", file_entry);
+
+        // Print warnings for this file
+        if let Some(warnings) = path_warnings.get(&file.to_path_buf()) {
+            for warning in warnings {
+                tracing::warn!("       └─ {}", console::style(warning).yellow());
+            }
+        }
+    }
+
+    // Print package statistics
+    let total_size: u64 = path_entries.iter().filter_map(|e| e.size_in_bytes).sum();
+    let file_count = path_entries.len();
+    let non_info_count = files
+        .iter()
+        .filter(|f| f.components().next() != Some(Component::Normal("info".as_ref())))
+        .count();
+
+    tracing::info!("\n");
+    tracing::info!(
+        "Package statistics: {} files ({} content, {} metadata), total size: {}",
+        file_count,
+        non_info_count,
+        file_count - non_info_count,
+        HumanBytes(total_size)
+    );
+
+    // Show largest files (top 5)
+    let mut files_with_sizes: Vec<_> = path_entries
+        .iter()
+        .filter(|e| e.size_in_bytes.is_some() && e.size_in_bytes.unwrap() > 0)
+        .collect();
+    files_with_sizes.sort_by(|a, b| b.size_in_bytes.cmp(&a.size_in_bytes));
+
+    if !files_with_sizes.is_empty() {
+        tracing::info!("Largest files:");
+        for entry in files_with_sizes.iter().take(5) {
+            let size = entry.size_in_bytes.unwrap_or(0);
+            let path_str = entry.relative_path.display().to_string().replace('\\', "/");
+            tracing::info!(
+                "  {} - {}",
+                console::style(HumanBytes(size)).cyan(),
+                path_str
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -469,15 +683,7 @@ pub fn package_conda(
         output.record_warning(&warn_str);
     }
 
-    let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
-
-    files.iter().for_each(|f| {
-        if f.components().next() == Some(Component::Normal("info".as_ref())) {
-            tracing::info!("  - {}", console::style(normalize_path(f)).dim())
-        } else {
-            tracing::info!("  - {}", normalize_path(f))
-        }
-    });
+    print_enhanced_file_listing(&files, &tmp, output)?;
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());

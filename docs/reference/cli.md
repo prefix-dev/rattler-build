@@ -1436,6 +1436,11 @@ This command updates the version and SHA256 checksum(s) in a recipe file. It can
 	Perform a dry-run: show what would be changed without writing to the file
 
 
+- `--keep-build-number`
+
+	Keep the current build number instead of resetting it to 0
+
+
 
 
 
