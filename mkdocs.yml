@@ -164,7 +164,7 @@ plugins:
   - social:
       cards_layout_dir: docs/layouts
       cards_layout: custom
-      debug: false
+      debug: true
 
   - mkdocstrings:
       default_handler: python
