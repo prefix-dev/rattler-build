@@ -161,7 +161,11 @@ nav:
 
 plugins:
   - search
-  - social
+  - social:
+      cards_layout_dir: docs/layouts
+      cards_layout: custom
+      debug: false
+
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -180,3 +184,6 @@ plugins:
 # version_selector: true
 # css_dir: css
 # javascript_dir: js
+
+watch:
+  - docs/layouts
