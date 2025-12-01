@@ -39,7 +39,6 @@ package:
     assert isinstance(hash_info.prefix, str)
     # Hash should be 7 characters
     assert len(hash_info.hash) == 7
-    print(f"Hash: {hash_info.hash}, Prefix: {hash_info.prefix}")
 
 
 def test_pin_subpackages_type() -> None:
@@ -108,8 +107,6 @@ outputs:
         assert pin_info.name == "test-lib"
         assert pin_info.version == "1.0.0"
 
-        print(f"Pin info - name: {pin_info.name}, version: {pin_info.version}, exact: {pin_info.exact}")
-
 
 def test_hash_info_repr() -> None:
     """Test the __repr__ of HashInfo."""
@@ -132,7 +129,6 @@ package:
         assert "HashInfo" in repr_str
         assert "hash=" in repr_str
         assert "prefix=" in repr_str
-        print(f"HashInfo repr: {repr_str}")
 
 
 def test_pin_subpackage_info_repr() -> None:
@@ -172,7 +168,6 @@ outputs:
                 assert "name=" in repr_str
                 assert "version=" in repr_str
                 assert "exact=" in repr_str
-                print(f"PinSubpackageInfo repr: {repr_str}")
                 break
 
 
