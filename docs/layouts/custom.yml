@@ -43,11 +43,11 @@ layers:
         height: 1.2
 
   # Page description
-  - size: {width: 650, height: 100}
+  - size: {width: 650, height: 80}
     offset: {x: 60, y: 110}
     typography:
       content: "{{ page.meta.description or config.site_description or 'Fast Conda Package Builder' }}"
-      color: "#FFFFFF"
+      color: "#FFFFFF80"
       font:
         family: Roboto
         style: Medium
