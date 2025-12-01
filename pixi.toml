@@ -24,8 +24,12 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 download-font = "bash docs/layouts/download-font-to-cache.sh"
 build-docs = { cmd = "mkdocs build --strict", depends-on = ["download-font"] }
 docs = { cmd = "mkdocs serve", depends-on = ["download-font"] }
-deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
-deploy-dev = "mike deploy --push dev devel"
+deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
+  "download-font",
+] }
+deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
+  "download-font",
+] }
 
 [dependencies]
 openssl = "3.*"
