@@ -42,7 +42,7 @@ To make this easier, certain shortcut env vars are available on Windows: `%LIBRA
 
 The _default interpreter_ for build scripts on Windows is `cmd.exe` which has a quite clunky syntax and execution model. 
 
-It will, for example, skip over errors if you do not manually insert `if %errorlevel% ...` after each statement. If the build script is a list of commands, then rattler-build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.
+It will, for example, skip over errors if you do not manually insert `if %ERRORLEVEL% neq 0 exit 1` after each statement. If the build script is a list of commands, then rattler-build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.
 
 ### Using Powershell
 
@@ -61,11 +61,14 @@ Or save your build script as `build.ps1` (which will automatically use powershel
 
 To use bash on Windows, you can install bash in your build requirements (e.g. on conda-forge it would be `m2-bash`) and call the bash script from a cmd.exe script:
 
-```
-bash.exe -c $RECIPE_DIR/build.sh
+```batch
+bash %RECIPE_DIR%/build_win.sh
+if %ERRORLEVEL% neq 0 exit 1
+
+...
 ```
 
-Note: we are working on proper "interpreter" support for Bash on Windows.
+To find more examples of this pattern, [try this Github search query](https://github.com/search?q=org%3Aconda-forge+bash+language%3ABatchfile+&type=code).
 
 ## Installing the correct MSVC compilers
 
