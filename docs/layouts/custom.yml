@@ -8,14 +8,14 @@ layers:
       color: "#001838"
 
   # Prefix.dev logo in top right
-  - size: {width: 340, height: 70}
-    offset: {x: 820, y: 56}
+  - size: {width: 380, height: 100}
+    offset: {x: 780, y: 56}
     background:
       image: docs/assets/prefix-logo-white.png
 
   # Mascot in bottom right
-  - size: {width: 340, height: 340}
-    offset: {x: 820, y: 260}
+  - size: {width: 360, height: 360}
+    offset: {x: 800, y: 240}
     background:
       image: docs/assets/paxton-mascot-socialcard.png
 
@@ -31,10 +31,10 @@ layers:
 
   # Page title - large and prominent
   - size: {width: 700, height: 220}
-    offset: {x: 60, y: 180}
+    offset: {x: 60, y: 250}
     typography:
       content: "{{ page.meta.title or page.title }}"
-      color: "#FFFFFF"
+      color: "#FFD432"
       font:
         family: Moranga
         style: Medium
@@ -42,12 +42,12 @@ layers:
         amount: 3
         height: 1.2
 
-  # Page description in brand yellow
+  # Page description
   - size: {width: 650, height: 100}
-    offset: {x: 60, y: 430}
+    offset: {x: 60, y: 110}
     typography:
-      content: "{{ page.meta.description or config.site_description or 'Fast conda package builder' }}"
-      color: "#FFD432"
+      content: "{{ page.meta.description or config.site_description or 'Fast Conda Package Builder' }}"
+      color: "#FFFFFF"
       font:
         family: Roboto
         style: Medium
