@@ -79,6 +79,11 @@ markdown_extensions:
   - toc:
       toc_depth: 3
       permalink: "#"
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra:
   homepage: https://prefix.dev

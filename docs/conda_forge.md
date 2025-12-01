@@ -11,11 +11,9 @@ The conda-forge workflow consists of two phases:
 1. **Initial submission**: Submit your recipe to [staged-recipes](https://github.com/conda-forge/staged-recipes)
 2. **Maintenance**: After approval, your recipe moves to its own "feedstock" repository
 
-```
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│  Your Recipe    │ ───► │  staged-recipes  │ ───► │  your-feedstock │
-│  (PR)           │      │  (review)        │      │  (automated)    │
-└─────────────────┘      └──────────────────┘      └─────────────────┘
+```mermaid
+flowchart LR
+    A["Your Recipe<br/>(PR)"] --> B["staged-recipes<br/>(review)"] --> C["your-feedstock<br/>(automated)"]
 ```
 
 ## Prerequisites
@@ -93,7 +91,7 @@ extra:
 - **License**: Use [SPDX identifiers](https://spdx.org/licenses/) and include the license file
 - **Tests**: Include meaningful tests that verify the package works
 - **Maintainers**: List GitHub usernames of people who will maintain the recipe
-- **Pinning**: Don't pin exact versions unless necessary; conda-forge manages version constraints
+- **Pinning**: Don't pin exact versions unless necessary; conda-forge manages pinnings in the [conda-forge pinnings](https://github.com/conda-forge/conda-forge-pinning-feedstock).
 
 ## Step 2: Submit to staged-recipes
 
@@ -227,5 +225,5 @@ requirements:
 
 - [conda-forge documentation](https://conda-forge.org/docs/)
 - [staged-recipes repository](https://github.com/conda-forge/staged-recipes)
-- [conda-forge Gitter chat](https://gitter.im/conda-forge/conda-forge.github.io)
+- [conda-forge Zulip chat](https://conda-forge.zulipchat.com/)
 - [Recipe format reference](reference/recipe_file.md)
