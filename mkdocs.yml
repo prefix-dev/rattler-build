@@ -162,6 +162,7 @@ nav:
 plugins:
   - search
   - social:
+      enabled: true
       cards_layout_dir: docs/layouts
       cards_layout: custom
       debug: false
