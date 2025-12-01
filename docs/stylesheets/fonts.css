@@ -1,0 +1,36 @@
+/* Display font */
+@font-face {
+    font-family: 'Moranga';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url(../fonts/MorangaLight/font.woff2) format('woff2');
+}
+@font-face {
+    font-family: 'Moranga';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(../fonts/MorangaRegular/font.woff2) format('woff2');
+}
+@font-face {
+    font-family: 'Moranga';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url(../fonts/MorangaMedium/font.woff2) format('woff2');
+}
+@font-face {
+    font-family: 'Moranga';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../fonts/MorangaBold/font.woff2) format('woff2');
+}
+@font-face {
+    font-family: 'Moranga';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(../fonts/MorangaBlack/font.woff2) format('woff2');
+}
