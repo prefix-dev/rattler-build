@@ -120,7 +120,11 @@ minijinja = { version = "2.12.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
-tracing-subscriber = { version = "0.3.20", features = [
+# Ansi colored logging using tracing subscriber is broken since 0.3.20. Rattler-build doesnt really
+# care about this because it uses a custom formatter. However, downstream packages might care,
+# therefor we explicitly loosen the bounds on tracing-subscriber.
+# See: https://github.com/tokio-rs/tracing/issues/3378
+tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "fmt",
   "ansi",
