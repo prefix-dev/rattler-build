@@ -75,6 +75,7 @@ watchdog = ">=6.0.0,<7"
 
 [feature.notebook.tasks]
 edit-notebook = { cmd = "marimo edit --watch {{ file }}", args = ["file"] }
+run-all-notebooks = "python notebooks/1-recipe_rendering_basics.py && python notebooks/2-multi_output_and_staging.py"
 
 
 [environments]

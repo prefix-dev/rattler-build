@@ -51,3 +51,7 @@ jobs:
         working-directory: py-rattler-build
         run: |
           pixi run test --color=yes
+      - name: Run notebooks
+        working-directory: py-rattler-build
+        run: |
+          pixi run run-all-notebooks
