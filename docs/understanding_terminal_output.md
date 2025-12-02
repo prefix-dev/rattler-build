@@ -448,11 +448,12 @@ The files are highlighted:
 
 - green: executable
 - magenta: symlink (shows symlink target)
-- yellow brackets: files that contain the `PREFIX` in a text or binary form
+- yellow brackets: files that contain the value of `$PREFIX` as a string (`[prefix:text]` or `[prefix:bin]`).
 
-Files that contain the $PREFIX (that is files that contain the string to the `/user/name/.../output/.../host_env_placehold_placehold...`) are marked with the yellow brackets. Ideally, no files contain references to the prefix, because that means that there will be text replacement at installation time.
+Files that contain the $PREFIX (that is files that contain the current installation path, e.g. `/user/name/.../output/.../host_env_placehold_placehold...`) are marked with the yellow brackets. 
 
-When a file contains the $PREFIX as a string, it will be replaced at installation time with the actual installation prefix (that is also the reason for the long placeholder string!). You can read more about prefix replacement in [Debugging Builds](internals.md#making-packages-relocatable-with-rattler-build)
+When a file contains the $PREFIX as a string, it will be replaced at installation time with the actual installation prefix (that is also the reason for the long placeholder string!). You can read more about prefix replacement in [Debugging Builds](internals.md#making-packages-relocatable-with-rattler-build).
+Ideally, no file contains the installation prefix as string, so that there is no text replacement at installation time.
 
 We then see a listing of the largest files in the package which can be a helpful sanity check.
 
