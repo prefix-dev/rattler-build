@@ -404,7 +404,7 @@ Then, any license files matched by the globs given are copied into `info/license
 ```txt
  │ │ Files in package:
  │ │   ├─ bin/curl (198.28 KiB)
- │ │   ├─ bin/curl-config (8.92 KiB)
+ │ │   ├─ bin/curl-config (8.92 KiB) [prefix:text]
  │ │   ├─ include/curl/curl.h (124.84 KiB)
  │ │   ├─ include/curl/curlver.h (2.97 KiB)
  │ │   ├─ include/curl/easy.h (3.93 KiB)
@@ -419,7 +419,7 @@ Then, any license files matched by the globs given are copied into `info/license
  │ │   ├─ include/curl/websockets.h (2.68 KiB)
  │ │   ├─ lib/libcurl.4.dylib (541.50 KiB)
  │ │   ├─ lib/libcurl.dylib -> libcurl.4.dylib
- │ │   ├─ lib/pkgconfig/libcurl.pc (1.86 KiB)
+ │ │   ├─ lib/pkgconfig/libcurl.pc (1.86 KiB) [prefix:text]
  │ │   ├─ info/about.json (453 B)
  │ │   ├─ info/hash_input.json (32 B)
  │ │   ├─ info/index.json (253 B)
@@ -448,6 +448,11 @@ The files are highlighted:
 
 - green: executable
 - magenta: symlink (shows symlink target)
+- yellow brackets: files that contain the `PREFIX` in a text or binary form
+
+Files that contain the $PREFIX (that is files that contain the string to the `/user/name/.../output/.../host_env_placehold_placehold...`) are marked with the yellow brackets. Ideally, no files contain references to the prefix, because that means that there will be text replacement at installation time.
+
+When a file contains the $PREFIX as a string, it will be replaced at installation time with the actual installation prefix (that is also the reason for the long placeholder string!). You can read more about prefix replacement in [Debugging Builds](internals.md#making-packages-relocatable-with-rattler-build)
 
 We then see a listing of the largest files in the package which can be a helpful sanity check.
 

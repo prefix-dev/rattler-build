@@ -22,14 +22,16 @@ On the top level, there is an additional `Scripts` folder, as well as a `bin/` f
 Additionally, the site-packages folder is _also_ located at the root of the filesystem layout:
 
 ```text
-- Library\
-  - lib\
-  - bin\
-  - share\
-  ...
-- site-packages\
-- Scripts\
-- bin\
+%PREFIX%
+├── Library
+│   ├── lib
+│   ├── bin
+│   ├── share
+│   ├── etc
+│   └── ...
+├── site-packages
+├── Scripts
+└── bin
 ```
 
 The reasons for this layout are historical: Python on Windows traditionally installs packages to `site-packages` at the root, and `Scripts` is where Python console scripts and entry points are placed. The `Library` folder mimics a Unix-style hierarchy for non-Python packages.
@@ -40,7 +42,7 @@ To make this easier, certain shortcut env vars are available on Windows: `%LIBRA
 
 ### Cmd.exe
 
-The _default interpreter_ for build scripts on Windows is `cmd.exe` which has a quite clunky syntax and execution model. 
+The _default interpreter_ for build scripts on Windows is `cmd.exe` which has a quite clunky syntax and execution model.
 
 It will, for example, skip over errors if you do not manually insert `if %ERRORLEVEL% neq 0 exit 1` after each statement. If the build script is a list of commands, then rattler-build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.
 
@@ -48,7 +50,7 @@ It will, for example, skip over errors if you do not manually insert `if %ERRORL
 
 You can select PowerShell as an interpreter, which comes pre-installed on Windows these days. To do so, just set
 
-```
+```yaml title="recipe.yaml"
 build:
   script:
     interpreter: powershell
@@ -61,7 +63,7 @@ Or save your build script as `build.ps1` (which will automatically use powershel
 
 To use bash on Windows, you can install bash in your build requirements (e.g. on conda-forge it would be `m2-bash`) and call the bash script from a cmd.exe script:
 
-```batch
+```batch title="build.bat"
 bash %RECIPE_DIR%/build_win.sh
 if %ERRORLEVEL% neq 0 exit 1
 
@@ -90,6 +92,9 @@ Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_BuildTools.exe" -OutFile
 
 ## MinGW64 compiler stack
 
+!!! note conda-forge specific information
+    Everything that follows on this page is specific to `conda-forge` and choices this distribution made. If you run your own software distribution you might do things differently, or not have certain compilers available.
+
 As an alternative to MSVC, conda-forge provides a MinGW-based compiler stack for Windows. This can be useful when porting Unix software that relies on GCC-specific features or when you want to avoid MSVC licensing requirements.
 
 ### Using MinGW compilers in recipes
@@ -117,12 +122,13 @@ The MinGW C++ and Fortran compilers are **not ABI-compatible** with the default 
 
 ### When to use MinGW vs MSVC
 
-| Use MinGW when... | Use MSVC when... |
-|-------------------|------------------|
-| Porting Unix/Linux software with GCC-specific code | Building native Windows applications |
-| The project uses GNU autotools extensively | Integrating with other MSVC-compiled libraries |
-| You need GCC-specific compiler extensions | Maximum compatibility with Windows ecosystem |
-| Building Fortran code (simpler than Flang setup) | Performance-critical Windows applications |
+| Use MinGW when...                                  | Use MSVC when...                               |
+| -------------------------------------------------- | ---------------------------------------------- |
+| Porting Unix/Linux software with GCC-specific code  | Building native Windows applications           |
+| The project uses GNU autotools extensively         | Integrating with other MSVC-compiled libraries |
+| You need GCC-specific compiler extensions           | Maximum compatibility with Windows ecosystem   |
+| Building Fortran code (simpler than Flang setup)   | Performance-critical Windows applications      |
+| Building R packages (requires MingW64)             |                                                |
 
 ### Legacy packages
 
@@ -136,10 +142,10 @@ Note that while Clang replaces the compiler itself, you still need the **Windows
 
 ### clang vs clang-cl
 
-| Frontend | Argument syntax | Use case |
-|----------|-----------------|----------|
-| `clang` | GCC-style arguments | Cross-platform builds, porting from Unix |
-| `clang-cl` | MSVC-style arguments | Drop-in replacement for MSVC's `cl.exe` |
+| Frontend   | Argument syntax      | Use case                                 |
+| ---------- | -------------------- | ---------------------------------------- |
+| `clang`    | GCC-style arguments  | Cross-platform builds, porting from Unix |
+| `clang-cl` | MSVC-style arguments | Drop-in replacement for MSVC's `cl.exe`  |
 
 ### Using Clang in recipes
 
