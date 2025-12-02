@@ -37,22 +37,26 @@ def _(mo):
 @app.cell
 def _():
     import json
+    import shutil
+    import tempfile
+    from pathlib import Path
 
     import marimo as mo
 
     from rattler_build.render import RenderConfig
     from rattler_build.stage0 import MultiOutputRecipe, Recipe
-    from rattler_build.tool_config import PlatformConfig
     from rattler_build.variant_config import VariantConfig
 
     return (
         MultiOutputRecipe,
-        PlatformConfig,
+        Path,
         Recipe,
         RenderConfig,
         VariantConfig,
         json,
         mo,
+        shutil,
+        tempfile,
     )
 
 
@@ -87,23 +91,34 @@ def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
           name: ${{ name }}-lib
         build:
           script:
-            - echo "Building library..."
-        requirements:
-          host:
-            - python
-          run:
-            - python
+            - if: unix
+              then: |
+                echo "Building library..."
+                mkdir -p $PREFIX/lib
+                echo "myproject-lib v2.0.0" > $PREFIX/lib/myproject.txt
+            - if: win
+              then: |
+                echo Building library...
+                mkdir %PREFIX%\\lib
+                echo myproject-lib v2.0.0 > %PREFIX%\\lib\\myproject.txt
 
       # Second output: Command-line tools
       - package:
           name: ${{ name }}-tools
         build:
           script:
-            - echo "Building tools..."
-        requirements:
-          run:
-            - ${{ name }}-lib
-            - click
+            - if: unix
+              then: |
+                echo "Building tools..."
+                mkdir -p $PREFIX/bin
+                echo "#!/bin/sh" > $PREFIX/bin/mytool
+                echo "echo 'Hello from mytool!'" >> $PREFIX/bin/mytool
+                chmod +x $PREFIX/bin/mytool
+            - if: win
+              then: |
+                echo Building tools...
+                mkdir %PREFIX%\\bin
+                echo @echo Hello from mytool! > %PREFIX%\\bin\\mytool.bat
     """
 
     multi_recipe = Recipe.from_yaml(multi_output_yaml)
@@ -131,6 +146,64 @@ def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
         print(f"\n📦 Package: {_stage1.package.name} {_stage1.package.version}")
         print(f"   Build script: {_stage1.build.script}")
         print(f"   Run requirements: {_stage1.requirements.run}")
+    return (mo_results,)
+
+
+@app.cell
+def _(Path, mo_results, shutil, tempfile):
+    # Create persistent temp directories (clean up from previous runs)
+    _recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output"
+    _output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output_output"
+
+    # Clean up from previous runs
+    if _recipe_tmpdir.exists():
+        shutil.rmtree(_recipe_tmpdir)
+    if _output_tmpdir.exists():
+        shutil.rmtree(_output_tmpdir)
+
+    # Create the directories
+    _recipe_tmpdir.mkdir(parents=True)
+    _output_tmpdir.mkdir(parents=True)
+
+    # Define dummy recipe path
+    _recipe_path = _recipe_tmpdir / "recipe.yaml"
+
+    # Build each variant
+    print("🔨 Building Example 1 packages...")
+    print("=" * 60)
+    print(f"Recipe directory: {_recipe_tmpdir}")
+    print(f"Output directory: {_output_tmpdir}")
+
+    for _i, _variant in enumerate(mo_results, 1):
+        print(f"\n📦 Building variant {_i}/{len(mo_results)}")
+        _stage1_recipe = _variant.recipe()
+        _package = _stage1_recipe.package
+        _build = _stage1_recipe.build
+
+        print(f"  Package: {_package.name}")
+        print(f"  Version: {_package.version}")
+        print(f"  Build string: {_build.string}")
+
+        _result = _variant.run_build(
+            progress_callback=None,
+            keep_build=False,
+            output_dir=_output_tmpdir,
+            recipe_path=_recipe_path,
+        )
+
+        # Display build result information
+        print(f"  ✅ Build complete in {_result.build_time:.2f}s!")
+        print(f"  📦 Package: {_result.packages[0]}")
+        if _result.variant:
+            print(f"  🔧 Variant: {_result.variant}")
+
+        # Display build log
+        if _result.log:
+            print(f"  📋 Build log: {len(_result.log)} messages captured")
+
+    print("\n" + "=" * 60)
+    print("🎉 Example 1 builds completed successfully!")
+    print(f"\n📦 Built packages are available in: {_output_tmpdir}")
     return
 
 
@@ -160,45 +233,57 @@ def _(Recipe, RenderConfig, VariantConfig, json):
       version: ${{ version }}
 
     outputs:
-      # Staging output: Compile the C++ library
+      # Staging output: Simulates compiling shared artifacts
       - staging:
-          name: cpp-build
+          name: shared-build
         build:
           script:
-            - echo "Compiling C++ library..."
-            - echo "g++ -c library.cpp -o library.o"
-        requirements:
-          build:
-            - ${{ compiler('cxx') }}
-          host:
-            - python
+            - if: unix
+              then: |
+                echo "Building shared artifacts..."
+                mkdir -p $PREFIX/lib
+                echo "Shared library v1.5.0" > $PREFIX/lib/libshared.txt
+            - if: win
+              then: |
+                echo Building shared artifacts...
+                mkdir %PREFIX%\\lib
+                echo Shared library v1.5.0 > %PREFIX%\\lib\\libshared.txt
 
       # Package output 1: Python bindings (uses staging)
       - package:
           name: ${{ name }}-python
         build:
           script:
-            - echo "Building Python bindings..."
-            - echo "Using compiled artifacts from cpp-build"
-        requirements:
-          host:
-            - python
-            - pybind11
-          run:
-            - python
-        inherit: cpp-build
+            - if: unix
+              then: |
+                echo "Building Python bindings..."
+                mkdir -p $PREFIX/lib/python
+                echo "Python bindings using shared lib" > $PREFIX/lib/python/bindings.txt
+            - if: win
+              then: |
+                echo Building Python bindings...
+                mkdir %PREFIX%\\lib\\python
+                echo Python bindings using shared lib > %PREFIX%\\lib\\python\\bindings.txt
+        inherit: shared-build
 
       # Package output 2: CLI tool (uses staging)
       - package:
           name: ${{ name }}-cli
         build:
           script:
-            - echo "Building CLI tool..."
-            - echo "Using compiled artifacts from cpp-build"
-        requirements:
-          run:
-            - ${{ name }}-python
-        inherit: cpp-build
+            - if: unix
+              then: |
+                echo "Building CLI tool..."
+                mkdir -p $PREFIX/bin
+                echo "#!/bin/sh" > $PREFIX/bin/compiled-tool
+                echo "echo CLI tool using shared lib" >> $PREFIX/bin/compiled-tool
+                chmod +x $PREFIX/bin/compiled-tool
+            - if: win
+              then: |
+                echo Building CLI tool...
+                mkdir %PREFIX%\\bin
+                echo @echo CLI tool using shared lib > %PREFIX%\\bin\\compiled-tool.bat
+        inherit: shared-build
     """
 
     staging_recipe = Recipe.from_yaml(staging_yaml)
@@ -240,167 +325,71 @@ def _(Recipe, RenderConfig, VariantConfig, json):
             for _cache in _stage1.staging_caches:
                 print(f"     - {_cache.name}")
                 print(f"       Build script: {_cache.build.script}")
-                print(f"       Build requirements: {_cache.requirements.build}")
 
         # Check inheritance
         if _stage1.inherits_from:
             print(f"   Inherits from: {json.dumps(_stage1.inherits_from, indent=6)}")
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Example 3: Complete Pipeline Visualization
-
-    Let's create a comprehensive example showing the entire pipeline from Stage0 to Stage1 for a multi-output recipe:
-    """)
-    return
+    return (staging_results,)
 
 
 @app.cell
-def _(PlatformConfig, Recipe, RenderConfig, VariantConfig, json):
-    # Comprehensive recipe
-    complete_yaml = """
-    schema_version: 1
+def _(Path, shutil, staging_results, tempfile):
+    # Create persistent temp directories (clean up from previous runs)
+    _recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging"
+    _output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging_output"
 
-    context:
-      name: complete-example
-      version: "4.2.0"
-      description: A complete pipeline example
+    # Clean up from previous runs
+    if _recipe_tmpdir.exists():
+        shutil.rmtree(_recipe_tmpdir)
+    if _output_tmpdir.exists():
+        shutil.rmtree(_output_tmpdir)
 
-    recipe:
-      version: ${{ version }}
+    # Create the directories
+    _recipe_tmpdir.mkdir(parents=True)
+    _output_tmpdir.mkdir(parents=True)
 
-    build:
-      number: 0
+    # Define dummy recipe path
+    _recipe_path = _recipe_tmpdir / "recipe.yaml"
 
-    about:
-      homepage: https://example.com/complete
-      license: MIT
-      summary: ${{ description }}
-
-    outputs:
-      # Stage 1: Build C extension
-      - staging:
-          name: c-extension
-        build:
-          script:
-            - gcc -shared -o extension.so extension.c
-        requirements:
-          build:
-            - ${{ compiler('c') }}
-        source:
-          - url: https://example.com/source.tar.gz
-
-      # Package 1: Python library
-      - package:
-          name: py-${{ name }}
-        build:
-          script:
-            - pip install .
-          noarch: python
-        requirements:
-          host:
-            - python ${{ python }}.*
-            - pip
-          run:
-            - python
-        inherit: c-extension
-
-      # Package 2: Command-line interface
-      - package:
-          name: ${{ name }}-cli
-        build:
-          script:
-            - install -m 755 cli.py $PREFIX/bin/${{ name }}
-          python:
-            entry_points:
-              - ${{ name }} = cli:main
-        requirements:
-          run:
-            - python
-            - py-${{ name }}
-            - click >=8.0
-        inherit: c-extension
-    """
-
-    # STAGE 0: Parse the recipe
-    print("🔵 STAGE 0: Parsing Recipe (Templates Intact)")
+    # Build each variant
+    print("🔨 Building Example 2 packages (with staging)...")
     print("=" * 60)
-    complete_stage0 = Recipe.from_yaml(complete_yaml)
+    print(f"Recipe directory: {_recipe_tmpdir}")
+    print(f"Output directory: {_output_tmpdir}")
 
-    print(f"Recipe type: {type(complete_stage0).__name__}")
-    print(f"Context: {complete_stage0.context}")
-    print(f"Number of outputs: {len(complete_stage0.outputs)}")
-    print("\nStage0 structure (with templates):")
-    stage0_dict = complete_stage0.to_dict()
-    print(json.dumps(stage0_dict, indent=2)[:1000] + "...")
+    for _i, _variant in enumerate(staging_results, 1):
+        print(f"\n📦 Building variant {_i}/{len(staging_results)}")
+        _stage1_recipe = _variant.recipe()
+        _package = _stage1_recipe.package
+        _build = _stage1_recipe.build
 
-    # Create variants and render config
-    print("\n\n🟡 CONFIGURATION: Variants and Render Config")
-    print("=" * 60)
-    complete_variants = VariantConfig({"python": ["3.10", "3.11"]})
-    platform_config = PlatformConfig("linux-64")
-    complete_render = RenderConfig(platform=platform_config)
+        print(f"  Package: {_package.name}")
+        print(f"  Version: {_package.version}")
+        print(f"  Build string: {_build.string}")
 
-    print(f"Variants: {complete_variants.to_dict()}")
-    print(f"Target platform: {complete_render.target_platform}")
-    print(f"Number of variant combinations: {len(complete_variants.combinations())}")
+        if _stage1_recipe.staging_caches:
+            print(f"  Staging caches: {[c.name for c in _stage1_recipe.staging_caches]}")
 
-    # RENDERING: Stage0 → Stage1
-    print("\n\n⚙️  RENDERING: Stage0 → Stage1")
-    print("=" * 60)
-    complete_results = complete_stage0.render(complete_variants, complete_render)
-    print(f"Rendered {len(complete_results)} package variant(s)")
+        _result = _variant.run_build(
+            progress_callback=None,
+            keep_build=False,
+            output_dir=_output_tmpdir,
+            recipe_path=_recipe_path,
+        )
 
-    # STAGE 1: Examine rendered recipes
-    print("\n\n🟢 STAGE 1: Fully Evaluated Recipes")
-    print("=" * 60)
+        # Display build result information
+        print(f"  ✅ Build complete in {_result.build_time:.2f}s!")
+        print(f"  📦 Package: {_result.packages[0]}")
+        if _result.variant:
+            print(f"  🔧 Variant: {_result.variant}")
 
-    for _idx, _result in enumerate(complete_results, 1):
-        _variant = _result.variant()
-        _stage1 = _result.recipe()
+        # Display build log
+        if _result.log:
+            print(f"  📋 Build log: {len(_result.log)} messages captured")
 
-        print(f"\n{'=' * 60}")
-        print(f"Package {_idx}: {_stage1.package.name}")
-        print(f"{'=' * 60}")
-
-        print("\n  Variant used:")
-        print(f"    {json.dumps(_variant, indent=4)}")
-
-        print("\n  Package info:")
-        print(f"    Name: {_stage1.package.name}")
-        print(f"    Version: {_stage1.package.version}")
-
-        print("\n  Build info:")
-        print(f"    Number: {_stage1.build.number}")
-        print(f"    Script: {_stage1.build.script}")
-        print(f"    Noarch: {_stage1.build.noarch}")
-
-        print("\n  Requirements:")
-        print(f"    Build: {_stage1.requirements.build}")
-        print(f"    Host: {_stage1.requirements.host}")
-        print(f"    Run: {_stage1.requirements.run}")
-
-        if _stage1.staging_caches:
-            print(f"\n  Staging caches ({len(_stage1.staging_caches)}):")
-            for _cache in _stage1.staging_caches:
-                print(f"    - {_cache.name}")
-                print(f"      Script: {_cache.build.script}")
-                print(f"      Build deps: {_cache.requirements.build}")
-
-        if _stage1.inherits_from:
-            print("\n  Inherits from:")
-            print(f"    {json.dumps(_stage1.inherits_from, indent=4)}")
-
-    print("\n\n✅ PIPELINE COMPLETE")
-    print("=" * 60)
-    print("Summary:")
-    print("  - Started with 1 multi-output recipe")
-    print(f"  - Applied {len(complete_variants.combinations())} variant combination(s)")
-    print(f"  - Produced {len(complete_results)} package build(s)")
-    print("  - Each with staging cache for shared build artifacts")
+    print("\n" + "=" * 60)
+    print("🎉 Example 2 builds completed successfully!")
+    print(f"\n📦 Built packages are available in: {_output_tmpdir}")
     return
 
 
@@ -413,15 +402,6 @@ def _(mo):
 
     - **Multi-Output Recipes**: Build multiple packages from one recipe using the `outputs` list
     - **Staging Outputs**: Create temporary build artifacts with `staging:` that other packages can inherit
-    - **Complete Pipeline**: Understand the full Stage0 → Rendering → Stage1 workflow
-
-    Key takeaways:
-    - Staging outputs reduce redundant compilation
-    - Multi-output recipes keep related packages together
-    - Inheritance allows flexible package composition
-    - Variants multiply outputs (N variants × M outputs = N×M packages)
-
-    You now have a comprehensive understanding of the rattler-build Python bindings!
     """)
     return
 
