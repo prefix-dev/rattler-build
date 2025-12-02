@@ -349,10 +349,6 @@ In the next step, the build and host environments are installed. The build envir
  │ │ .3 libcurl-share.3 libcurl-symbols.3 libcurl-thread.3 libcurl-tutorial.3 libcurl-url.3 libcurl.3 '$PREFIX/share/man/man3
  │ │ '
  │ │ make[6]: Leaving directory '$SRC_DIR/docs/libcurl'
- │ │ make[5]: Leaving directory '$SRC_DIR/docs/libcurl'
- │ │ make[4]: Leaving directory '$SRC_DIR/docs/libcurl'
- │ │ make[3]: Leaving directory '$SRC_DIR'
- │ │ make[2]: Leaving directory '$SRC_DIR'
  │ │ make[1]: Leaving directory '$SRC_DIR'
  │ │
  │ ╰─────────────────── (took 59 seconds)
