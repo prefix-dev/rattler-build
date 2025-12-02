@@ -875,6 +875,8 @@
       
         
       
+        
+      
     
     
     
@@ -1294,6 +1296,34 @@
     
   
     Tips and tricks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../windows_quirks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Quirks
   
 
     
@@ -2442,7 +2472,7 @@
 <p>Then, any license files matched by the globs given are copied into <code>info/licenses</code> and the recipe and all files next to it are copied to <code>info/recipe</code>.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a> │ │ Files in package:
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a> │ │   ├─ bin/curl (198.28 KiB)
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a> │ │   ├─ bin/curl-config (8.92 KiB)
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a> │ │   ├─ bin/curl-config (8.92 KiB) [prefix:text]
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a> │ │   ├─ include/curl/curl.h (124.84 KiB)
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a> │ │   ├─ include/curl/curlver.h (2.97 KiB)
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a> │ │   ├─ include/curl/easy.h (3.93 KiB)
@@ -2457,7 +2487,7 @@
 </span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a> │ │   ├─ include/curl/websockets.h (2.68 KiB)
 </span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a> │ │   ├─ lib/libcurl.4.dylib (541.50 KiB)
 </span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a> │ │   ├─ lib/libcurl.dylib -&gt; libcurl.4.dylib
-</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a> │ │   ├─ lib/pkgconfig/libcurl.pc (1.86 KiB)
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a> │ │   ├─ lib/pkgconfig/libcurl.pc (1.86 KiB) [prefix:text]
 </span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a> │ │   ├─ info/about.json (453 B)
 </span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a> │ │   ├─ info/hash_input.json (32 B)
 </span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a> │ │   ├─ info/index.json (253 B)
@@ -2484,7 +2514,11 @@
 <ul>
 <li>green: executable</li>
 <li>magenta: symlink (shows symlink target)</li>
+<li>yellow brackets: files that contain the value of <code>$PREFIX</code> as a string (<code>[prefix:text]</code> or <code>[prefix:bin]</code>).</li>
 </ul>
+<p>Files that contain the $PREFIX (that is files that contain the current installation path, e.g. <code>/user/name/.../output/.../host_env_placehold_placehold...</code>) are marked with the yellow brackets. </p>
+<p>When a file contains the $PREFIX as a string, it will be replaced at installation time with the actual installation prefix (that is also the reason for the long placeholder string!). You can read more about prefix replacement in <a href="../internals/#making-packages-relocatable-with-rattler-build">Debugging Builds</a>.
+Ideally, no file contains the installation prefix as string, so that there is no text replacement at installation time.</p>
 <p>We then see a listing of the largest files in the package which can be a helpful sanity check.</p>
 <p>Lastly the files are compressed and "packaged":</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a> │ │ Creating target folder &#39;/Users/wolfv/Programs/rattler-build/output/osx-arm64&#39;
