@@ -536,7 +536,8 @@ impl PythonTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running python test(s)");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running python test(s)", span_color = pkg_id);
         let _guard = span.enter();
 
         // The version spec of the package being built
@@ -695,7 +696,8 @@ impl PerlTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running perl test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running perl test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -770,7 +772,8 @@ impl CommandsTest {
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
 
-        let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
+        let pkg_str = pkg.to_string();
+        let span = tracing::info_span!("Running script test for", recipe = %pkg_str, span_color = pkg_str);
         let _guard = span.enter();
 
         let build_prefix = if !deps.build.is_empty() {
@@ -880,8 +883,9 @@ impl DownstreamTest {
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
         let downstream_spec = self.downstream.clone();
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
 
-        let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+        let span = tracing::info_span!("Running downstream test for", package = downstream_spec, span_color = pkg_id);
         let _guard = span.enter();
 
         // first try to resolve an environment with the downstream spec and our
@@ -971,7 +975,8 @@ impl RTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running R test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running R test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -1042,7 +1047,8 @@ impl RubyTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running Ruby test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
