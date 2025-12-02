@@ -87,8 +87,9 @@ winget install Microsoft.VisualStudio.BuildTools --silent --accept-source-agreem
 
 # For VS2019, use --add Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64
 # For Windows 11 SDK, --add Microsoft.VisualStudio.Component.Windows11SDK.22621
-# More identifiers: https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=visualstudio#desktop-development-with-c
 ```
+
+You can find more [documentation](https://learn.microsoft.com/en-us/visualstudio/install/command-line-parameter-examples?view=visualstudio#using-winget) and [more identifiers](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=visualstudio#desktop-development-with-c) on the Microsoft Visual Studio documentation.
 
 ## MinGW64 compiler stack
 
