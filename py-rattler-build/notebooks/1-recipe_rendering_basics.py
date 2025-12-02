@@ -363,18 +363,6 @@ def _(mo):
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes
     - **Rendering**: Use `recipe.render()` to transform Stage0 → Stage1 with variants
     - **Building**: Use `variant.run_build()` to build conda packages, which returns a `BuildResult` with package paths, metadata, timing information, and captured build logs
-
-    The `BuildResult` object includes:
-    - `packages`: List of built package file paths
-    - `name`, `version`, `build_string`: Package metadata
-    - `platform`: Target platform
-    - `variant`: Variant configuration used
-    - `build_time`: Build duration in seconds
-    - `log`: Captured build log messages (info level and above)
-
-    Next, explore the other notebooks to learn about:
-    - Advanced Jinja templating and conditional variants
-    - Multi-output recipes and staging caches
     """)
     return
 
