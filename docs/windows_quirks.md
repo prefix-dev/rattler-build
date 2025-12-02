@@ -81,14 +81,15 @@ The `C` / `C++` compiler that is installed on the host system needs to match the
 You can use the GUI to install the right version of Visual Studio Compilers, or you can use the following commands in Powershell:
 
 ```powershell
-# Download the installer (`/17/` will select vs2022)
-Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_BuildTools.exe" -OutFile "$env:TEMP\vs_BuildTools.exe"
+# Install C/C++ build tools with Winget (through community installer)
+winget install Microsoft.VisualStudio.BuildTools --silent --accept-source-agreements --accept-package-agreements `
+    --override "--passive --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 
-# Install C/C++ build tools silently
-& "$env:TEMP\vs_BuildTools.exe" --quiet --wait --norestart --nocache `
-    --add Microsoft.VisualStudio.Workload.VCTools `
-    --includeRecommended
+# For VS2019, use --add Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64
+# For Windows 11 SDK, --add Microsoft.VisualStudio.Component.Windows11SDK.22621
 ```
+
+You can find more [documentation](https://learn.microsoft.com/en-us/visualstudio/install/command-line-parameter-examples?view=visualstudio#using-winget) and [more identifiers](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=visualstudio#desktop-development-with-c) on the Microsoft Visual Studio documentation.
 
 ## MinGW64 compiler stack
 
