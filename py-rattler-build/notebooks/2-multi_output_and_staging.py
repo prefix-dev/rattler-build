@@ -63,18 +63,20 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Example 1: Simple Multi-Output Recipe
+    ## Example 1: Multi-Output with Inter-Output Dependencies
 
-    Multi-output recipes allow you to build multiple packages from a single recipe. This is useful when you have a project that produces both a library and tools, or when you want to split debug symbols from the main package.
+    Multi-output recipes build multiple packages from one recipe. When one output needs another, you list it as a **host** (or build) **dependency**. The dependency package is installed into the build environment, and your build script can use its files.
 
-    Let's create a simple multi-output recipe:
+    In this example:
+    - `myproject-lib` creates a Python module
+    - `myproject-tools` depends on `myproject-lib` as a host dependency and reads that file during its build
     """)
     return
 
 
 @app.cell
 def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
-    # Simple multi-output recipe
+    # Multi-output recipe with inter-output dependency
     multi_output_yaml = """
     schema_version: 1
 
@@ -91,34 +93,42 @@ def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
           name: ${{ name }}-lib
         build:
           script:
-            - if: unix
-              then: |
-                echo "Building library..."
-                mkdir -p $PREFIX/lib
-                echo "myproject-lib v2.0.0" > $PREFIX/lib/myproject.txt
-            - if: win
-              then: |
-                echo Building library...
-                mkdir %PREFIX%\\lib
-                echo myproject-lib v2.0.0 > %PREFIX%\\lib\\myproject.txt
+            interpreter: python
+            content: |
+              import os
+              from pathlib import Path
 
-      # Second output: Command-line tools
+              prefix = Path(os.environ["PREFIX"])
+              lib_dir = prefix / "lib" / "python"
+              lib_dir.mkdir(parents=True, exist_ok=True)
+
+              (lib_dir / "myproject_lib.py").write_text('VERSION = "2.0.0"')
+              print(f"Created library at {lib_dir}")
+        requirements:
+          build:
+            - python
+
+      # Second output: Uses the library as a host dependency
       - package:
           name: ${{ name }}-tools
         build:
           script:
-            - if: unix
-              then: |
-                echo "Building tools..."
-                mkdir -p $PREFIX/bin
-                echo "#!/bin/sh" > $PREFIX/bin/mytool
-                echo "echo 'Hello from mytool!'" >> $PREFIX/bin/mytool
-                chmod +x $PREFIX/bin/mytool
-            - if: win
-              then: |
-                echo Building tools...
-                mkdir %PREFIX%\\bin
-                echo @echo Hello from mytool! > %PREFIX%\\bin\\mytool.bat
+            interpreter: python
+            content: |
+              import os
+              from pathlib import Path
+
+              prefix = Path(os.environ["PREFIX"])
+
+              # Read and print the lib file (installed as host dependency)
+              lib_file = prefix / "lib" / "python" / "myproject_lib.py"
+              print(f"Reading library from: {lib_file}")
+              print(lib_file.read_text())
+        requirements:
+          build:
+            - python
+          host:
+            - ${{ name }}-lib
     """
 
     multi_recipe = Recipe.from_yaml(multi_output_yaml)
@@ -210,11 +220,16 @@ def _(Path, mo_results, shutil, tempfile):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Example 2: Staging Outputs - Intermediate Build Artifacts
+    ## Example 2: Staging Outputs - Shared Build Artifacts
 
-    Staging outputs are temporary build artifacts that aren't packaged but can be used by other outputs. They're perfect for compiled artifacts that multiple packages need.
+    Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then **copies its files directly into each inheriting package's prefix**. Since these are "new" files in the prefix, they will be included in the final package.
 
-    Common use case: Compile a C++ library once, then use it in multiple Python packages.
+    Use the `files` field to select which subset of files to include from the staging prefix.
+
+    In this example:
+    - `shared-build` staging creates both `/lib/shared.py` AND `/bin/tool.py`
+    - `compiled-project-python` inherits and uses `files: [lib/**]` to only include lib files
+    - `compiled-project-cli` inherits and uses `files: [bin/**]` to only include bin files
     """)
     return
 
@@ -233,57 +248,48 @@ def _(Recipe, RenderConfig, VariantConfig, json):
       version: ${{ version }}
 
     outputs:
-      # Staging output: Simulates compiling shared artifacts
+      # Staging output: Creates shared artifacts for multiple packages
       - staging:
           name: shared-build
         build:
           script:
-            - if: unix
-              then: |
-                echo "Building shared artifacts..."
-                mkdir -p $PREFIX/lib
-                echo "Shared library v1.5.0" > $PREFIX/lib/libshared.txt
-            - if: win
-              then: |
-                echo Building shared artifacts...
-                mkdir %PREFIX%\\lib
-                echo Shared library v1.5.0 > %PREFIX%\\lib\\libshared.txt
+            interpreter: python
+            content: |
+              import os
+              from pathlib import Path
 
-      # Package output 1: Python bindings (uses staging)
+              prefix = Path(os.environ["PREFIX"])
+
+              # Create lib files
+              lib_dir = prefix / "lib"
+              lib_dir.mkdir(parents=True, exist_ok=True)
+              (lib_dir / "shared.py").write_text('SHARED_VERSION = "1.5.0"')
+              print(f"Created shared library at {lib_dir}")
+
+              # Create bin files
+              bin_dir = prefix / "bin"
+              bin_dir.mkdir(parents=True, exist_ok=True)
+              (bin_dir / "tool.py").write_text('#!/usr/bin/env python\\nprint("CLI tool")')
+              print(f"Created CLI tool at {bin_dir}")
+        requirements:
+          build:
+            - python
+
+      # Package output 1: Python bindings (inherits lib files from staging)
       - package:
           name: ${{ name }}-python
-        build:
-          script:
-            - if: unix
-              then: |
-                echo "Building Python bindings..."
-                mkdir -p $PREFIX/lib/python
-                echo "Python bindings using shared lib" > $PREFIX/lib/python/bindings.txt
-            - if: win
-              then: |
-                echo Building Python bindings...
-                mkdir %PREFIX%\\lib\\python
-                echo Python bindings using shared lib > %PREFIX%\\lib\\python\\bindings.txt
         inherit: shared-build
+        build:
+          files:
+            - lib/**
 
-      # Package output 2: CLI tool (uses staging)
+      # Package output 2: CLI tool (inherits bin files from staging)
       - package:
           name: ${{ name }}-cli
-        build:
-          script:
-            - if: unix
-              then: |
-                echo "Building CLI tool..."
-                mkdir -p $PREFIX/bin
-                echo "#!/bin/sh" > $PREFIX/bin/compiled-tool
-                echo "echo CLI tool using shared lib" >> $PREFIX/bin/compiled-tool
-                chmod +x $PREFIX/bin/compiled-tool
-            - if: win
-              then: |
-                echo Building CLI tool...
-                mkdir %PREFIX%\\bin
-                echo @echo CLI tool using shared lib > %PREFIX%\\bin\\compiled-tool.bat
         inherit: shared-build
+        build:
+          files:
+            - bin/**
     """
 
     staging_recipe = Recipe.from_yaml(staging_yaml)
