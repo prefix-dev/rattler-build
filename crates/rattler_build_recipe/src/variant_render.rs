@@ -20,14 +20,12 @@ use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
+use crate::stage0::evaluate::ALWAYS_INCLUDED_VARS;
 use crate::stage1::HashInfo;
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
-
-/// Variables that are always included in variant combinations
-const ALWAYS_INCLUDED_VARS: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
 
 /// Information about a pin_subpackage dependency for variant tracking
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

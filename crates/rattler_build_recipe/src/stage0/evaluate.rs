@@ -90,6 +90,10 @@ use crate::{
 };
 use rattler_build_jinja::{Jinja, Variable};
 
+/// Variables that are always included in variant combinations
+pub const ALWAYS_INCLUDED_VARS: &[&str] =
+    &["target_platform", "channel_targets", "channel_sources"];
+
 /// Helper to render a Jinja template to a Variable (preserving type information)
 fn render_template_to_variable(
     template: &str,
@@ -479,7 +483,7 @@ pub fn evaluate_optional_string_value(
 ) -> Result<Option<String>, ParseError> {
     match value {
         None => Ok(None),
-        Some(v) => evaluate_string_value(v, context).map(Some),
+        Some(v) => evaluate_string_value(v, context).map(|s| Some(s.trim().to_string())),
     }
 }
 
@@ -2039,11 +2043,6 @@ impl Evaluate for Stage0Recipe {
             tests.push(test.evaluate(&context_with_vars)?);
         }
 
-        // Now that evaluation is complete, we know which variables were actually accessed.
-        // Compute the hash from the actual variant (accessed variables) and render the build string.
-        // Variables that should ALWAYS be included in the hash, even if not accessed
-        const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
-
         let accessed_vars = context_with_vars.accessed_variables();
         let free_specs = requirements
             .free_specs()
@@ -2086,7 +2085,7 @@ impl Evaluate for Stage0Recipe {
                 // Include if accessed, part of our (free) dependencies or if it's an always-include variable
                 accessed_vars.contains(key_str)
                     || free_specs.contains(&NormalizedKey::from(key_str))
-                    || ALWAYS_INCLUDE.contains(&key_str)
+                    || ALWAYS_INCLUDED_VARS.contains(&key_str)
             })
             .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
             .collect();
@@ -2428,10 +2427,6 @@ fn evaluate_package_output_to_recipe(
     // Extract the resolved context variables
     let resolved_context = context.variables().clone();
 
-    // Compute the actual variant for this output (subset of accessed variables)
-    // This is the same logic as SingleOutputRecipe
-    const ALWAYS_INCLUDE: &[&str] = &["target_platform", "channel_targets", "channel_sources"];
-
     let accessed_vars = context.accessed_variables();
     let mut free_specs = requirements
         .free_specs()
@@ -2495,7 +2490,7 @@ fn evaluate_package_output_to_recipe(
             // Include if accessed, part of our (free) dependencies or if it's an always-include variable
             accessed_vars.contains(key_str)
                 || free_specs.contains(&NormalizedKey::from(key_str))
-                || ALWAYS_INCLUDE.contains(&key_str)
+                || ALWAYS_INCLUDED_VARS.contains(&key_str)
         })
         .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
         .collect();

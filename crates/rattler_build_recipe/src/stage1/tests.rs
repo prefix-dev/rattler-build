@@ -134,15 +134,32 @@ pub struct DownstreamTest {
 }
 
 /// Files to check for existence or non-existence (evaluated)
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct PackageContentsCheckFiles {
     /// Files that must exist (validated glob patterns)
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub exists: GlobVec,
 
     /// Files that must not exist (validated glob patterns)
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub not_exists: GlobVec,
+}
+
+impl Serialize for PackageContentsCheckFiles {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // If not_exists is empty, serialize as a plain list (backward compatible)
+        if self.not_exists.is_empty() {
+            self.exists.serialize(serializer)
+        } else {
+            // Otherwise serialize as a map with both fields
+            use serde::ser::SerializeMap;
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry("exists", &self.exists)?;
+            map.serialize_entry("not_exists", &self.not_exists)?;
+            map.end()
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for PackageContentsCheckFiles {
