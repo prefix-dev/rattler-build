@@ -433,7 +433,7 @@ pub fn evaluate_string_value(
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
     if let Some(s) = value.as_concrete() {
-        Ok(s)
+        Ok(s.clone())
     } else if let Some(template) = value.as_template() {
         render_template(template.source(), context, value.span())
     } else {
