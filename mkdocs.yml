@@ -103,6 +103,7 @@ nav:
   - Home: index.md
   - Getting started: getting_started.md
   - High-level overview: highlevel.md
+  - Understanding the logs: understanding_terminal_output.md
   # - Tutorials:
   #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
