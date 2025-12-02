@@ -136,6 +136,7 @@ nav:
       - Creating patches: create_patch.md
       - Debugging builds: debugging_builds.md
       - Tips and tricks: tips_and_tricks.md
+      - Windows Quirks: windows_quirks.md
 
   - Testing:
       - Testing packages: testing.md
