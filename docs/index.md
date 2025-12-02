@@ -123,14 +123,14 @@ self-contained.
 
 There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
 
-### The recipe format
+## The Recipe Format
 
 > **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
 > folder in the codebase and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
 
-```yaml
+```yaml title="recipe.yaml"
 context:
   name: xtensor
   version: 0.24.6
@@ -198,7 +198,7 @@ extra:
 
 A recipe for the `rich` Python package (using `noarch`):
 
-```yaml
+```yaml title="recipe.yaml"
 context:
   version: "13.4.2"
 
@@ -251,7 +251,7 @@ about:
 
 A recipe for the `curl` library:
 
-```yaml
+```yaml title="recipe.yaml"
 context:
   version: "8.0.1"
 
@@ -298,9 +298,7 @@ about:
 
 For the `curl` library recipe, two additional script files (`build.sh` and `build.bat`) are needed.
 
-**`build.sh`**
-
-```bash
+```bash title="build.sh"
 #!/bin/bash
 
 # Get an updated config.sub and config.guess
@@ -326,9 +324,9 @@ make install
 rm -rf "${PREFIX}/share"
 ```
 
-**`build.bat`**
+Or on Windows:
 
-```cmd
+```cmd title="build.bat"
 mkdir build
 
 cmake -GNinja ^
