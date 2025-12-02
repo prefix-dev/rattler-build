@@ -71,9 +71,10 @@ type-check = { cmd = "mypy" }
 [feature.notebook.dependencies]
 marimo = ">=0.17.6,<0.18"
 python-lsp-server = ">=1.13.1,<2"
+watchdog = ">=6.0.0,<7"
 
 [feature.notebook.tasks]
-edit-notebook = { cmd = "marimo edit {{ file }}", args = ["file"] }
+edit-notebook = { cmd = "marimo edit --watch {{ file }}", args = ["file"] }
 
 
 [environments]
