@@ -43,13 +43,13 @@ def _():
 
     import marimo as mo
 
-    from rattler_build.render import RenderConfig
+    from rattler_build.render import RenderConfig, PlatformConfig
     from rattler_build.stage0 import MultiOutputRecipe, Recipe
     from rattler_build.variant_config import VariantConfig
-
     return (
         MultiOutputRecipe,
         Path,
+        PlatformConfig,
         Recipe,
         RenderConfig,
         VariantConfig,
@@ -235,7 +235,7 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, RenderConfig, VariantConfig, json):
+def _(PlatformConfig, Recipe, RenderConfig, VariantConfig, json):
     # Recipe with staging output
     staging_yaml = """
     schema_version: 1
@@ -314,7 +314,8 @@ def _(Recipe, RenderConfig, VariantConfig, json):
 
     # Render the recipe
     staging_variants = VariantConfig()
-    staging_render = RenderConfig()
+    platform_config = PlatformConfig(experimental=True)  # Staging is still experimental
+    staging_render = RenderConfig(platform=platform_config)
     staging_results = staging_recipe.render(staging_variants, staging_render)
 
     print(f"\n📦 Rendered {len(staging_results)} package(s)")

@@ -674,6 +674,18 @@ fn render_multi_output_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
+    // Check if recipe contains staging outputs - these require experimental flag
+    let has_staging = stage0_recipe
+        .outputs
+        .iter()
+        .any(|o| matches!(o, stage0::Output::Staging(_)));
+
+    if has_staging && !config.experimental {
+        return Err(ParseError::from_message(
+            "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature",
+        ));
+    }
+
     let stage0 = Stage0Recipe::MultiOutput(Box::new(stage0_recipe.clone()));
     render_with_variants(&stage0, variant_config, config)
 }
@@ -1306,5 +1318,68 @@ outputs:
 
         // Self-pin should be tracked but not cause ordering issues
         assert_eq!(sorted[0].pin_subpackages.len(), 1);
+    }
+
+    #[test]
+    fn test_staging_requires_experimental() {
+        // Test that staging outputs require the experimental flag
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script:
+        - echo "Building..."
+
+  - package:
+      name: my-pkg
+    inherit: build-cache
+    build:
+      noarch: generic
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        // Without experimental flag, should fail
+        let result =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new());
+
+        assert!(
+            result.is_err(),
+            "Staging outputs should require experimental flag"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("experimental"),
+            "Error should mention experimental flag: {}",
+            err
+        );
+
+        // With experimental flag, should succeed
+        let result = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_experimental(true),
+        );
+
+        assert!(
+            result.is_ok(),
+            "Staging outputs should work with experimental flag: {:?}",
+            result.err()
+        );
     }
 }
