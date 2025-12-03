@@ -55,7 +55,7 @@ jobs:
         if: ${{ matrix.os == 'macos-latest' }}
         run: pixi global install patchelf
       - name: Run tests
-        run: cargo test --all --features=tui,recipe-generation --verbose -- --nocapture
+        run: cargo test --workspace --all-targets --features=tui,recipe-generation --verbose -- --nocapture
       - name: Run patch apply tests
         # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}

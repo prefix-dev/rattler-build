@@ -11,8 +11,8 @@ install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
   "build-release",
 ] }
-test = "cargo test"
-test-slow = "cargo test --release"
+test = "cargo test --workspace"
+test-slow = "cargo test --release --workspace"
 test-patch-extra = "cargo test --features patch-test-extra"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 test-ci = "cargo test --release -p rust-tests"
