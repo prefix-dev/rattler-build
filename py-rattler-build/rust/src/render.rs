@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use indexmap::IndexMap;
@@ -66,6 +67,9 @@ impl PyRenderConfig {
             .transpose()?
             .unwrap_or_default();
 
+        // TODO: decide whether to expose this in Python
+        let os_env_var_keys = HashSet::default();
+
         Ok(Self {
             inner: RustRenderConfig {
                 extra_context,
@@ -74,6 +78,7 @@ impl PyRenderConfig {
                 target_platform,
                 build_platform,
                 host_platform,
+                os_env_var_keys,
             },
         })
     }
