@@ -46,6 +46,7 @@ def _():
     from rattler_build.render import RenderConfig, PlatformConfig
     from rattler_build.stage0 import MultiOutputRecipe, Recipe
     from rattler_build.variant_config import VariantConfig
+
     return (
         MultiOutputRecipe,
         Path,
