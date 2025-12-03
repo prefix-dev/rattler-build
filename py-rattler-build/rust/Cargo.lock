@@ -4077,6 +4077,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "strum",
  "thiserror 2.0.17",
  "toml",
 ]
