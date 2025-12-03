@@ -301,12 +301,12 @@ impl Build {
             vars.extend(item.used_variables());
 
             // For concrete string values, parse as Jinja expression to extract variables
-            if let Some(value) = item.as_value() {
-                if let Some(expr_str) = value.as_concrete() {
-                    // Try to parse as JinjaExpression to extract variables
-                    if let Ok(expr) = rattler_build_jinja::JinjaExpression::new(expr_str.clone()) {
-                        vars.extend(expr.used_variables().iter().cloned());
-                    }
+            if let Some(value) = item.as_value()
+                && let Some(expr_str) = value.as_concrete()
+            {
+                // Try to parse as JinjaExpression to extract variables
+                if let Ok(expr) = rattler_build_jinja::JinjaExpression::new(expr_str.clone()) {
+                    vars.extend(expr.used_variables().iter().cloned());
                 }
             }
         }

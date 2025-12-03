@@ -36,12 +36,13 @@ pub fn parse_tests(node: &Node) -> Result<ConditionalList<TestType>, ParseError>
 }
 
 /// Parse a single test item which can be either a TestType or a conditional
+/// TODO: Refactor to reduce code duplication with other conditional parsers
 fn parse_test_item(node: &Node) -> Result<Item<TestType>, ParseError> {
     // Check if it's a conditional (mapping with "if" key)
-    if let Some(mapping) = node.as_mapping() {
-        if mapping.get("if").is_some() {
-            return parse_conditional_test_item(mapping);
-        }
+    if let Some(mapping) = node.as_mapping()
+        && mapping.get("if").is_some()
+    {
+        return parse_conditional_test_item(mapping);
     }
 
     // Not a conditional - parse as a regular TestType
