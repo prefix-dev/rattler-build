@@ -245,13 +245,9 @@ impl GitSource {
             vars.extend(depth.used_variables());
         }
         // Extract variables from patches (both values and conditionals)
-        for item in patches {
-            vars.extend(item.used_variables());
-        }
-        if let Some(td) = target_directory
-            && let Some(t) = td.as_template()
-        {
-            vars.extend(t.used_variables().iter().cloned());
+        vars.extend(patches.used_variables());
+        if let Some(td) = target_directory {
+            vars.extend(td.used_variables());
         }
         if let Some(lfs) = lfs {
             vars.extend(lfs.used_variables());
@@ -291,10 +287,8 @@ impl UrlSource {
         for item in patches {
             vars.extend(item.used_variables());
         }
-        if let Some(td) = target_directory
-            && let Some(t) = td.as_template()
-        {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(td) = target_directory {
+            vars.extend(td.used_variables());
         }
         vars.sort();
         vars.dedup();
@@ -309,7 +303,7 @@ impl PathSource {
             path,
             sha256,
             md5,
-            patches: _,
+            patches,
             target_directory,
             file_name,
             use_gitignore: _,
@@ -317,9 +311,9 @@ impl PathSource {
         } = self;
 
         let mut vars = Vec::new();
-        if let Some(t) = path.as_template() {
-            vars.extend(t.used_variables().iter().cloned());
-        }
+
+        vars.extend(path.used_variables());
+        vars.extend(patches.used_variables());
         if let Some(sha256) = sha256 {
             vars.extend(sha256.used_variables());
         }
@@ -327,15 +321,11 @@ impl PathSource {
             vars.extend(md5.used_variables());
         }
         // Skip patches as PathBuf doesn't easily support template extraction
-        if let Some(td) = target_directory
-            && let Some(t) = td.as_template()
-        {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(td) = target_directory {
+            vars.extend(td.used_variables());
         }
-        if let Some(fn_val) = file_name
-            && let Some(t) = fn_val.as_template()
-        {
-            vars.extend(t.used_variables().iter().cloned());
+        if let Some(fn_val) = file_name {
+            vars.extend(fn_val.used_variables());
         }
         vars.extend(filter.used_variables());
         vars.sort();

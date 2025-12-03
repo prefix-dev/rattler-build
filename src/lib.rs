@@ -613,13 +613,21 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
                 .iter()
                 .chain(command.requirements.run.iter())
             {
-                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-                if all_output_names
-                    .iter()
-                    .any(|o| Some(*o) == dep_spec.name.as_ref())
-                {
+                let dep_name = dep.name();
+                if all_output_names.iter().any(|o| Some(*o) == dep_name) {
                     // this dependency might not be built yet
-                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+                    // For pin_subpackage/pin_compatible, we only check name match
+                    // For regular specs, we also check version/build if specified
+                    let is_built = match dep {
+                        rattler_build_recipe::stage1::Dependency::Spec(spec) => {
+                            done_outputs.iter().any(|o| check_if_matches(spec, o))
+                        }
+                        _ => {
+                            // For pins, just check if any output with that name is built
+                            done_outputs.iter().any(|o| Some(o.name()) == dep_name)
+                        }
+                    };
+                    if !is_built {
                         return false;
                     }
                 }

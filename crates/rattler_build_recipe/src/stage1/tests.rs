@@ -1,6 +1,8 @@
 use rattler_build_script::Script;
 use serde::{Deserialize, Serialize};
 
+use crate::stage1::Dependency;
+
 use super::GlobVec;
 
 /// Python version specification for tests (evaluated)
@@ -77,11 +79,11 @@ pub struct RubyTest {
 pub struct CommandsTestRequirements {
     /// Extra run requirements for the test.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub run: Vec<String>,
+    pub run: Vec<Dependency>,
 
     /// Extra build requirements for the test (e.g. emulators, compilers, ...).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub build: Vec<String>,
+    pub build: Vec<Dependency>,
 }
 
 impl CommandsTestRequirements {

@@ -33,6 +33,41 @@ pub enum Dependency {
     PinCompatible(PinCompatible),
 }
 
+impl Dependency {
+    /// Returns the underlying MatchSpec.
+    ///
+    /// # Panics
+    /// Panics if this is a PinSubpackage or PinCompatible dependency, as those
+    /// should have been resolved before this point.
+    pub fn as_match_spec(&self) -> &MatchSpec {
+        match self {
+            Dependency::Spec(spec) => spec,
+            Dependency::PinSubpackage(pin) => {
+                panic!(
+                    "Unresolved pin_subpackage dependency: {}. This should have been resolved during package creation.",
+                    pin.pin_subpackage.name.as_normalized()
+                )
+            }
+            Dependency::PinCompatible(pin) => {
+                panic!(
+                    "Unresolved pin_compatible dependency: {}. This should have been resolved during package creation.",
+                    pin.pin_compatible.name.as_normalized()
+                )
+            }
+        }
+    }
+
+    /// Returns the package name for this dependency.
+    /// Works for all dependency types including unresolved pins.
+    pub fn name(&self) -> Option<&PackageName> {
+        match self {
+            Dependency::Spec(spec) => spec.name.as_ref(),
+            Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage.name),
+            Dependency::PinCompatible(pin) => Some(&pin.pin_compatible.name),
+        }
+    }
+}
+
 impl std::fmt::Display for Dependency {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

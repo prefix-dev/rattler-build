@@ -1,12 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, ConditionalListOrItem, Script, Value};
+use crate::stage0::{
+    SerializableMatchSpec,
+    types::{ConditionalList, ConditionalListOrItem, Script, Value},
+};
 
 /// Python version specification for tests
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PythonVersion {
     /// A single python version
+    /// TODO: possibly change to use `VersionSpec` for proper parsing?
     Single(Value<String>),
     /// Multiple python versions
     Multiple(Vec<Value<String>>),
@@ -57,11 +61,11 @@ pub struct RubyTest {
 pub struct CommandsTestRequirements {
     /// Extra run requirements for the test.
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub run: ConditionalList<String>,
+    pub run: ConditionalList<SerializableMatchSpec>,
 
     /// Extra build requirements for the test (e.g. emulators, compilers, ...).
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub build: ConditionalList<String>,
+    pub build: ConditionalList<SerializableMatchSpec>,
 }
 
 /// The files that should be copied to the test directory
@@ -185,11 +189,7 @@ impl TestType {
         let mut vars = Vec::new();
         match self {
             TestType::Python { python } => {
-                for item in &python.imports {
-                    if let crate::stage0::types::Item::Value(v) = item {
-                        vars.extend(v.used_variables());
-                    }
-                }
+                vars.extend(python.imports.used_variables());
                 if let Some(pip_check) = &python.pip_check {
                     vars.extend(pip_check.used_variables());
                 }
@@ -197,6 +197,7 @@ impl TestType {
                     match python_version {
                         PythonVersion::Single(v) => vars.extend(v.used_variables()),
                         PythonVersion::Multiple(versions) => {
+                            // TODO(refactor): move to ConditionalList as well?
                             for v in versions {
                                 vars.extend(v.used_variables());
                             }
@@ -205,51 +206,24 @@ impl TestType {
                 }
             }
             TestType::Perl { perl } => {
-                for item in &perl.uses {
-                    if let crate::stage0::types::Item::Value(v) = item {
-                        vars.extend(v.used_variables());
-                    }
-                }
+                vars.extend(perl.uses.used_variables());
             }
             TestType::R { r } => {
-                for item in &r.libraries {
-                    if let crate::stage0::types::Item::Value(v) = item {
-                        vars.extend(v.used_variables());
-                    }
-                }
+                vars.extend(r.libraries.used_variables());
             }
             TestType::Ruby { ruby } => {
-                for item in &ruby.requires {
-                    if let crate::stage0::types::Item::Value(v) = item {
-                        vars.extend(v.used_variables());
-                    }
-                }
+                vars.extend(ruby.requires.used_variables());
             }
             TestType::Commands(commands) => {
                 vars.extend(commands.script.used_variables());
                 if let Some(reqs) = &commands.requirements {
-                    for item in &reqs.run {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &reqs.build {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    // TODO(refactor): should this parse into matchspec?
+                    vars.extend(reqs.run.used_variables());
+                    vars.extend(reqs.build.used_variables());
                 }
                 if let Some(files) = &commands.files {
-                    for item in &files.source {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &files.recipe {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(files.source.used_variables());
+                    vars.extend(files.recipe.used_variables());
                 }
             }
             TestType::Downstream(downstream) => {
@@ -258,65 +232,27 @@ impl TestType {
             TestType::PackageContents { package_contents } => {
                 // Extract variables from all check files
                 if let Some(files) = &package_contents.files {
-                    for item in &files.exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &files.not_exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(files.exists.used_variables());
+                    vars.extend(files.not_exists.used_variables());
                 }
                 // Same for site_packages, bin, lib, include...
                 if let Some(sp) = &package_contents.site_packages {
-                    for item in &sp.exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &sp.not_exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(sp.exists.used_variables());
+                    vars.extend(sp.not_exists.used_variables());
                 }
                 if let Some(bin) = &package_contents.bin {
-                    for item in &bin.exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &bin.not_exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(bin.exists.used_variables());
+                    vars.extend(bin.not_exists.used_variables());
                 }
+
                 if let Some(lib) = &package_contents.lib {
-                    for item in &lib.exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &lib.not_exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(lib.exists.used_variables());
+                    vars.extend(lib.not_exists.used_variables());
                 }
+
                 if let Some(include) = &package_contents.include {
-                    for item in &include.exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
-                    for item in &include.not_exists {
-                        if let crate::stage0::types::Item::Value(v) = item {
-                            vars.extend(v.used_variables());
-                        }
-                    }
+                    vars.extend(include.exists.used_variables());
+                    vars.extend(include.not_exists.used_variables());
                 }
             }
         }

@@ -1,12 +1,70 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use rattler_build_recipe::stage1::{TestType, tests::CommandsTest};
+use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::CommandsTest};
 use rattler_build_script::{
     ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
 };
+use rattler_conda_types::MatchSpec;
 
 use crate::{metadata::Output, packaging::PackagingError};
+
+/// Resolve a dependency, converting PinSubpackage/PinCompatible to concrete MatchSpecs
+fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
+    match dep {
+        Dependency::Spec(_) => dep.clone(),
+        Dependency::PinSubpackage(pin) => {
+            let name = &pin.pin_subpackage.name;
+            if let Some(subpackage) = output.build_configuration.subpackages.get(name) {
+                // Apply the pin to get a concrete MatchSpec
+                match pin
+                    .pin_subpackage
+                    .apply(&subpackage.version, &subpackage.build_string)
+                {
+                    Ok(spec) => Dependency::Spec(Box::new(spec)),
+                    Err(_) => {
+                        // If apply fails, fall back to just the package name
+                        Dependency::Spec(Box::new(MatchSpec {
+                            name: Some(name.clone()),
+                            ..Default::default()
+                        }))
+                    }
+                }
+            } else {
+                // Subpackage not found, fall back to just the package name
+                Dependency::Spec(Box::new(MatchSpec {
+                    name: Some(name.clone()),
+                    ..Default::default()
+                }))
+            }
+        }
+        Dependency::PinCompatible(pin) => {
+            // For pin_compatible in tests, we just use the package name
+            // since we don't have compatibility_specs available here
+            let name = &pin.pin_compatible.name;
+            Dependency::Spec(Box::new(MatchSpec {
+                name: Some(name.clone()),
+                ..Default::default()
+            }))
+        }
+    }
+}
+
+/// Resolve all dependencies in a CommandsTest requirements
+fn resolve_test_requirements(command_test: &mut CommandsTest, output: &Output) {
+    command_test.requirements.run = command_test
+        .requirements
+        .run
+        .iter()
+        .map(|dep| resolve_dependency(dep, output))
+        .collect();
+    command_test.requirements.build = command_test
+        .requirements
+        .build
+        .iter()
+        .map(|dep| resolve_dependency(dep, output))
+        .collect();
+}
 
 pub fn write_command_test_files(
     command_test: &CommandsTest,
@@ -66,6 +124,9 @@ pub(crate) fn write_test_files(
     // For each `Command` test, we need to copy the test files to the package
     for (idx, test) in tests.iter_mut().enumerate() {
         if let TestType::Commands(command_test) = test {
+            // Resolve pin_subpackage dependencies to concrete MatchSpecs
+            resolve_test_requirements(command_test, output);
+
             let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
             let files = write_command_test_files(command_test, &folder, output)?;

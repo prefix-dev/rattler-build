@@ -2013,7 +2013,17 @@ impl Evaluate for Stage0PythonTest {
 impl_evaluate_list_fields!(Stage0PerlTest => Stage1PerlTest { uses });
 impl_evaluate_list_fields!(Stage0RTest => Stage1RTest { libraries });
 impl_evaluate_list_fields!(Stage0RubyTest => Stage1RubyTest { requires });
-impl_evaluate_list_fields!(Stage0CommandsTestRequirements => Stage1CommandsTestRequirements { run, build });
+
+impl Evaluate for Stage0CommandsTestRequirements {
+    type Output = Stage1CommandsTestRequirements;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Self::Output {
+            run: evaluate_dependency_list(&self.run, context)?,
+            build: evaluate_dependency_list(&self.build, context)?,
+        })
+    }
+}
 
 impl Evaluate for Stage0CommandsTestFiles {
     type Output = Stage1CommandsTestFiles;

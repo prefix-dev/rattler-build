@@ -319,26 +319,15 @@ impl Build {
             site_packages_path,
         } = python;
 
-        for item in entry_points {
-            vars.extend(item.used_variables());
-        }
-
-        for item in skip_pyc_compilation {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(entry_points.used_variables());
+        vars.extend(skip_pyc_compilation.used_variables());
 
         if let Some(site_packages_path) = site_packages_path {
             vars.extend(site_packages_path.used_variables());
         }
 
-        for item in always_copy_files {
-            vars.extend(item.used_variables());
-        }
-
-        for item in always_include_files {
-            vars.extend(item.used_variables());
-        }
-
+        vars.extend(always_copy_files.used_variables());
+        vars.extend(always_include_files.used_variables());
         vars.extend(files.used_variables());
 
         // Dynamic linking
@@ -351,9 +340,7 @@ impl Build {
             overlinking_behavior,
         } = dynamic_linking;
 
-        for item in rpaths {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(rpaths.used_variables());
 
         match binary_relocation {
             BinaryRelocation::Boolean(val) => {
@@ -366,13 +353,8 @@ impl Build {
             }
         }
 
-        for item in missing_dso_allowlist {
-            vars.extend(item.used_variables());
-        }
-
-        for item in rpath_allowlist {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(missing_dso_allowlist.used_variables());
+        vars.extend(rpath_allowlist.used_variables());
 
         if let Some(overdepending_behavior) = overdepending_behavior {
             vars.extend(overdepending_behavior.used_variables());
@@ -389,13 +371,8 @@ impl Build {
             down_prioritize_variant,
         } = variant;
 
-        for item in use_keys {
-            vars.extend(item.used_variables());
-        }
-
-        for item in ignore_keys {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(use_keys.used_variables());
+        vars.extend(ignore_keys.used_variables());
 
         if let Some(down_prioritize) = down_prioritize_variant {
             vars.extend(down_prioritize.used_variables());
@@ -410,22 +387,15 @@ impl Build {
 
         let ForceFileType { text, binary } = force_file_type;
 
-        for item in text {
-            vars.extend(item.used_variables());
-        }
-
-        for item in binary {
-            vars.extend(item.used_variables());
-        }
+        vars.extend(text.used_variables());
+        vars.extend(binary.used_variables());
 
         match ignore {
             PrefixIgnore::Boolean(val) => {
                 vars.extend(val.used_variables());
             }
             PrefixIgnore::Patterns(list) => {
-                for item in list {
-                    vars.extend(item.used_variables());
-                }
+                vars.extend(list.used_variables());
             }
         }
 
@@ -437,9 +407,7 @@ impl Build {
                 replacement,
             } = pp;
 
-            for item in files {
-                vars.extend(item.used_variables());
-            }
+            vars.extend(files.used_variables());
             vars.extend(regex.used_variables());
             vars.extend(replacement.used_variables());
         }

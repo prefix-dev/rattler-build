@@ -816,11 +816,11 @@ async fn run_commands_test(
     let build_prefix = if !deps.build.is_empty() {
         tracing::info!("Installing build dependencies");
         let build_prefix = test_directory.join("test_build_env");
-        let build_dependencies = deps
+        let build_dependencies: Vec<MatchSpec> = deps
             .build
             .iter()
-            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|d| d.as_match_spec().clone())
+            .collect();
 
         create_environment(
             "test",
@@ -840,11 +840,8 @@ async fn run_commands_test(
         None
     };
 
-    let mut dependencies = deps
-        .run
-        .iter()
-        .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut dependencies: Vec<MatchSpec> =
+        deps.run.iter().map(|d| d.as_match_spec().clone()).collect();
 
     // create environment with the test dependencies
     dependencies.push(MatchSpec::from_str(
