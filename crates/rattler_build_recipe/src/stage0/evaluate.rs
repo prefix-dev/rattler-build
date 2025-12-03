@@ -570,15 +570,17 @@ where
     }
 }
 
-/// Generic helper to evaluate a ConditionalList<T> by processing each Value<T>
+/// Generic helper to evaluate a slice of Item<T> by processing each Value<T>
 ///
 /// This abstracts the common pattern of iterating over a conditional list,
 /// evaluating conditionals, and processing each value with a closure.
 ///
 /// This helper significantly reduces code duplication across the evaluation functions
 /// for different list types (strings, globs, dependencies, etc.).
+///
+/// Works with both `ConditionalList` and `ConditionalListOrItem` via `.as_slice()`.
 fn evaluate_conditional_list<T, R, F>(
-    list: &ConditionalList<T>,
+    list: &[Item<T>],
     context: &EvaluationContext,
     mut process: F,
 ) -> Result<Vec<R>, ParseError>
@@ -619,13 +621,15 @@ where
     Ok(results)
 }
 
-/// Evaluate a ConditionalList<String> into Vec<String>
+/// Evaluate a slice of Item<String> into Vec<String>
 ///
 /// Empty strings are filtered out. This allows conditional list items like
 /// `- ${{ "numpy" if unix }}` to be removed when the condition is false
 /// (Jinja renders them as empty strings).
-pub fn evaluate_string_list(
-    list: &ConditionalList<String>,
+///
+/// This function works with both `ConditionalList` and `ConditionalListOrItem` via `.as_slice()`.
+pub fn evaluate_string_list_items(
+    list: &[Item<String>],
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
     evaluate_conditional_list(list, context, |value, ctx| {
@@ -635,15 +639,87 @@ pub fn evaluate_string_list(
     })
 }
 
+/// Evaluate a ConditionalList<String> into Vec<String>
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "numpy" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
+pub fn evaluate_string_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_string_list_items(list.as_slice(), context)
+}
+
+/// Evaluate skip expressions as Jinja boolean expressions
+///
+/// Skip values are Jinja expressions like `is_abi3`, `not unix`, etc.
+/// They need to be rendered through Jinja to track accessed variables
+/// (important for variant hash computation).
+///
+/// Returns all skip expressions as strings, preserving them for later evaluation
+/// during the actual build decision. The expressions are evaluated here only
+/// for variable tracking purposes.
+pub fn evaluate_skip_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        // Skip expressions are Jinja boolean expressions, not templates
+        // We need to render them through Jinja to track accessed variables,
+        // but we preserve the original expression string for later evaluation
+        if let Some(expr_str) = value.as_concrete() {
+            // Wrap in ${{ }} to render as Jinja expression (for variable tracking)
+            let template = format!("${{{{ {} }}}}", expr_str);
+            // Ignore the result - we just want to trigger variable tracking
+            let _ = render_template(&template, ctx, value.span());
+
+            // Always return the original expression string
+            Ok(Some(expr_str.clone()))
+        } else if let Some(template) = value.as_template() {
+            // Already a template, render it
+            let rendered = render_template(template.source(), ctx, value.span())?;
+            // Return the rendered value (should evaluate to a skip condition)
+            if rendered.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(rendered))
+            }
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    })
+}
+
 /// Evaluate a string list, preserving templates with undefined variables
 /// This is used for script content where build-time environment variables might be referenced
 pub fn evaluate_string_list_lenient(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
-    evaluate_conditional_list(list, context, |value, ctx| {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let s = evaluate_or_preserve_template(value, ctx)?;
         // Filter out empty strings from templates like `${{ "value" if condition }}`
+        Ok(if s.is_empty() { None } else { Some(s) })
+    })
+}
+
+/// Preserve a string list with lazy evaluation - conditionals are evaluated but string content is kept as-is
+///
+/// This is used for script content where we want to:
+/// 1. Evaluate if/then/else conditionals (e.g., `- if: unix`) to decide which items to include
+/// 2. Keep the string content as-is, preserving any Jinja templates for later evaluation at build time
+///
+/// This allows templates like `${{ "$CMAKE_ARGS" if unix else "%CMAKE_ARGS%" }}` to remain
+/// unevaluated until build time when the actual environment variables are available.
+pub fn preserve_string_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<Vec<String>, ParseError> {
+    evaluate_conditional_list(list.as_slice(), context, |value, _ctx| {
+        // Extract the original string value without evaluating templates
+        let s = extract_template_source(value).unwrap_or_default();
+        // Filter out empty strings
         Ok(if s.is_empty() { None } else { Some(s) })
     })
 }
@@ -655,30 +731,34 @@ pub fn evaluate_package_name_list(
     list: &ConditionalList<PackageName>,
     context: &EvaluationContext,
 ) -> Result<Vec<PackageName>, ParseError> {
-    evaluate_conditional_list(list, context, |value, ctx| {
-        // Handle both concrete PackageName and template values
-        if let Some(concrete) = value.as_concrete() {
-            // For concrete values, just clone it
-            Ok(Some(concrete.clone()))
-        } else if let Some(template) = value.as_template() {
-            // Render the template
-            let s = render_template(template.source(), ctx, value.span())?;
-            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
-            if s.is_empty() {
-                return Ok(None);
+    evaluate_conditional_list(
+        list.as_slice(),
+        context,
+        |value: &Value<PackageName>, ctx| {
+            // Handle both concrete PackageName and template values
+            if let Some(concrete) = value.as_concrete() {
+                // For concrete values, just clone it
+                Ok(Some(concrete.clone()))
+            } else if let Some(template) = value.as_template() {
+                // Render the template
+                let s = render_template(template.source(), ctx, value.span())?;
+                // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+                if s.is_empty() {
+                    return Ok(None);
+                }
+                // Parse the string into a PackageName
+                PackageName::from_str(&s).map(Some).map_err(|e| {
+                    ParseError::invalid_value(
+                        "package name",
+                        format!("'{}' is not a valid package name: {}", s, e),
+                        value.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                })
+            } else {
+                unreachable!("Value must be either concrete or template")
             }
-            // Parse the string into a PackageName
-            PackageName::from_str(&s).map(Some).map_err(|e| {
-                ParseError::invalid_value(
-                    "package name",
-                    format!("'{}' is not a valid package name: {}", s, e),
-                    value.span().copied().unwrap_or_else(Span::new_blank),
-                )
-            })
-        } else {
-            unreachable!("Value must be either concrete or template")
-        }
-    })
+        },
+    )
 }
 
 /// Helper function to validate and evaluate glob patterns from a ConditionalList
@@ -686,7 +766,7 @@ fn evaluate_glob_patterns(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
-    evaluate_conditional_list(list, context, |value, ctx| {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let pattern = evaluate_string_value(value, ctx)?;
         // Validate the glob pattern immediately with proper error reporting
         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
@@ -749,27 +829,31 @@ pub fn evaluate_entry_point_list(
     list: &ConditionalList<rattler_conda_types::package::EntryPoint>,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::package::EntryPoint>, ParseError> {
-    evaluate_conditional_list(list, context, |val, ctx| {
-        if let Some(ep) = val.as_concrete() {
-            Ok(Some(ep.clone()))
-        } else if let Some(template) = val.as_template() {
-            let s = render_template(template.source(), ctx, val.span())?;
-            s.parse::<rattler_conda_types::package::EntryPoint>()
-                .map(Some)
-                .map_err(|e| {
-                    ParseError::invalid_value(
-                        "entry point",
-                        format!("Invalid entry point '{}': {}", s, e),
-                        val.span().copied().unwrap_or_else(Span::new_blank),
-                    )
-                    .with_suggestion(
-                        "Entry points should be in the format 'command = module:function'",
-                    )
-                })
-        } else {
-            unreachable!("Value must be either concrete or template")
-        }
-    })
+    evaluate_conditional_list(
+        list.as_slice(),
+        context,
+        |val: &Value<rattler_conda_types::package::EntryPoint>, ctx| {
+            if let Some(ep) = val.as_concrete() {
+                Ok(Some(ep.clone()))
+            } else if let Some(template) = val.as_template() {
+                let s = render_template(template.source(), ctx, val.span())?;
+                s.parse::<rattler_conda_types::package::EntryPoint>()
+                    .map(Some)
+                    .map_err(|e| {
+                        ParseError::invalid_value(
+                            "entry point",
+                            format!("Invalid entry point '{}': {}", s, e),
+                            val.span().copied().unwrap_or_else(Span::new_blank),
+                        )
+                        .with_suggestion(
+                            "Entry points should be in the format 'command = module:function'",
+                        )
+                    })
+            } else {
+                unreachable!("Value must be either concrete or template")
+            }
+        },
+    )
 }
 
 /// Check if a MatchSpec is a "free spec" (no version constraints).
@@ -838,7 +922,7 @@ pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
-    evaluate_conditional_list(list, context, |value, ctx| {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         if let Some(match_spec) = value.as_concrete() {
             Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
         } else if let Some(template) = value.as_template() {
@@ -931,30 +1015,48 @@ pub fn evaluate_script(
     };
 
     // For content: evaluate conditionals but preserve templates with undefined vars
-    let content = if let Some(file_val) = &script.file {
+    let (content, inferred_interpreter) = if let Some(file_val) = &script.file {
         // File paths should be evaluated normally
         let file_str = evaluate_string_value(file_val, context)?;
-        ScriptContentOutput::Path(PathBuf::from(file_str))
+        let file_path = PathBuf::from(&file_str);
+        // Infer interpreter from file extension if not explicitly set
+        let inferred = if interpreter.is_none() {
+            rattler_build_script::determine_interpreter_from_path(&file_path)
+        } else {
+            None
+        };
+        (ScriptContentOutput::Path(file_path), inferred)
     } else if let Some(content_list) = &script.content {
-        // Use the lenient evaluation that preserves templates with undefined variables
-        // This handles conditional logic (if/then/else) while preserving build-time env vars
-        let commands = evaluate_string_list_lenient(content_list, context)?;
+        // Use lazy evaluation that preserves templates entirely
+        // This evaluates if/then/else conditionals but keeps string content as-is
+        // Templates like `${{ "$CMAKE_ARGS" if unix }}` will be evaluated at build time
+        let commands = preserve_string_list(content_list, context)?;
 
-        if commands.is_empty() {
+        // Determine if script has additional options (env, interpreter, cwd, secrets)
+        let has_additional_options =
+            !env.is_empty() || interpreter.is_some() || cwd.is_some() || !secrets.is_empty();
+
+        let content = if commands.is_empty() {
             ScriptContentOutput::Default
-        } else if commands.len() == 1 {
-            // Single command - could be a path or command, use CommandOrPath
+        } else if commands.len() == 1 && !has_additional_options {
+            // Single command with no additional options - use CommandOrPath for backward compat
+            // This serializes as a simple string: `script: "cmd"`
             ScriptContentOutput::CommandOrPath(commands.into_iter().next().unwrap())
         } else {
-            // Multiple commands
+            // Multiple commands OR has additional options - use Commands
+            // This serializes as a list inside the content field: `script: { content: [...] }`
             ScriptContentOutput::Commands(commands)
-        }
+        };
+        (content, None)
     } else {
-        ScriptContentOutput::Default
+        (ScriptContentOutput::Default, None)
     };
 
+    // Use inferred interpreter if no explicit interpreter was set
+    let final_interpreter = interpreter.or(inferred_interpreter);
+
     Ok(Script {
-        interpreter,
+        interpreter: final_interpreter,
         env,
         secrets,
         content,
@@ -1602,8 +1704,9 @@ impl Evaluate for Stage0Build {
             }
         };
 
-        // Evaluate skip conditions
-        let skip = evaluate_string_list(&self.skip, context)?;
+        // Evaluate skip conditions as Jinja boolean expressions
+        // This tracks accessed variables for proper variant hash computation
+        let skip = evaluate_skip_list(&self.skip, context)?;
 
         // Evaluate python configuration
         let python = self.python.evaluate(context)?;
@@ -1886,7 +1989,7 @@ impl Evaluate for Stage0PythonTest {
     type Output = Stage1PythonTest;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let imports = evaluate_string_list(&self.imports, context)?;
+        let imports = evaluate_string_list_items(self.imports.as_slice(), context)?;
 
         let pip_check = match &self.pip_check {
             None => true, // default to true
@@ -1983,35 +2086,91 @@ impl Evaluate for Stage0PackageContentsTest {
     }
 }
 
+/// Evaluate a single test item (which can be a Value or Conditional), returning a vector
+/// (conditionals expand to multiple tests)
+pub fn evaluate_test(
+    test_item: &Item<Stage0TestType>,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1TestType>, ParseError> {
+    match test_item {
+        Item::Value(value) => {
+            // Get the concrete TestType from the Value
+            let test = value.as_concrete().ok_or_else(|| {
+                ParseError::invalid_value(
+                    "test",
+                    "test cannot be a template",
+                    crate::Span::new_blank(),
+                )
+            })?;
+            evaluate_test_type(test, context).map(|t| vec![t])
+        }
+        Item::Conditional(cond) => {
+            // Evaluate the condition
+            let condition_met = evaluate_condition(&cond.condition, context)?;
+
+            let tests_to_evaluate = if condition_met {
+                &cond.then
+            } else {
+                match &cond.else_value {
+                    Some(else_value) => else_value,
+                    None => return Ok(Vec::new()), // No else branch and condition is false
+                }
+            };
+
+            // Recursively evaluate the selected tests
+            let mut results = Vec::new();
+            for value in tests_to_evaluate.iter() {
+                let test = value.as_concrete().ok_or_else(|| {
+                    ParseError::invalid_value(
+                        "test",
+                        "test cannot be a template",
+                        crate::Span::new_blank(),
+                    )
+                })?;
+                results.push(evaluate_test_type(test, context)?);
+            }
+            Ok(results)
+        }
+    }
+}
+
+/// Evaluate a concrete TestType
+fn evaluate_test_type(
+    test: &Stage0TestType,
+    context: &EvaluationContext,
+) -> Result<Stage1TestType, ParseError> {
+    match test {
+        Stage0TestType::Python { python } => Ok(Stage1TestType::Python {
+            python: python.evaluate(context)?,
+        }),
+        Stage0TestType::Perl { perl } => Ok(Stage1TestType::Perl {
+            perl: perl.evaluate(context)?,
+        }),
+        Stage0TestType::R { r } => Ok(Stage1TestType::R {
+            r: r.evaluate(context)?,
+        }),
+        Stage0TestType::Ruby { ruby } => Ok(Stage1TestType::Ruby {
+            ruby: ruby.evaluate(context)?,
+        }),
+        Stage0TestType::Commands(commands) => {
+            Ok(Stage1TestType::Commands(commands.evaluate(context)?))
+        }
+        Stage0TestType::Downstream(downstream) => {
+            Ok(Stage1TestType::Downstream(downstream.evaluate(context)?))
+        }
+        Stage0TestType::PackageContents { package_contents } => {
+            Ok(Stage1TestType::PackageContents {
+                package_contents: package_contents.evaluate(context)?,
+            })
+        }
+    }
+}
+
 impl Evaluate for Stage0TestType {
     type Output = Stage1TestType;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        match self {
-            Stage0TestType::Python { python } => Ok(Stage1TestType::Python {
-                python: python.evaluate(context)?,
-            }),
-            Stage0TestType::Perl { perl } => Ok(Stage1TestType::Perl {
-                perl: perl.evaluate(context)?,
-            }),
-            Stage0TestType::R { r } => Ok(Stage1TestType::R {
-                r: r.evaluate(context)?,
-            }),
-            Stage0TestType::Ruby { ruby } => Ok(Stage1TestType::Ruby {
-                ruby: ruby.evaluate(context)?,
-            }),
-            Stage0TestType::Commands(commands) => {
-                Ok(Stage1TestType::Commands(commands.evaluate(context)?))
-            }
-            Stage0TestType::Downstream(downstream) => {
-                Ok(Stage1TestType::Downstream(downstream.evaluate(context)?))
-            }
-            Stage0TestType::PackageContents { package_contents } => {
-                Ok(Stage1TestType::PackageContents {
-                    package_contents: package_contents.evaluate(context)?,
-                })
-            }
-        }
+        evaluate_test_type(self, context)
     }
 }
 
@@ -2037,10 +2196,10 @@ impl Evaluate for Stage0Recipe {
             source.push(src.evaluate(&context_with_vars)?);
         }
 
-        // Evaluate tests list
+        // Evaluate tests list (conditionals expand to multiple tests)
         let mut tests = Vec::new();
         for test in &self.tests {
-            tests.push(test.evaluate(&context_with_vars)?);
+            tests.extend(evaluate_test(test, &context_with_vars)?);
         }
 
         let accessed_vars = context_with_vars.accessed_variables();
@@ -2064,6 +2223,9 @@ impl Evaluate for Stage0Recipe {
             }
         };
 
+        // Get OS environment variable keys that can be overridden by variant config
+        let os_env_var_keys = context_with_vars.os_env_var_keys();
+
         let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
             .variables()
             .iter()
@@ -2082,10 +2244,12 @@ impl Evaluate for Stage0Recipe {
                     return false;
                 }
 
-                // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+                // Include if accessed, part of our (free) dependencies,
+                // if it's an always-include variable, or if it's an OS env var key
                 accessed_vars.contains(key_str)
                     || free_specs.contains(&NormalizedKey::from(key_str))
                     || ALWAYS_INCLUDED_VARS.contains(&key_str)
+                    || os_env_var_keys.contains(key_str)
             })
             .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
             .collect();
@@ -2417,11 +2581,11 @@ fn evaluate_package_output_to_recipe(
     let mut tests = Vec::new();
     if inherits_from_toplevel {
         for test in &recipe.tests {
-            tests.push(test.evaluate(context)?);
+            tests.extend(evaluate_test(test, context)?);
         }
     }
     for test in &output.tests {
-        tests.push(test.evaluate(context)?);
+        tests.extend(evaluate_test(test, context)?);
     }
 
     // Extract the resolved context variables
@@ -2860,12 +3024,13 @@ mod tests {
         // Evaluate the list - only unix branch is taken
         let _result = evaluate_string_list(&list, &ctx).unwrap();
 
-        // unix should be checked in the condition, but we don't track that yet
-        // The concrete values don't trigger template rendering, so no template variables tracked
+        // Now we DO track variables from conditional expressions
+        // The condition "unix" is evaluated through Jinja's eval method,
+        // which tracks accessed variables
         let accessed = ctx.accessed_variables();
-        // Since the then/else branches contain concrete strings (not templates),
-        // no variables are accessed during evaluation
-        assert_eq!(accessed.len(), 0);
+        // The conditional expression "unix" should be tracked
+        assert_eq!(accessed.len(), 1);
+        assert!(accessed.contains("unix"));
     }
 
     #[test]
@@ -3654,5 +3819,108 @@ outputs:
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
+    }
+
+    #[test]
+    fn test_build_platform_tracked_from_conditional() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        // Recipe with build_platform in a conditional if expression in requirements
+        let recipe_yaml = r#"
+schema_version: 1
+package:
+  name: test
+  version: 1.0.0
+requirements:
+  build:
+    - gcc
+    - if: build_platform != target_platform
+      then:
+        - cross-python_linux-64
+        - numpy
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+
+        // Create context with both build_platform and target_platform
+        let mut ctx = EvaluationContext::new();
+        ctx.insert(
+            "target_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+        ctx.insert(
+            "build_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+
+        // Evaluate the recipe
+        let result = parsed.evaluate(&ctx);
+        assert!(result.is_ok(), "Recipe evaluation should succeed");
+
+        // Check that build_platform was tracked as accessed
+        let accessed = ctx.accessed_variables();
+        assert!(
+            accessed.contains("build_platform"),
+            "build_platform should be tracked as accessed during evaluation of 'if: build_platform != target_platform'. Accessed vars: {:?}",
+            accessed
+        );
+        assert!(
+            accessed.contains("target_platform"),
+            "target_platform should be tracked as accessed during evaluation of 'if: build_platform != target_platform'. Accessed vars: {:?}",
+            accessed
+        );
+    }
+
+    #[test]
+    fn test_skip_variable_tracking_plain_string() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        // Recipe with skip conditions as plain strings (not templates)
+        let recipe_yaml = r#"
+schema_version: 1
+package:
+  name: test
+  version: 1.0.0
+build:
+  skip:
+    - not (match(python, python_min ~ ".*") and is_abi3)
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+
+        // Create context with all required variables
+        // Using python=3.8 and python_min=3.8 so that match() succeeds and is_abi3 is evaluated
+        let mut ctx = EvaluationContext::new();
+        ctx.insert(
+            "target_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+        ctx.insert("python".to_string(), Variable::from_string("3.8"));
+        ctx.insert("python_min".to_string(), Variable::from_string("3.8"));
+        ctx.insert("is_abi3".to_string(), Variable::from(true));
+
+        // Evaluate the recipe
+        let result = parsed.evaluate(&ctx);
+        assert!(result.is_ok(), "Recipe evaluation should succeed");
+
+        // Check that skip variables were tracked
+        // Note: Only variables that are actually accessed during evaluation are tracked.
+        // If short-circuit evaluation skips a variable, it won't be in accessed_vars.
+        let accessed = ctx.accessed_variables();
+        assert!(
+            accessed.contains("python"),
+            "python should be tracked from skip expression. Accessed vars: {:?}",
+            accessed
+        );
+        assert!(
+            accessed.contains("python_min"),
+            "python_min should be tracked from skip expression. Accessed vars: {:?}",
+            accessed
+        );
+        assert!(
+            accessed.contains("is_abi3"),
+            "is_abi3 should be tracked from skip expression (since match() succeeds, the 'and' evaluates the second operand). Accessed vars: {:?}",
+            accessed
+        );
     }
 }

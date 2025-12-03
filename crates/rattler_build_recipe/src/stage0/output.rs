@@ -13,7 +13,7 @@ use crate::stage0::{
     requirements::Requirements,
     source::Source,
     tests::TestType,
-    types::Value,
+    types::{ConditionalList, Item, Value},
 };
 
 /// A recipe can be either a single-output or multi-output recipe
@@ -44,8 +44,8 @@ pub struct SingleOutputRecipe {
     pub extra: crate::stage0::extra::Extra,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tests: Vec<TestType>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub tests: ConditionalList<TestType>,
 }
 
 /// Multi-output recipe with staging support
@@ -79,8 +79,8 @@ pub struct MultiOutputRecipe {
     pub extra: crate::stage0::extra::Extra,
 
     /// Top-level tests (inheritable by outputs, prepended to output tests)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tests: Vec<TestType>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub tests: ConditionalList<TestType>,
 
     /// List of outputs (staging and package outputs)
     pub outputs: Vec<Output>,
@@ -181,8 +181,8 @@ pub struct PackageOutput {
     pub about: About,
 
     /// Tests for this output
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tests: Vec<TestType>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub tests: ConditionalList<TestType>,
 }
 
 /// Serialize TopLevel as null
@@ -260,8 +260,8 @@ impl SingleOutputRecipe {
         for src in source {
             vars.extend(src.used_variables());
         }
-        for test in tests {
-            vars.extend(test.used_variables());
+        for test_item in tests {
+            vars.extend(collect_test_item_variables(test_item));
         }
         for value in context.values() {
             vars.extend(value.used_variables());
@@ -309,8 +309,8 @@ impl MultiOutputRecipe {
         for src in source {
             vars.extend(src.used_variables());
         }
-        for test in tests {
-            vars.extend(test.used_variables());
+        for test_item in tests {
+            vars.extend(collect_test_item_variables(test_item));
         }
 
         // Context variables
@@ -411,8 +411,8 @@ impl PackageOutput {
         vars.extend(requirements.used_variables());
         vars.extend(build.used_variables());
         vars.extend(about.used_variables());
-        for test in tests {
-            vars.extend(test.used_variables());
+        for test_item in tests {
+            vars.extend(collect_test_item_variables(test_item));
         }
         vars.sort();
         vars.dedup();
@@ -444,5 +444,40 @@ impl StagingBuild {
         vars.sort();
         vars.dedup();
         vars
+    }
+}
+
+/// Helper to collect used variables from a test Item
+/// This handles both Value (concrete TestType) and Conditional cases
+fn collect_test_item_variables(item: &Item<TestType>) -> Vec<String> {
+    match item {
+        Item::Value(value) => {
+            let mut vars = value.used_variables();
+            // If the value is concrete, also get the TestType's own used variables
+            if let Some(test) = value.as_concrete() {
+                vars.extend(test.used_variables());
+            }
+            vars
+        }
+        Item::Conditional(cond) => {
+            let mut vars = cond.condition.used_variables().to_vec();
+            // Collect from then branch
+            for value in cond.then.iter() {
+                vars.extend(value.used_variables());
+                if let Some(test) = value.as_concrete() {
+                    vars.extend(test.used_variables());
+                }
+            }
+            // Collect from else branch if present
+            if let Some(else_value) = &cond.else_value {
+                for value in else_value.iter() {
+                    vars.extend(value.used_variables());
+                    if let Some(test) = value.as_concrete() {
+                        vars.extend(test.used_variables());
+                    }
+                }
+            }
+            vars
+        }
     }
 }

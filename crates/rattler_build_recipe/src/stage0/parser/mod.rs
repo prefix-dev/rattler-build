@@ -205,7 +205,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
     let tests = if let Some(tests_node) = mapping.get("tests") {
         parse_tests(tests_node)?
     } else {
-        Vec::new()
+        crate::stage0::ConditionalList::default()
     };
 
     // Check for unknown top-level fields

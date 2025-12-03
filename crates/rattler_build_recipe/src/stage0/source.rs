@@ -244,11 +244,9 @@ impl GitSource {
         if let Some(depth) = depth {
             vars.extend(depth.used_variables());
         }
-        // Extract variables from patches
+        // Extract variables from patches (both values and conditionals)
         for item in patches {
-            if let crate::stage0::types::Item::Value(v) = item {
-                vars.extend(v.used_variables());
-            }
+            vars.extend(item.used_variables());
         }
         if let Some(td) = target_directory
             && let Some(t) = td.as_template()
@@ -289,11 +287,9 @@ impl UrlSource {
         if let Some(file_name) = file_name {
             vars.extend(file_name.used_variables());
         }
-        // Extract variables from patches
+        // Extract variables from patches (both values and conditionals)
         for item in patches {
-            if let crate::stage0::types::Item::Value(v) = item {
-                vars.extend(v.used_variables());
-            }
+            vars.extend(item.used_variables());
         }
         if let Some(td) = target_directory
             && let Some(t) = td.as_template()

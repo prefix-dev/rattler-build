@@ -4319,6 +4319,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "strum 0.27.2",
  "tempfile",
  "thiserror 2.0.17",
  "toml",

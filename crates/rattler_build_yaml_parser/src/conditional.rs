@@ -8,7 +8,7 @@ use crate::{
     error::{ParseError, ParseResult},
     helpers::get_span,
     list::parse_list_or_item_with_converter,
-    types::{Conditional, ConditionalList, Item},
+    types::{Conditional, ConditionalList, ConditionalListOrItem, Item},
     value::parse_value_with_converter,
 };
 
@@ -49,6 +49,50 @@ where
         items.push(parse_item_with_converter(item, converter)?);
     }
     Ok(ConditionalList::new(items))
+}
+
+/// Parse a ConditionalListOrItem<T> from YAML
+///
+/// This handles either:
+/// - A single scalar value (e.g., `imports: anyio`)
+/// - A sequence that may contain if/then/else conditionals (e.g., `imports: [numpy, pandas]`)
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse (can be a scalar or a sequence)
+pub fn parse_conditional_list_or_item<T>(yaml: &MarkedNode) -> ParseResult<ConditionalListOrItem<T>>
+where
+    T: std::str::FromStr + ToString,
+    T::Err: std::fmt::Display,
+{
+    parse_conditional_list_or_item_with_converter(yaml, &FromStrConverter::new())
+}
+
+/// Parse a ConditionalListOrItem<T> from YAML using a custom converter
+///
+/// This handles either a single value or a sequence that may contain conditionals
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse (can be a scalar or a sequence)
+/// * `converter` - The converter to use for parsing concrete values
+pub fn parse_conditional_list_or_item_with_converter<T, C>(
+    yaml: &MarkedNode,
+    converter: &C,
+) -> ParseResult<ConditionalListOrItem<T>>
+where
+    C: NodeConverter<T>,
+{
+    // If it's a sequence, parse as a list
+    if let Some(sequence) = yaml.as_sequence() {
+        let mut items = Vec::new();
+        for item in sequence.iter() {
+            items.push(parse_item_with_converter(item, converter)?);
+        }
+        return Ok(ConditionalListOrItem::new(items));
+    }
+
+    // Otherwise, parse as a single item (scalar or conditional mapping)
+    let item = parse_item_with_converter(yaml, converter)?;
+    Ok(ConditionalListOrItem::new(vec![item]))
 }
 
 /// Parse an Item<T> from YAML using a custom converter

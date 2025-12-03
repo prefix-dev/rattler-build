@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, Script, Value};
+use crate::stage0::types::{ConditionalList, ConditionalListOrItem, Script, Value};
 
 /// Python version specification for tests
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -15,9 +15,9 @@ pub enum PythonVersion {
 /// A special Python test that checks if the imports are available and runs `pip check`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
-    /// List of imports to test
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub imports: ConditionalList<String>,
+    /// List of imports to test (accepts either a single import or a list)
+    #[serde(default, skip_serializing_if = "ConditionalListOrItem::is_empty")]
+    pub imports: ConditionalListOrItem<String>,
 
     /// Whether to run `pip check` or not (default to true)
     #[serde(default, skip_serializing_if = "Option::is_none")]

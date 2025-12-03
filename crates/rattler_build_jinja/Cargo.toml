@@ -19,6 +19,7 @@ itertools = { workspace = true }
 minijinja = { workspace = true }
 rattler_build_types = { workspace = true }
 rattler_conda_types = { workspace = true, default-features = false }
+strum = { workspace = true }
 lazy_static = { workspace = true }
 indexmap = { workspace = true }
 fs-err = { workspace = true }

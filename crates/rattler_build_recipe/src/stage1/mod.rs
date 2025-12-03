@@ -53,6 +53,9 @@ pub struct EvaluationContext {
     accessed_variables: Arc<Mutex<HashSet<String>>>,
     /// Set of variables that were accessed but undefined (tracked via thread-safe interior mutability)
     undefined_variables: Arc<Mutex<HashSet<String>>>,
+    /// OS environment variable keys that can be overridden by variant configuration.
+    /// These should be included in the used_variant even if not directly accessed during evaluation.
+    os_env_var_keys: HashSet<String>,
 }
 
 impl Default for EvaluationContext {
@@ -62,6 +65,7 @@ impl Default for EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys: HashSet::new(),
         }
     }
 }
@@ -83,6 +87,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys: HashSet::new(),
         }
     }
 
@@ -93,6 +98,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys: HashSet::new(),
         }
     }
 
@@ -107,6 +113,22 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys: HashSet::new(),
+        }
+    }
+
+    /// Create an evaluation context with variables, config, and OS env var keys
+    pub fn with_variables_config_and_os_env_keys(
+        variables: IndexMap<String, Variable>,
+        jinja_config: JinjaConfig,
+        os_env_var_keys: HashSet<String>,
+    ) -> Self {
+        Self {
+            variables,
+            jinja_config,
+            accessed_variables: Arc::new(Mutex::new(HashSet::new())),
+            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys,
         }
     }
 
@@ -120,6 +142,7 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             undefined_variables: Arc::new(Mutex::new(HashSet::new())),
+            os_env_var_keys: HashSet::new(),
         }
     }
 
@@ -128,9 +151,19 @@ impl EvaluationContext {
         self.variables.get(key)
     }
 
+    /// Get the OS environment variable keys
+    pub fn os_env_var_keys(&self) -> &HashSet<String> {
+        &self.os_env_var_keys
+    }
+
     /// Check if a variable exists in the context
     pub fn contains(&self, key: &str) -> bool {
         self.variables.contains_key(key)
+    }
+
+    /// Insert a variable into the context
+    pub fn insert(&mut self, key: String, value: Variable) {
+        self.variables.insert(key, value);
     }
 
     /// Get all variables as a reference

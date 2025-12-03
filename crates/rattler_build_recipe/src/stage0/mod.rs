@@ -31,8 +31,8 @@ pub use requirements::Requirements;
 pub use source::Source;
 pub use tests::TestType;
 pub use types::{
-    Conditional, ConditionalList, IncludeExclude, Item, JinjaExpression, JinjaTemplate, ListOrItem,
-    Value,
+    Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,
+    JinjaTemplate, ListOrItem, Value,
 };
 
 /// Backwards compatibility alias for Stage0Recipe
@@ -149,5 +149,101 @@ build:
         assert!(used_vars.contains(&"cuda".to_string()));
         assert!(used_vars.contains(&"linux".to_string()));
         assert!(!used_vars.contains(&"osx".to_string()));
+    }
+
+    #[test]
+    fn test_build_platform_from_conditional() {
+        // Test that build_platform and target_platform are extracted from
+        // conditional if expressions in requirements
+        let recipe = r#"
+schema_version: 1
+package:
+  name: test
+  version: 1.0.0
+requirements:
+  build:
+    - gcc
+    - if: build_platform != target_platform
+      then:
+        - cross-python_${{ target_platform }}
+        - numpy
+        - python
+        "#;
+
+        let parsed = parse_recipe_from_source(recipe).unwrap();
+        let used_vars = parsed.used_variables();
+
+        // The if condition uses build_platform and target_platform
+        assert!(
+            used_vars.contains(&"build_platform".to_string()),
+            "build_platform should be extracted from 'if: build_platform != target_platform'"
+        );
+        assert!(
+            used_vars.contains(&"target_platform".to_string()),
+            "target_platform should be extracted from 'if: build_platform != target_platform'"
+        );
+    }
+
+    #[test]
+    fn test_skip_plain_string_variable_tracking() {
+        // Test that skip conditions as plain strings (not templates) still track variables
+        let recipe = r#"
+schema_version: 1
+package:
+  name: test
+  version: 1.0.0
+build:
+  skip:
+    - not (match(python, python_min ~ ".*") and is_abi3)
+        "#;
+
+        let parsed = parse_recipe_from_source(recipe).unwrap();
+        let used_vars = parsed.used_variables();
+
+        // Skip expressions should track variables even when not wrapped in ${{ }}
+        assert!(
+            used_vars.contains(&"python".to_string()),
+            "python should be extracted from skip expression"
+        );
+        assert!(
+            used_vars.contains(&"python_min".to_string()),
+            "python_min should be extracted from skip expression"
+        );
+        assert!(
+            used_vars.contains(&"is_abi3".to_string()),
+            "is_abi3 should be extracted from skip expression"
+        );
+    }
+
+    #[test]
+    fn test_source_patch_conditional_variable_extraction() {
+        // Test that variables from conditional if expressions in source patches are extracted
+        let recipe = r#"
+schema_version: 1
+package:
+  name: test
+  version: 1.0.0
+source:
+  url: https://example.com/test.tar.gz
+  sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  patches:
+    - if: win
+      then: msvc_warnings.patch
+    - if: "python_impl == 'pypy'"
+      then: pypy-compat.patch
+        "#;
+
+        let parsed = parse_recipe_from_source(recipe).unwrap();
+        let used_vars = parsed.used_variables();
+
+        // Variables from patch conditionals should be extracted
+        assert!(
+            used_vars.contains(&"win".to_string()),
+            "win should be extracted from patch conditional 'if: win'"
+        );
+        assert!(
+            used_vars.contains(&"python_impl".to_string()),
+            "python_impl should be extracted from patch conditional 'if: python_impl == 'pypy''"
+        );
     }
 }

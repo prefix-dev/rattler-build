@@ -1,10 +1,13 @@
 use marked_yaml::Node;
-use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{
+    parse_conditional_list, parse_conditional_list_or_item, parse_value,
+};
 
 use crate::{
     ParseError,
     stage0::{
-        ConditionalList,
+        Conditional, ConditionalList, ConditionalListOrItem, Item, JinjaExpression, ListOrItem,
+        Value,
         parser::helpers::get_span,
         tests::{
             CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
@@ -18,17 +21,82 @@ use crate::{
 use super::helpers::validate_mapping_fields;
 
 /// Parse tests section from YAML (expects a sequence)
-pub fn parse_tests(node: &Node) -> Result<Vec<TestType>, ParseError> {
+/// Returns a ConditionalList<TestType> which supports if/then/else conditionals
+pub fn parse_tests(node: &Node) -> Result<ConditionalList<TestType>, ParseError> {
     let seq = node.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(node))
             .with_message("Expected 'tests' to be a sequence")
     })?;
 
+    let mut items = Vec::new();
+    for item in seq.iter() {
+        items.push(parse_test_item(item)?);
+    }
+    Ok(ConditionalList::new(items))
+}
+
+/// Parse a single test item which can be either a TestType or a conditional
+fn parse_test_item(node: &Node) -> Result<Item<TestType>, ParseError> {
+    // Check if it's a conditional (mapping with "if" key)
+    if let Some(mapping) = node.as_mapping() {
+        if mapping.get("if").is_some() {
+            return parse_conditional_test_item(mapping);
+        }
+    }
+
+    // Not a conditional - parse as a regular TestType
+    let test = parse_single_test(node)?;
+    Ok(Item::Value(Value::new_concrete(test, None)))
+}
+
+/// Parse a conditional test item with if/then/else branches
+fn parse_conditional_test_item(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<Item<TestType>, ParseError> {
+    let if_node = mapping
+        .get("if")
+        .ok_or_else(|| ParseError::missing_field("if", *mapping.span()))?;
+
+    let condition_str = if_node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(if_node))
+            .with_message("'if' condition must be a string")
+    })?;
+
+    let condition = JinjaExpression::new(condition_str.as_str().to_string())
+        .map_err(|e| ParseError::jinja_error(e, *condition_str.span()))?;
+
+    let then_node = mapping
+        .get("then")
+        .ok_or_else(|| ParseError::missing_field("then", *mapping.span()))?;
+
+    let then_tests = parse_test_list_as_values(then_node)?;
+
+    let else_tests = if let Some(else_node) = mapping.get("else") {
+        Some(parse_test_list_as_values(else_node)?)
+    } else {
+        None
+    };
+
+    Ok(Item::Conditional(Conditional {
+        condition,
+        then: then_tests,
+        else_value: else_tests,
+    }))
+}
+
+/// Parse a test list from a sequence node and wrap each test in Value
+fn parse_test_list_as_values(node: &Node) -> Result<ListOrItem<Value<TestType>>, ParseError> {
+    let seq = node.as_sequence().ok_or_else(|| {
+        ParseError::expected_type("sequence", "non-sequence", get_span(node))
+            .with_message("'then' and 'else' must be sequences of tests")
+    })?;
+
     let mut tests = Vec::new();
     for item in seq.iter() {
-        tests.push(parse_single_test(item)?);
+        let test = parse_single_test(item)?;
+        tests.push(Value::new_concrete(test, None));
     }
-    Ok(tests)
+    Ok(ListOrItem::new(tests))
 }
 
 fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
@@ -85,9 +153,7 @@ fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
 fn parse_python_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PythonTest, ParseError> {
-    use ConditionalList;
-
-    let mut imports = ConditionalList::default();
+    let mut imports = ConditionalListOrItem::default();
     let mut pip_check = None;
     let mut python_version = None;
 
@@ -95,7 +161,7 @@ fn parse_python_test(
         let key = key_node.as_str();
         match key {
             "imports" => {
-                imports = parse_conditional_list(value_node)?;
+                imports = parse_conditional_list_or_item(value_node)?;
             }
             "pip_check" => {
                 pip_check = Some(parse_value(value_node)?);
@@ -138,8 +204,6 @@ fn parse_python_version(node: &Node) -> Result<PythonVersion, ParseError> {
 fn parse_perl_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PerlTest, ParseError> {
-    use ConditionalList;
-
     // Validate that all fields are known
     validate_mapping_fields(mapping, "perl test", &["uses"])?;
 
@@ -159,8 +223,6 @@ fn parse_perl_test(
 }
 
 fn parse_r_test(mapping: &marked_yaml::types::MarkedMappingNode) -> Result<RTest, ParseError> {
-    use ConditionalList;
-
     // Validate that all fields are known
     validate_mapping_fields(mapping, "r test", &["libraries"])?;
 
@@ -182,8 +244,6 @@ fn parse_r_test(mapping: &marked_yaml::types::MarkedMappingNode) -> Result<RTest
 fn parse_ruby_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<RubyTest, ParseError> {
-    use ConditionalList;
-
     // Validate that all fields are known
     validate_mapping_fields(mapping, "ruby test", &["requires"])?;
 
@@ -251,8 +311,6 @@ fn parse_commands_test(
 fn parse_commands_test_requirements(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTestRequirements, ParseError> {
-    use ConditionalList;
-
     let mut run = ConditionalList::default();
     let mut build = ConditionalList::default();
 
@@ -282,8 +340,6 @@ fn parse_commands_test_requirements(
 fn parse_commands_test_files(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTestFiles, ParseError> {
-    use ConditionalList;
-
     let mut source = ConditionalList::default();
     let mut recipe = ConditionalList::default();
 
@@ -416,8 +472,6 @@ fn parse_package_contents_test(
 fn parse_package_contents_check_files_flexible(
     node: &Node,
 ) -> Result<PackageContentsCheckFiles, ParseError> {
-    use ConditionalList;
-
     // Try to parse as a mapping first (explicit format with exists/not_exists)
     if let Some(mapping) = node.as_mapping() {
         return parse_package_contents_check_files(mapping);
@@ -445,8 +499,6 @@ fn parse_package_contents_check_files_flexible(
 fn parse_package_contents_check_files(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<PackageContentsCheckFiles, ParseError> {
-    use ConditionalList;
-
     let mut exists = ConditionalList::default();
     let mut not_exists = ConditionalList::default();
 

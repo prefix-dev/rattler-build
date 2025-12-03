@@ -56,6 +56,11 @@ pub struct RenderConfig {
     pub build_platform: rattler_conda_types::Platform,
     /// Host platform (for cross-compilation)
     pub host_platform: rattler_conda_types::Platform,
+    /// OS environment variable keys that can be overridden by variant configuration.
+    /// These are typically derived from `env_vars::os_vars()` and include variables
+    /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
+    /// customized via variant config.
+    pub os_env_var_keys: HashSet<String>,
 }
 
 impl Default for RenderConfig {
@@ -67,6 +72,7 @@ impl Default for RenderConfig {
             target_platform: rattler_conda_types::Platform::current(),
             build_platform: rattler_conda_types::Platform::current(),
             host_platform: rattler_conda_types::Platform::current(),
+            os_env_var_keys: HashSet::new(),
         }
     }
 }
@@ -110,6 +116,13 @@ impl RenderConfig {
     /// Set the host platform
     pub fn with_host_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
         self.host_platform = platform;
+        self
+    }
+
+    /// Set the OS environment variable keys that can be overridden by variant config.
+    /// These are typically derived from `env_vars::os_vars()` keys.
+    pub fn with_os_env_var_keys(mut self, keys: HashSet<String>) -> Self {
+        self.os_env_var_keys = keys;
         self
     }
 }
@@ -160,12 +173,12 @@ fn add_pins_to_variant(
     pin_subpackages: &BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
 ) -> Result<(), String> {
-    let self_name = NormalizedKey::from(self_name.as_normalized());
     for (pin_name, pin_info) in pin_subpackages {
         // Ignore ourselves
-        if self_name == *pin_name {
+        if self_name == &pin_info.name {
             continue;
         }
+
         // Find the rendered variant for this pinned package
         if let Some(pinned_variant) = all_rendered
             .iter()
@@ -319,11 +332,13 @@ fn stable_topological_sort(
 /// - Template variables used in Jinja expressions
 /// - Free specs (dependencies without version constraints) that could be variants
 /// - Always-included variables (target_platform, etc.)
+/// - OS environment variable keys (passed via RenderConfig)
 ///
 /// Returns only variables that exist in the variant config.
 fn collect_used_variables(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
+    os_env_var_keys: &HashSet<String>,
 ) -> HashSet<NormalizedKey> {
     let mut used_vars = HashSet::new();
 
@@ -340,6 +355,13 @@ fn collect_used_variables(
     // Insert always-included variables
     for key in ALWAYS_INCLUDED_VARS {
         used_vars.insert(NormalizedKey::from(*key));
+    }
+
+    // Insert OS environment variable keys that can be overridden by variant config
+    // These come from env_vars::os_vars() and include platform-specific vars like
+    // MACOSX_DEPLOYMENT_TARGET
+    for key in os_env_var_keys {
+        used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
     // Filter to only variants that exist in the config
@@ -365,8 +387,12 @@ fn build_evaluation_context(
     // Create JinjaConfig with the variant properly populated
     let jinja_config = create_jinja_config(config, variant);
 
-    // Create evaluation context with variables and config
-    let context = EvaluationContext::with_variables_and_config(context_map, jinja_config);
+    // Create evaluation context with variables, config, and OS env var keys
+    let context = EvaluationContext::with_variables_config_and_os_env_keys(
+        context_map,
+        jinja_config,
+        config.os_env_var_keys.clone(),
+    );
 
     // Evaluate and merge recipe context variables
     let (context, _evaluated_context) = match stage0_recipe {
@@ -695,7 +721,7 @@ fn render_with_variants(
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
     // Collect used variables
-    let used_vars = collect_used_variables(stage0_recipe, variant_config);
+    let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
 
     // Compute all variant combinations
     let combinations = variant_config

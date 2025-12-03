@@ -323,7 +323,8 @@ pub struct Build {
 
     /// Skip conditions - can be boolean expressions or platform names
     /// For example: ["win", "platform == 'osx-64'"]
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Note: This field is not serialized to JSON output (like main branch)
+    #[serde(default, skip)]
     pub skip: Vec<String>,
 
     /// Always copy these files (validated glob patterns)

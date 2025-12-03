@@ -146,13 +146,21 @@ fn find_variants(
         })
         .wrap_err("Failed to parse recipe")?;
 
+    // Get OS environment variable keys that can be overridden by variant config
+    // We use an empty prefix path since we just need the keys, not the values
+    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
+        .keys()
+        .cloned()
+        .collect();
+
     // Build render config with platform information, experimental flag, and recipe path
     let render_config = RenderConfig::new()
         .with_target_platform(target_platform)
         .with_build_platform(build_platform)
         .with_host_platform(host_platform)
         .with_experimental(experimental)
-        .with_recipe_path(recipe_path);
+        .with_recipe_path(recipe_path)
+        .with_os_env_var_keys(os_env_var_keys);
 
     tracing::info!("All variants: {:#?}", variant_config.variants);
     // Render with variant config (handles both single and multi-output recipes)

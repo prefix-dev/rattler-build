@@ -424,3 +424,203 @@ impl<T> Default for ConditionalList<T> {
         Self::empty()
     }
 }
+
+/// A list that may contain conditionals, but also accepts a single value during deserialization
+/// Use this type when a field should accept both `field: value` and `field: [value1, value2]`
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct ConditionalListOrItem<T> {
+    items: Vec<Item<T>>,
+}
+
+// Custom deserialization: accept either single value or array
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ConditionalListOrItem<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::marker::PhantomData;
+
+        struct ConditionalListOrItemVisitor<T>(PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ConditionalListOrItemVisitor<T> {
+            type Value = ConditionalListOrItem<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a single value or a list of values")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element::<Item<T>>()? {
+                    items.push(item);
+                }
+                Ok(ConditionalListOrItem { items })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                // Deserialize a single string as a Value<T> wrapped in Item
+                let value = Value::<T>::deserialize(de::value::StrDeserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = Value::<T>::deserialize(de::value::StringDeserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                // A map could be a conditional (if/then/else) - deserialize as Item
+                let item = Item::<T>::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(ConditionalListOrItem { items: vec![item] })
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = Value::<T>::deserialize(de::value::BoolDeserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = Value::<T>::deserialize(de::value::I64Deserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = Value::<T>::deserialize(de::value::U64Deserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = Value::<T>::deserialize(de::value::F64Deserializer::new(v))?;
+                Ok(ConditionalListOrItem {
+                    items: vec![Item::Value(value)],
+                })
+            }
+        }
+
+        deserializer.deserialize_any(ConditionalListOrItemVisitor(PhantomData))
+    }
+}
+
+impl<T> ConditionalListOrItem<T> {
+    /// Create a new conditional list
+    pub fn new(items: Vec<Item<T>>) -> Self {
+        Self { items }
+    }
+
+    /// Create an empty conditional list
+    pub fn empty() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Get the number of items
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Get an iterator over the items
+    pub fn iter(&self) -> impl Iterator<Item = &Item<T>> {
+        self.items.iter()
+    }
+
+    /// Get a mutable iterator over the items
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Item<T>> {
+        self.items.iter_mut()
+    }
+
+    /// Convert to a vector
+    pub fn into_vec(self) -> Vec<Item<T>> {
+        self.items
+    }
+
+    /// Get as a slice
+    pub fn as_slice(&self) -> &[Item<T>] {
+        &self.items
+    }
+
+    /// Get all variables used in all items
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for item in self.items.iter() {
+            vars.extend(item.used_variables());
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+
+    /// Convert to a ConditionalList
+    pub fn into_conditional_list(self) -> ConditionalList<T> {
+        ConditionalList::new(self.items)
+    }
+}
+
+impl<T> IntoIterator for ConditionalListOrItem<T> {
+    type Item = Item<T>;
+    type IntoIter = std::vec::IntoIter<Item<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a ConditionalListOrItem<T> {
+    type Item = &'a Item<T>;
+    type IntoIter = std::slice::Iter<'a, Item<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
+impl<T> Default for ConditionalListOrItem<T> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<T> From<ConditionalListOrItem<T>> for ConditionalList<T> {
+    fn from(value: ConditionalListOrItem<T>) -> Self {
+        ConditionalList::new(value.items)
+    }
+}

@@ -16,6 +16,7 @@ use std::{
 };
 
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
+use strum::IntoEnumIterator as _;
 
 use crate::variable::Variable;
 
@@ -183,9 +184,23 @@ impl Jinja {
             Value::from(config.target_platform.is_windows()),
         );
 
-        // Add architecture
-        if let Some(arch) = config.target_platform.arch() {
-            context.insert(arch.to_string(), Value::from(true));
+        // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
+        // All known architectures are defined, with only the current target's architecture being true
+        let current_arch = config.target_platform.arch();
+        for arch in Arch::iter() {
+            context.insert(arch.to_string(), Value::from(current_arch == Some(arch)));
+        }
+
+        // Add platform aliases (e.g., "linux64", "osx64", "win64")
+        // These are the platform string with "-" removed (e.g., "linux-64" -> "linux64")
+        // All known platforms get an alias, with only the current target_platform being true
+        for platform in Platform::iter() {
+            // Skip noarch and unknown platforms
+            if matches!(platform, Platform::NoArch | Platform::Unknown) {
+                continue;
+            }
+            let alias = platform.to_string().replace('-', "");
+            context.insert(alias, Value::from(platform == config.target_platform));
         }
 
         // Add variant variables to context
@@ -252,9 +267,19 @@ impl Jinja {
     }
 
     /// Render, compile and evaluate a expr string with the current context.
+    ///
+    /// This will track accessed and undefined variables during evaluation using
+    /// a TrackingContext object wrapper.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
+        // Create a TrackingContext that wraps our context
+        let tracking_context = TrackingContext::new(
+            self.context.clone(),
+            self.accessed_variables.clone(),
+            self.undefined_variables.clone(),
+        );
+
         let expr = self.env.compile_expression(str)?;
-        expr.eval(self.context())
+        expr.eval(Value::from_object(tracking_context))
     }
 
     /// Get the set of variables that were accessed during rendering

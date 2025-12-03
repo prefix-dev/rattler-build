@@ -7,7 +7,7 @@ use rattler_build_yaml_parser::{ParseMapping, parse_value};
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
-        Requirements, Value,
+        ConditionalList, Requirements, Value,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
             StagingBuild, StagingMetadata, StagingOutput,
@@ -101,7 +101,7 @@ pub fn parse_multi_output_recipe(
     let tests = if let Some(tests_node) = mapping.get("tests") {
         parse_tests(tests_node)?
     } else {
-        Vec::new()
+        ConditionalList::default()
     };
 
     // Parse outputs (required)
@@ -477,7 +477,7 @@ fn parse_package_output(
     let tests = if let Some(tests_node) = mapping.get("tests") {
         parse_tests(tests_node)?
     } else {
-        Vec::new()
+        ConditionalList::default()
     };
 
     // Validate field names
