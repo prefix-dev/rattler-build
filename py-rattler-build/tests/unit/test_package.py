@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 import rattler_build
-from rattler_build import Package, PackageTest, TestResult
+from rattler_build import Package, PackageTest
+from rattler_build import TestResult as _TestResult
 
 
 @pytest.fixture
@@ -237,7 +238,7 @@ class TestRunTests:
         pkg = Package.from_file(built_package)
         if pkg.test_count() > 0:
             result = pkg.run_test(0)
-            assert isinstance(result, TestResult)
+            assert isinstance(result, _TestResult)
             assert isinstance(result.success, bool)
             assert isinstance(result.output, list)
             assert result.test_index == 0
@@ -251,7 +252,7 @@ class TestRunTests:
             # Should have at least one result
             assert len(results) > 0
             for result in results:
-                assert isinstance(result, TestResult)
+                assert isinstance(result, _TestResult)
 
     def test_run_test_invalid_index(self, built_package: Path) -> None:
         """Test that running a test with invalid index raises error."""
