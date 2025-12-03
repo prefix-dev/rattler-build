@@ -87,7 +87,7 @@ outputs:
     requirements:
       run:
         - python
-        - libcomplex ${{ version }}
+        - libcomplex ${{ version }}.*
     about:
       summary: Python bindings for complex project
       license: Apache-2.0
@@ -107,7 +107,7 @@ outputs:
     inherit: null
     requirements:
       run:
-        - libcomplex ${{ version }}
+        - libcomplex ${{ version }}.*
     about:
       summary: Development headers for complex project
       license: Apache-2.0
