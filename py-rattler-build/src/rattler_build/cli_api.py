@@ -240,7 +240,7 @@ def upload_package_to_prefix(
     auth_file: str | Path | None = None,
     skip_existing: bool = False,
     generate_attestation: bool = False,
-    attestation_file: Union[str, Path, None] = None,
+    attestation_file: str | Path | None = None,
 ) -> None:
     """
     Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.
