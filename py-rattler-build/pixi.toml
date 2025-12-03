@@ -69,13 +69,13 @@ type-check = { cmd = "mypy" }
 
 
 [feature.notebook.dependencies]
-marimo = ">=0.17.6,<0.18"
+marimo = ">=0.18.1,<0.19"
 python-lsp-server = ">=1.13.1,<2"
 watchdog = ">=6.0.0,<7"
 
 [feature.notebook.tasks]
 edit-notebook = { cmd = "marimo edit --watch {{ file }}", args = ["file"] }
-run-all-notebooks = "python notebooks/1-recipe_rendering_basics.py && python notebooks/2-multi_output_and_staging.py"
+run-all-notebooks = "python notebooks/1-recipe_rendering_basics.py && python notebooks/2-multi_output_and_staging.py && python notebooks/3-package_inspection_and_testing.py"
 
 
 [environments]

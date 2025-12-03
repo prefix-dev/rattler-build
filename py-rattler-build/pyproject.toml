@@ -55,3 +55,6 @@ module = ["rattler_build.*"]
 # amounts to duplicating almost all type annotations on our api, as the Python api itself is a
 # thin wrapper around the PyO3 api to start with.
 warn_return_any = false
+
+[tool.ty.rules]
+unresolved-import = "ignore" # Ignore until ty can deal with the Rust shared lib

@@ -14,6 +14,7 @@ use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 
 mod error;
 mod jinja_config;
+mod package;
 mod progress_callback;
 mod recipe_generation;
 mod render;
@@ -659,6 +660,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     variant_config::register_variant_config_module(_py, &m)?;
     render::register_render_module(_py, &m)?;
     tool_config::register_tool_config_module(_py, &m)?;
+    package::register_package_module(_py, &m)?;
 
     Ok(())
 }
