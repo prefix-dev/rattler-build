@@ -141,6 +141,10 @@ pub struct GitSource {
     /// Whether to request the lfs pull in git source
     #[serde(default, skip_serializing_if = "is_false")]
     pub lfs: bool,
+
+    /// Optionally an expected commit hash to verify after checkout
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_commit: Option<String>,
 }
 
 fn is_false(value: &bool) -> bool {

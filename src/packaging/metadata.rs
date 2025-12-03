@@ -365,14 +365,14 @@ impl Output {
                 .depends
                 .iter()
                 .map(|dep| dep.spec().to_string())
-                .dedup()
+                .unique()
                 .collect(),
             constrains: finalized_dependencies
                 .run
                 .constraints
                 .iter()
                 .map(|dep| dep.spec().to_string())
-                .dedup()
+                .unique()
                 .collect(),
             noarch,
             track_features,

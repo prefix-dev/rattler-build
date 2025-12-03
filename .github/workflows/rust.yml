@@ -30,20 +30,20 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: "1.89.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.9.2
+      - uses: prefix-dev/setup-pixi@v0.9.3
         if: ${{ matrix.os == 'macos-latest' }}
         with:
           cache: true
@@ -113,11 +113,12 @@ jobs:
       CARGO_PROFILE_OPT_LEVEL: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 's' || '0' }}
 
       # Sets the default features which are always used also when `--no-default` is used.
-      REQUIRED_FEATURES: recipe-generation
+      # Enable the `performance` feature for release builds to use optimized memory allocators.
+      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance' || 'recipe-generation' }}
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
         with:
           submodules: recursive
 
@@ -155,7 +156,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
         with:
           tool: cross
 
@@ -243,7 +244,7 @@ jobs:
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
@@ -269,7 +270,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
         with:
           submodules: recursive
       - name: Set as latest release
@@ -288,7 +289,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
         with:
           submodules: recursive
 

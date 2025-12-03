@@ -548,12 +548,16 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
 /// Helper function to extract all dependency package names from a recipe
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
     use crate::stage1::requirements::Dependency;
+    use rattler_conda_types::PackageNameMatcher;
 
     recipe
         .requirements
         .all_requirements()
         .filter_map(|dep| match dep {
-            Dependency::Spec(spec) => spec.name.clone(),
+            Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| match matcher {
+                PackageNameMatcher::Exact(name) => Some(name),
+                _ => None,
+            }),
             Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
             Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
         })

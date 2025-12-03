@@ -69,6 +69,10 @@ pub struct GitSource {
     /// Optionally request the lfs pull in git source
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lfs: Option<Value<bool>>,
+
+    /// Optionally an expected commit hash to verify after checkout
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_commit: Option<Value<String>>,
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive)
@@ -228,6 +232,7 @@ impl GitSource {
             patches,
             target_directory,
             lfs,
+            expected_commit,
         } = self;
 
         let mut vars = Vec::new();
@@ -251,6 +256,9 @@ impl GitSource {
         }
         if let Some(lfs) = lfs {
             vars.extend(lfs.used_variables());
+        }
+        if let Some(ec) = expected_commit {
+            vars.extend(ec.used_variables());
         }
         vars.sort();
         vars.dedup();

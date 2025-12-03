@@ -77,6 +77,8 @@ pub struct GitSource {
     pub reference: RattlerGitReference,
     pub depth: Option<i32>,
     pub lfs: bool,
+    /// Optionally an expected commit hash to verify after checkout
+    pub expected_commit: Option<String>,
 }
 
 impl GitSource {
@@ -97,6 +99,24 @@ impl GitSource {
             reference,
             depth,
             lfs,
+            expected_commit: None,
+        }
+    }
+
+    /// Create a new GitSource with expected commit
+    pub fn with_expected_commit(
+        url: url::Url,
+        reference: RattlerGitReference,
+        depth: Option<i32>,
+        lfs: bool,
+        expected_commit: Option<String>,
+    ) -> Self {
+        Self {
+            url,
+            reference,
+            depth,
+            lfs,
+            expected_commit,
         }
     }
 }

@@ -112,6 +112,18 @@ impl SourceCache {
         let repo_path = fetch_result.path().to_path_buf();
         let commit_hash = fetch_result.commit().to_string();
 
+        // Verify expected commit if specified
+        if let Some(expected) = &source.expected_commit {
+            if commit_hash != *expected {
+                return Err(CacheError::GitCommitMismatch {
+                    expected: expected.clone(),
+                    actual: commit_hash,
+                    rev: source.reference.to_string(),
+                });
+            }
+            tracing::info!("Verified expected commit: {}", expected);
+        }
+
         // Handle LFS if needed
         if source.lfs {
             self.git_lfs_pull(&repo_path).await?;

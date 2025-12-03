@@ -5,7 +5,7 @@
 //! to avoid redundant rebuilds of common dependencies.
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
@@ -84,7 +84,7 @@ impl Output {
     pub fn staging_cache_key(&self, staging: &StagingCache) -> Result<String, StagingError> {
         // Collect variant variable names that are used in the staging requirements
         // We look at build and host requirements (build time dependencies)
-        let requirement_names = staging
+        let requirement_names: std::collections::HashSet<String> = staging
             .requirements
             .build
             .iter()
@@ -94,14 +94,15 @@ impl Output {
                     // Only include variables that appear in simple specs without version/build
                     if spec.version.is_none()
                         && spec.build.is_none()
-                        && let Some(name) = spec.name.as_ref()
+                        && let Some(matcher) = spec.name.as_ref()
+                        && let rattler_conda_types::PackageNameMatcher::Exact(name) = matcher
                     {
                         return Some(name.as_normalized().to_string());
                     }
                 }
                 None
             })
-            .collect::<HashSet<_>>();
+            .collect();
 
         // Select only the variant variables that are relevant
         let mut selected_variant = BTreeMap::new();

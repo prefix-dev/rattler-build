@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, AsyncRead};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -488,6 +488,13 @@ pub async fn run_process_with_replacements(
     replacements: &HashMap<String, String>,
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
+    // Create or open the build log file
+    let log_file_path = cwd.join("conda_build.log");
+    let mut log_file = tokio::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file_path)
+        .await?;
     let mut command = if let Some(sandbox_config) = sandbox_config {
         tracing::info!("{}", sandbox_config);
 
@@ -562,6 +569,14 @@ pub async fn run_process_with_replacements(
                     stdout_log.push('\n');
                 }
 
+                // Write to log file
+                if let Err(e) = log_file.write_all(filtered_line.as_bytes()).await {
+                    tracing::warn!("Failed to write to build log: {:?}", e);
+                }
+                if let Err(e) = log_file.write_all(b"\n").await {
+                    tracing::warn!("Failed to write newline to build log: {:?}", e);
+                }
+
                 tracing::info!("{}", filtered_line);
             }
             Ok(None) if !is_stderr => closed.0 = true,
@@ -579,6 +594,11 @@ pub async fn run_process_with_replacements(
     }
 
     let status = child.wait().await?;
+
+    // Flush and close the log file
+    if let Err(e) = log_file.flush().await {
+        tracing::warn!("Failed to flush build log: {:?}", e);
+    }
 
     Ok(std::process::Output {
         status,

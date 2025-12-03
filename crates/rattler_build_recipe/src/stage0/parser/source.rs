@@ -169,6 +169,7 @@ fn parse_git_source(
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
     let mut lfs = None;
+    let mut expected_commit = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -199,6 +200,9 @@ fn parse_git_source(
             "lfs" => {
                 lfs = Some(parse_value(value_node)?);
             }
+            "expected_commit" => {
+                expected_commit = Some(parse_value(value_node)?);
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "git source",
@@ -206,7 +210,7 @@ fn parse_git_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs",
+                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs, expected_commit",
                 ));
             }
         }
@@ -238,6 +242,7 @@ fn parse_git_source(
         patches,
         target_directory,
         lfs,
+        expected_commit,
     })
 }
 

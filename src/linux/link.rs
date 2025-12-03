@@ -233,7 +233,12 @@ impl Relinker for SharedObject {
                     },
                 )?;
 
-                tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
+                tracing::debug!(
+                    "Converted rpath {} to $ORIGIN/{} for {:?}",
+                    rpath.display(),
+                    relative_path.display(),
+                    self.path
+                );
                 final_rpaths.push(PathBuf::from(format!(
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
@@ -273,7 +278,11 @@ fn call_patchelf(
 ) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
-    tracing::info!("patchelf for {:?}: {:?}", elf_path, new_rpath);
+    tracing::info!(
+        "Relinking {:?} (patchelf)",
+        elf_path.file_name().unwrap_or_default()
+    );
+    tracing::debug!("New rpath: {:?}", new_rpath);
 
     let mut cmd = system_tools.call(Tool::Patchelf)?;
 
@@ -432,7 +441,7 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
         }
     }
 
-    tracing::info!("Patched dynamic section of {:?}", elf_path);
+    tracing::info!("Relinking {:?}", elf_path.file_name().unwrap_or_default());
 
     data_mut.flush()?;
 

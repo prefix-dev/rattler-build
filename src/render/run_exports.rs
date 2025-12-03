@@ -29,22 +29,22 @@ pub fn filter_run_exports(
     let mut filtered_run_exports = FilteredRunExports::default();
 
     let to_specs = |strings: &Vec<String>| -> Result<Vec<MatchSpec>, ParseMatchSpecError> {
+        use rattler_conda_types::PackageNameMatcher;
         strings
             .iter()
             // We have to parse these as lenient as they come from packages
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .filter_map(|result| match result {
                 Ok(spec) => {
-                    if spec
-                        .name
-                        .as_ref()
-                        .map(|n| !ignore_run_exports.by_name.contains(n))
-                        .unwrap_or(false)
-                    {
-                        Some(Ok(spec))
-                    } else {
-                        None
-                    }
+                    let should_include = spec.name.as_ref().is_some_and(|matcher| {
+                        match matcher {
+                            PackageNameMatcher::Exact(name) => {
+                                !ignore_run_exports.by_name.contains(name)
+                            }
+                            _ => true, // Include non-exact matchers
+                        }
+                    });
+                    if should_include { Some(Ok(spec)) } else { None }
                 }
                 Err(e) => Some(Err(e)),
             })

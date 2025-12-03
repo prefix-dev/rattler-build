@@ -26,6 +26,15 @@ pub enum CacheError {
     #[error("Git error: {0}")]
     Git(String),
 
+    #[error(
+        "Git commit mismatch: expected commit '{expected}' but got '{actual}' for revision '{rev}'"
+    )]
+    GitCommitMismatch {
+        expected: String,
+        actual: String,
+        rev: String,
+    },
+
     #[error("Failed to extract archive: {0}")]
     ExtractionError(String),
 

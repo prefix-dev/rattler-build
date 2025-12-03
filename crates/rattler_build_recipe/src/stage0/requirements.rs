@@ -77,7 +77,17 @@ impl Requirements {
     /// These are also used as "variants" in the build system.
     /// Note: since this is before rendering, we consider both branches of conditionals (then and else)
     pub fn free_specs(&self) -> Vec<PackageName> {
+        use rattler_conda_types::PackageNameMatcher;
+
         let mut specs = Vec::new();
+
+        // Helper to extract PackageName from PackageNameMatcher
+        let extract_name = |matcher: &PackageNameMatcher| -> Option<PackageName> {
+            match matcher {
+                PackageNameMatcher::Exact(name) => Some(name.clone()),
+                _ => None,
+            }
+        };
 
         for item in self.build.iter().chain(self.host.iter()) {
             match item {
@@ -91,7 +101,9 @@ impl Requirements {
                             && matchspec.build.is_none()
                             && let Some(name) = &matchspec.name
                         {
-                            specs.push(name.clone());
+                            if let Some(pkg_name) = extract_name(name) {
+                                specs.push(pkg_name);
+                            }
                         }
                     }
                 }
@@ -106,7 +118,9 @@ impl Requirements {
                                 && matchspec.build.is_none()
                                 && let Some(name) = &matchspec.name
                             {
-                                specs.push(name.clone());
+                                if let Some(pkg_name) = extract_name(name) {
+                                    specs.push(pkg_name);
+                                }
                             }
                         }
                     }
@@ -120,7 +134,9 @@ impl Requirements {
                                     && matchspec.build.is_none()
                                     && let Some(name) = &matchspec.name
                                 {
-                                    specs.push(name.clone());
+                                    if let Some(pkg_name) = extract_name(name) {
+                                        specs.push(pkg_name);
+                                    }
                                 }
                             }
                         }

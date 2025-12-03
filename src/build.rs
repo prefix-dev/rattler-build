@@ -122,7 +122,11 @@ pub async fn run_build(
         .create_build_dir(cleanup)
         .into_diagnostic()?;
 
-    let span = tracing::info_span!("Running build for", recipe = output.identifier());
+    let span = tracing::info_span!(
+        "Running build for",
+        recipe = output.identifier(),
+        span_color = output.identifier()
+    );
     let _enter = span.enter();
     output.record_build_start();
 

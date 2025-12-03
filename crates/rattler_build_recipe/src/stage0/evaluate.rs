@@ -885,6 +885,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         extras,
         url,
         license,
+        condition,
     } = spec;
 
     name.is_some()
@@ -900,6 +901,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && extras.is_none()
         && url.is_none()
         && license.is_none()
+        && condition.is_none()
 }
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
@@ -1845,6 +1847,11 @@ impl Evaluate for Stage0GitSource {
                 .map(|v| evaluate_bool_value(v, context, "lfs"))
                 .transpose()?
                 .unwrap_or(false),
+            expected_commit: self
+                .expected_commit
+                .as_ref()
+                .map(|v| evaluate_string_value(v, context))
+                .transpose()?,
         })
     }
 }
@@ -2273,11 +2280,12 @@ impl Evaluate for Stage0Recipe {
         // Virtual packages (starting with '__') should be included in the hash
         for dep in &requirements.run {
             if let crate::stage1::Dependency::Spec(spec) = dep
-                && let Some(ref name) = spec.name
-                && name.as_normalized().starts_with("__")
+                && let Some(ref matcher) = spec.name
+                && let rattler_conda_types::PackageNameMatcher::Exact(pkg_name) = matcher
+                && pkg_name.as_normalized().starts_with("__")
             {
                 actual_variant.insert(
-                    NormalizedKey::from(name.as_normalized()),
+                    NormalizedKey::from(pkg_name.as_normalized()),
                     Variable::from(spec.to_string()),
                 );
             }
@@ -2678,11 +2686,12 @@ fn evaluate_package_output_to_recipe(
     // Virtual packages (starting with '__') should be included in the hash
     for dep in &requirements.run {
         if let crate::stage1::Dependency::Spec(spec) = dep
-            && let Some(ref name) = spec.name
-            && name.as_normalized().starts_with("__")
+            && let Some(ref matcher) = spec.name
+            && let rattler_conda_types::PackageNameMatcher::Exact(pkg_name) = matcher
+            && pkg_name.as_normalized().starts_with("__")
         {
             actual_variant.insert(
-                NormalizedKey::from(name.as_normalized()),
+                NormalizedKey::from(pkg_name.as_normalized()),
                 Variable::from(spec.to_string()),
             );
         }

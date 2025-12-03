@@ -573,7 +573,8 @@ async fn run_python_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let span = tracing::info_span!("Running python test(s)");
+    let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+    let span = tracing::info_span!("Running python test(s)", span_color = pkg_id);
     let _guard = span.enter();
 
     // The version spec of the package being built
@@ -737,7 +738,8 @@ async fn run_perl_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let span = tracing::info_span!("Running perl test");
+    let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+    let span = tracing::info_span!("Running perl test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(
@@ -810,7 +812,9 @@ async fn run_commands_test(
 ) -> Result<(), TestError> {
     let deps = commands_test.requirements.clone();
 
-    let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
+    let pkg_str = pkg.to_string();
+    let span =
+        tracing::info_span!("Running script test for", recipe = %pkg_str, span_color = pkg_str);
     let _guard = span.enter();
 
     let build_prefix = if !deps.build.is_empty() {
@@ -916,8 +920,13 @@ async fn run_downstream_test(
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
     let downstream_spec = downstream_test.downstream.clone();
+    let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
 
-    let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+    let span = tracing::info_span!(
+        "Running downstream test for",
+        package = downstream_spec,
+        span_color = pkg_id
+    );
     let _guard = span.enter();
 
     // first try to resolve an environment with the downstream spec and our
@@ -945,7 +954,15 @@ async fn run_downstream_test(
 
     match resolved {
         Ok(solution) => {
-            let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
+            let spec_name_matcher = match_specs[0].name.clone().expect("matchspec has a name");
+            let spec_name = match spec_name_matcher {
+                rattler_conda_types::PackageNameMatcher::Exact(name) => name,
+                _ => {
+                    return Err(TestError::TestFailed(
+                        "Expected exact package name in matchspec".to_string(),
+                    ));
+                }
+            };
             // we found a solution, so let's run the downstream test with that particular
             // package!
             let downstream_package = solution
@@ -1001,7 +1018,8 @@ async fn run_r_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let span = tracing::info_span!("Running R test");
+    let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+    let span = tracing::info_span!("Running R test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(
@@ -1070,7 +1088,8 @@ async fn run_ruby_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let span = tracing::info_span!("Running Ruby test");
+    let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+    let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(

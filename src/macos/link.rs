@@ -342,7 +342,7 @@ fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> 
     cmd.arg(path);
 
     // log the cmd invocation
-    tracing::info!("Running codesign: {:?}", cmd);
+    tracing::debug!("Running codesign: {:?}", cmd);
 
     let output = cmd.output().map_err(|e| {
         tracing::error!("codesign failed: {}", e);
@@ -441,11 +441,8 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         return Err(RelinkError::BuiltinRelinkFailed);
     }
 
-    tracing::info!(
-        "builtin relink for {:?}:\n{}",
-        dylib_path.file_name().unwrap_or_default(),
-        changes
-    );
+    tracing::info!("Relinking {:?}", dylib_path.file_name().unwrap_or_default());
+    tracing::debug!("Relink changes:\n{}", changes);
 
     let mut modified = false;
 
@@ -554,7 +551,11 @@ fn install_name_tool(
     changes: &DylibChanges,
     system_tools: &SystemTools,
 ) -> Result<(), RelinkError> {
-    tracing::info!("install_name_tool for {:?}:\n{}", dylib_path, changes);
+    tracing::info!(
+        "Relinking {:?} (install_name_tool)",
+        dylib_path.file_name().unwrap_or_default()
+    );
+    tracing::debug!("Relink changes:\n{}", changes);
 
     let mut cmd = system_tools.call(Tool::InstallNameTool)?;
 
