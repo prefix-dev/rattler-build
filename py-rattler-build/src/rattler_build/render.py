@@ -7,8 +7,9 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rattler_build import stage1
 from rattler_build._rattler_build import render as _render
@@ -16,6 +17,7 @@ from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
     from rattler_build.build_result import BuildResult
+    from rattler_build.progress import ProgressCallback
 
 __all__ = [
     "RenderConfig",
@@ -280,13 +282,13 @@ class RenderedVariant:
         tool_config: ToolConfiguration | None = None,
         output_dir: str | Path = ".",
         channels: list[str] | None = None,
-        progress_callback: Any | None = None,
+        progress_callback: ProgressCallback | None = None,
         recipe_path: str | Path | None = None,
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
         debug: bool = False,
-        exclude_newer: Any | None = None,
+        exclude_newer: datetime | None = None,
     ) -> BuildResult:
         """Build this rendered variant.
 
@@ -353,13 +355,13 @@ def build_rendered_variants(
     tool_config: ToolConfiguration | None = None,
     output_dir: str | Path = ".",
     channels: list[str] | None = None,
-    progress_callback: Any | None = None,
+    progress_callback: ProgressCallback | None = None,
     recipe_path: str | Path | None = None,
     no_build_id: bool = False,
     package_format: str | None = None,
     no_include_recipe: bool = False,
     debug: bool = False,
-    exclude_newer: Any | None = None,
+    exclude_newer: datetime | None = None,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
 

@@ -464,3 +464,28 @@ python:
     assert len(rendered) == 2
     python_versions = {variant.variant().get("python") for variant in rendered}
     assert python_versions == {"3.9", "3.10"}
+
+
+def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path) -> None:
+    """Test that Python datetime converts correctly to Rust chrono::DateTime<Utc>."""
+    from datetime import datetime, timezone
+
+    recipe_yaml = """
+package:
+  name: datetime-test
+  version: 1.0.0
+
+build:
+  number: 0
+  noarch: generic
+"""
+
+    recipe = Recipe.from_yaml(recipe_yaml)
+    variant_config = VariantConfig()
+    rendered = recipe.render(variant_config)
+
+    # Create a timezone-aware datetime (required for chrono::DateTime<Utc>)
+    exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
+    assert result.name == "datetime-test"

@@ -170,6 +170,7 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
     print("\n🔨 Building package...")
     _variant = demo_results[0]
     from rattler_build import ToolConfiguration
+
     _tool_config = ToolConfiguration(test_strategy="skip")
     _build_result = _variant.run_build(
         tool_config=_tool_config,

@@ -9,6 +9,7 @@ and conditional resolution.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +21,7 @@ from rattler_build.variant_config import VariantConfig
 
 if TYPE_CHECKING:
     from rattler_build.build_result import BuildResult
+    from rattler_build.progress import ProgressCallback
 
 __all__ = [
     "Recipe",
@@ -210,13 +212,13 @@ class Recipe(ABC):
         tool_config: ToolConfiguration | None = None,
         output_dir: str | Path = ".",
         channels: list[str] | None = None,
-        progress_callback: Any | None = None,
+        progress_callback: ProgressCallback | None = None,
         recipe_path: str | Path | None = None,
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
         debug: bool = False,
-        exclude_newer: Any | None = None,
+        exclude_newer: datetime | None = None,
     ) -> list[BuildResult]:
         """
         Build this recipe.
