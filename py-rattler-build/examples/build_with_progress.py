@@ -68,7 +68,7 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 result = variant.run_build(
-                    progress_callback=callback, keep_build=False, output_dir=Path(tmpdir), recipe_path=recipe_path
+                    progress_callback=callback, output_dir=Path(tmpdir), recipe_path=recipe_path
                 )
 
                 # Display build result information

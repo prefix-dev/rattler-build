@@ -323,8 +323,6 @@ def _(Path, rendered_variants, tempfile):
         print(f"  Build string: {_build.string}")
 
         _result = _variant.run_build(
-            progress_callback=None,
-            keep_build=False,
             output_dir=_output_tmpdir,
             recipe_path=_recipe_path,
         )

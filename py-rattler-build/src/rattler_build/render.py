@@ -278,11 +278,15 @@ class RenderedVariant:
     def run_build(
         self,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path | None = None,
-        channel: list[str] | None = None,
+        output_dir: str | Path = ".",
+        channels: list[str] | None = None,
         progress_callback: Any | None = None,
         recipe_path: str | Path | None = None,
-        **kwargs: Any,
+        no_build_id: bool = False,
+        package_format: str | None = None,
+        no_include_recipe: bool = False,
+        debug: bool = False,
+        exclude_newer: Any | None = None,
     ) -> BuildResult:
         """Build this rendered variant.
 
@@ -290,12 +294,16 @@ class RenderedVariant:
         to go back through the Stage0 recipe.
 
         Args:
-            tool_config: Optional ToolConfiguration to use for the build.
+            tool_config: ToolConfiguration to use for the build. If None, uses defaults.
             output_dir: Directory to store the built package. Defaults to current directory.
-            channel: List of channels to use for resolving dependencies.
-            progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
-            recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
-            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+            channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
+            progress_callback: Optional progress callback for build events.
+            recipe_path: Path to the recipe file (for copying license files, etc.).
+            no_build_id: Don't include build ID in output directory.
+            package_format: Package format ("conda" or "tar.bz2").
+            no_include_recipe: Don't include recipe in the output package.
+            debug: Enable debug mode.
+            exclude_newer: Exclude packages newer than this timestamp.
 
         Returns:
             BuildResult: Information about the built package including paths, metadata, and timing.
@@ -314,18 +322,23 @@ class RenderedVariant:
         from rattler_build import _rattler_build as _rb
         from rattler_build.build_result import BuildResult
 
-        # Extract the inner ToolConfiguration if provided
-        tool_config_inner = tool_config._inner if tool_config else None
+        # Use default ToolConfiguration if not provided
+        if tool_config is None:
+            tool_config = ToolConfiguration()
 
         # Build this single variant
         rust_result = _rb.build_rendered_variant_py(
             rendered_variant=self._inner,
-            tool_config=tool_config_inner,
-            output_dir=Path(output_dir) if output_dir else None,
-            channel=channel,
+            tool_config=tool_config._inner,
+            output_dir=Path(output_dir),
+            channels=channels if channels is not None else ["conda-forge"],
             progress_callback=progress_callback,
             recipe_path=Path(recipe_path) if recipe_path else None,
-            **kwargs,
+            no_build_id=no_build_id,
+            package_format=package_format,
+            no_include_recipe=no_include_recipe,
+            debug=debug,
+            exclude_newer=exclude_newer,
         )
 
         # Convert Rust BuildResult to Python BuildResult
@@ -338,11 +351,15 @@ class RenderedVariant:
 def build_rendered_variants(
     rendered_variants: list[RenderedVariant],
     tool_config: ToolConfiguration | None = None,
-    output_dir: str | Path | None = None,
-    channel: list[str] | None = None,
+    output_dir: str | Path = ".",
+    channels: list[str] | None = None,
     progress_callback: Any | None = None,
     recipe_path: str | Path | None = None,
-    **kwargs: Any,
+    no_build_id: bool = False,
+    package_format: str | None = None,
+    no_include_recipe: bool = False,
+    debug: bool = False,
+    exclude_newer: Any | None = None,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
 
@@ -351,12 +368,16 @@ def build_rendered_variants(
 
     Args:
         rendered_variants: List of RenderedVariant objects to build
-        tool_config: Optional ToolConfiguration to use for the build.
+        tool_config: ToolConfiguration to use for the build. If None, uses defaults.
         output_dir: Directory to store the built packages. Defaults to current directory.
-        channel: List of channels to use for resolving dependencies.
-        progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
-        recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
-        **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
+        channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
+        progress_callback: Optional progress callback for build events.
+        recipe_path: Path to the recipe file (for copying license files, etc.).
+        no_build_id: Don't include build ID in output directory.
+        package_format: Package format ("conda" or "tar.bz2").
+        no_include_recipe: Don't include recipe in the output package.
+        debug: Enable debug mode.
+        exclude_newer: Exclude packages newer than this timestamp.
 
     Returns:
         list[BuildResult]: List of build results, one per variant built.
@@ -384,26 +405,20 @@ def build_rendered_variants(
         >>> # Or build a subset
         >>> results = build_rendered_variants(rendered[:2], output_dir="./output")
     """
-    from rattler_build import _rattler_build as _rb
-    from rattler_build.build_result import BuildResult
-
-    # Extract the inner ToolConfiguration if provided
-    tool_config_inner = tool_config._inner if tool_config else None
-
-    # Build all variants by calling the single-variant function for each
     results = []
     for variant in rendered_variants:
-        rust_result = _rb.build_rendered_variant_py(
-            rendered_variant=variant._inner,
-            tool_config=tool_config_inner,
-            output_dir=Path(output_dir) if output_dir else None,
-            channel=channel,
+        result = variant.run_build(
+            tool_config=tool_config,
+            output_dir=output_dir,
+            channels=channels,
             progress_callback=progress_callback,
-            recipe_path=Path(recipe_path) if recipe_path else None,
-            **kwargs,
+            recipe_path=recipe_path,
+            no_build_id=no_build_id,
+            package_format=package_format,
+            no_include_recipe=no_include_recipe,
+            debug=debug,
+            exclude_newer=exclude_newer,
         )
-
-        # Convert Rust BuildResult to Python BuildResult
-        results.append(BuildResult._from_inner(rust_result))
+        results.append(result)
 
     return results

@@ -196,8 +196,6 @@ def _(Path, mo_results, shutil, tempfile):
         print(f"  Build string: {_build.string}")
 
         _result = _variant.run_build(
-            progress_callback=None,
-            keep_build=False,
             output_dir=_output_tmpdir,
             recipe_path=_recipe_path,
         )
@@ -379,8 +377,6 @@ def _(Path, shutil, staging_results, tempfile):
             print(f"  Staging caches: {[c.name for c in _stage1_recipe.staging_caches]}")
 
         _result = _variant.run_build(
-            progress_callback=None,
-            keep_build=False,
             output_dir=_output_tmpdir,
             recipe_path=_recipe_path,
         )

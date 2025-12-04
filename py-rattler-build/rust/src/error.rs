@@ -5,6 +5,7 @@ use thiserror::Error;
 
 create_exception!(rattler_build, PyRattlerBuildError, PyException);
 create_exception!(rattler_build, PyPlatformParseError, PyRattlerBuildError);
+create_exception!(rattler_build, PyChannelError, PyRattlerBuildError);
 create_exception!(rattler_build, PyChannelPriorityError, PyRattlerBuildError);
 create_exception!(rattler_build, PyPackageFormatError, PyRattlerBuildError);
 create_exception!(rattler_build, PyUrlParseError, PyRattlerBuildError);
@@ -19,6 +20,9 @@ create_exception!(rattler_build, PyIoError, PyRattlerBuildError);
 pub enum RattlerBuildError {
     #[error("Platform parse error: {0}")]
     PlatformParse(#[from] rattler_conda_types::ParsePlatformError),
+
+    #[error("Channel error: {0}")]
+    Channel(String),
 
     #[error("Channel priority error: {0}")]
     ChannelPriority(String),
@@ -55,6 +59,7 @@ impl From<RattlerBuildError> for PyErr {
     fn from(error: RattlerBuildError) -> Self {
         match error {
             RattlerBuildError::PlatformParse(e) => PyPlatformParseError::new_err(e.to_string()),
+            RattlerBuildError::Channel(msg) => PyChannelError::new_err(msg),
             RattlerBuildError::ChannelPriority(msg) => PyChannelPriorityError::new_err(msg),
             RattlerBuildError::PackageFormat(msg) => PyPackageFormatError::new_err(msg),
             RattlerBuildError::UrlParse(e) => PyUrlParseError::new_err(e.to_string()),
@@ -78,6 +83,7 @@ impl From<miette::Report> for RattlerBuildError {
 pub(crate) fn register_exceptions(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("RattlerBuildError", py.get_type::<PyRattlerBuildError>())?;
     m.add("PlatformParseError", py.get_type::<PyPlatformParseError>())?;
+    m.add("ChannelError", py.get_type::<PyChannelError>())?;
     m.add(
         "ChannelPriorityError",
         py.get_type::<PyChannelPriorityError>(),

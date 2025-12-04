@@ -67,9 +67,6 @@ class PlatformConfig:
 class ToolConfiguration:
     """Configuration for the rattler-build tool.
 
-    This class wraps the Rust ToolConfiguration and provides a Pythonic interface
-    for configuring build behavior.
-
     Args:
         keep_build: Whether to keep the build directory after the build is done
         compression_threads: Number of threads to use for compression (default: None - auto)

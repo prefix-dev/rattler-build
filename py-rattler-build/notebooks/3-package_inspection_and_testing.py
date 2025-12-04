@@ -169,12 +169,12 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
     # Build the package (skip tests during build, we'll run them manually)
     print("\n🔨 Building package...")
     _variant = demo_results[0]
+    from rattler_build import ToolConfiguration
+    _tool_config = ToolConfiguration(test_strategy="skip")
     _build_result = _variant.run_build(
-        progress_callback=None,
-        keep_build=False,
+        tool_config=_tool_config,
         output_dir=_output_tmpdir,
         recipe_path=_recipe_path,
-        test="skip",  # Skip tests during build
     )
 
     built_package_path = _build_result.packages[0]

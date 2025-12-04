@@ -232,45 +232,24 @@ fn build_recipes_py(
 ///
 /// This function takes a RenderedVariant object (from recipe.render()) and builds it
 /// directly without needing to write temporary files.
-///
-/// If tool_config is provided, it will be used instead of the individual parameters.
 #[pyfunction]
-#[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channel=None, progress_callback=None, recipe_path=None, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, auth_file=None, channel_priority=None, skip_existing=None, allow_insecure_host=None, continue_on_failure=false, debug=false, _error_prefix_in_binary=false, _allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
-#[allow(clippy::too_many_arguments)]
 fn build_rendered_variant_py(
     rendered_variant: render::PyRenderedVariant,
-    tool_config: Option<tool_config::PyToolConfiguration>,
-    output_dir: Option<PathBuf>,
-    channel: Option<Vec<String>>,
+    tool_config: tool_config::PyToolConfiguration,
+    output_dir: PathBuf,
+    channels: Vec<String>,
     progress_callback: Option<Py<PyAny>>,
     recipe_path: Option<PathBuf>,
-    keep_build: bool,
     no_build_id: bool,
     package_format: Option<String>,
-    compression_threads: Option<u32>,
-    io_concurrency_limit: Option<usize>,
     no_include_recipe: bool,
-    test: Option<String>,
-    auth_file: Option<String>,
-    channel_priority: Option<String>,
-    skip_existing: Option<String>,
-    allow_insecure_host: Option<Vec<String>>,
-    continue_on_failure: bool,
     debug: bool,
-    _error_prefix_in_binary: bool,
-    _allow_symlinks_on_windows: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-    use_bz2: bool,
-    use_zstd: bool,
-    use_jlap: bool,
-    use_sharded: bool,
 ) -> PyResult<BuildResultPy> {
     use ::rattler_build::{
-        console_utils::LoggingOutputHandler,
         metadata::{BuildConfiguration, Output, PlatformWithVirtualPackages},
         run_build_from_args,
         system_tools::SystemTools,
-        tool_configuration::Configuration,
         types::{BuildSummary, Directories, PackageIdentifier, PackagingSettings},
     };
     use rattler_build_recipe::stage1::HashInfo;
@@ -281,80 +260,22 @@ fn build_rendered_variant_py(
         sync::{Arc, Mutex},
     };
 
-    // Use provided tool_config or build one from parameters
-    let tool_config = if let Some(config) = tool_config {
-        config.inner
-    } else {
-        let channel_priority = channel_priority
-            .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
-            .transpose()
-            .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
-
-        let config = ConfigBase::<()>::default();
-        let channel_config = config.channel_config.clone();
-        let _common = CommonData::new(
-            output_dir.clone(),
-            false,
-            auth_file.map(|a| a.into()),
-            config,
-            channel_priority,
-            allow_insecure_host.clone(),
-            use_bz2,
-            use_zstd,
-            use_jlap,
-            use_sharded,
-        );
-
-        let test_strategy = test.map(|t| TestStrategy::from_str(&t, false).unwrap());
-        let skip_existing = skip_existing.map(|s| SkipExisting::from_str(&s, false).unwrap());
-
-        // Use a hidden multi-progress if Python callback is provided to suppress Rust progress bars
-        let log_handler = if progress_callback.is_some() {
-            use indicatif::MultiProgress;
-            // Create a hidden MultiProgress that doesn't render to terminal
-            let mp = MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
-            LoggingOutputHandler::default().with_multi_progress(mp)
-        } else {
-            LoggingOutputHandler::default()
-        };
-
-        Configuration::builder()
-            .with_logging_output_handler(log_handler)
-            .with_channel_config(channel_config.clone())
-            .with_compression_threads(compression_threads)
-            .with_io_concurrency_limit(io_concurrency_limit)
-            .with_keep_build(keep_build)
-            .with_test_strategy(test_strategy.unwrap_or(TestStrategy::Skip))
-            .with_zstd_repodata_enabled(use_zstd)
-            .with_bz2_repodata_enabled(use_bz2)
-            .with_sharded_repodata_enabled(use_sharded)
-            .with_jlap_enabled(use_jlap)
-            .with_skip_existing(skip_existing.unwrap_or(SkipExisting::None))
-            .with_channel_priority(channel_priority.unwrap_or_default())
-            .with_continue_on_failure(ContinueOnFailure::from(continue_on_failure))
-            .with_allow_insecure_host(allow_insecure_host)
-            .finish()
-    };
+    let tool_config = tool_config.inner;
 
     let package_format = package_format
         .map(|p| PackageFormatAndCompression::from_str(&p))
         .transpose()
         .map_err(|e| RattlerBuildError::PackageFormat(e.to_string()))?;
 
-    let channels = match channel {
-        None => vec![NamedChannelOrUrl::Name("conda-forge".to_string())],
-        Some(channel) => channel
-            .iter()
-            .map(|c| {
-                NamedChannelOrUrl::from_str(c)
-                    .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))
-                    .map_err(|e| e.into())
-            })
-            .collect::<PyResult<_>>()?,
-    };
+    let channels: Vec<NamedChannelOrUrl> = channels
+        .iter()
+        .map(|c| {
+            NamedChannelOrUrl::from_str(c)
+                .map_err(|e| RattlerBuildError::Channel(e.to_string()))
+        })
+        .collect::<Result<_, _>>()?;
 
     // Convert rendered variant to Output object
-    let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("."));
     let timestamp = chrono::Utc::now();
     let virtual_package_override = rattler_virtual_packages::VirtualPackageOverrides::from_env();
 

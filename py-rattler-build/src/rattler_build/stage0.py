@@ -208,11 +208,15 @@ class Recipe(ABC):
         self,
         variant_config: VariantConfig | None = None,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path | None = None,
-        channel: list[str] | None = None,
+        output_dir: str | Path = ".",
+        channels: list[str] | None = None,
         progress_callback: Any | None = None,
         recipe_path: str | Path | None = None,
-        **kwargs: Any,
+        no_build_id: bool = False,
+        package_format: str | None = None,
+        no_include_recipe: bool = False,
+        debug: bool = False,
+        exclude_newer: Any | None = None,
     ) -> list[BuildResult]:
         """
         Build this recipe.
@@ -222,14 +226,16 @@ class Recipe(ABC):
 
         Args:
             variant_config: Optional VariantConfig to use for building variants.
-            tool_config: Optional ToolConfiguration to use for the build. If provided, individual
-                        parameters like keep_build, test, etc. will be ignored.
+            tool_config: ToolConfiguration to use for the build. If None, uses defaults.
             output_dir: Directory to store the built packages. Defaults to current directory.
-            channel: List of channels to use for resolving dependencies.
-            progress_callback: Optional progress callback for build events (e.g., RichProgressCallback or SimpleProgressCallback).
-            recipe_path: Path to the recipe file (for copying license files, etc.). Defaults to None.
-            **kwargs: Additional arguments passed to build (e.g., keep_build, test, etc.)
-                     These are ignored if tool_config is provided.
+            channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
+            progress_callback: Optional progress callback for build events.
+            recipe_path: Path to the recipe file (for copying license files, etc.).
+            no_build_id: Don't include build ID in output directory.
+            package_format: Package format ("conda" or "tar.bz2").
+            no_include_recipe: Don't include recipe in the output package.
+            debug: Enable debug mode.
+            exclude_newer: Exclude packages newer than this timestamp.
 
         Returns:
             list[BuildResult]: List of build results, one per variant built.
@@ -256,10 +262,14 @@ class Recipe(ABC):
             result = variant.run_build(
                 tool_config=tool_config,
                 output_dir=output_dir,
-                channel=channel,
+                channels=channels,
                 progress_callback=progress_callback,
                 recipe_path=recipe_path,
-                **kwargs,
+                no_build_id=no_build_id,
+                package_format=package_format,
+                no_include_recipe=no_include_recipe,
+                debug=debug,
+                exclude_newer=exclude_newer,
             )
             results.append(result)
 
