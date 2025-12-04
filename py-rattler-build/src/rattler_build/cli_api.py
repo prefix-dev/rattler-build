@@ -52,6 +52,7 @@ def build_recipes(
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     exclude_newer: datetime | None = None,
+    build_num: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
     use_jlap: bool = False,
@@ -90,6 +91,7 @@ def build_recipes(
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
         exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
+        build_num: Override the build number for all outputs. (default: None, uses build number from recipe)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
         use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
@@ -129,6 +131,7 @@ def build_recipes(
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         exclude_newer,
+        build_num,
         use_bz2,
         use_zstd,
         use_jlap,
