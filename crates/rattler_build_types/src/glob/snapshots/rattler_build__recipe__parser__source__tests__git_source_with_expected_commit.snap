@@ -1,0 +1,8 @@
+---
+source: src/recipe/parser/source.rs
+assertion_line: 735
+expression: yaml
+---
+git: https://test.com/test.git
+rev: refs/tags/v1.0.0
+expected_commit: abc123def456

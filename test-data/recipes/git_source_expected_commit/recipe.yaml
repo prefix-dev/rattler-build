@@ -1,0 +1,12 @@
+package:
+  name: "git_source_expected_commit"
+  version: "1"
+
+source:
+  - git: https://github.com/prefix-dev/rattler-build
+    tag: v0.1.0
+    expected_commit: df83c1edf287a756b8fc995e03e9632af0344777
+
+build:
+  script:
+    - test -f README.md
