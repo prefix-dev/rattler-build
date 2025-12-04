@@ -1601,15 +1601,15 @@ about:
     pkg = get_extracted_package(tmp_path / "output", "test-case-collision")
     extracted_files_list = [str(f.relative_to(pkg)) for f in pkg.glob("**/*")]
 
-    assert (
-        "case_test/CASE-FILE.txt" in extracted_files_list
-    ), "CASE-FILE.txt not found in package"
-    assert (
-        "case_test/case-file.txt" in extracted_files_list
-    ), "case-file.txt not found in package"
-    assert (
-        "regular-file.txt" in extracted_files_list
-    ), "regular-file.txt not found in package"
+    assert "case_test/CASE-FILE.txt" in extracted_files_list, (
+        "CASE-FILE.txt not found in package"
+    )
+    assert "case_test/case-file.txt" in extracted_files_list, (
+        "case-file.txt not found in package"
+    )
+    assert "regular-file.txt" in extracted_files_list, (
+        "regular-file.txt not found in package"
+    )
 
     collision_warning_pattern = (
         r"Mixed-case filenames detected, case-insensitive filesystems may break:"
@@ -1617,9 +1617,9 @@ about:
         r"\n  - case_test/case-file.txt"
     )
 
-    assert re.search(
-        collision_warning_pattern, output, flags=re.IGNORECASE
-    ), f"Case collision warning not found in build output. Output contains:\n{output}"
+    assert re.search(collision_warning_pattern, output, flags=re.IGNORECASE), (
+        f"Case collision warning not found in build output. Output contains:\n{output}"
+    )
 
 
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
@@ -2030,29 +2030,29 @@ build:
     pkg = get_extracted_package(build_output_path, "test-relative-git")
 
     cloned_readme = pkg / "README_from_build.md"
-    assert (
-        cloned_readme.exists()
-    ), "README_from_build.md should exist in the built package"
+    assert cloned_readme.exists(), (
+        "README_from_build.md should exist in the built package"
+    )
     assert cloned_readme.read_text() == "test content", "Cloned README content mismatch"
 
     rendered_recipe_path = pkg / "info/recipe/rendered_recipe.yaml"
-    assert (
-        rendered_recipe_path.exists()
-    ), "rendered_recipe.yaml not found in package info"
+    assert rendered_recipe_path.exists(), (
+        "rendered_recipe.yaml not found in package info"
+    )
     rendered_recipe = yaml.safe_load(rendered_recipe_path.read_text())
 
-    assert (
-        "finalized_sources" in rendered_recipe
-    ), "'finalized_sources' missing in rendered recipe"
-    assert (
-        len(rendered_recipe["finalized_sources"]) == 1
-    ), "Expected exactly one finalized source"
+    assert "finalized_sources" in rendered_recipe, (
+        "'finalized_sources' missing in rendered recipe"
+    )
+    assert len(rendered_recipe["finalized_sources"]) == 1, (
+        "Expected exactly one finalized source"
+    )
     final_source = rendered_recipe["finalized_sources"][0]
     assert "rev" in final_source, "'rev' missing in finalized source"
     resolved_commit = final_source["rev"]
-    assert (
-        resolved_commit == original_commit
-    ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+    assert resolved_commit == original_commit, (
+        f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+    )
 
 
 @pytest.mark.skipif(

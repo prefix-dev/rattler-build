@@ -266,6 +266,6 @@ outputs:
     assert "ech" in error_msg, f"Error message doesn't mention the failed command 'ech': {error_msg}"
 
     # Check for some indication of what went wrong (exit code or error details)
-    assert any(
-        keyword in error_msg.lower() for keyword in ["exit", "status", "code", "not found", "stderr"]
-    ), f"Error message doesn't contain error details like exit code or stderr: {error_msg}"
+    assert any(keyword in error_msg.lower() for keyword in ["exit", "status", "code", "not found", "stderr"]), (
+        f"Error message doesn't contain error details like exit code or stderr: {error_msg}"
+    )

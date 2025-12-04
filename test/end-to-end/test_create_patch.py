@@ -622,9 +622,9 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
 
     # Verify the patch contains our modification
     patch_content = patch_file.read_text()
-    assert (
-        "Test modification for create-patch" in patch_content
-    ), "Patch doesn't contain our modification"
+    assert "Test modification for create-patch" in patch_content, (
+        "Patch doesn't contain our modification"
+    )
 
     # Verify it's a proper unified diff
     relative_path = test_file.relative_to(work_dir)

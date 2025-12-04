@@ -49,7 +49,7 @@ actionlint = ">=1.7.4,<2"
 cargo-deny = ">=0.18.3,<0.19"
 dprint = ">=0.50.0,<0.51"
 lefthook = ">=1.12.2,<2"
-ruff = ">=0.4.8,<0.5"
+ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
 typos = ">=1.23.1,<2"
@@ -110,7 +110,7 @@ mkdocs-material = ">=9.6.20,<10"
 mkdocstrings = ">=0.30.1,<0.31"
 mkdocstrings-python = ">=1.18.2,<2"
 pillow = ">=11.3.0,<12"
-ruff = ">=0.13.1,<0.14"
+ruff = ">=0.14.7,<0.15"
 
 
 [environments]
