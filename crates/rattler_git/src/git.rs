@@ -325,12 +325,20 @@ pub(crate) struct GitRepository {
 
 impl GitRepository {
     /// Opens an existing Git repository at `path`.
+    ///
+    /// Returns an error if the path is not a valid git repository (e.g., missing .git directory,
+    /// corrupted repository, etc.)
     pub(crate) fn open(path: &Path) -> Result<GitRepository, GitError> {
         // Make sure there is a Git repository at the specified path.
-        Command::new(GIT.as_ref().map_err(|e| e.clone())?)
-            .arg("rev-parse")
+        // Use --git-dir to verify this is a valid git repository.
+        let output = Command::new(GIT.as_ref().map_err(|e| e.clone())?)
+            .args(["rev-parse", "--git-dir"])
             .current_dir(path)
             .output()?;
+
+        if !output.status.success() {
+            return Err(GitError::InvalidRepository(path.to_path_buf()));
+        }
 
         Ok(GitRepository {
             path: path.to_path_buf(),

@@ -75,7 +75,21 @@ impl GitSource {
         };
 
         let remote = GitRemote::new(&remote);
-        let (db, actual_rev, task) = match (self.git.precise, remote.db_at(&db_path).ok()) {
+
+        // Try to open the existing database, logging a warning if it's corrupted
+        let existing_db = match remote.db_at(&db_path) {
+            Ok(db) => Some(db),
+            Err(GitError::InvalidRepository(path)) => {
+                tracing::warn!(
+                    "Detected corrupted git cache at {} (not a valid git repository), removing and re-cloning",
+                    path.display()
+                );
+                None
+            }
+            Err(_) => None,
+        };
+
+        let (db, actual_rev, task) = match (self.git.precise, existing_db) {
             // If we have a locked revision, and we have a preexisting database
             // which has that revision, then no update needs to happen.
             (Some(rev), Some(db)) if db.contains(rev.into()) => {

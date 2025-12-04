@@ -333,6 +333,7 @@ fn stable_topological_sort(
 /// - Free specs (dependencies without version constraints) that could be variants
 /// - Always-included variables (target_platform, etc.)
 /// - OS environment variable keys (passed via RenderConfig)
+/// - use_keys from build.variant.use_keys (forces keys into the variant matrix)
 ///
 /// Returns only variables that exist in the variant config.
 fn collect_used_variables(
@@ -361,6 +362,13 @@ fn collect_used_variables(
     // These come from env_vars::os_vars() and include platform-specific vars like
     // MACOSX_DEPLOYMENT_TARGET
     for key in os_env_var_keys {
+        used_vars.insert(NormalizedKey::from(key.as_str()));
+    }
+
+    // Add use_keys from build.variant.use_keys
+    // These force specific variant keys to be included in the matrix even if
+    // not explicitly referenced in templates or dependencies
+    for key in stage0_recipe.use_keys() {
         used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
@@ -740,13 +748,28 @@ fn render_with_variants(
     // Render recipe for each variant combination
     let mut results = Vec::with_capacity(combinations.len());
 
-    for variant in combinations {
-        let context = build_evaluation_context(&variant, &config, stage0_recipe)?;
+    for combination in combinations {
+        let context = build_evaluation_context(&combination, &config, stage0_recipe)?;
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
         // Convert each output to a RenderedVariant
         for recipe in outputs {
             let mut variant = recipe.used_variant.clone();
+
+            // Add use_keys to the variant (forces them to be included even if not referenced)
+            // We need to get them from the combination since they were used to compute it
+            let use_keys: HashSet<NormalizedKey> = recipe
+                .build
+                .variant
+                .use_keys
+                .iter()
+                .map(|k| k.as_str().into())
+                .collect();
+            for key in &use_keys {
+                if let Some(value) = combination.get(key) {
+                    variant.insert(key.clone(), value.clone());
+                }
+            }
 
             // Filter out ignore_keys from the variant
             let ignore_keys: HashSet<NormalizedKey> = recipe

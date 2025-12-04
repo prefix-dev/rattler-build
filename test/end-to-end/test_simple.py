@@ -2442,47 +2442,16 @@ about:
     assert (pkg1 / "test.txt").exists()
     assert (pkg1 / "test.txt").read_text() == "Hello from git repo!"
 
-    # Find the git cache directory in the default rattler cache location
-    # The default cache is typically ~/.cache/rattler on Linux
-    import os
+    # Find the git cache directory in the source cache
+    # The refactor stores git repos at src_cache/git/db/<hash>/
+    src_cache = build_output_dir / "src_cache"
+    git_cache_dir = src_cache / "git" / "db"
 
-    default_cache = Path(os.path.expanduser("~/.cache/rattler"))
-
-    # Look for git cache in the default location
-    # Git sources are cached in the src_cache directory under output
-    src_cache_locations = [
-        build_output_dir.parent / "output" / "src_cache",  # May be here
-        default_cache / "git",  # Or here
-    ]
-
-    # Find where the git cache actually is by looking for our test repo
-    git_cache_dir = None
-    for potential_cache in src_cache_locations:
-        if potential_cache.exists():
-            # Check if this directory contains our test repo
-            for item in potential_cache.iterdir():
-                if item.is_dir():
-                    # Check if this looks like our repo (has test.txt or is a git repo)
-                    if (item / ".git").exists() or (item / "test.txt").exists():
-                        git_cache_dir = potential_cache
-                        break
-        if git_cache_dir:
-            break
-
-    # If we still haven't found it, look in the output directory's src_cache
-    if git_cache_dir is None:
-        src_cache = build_output_dir / "src_cache"
-        if src_cache.exists():
-            git_cache_dir = src_cache
-
-    assert git_cache_dir is not None, (
-        f"Could not find git cache directory. Checked: {src_cache_locations}"
-    )
     assert git_cache_dir.exists(), (
         f"Git cache directory should exist after first build: {git_cache_dir}"
     )
 
-    # Find the actual cached repo directory (should be named after the repo)
+    # Find the actual cached repo directory (hash-based directory name)
     cached_repos = [d for d in git_cache_dir.iterdir() if d.is_dir()]
     assert len(cached_repos) > 0, (
         f"Should have at least one cached git repo in {git_cache_dir}"
@@ -2491,8 +2460,8 @@ about:
 
     # Corrupt the cache by removing the .git directory
     git_dir = cached_repo / ".git"
-    if git_dir.exists():
-        shutil.rmtree(git_dir)
+    assert git_dir.exists(), f"Expected .git directory at {git_dir}"
+    shutil.rmtree(git_dir)
 
     # Verify the cache is now corrupted (git commands should fail)
     result = subprocess.run(
@@ -2570,20 +2539,16 @@ def test_topological_sort_with_variants(
 
     # Use render-only to get the sorted output order without actually building
     args = ["build", "--recipe-dir", str(recipe_dir), "--render-only"]
-    output = check_output(
+    result = subprocess.run(
         [str(rattler_build.path), *args],
-        stderr=STDOUT,
+        capture_output=True,
         text=True,
         encoding="utf-8",
     )
 
-    # Parse the JSON output to get package names in order
-    # The output after the build variant messages is JSON
-    json_start = output.find("[")
-    if json_start == -1:
-        pytest.fail("Could not find JSON output in render-only response")
-
-    rendered = json.loads(output[json_start:])
+    # The JSON is on stdout, debug messages are on stderr
+    assert result.returncode == 0, f"Build failed: {result.stderr}"
+    rendered = json.loads(result.stdout)
 
     # Extract package names in order
     package_names = [r["recipe"]["package"]["name"] for r in rendered]

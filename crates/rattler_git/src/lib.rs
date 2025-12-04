@@ -205,4 +205,7 @@ pub enum GitError {
 
     #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
+
+    #[error("corrupted or invalid git repository at {0}")]
+    InvalidRepository(std::path::PathBuf),
 }

@@ -235,6 +235,17 @@ impl Recipe {
             Recipe::MultiOutput(multi) => multi.as_ref().free_specs(),
         }
     }
+
+    /// Get all use_keys from build.variant.use_keys across the entire recipe
+    ///
+    /// These are variant keys that should be forcibly included in the variant matrix,
+    /// even if they're not explicitly used in templates or dependencies.
+    pub fn use_keys(&self) -> Vec<String> {
+        match self {
+            Recipe::SingleOutput(single) => single.as_ref().use_keys(),
+            Recipe::MultiOutput(multi) => multi.as_ref().use_keys(),
+        }
+    }
 }
 
 impl SingleOutputRecipe {
@@ -274,6 +285,18 @@ impl SingleOutputRecipe {
     /// Get all free specs (specs without version or build constraints) in this single-output recipe
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
         self.requirements.free_specs()
+    }
+
+    /// Get all use_keys from build.variant.use_keys
+    ///
+    /// These are variant keys that should be forcibly included in the variant matrix.
+    pub fn use_keys(&self) -> Vec<String> {
+        self.build
+            .variant
+            .use_keys
+            .iter()
+            .filter_map(|item| item.as_value().and_then(|v| v.as_concrete().cloned()))
+            .collect()
     }
 }
 
@@ -341,6 +364,31 @@ impl MultiOutputRecipe {
         specs.dedup();
         specs
     }
+
+    /// Get all use_keys from build.variant.use_keys across recipe and all outputs
+    ///
+    /// These are variant keys that should be forcibly included in the variant matrix.
+    pub fn use_keys(&self) -> Vec<String> {
+        let mut keys = Vec::new();
+
+        // Collect from top-level build
+        keys.extend(
+            self.build
+                .variant
+                .use_keys
+                .iter()
+                .filter_map(|item| item.as_value().and_then(|v| v.as_concrete().cloned())),
+        );
+
+        // Collect from each output
+        for output in &self.outputs {
+            keys.extend(output.use_keys());
+        }
+
+        keys.sort();
+        keys.dedup();
+        keys
+    }
 }
 
 impl Output {
@@ -357,6 +405,15 @@ impl Output {
         match self {
             Output::Staging(staging) => staging.as_ref().free_specs(),
             Output::Package(package) => package.as_ref().free_specs(),
+        }
+    }
+
+    /// Get all use_keys from build.variant.use_keys in this output
+    pub fn use_keys(&self) -> Vec<String> {
+        match self {
+            // Staging outputs don't have variant configuration
+            Output::Staging(_) => Vec::new(),
+            Output::Package(package) => package.as_ref().use_keys(),
         }
     }
 }
@@ -422,6 +479,18 @@ impl PackageOutput {
     /// Get all free specs (specs without version or build constraints) in this package output
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
         self.requirements.free_specs()
+    }
+
+    /// Get all use_keys from build.variant.use_keys
+    ///
+    /// These are variant keys that should be forcibly included in the variant matrix.
+    pub fn use_keys(&self) -> Vec<String> {
+        self.build
+            .variant
+            .use_keys
+            .iter()
+            .filter_map(|item| item.as_value().and_then(|v| v.as_concrete().cloned()))
+            .collect()
     }
 }
 
