@@ -233,6 +233,7 @@ fn build_recipes_py(
 /// This function takes a RenderedVariant object (from recipe.render()) and builds it
 /// directly without needing to write temporary files.
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn build_rendered_variant_py(
     rendered_variant: render::PyRenderedVariant,
     tool_config: tool_config::PyToolConfiguration,

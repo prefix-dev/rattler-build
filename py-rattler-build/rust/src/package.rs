@@ -422,14 +422,14 @@ impl PyPackage {
         let test_count = tests.len();
 
         // If running specific test, validate index
-        if let Some(idx) = test_index {
-            if idx >= test_count {
-                return Err(RattlerBuildError::Other(format!(
-                    "Test index {} out of range (0..{})",
-                    idx, test_count
-                ))
-                .into());
-            }
+        if let Some(idx) = test_index
+            && idx >= test_count
+        {
+            return Err(RattlerBuildError::Other(format!(
+                "Test index {} out of range (0..{})",
+                idx, test_count
+            ))
+            .into());
         }
 
         let test_data = TestData::new(
@@ -442,8 +442,7 @@ impl PyPackage {
         );
 
         // Run the test(s)
-        let result =
-            run_async_task(async { run_test(test_data, None).await.map_err(|e| e.into()) });
+        let result = run_async_task(async { run_test(test_data, None).await });
 
         match result {
             Ok(()) => {

@@ -289,7 +289,7 @@ fn python_to_variable(value: Bound<'_, PyAny>) -> PyResult<Variable> {
         Ok(Variable::from(i))
     } else if let Ok(s) = value.extract::<String>() {
         Ok(Variable::from(s))
-    } else if let Ok(list) = value.downcast::<pyo3::types::PyList>() {
+    } else if let Ok(list) = value.cast::<pyo3::types::PyList>() {
         let items: PyResult<Vec<Variable>> =
             list.iter().map(|item| python_to_variable(item)).collect();
         Ok(Variable::from(items?))

@@ -51,6 +51,7 @@ pub fn upload_package_to_artifactory_py(
 
 #[pyfunction]
 #[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, generate_attestation, attestation_file))]
+#[allow(clippy::too_many_arguments)]
 pub fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
