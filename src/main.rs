@@ -367,6 +367,8 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::CreatePatch(opts)) => {
             let exclude_vec = opts.exclude.clone().unwrap_or_default();
+            let add_vec = opts.add.clone().unwrap_or_default();
+            let include_vec = opts.include.clone().unwrap_or_default();
 
             // Try to parse environment variable if available
             let env_dirs = std::env::var("RATTLER_BUILD_DIRECTORIES")
@@ -417,6 +419,8 @@ async fn async_main() -> miette::Result<()> {
                 opts.overwrite,
                 patch_dir.as_deref(),
                 &exclude_vec,
+                &add_vec,
+                &include_vec,
                 opts.dry_run,
             ) {
                 Ok(()) => Ok(()),
