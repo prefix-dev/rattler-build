@@ -1,3 +1,7 @@
+//! The functions in this module should not be needed anymore
+//! now that we have a more powerful API.
+//! We should remove this module at some point
+
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
@@ -10,7 +14,7 @@ use ::rattler_build::{
 use clap::ValueEnum;
 use pyo3::prelude::*;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
-use rattler_config::config::{build::PackageFormatAndCompression, ConfigBase};
+use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 
 use crate::error::RattlerBuildError;
 use crate::run_async_task;
