@@ -7,7 +7,6 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 import pytest
-
 from helpers import (
     RattlerBuild,
     get_extracted_package,
@@ -16,7 +15,9 @@ from helpers import (
 
 def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test basic staging output with multiple package outputs inheriting from it."""
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
+    )
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -37,7 +38,11 @@ def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 @pytest.mark.skipif(os.name == "nt", reason="symlinks not fully supported on Windows")
 def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that symlinks are properly cached and restored in staging outputs."""
-    rattler_build.build(recipes / "staging/staging-symlinks.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-symlinks.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # First package output with most symlinks
     pkg = get_extracted_package(tmp_path, "cache-symlinks")
@@ -112,12 +117,12 @@ def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     abs_symlink = pkg_absolute / "absolute-symlink.txt"
     abs_exe_symlink = pkg_absolute / "bin/absolute-exe-symlink"
 
-    assert (
-        abs_symlink.exists() or abs_symlink.is_symlink()
-    ), "absolute-symlink.txt not found"
-    assert (
-        abs_exe_symlink.exists() or abs_exe_symlink.is_symlink()
-    ), "bin/absolute-exe-symlink not found"
+    assert abs_symlink.exists() or abs_symlink.is_symlink(), (
+        "absolute-symlink.txt not found"
+    )
+    assert abs_exe_symlink.exists() or abs_exe_symlink.is_symlink(), (
+        "bin/absolute-exe-symlink not found"
+    )
 
     # Verify they are symlinks
     if abs_symlink.is_symlink():
@@ -132,7 +137,11 @@ def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
 
 def test_staging_with_deps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test staging output with build dependencies (cmake)."""
-    rattler_build.build(recipes / "staging/staging-with-deps.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-with-deps.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "check-1")
@@ -148,15 +157,19 @@ def test_staging_run_exports(
 ):
     """Test run_exports handling with staging outputs."""
     # Build the staging recipe (includes helper package as first output)
-    rattler_build.build(recipes / "staging/staging-run-exports.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-run-exports.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # Package that inherits run_exports
     pkg = get_extracted_package(tmp_path, "cache-run-exports")
     index = json.loads((pkg / "info/index.json").read_text())
     depends = index.get("depends", [])
-    assert any(
-        "normal-run-exports" in dep for dep in depends
-    ), f"normal-run-exports should be in dependencies but got {depends}"
+    assert any("normal-run-exports" in dep for dep in depends), (
+        f"normal-run-exports should be in dependencies but got {depends}"
+    )
 
     # Package that ignores run_exports from specific package
     pkg_no_from = get_extracted_package(tmp_path, "no-cache-from-package-run-exports")
@@ -181,6 +194,7 @@ def test_staging_with_variants(
         recipes / "staging/staging-with-variants.yaml",
         tmp_path,
         variant_config=recipes / "staging/staging-variants-variant.yaml",
+        extra_args=["--experimental"],
     )
 
     # There should be 2x variant-cache and 2x3 variant-cache-py outputs for 2 versions of libfoo and 3 versions of python
@@ -194,14 +208,14 @@ def test_staging_with_variants(
     ]
 
     # Should have 2 variant-cache outputs (one for each libfoo version)
-    assert (
-        len(variant_cache_outputs) == 2
-    ), f"Expected 2 variant-cache outputs, got {len(variant_cache_outputs)}"
+    assert len(variant_cache_outputs) == 2, (
+        f"Expected 2 variant-cache outputs, got {len(variant_cache_outputs)}"
+    )
 
     # Should have 6 variant-cache-py outputs (2 libfoo × 3 python versions)
-    assert (
-        len(variant_cache_py_outputs) == 6
-    ), f"Expected 6 variant-cache-py outputs, got {len(variant_cache_py_outputs)}"
+    assert len(variant_cache_py_outputs) == 6, (
+        f"Expected 6 variant-cache-py outputs, got {len(variant_cache_py_outputs)}"
+    )
 
     # Verify variant-cache has both libfoo versions
     cache_libfoo_versions = {
@@ -228,16 +242,20 @@ def test_staging_with_variants(
         )
         for o in variant_cache_py_outputs
     }
-    assert (
-        actual_combinations == expected_combinations
-    ), f"Expected combinations {expected_combinations}, got {actual_combinations}"
+    assert actual_combinations == expected_combinations, (
+        f"Expected combinations {expected_combinations}, got {actual_combinations}"
+    )
 
 
 def test_multiple_staging_caches(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test multiple independent staging outputs in one recipe."""
-    rattler_build.build(recipes / "staging/multiple-staging-caches.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/multiple-staging-caches.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # Package from core-build staging
     pkg_core = get_extracted_package(tmp_path, "libcore")
@@ -260,7 +278,9 @@ def test_staging_with_top_level_inherit(
 ):
     """Test mix of staging inheritance and top-level inheritance."""
     rattler_build.build(
-        recipes / "staging/staging-with-top-level-inherit.yaml", tmp_path
+        recipes / "staging/staging-with-top-level-inherit.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
     )
 
     # Package that inherits from staging
@@ -282,7 +302,11 @@ def test_staging_with_top_level_inherit(
 
 def test_staging_no_inherit(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test staging output used for side effects without explicit inheritance."""
-    rattler_build.build(recipes / "staging/staging-no-inherit.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-no-inherit.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # Both packages should build successfully
     pkg_a = get_extracted_package(tmp_path, "package-a")
@@ -300,7 +324,11 @@ def test_staging_work_dir_cache(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that both prefix AND work directory files are cached and restored."""
-    rattler_build.build(recipes / "staging/staging-work-dir-cache.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-work-dir-cache.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "work-dir-test")
 
@@ -319,7 +347,11 @@ def test_staging_complex_deps(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test complex dependency scenarios with staging."""
-    rattler_build.build(recipes / "staging/staging-complex-deps.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-complex-deps.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # Package with run_exports inherited
     pkg_full = get_extracted_package(tmp_path, "complex-deps-full")
@@ -349,7 +381,9 @@ def test_staging_render_only(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that rendering works correctly with staging outputs."""
-    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
+    rendered = rattler_build.render(
+        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
+    )
 
     # Should have 2 outputs (foo-split-1 and foo-othersplit)
     assert len(rendered) == 2
@@ -366,7 +400,9 @@ def test_staging_hash_includes_variant(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that staging cache hash includes variant information."""
-    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
+    rendered = rattler_build.render(
+        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
+    )
 
     # Check that used_variant is set for staging caches
     for output in rendered:
@@ -398,7 +434,7 @@ def test_staging_different_platforms(
     rattler_build.build(
         recipes / "staging/basic-staging.yaml",
         tmp_path,
-        extra_args=["--target-platform", target_platform],
+        extra_args=["--experimental", "--target-platform", target_platform],
     )
 
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -410,7 +446,9 @@ def test_staging_with_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path
     # The basic-staging.yaml includes tests that run 'cat $PREFIX/foo.txt'
     # This verifies the staging cache files are available during tests
 
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
+    )
 
     # If tests failed, the build would have failed
     # Just verify the packages were created
@@ -425,7 +463,11 @@ def test_staging_metadata_preserved(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that staging metadata is preserved in package outputs."""
-    rattler_build.build(recipes / "staging/multiple-staging-caches.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/multiple-staging-caches.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "libcore")
 
@@ -453,14 +495,22 @@ def test_staging_error_invalid_inherit(
 ):
     # This should fail during rendering because the cache does not exist
     with pytest.raises(CalledProcessError):
-        rattler_build.build(recipes / "staging/staging-invalid-inherit.yaml", tmp_path)
+        rattler_build.build(
+            recipes / "staging/staging-invalid-inherit.yaml",
+            tmp_path,
+            extra_args=["--experimental"],
+        )
 
 
 def test_staging_files_selection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that file selection works correctly with staging inheritance."""
-    rattler_build.build(recipes / "staging/multiple-staging-caches.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/multiple-staging-caches.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     # libcore should have both lib and include
     pkg_core = get_extracted_package(tmp_path, "libcore")
@@ -482,7 +532,11 @@ def test_staging_source_handling(
 ):
     """Test that sources are properly handled in staging outputs."""
     # The staging recipes reference sources, ensure they're fetched correctly
-    rattler_build.build(recipes / "staging/multiple-staging-caches.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/multiple-staging-caches.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "libcore")
 
@@ -502,7 +556,11 @@ def test_staging_build_number_propagation(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that build numbers are properly handled with staging."""
-    rattler_build.build(recipes / "staging/staging-with-deps.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-with-deps.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "check-1")
     index = json.loads((pkg / "info/index.json").read_text())
@@ -515,7 +573,11 @@ def test_staging_about_propagation(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that about metadata is properly set in package outputs."""
-    rattler_build.build(recipes / "staging/multiple-staging-caches.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/multiple-staging-caches.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "libcore")
     about = json.loads((pkg / "info/about.json").read_text())
@@ -535,24 +597,28 @@ def test_staging_select_files_with_symlinks(
     The pattern lib/*.so.* should select lib/libdav1d.so.7.0.0 and lib/libdav1d.so.7
     but NOT lib/libdav1d.so (which doesn't match the pattern).
     """
-    rattler_build.build(recipes / "staging/staging-compiler.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-compiler.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "testlib-so-version")
     paths = json.loads((pkg / "info/paths.json").read_text())
     path_files = [p["_path"] for p in paths["paths"]]
 
     # Should include versioned .so files
-    assert any(
-        "lib/libdav1d.so.7.0.0" in f for f in path_files
-    ), f"lib/libdav1d.so.7.0.0 not found in {path_files}"
-    assert any(
-        "lib/libdav1d.so.7" in f for f in path_files
-    ), f"lib/libdav1d.so.7 not found in {path_files}"
+    assert any("lib/libdav1d.so.7.0.0" in f for f in path_files), (
+        f"lib/libdav1d.so.7.0.0 not found in {path_files}"
+    )
+    assert any("lib/libdav1d.so.7" in f for f in path_files), (
+        f"lib/libdav1d.so.7 not found in {path_files}"
+    )
 
     # Should NOT include the .so file (no version)
-    assert not any(
-        f.endswith("lib/libdav1d.so") for f in path_files
-    ), f"lib/libdav1d.so should not be included in {path_files}"
+    assert not any(f.endswith("lib/libdav1d.so") for f in path_files), (
+        f"lib/libdav1d.so should not be included in {path_files}"
+    )
 
     # Verify the symlinks exist in the actual package
     assert (pkg / "lib/libdav1d.so.7.0.0").exists()
@@ -570,16 +636,20 @@ def test_staging_run_exports_ignore_from_package(
     in staging cache requirements.
     """
     # Build the staging recipe (includes helper package as first output)
-    rattler_build.build(recipes / "staging/staging-run-exports-test2.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-run-exports-test2.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "staging-ignore-run-exports-from-package")
     index = json.loads((pkg / "info/index.json").read_text())
 
     # normal-run-exports should NOT be in dependencies (ignored by from_package)
     depends = index.get("depends", [])
-    assert not any(
-        "normal-run-exports" in dep for dep in depends
-    ), f"normal-run-exports should be ignored but found in {depends}"
+    assert not any("normal-run-exports" in dep for dep in depends), (
+        f"normal-run-exports should be ignored but found in {depends}"
+    )
 
 
 def test_staging_run_exports_ignore_by_name(
@@ -591,16 +661,20 @@ def test_staging_run_exports_ignore_by_name(
     in staging cache requirements.
     """
     # Build the staging recipe (includes helper package as first output)
-    rattler_build.build(recipes / "staging/staging-run-exports-test3.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "staging/staging-run-exports-test3.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "staging-ignore-run-exports-by-name")
     index = json.loads((pkg / "info/index.json").read_text())
 
     # normal-run-exports should NOT be in dependencies (ignored by name)
     depends = index.get("depends", [])
-    assert not any(
-        "normal-run-exports" in dep for dep in depends
-    ), f"normal-run-exports should be ignored but found in {depends}"
+    assert not any("normal-run-exports" in dep for dep in depends), (
+        f"normal-run-exports should be ignored but found in {depends}"
+    )
 
 
 if __name__ == "__main__":
