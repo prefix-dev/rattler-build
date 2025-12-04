@@ -140,7 +140,7 @@ fn shift_diff_down<'a, 'b, T: ?Sized + SliceLike>(
             // Shift Insert Downward
             //
             (DiffRange::Insert(this_diff), DiffRange::Equal(next_diff1, _)) => {
-                // check common prefix for the amount we can shift
+                // check common prefix for the amoutn we can shift
                 let prefix_len = this_diff.common_prefix_len(next_diff1);
                 if prefix_len != 0 {
                     if let Some(DiffRange::Equal(..)) =
@@ -176,7 +176,7 @@ fn shift_diff_down<'a, 'b, T: ?Sized + SliceLike>(
             // Shift Deletion Downward
             //
             (DiffRange::Delete(this_diff), DiffRange::Equal(_, next_diff2)) => {
-                // check common prefix for the amount we can shift
+                // check common prefix for the amoutn we can shift
                 let prefix_len = this_diff.common_prefix_len(next_diff2);
                 if prefix_len != 0 {
                     if let Some(DiffRange::Equal(..)) =

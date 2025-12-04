@@ -1,5 +1,5 @@
 ---
-source: crates/rattler_build_diffy/src/apply.rs
+source: src/apply.rs
 expression: result
 ---
 import importlib

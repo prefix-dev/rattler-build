@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/src/luaconf.h",
+                    "src/luaconf.h",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/src/luaconf.h",
+                    "src/luaconf.h",
                 ),
             ),
             hunks: [

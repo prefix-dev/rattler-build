@@ -1,0 +1,8 @@
+---
+source: crates/rattler_build_diffy/src/patch/parse.rs
+expression: patches
+input_file: crates/rattler_build_diffy/src/patch/test-data/0002-cross-CMakeLists.txt.patch
+---
+Err(
+    HunksOrder,
+)

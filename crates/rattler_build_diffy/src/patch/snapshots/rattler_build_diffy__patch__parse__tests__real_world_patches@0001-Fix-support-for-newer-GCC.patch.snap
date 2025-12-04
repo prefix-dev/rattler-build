@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/CMakeModules/CompilerChecks.cmake",
+                    "CMakeModules/CompilerChecks.cmake",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/CMakeModules/CompilerChecks.cmake",
+                    "CMakeModules/CompilerChecks.cmake",
                 ),
             ),
             hunks: [
@@ -61,12 +61,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/Tests/GTest/src/gtest-death-test.cc",
+                    "Tests/GTest/src/gtest-death-test.cc",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/Tests/GTest/src/gtest-death-test.cc",
+                    "Tests/GTest/src/gtest-death-test.cc",
                 ),
             ),
             hunks: [
@@ -138,12 +138,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/include/Hammer/Math/Utils.hh",
+                    "include/Hammer/Math/Utils.hh",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/include/Hammer/Math/Utils.hh",
+                    "include/Hammer/Math/Utils.hh",
                 ),
             ),
             hunks: [

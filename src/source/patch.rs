@@ -113,6 +113,7 @@ fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError
             ..Default::default()
         },
     )
+    .map(|(content, _stats)| content)
 }
 
 // Returns number by which all patch paths must be stripped to be

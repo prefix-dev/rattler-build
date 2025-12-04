@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cmake/modules/DefineInstallationPaths.cmake",
+                    "cmake/modules/DefineInstallationPaths.cmake",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cmake/modules/DefineInstallationPaths.cmake",
+                    "cmake/modules/DefineInstallationPaths.cmake",
                 ),
             ),
             hunks: [

@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/src/lib/hello.txt",
+                    "src/lib/hello.txt",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/src/lib/hello.txt",
+                    "src/lib/hello.txt",
                 ),
             ),
             hunks: [

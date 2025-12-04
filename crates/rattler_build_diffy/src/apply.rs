@@ -26,6 +26,72 @@ impl fmt::Display for ApplyError {
 
 impl std::error::Error for ApplyError {}
 
+/// Statistics for a single hunk application
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HunkStats {
+    /// Number of lines added in this hunk
+    added: usize,
+    /// Number of lines deleted in this hunk
+    deleted: usize,
+    /// Number of context lines in this hunk
+    context: usize,
+}
+
+/// Statistics about the changes made when applying a patch
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ApplyStats {
+    /// Total number of lines added
+    pub lines_added: usize,
+    /// Total number of lines deleted
+    pub lines_deleted: usize,
+    /// Total number of context lines (unchanged)
+    pub lines_context: usize,
+    /// Number of hunks successfully applied
+    pub hunks_applied: usize,
+}
+
+impl ApplyStats {
+    /// Create new empty statistics
+    fn new() -> Self {
+        Self {
+            lines_added: 0,
+            lines_deleted: 0,
+            lines_context: 0,
+            hunks_applied: 0,
+        }
+    }
+
+    /// Add statistics from a hunk
+    fn add_hunk(&mut self, hunk_stats: HunkStats) {
+        self.lines_added += hunk_stats.added;
+        self.lines_deleted += hunk_stats.deleted;
+        self.lines_context += hunk_stats.context;
+        self.hunks_applied += 1;
+    }
+
+    /// Returns whether any changes were made
+    pub fn has_changes(&self) -> bool {
+        self.lines_added > 0 || self.lines_deleted > 0
+    }
+}
+
+/// Result of applying a patch with statistics
+///
+/// # Examples
+///
+/// ```
+/// use rattler_build_diffy::{apply, Diff};
+///
+/// let base = "line 1\nline 2\n";
+/// let patch_str = "--- a\n+++ b\n@@ -1,2 +1,2 @@\n line 1\n-line 2\n+line 2 modified\n";
+/// let diff = Diff::from_str(patch_str).unwrap();
+///
+/// let (content, stats) = apply(base, &diff).unwrap();
+/// assert_eq!(content, "line 1\nline 2 modified\n");
+/// assert!(stats.has_changes());
+/// ```
+pub type ApplyResult<T, E = ApplyError> = Result<(T, ApplyStats), E>;
+
 /// Configuration for patch application
 #[derive(Default, Debug, Clone)]
 pub struct ApplyConfig {
@@ -224,7 +290,7 @@ where
 }
 
 /// Apply a `Diff` to a base image with default fuzzy matching
-pub fn apply(base_image: &str, diff: &Diff<'_, str>) -> Result<String, ApplyError> {
+pub fn apply(base_image: &str, diff: &Diff<'_, str>) -> ApplyResult<String, ApplyError> {
     apply_with_config(base_image, diff, &ApplyConfig::default())
 }
 
@@ -233,14 +299,19 @@ pub fn apply_with_config(
     base_image: &str,
     diff: &Diff<'_, str>,
     config: &ApplyConfig,
-) -> Result<String, ApplyError> {
+) -> ApplyResult<String, ApplyError> {
     let mut image: Vec<_> = LineIter::new(base_image)
         .map(ImageLine::Unpatched)
         .collect();
 
+    let mut stats = ApplyStats::new();
+
     for (i, hunk) in diff.hunks().iter().enumerate() {
-        apply_hunk_with_config(&mut image, hunk, config)
-            .map_err(|_| ApplyError(i + 1, format!("{:#?}", hunk)))?;
+        let hunk_stats = match apply_hunk_with_config(&mut image, hunk, config) {
+            Ok(stats) => stats,
+            Err(_) => return Err(ApplyError(i + 1, format!("{:#?}", hunk))),
+        };
+        stats.add_hunk(hunk_stats);
     }
 
     // TODO: Keep line ending as is like it was before.
@@ -265,7 +336,7 @@ pub fn apply_with_config(
         LineEndHandling::EnsureLineEnding(line_end) => line_end,
     });
 
-    Ok(image
+    let content = image
         .into_iter()
         .map(ImageLine::into_inner)
         .map(|(line, ending)| {
@@ -275,11 +346,13 @@ pub fn apply_with_config(
                 map_line_ending::<&str>(ending, preferred_line_ending)
             )
         })
-        .collect())
+        .collect();
+
+    Ok((content, stats))
 }
 
 /// Apply a non-utf8 `Diff` to a base image with default fuzzy matching
-pub fn apply_bytes(base_image: &[u8], patch: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
+pub fn apply_bytes(base_image: &[u8], patch: &Diff<'_, [u8]>) -> ApplyResult<Vec<u8>, ApplyError> {
     apply_bytes_with_config(base_image, patch, &ApplyConfig::default())
 }
 
@@ -288,14 +361,19 @@ pub fn apply_bytes_with_config(
     base_image: &[u8],
     diff: &Diff<'_, [u8]>,
     config: &ApplyConfig,
-) -> Result<Vec<u8>, ApplyError> {
+) -> ApplyResult<Vec<u8>, ApplyError> {
     let mut image: Vec<_> = LineIter::new(base_image)
         .map(ImageLine::Unpatched)
         .collect();
 
+    let mut stats = ApplyStats::new();
+
     for (i, hunk) in diff.hunks().iter().enumerate() {
-        apply_hunk_with_config(&mut image, hunk, config)
-            .map_err(|_| ApplyError(i + 1, format!("{:#?}", hunk)))?;
+        let hunk_stats = match apply_hunk_with_config(&mut image, hunk, config) {
+            Ok(stats) => stats,
+            Err(_) => return Err(ApplyError(i + 1, format!("{:#?}", hunk))),
+        };
+        stats.add_hunk(hunk_stats);
     }
 
     // TODO: Keep line ending as is like it was before.
@@ -320,7 +398,7 @@ pub fn apply_bytes_with_config(
         LineEndHandling::EnsureLineEnding(line_end) => line_end,
     });
 
-    Ok(image
+    let content = image
         .into_iter()
         .map(ImageLine::into_inner)
         .flat_map(|(line, ending)| {
@@ -330,19 +408,34 @@ pub fn apply_bytes_with_config(
             ]
             .concat()
         })
-        .collect())
+        .collect();
+
+    Ok((content, stats))
 }
 
 fn apply_hunk_with_config<'a, T>(
     image: &mut Vec<ImageLine<'a, T>>,
     hunk: &Hunk<'a, T>,
     config: &ApplyConfig,
-) -> Result<(), ()>
+) -> Result<HunkStats, ()>
 where
     T: PartialEq + FuzzyComparable + ?Sized + Text + ToOwned,
 {
     // Find position with fuzzy matching
     let (pos, fuzz_level) = find_position_fuzzy(image, hunk, config).ok_or(())?;
+
+    // Count changes in this hunk
+    let mut added = 0;
+    let mut deleted = 0;
+    let mut context = 0;
+
+    for line in hunk.lines() {
+        match line {
+            Line::Insert(_) => added += 1,
+            Line::Delete(_) => deleted += 1,
+            Line::Context(_) => context += 1,
+        }
+    }
 
     // update image
     if fuzz_level == 0 {
@@ -356,7 +449,11 @@ where
         apply_hunk_preserving_context(image, hunk, pos);
     }
 
-    Ok(())
+    Ok(HunkStats {
+        added,
+        deleted,
+        context,
+    })
 }
 
 /// Apply hunk while preserving original context lines (for fuzzy matching)
@@ -715,8 +812,8 @@ mod test {
             .join("test-data")
             .join(name);
 
-        let base_image = fs_err::read_to_string(base_folder.join("target.txt")).unwrap();
-        let patch = fs_err::read_to_string(base_folder.join("patch.patch")).unwrap();
+        let base_image = std::fs::read_to_string(base_folder.join("target.txt")).unwrap();
+        let patch = std::fs::read_to_string(base_folder.join("patch.patch")).unwrap();
         (base_image, patch)
     }
 
@@ -726,9 +823,9 @@ mod test {
         let patch = crate::Diff::from_bytes(patch.as_bytes()).unwrap();
 
         println!("Applied: {:#?}", patch);
-        let result = crate::apply_bytes(base_image.as_bytes(), &patch).unwrap();
+        let (content, _stats) = crate::apply_bytes(base_image.as_bytes(), &patch).unwrap();
         // take the first 50 lines for snapshot testing
-        let result = String::from_utf8(result)
+        let result = String::from_utf8(content)
             .unwrap()
             .lines()
             .take(50)
@@ -740,7 +837,108 @@ mod test {
 
     fn assert_patch(old: &str, new: &str, patch: &str) {
         let diff = Diff::from_str(patch).unwrap();
-        assert_eq!(Ok(new.to_string()), apply(old, &diff));
+        let (content, _stats) = apply(old, &diff).unwrap();
+        assert_eq!(new, content);
+    }
+
+    #[test]
+    fn test_apply_result_statistics() {
+        let old = "line 1\nline 2\nline 3\n";
+        let new = "line 1\nline 2 modified\nline 4\n";
+        let patch = "\
+--- original
++++ modified
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
+-line 3
++line 2 modified
++line 4
+";
+        let diff = Diff::from_str(patch).unwrap();
+        let (content, stats) = apply(old, &diff).unwrap();
+
+        assert_eq!(content, new);
+        assert_eq!(stats.lines_added, 2);
+        assert_eq!(stats.lines_deleted, 2);
+        assert_eq!(stats.lines_context, 1);
+        assert_eq!(stats.hunks_applied, 1);
+        assert!(stats.has_changes());
+    }
+
+    #[test]
+    fn test_apply_result_no_changes() {
+        let old = "line 1\nline 2\n";
+        let new = "line 1\nline 2\n";
+        let patch = "\
+--- original
++++ modified
+@@ -1,2 +1,2 @@
+ line 1
+ line 2
+";
+        let diff = Diff::from_str(patch).unwrap();
+        let (content, stats) = apply(old, &diff).unwrap();
+
+        assert_eq!(content, new);
+        assert_eq!(stats.lines_added, 0);
+        assert_eq!(stats.lines_deleted, 0);
+        assert_eq!(stats.lines_context, 2);
+        assert_eq!(stats.hunks_applied, 1);
+        assert!(!stats.has_changes());
+    }
+
+    #[test]
+    fn test_apply_result_multiple_hunks() {
+        let old = "line 1\nline 2\nline 3\nline 4\nline 5\n";
+        let new = "line 1\nline 2 modified\nline 3\nline 4 modified\nline 5\n";
+        let patch = "\
+--- original
++++ modified
+@@ -1,2 +1,2 @@
+ line 1
+-line 2
++line 2 modified
+@@ -4,2 +4,2 @@
+-line 4
++line 4 modified
+ line 5
+";
+        let diff = Diff::from_str(patch).unwrap();
+        let (content, stats) = apply(old, &diff).unwrap();
+
+        assert_eq!(content, new);
+        assert_eq!(stats.lines_added, 2);
+        assert_eq!(stats.lines_deleted, 2);
+        assert_eq!(stats.lines_context, 2);
+        assert_eq!(stats.hunks_applied, 2);
+        assert!(stats.has_changes());
+    }
+
+    #[test]
+    fn test_detect_already_applied_patch() {
+        let old = "line 1\nline 2\nline 3\n";
+        let patch = "\
+--- original
++++ modified
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line 2 modified
+ line 3
+";
+        let diff = Diff::from_str(patch).unwrap();
+
+        // First application should succeed with changes
+        let (content, stats) = apply(old, &diff).unwrap();
+        assert_eq!(content, "line 1\nline 2 modified\nline 3\n");
+        assert!(stats.has_changes());
+        assert_eq!(stats.lines_added, 1);
+        assert_eq!(stats.lines_deleted, 1);
+
+        // Second application should fail because the patch expects "line 2" but finds "line 2 modified"
+        let result = apply(&content, &diff);
+        assert!(result.is_err(), "Applying the same patch twice should fail");
     }
 
     #[test]

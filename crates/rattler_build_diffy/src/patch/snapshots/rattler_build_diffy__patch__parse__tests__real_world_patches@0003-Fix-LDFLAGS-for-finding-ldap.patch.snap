@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/configure.ac",
+                    "configure.ac",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/configure.ac",
+                    "configure.ac",
                 ),
             ),
             hunks: [

@@ -6,14 +6,10 @@ input_file: crates/rattler_build_diffy/src/patch/test-data/40.patch
 Ok(
     [
         Patch {
-            original: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            original: None,
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/__init__.py",
+                    "cvmfs/scripts/__init__.py",
                 ),
             ),
             hunks: [
@@ -36,14 +32,10 @@ Ok(
             ],
         },
         Patch {
-            original: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            original: None,
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/big_catalogs.py",
+                    "cvmfs/scripts/big_catalogs.py",
                 ),
             ),
             hunks: [
@@ -183,14 +175,10 @@ Ok(
             ],
         },
         Patch {
-            original: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            original: None,
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/catdirusage.py",
+                    "cvmfs/scripts/catdirusage.py",
                 ),
             ),
             hunks: [
@@ -344,12 +332,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/utils/cvmfs_search",
+                    "utils/cvmfs_search",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/cvmfs_search.py",
+                    "cvmfs/scripts/cvmfs_search.py",
                 ),
             ),
             hunks: [
@@ -431,14 +419,10 @@ Ok(
             ],
         },
         Patch {
-            original: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            original: None,
             modified: Some(
                 Filename(
-                    "b/pyproject.toml",
+                    "pyproject.toml",
                 ),
             ),
             hunks: [
@@ -610,14 +594,10 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/setup.py",
+                    "setup.py",
                 ),
             ),
-            modified: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            modified: None,
             hunks: [
                 Hunk {
                     old_range: HunkRange {
@@ -769,14 +749,10 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/utils/big_catalogs",
+                    "utils/big_catalogs",
                 ),
             ),
-            modified: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            modified: None,
             hunks: [
                 Hunk {
                     old_range: HunkRange {
@@ -895,14 +871,10 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/utils/catdirusage",
+                    "utils/catdirusage",
                 ),
             ),
-            modified: Some(
-                Filename(
-                    "/dev/null",
-                ),
-            ),
+            modified: None,
             hunks: [
                 Hunk {
                     old_range: HunkRange {
@@ -1033,12 +1005,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/__init__.py",
+                    "cvmfs/__init__.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/__init__.py",
+                    "cvmfs/__init__.py",
                 ),
             ),
             hunks: [
@@ -1086,12 +1058,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/big_catalogs.py",
+                    "cvmfs/scripts/big_catalogs.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/big_catalogs.py",
+                    "cvmfs/scripts/big_catalogs.py",
                 ),
             ),
             hunks: [
@@ -1281,12 +1253,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/catdirusage.py",
+                    "cvmfs/scripts/catdirusage.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/catdirusage.py",
+                    "cvmfs/scripts/catdirusage.py",
                 ),
             ),
             hunks: [
@@ -1428,12 +1400,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/cvmfs_search.py",
+                    "cvmfs/scripts/cvmfs_search.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/cvmfs_search.py",
+                    "cvmfs/scripts/cvmfs_search.py",
                 ),
             ),
             hunks: [
@@ -1481,12 +1453,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/__init__.py",
+                    "cvmfs/scripts/__init__.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/__init__.py",
+                    "cvmfs/scripts/__init__.py",
                 ),
             ),
             hunks: [
@@ -1514,12 +1486,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/big_catalogs.py",
+                    "cvmfs/scripts/big_catalogs.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/big_catalogs.py",
+                    "cvmfs/scripts/big_catalogs.py",
                 ),
             ),
             hunks: [
@@ -1558,12 +1530,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/catdirusage.py",
+                    "cvmfs/scripts/catdirusage.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/catdirusage.py",
+                    "cvmfs/scripts/catdirusage.py",
                 ),
             ),
             hunks: [
@@ -1602,12 +1574,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/cvmfs/scripts/cvmfs_search.py",
+                    "cvmfs/scripts/cvmfs_search.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/cvmfs/scripts/cvmfs_search.py",
+                    "cvmfs/scripts/cvmfs_search.py",
                 ),
             ),
             hunks: [

@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/setup.py",
+                    "setup.py",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/setup.py",
+                    "setup.py",
                 ),
             ),
             hunks: [

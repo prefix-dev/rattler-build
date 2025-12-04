@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/src/core/CMakeLists.txt",
+                    "src/core/CMakeLists.txt",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/src/core/CMakeLists.txt",
+                    "src/core/CMakeLists.txt",
                 ),
             ),
             hunks: [

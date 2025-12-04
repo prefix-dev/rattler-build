@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/makepanda/config.in",
+                    "makepanda/config.in",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/makepanda/config.in",
+                    "makepanda/config.in",
                 ),
             ),
             hunks: [

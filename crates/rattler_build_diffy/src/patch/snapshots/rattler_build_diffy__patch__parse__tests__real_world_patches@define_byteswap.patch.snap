@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/image/decode/segdec.c",
+                    "image/decode/segdec.c",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/image/decode/segdec.c",
+                    "image/decode/segdec.c",
                 ),
             ),
             hunks: [
@@ -64,12 +64,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/jxrgluelib/JXRGlueJxr.c",
+                    "jxrgluelib/JXRGlueJxr.c",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/jxrgluelib/JXRGlueJxr.c",
+                    "jxrgluelib/JXRGlueJxr.c",
                 ),
             ),
             hunks: [

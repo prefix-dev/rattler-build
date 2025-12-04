@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/.gitignore",
+                    ".gitignore",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/.gitignore",
+                    ".gitignore",
                 ),
             ),
             hunks: [

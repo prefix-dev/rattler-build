@@ -8,12 +8,12 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "a/bin/mqtt5_canary/main.cpp",
+                    "bin/mqtt5_canary/main.cpp",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "b/bin/mqtt5_canary/main.cpp",
+                    "bin/mqtt5_canary/main.cpp",
                 ),
             ),
             hunks: [

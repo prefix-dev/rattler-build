@@ -1,35 +1,38 @@
 ---
 source: crates/rattler_build_diffy/src/patch/parse.rs
 expression: patches
-input_file: crates/rattler_build_diffy/src/patch/test-data/simple.patch
+input_file: crates/rattler_build_diffy/src/patch/test-data/0004-win-remove-ucrt-Lld.zig.patch
 ---
 Ok(
     [
         Patch {
             original: Some(
                 Filename(
-                    "hello.txt",
+                    "a/src/link/Lld.zig.old",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "hello.txt",
+                    "b/src/link/Lld.zig",
                 ),
             ),
             hunks: [
                 Hunk {
                     old_range: HunkRange {
-                        start: 0,
-                        len: 0,
+                        start: 687,
+                        len: 1,
                     },
                     new_range: HunkRange {
-                        start: 1,
+                        start: 687,
                         len: 1,
                     },
                     function_context: None,
                     lines: [
+                        Delete(
+                            "                        try argv.append(try allocPrint(arena, \"{s}ucrt.lib\", .{lib_str}));\n",
+                        ),
                         Insert(
-                            "hello world\n",
+                            "                        // try argv.append(try allocPrint(arena, \"{s}ucrt.lib\", .{lib_str}));\n",
                         ),
                     ],
                 },

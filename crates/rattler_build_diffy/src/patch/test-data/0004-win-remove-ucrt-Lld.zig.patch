@@ -1,0 +1,5 @@
+--- a/src/link/Lld.zig.old	2024-06-06 14:05:11.000000000 -0500
++++ b/src/link/Lld.zig	2024-06-22 11:27:13.931633400 -0500
+@@ -687,1 +687,1 @@
+-                        try argv.append(try allocPrint(arena, "{s}ucrt.lib", .{lib_str}));
++                        // try argv.append(try allocPrint(arena, "{s}ucrt.lib", .{lib_str}));

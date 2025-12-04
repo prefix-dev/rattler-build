@@ -1,0 +1,104 @@
+--- cmake/Findllvm.cmake        2024-06-06 14:05:11.000000000 -0500
++++ cmake/Findllvm.cmake        2024-06-09 13:26:31.038534947 -0500
+@@ -35,7 +35,7 @@
+
+     # Check that this LLVM is the right version
+     execute_process(
+-      COMMAND ${LLVM_CONFIG_EXE} --version
++      COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --version
+       OUTPUT_VARIABLE LLVM_CONFIG_VERSION
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+@@ -58,7 +58,7 @@
+       endif()
+
+       execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --libs ${STATIC_OR_SHARED_LINK}
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --libs ${STATIC_OR_SHARED_LINK}
+         OUTPUT_QUIET
+         ERROR_VARIABLE LLVM_CONFIG_ERROR
+         ERROR_STRIP_TRAILING_WHITESPACE)
+@@ -78,7 +78,7 @@
+     endif()
+
+     execute_process(
+-      COMMAND ${LLVM_CONFIG_EXE} --targets-built
++      COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --targets-built
+         OUTPUT_VARIABLE LLVM_TARGETS_BUILT_SPACES
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_TARGETS_BUILT "${LLVM_TARGETS_BUILT_SPACES}")
+@@ -108,48 +108,48 @@
+
+   if(ZIG_SHARED_LLVM OR ZIG_STATIC_LLVM)
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --libfiles ${STATIC_OR_SHARED_LINK}
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --libfiles ${STATIC_OR_SHARED_LINK}
+         OUTPUT_VARIABLE LLVM_LIBRARIES_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_LIBRARIES "${LLVM_LIBRARIES_SPACES}")
+
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --libdir ${STATIC_OR_SHARED_LINK}
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --libdir ${STATIC_OR_SHARED_LINK}
+         OUTPUT_VARIABLE LLVM_LIBDIRS_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_LIBDIRS "${LLVM_LIBDIRS_SPACES}")
+
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --system-libs ${STATIC_OR_SHARED_LINK}
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --system-libs ${STATIC_OR_SHARED_LINK}
+         OUTPUT_VARIABLE LLVM_SYSTEM_LIBS_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_SYSTEM_LIBS "${LLVM_SYSTEM_LIBS_SPACES}")
+
+     execute_process(
+-      COMMAND ${LLVM_CONFIG_EXE} --shared-mode ${STATIC_OR_SHARED_LINK}
++      COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --shared-mode ${STATIC_OR_SHARED_LINK}
+       OUTPUT_VARIABLE LLVM_LINK_MODE
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+   else()
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --libs
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --libs
+         OUTPUT_VARIABLE LLVM_LIBRARIES_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_LIBRARIES "${LLVM_LIBRARIES_SPACES}")
+
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --libdir
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --libdir
+         OUTPUT_VARIABLE LLVM_LIBDIRS_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_LIBDIRS "${LLVM_LIBDIRS_SPACES}")
+
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --system-libs
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --system-libs
+         OUTPUT_VARIABLE LLVM_SYSTEM_LIBS_SPACES
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+     string(REPLACE " " ";" LLVM_SYSTEM_LIBS "${LLVM_SYSTEM_LIBS_SPACES}")
+
+     execute_process(
+-      COMMAND ${LLVM_CONFIG_EXE} --shared-mode
++      COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --shared-mode
+       OUTPUT_VARIABLE LLVM_LINK_MODE
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+   endif()
+@@ -159,7 +159,7 @@
+     # since on some distros LLD is only available as a static library
+     # and we need these libraries to link it successfully
+     execute_process(
+-        COMMAND ${LLVM_CONFIG_EXE} --system-libs --link-static
++        COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --system-libs --link-static
+         OUTPUT_VARIABLE LLVM_STATIC_SYSTEM_LIBS_SPACES
+         ERROR_QUIET # Some installations have no static libs, we just ignore the failure
+         OUTPUT_STRIP_TRAILING_WHITESPACE)
+@@ -171,7 +171,7 @@
+   endif()
+
+   execute_process(
+-      COMMAND ${LLVM_CONFIG_EXE} --includedir
++      COMMAND $ENV{CROSSCOMPILING_EMULATOR} ${LLVM_CONFIG_EXE} --includedir
+       OUTPUT_VARIABLE LLVM_INCLUDE_DIRS_SPACES
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+   string(REPLACE " " ";" LLVM_INCLUDE_DIRS "${LLVM_INCLUDE_DIRS_SPACES}")

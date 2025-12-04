@@ -1,56 +1,188 @@
 ---
-source: src/patch/parse.rs
+source: crates/rattler_build_diffy/src/patch/parse.rs
 expression: patches
-input_file: src/patch/test-data/flang-support.patch
+input_file: crates/rattler_build_diffy/src/patch/test-data/0001-win-deprecations.patch
 ---
 Ok(
     [
         Patch {
             original: Some(
                 Filename(
-                    "mumps/src/mumps_common_orig.h",
+                    "src/zig_llvm.cpp.orig",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "mumps/src/mumps_common.h",
+                    "src/zig_llvm.cpp",
                 ),
             ),
             hunks: [
                 Hunk {
                     old_range: HunkRange {
-                        start: 27,
+                        start: 204,
                         len: 7,
                     },
                     new_range: HunkRange {
-                        start: 27,
+                        start: 204,
                         len: 7,
                     },
                     function_context: None,
                     lines: [
                         Context(
-                            " *     knowledge, there is no way to perform the conversion with CPP\n",
+                            "        std::error_code EC;\n",
                         ),
                         Context(
-                            " *     directives only.\n",
+                            "        dest_asm_ptr = new(std::nothrow) raw_fd_ostream(asm_filename, EC, sys::fs::OF_None);\n",
                         ),
                         Context(
-                            " */\n",
+                            "        if (EC) {\n",
                         ),
                         Delete(
-                            "#if defined(UPPER) || defined(MUMPS_WIN32)\n",
+                            "            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
                         ),
                         Insert(
-                            "#if defined(UPPER)\n",
+                            "            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
                         ),
                         Context(
-                            "# define F_SYMBOL(lower_case,upper_case) MUMPS_##upper_case\n",
+                            "            return true;\n",
                         ),
                         Context(
-                            "#elif defined(Add_)\n",
+                            "        }\n",
                         ),
                         Context(
-                            "# define F_SYMBOL(lower_case,upper_case) mumps_##lower_case##_\n",
+                            "    }\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 212,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 212,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "        std::error_code EC;\n",
+                        ),
+                        Context(
+                            "        dest_bin_ptr = new(std::nothrow) raw_fd_ostream(bin_filename, EC, sys::fs::OF_None);\n",
+                        ),
+                        Context(
+                            "        if (EC) {\n",
+                        ),
+                        Delete(
+                            "            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
+                        ),
+                        Insert(
+                            "            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
+                        ),
+                        Context(
+                            "            return true;\n",
+                        ),
+                        Context(
+                            "        }\n",
+                        ),
+                        Context(
+                            "    }\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 220,
+                        len: 7,
+                    },
+                    new_range: HunkRange {
+                        start: 220,
+                        len: 7,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "        std::error_code EC;\n",
+                        ),
+                        Context(
+                            "        dest_bitcode_ptr = new(std::nothrow) raw_fd_ostream(bitcode_filename, EC, sys::fs::OF_None);\n",
+                        ),
+                        Context(
+                            "        if (EC) {\n",
+                        ),
+                        Delete(
+                            "            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
+                        ),
+                        Insert(
+                            "            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());\n",
+                        ),
+                        Context(
+                            "            return true;\n",
+                        ),
+                        Context(
+                            "        }\n",
+                        ),
+                        Context(
+                            "    }\n",
+                        ),
+                    ],
+                },
+                Hunk {
+                    old_range: HunkRange {
+                        start: 337,
+                        len: 13,
+                    },
+                    new_range: HunkRange {
+                        start: 337,
+                        len: 13,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "\n",
+                        ),
+                        Context(
+                            "    if (dest_bin && !lto) {\n",
+                        ),
+                        Context(
+                            "        if (target_machine.addPassesToEmitFile(codegen_pm, *dest_bin, nullptr, CodeGenFileType::ObjectFile)) {\n",
+                        ),
+                        Delete(
+                            "            *error_message = strdup(\"TargetMachine can't emit an object file\");\n",
+                        ),
+                        Insert(
+                            "            *error_message = _strdup(\"TargetMachine can't emit an object file\");\n",
+                        ),
+                        Context(
+                            "            return true;\n",
+                        ),
+                        Context(
+                            "        }\n",
+                        ),
+                        Context(
+                            "    }\n",
+                        ),
+                        Context(
+                            "    if (dest_asm) {\n",
+                        ),
+                        Context(
+                            "        if (target_machine.addPassesToEmitFile(codegen_pm, *dest_asm, nullptr, CodeGenFileType::AssemblyFile)) {\n",
+                        ),
+                        Delete(
+                            "            *error_message = strdup(\"TargetMachine can't emit an assembly file\");\n",
+                        ),
+                        Insert(
+                            "            *error_message = _strdup(\"TargetMachine can't emit an assembly file\");\n",
+                        ),
+                        Context(
+                            "            return true;\n",
+                        ),
+                        Context(
+                            "        }\n",
+                        ),
+                        Context(
+                            "    }\n",
                         ),
                     ],
                 },
@@ -59,211 +191,55 @@ Ok(
         Patch {
             original: Some(
                 Filename(
-                    "mumps/src/mumps_c_orig.c",
+                    "src/zig_llvm-ar.cpp.orig",
                 ),
             ),
             modified: Some(
                 Filename(
-                    "mumps/src/mumps_c.c",
+                    "src/zig_llvm-ar.cpp",
                 ),
             ),
             hunks: [
                 Hunk {
                     old_range: HunkRange {
-                        start: 42,
-                        len: 7,
+                        start: 619,
+                        len: 8,
                     },
                     new_range: HunkRange {
-                        start: 42,
-                        len: 7,
+                        start: 619,
+                        len: 8,
                     },
                     function_context: None,
                     lines: [
                         Context(
-                            " *   CMUMPS_XXX in the code to get rid of any symbol convention annoyance.\n",
+                            "        sys::fs::setLastAccessAndModificationTime(FD, ModTimeOrErr.get()));\n",
                         ),
                         Context(
-                            " */\n",
-                        ),
-                        Context(
-                            "#if MUMPS_ARITH == MUMPS_ARITH_s\n",
-                        ),
-                        Delete(
-                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
-                        ),
-                        Insert(
-                            "# if defined(UPPER)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) SMUMPS_##upper_case\n",
-                        ),
-                        Context(
-                            "# elif defined(Add_)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case##_\n",
-                        ),
-                    ],
-                },
-                Hunk {
-                    old_range: HunkRange {
-                        start: 52,
-                        len: 7,
-                    },
-                    new_range: HunkRange {
-                        start: 52,
-                        len: 7,
-                    },
-                    function_context: None,
-                    lines: [
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case\n",
-                        ),
-                        Context(
-                            "# endif\n",
-                        ),
-                        Context(
-                            "#elif MUMPS_ARITH == MUMPS_ARITH_d\n",
-                        ),
-                        Delete(
-                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
-                        ),
-                        Insert(
-                            "# if defined(UPPER)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) DMUMPS_##upper_case\n",
-                        ),
-                        Context(
-                            "# elif defined(Add_)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case##_\n",
-                        ),
-                    ],
-                },
-                Hunk {
-                    old_range: HunkRange {
-                        start: 62,
-                        len: 7,
-                    },
-                    new_range: HunkRange {
-                        start: 62,
-                        len: 7,
-                    },
-                    function_context: None,
-                    lines: [
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case\n",
-                        ),
-                        Context(
-                            "# endif\n",
-                        ),
-                        Context(
-                            "#elif MUMPS_ARITH == MUMPS_ARITH_c\n",
-                        ),
-                        Delete(
-                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
-                        ),
-                        Insert(
-                            "# if defined(UPPER)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) CMUMPS_##upper_case\n",
-                        ),
-                        Context(
-                            "# elif defined(Add_)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case##_\n",
-                        ),
-                    ],
-                },
-                Hunk {
-                    old_range: HunkRange {
-                        start: 72,
-                        len: 7,
-                    },
-                    new_range: HunkRange {
-                        start: 72,
-                        len: 7,
-                    },
-                    function_context: None,
-                    lines: [
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case\n",
-                        ),
-                        Context(
-                            "# endif\n",
-                        ),
-                        Context(
-                            "#elif MUMPS_ARITH == MUMPS_ARITH_z\n",
-                        ),
-                        Delete(
-                            "# if defined(UPPER) || defined(MUMPS_WIN32)\n",
-                        ),
-                        Insert(
-                            "# if defined(UPPER)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) ZMUMPS_##upper_case\n",
-                        ),
-                        Context(
-                            "# elif defined(Add_)\n",
-                        ),
-                        Context(
-                            "#  define F_SYM_ARITH(lower_case,upper_case) zmumps_##lower_case##_\n",
-                        ),
-                    ],
-                },
-            ],
-        },
-        Patch {
-            original: Some(
-                Filename(
-                    "mumps/libseq/elapse_orig.h",
-                ),
-            ),
-            modified: Some(
-                Filename(
-                    "mumps/libseq/elapse.h",
-                ),
-            ),
-            hunks: [
-                Hunk {
-                    old_range: HunkRange {
-                        start: 24,
-                        len: 7,
-                    },
-                    new_range: HunkRange {
-                        start: 24,
-                        len: 7,
-                    },
-                    function_context: None,
-                    lines: [
-                        Context(
-                            "#endif\n",
-                        ),
-                        Context(
-                            "#endif\n",
+                            "  }\n",
                         ),
                         Context(
                             "\n",
                         ),
                         Delete(
-                            "#if (defined(_WIN32) && ! defined(__MINGW32__)) || defined(UPPER)\n",
+                            "  if (close(FD))\n",
+                        ),
+                        Delete(
+                            "    fail(\"Could not close the file\");\n",
                         ),
                         Insert(
-                            "#if defined(UPPER)\n",
+                            "  if (_close(FD))\n",
+                        ),
+                        Insert(
+                            "    fail(\"Could not _close the file\");\n",
                         ),
                         Context(
-                            "#define mumps_elapse MUMPS_ELAPSE\n",
+                            "}\n",
                         ),
                         Context(
-                            "#elif defined(Add__)\n",
+                            "\n",
                         ),
                         Context(
-                            "#define mumps_elapse mumps_elapse__\n",
+                            "static bool shouldCreateArchive(ArchiveOperation Op) {\n",
                         ),
                     ],
                 },

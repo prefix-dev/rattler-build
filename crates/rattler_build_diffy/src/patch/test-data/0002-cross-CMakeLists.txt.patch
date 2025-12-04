@@ -1,0 +1,154 @@
+--- CMakeLists.txt.old	2024-06-06 14:05:11.000000000 -0500
++++ CMakeLists.txt	2024-07-05 15:35:21.268292096 -0500
+@@ -91,2 +91,3 @@
+ set(ZIG_STATIC_ZSTD ${ZIG_STATIC} CACHE BOOL "Prefer linking against static zstd")
++set(ZIG_STATIC_XML2 ${ZIG_STATIC} CACHE BOOL "Prefer linking against static xml2")
+ set(ZIG_STATIC_CURSES OFF CACHE BOOL "Enable static linking against curses")
+@@ -148,2 +149,5 @@
+     list(APPEND LLVM_LIBRARIES "${ZLIB}")
++else()
++    find_library(ZLIB NAMES z zlib libz libz.a libzlibstatic.a NAMES_PER_DIR)
++    list(APPEND LLVM_LIBRARIES "${ZLIB}")
+ endif()
+@@ -159,2 +161,19 @@
+     list(APPEND LLVM_LIBRARIES "${ZSTD}")
++else()
++    find_library(ZSTD NAMES zstd libzstd.a libzstdstatic.a NAMES_PER_DIR)
++    list(APPEND LLVM_LIBRARIES "${ZSTD}")
++endif()
++
++if(ZIG_STATIC_XML2)
++    if (MSVC)
++        list(REMOVE_ITEM LLVM_LIBRARIES "xml2.lib")
++    else()
++        list(REMOVE_ITEM LLVM_LIBRARIES "-lxml2")
++    endif()
++
++    find_library(XML2 NAMES libxml2.a xml2 NAMES_PER_DIR)
++    list(APPEND LLVM_LIBRARIES "${XML2}")
++else()
++    find_library(XML2 NAMES xml2 libxml2 libxml2.a NAMES_PER_DIR)
++    list(APPEND LLVM_LIBRARIES "${XML2}")
+ endif()
+@@ -704,3 +725,3 @@
+     -fno-rtti
+-    -fno-stack-protector
++    # -fno-stack-protector
+ 
+@@ -711,6 +732,8 @@
+     -Wno-comment
++    -Os
+   )
+ else()
+-target_compile_options(zigcpp PRIVATE /Zc:preprocessor)
+-set_property(TARGET zigcpp PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
++  target_compile_options(zigcpp PRIVATE -MD)
++  target_compile_options(zigcpp PRIVATE /Zc:preprocessor)
++  set_property(TARGET zigcpp PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+ endif()
+@@ -789,2 +812,28 @@
+ set(ZIG_HOST_TARGET_TRIPLE "${ZIG_HOST_TARGET_ARCH}-${ZIG_HOST_TARGET_OS}${ZIG_HOST_TARGET_ABI}" CACHE STRING "Host zig target triple.")
++if(DEFINED ENV{CROSSCOMPILING_EMULATOR})
++  set(CROSSCOMPILING_EMULATOR $ENV{CROSSCOMPILING_EMULATOR})
++  if(NOT DEFINED ENV{CROSSCOMPILING_LIBC})
++    set(CROSSCOMPILING_LIBC "-lc")
++  else()
++    set(CROSSCOMPILING_LIBC $ENV{CROSSCOMPILING_LIBC})
++    message(STATUS "Setting CROSSCOMPILING_LIBC ${CROSSCOMPILING_LIBC}")
++  endif()
++  if(DEFINED ENV{ZIG_CROSS_TARGET_TRIPLE})
++    set(ZIG_CROSS_TARGET_TRIPLE $ENV{ZIG_CROSS_TARGET_TRIPLE} CACHE STRING "Host zig target triple.")
++    message(STATUS "Setting ZIG_CROSS_TARGET_TRIPLE ${ZIG_CROSS_TARGET_TRIPLE}")
++  else()
++    message(SEND_ERROR "ZIG_CROSS_TARGET_TRIPLE is not set while cross-compiling")
++  endif()
++  if(DEFINED ENV{ZIG_CROSS_TARGET_MCPU})
++    set(ZIG_CROSS_TARGET_MCPU $ENV{ZIG_CROSS_TARGET_MCPU} CACHE STRING "Host zig target cpu.")
++    message(STATUS "Setting ZIG_CROSS_TARGET_MCPU ${ZIG_CROSS_TARGET_MCPU}")
++  else()
++    set(ZIG_CROSS_TARGET_MCPU "baseline" CACHE STRING "Host zig target cpu.")
++    message(STATUS "Setting ZIG_CROSS_TARGET_MCPU ${ZIG_CROSS_TARGET_MCPU}")
++  endif()
++else()
++  set(CROSSCOMPILING_EMULATOR "")
++  set(ZIG_CROSS_TARGET_TRIPLE ${ZIG_TARGET_TRIPLE})
++  set(ZIG_CROSS_TARGET_MCPU ${ZIG_TARGET_MCPU})
++endif()
+ 
+@@ -796,5 +865,11 @@
+ else()
+-  set(ZIG_WASM2C_COMPILE_FLAGS "-std=c99 -O2")
+-  set(ZIG1_COMPILE_FLAGS "-std=c99 -Os")
+-  set(ZIG2_COMPILE_FLAGS "-std=c99 -O0 -fno-sanitize=undefined -fno-stack-protector")
++  if(ZIG_HOST_TARGET_ARCH MATCHES "powerpc64le")
++    set(ZIG_WASM2C_COMPILE_FLAGS "-std=c99 -O2")
++    set(ZIG1_COMPILE_FLAGS "-std=c99 -Os")
++    set(ZIG2_COMPILE_FLAGS "-std=c99 -Os -fno-sanitize=undefined -fno-stack-protector --save-temps")
++  else()
++    set(ZIG_WASM2C_COMPILE_FLAGS "-std=c99 -O2")
++    set(ZIG1_COMPILE_FLAGS "-std=c99 -Os")
++    set(ZIG2_COMPILE_FLAGS "-std=c99 -Os")
++  endif()
+   if(APPLE)
+@@ -821,3 +870,3 @@
+   OUTPUT "${ZIG1_C_SOURCE}"
+-  COMMAND zig-wasm2c "${ZIG1_WASM_MODULE}" "${ZIG1_C_SOURCE}"
++  COMMAND ${CROSSCOMPILING_EMULATOR} ${PROJECT_BINARY_DIR}/zig-wasm2c "${ZIG1_WASM_MODULE}" "${ZIG1_C_SOURCE}"
+   DEPENDS zig-wasm2c "${ZIG1_WASM_MODULE}"
+@@ -833,3 +882,9 @@
+ else()
+-  target_link_libraries(zig1 LINK_PUBLIC m)
++  if(WIN32)
++    find_library(M NAMES m libm.lib NAMES_PER_DIR)
++    target_link_libraries(zig1 LINK_PUBLIC $M)
++    # target_link_libraries(zig1 LINK_PUBLIC $ENV{PREFIX}/Library/lib/libm.lib)
++  else()
++    target_link_libraries(zig1 LINK_PUBLIC m)
++  endif()
+   if(MINGW)
+@@ -839,8 +894,11 @@
+ 
++if(NOT DEFINED ZIG_CROSS_TARGET_TRIPLE)
++    set(ZIG_CROSS_TARGET_TRIPLE ${ZIG_HOST_TARGET_TRIPLE})
++endif()
+ set(BUILD_ZIG2_ARGS
+   "${PROJECT_SOURCE_DIR}/lib"
+-  build-exe -ofmt=c -lc -OReleaseSmall
++  build-exe -ofmt=c "${CROSSCOMPILING_LIBC}" -OReleaseSmall
+   --name zig2
+   -femit-bin="${ZIG2_C_SOURCE}"
+-  -target "${ZIG_HOST_TARGET_TRIPLE}"
++  -target "${ZIG_CROSS_TARGET_TRIPLE}"
+   --dep "build_options"
+@@ -854,3 +912,3 @@
+   OUTPUT "${ZIG2_C_SOURCE}"
+-  COMMAND zig1 ${BUILD_ZIG2_ARGS}
++  COMMAND ${CROSSCOMPILING_EMULATOR} ${PROJECT_BINARY_DIR}/zig1 ${BUILD_ZIG2_ARGS}
+   DEPENDS zig1 "${ZIG_STAGE2_SOURCES}"
+@@ -865,3 +923,3 @@
+   -femit-bin="${ZIG_COMPILER_RT_C_SOURCE}"
+-  -target "${ZIG_HOST_TARGET_TRIPLE}"
++  -target "${ZIG_CROSS_TARGET_TRIPLE}"
+   --dep "build_options"
+@@ -871,3 +929,3 @@
+   OUTPUT "${ZIG_COMPILER_RT_C_SOURCE}"
+-  COMMAND zig1 ${BUILD_COMPILER_RT_ARGS}
++  COMMAND ${CROSSCOMPILING_EMULATOR} ${PROJECT_BINARY_DIR}/zig1 ${BUILD_COMPILER_RT_ARGS}
+   DEPENDS zig1 "${ZIG_STAGE2_SOURCES}"
+@@ -913,4 +971,4 @@
+   "-Dversion-string=${RESOLVED_ZIG_VERSION}"
+-  "-Dtarget=${ZIG_TARGET_TRIPLE}"
+-  "-Dcpu=${ZIG_TARGET_MCPU}"
++  "-Dtarget=${ZIG_CROSS_TARGET_TRIPLE}"
++  "-Dcpu=${ZIG_CROSS_TARGET_MCPU}" --verbose --verbose-link --summary all
+
+@@ -977,3 +1035,4 @@
+   OUTPUT "${PROJECT_BINARY_DIR}/stage3/bin/zig"
+-  COMMAND zig2 build --prefix "${PROJECT_BINARY_DIR}/stage3" ${ZIG_BUILD_ARGS}
++  COMMAND ${CROSSCOMPILING_EMULATOR} ${PROJECT_BINARY_DIR}/zig2 build --prefix "${PROJECT_BINARY_DIR}/stage3" ${ZIG_BUILD_ARGS}
++  DEPENDS zig2
+   COMMENT STATUS "Building stage3"
+@@ -985,2 +1043,3 @@
+
++install(CODE "set(CROSSCOMPILING_EMULATOR \"${CROSSCOMPILING_EMULATOR}\")")
+ install(CODE "set(ZIG_EXECUTABLE \"${ZIG_EXECUTABLE}\")")

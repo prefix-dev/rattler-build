@@ -1,0 +1,8 @@
+--- CMakeLists.txt.old	2024-06-06 14:05:11.000000000 -0500
++++ CMakeLists.txt	2024-06-22 11:27:13.931633400 -0500
+@@ -184,2 +184,5 @@
+     list(APPEND LLVM_LIBRARIES "${LIBXML2}")
++else()
++    list(REMOVE_ITEM LLVM_LIBRARIES "-lxml2")
++    list(APPEND LLVM_LIBRARIES "$ENV{PREFIX}/lib/libxml2.so.16")
+ endif()
