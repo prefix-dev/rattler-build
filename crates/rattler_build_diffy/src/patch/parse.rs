@@ -692,6 +692,7 @@ mod tests {
     use crate::patch::parse::{HunkRangeStrategy, ParserConfig, parse_multiple_with_config};
 
     use super::{parse, parse_bytes, parse_multiple};
+    use fs_err as fs;
 
     #[test]
     fn test_escaped_filenames() {
@@ -829,7 +830,7 @@ mod tests {
     #[test]
     fn test_real_world_patches() {
         insta::glob!("test-data/*.patch", |path| {
-            let input = std::fs::read_to_string(path).unwrap();
+            let input = fs::read_to_string(path).unwrap();
             let patches = parse_multiple_with_config(
                 &input,
                 ParserConfig {
@@ -842,7 +843,7 @@ mod tests {
 
     #[test]
     fn test_multi_patch_file() {
-        let input = std::fs::read_to_string("src/patch/test-data/40.patch").unwrap();
+        let input = fs::read_to_string("src/patch/test-data/40.patch").unwrap();
 
         let result = parse_multiple_with_config(
             &input,

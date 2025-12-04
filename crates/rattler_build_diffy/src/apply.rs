@@ -803,6 +803,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use fs_err as fs;
     use std::path::PathBuf;
 
     use crate::{Diff, apply};
@@ -812,8 +813,8 @@ mod test {
             .join("test-data")
             .join(name);
 
-        let base_image = std::fs::read_to_string(base_folder.join("target.txt")).unwrap();
-        let patch = std::fs::read_to_string(base_folder.join("patch.patch")).unwrap();
+        let base_image = fs::read_to_string(base_folder.join("target.txt")).unwrap();
+        let patch = fs::read_to_string(base_folder.join("patch.patch")).unwrap();
         (base_image, patch)
     }
 
