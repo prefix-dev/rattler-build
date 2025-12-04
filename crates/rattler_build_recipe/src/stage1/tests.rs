@@ -356,7 +356,7 @@ mod tests {
                     ..Default::default()
                 },
                 requirements: CommandsTestRequirements {
-                    run: vec!["pytest".to_string()],
+                    run: vec![Dependency::Spec(Box::new("pytest".parse().unwrap()))],
                     build: vec![],
                 },
                 files: CommandsTestFiles::default(),
