@@ -8,6 +8,7 @@ use crate::stage0::types::{ConditionalList, IncludeExclude, Value};
 /// Source information - can be Git, Url, or Path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum Source {
     /// Git source pointing to a Git repository
     Git(GitSource),

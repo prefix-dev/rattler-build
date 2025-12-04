@@ -100,10 +100,9 @@ impl Requirements {
                         if matchspec.version.is_none()
                             && matchspec.build.is_none()
                             && let Some(name) = &matchspec.name
+                            && let Some(pkg_name) = extract_name(name)
                         {
-                            if let Some(pkg_name) = extract_name(name) {
-                                specs.push(pkg_name);
-                            }
+                            specs.push(pkg_name);
                         }
                     }
                 }
@@ -117,10 +116,9 @@ impl Requirements {
                             if matchspec.version.is_none()
                                 && matchspec.build.is_none()
                                 && let Some(name) = &matchspec.name
+                                && let Some(pkg_name) = extract_name(name)
                             {
-                                if let Some(pkg_name) = extract_name(name) {
-                                    specs.push(pkg_name);
-                                }
+                                specs.push(pkg_name);
                             }
                         }
                     }
@@ -133,10 +131,9 @@ impl Requirements {
                                 if matchspec.version.is_none()
                                     && matchspec.build.is_none()
                                     && let Some(name) = &matchspec.name
+                                    && let Some(pkg_name) = extract_name(name)
                                 {
-                                    if let Some(pkg_name) = extract_name(name) {
-                                        specs.push(pkg_name);
-                                    }
+                                    specs.push(pkg_name);
                                 }
                             }
                         }
