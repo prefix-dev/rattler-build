@@ -259,18 +259,27 @@ def test_multiple_staging_caches(
 
     # Package from core-build staging
     pkg_core = get_extracted_package(tmp_path, "libcore")
-    assert (pkg_core / "lib/libcore.so").exists()
+    if platform.system() == "Windows":
+        assert (pkg_core / "lib/libcore.dll").exists()
+    else:
+        assert (pkg_core / "lib/libcore.so").exists()
     assert (pkg_core / "include/core.h").exists()
 
     # Package from python-build staging
     pkg_py = get_extracted_package(tmp_path, "python-mycore")
-    assert (pkg_py / "lib/python3.11/site-packages/mycore.py").exists()
+    if platform.system() == "Windows":
+        assert (pkg_py / "Lib/site-packages/mycore.py").exists()
+    else:
+        assert (pkg_py / "lib/python3.11/site-packages/mycore.py").exists()
 
     # Dev package also from core-build staging
     pkg_dev = get_extracted_package(tmp_path, "core-headers")
     assert (pkg_dev / "include/core.h").exists()
     # Should not have the lib file (filtered by files section)
-    assert not (pkg_dev / "lib/libcore.so").exists()
+    if platform.system() == "Windows":
+        assert not (pkg_dev / "lib/libcore.dll").exists()
+    else:
+        assert not (pkg_dev / "lib/libcore.so").exists()
 
 
 def test_staging_with_top_level_inherit(
@@ -516,7 +525,10 @@ def test_staging_files_selection(
     pkg_core = get_extracted_package(tmp_path, "libcore")
     paths_core = json.loads((pkg_core / "info/paths.json").read_text())
     core_files = [p["_path"] for p in paths_core["paths"]]
-    assert any("lib/libcore.so" in f for f in core_files)
+    if platform.system() == "Windows":
+        assert any("lib/libcore.dll" in f for f in core_files)
+    else:
+        assert any("lib/libcore.so" in f for f in core_files)
     assert any("include/core.h" in f for f in core_files)
 
     # core-headers should only have include

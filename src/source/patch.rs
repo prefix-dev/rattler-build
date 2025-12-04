@@ -386,10 +386,12 @@ mod tests {
     use crate::{
         get_build_output, get_tool_config,
         opt::{BuildData, BuildOpts, CommonOpts},
-        recipe::parser::Source,
         script::SandboxArguments,
         tool_configuration::Configuration,
     };
+
+    #[cfg(feature = "patch-test-extra")]
+    use rattler_build_recipe::stage1::Source;
 
     #[cfg(feature = "patch-test-extra")]
     use std::{ffi::OsStr, process::Command, sync::LazyLock};
@@ -815,7 +817,7 @@ mod tests {
 
         let mut patchable_sources = vec![];
         for output in outputs {
-            let sources = output.recipe.sources();
+            let sources = output.recipe.source();
             for source in sources {
                 if !source.patches().is_empty() {
                     patchable_sources.push(source.clone())
@@ -973,17 +975,17 @@ mod tests {
 
             // Convert source and fetch from cache
             let cache_source = match &source {
-                crate::recipe::parser::Source::Git(git_src) => {
+                Source::Git(git_src) => {
                     let cache_git_source = git_src
                         .to_cache_source(&recipe_dir)
                         .expect("Failed to convert git source to cache source");
                     CacheSource::Git(cache_git_source)
                 }
-                crate::recipe::parser::Source::Url(url_src) => {
+                Source::Url(url_src) => {
                     let cache_url_source = CacheUrlSource::try_from(url_src).unwrap();
                     CacheSource::Url(cache_url_source)
                 }
-                crate::recipe::parser::Source::Path(_) => {
+                Source::Path(_) => {
                     panic!("Path sources should not have patches to test");
                 }
             };
