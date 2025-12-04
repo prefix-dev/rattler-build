@@ -554,7 +554,7 @@ fn hunk<'a, T: Text + ?Sized + ToOwned>(parser: &mut Parser<'a, T>) -> Result<Hu
                 .rev()
                 .collect();
 
-            // Should never overflow since len{1,2} >= empty_context_lines by the defintion above.
+            // Should never overflow since len{1,2} >= empty_context_lines by the definition above.
             range1.len = len1 - empty_context_lines;
             range2.len = len2 - empty_context_lines;
         }

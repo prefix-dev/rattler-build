@@ -223,7 +223,7 @@ impl SliceLike for str {
         cmp::min(self.len(), other.len())
     }
 
-    // returns length of overlap of prefix of `self` with suffic of `other`
+    // returns length of overlap of prefix of `self` with suffix of `other`
     fn common_overlap_len(&self, mut other: &str) -> usize {
         let mut this = self;
         // Eliminate the null case
@@ -320,7 +320,7 @@ where
         cmp::min(self.len(), other.len())
     }
 
-    // returns length of overlap of prefix of `self` with suffic of `other`
+    // returns length of overlap of prefix of `self` with suffix of `other`
     //TODO make a more efficient solution
     fn common_overlap_len(&self, other: &[T]) -> usize {
         let mut len = cmp::min(self.len(), other.len());

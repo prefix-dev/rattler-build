@@ -2475,18 +2475,18 @@ about:
         if src_cache.exists():
             git_cache_dir = src_cache
 
-    assert (
-        git_cache_dir is not None
-    ), f"Could not find git cache directory. Checked: {src_cache_locations}"
-    assert (
-        git_cache_dir.exists()
-    ), f"Git cache directory should exist after first build: {git_cache_dir}"
+    assert git_cache_dir is not None, (
+        f"Could not find git cache directory. Checked: {src_cache_locations}"
+    )
+    assert git_cache_dir.exists(), (
+        f"Git cache directory should exist after first build: {git_cache_dir}"
+    )
 
     # Find the actual cached repo directory (should be named after the repo)
     cached_repos = [d for d in git_cache_dir.iterdir() if d.is_dir()]
-    assert (
-        len(cached_repos) > 0
-    ), f"Should have at least one cached git repo in {git_cache_dir}"
+    assert len(cached_repos) > 0, (
+        f"Should have at least one cached git repo in {git_cache_dir}"
+    )
     cached_repo = cached_repos[0]
 
     # Corrupt the cache by removing the .git directory
@@ -2532,9 +2532,9 @@ about:
     # Verify the cache was re-created and is now valid
     # The cache directory should still exist (may have been re-cloned)
     cached_repos_after = [d for d in git_cache_dir.iterdir() if d.is_dir()]
-    assert (
-        len(cached_repos_after) > 0
-    ), "Should have at least one cached git repo after re-clone"
+    assert len(cached_repos_after) > 0, (
+        "Should have at least one cached git repo after re-clone"
+    )
 
     # Verify the cache is now valid
     for repo in cached_repos_after:
@@ -2611,16 +2611,16 @@ def test_topological_sort_with_variants(
 
     # Verify correct ordering:
     # All pkg-a variants should come before any pkg-b variant
-    assert (
-        last_a < first_b
-    ), f"All pkg-a variants ({first_a}-{last_a}) should come before pkg-b ({first_b})"
+    assert last_a < first_b, (
+        f"All pkg-a variants ({first_a}-{last_a}) should come before pkg-b ({first_b})"
+    )
 
     # All pkg-b variants should come before any pkg-c variant
-    assert (
-        last_b < first_c
-    ), f"All pkg-b variants ({first_b}-{last_b}) should come before pkg-c ({first_c})"
+    assert last_b < first_c, (
+        f"All pkg-b variants ({first_b}-{last_b}) should come before pkg-c ({first_c})"
+    )
 
     # Verify we have the expected number of packages (2 variants each = 6 total)
-    assert (
-        len(package_names) == 6
-    ), f"Expected 6 packages (2 variants each), got {len(package_names)}"
+    assert len(package_names) == 6, (
+        f"Expected 6 packages (2 variants each), got {len(package_names)}"
+    )
