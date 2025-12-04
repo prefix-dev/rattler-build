@@ -47,7 +47,6 @@ def _():
     from rattler_build.render import RenderConfig
     from rattler_build.stage0 import Recipe
     from rattler_build.variant_config import VariantConfig
-
     return (
         Package,
         Path,
@@ -66,10 +65,8 @@ def _(mo):
     mo.md(r"""
     ## Step 1: Build a Package with Tests
 
-    First, let's build a package that has embedded tests. We'll create a simple package with:
+    First, let's build a package that has embedded tests. We'll create a simple noarch Python package with:
     - A Python module
-    - Python import tests
-    - Command-line tests
     - Package content checks
     """)
     return
@@ -85,6 +82,7 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
 
     build:
       number: 0
+      noarch: python
       script:
         interpreter: python
         content: |
@@ -93,8 +91,8 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
 
           prefix = Path(os.environ["PREFIX"])
 
-          # Create a Python module
-          site_packages = prefix / "lib" / "python" / "site-packages"
+          # Create a Python module (noarch packages use site-packages directly)
+          site_packages = prefix / "site-packages"
           site_packages.mkdir(parents=True, exist_ok=True)
 
           module_file = site_packages / "demo_module.py"
@@ -110,32 +108,20 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
           ''')
           print(f"Created module at {module_file}")
 
-          # Create a CLI script
-          bin_dir = prefix / "bin"
-          bin_dir.mkdir(parents=True, exist_ok=True)
-
-          cli_file = bin_dir / "demo-cli"
-          cli_file.write_text('''#!/bin/sh
-          echo "Demo CLI v1.0.0"
-          ''')
-          cli_file.chmod(0o755)
-          print(f"Created CLI at {cli_file}")
-
     requirements:
-      build:
+      run:
         - python
 
     tests:
-      # Test 1: Command test
-      - script:
-          - demo-cli
+      # Test 1: Python import test (embedded in package)
+      - python:
+          imports:
+            - demo_module
 
-      # Test 2: Package contents check
+      # Test 2: Package contents check (runs at build time)
       - package_contents:
           files:
-            - lib/python/site-packages/demo_module.py
-          bin:
-            - demo-cli
+            - site-packages/demo_module.py
     about:
       license: MIT
     """
@@ -338,7 +324,7 @@ def _(mo):
 
 
 @app.cell
-def _(json, pkg_tests):
+def _(pkg_tests):
     print("🔬 Test Type Details")
     print("=" * 60)
 
@@ -387,10 +373,6 @@ def _(json, pkg_tests):
                         print(f"      exists: {_checks.exists}")
                     if _checks.not_exists:
                         print(f"      not_exists: {_checks.not_exists}")
-
-        # Also show the full dict representation
-        print("\n  Full test as dict:")
-        print(f"    {json.dumps(_test.to_dict(), indent=4)}")
     return
 
 
