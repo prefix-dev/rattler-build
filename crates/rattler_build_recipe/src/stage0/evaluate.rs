@@ -716,7 +716,12 @@ pub fn preserve_string_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
-    evaluate_conditional_list(list.as_slice(), context, |value, _ctx| {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        // Track variables in templates for used_variant calculation
+        // This ensures that variables like ${{ python }} in scripts are tracked
+        // even though we don't fully evaluate them at this stage
+        track_template_variables(value, ctx);
+
         // Extract the original string value without evaluating templates
         let s = extract_template_source(value).unwrap_or_default();
         // Filter out empty strings
@@ -3059,9 +3064,12 @@ mod tests {
         variant.insert("c_compiler".into(), Variable::from_string("supergcc"));
         variant.insert("c_compiler_version".into(), Variable::from_string("15.0"));
 
-        // Create JinjaConfig with the variant
+        // Create JinjaConfig with the variant and target_platform
         let jinja_config = JinjaConfig {
             variant: variant.clone(),
+            target_platform: rattler_conda_types::Platform::Linux64,
+            build_platform: rattler_conda_types::Platform::Linux64,
+            host_platform: rattler_conda_types::Platform::Linux64,
             ..Default::default()
         };
 
