@@ -58,6 +58,7 @@ impl BaseClient {
                 .no_gzip()
                 .pool_max_idle_per_host(20)
                 .user_agent(&user_agent)
+                .referer(false)
                 .read_timeout(std::time::Duration::from_secs(timeout_secs))
                 .build()
                 .expect("failed to create client"),
@@ -74,6 +75,7 @@ impl BaseClient {
                 .user_agent(&user_agent)
                 .read_timeout(std::time::Duration::from_secs(timeout_secs))
                 .danger_accept_invalid_certs(true)
+                .referer(false)
                 .build()
                 .expect("failed to create dangerous client"),
         )
@@ -258,6 +260,7 @@ impl BaseClientBuilder {
                 .no_gzip()
                 .pool_max_idle_per_host(20)
                 .user_agent(&user_agent)
+                .referer(false)
                 .read_timeout(std::time::Duration::from_secs(timeout_secs))
         };
 
