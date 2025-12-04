@@ -324,11 +324,69 @@
 
 /* Footer styling */
 .md-footer {
-    background-color: var(--brand-navy);
+    background-color: transparent;
 }
 
-.md-footer-meta {
+.md-footer__inner {
+    padding-bottom: 1.5rem;
+}
+
+[data-md-color-scheme="default"] .md-footer-meta {
+    background-color: white;
+    color: var(--text-light);
+    border-top: 1px solid var(--gsd-100);
+}
+
+[data-md-color-scheme="slate"] .md-footer-meta {
     background-color: var(--gsd-700);
+    color: var(--text-dark);
+}
+
+.md-footer__link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 4rem;
+    padding: 0 1rem;
+    border-radius: 1rem;
+    font-family: var(--font-display), serif;
+}
+
+[data-md-color-scheme="default"] .md-footer__link:hover,
+[data-md-color-scheme="slate"] .md-footer__link:hover {
+    border: 1px solid var(--brand-yellow);
+}
+
+[data-md-color-scheme="default"] .md-footer__link {
+    background-color: white;
+    color: var(--text-light);
+    border: 1px solid var(--gsd-100);
+}
+
+[data-md-color-scheme="slate"] .md-footer__link {
+    background-color: var(--gsd-700);
+    color: var(--text-dark);
+}
+
+.md-footer__title {
+    padding: 0;
+    margin: 0;
+}
+
+.prefix-logo {
+    transform: scale(0.8);
+}
+
+[data-md-color-scheme="default"] .prefix-logo__dark {
+    display: none;
+}
+
+[data-md-color-scheme="slate"] .prefix-logo__light {
+    display: none;
+}
+
+[data-md-color-scheme="default"] .md-copyright {
+    color: var(--gsd-400);
 }
 
 /* Admonition colors using brand palette */
@@ -378,7 +436,7 @@
 }
 
 .md-header__button.md-logo img, .md-header__button.md-logo svg {
-    height: 2.1rem;
+    height: 2.5rem;
 }
 
 [dir=ltr] .md-header__title {
