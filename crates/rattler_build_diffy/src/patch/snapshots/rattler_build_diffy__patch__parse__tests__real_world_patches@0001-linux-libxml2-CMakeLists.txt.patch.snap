@@ -1,0 +1,51 @@
+---
+source: crates/rattler_build_diffy/src/patch/parse.rs
+expression: patches
+input_file: crates/rattler_build_diffy/src/patch/test-data/0001-linux-libxml2-CMakeLists.txt.patch
+---
+Ok(
+    [
+        Patch {
+            original: Some(
+                Filename(
+                    "CMakeLists.txt.old",
+                ),
+            ),
+            modified: Some(
+                Filename(
+                    "CMakeLists.txt",
+                ),
+            ),
+            hunks: [
+                Hunk {
+                    old_range: HunkRange {
+                        start: 184,
+                        len: 2,
+                    },
+                    new_range: HunkRange {
+                        start: 184,
+                        len: 5,
+                    },
+                    function_context: None,
+                    lines: [
+                        Context(
+                            "    list(APPEND LLVM_LIBRARIES \"${LIBXML2}\")\n",
+                        ),
+                        Insert(
+                            "else()\n",
+                        ),
+                        Insert(
+                            "    list(REMOVE_ITEM LLVM_LIBRARIES \"-lxml2\")\n",
+                        ),
+                        Insert(
+                            "    list(APPEND LLVM_LIBRARIES \"$ENV{PREFIX}/lib/libxml2.so.16\")\n",
+                        ),
+                        Context(
+                            "endif()\n",
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+)

@@ -1,0 +1,15 @@
+--- cmake/install.cmake 2024-06-06 14:05:11.000000000 -0500
++++ cmake/install.cmake 2024-06-19 11:00:55.023460439 -0500
+@@ -2,3 +2,3 @@
+ execute_process(
+-  COMMAND "${ZIG_EXECUTABLE}" ${ZIG_INSTALL_ARGS}
++  COMMAND ${CROSSCOMPILING_EMULATOR} "${ZIG_EXECUTABLE}" ${ZIG_INSTALL_ARGS}
+   WORKING_DIRECTORY "${ZIG2_WORKING_DIR}"
+@@ -13,5 +13,5 @@
+     message("::")
+-    message(":: argv: ${ZIG_EXECUTABLE} ${s_INSTALL_LIBSTAGE2_ARGS}")
++    message(":: argv: ${CROSSCOMPILING_EMULATOR} ${ZIG_EXECUTABLE} ${s_INSTALL_LIBSTAGE2_ARGS}")
+
+-    set(_args ${ZIG_EXECUTABLE} ${ZIG_INSTALL_ARGS})
++    set(_args ${CROSSCOMPILING_EMULATOR} ${ZIG_EXECUTABLE} ${ZIG_INSTALL_ARGS})
+     list(LENGTH _args _len)

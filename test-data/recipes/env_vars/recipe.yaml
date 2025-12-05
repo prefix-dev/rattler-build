@@ -5,11 +5,11 @@ package:
 build:
   script:
     - if: unix
-      then:
-        - echo "Value of $pybind11_abi"
-        - echo "And jinja style: ${{ pybind11_abi }}"
-        - echo $MAKEFLAGS > $PREFIX/makeflags.txt
-        - echo $pybind11_abi > $PREFIX/pybind_abi.txt
+      then: |
+        echo "Value of $pybind11_abi"
+        echo "And jinja style: ${{ pybind11_abi }}"
+        echo $MAKEFLAGS > $PREFIX/makeflags.txt
+        echo $pybind11_abi > $PREFIX/pybind_abi.txt
       else:
         - echo %MAKEFLAGS% > %PREFIX%\makeflags.txt
         - echo %pybind11_abi% > %PREFIX%\pybind_abi.txt

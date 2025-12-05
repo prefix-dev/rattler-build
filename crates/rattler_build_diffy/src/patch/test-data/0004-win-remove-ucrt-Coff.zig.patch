@@ -1,0 +1,5 @@
+--- a/src/link/Coff.zig.old	2024-06-06 14:05:11.000000000 -0500
++++ b/src/link/Coff.zig	2024-06-22 11:27:13.931633400 -0500
+@@ -2130 +2130 @@
+-                        try argv.append(try allocPrint(arena, "{s}ucrt{s}.lib", .{ lib_str, d_str }));
++                        // try argv.append(try allocPrint(arena, "{s}ucrt{s}.lib", .{ lib_str, d_str }));

@@ -1,0 +1,24 @@
+[package]
+name = "rattler_build_types"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Common types for rattler-build crates"
+
+[features]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+serde_with = { workspace = true }
+rattler_conda_types = { workspace = true }
+thiserror = { workspace = true }
+itertools = { workspace = true }
+globset = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml"] }
+fs-err = { workspace = true }

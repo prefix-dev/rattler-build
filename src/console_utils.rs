@@ -240,11 +240,7 @@ where
             };
 
             let indent = indent_levels_colored(&state.span_stack);
-            let header = format!(
-                "{indent}\n{indent} {} {}",
-                span_color.apply_to("╭─"),
-                name
-            );
+            let header = format!("{indent}\n{indent} {} {}", span_color.apply_to("╭─"), name);
 
             state.span_stack.push(SpanInfo {
                 id: id.clone(),
@@ -267,11 +263,7 @@ where
             // Get the indent before truncating (parent spans only)
             let indent = indent_levels_colored(&state.span_stack[..pos]);
             // For indent_plus_one, we need to include this span's color too
-            let indent_plus_one = format!(
-                "{} {}",
-                indent,
-                span_color.apply_to("│")
-            );
+            let indent_plus_one = format!("{} {}", indent, span_color.apply_to("│"));
 
             state.span_stack.truncate(pos);
 

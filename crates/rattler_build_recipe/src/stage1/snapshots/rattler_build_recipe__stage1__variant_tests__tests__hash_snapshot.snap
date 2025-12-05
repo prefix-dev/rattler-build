@@ -1,0 +1,5 @@
+---
+source: crates/rattler_build_recipe/src/stage1/variant_tests.rs
+expression: hash
+---
+np120py311he588871

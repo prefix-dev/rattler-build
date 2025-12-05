@@ -1,9 +1,0 @@
----
-source: src/recipe/parser/glob_vec.rs
-expression: "&yaml"
----
-exists:
-- foo
-- bar
-not_exists:
-- baz/**/qux
