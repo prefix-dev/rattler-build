@@ -17,11 +17,6 @@ from rattler_build.build_result import BuildResult
 from rattler_build.cli_api import (
     build_recipes,
     test_package,
-    upload_package_to_anaconda,
-    upload_package_to_artifactory,
-    upload_package_to_prefix,
-    upload_package_to_quetz,
-    upload_packages_to_conda_forge,
 )
 from rattler_build.jinja_config import JinjaConfig
 from rattler_build.package import (
@@ -49,6 +44,13 @@ from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
 from rattler_build.stage1 import Stage1Recipe
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
+from rattler_build.upload import (
+    upload_package_to_anaconda,
+    upload_package_to_artifactory,
+    upload_package_to_prefix,
+    upload_package_to_quetz,
+    upload_packages_to_conda_forge,
+)
 from rattler_build.variant_config import VariantConfig
 
 __all__ = [
