@@ -1,19 +1,8 @@
 //! Prefix placeholder detection in files
 
-use rattler_conda_types::package::FileMode;
 use std::path::Path;
 
 use crate::Result;
-
-/// A detected prefix placeholder
-#[derive(Debug, Clone)]
-pub struct PrefixPlaceholder {
-    /// The file mode (text or binary)
-    pub file_mode: FileMode,
-
-    /// The actual placeholder string found
-    pub placeholder: String,
-}
 
 /// Detect if a binary file contains the given prefix
 ///
