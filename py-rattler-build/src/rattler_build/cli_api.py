@@ -7,11 +7,6 @@ from rattler_build._rattler_build import (
     test_package_py,
 )
 
-__all__ = [
-    "build_recipes",
-    "test_package",
-]
-
 
 def build_recipes(
     recipes: list[str | Path],

@@ -6,8 +6,6 @@ This module provides a Pythonic API for configuring the build tool.
 
 from rattler_build._rattler_build import tool_config as _tool_config
 
-__all__ = ["PlatformConfig", "ToolConfiguration"]
-
 
 class PlatformConfig:
     """Platform configuration for building packages.

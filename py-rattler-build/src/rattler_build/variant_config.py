@@ -12,8 +12,6 @@ from typing import Any
 from rattler_build._rattler_build import VariantConfig as _VariantConfig
 from rattler_build.jinja_config import JinjaConfig
 
-__all__ = ["VariantConfig"]
-
 
 class VariantConfig:
     """

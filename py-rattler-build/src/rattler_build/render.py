@@ -12,20 +12,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build import stage1
+from rattler_build._rattler_build import build_rendered_variant_py
 from rattler_build._rattler_build import render as _render
+from rattler_build.build_result import BuildResult
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
-    from rattler_build.build_result import BuildResult
     from rattler_build.progress import ProgressCallback
-
-__all__ = [
-    "RenderConfig",
-    "RenderedVariant",
-    "HashInfo",
-    "PinSubpackageInfo",
-    "build_rendered_variants",
-]
 
 ContextValue = str | int | float | bool | list[str | int | float | bool]
 
@@ -321,15 +314,12 @@ class RenderedVariant:
             >>> result = rendered[0].run_build(output_dir="./output")
             >>> print(f"Built package: {result.packages[0]}")
         """
-        from rattler_build import _rattler_build as _rb
-        from rattler_build.build_result import BuildResult
-
         # Use default ToolConfiguration if not provided
         if tool_config is None:
             tool_config = ToolConfiguration()
 
         # Build this single variant
-        rust_result = _rb.build_rendered_variant_py(
+        rust_result = build_rendered_variant_py(
             rendered_variant=self._inner,
             tool_config=tool_config._inner,
             output_dir=Path(output_dir),
