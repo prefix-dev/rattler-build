@@ -10,6 +10,7 @@ from rattler_build._rattler_build import (
     generate_pypi_recipe_string_py,
     generate_r_recipe_string_py,
 )
+from rattler_build.stage0 import Stage0Recipe
 
 __all__ = [
     "generate_pypi_recipe",
@@ -19,7 +20,7 @@ __all__ = [
 ]
 
 
-def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: bool = True) -> str:
+def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: bool = True) -> Stage0Recipe:
     """Generate a conda recipe from a PyPI package.
 
     Args:
@@ -29,7 +30,7 @@ def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: 
             This helps map PyPI names to their corresponding conda-forge package names.
 
     Returns:
-        A string containing the generated recipe YAML.
+        A Stage0Recipe object representing the generated recipe.
 
     Raises:
         RuntimeError: If the package cannot be found or if there's a network error.
@@ -38,14 +39,15 @@ def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: 
         Generate a recipe for the latest version of flit-core:
 
         >>> from rattler_build import generate_pypi_recipe
-        >>> recipe_yaml = generate_pypi_recipe("flit-core")  # doctest: +SKIP
-        >>> "package:" in recipe_yaml  # doctest: +SKIP
-        True
+        >>> recipe = generate_pypi_recipe("flit-core")  # doctest: +SKIP
+        >>> recipe.as_single_output().package.name  # doctest: +SKIP
+        'flit-core'
     """
-    return generate_pypi_recipe_string_py(package, version, use_mapping)
+    yaml = generate_pypi_recipe_string_py(package, version, use_mapping)
+    return Stage0Recipe.from_yaml(yaml)
 
 
-def generate_cran_recipe(package: str, universe: str | None = None) -> str:
+def generate_cran_recipe(package: str, universe: str | None = None) -> Stage0Recipe:
     """Generate a conda recipe from a CRAN (R) package.
 
     Args:
@@ -54,7 +56,7 @@ def generate_cran_recipe(package: str, universe: str | None = None) -> str:
             Other options include specific R-universe repositories.
 
     Returns:
-        A string containing the generated recipe YAML.
+        A Stage0Recipe object representing the generated recipe.
 
     Raises:
         RuntimeError: If the package cannot be found or if there's a network error.
@@ -63,14 +65,15 @@ def generate_cran_recipe(package: str, universe: str | None = None) -> str:
         Generate a recipe for a CRAN package:
 
         >>> from rattler_build import generate_cran_recipe
-        >>> recipe_yaml = generate_cran_recipe("assertthat")  # doctest: +SKIP
-        >>> "package:" in recipe_yaml  # doctest: +SKIP
-        True
+        >>> recipe = generate_cran_recipe("assertthat")  # doctest: +SKIP
+        >>> recipe.as_single_output().package.name  # doctest: +SKIP
+        'r-assertthat'
     """
-    return generate_r_recipe_string_py(package, universe)
+    yaml = generate_r_recipe_string_py(package, universe)
+    return Stage0Recipe.from_yaml(yaml)
 
 
-def generate_cpan_recipe(package: str, version: str | None = None) -> str:
+def generate_cpan_recipe(package: str, version: str | None = None) -> Stage0Recipe:
     """Generate a conda recipe from a CPAN (Perl) package.
 
     Args:
@@ -78,7 +81,7 @@ def generate_cpan_recipe(package: str, version: str | None = None) -> str:
         version: Specific version of the package to use. If None, uses the latest version.
 
     Returns:
-        A string containing the generated recipe YAML.
+        A Stage0Recipe object representing the generated recipe.
 
     Raises:
         RuntimeError: If the package cannot be found or if there's a network error.
@@ -87,14 +90,15 @@ def generate_cpan_recipe(package: str, version: str | None = None) -> str:
         Generate a recipe for a CPAN package:
 
         >>> from rattler_build import generate_cpan_recipe
-        >>> recipe_yaml = generate_cpan_recipe("Try-Tiny")  # doctest: +SKIP
-        >>> "package:" in recipe_yaml  # doctest: +SKIP
-        True
+        >>> recipe = generate_cpan_recipe("Try-Tiny")  # doctest: +SKIP
+        >>> recipe.as_single_output().package.name  # doctest: +SKIP
+        'perl-try-tiny'
     """
-    return generate_cpan_recipe_string_py(package, version)
+    yaml = generate_cpan_recipe_string_py(package, version)
+    return Stage0Recipe.from_yaml(yaml)
 
 
-def generate_luarocks_recipe(rock: str) -> str:
+def generate_luarocks_recipe(rock: str) -> Stage0Recipe:
     """Generate a conda recipe from a LuaRocks package.
 
     Args:
@@ -105,7 +109,7 @@ def generate_luarocks_recipe(rock: str) -> str:
             - Direct rockspec URL
 
     Returns:
-        A string containing the generated recipe YAML.
+        A Stage0Recipe object representing the generated recipe.
 
     Raises:
         RuntimeError: If the package cannot be found or if there's a network error.
@@ -114,8 +118,9 @@ def generate_luarocks_recipe(rock: str) -> str:
         Generate a recipe for a LuaRocks package:
 
         >>> from rattler_build import generate_luarocks_recipe
-        >>> recipe_yaml = generate_luarocks_recipe("luafilesystem")  # doctest: +SKIP
-        >>> "package:" in recipe_yaml  # doctest: +SKIP
-        True
+        >>> recipe = generate_luarocks_recipe("luafilesystem")  # doctest: +SKIP
+        >>> recipe.as_single_output().package.name  # doctest: +SKIP
+        'lua-luafilesystem'
     """
-    return generate_luarocks_recipe_string_py(rock)
+    yaml = generate_luarocks_recipe_string_py(rock)
+    return Stage0Recipe.from_yaml(yaml)
