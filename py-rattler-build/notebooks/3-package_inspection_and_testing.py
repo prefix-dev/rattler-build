@@ -47,6 +47,7 @@ def _():
     from rattler_build.render import RenderConfig
     from rattler_build.stage0 import Recipe
     from rattler_build.variant_config import VariantConfig
+
     return (
         Package,
         Path,
