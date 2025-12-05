@@ -5,21 +5,21 @@ from PyPI, CRAN, CPAN, and LuaRocks packages.
 """
 
 from rattler_build._rattler_build import (
-    generate_pypi_recipe_string_py,
-    generate_r_recipe_string_py,
     generate_cpan_recipe_string_py,
     generate_luarocks_recipe_string_py,
+    generate_pypi_recipe_string_py,
+    generate_r_recipe_string_py,
 )
 
 __all__ = [
-    "pypi",
-    "cran",
-    "cpan",
-    "luarocks",
+    "generate_pypi_recipe",
+    "generate_cran_recipe",
+    "generate_cpan_recipe",
+    "generate_luarocks_recipe",
 ]
 
 
-def pypi(package: str, version: str | None = None, use_mapping: bool = True) -> str:
+def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: bool = True) -> str:
     """Generate a conda recipe from a PyPI package.
 
     Args:
@@ -35,21 +35,17 @@ def pypi(package: str, version: str | None = None, use_mapping: bool = True) -> 
         RuntimeError: If the package cannot be found or if there's a network error.
 
     Example:
-        Generate a recipe for the latest version of numpy:
+        Generate a recipe for the latest version of flit-core:
 
-        >>> import rattler_build.recipe_generation as rg
-        >>> recipe_yaml = rg.pypi("flit-core")  # doctest: +SKIP
+        >>> from rattler_build import generate_pypi_recipe
+        >>> recipe_yaml = generate_pypi_recipe("flit-core")  # doctest: +SKIP
         >>> "package:" in recipe_yaml  # doctest: +SKIP
         True
-
-        Generate a recipe for a specific version:
-
-        >>> recipe_yaml = rg.pypi("flit-core", version=None)  # doctest: +SKIP
     """
     return generate_pypi_recipe_string_py(package, version, use_mapping)
 
 
-def cran(package: str, universe: str | None = None) -> str:
+def generate_cran_recipe(package: str, universe: str | None = None) -> str:
     """Generate a conda recipe from a CRAN (R) package.
 
     Args:
@@ -66,19 +62,15 @@ def cran(package: str, universe: str | None = None) -> str:
     Example:
         Generate a recipe for a CRAN package:
 
-        >>> import rattler_build.recipe_generation as rg
-        >>> recipe_yaml = rg.cran("assertthat")  # doctest: +SKIP
+        >>> from rattler_build import generate_cran_recipe
+        >>> recipe_yaml = generate_cran_recipe("assertthat")  # doctest: +SKIP
         >>> "package:" in recipe_yaml  # doctest: +SKIP
         True
-
-        Use a specific R universe:
-
-        >>> recipe_yaml = rg.cran("assertthat", universe=None)  # doctest: +SKIP
     """
     return generate_r_recipe_string_py(package, universe)
 
 
-def cpan(package: str, version: str | None = None) -> str:
+def generate_cpan_recipe(package: str, version: str | None = None) -> str:
     """Generate a conda recipe from a CPAN (Perl) package.
 
     Args:
@@ -94,19 +86,15 @@ def cpan(package: str, version: str | None = None) -> str:
     Example:
         Generate a recipe for a CPAN package:
 
-        >>> import rattler_build.recipe_generation as rg
-        >>> recipe_yaml = rg.cpan("Try-Tiny")  # doctest: +SKIP
+        >>> from rattler_build import generate_cpan_recipe
+        >>> recipe_yaml = generate_cpan_recipe("Try-Tiny")  # doctest: +SKIP
         >>> "package:" in recipe_yaml  # doctest: +SKIP
         True
-
-        Generate a recipe for a specific version:
-
-        >>> recipe_yaml = rg.cpan("Try-Tiny", version=None)  # doctest: +SKIP
     """
     return generate_cpan_recipe_string_py(package, version)
 
 
-def luarocks(rock: str) -> str:
+def generate_luarocks_recipe(rock: str) -> str:
     """Generate a conda recipe from a LuaRocks package.
 
     Args:
@@ -125,17 +113,9 @@ def luarocks(rock: str) -> str:
     Example:
         Generate a recipe for a LuaRocks package:
 
-        >>> import rattler_build.recipe_generation as rg
-        >>> recipe_yaml = rg.luarocks("luafilesystem")  # doctest: +SKIP
+        >>> from rattler_build import generate_luarocks_recipe
+        >>> recipe_yaml = generate_luarocks_recipe("luafilesystem")  # doctest: +SKIP
         >>> "package:" in recipe_yaml  # doctest: +SKIP
         True
-
-        Use a specific version:
-
-        >>> recipe_yaml = rg.luarocks("luasocket/3.1.0-1")  # doctest: +SKIP
-
-        Use author/module/version format:
-
-        >>> recipe_yaml = rg.luarocks("luarocks/luasocket/3.1.0-1")  # doctest: +SKIP
     """
     return generate_luarocks_recipe_string_py(rock)
