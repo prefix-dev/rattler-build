@@ -64,7 +64,7 @@ types-networkx = "*"
 
 [feature.test.tasks]
 check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
-test = { cmd = "pytest ./tests --doctest-modules", depends-on = ["type-check"] }
+test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
 type-check = { cmd = "mypy" }
 
 
