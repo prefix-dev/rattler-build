@@ -21,7 +21,7 @@ impl PyStage0Recipe {
     #[staticmethod]
     fn from_yaml(yaml: &str) -> PyResult<Self> {
         let recipe = stage0::parse_recipe_or_multi_from_source(yaml)
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{:?}", e)))?;
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
         Ok(PyStage0Recipe { inner: recipe })
     }
 
@@ -41,7 +41,7 @@ impl PyStage0Recipe {
 
         // Parse as YAML (YAML is a superset of JSON, so this works)
         let recipe = stage0::parse_recipe_or_multi_from_source(&json_string)
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{:?}", e)))?;
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
 
         Ok(PyStage0Recipe { inner: recipe })
     }

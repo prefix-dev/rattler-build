@@ -21,12 +21,8 @@ def test_from_dict_missing_required_field() -> None:
         }
     }
 
-    with pytest.raises(RecipeParseError) as exc_info:
+    with pytest.raises(RecipeParseError, match="missing required field 'name'"):
         Stage0Recipe.from_dict(recipe_dict)
-
-    # Error should mention the missing field
-    error_msg = str(exc_info.value)
-    assert "name" in error_msg.lower() or "package" in error_msg.lower()
 
 
 def test_from_dict_wrong_type_for_version() -> None:

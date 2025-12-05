@@ -28,7 +28,7 @@ class Stage0Recipe(ABC):
     """
     A parsed conda recipe (stage0).
 
-    This is an abstract base class. Use from_yaml(), from_file(), or from_dict()
+        This is an abstract base class. Use from_yaml(), from_file(), or from_dict()
     to create concrete instances (SingleOutputRecipe or MultiOutputRecipe).
 
     Example:
