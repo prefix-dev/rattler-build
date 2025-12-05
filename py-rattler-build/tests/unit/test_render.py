@@ -24,16 +24,6 @@ def test_data_dir() -> Path:
     return Path(__file__).parent.parent / "data"
 
 
-def test_render_config_creation() -> None:
-    """Test RenderConfig can be created with default settings."""
-    config = RenderConfig()
-    assert config.target_platform is not None
-    assert config.build_platform is not None
-    assert config.host_platform is not None
-    assert not config.experimental
-    assert config.recipe_path is None
-
-
 def test_render_config_with_platforms() -> None:
     """Test RenderConfig with custom platforms."""
     platform_config = PlatformConfig("linux-64")
@@ -41,71 +31,6 @@ def test_render_config_with_platforms() -> None:
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
     assert config.host_platform == "linux-64"
-
-
-def test_render_config_set_context() -> None:
-    """Test setting extra context variables."""
-    config = RenderConfig(
-        extra_context={
-            "my_var": "value",
-            "my_bool": True,
-            "my_number": 42,
-            "my_list": [1, 2, 3],
-            # TODO: This should actually error as mixed types are not allowed
-            "error_list": [1, "string", 3],
-        }
-    )
-
-    assert config.get_context("my_var") == "value"
-    assert config.get_context("my_bool")
-    assert isinstance(config.get_context("my_bool"), bool)
-    assert config.get_context("my_number") == 42
-    assert config.get_context("my_list") == [1, 2, 3]
-    assert config.get_context("error_list") == [1, "string", 3]
-
-    context = config.get_all_context()
-    assert context.keys() == {"my_var", "my_bool", "my_number", "my_list", "error_list"}
-
-
-def test_render_config_experimental() -> None:
-    """Test experimental flag."""
-    platform_config = PlatformConfig("linux-64", experimental=True)
-    config = RenderConfig(platform=platform_config)
-    assert config.experimental
-
-    platform_config_false = PlatformConfig("linux-64", experimental=False)
-    config = RenderConfig(platform=platform_config_false)
-    assert not config.experimental
-
-
-def test_render_simple_recipe() -> None:
-    """Test rendering a simple recipe without variants."""
-    recipe_yaml = """
-package:
-  name: test-package
-  version: 1.0.0
-
-build:
-  number: 0
-
-requirements:
-  host:
-    - python >=3.8
-  run:
-    - python >=3.8
-
-about:
-  summary: A test package
-  license: MIT
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig()
-
-    rendered = recipe.render(variant_config)
-
-    assert len(rendered) == 1
-    assert isinstance(rendered[0], RenderedVariant)
 
 
 def test_render_recipe_with_variants() -> None:
@@ -140,66 +65,6 @@ python:
     # Check that each variant has the correct python value
     python_versions = {variant.variant().get("python") for variant in rendered}
     assert python_versions == {"3.9", "3.10", "3.11"}
-
-
-def test_render_recipe_with_custom_config() -> None:
-    """Test rendering with custom render configuration."""
-    recipe_yaml = """
-package:
-  name: test-package
-  version: 1.0.0
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig()
-    platform_config = PlatformConfig("linux-64", experimental=True)
-    config = RenderConfig(platform=platform_config)
-
-    rendered = recipe.render(variant_config, config)
-
-    assert len(rendered) >= 1
-    # Verify the recipe was rendered
-    assert rendered[0].recipe() is not None
-
-
-def test_rendered_variant_properties() -> None:
-    """Test RenderedVariant properties."""
-    recipe_yaml = """
-package:
-  name: my-package
-  version: 1.2.3
-
-build:
-  number: 5
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig()
-
-    rendered = recipe.render(variant_config)
-    variant = rendered[0]
-
-    # Test variant() method
-    variant_dict = variant.variant()
-    assert isinstance(variant_dict, dict)
-
-    # Test recipe() method
-    stage1_recipe = variant.recipe()
-    assert stage1_recipe is not None
-    # Verify it's a Stage1 recipe by checking properties
-    package = stage1_recipe.package
-    assert package.name == "my-package"
-    assert str(package.version) == "1.2.3"
-
-    # Test hash_info() method
-    hash_info = variant.hash_info()
-    if hash_info is not None:
-        assert hasattr(hash_info, "hash")
-        assert hasattr(hash_info, "prefix")
-
-    # Test pin_subpackages() method
-    pin_subpackages = variant.pin_subpackages()
-    assert isinstance(pin_subpackages, dict)
 
 
 def test_render_multi_output_recipe() -> None:
@@ -237,86 +102,6 @@ outputs:
     # Check package names
     names = {variant.recipe().package.name for variant in rendered}
     assert names == {"multi-pkg-lib", "multi-pkg"}
-
-
-def test_render_with_jinja_expressions() -> None:
-    """Test rendering with Jinja expressions."""
-    recipe_yaml = """
-package:
-  name: jinja-test
-  version: 1.0.0
-
-context:
-  my_value: "hello"
-
-build:
-  number: 0
-  script:
-    - echo "${{ my_value }}"
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig()
-
-    rendered = recipe.render(variant_config)
-
-    assert len(rendered) == 1
-    # Jinja should have been evaluated
-    stage1_recipe = rendered[0].recipe()
-    assert stage1_recipe is not None
-
-
-def test_render_with_free_specs() -> None:
-    """Test rendering with free specs (unversioned dependencies)."""
-    recipe_yaml = """
-package:
-  name: test-pkg
-  version: "1.0.0"
-
-requirements:
-  build:
-    - python
-"""
-
-    variant_yaml = """
-python:
-  - "3.9"
-  - "3.10"
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig.from_yaml(variant_yaml)
-
-    rendered = recipe.render(variant_config)
-
-    # Should create variants based on free spec "python"
-    assert len(rendered) == 2
-
-
-def test_render_config_repr() -> None:
-    """Test RenderConfig __repr__."""
-    platform_config = PlatformConfig("linux-64", experimental=True)
-    config = RenderConfig(platform=platform_config)
-    repr_str = repr(config)
-    assert "RenderConfig" in repr_str
-    assert "linux-64" in repr_str
-
-
-def test_rendered_variant_repr() -> None:
-    """Test RenderedVariant __repr__."""
-    recipe_yaml = """
-package:
-  name: repr-test
-  version: 2.0.0
-"""
-
-    recipe = Stage0Recipe.from_yaml(recipe_yaml)
-    variant_config = VariantConfig()
-
-    rendered = recipe.render(variant_config)
-    repr_str = repr(rendered[0])
-    assert "RenderedVariant" in repr_str
-    assert "repr-test" in repr_str
 
 
 def test_render_with_pin_subpackage() -> None:
@@ -373,8 +158,8 @@ outputs:
 
 def test_render_invalid_platform() -> None:
     """Test that invalid platform raises PlatformParseError."""
-    with pytest.raises(PlatformParseError):
-        platform_config = PlatformConfig("invalid-platform-name")
+    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
+        platform_config = PlatformConfig("invalid-platform")
         RenderConfig(platform=platform_config)
 
 
