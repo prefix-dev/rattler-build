@@ -43,16 +43,13 @@ def _():
 
     import marimo as mo
 
-    from rattler_build import Package
-    from rattler_build.render import RenderConfig
-    from rattler_build.stage0 import Stage0Recipe
-    from rattler_build.variant_config import VariantConfig
+    from rattler_build import Package, RenderConfig, Stage0Recipe, VariantConfig
 
     return (
         Package,
         Path,
-        Stage0Recipe,
         RenderConfig,
+        Stage0Recipe,
         VariantConfig,
         json,
         mo,

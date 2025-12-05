@@ -1,9 +1,13 @@
 from urllib.request import urlopen
 
 import pytest
-import rattler_build._rattler_build as _rb
 
-import rattler_build.recipe_generation as rg
+from rattler_build import (
+    generate_cpan_recipe,
+    generate_cran_recipe,
+    generate_luarocks_recipe,
+    generate_pypi_recipe,
+)
 
 
 def _network_available(url: str = "https://example.com") -> bool:
@@ -15,8 +19,8 @@ def _network_available(url: str = "https://example.com") -> bool:
 
 
 @pytest.mark.skipif(not _network_available("https://pypi.org/pypi/pip/json"), reason="Network not available for PyPI")
-def test_generate_pypi_recipe_string_smoke() -> None:
-    s = _rb.generate_pypi_recipe_string_py("flit-core")
+def test_generate_pypi_recipe_smoke() -> None:
+    s = generate_pypi_recipe("flit-core")
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s
@@ -25,41 +29,33 @@ def test_generate_pypi_recipe_string_smoke() -> None:
 @pytest.mark.skipif(
     not _network_available("https://r-universe.dev"), reason="Network not available for CRAN/R-universe"
 )
-def test_generate_cran_recipe_string_smoke() -> None:
-    s = _rb.generate_r_recipe_string_py("assertthat")
+def test_generate_cran_recipe_smoke() -> None:
+    s = generate_cran_recipe("assertthat")
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s
 
 
 @pytest.mark.skipif(not _network_available("https://fastapi.metacpan.org"), reason="Network not available for MetaCPAN")
-def test_generate_cpan_recipe_string_smoke() -> None:
-    s = _rb.generate_cpan_recipe_string_py("Try-Tiny")
+def test_generate_cpan_recipe_smoke() -> None:
+    s = generate_cpan_recipe("Try-Tiny")
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s
 
 
 @pytest.mark.skipif(not _network_available("https://luarocks.org"), reason="Network not available for LuaRocks")
-def test_generate_luarocks_recipe_string_smoke() -> None:
-    s = _rb.generate_luarocks_recipe_string_py("luafilesystem")
+def test_generate_luarocks_recipe_smoke() -> None:
+    s = generate_luarocks_recipe("luafilesystem")
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s
 
 
 @pytest.mark.skipif(not _network_available("https://pypi.org/pypi/pip/json"), reason="Network not available for PyPI")
-def test_pypi_wrapper_smoke() -> None:
-    s = rg.pypi("flit-core")
-    assert "package:" in s
-    assert "about:" in s
-    assert "source:" in s
-
-
-@pytest.mark.skipif(not _network_available("https://pypi.org/pypi/pip/json"), reason="Network not available for PyPI")
-def test_pypi_wrapper_with_use_mapping_false() -> None:
+def test_generate_pypi_recipe_with_use_mapping_false() -> None:
     """Test PyPI recipe generation with use_mapping=False."""
-    s = rg.pypi("flit-core", use_mapping=False)
+    s = generate_pypi_recipe("flit-core", use_mapping=False)
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s
@@ -68,35 +64,9 @@ def test_pypi_wrapper_with_use_mapping_false() -> None:
 @pytest.mark.skipif(
     not _network_available("https://r-universe.dev"), reason="Network not available for CRAN/R-universe"
 )
-def test_cran_wrapper_smoke() -> None:
-    s = rg.cran("assertthat")
-    assert "package:" in s
-    assert "about:" in s
-    assert "source:" in s
-
-
-@pytest.mark.skipif(
-    not _network_available("https://r-universe.dev"), reason="Network not available for CRAN/R-universe"
-)
-def test_cran_wrapper_with_explicit_universe() -> None:
+def test_generate_cran_recipe_with_explicit_universe() -> None:
     """Test CRAN recipe generation with explicit universe parameter."""
-    s = rg.cran("assertthat", universe="cran")
-    assert "package:" in s
-    assert "about:" in s
-    assert "source:" in s
-
-
-@pytest.mark.skipif(not _network_available("https://fastapi.metacpan.org"), reason="Network not available for MetaCPAN")
-def test_cpan_wrapper_smoke() -> None:
-    s = rg.cpan("Try-Tiny")
-    assert "package:" in s
-    assert "about:" in s
-    assert "source:" in s
-
-
-@pytest.mark.skipif(not _network_available("https://luarocks.org"), reason="Network not available for LuaRocks")
-def test_luarocks_wrapper_smoke() -> None:
-    s = rg.luarocks("luafilesystem")
+    s = generate_cran_recipe("assertthat", universe="cran")
     assert "package:" in s
     assert "about:" in s
     assert "source:" in s

@@ -6,10 +6,14 @@ This replaces the old test_recipe_oop.py with the new pipeline architecture.
 
 from pathlib import Path
 
-from rattler_build.render import RenderConfig
-from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
-from rattler_build.tool_config import PlatformConfig
-from rattler_build.variant_config import VariantConfig
+from rattler_build import (
+    MultiOutputRecipe,
+    PlatformConfig,
+    RenderConfig,
+    SingleOutputRecipe,
+    Stage0Recipe,
+    VariantConfig,
+)
 
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "recipes" / "comprehensive-test"
 TEST_RECIPE_FILE = TEST_DATA_DIR / "recipe.yaml"

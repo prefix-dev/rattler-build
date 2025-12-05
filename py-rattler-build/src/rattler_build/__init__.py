@@ -1,12 +1,3 @@
-from rattler_build import (
-    package,
-    progress,
-    recipe_generation,
-    render,
-    stage0,
-    stage1,
-    tool_config,
-)
 from rattler_build._rattler_build import (
     AuthError,
     ChannelError,
@@ -48,10 +39,16 @@ from rattler_build.package import (
     RubyTest,
     TestResult,
 )
-from rattler_build.render import RenderConfig
-from rattler_build.stage0 import Stage0Recipe
+from rattler_build.recipe_generation import (
+    generate_cpan_recipe,
+    generate_cran_recipe,
+    generate_luarocks_recipe,
+    generate_pypi_recipe,
+)
+from rattler_build.render import RenderConfig, RenderedVariant
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
 from rattler_build.stage1 import Stage1Recipe
-from rattler_build.tool_config import ToolConfiguration
+from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 from rattler_build.variant_config import VariantConfig
 
 __all__ = [
@@ -64,24 +61,25 @@ __all__ = [
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
     "upload_packages_to_conda_forge",
-    "recipe_generation",
+    # Recipe generation
+    "generate_pypi_recipe",
+    "generate_cran_recipe",
+    "generate_cpan_recipe",
+    "generate_luarocks_recipe",
     # Configuration
     "BuildResult",
     "JinjaConfig",
     "VariantConfig",
     "ToolConfiguration",
+    "PlatformConfig",
     "RenderConfig",
+    "RenderedVariant",
     # Recipe types
     "Stage0Recipe",
+    "SingleOutputRecipe",
+    "MultiOutputRecipe",
     "Stage1Recipe",
-    # Recipe modules
-    "stage0",
-    "stage1",
-    "render",
-    "tool_config",
-    "progress",
     # Package inspection and testing
-    "package",
     "Package",
     "PackageTest",
     "PythonTest",

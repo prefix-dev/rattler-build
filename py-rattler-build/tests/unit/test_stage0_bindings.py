@@ -2,7 +2,8 @@
 
 import pytest
 from inline_snapshot import snapshot
-from rattler_build.stage0 import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe
+
+from rattler_build import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
 
 
 # Sample YAML recipes for testing

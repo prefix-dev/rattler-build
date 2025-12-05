@@ -2,9 +2,7 @@
 
 import pytest
 
-from rattler_build._rattler_build import PlatformParseError
-from rattler_build.jinja_config import JinjaConfig
-from rattler_build.tool_config import PlatformConfig
+from rattler_build import JinjaConfig, PlatformConfig, PlatformParseError
 
 
 def test_jinja_config_creation() -> None:

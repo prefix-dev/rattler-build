@@ -7,11 +7,14 @@ from pathlib import Path
 import pytest
 from inline_snapshot import snapshot
 
-from rattler_build._rattler_build import PlatformParseError
-from rattler_build.render import RenderConfig, RenderedVariant
-from rattler_build.stage0 import Stage0Recipe
-from rattler_build.tool_config import PlatformConfig
-from rattler_build.variant_config import VariantConfig
+from rattler_build import (
+    PlatformConfig,
+    PlatformParseError,
+    RenderConfig,
+    RenderedVariant,
+    Stage0Recipe,
+    VariantConfig,
+)
 
 
 @pytest.fixture

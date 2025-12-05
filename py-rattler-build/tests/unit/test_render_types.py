@@ -1,8 +1,6 @@
 """Tests for render module typed structures (HashInfo and PinSubpackageInfo)."""
 
-from rattler_build.render import RenderConfig
-from rattler_build.stage0 import Stage0Recipe
-from rattler_build.variant_config import VariantConfig
+from rattler_build import RenderConfig, Stage0Recipe, VariantConfig
 
 
 def test_hash_info_type() -> None:
