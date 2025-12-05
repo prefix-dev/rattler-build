@@ -26,6 +26,7 @@ members = [
   "crates/rattler_build_diffy",
   "crates/rattler_build_yaml_parser",
   "crates/rattler_build_allocator",
+  "crates/rattler_build_package",
 ]
 
 [workspace.package]
@@ -68,6 +69,7 @@ rattler_digest = { version = "1.2.0", default-features = false, features = [
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe" }
 rattler_shell = { version = "0.25.13", default-features = false, features = [
   "sysinfo",
 ] }
