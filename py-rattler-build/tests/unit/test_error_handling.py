@@ -7,8 +7,10 @@ These tests ensure that we get clear, helpful error messages when things go wron
 from pathlib import Path
 
 import pytest
-from rattler_build._rattler_build import RattlerBuildError, RecipeParseError
-from rattler_build.stage0 import Recipe as Stage0Recipe, SingleOutputRecipe
+
+from rattler_build import RattlerBuildError, RecipeParseError
+from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.stage0 import SingleOutputRecipe
 
 
 def test_from_dict_missing_required_field() -> None:
