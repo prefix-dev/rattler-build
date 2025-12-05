@@ -248,6 +248,7 @@ fn test_from_recipe_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
         Vec::new(),
         Vec::new(),
         Default::default(),
+        Default::default(),
     );
 
     let config = PackageConfig {

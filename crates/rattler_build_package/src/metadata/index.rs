@@ -162,7 +162,7 @@ impl IndexJsonBuilder {
             subdir: self.subdir,
             license: self.license,
             license_family: self.license_family,
-            timestamp: self.timestamp,
+            timestamp: self.timestamp.map(Into::into),
             depends: self.depends,
             constrains: self.constrains,
             noarch: self.noarch,
