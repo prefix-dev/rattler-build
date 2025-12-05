@@ -1,7 +1,7 @@
 """Tests for render module typed structures (HashInfo and PinSubpackageInfo)."""
 
 from rattler_build.render import RenderConfig
-from rattler_build.stage0 import Recipe
+from rattler_build.stage0 import Stage0Recipe
 from rattler_build.variant_config import VariantConfig
 
 
@@ -16,7 +16,7 @@ package:
 """
 
     # Parse recipe
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
 
     # Create empty variant config
     variant_config = VariantConfig()
@@ -63,7 +63,7 @@ outputs:
 """
 
     # Parse recipe
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
 
     # Create empty variant config
     variant_config = VariantConfig()
@@ -117,7 +117,7 @@ package:
   version: "1.0.0"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
@@ -151,7 +151,7 @@ outputs:
         - ${{ pin_subpackage('lib', upper_bound='x.x') }}
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
@@ -180,7 +180,7 @@ package:
   version: "1.0.0"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     render_config = RenderConfig()
@@ -202,7 +202,7 @@ package:
   version: "1.0.0"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     render_config = RenderConfig()

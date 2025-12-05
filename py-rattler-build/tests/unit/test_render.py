@@ -9,7 +9,7 @@ from inline_snapshot import snapshot
 
 from rattler_build._rattler_build import PlatformParseError
 from rattler_build.render import RenderConfig, RenderedVariant
-from rattler_build.stage0 import Recipe
+from rattler_build.stage0 import Stage0Recipe
 from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
@@ -96,7 +96,7 @@ about:
   license: MIT
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -126,7 +126,7 @@ python:
   - "3.11"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
     rendered = recipe.render(variant_config)
@@ -147,7 +147,7 @@ package:
   version: 1.0.0
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
     platform_config = PlatformConfig("linux-64", experimental=True)
     config = RenderConfig(platform=platform_config)
@@ -170,7 +170,7 @@ build:
   number: 5
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -223,7 +223,7 @@ outputs:
       noarch: generic
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -252,7 +252,7 @@ build:
     - echo "${{ my_value }}"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -281,7 +281,7 @@ python:
   - "3.10"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
     rendered = recipe.render(variant_config)
@@ -307,7 +307,7 @@ package:
   version: 2.0.0
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -346,7 +346,7 @@ outputs:
         - ${{ pin_subpackage(name, exact=true) }}
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
 
     rendered = recipe.render(variant_config)
@@ -385,7 +385,7 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     """Test rendering a recipe with staging."""
     recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
     recipe_yaml = recipe_path.read_text()
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
     render_config = RenderConfig(platform=PlatformConfig(experimental=True))
     rendered = recipe.render(variant_config, render_config)
@@ -417,7 +417,7 @@ python:
   - "3.10"
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
     rendered = recipe.render(variant_config)
@@ -429,7 +429,7 @@ python:
 def test_render_recipe_from_path(test_data_dir: Path) -> None:
     """Test rendering with recipe as Path object."""
     recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
-    recipe = Recipe.from_file(recipe_path)
+    recipe = Stage0Recipe.from_file(recipe_path)
     variant_config = VariantConfig()
     render_config = RenderConfig(platform=PlatformConfig(experimental=True))
 
@@ -456,7 +456,7 @@ python:
   - "3.9"
   - "3.10"
 """
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig.from_yaml(variant_yaml)
 
     rendered = recipe.render(variant_config)
@@ -480,7 +480,7 @@ build:
   noarch: generic
 """
 
-    recipe = Recipe.from_yaml(recipe_yaml)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
     rendered = recipe.render(variant_config)
 

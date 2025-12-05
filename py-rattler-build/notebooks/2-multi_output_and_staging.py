@@ -44,14 +44,14 @@ def _():
     import marimo as mo
 
     from rattler_build.render import RenderConfig, PlatformConfig
-    from rattler_build.stage0 import MultiOutputRecipe, Recipe
+    from rattler_build.stage0 import MultiOutputRecipe, Stage0Recipe
     from rattler_build.variant_config import VariantConfig
 
     return (
         MultiOutputRecipe,
         Path,
         PlatformConfig,
-        Recipe,
+        Stage0Recipe,
         RenderConfig,
         VariantConfig,
         json,
@@ -76,7 +76,7 @@ def _(mo):
 
 
 @app.cell
-def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
+def _(MultiOutputRecipe, Stage0Recipe, RenderConfig, VariantConfig):
     # Multi-output recipe with inter-output dependency
     multi_output_yaml = """
     schema_version: 1
@@ -132,7 +132,7 @@ def _(MultiOutputRecipe, Recipe, RenderConfig, VariantConfig):
             - ${{ name }}-lib
     """
 
-    multi_recipe = Recipe.from_yaml(multi_output_yaml)
+    multi_recipe = Stage0Recipe.from_yaml(multi_output_yaml)
 
     print("📦 Multi-Output Recipe Loaded")
     print("=" * 60)
@@ -234,7 +234,7 @@ def _(mo):
 
 
 @app.cell
-def _(PlatformConfig, Recipe, RenderConfig, VariantConfig, json):
+def _(PlatformConfig, Stage0Recipe, RenderConfig, VariantConfig, json):
     # Recipe with staging output
     staging_yaml = """
     schema_version: 1
@@ -291,7 +291,7 @@ def _(PlatformConfig, Recipe, RenderConfig, VariantConfig, json):
             - bin/**
     """
 
-    staging_recipe = Recipe.from_yaml(staging_yaml)
+    staging_recipe = Stage0Recipe.from_yaml(staging_yaml)
 
     print("🏗️  Recipe with Staging Output")
     print("=" * 60)

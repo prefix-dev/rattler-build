@@ -9,8 +9,7 @@ from pathlib import Path
 import pytest
 
 from rattler_build import RattlerBuildError, RecipeParseError
-from rattler_build.stage0 import Recipe as Stage0Recipe
-from rattler_build.stage0 import SingleOutputRecipe
+from rattler_build.stage0 import Stage0Recipe, SingleOutputRecipe
 
 
 def test_from_dict_missing_required_field() -> None:

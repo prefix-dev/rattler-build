@@ -49,6 +49,8 @@ from rattler_build.package import (
     TestResult,
 )
 from rattler_build.render import RenderConfig
+from rattler_build.stage0 import Stage0Recipe
+from rattler_build.stage1 import Stage1Recipe
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
 
@@ -69,6 +71,9 @@ __all__ = [
     "VariantConfig",
     "ToolConfiguration",
     "RenderConfig",
+    # Recipe types
+    "Stage0Recipe",
+    "Stage1Recipe",
     # Recipe modules
     "stage0",
     "stage1",

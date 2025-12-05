@@ -19,7 +19,7 @@ from rattler_build.progress import RichProgressCallback
 from rattler_build.render import RenderConfig
 
 # Import rattler_build components
-from rattler_build.stage0 import Recipe
+from rattler_build.stage0 import Stage0Recipe
 from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
@@ -33,7 +33,7 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     print(f"🔍 Loading recipe from {recipe_path}")
 
     # Load the recipe
-    recipe = Recipe.from_file(recipe_path)
+    recipe = Stage0Recipe.from_file(recipe_path)
 
     # Configure variant rendering
     variant_config = VariantConfig()

@@ -11,7 +11,7 @@ from typing import Any
 from rattler_build._rattler_build import stage1 as _stage1
 
 __all__ = [
-    "Recipe",
+    "Stage1Recipe",
     "Package",
     "Build",
     "Requirements",
@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 
-class Recipe:
+class Stage1Recipe:
     """
     A fully evaluated conda recipe (stage1), ready for building.
 
@@ -29,8 +29,10 @@ class Recipe:
     and all conditionals resolved.
 
     Example:
-        >>> # After parsing and evaluating a stage0 recipe
-        >>> stage1_recipe = evaluate(stage0_recipe, context)
+        >>> # After parsing and rendering a Stage0Recipe
+        >>> stage0_recipe = Stage0Recipe.from_yaml(yaml_string)
+        >>> rendered = stage0_recipe.render(variant_config)
+        >>> stage1_recipe = rendered[0].recipe()
         >>> print(stage1_recipe.package.name)
         >>> print(stage1_recipe.package.version)
     """

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from rattler_build.progress import ProgressCallback
 
 __all__ = [
-    "Recipe",
+    "Stage0Recipe",
     "SingleOutputRecipe",
     "MultiOutputRecipe",
     "Package",
@@ -37,7 +37,7 @@ __all__ = [
 ]
 
 
-class Recipe(ABC):
+class Stage0Recipe(ABC):
     """
     A parsed conda recipe (stage0).
 
@@ -45,7 +45,7 @@ class Recipe(ABC):
     to create concrete instances (SingleOutputRecipe or MultiOutputRecipe).
 
     Example:
-        >>> recipe = Recipe.from_yaml(yaml_string)
+        >>> recipe = Stage0Recipe.from_yaml(yaml_string)
         >>> if isinstance(recipe, SingleOutputRecipe):
         ...     print(recipe.package.name)
     """
@@ -55,7 +55,7 @@ class Recipe(ABC):
     _wrapper: _stage0.Stage0Recipe
 
     @classmethod
-    def from_yaml(cls, yaml: str) -> Recipe:
+    def from_yaml(cls, yaml: str) -> Stage0Recipe:
         """
         Parse a recipe from YAML string.
 
@@ -70,7 +70,7 @@ class Recipe(ABC):
             return MultiOutputRecipe(multi_inner, wrapper)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Recipe:
+    def from_file(cls, path: str | Path) -> Stage0Recipe:
         """
         Parse a recipe from a YAML file.
 
@@ -80,7 +80,7 @@ class Recipe(ABC):
             return cls.from_yaml(f.read())
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any]) -> Recipe:
+    def from_dict(cls, recipe_dict: dict[str, Any]) -> Stage0Recipe:
         """
         Create a recipe from a Python dictionary.
 
@@ -106,7 +106,7 @@ class Recipe(ABC):
             ...         "number": 0
             ...     }
             ... }
-            >>> recipe = Recipe.from_dict(recipe_dict)
+            >>> recipe = Stage0Recipe.from_dict(recipe_dict)
         """
         wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
         if wrapper.is_single_output():
@@ -186,7 +186,7 @@ class Recipe(ABC):
             List of RenderedVariant objects (one for each variant combination)
 
         Example:
-            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
             >>> variants = recipe.render(variant_config)
             >>> for variant in variants:
             ...     print(variant.recipe().package.name)
@@ -243,7 +243,7 @@ class Recipe(ABC):
             list[BuildResult]: List of build results, one per variant built.
 
         Example:
-            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
             >>> results = recipe.run_build(output_dir="./output")
             >>> for result in results:
             ...     print(f"Built {result.name} {result.version}")
@@ -278,7 +278,7 @@ class Recipe(ABC):
         return results
 
 
-class SingleOutputRecipe(Recipe):
+class SingleOutputRecipe(Stage0Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
     def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe):
@@ -364,7 +364,7 @@ class StagingOutput:
         return self._inner.to_dict()
 
 
-class MultiOutputRecipe(Recipe):
+class MultiOutputRecipe(Stage0Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
     def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe):

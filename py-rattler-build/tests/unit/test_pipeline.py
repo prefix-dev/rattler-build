@@ -7,8 +7,7 @@ Tests the complete flow: Stage0 Recipe -> Render -> Stage1 Recipe
 import pytest
 
 from rattler_build.render import RenderConfig
-from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe
-from rattler_build.stage0 import Recipe as Stage0Recipe
+from rattler_build.stage0 import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
 from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 

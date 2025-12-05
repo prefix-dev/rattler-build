@@ -44,7 +44,7 @@ def _():
     from rattler_build.render import RenderConfig
     from rattler_build.stage0 import (
         MultiOutputRecipe,
-        Recipe,
+        Stage0Recipe,
         SingleOutputRecipe,
     )
     from rattler_build.tool_config import PlatformConfig
@@ -54,7 +54,7 @@ def _():
         MultiOutputRecipe,
         Path,
         PlatformConfig,
-        Recipe,
+        Stage0Recipe,
         RenderConfig,
         SingleOutputRecipe,
         VariantConfig,
@@ -77,7 +77,7 @@ def _(mo):
 
 
 @app.cell
-def _(MultiOutputRecipe, Recipe, SingleOutputRecipe, json):
+def _(MultiOutputRecipe, Stage0Recipe, SingleOutputRecipe, json):
     # Define a simple recipe in YAML format with Jinja templates
     simple_recipe_yaml = """
     package:
@@ -103,8 +103,8 @@ def _(MultiOutputRecipe, Recipe, SingleOutputRecipe, json):
       summary: A simple example package
     """
 
-    # Parse the YAML into a Recipe object (Stage0)
-    simple_recipe = Recipe.from_yaml(simple_recipe_yaml)
+    # Parse the YAML into a Stage0Recipe object
+    simple_recipe = Stage0Recipe.from_yaml(simple_recipe_yaml)
 
     print("Recipe loaded successfully!")
     print(f"Type: {type(simple_recipe).__name__}")
@@ -126,12 +126,12 @@ def _(mo):
 
 
 @app.cell
-def _(Recipe, simple_recipe, simple_recipe_yaml, yaml):
+def _(Stage0Recipe, simple_recipe, simple_recipe_yaml, yaml):
     # Parse the same YAML as a Python dictionary
     recipe_dict = yaml.safe_load(simple_recipe_yaml)
 
-    # Create Recipe from dictionary
-    dict_recipe = Recipe.from_dict(recipe_dict)
+    # Create Stage0Recipe from dictionary
+    dict_recipe = Stage0Recipe.from_dict(recipe_dict)
 
     print("Recipe created from dictionary!")
 
@@ -355,7 +355,7 @@ def _(mo):
 
     In this notebook, you learned:
 
-    - **Recipe Creation**: Load recipes from YAML strings (`Recipe.from_yaml()`) or Python dicts (`Recipe.from_dict()`)
+    - **Recipe Creation**: Load recipes from YAML strings (`Stage0Recipe.from_yaml()`) or Python dicts (`Stage0Recipe.from_dict()`)
     - **VariantConfig**: Define build variants and use `zip_keys` to pair specific combinations
     - **RenderConfig**: Configure target platforms and add custom context variables
     - **Stage0 vs Stage1**: Understand the difference between parsed templates and evaluated recipes

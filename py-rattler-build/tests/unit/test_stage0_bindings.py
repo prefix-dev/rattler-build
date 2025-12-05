@@ -2,7 +2,7 @@
 
 import pytest
 from inline_snapshot import snapshot
-from rattler_build.stage0 import Recipe, SingleOutputRecipe, MultiOutputRecipe
+from rattler_build.stage0 import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe
 
 
 # Sample YAML recipes for testing
@@ -54,7 +54,7 @@ about:
 
 def test_recipe_from_yaml_single_output() -> None:
     """Test parsing a single-output recipe from YAML."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     assert recipe is not None
     assert isinstance(recipe, SingleOutputRecipe)
@@ -63,7 +63,7 @@ def test_recipe_from_yaml_single_output() -> None:
 
 def test_recipe_from_yaml_multi_output() -> None:
     """Test parsing a multi-output recipe from YAML."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
 
     assert recipe is not None
     assert isinstance(recipe, MultiOutputRecipe)
@@ -72,7 +72,7 @@ def test_recipe_from_yaml_multi_output() -> None:
 
 def test_recipe_to_dict() -> None:
     """Test converting recipe to dictionary."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     recipe_dict = recipe.to_dict()
     assert isinstance(recipe_dict, dict)
@@ -81,7 +81,7 @@ def test_recipe_to_dict() -> None:
 
 def test_recipe_to_dict_snapshot() -> None:
     """Test recipe serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     recipe_dict = recipe.to_dict()
     # The snapshot will capture the exact structure
@@ -142,7 +142,7 @@ def test_recipe_to_dict_snapshot() -> None:
 
 def test_single_output_recipe_package() -> None:
     """Test accessing package info from single-output recipe."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     assert isinstance(recipe, SingleOutputRecipe)
     assert recipe.package is not None
@@ -157,7 +157,7 @@ def test_single_output_recipe_package() -> None:
 
 def test_single_output_recipe_to_dict() -> None:
     """Test converting single-output recipe to dict."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     recipe_dict = recipe.to_dict()
     assert isinstance(recipe_dict, dict)
     assert "package" in recipe_dict
@@ -165,7 +165,7 @@ def test_single_output_recipe_to_dict() -> None:
 
 def test_single_output_recipe_to_dict_snapshot() -> None:
     """Test single-output recipe serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     recipe_dict = recipe.to_dict()
 
     # Snapshot the full structure
@@ -226,7 +226,7 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
 
 def test_multi_output_recipe_about() -> None:
     """Test accessing about from multi-output recipe."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
 
     assert isinstance(recipe, MultiOutputRecipe)
     assert isinstance(recipe.outputs, list)
@@ -242,7 +242,7 @@ def test_multi_output_recipe_about() -> None:
 
 def test_multi_output_recipe_to_dict() -> None:
     """Test converting multi-output recipe to dict."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
     recipe_dict = recipe.to_dict()
     assert isinstance(recipe_dict, dict)
     assert "recipe" in recipe_dict or "outputs" in recipe_dict
@@ -250,7 +250,7 @@ def test_multi_output_recipe_to_dict() -> None:
 
 def test_multi_output_recipe_to_dict_snapshot() -> None:
     """Test multi-output recipe serialization with snapshot."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
 
     # Snapshot the full structure including all outputs
     assert recipe.to_dict() == snapshot(
@@ -413,7 +413,7 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
 
 def test_package_to_dict() -> None:
     """Test converting package to dict."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     assert isinstance(recipe, SingleOutputRecipe)
     package = recipe.package
     package_dict = package.to_dict()
@@ -422,7 +422,7 @@ def test_package_to_dict() -> None:
 
 def test_package_to_dict_snapshot() -> None:
     """Test package serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     assert isinstance(recipe, SingleOutputRecipe)
 
     package = recipe.package
@@ -434,7 +434,7 @@ def test_package_to_dict_snapshot() -> None:
 
 def test_build_to_dict_snapshot() -> None:
     """Test build serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     assert isinstance(recipe, SingleOutputRecipe)
 
     build = recipe.build
@@ -484,7 +484,7 @@ def test_build_to_dict_snapshot() -> None:
 
 def test_requirements_to_dict_snapshot() -> None:
     """Test requirements serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     assert isinstance(recipe, SingleOutputRecipe)
 
     requirements = recipe.requirements
@@ -496,7 +496,7 @@ def test_requirements_to_dict_snapshot() -> None:
 
 def test_about_to_dict_snapshot() -> None:
     """Test about serialization with snapshot."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
     assert isinstance(recipe, SingleOutputRecipe)
 
     about = recipe.about
@@ -530,7 +530,7 @@ build:
   number: 0
 """
 
-    recipe = Recipe.from_yaml(yaml_with_context)
+    recipe = Stage0Recipe.from_yaml(yaml_with_context)
     context = recipe.context
     assert len(context) > 0
 
@@ -542,12 +542,12 @@ def test_invalid_yaml() -> None:
     """
 
     with pytest.raises(Exception):  # Should raise some parsing error
-        Recipe.from_yaml(invalid_yaml)
+        Stage0Recipe.from_yaml(invalid_yaml)
 
 
 def test_recipe_repr() -> None:
     """Test recipe string representation."""
-    recipe = Recipe.from_yaml(SIMPLE_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(SIMPLE_RECIPE_YAML)
 
     repr_str = repr(recipe)
     assert "Stage0Recipe" in repr_str or "Recipe" in repr_str
@@ -555,7 +555,7 @@ def test_recipe_repr() -> None:
 
 def test_multi_output_outputs_snapshot() -> None:
     """Test multi-output recipe outputs structure with snapshot."""
-    recipe = Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
+    recipe = Stage0Recipe.from_yaml(MULTI_OUTPUT_RECIPE_YAML)
     assert isinstance(recipe, MultiOutputRecipe)
     outputs = recipe.outputs
 
@@ -699,7 +699,7 @@ build:
   number: 0
 """
 
-    recipe = Recipe.from_yaml(yaml_with_context)
+    recipe = Stage0Recipe.from_yaml(yaml_with_context)
     assert isinstance(recipe, SingleOutputRecipe)
 
     # Snapshot the context structure

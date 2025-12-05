@@ -239,7 +239,7 @@ class RenderedVariant:
         """
         return self._inner.variant()
 
-    def recipe(self) -> stage1.Recipe:
+    def recipe(self) -> stage1.Stage1Recipe:
         """Get the rendered Stage1 recipe.
 
         Returns:
@@ -311,11 +311,11 @@ class RenderedVariant:
             BuildResult: Information about the built package including paths, metadata, and timing.
 
         Example:
-            >>> from rattler_build.stage0 import Recipe
+            >>> from rattler_build.stage0 import Stage0Recipe
             >>> from rattler_build.variant_config import VariantConfig
             >>> from rattler_build.render import render_recipe
             >>>
-            >>> recipe = Recipe.from_yaml(yaml_string)
+            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
             >>> rendered = render_recipe(recipe, VariantConfig())
             >>> # Build just the first variant
             >>> result = rendered[0].run_build(output_dir="./output")
@@ -385,12 +385,12 @@ def build_rendered_variants(
         list[BuildResult]: List of build results, one per variant built.
 
     Example:
-        >>> from rattler_build.stage0 import Recipe
+        >>> from rattler_build.stage0 import Stage0Recipe
         >>> from rattler_build.variant_config import VariantConfig
         >>> from rattler_build.render import render_recipe, build_rendered_variants
         >>>
         >>> # Parse and render recipe
-        >>> recipe = Recipe.from_yaml(yaml_string)
+        >>> recipe = Stage0Recipe.from_yaml(yaml_string)
         >>> variant_config = VariantConfig.from_yaml('''
         ... python:
         ...   - "3.9"

@@ -45,13 +45,13 @@ def _():
 
     from rattler_build import Package
     from rattler_build.render import RenderConfig
-    from rattler_build.stage0 import Recipe
+    from rattler_build.stage0 import Stage0Recipe
     from rattler_build.variant_config import VariantConfig
 
     return (
         Package,
         Path,
-        Recipe,
+        Stage0Recipe,
         RenderConfig,
         VariantConfig,
         json,
@@ -74,7 +74,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
+def _(Path, Stage0Recipe, RenderConfig, VariantConfig, shutil, tempfile):
     # Define a recipe with multiple test types
     test_recipe_yaml = """
     package:
@@ -128,7 +128,7 @@ def _(Path, Recipe, RenderConfig, VariantConfig, shutil, tempfile):
     """
 
     # Parse and render the recipe
-    demo_recipe = Recipe.from_yaml(test_recipe_yaml)
+    demo_recipe = Stage0Recipe.from_yaml(test_recipe_yaml)
     demo_variants = VariantConfig()
     demo_render = RenderConfig()
     demo_results = demo_recipe.render(demo_variants, demo_render)
