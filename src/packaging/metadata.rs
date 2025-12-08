@@ -303,8 +303,8 @@ impl Output {
             .ok_or(PackagingError::DependenciesNotFinalized)?;
 
         // Track features are exclusively used to down-prioritize packages
-        // Each feature contributes "1 point" to the down-priorization. So we add a
-        // feature for each down-priorization level.
+        // Each feature contributes "1 point" to the down-prioritization. So we add a
+        // feature for each down-prioritization level.
         let track_features = self
             .recipe
             .build()
