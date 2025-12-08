@@ -2978,15 +2978,19 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <p><code>--attestation &lt;ATTESTATION&gt;</code></p>
-<p>Upload one or more attestation files alongside the package Note: if you add an attestation, you can <em>only</em> upload a single package</p>
+<p>Upload an attestation file alongside the package. Note: if you add an attestation, you can <em>only</em> upload a single package. Mutually exclusive with --generate-attestation</p>
 </li>
 <li>
 <p><code>--generate-attestation</code></p>
-<p>Automatically generate attestations when using trusted publishing</p>
+<p>Automatically generate attestation using cosign in CI. Mutually exclusive with --attestation</p>
 </li>
 <li>
 <p><code>-s</code>, <code>--skip-existing</code></p>
-<p>Skip upload if package is existed</p>
+<p>Skip upload if package already exists</p>
+</li>
+<li>
+<p><code>--force</code></p>
+<p>Force overwrite existing packages</p>
 </li>
 </ul>
 <h4 id="anaconda"><code>anaconda</code><a class="headerlink" href="#anaconda" title="Permanent link">#</a></h4>

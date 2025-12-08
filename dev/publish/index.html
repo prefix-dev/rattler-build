@@ -1534,6 +1534,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#channel-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channel Initialization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Channel Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#existing-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2028,6 +2067,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#channel-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channel Initialization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Channel Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#existing-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2087,7 +2165,7 @@ The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local fil
 <p>The following schema is used:</p>
 <ul>
 <li>prefix.dev: <code>https://prefix.dev/&lt;channel-name&gt;</code></li>
-<li>anaconda.org: <code>https://anaconda.org/&lt;owner&gt;/&lt;label (optional)&gt;</code> (e.g. https://anaconda.org/foobar)</li>
+<li>anaconda.org: <code>https://anaconda.org/&lt;owner&gt;/&lt;label (optional)&gt;</code> (e.g. <code>https://anaconda.org/foobar</code>)</li>
 <li>S3: <code>s3://bucket-name</code> (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)</li>
 <li>Filesystem: <code>file:///path/to/channel</code></li>
 <li>Quetz: <code>quetz://server.my-company.com/&lt;channel&gt;</code></li>
@@ -2102,13 +2180,36 @@ The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local fil
 <li>By using a variant file, and updating it at certain times</li>
 <li>By bumping the build number and re-publishing the package again</li>
 </ul>
-<p>The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. <code>--build-number=12</code>) or a <em>relative</em> bump for all packages (e.g. <code>--build-number=+1</code> to add 1 to the <em>highest</em> build number found in the publish channel). 
+<p>The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. <code>--build-number=12</code>) or a <em>relative</em> bump for all packages (e.g. <code>--build-number=+1</code> to add 1 to the <em>highest</em> build number found in the publish channel).
 When bumping by a relative amount, we download the repodata and determine for each subdir/package combination that you are building the highest build number.</p>
 <p>When the recipe does not specify a build number, the build number is automatically bumped on <code>publish</code> to the <em>next available build number</em>.</p>
 <p>If the recipe does specify a build number, you have to manually trigger an override using the <code>--build-number</code> CLI flag. Alternatively, you can use the <code>--force</code> upload option on S3, your local filesystem, Anaconda and prefix channels to forcibly replace the previous build. Please note that this is heavily discouraged as lockfiles will get out of date and the old build is irrevocably deleted.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">#</a></h2>
 <p>Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the <code>auth</code> subcommand: <code>rattler-build auth login</code>. Note: if you are already logged in with <code>pixi</code>, you are also logged in with <code>rattler-build</code> - they share credentials.</p>
 <p>Otherwise you can also use the same options as with <code>upload</code>, and supply tokens as environment variables or CLI arguments.</p>
+<h2 id="channel-initialization">Channel Initialization<a class="headerlink" href="#channel-initialization" title="Permanent link">#</a></h2>
+<p>When publishing to local filesystem or S3 channels, rattler-build automatically handles channel initialization:</p>
+<h3 id="new-channels">New channels<a class="headerlink" href="#new-channels" title="Permanent link">#</a></h3>
+<p>If the target channel doesn't exist yet, rattler-build will:</p>
+<ol>
+<li>Create the channel directory (for filesystem channels)</li>
+<li>Initialize it with an empty <code>noarch/repodata.json</code></li>
+<li>Upload your package</li>
+<li>Run indexing to update the repodata</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># This will create /path/to/my-channel if it doesn&#39;t exist</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-package.conda<span class="w"> </span>--to<span class="w"> </span>file:///path/to/my-channel
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Same for S3 buckets</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-package.conda<span class="w"> </span>--to<span class="w"> </span>s3://my-bucket/channel
+</span></code></pre></div>
+<h3 id="existing-channels">Existing channels<a class="headerlink" href="#existing-channels" title="Permanent link">#</a></h3>
+<p>If the channel directory exists but is not properly initialized (missing <code>noarch/repodata.json</code>), rattler-build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.</p>
+<p>To initialize an existing directory as a channel, you can either:</p>
+<ul>
+<li>Let rattler-build create it fresh (remove the directory first)</li>
+<li>Manually create <code>noarch/repodata.json</code> with content <code>{"packages": {}, "packages.conda": {}}</code></li>
+</ul>
 <h2 id="indexing-s3-and-filesystem-channels">Indexing S3 and Filesystem channels<a class="headerlink" href="#indexing-s3-and-filesystem-channels" title="Permanent link">#</a></h2>
 <p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
 

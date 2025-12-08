@@ -2159,7 +2159,7 @@ In the second example we will build a package for <code>numpy</code> which conta
 <h2 id="generating-a-starter-recipe">Generating a starter recipe<a class="headerlink" href="#generating-a-starter-recipe" title="Permanent link">#</a></h2>
 <p>Rattler-build provides a command to generate a recipe for a package from PyPI.
 The generated recipe can be used as a starting point for your recipe.
-The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the <code>sdist</code> source distriution.</p>
+The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the <code>sdist</code> source distribution.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>pypi<span class="w"> </span>ipywidgets
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># select an older version of the package</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>pypi<span class="w"> </span>ipywidgets<span class="w"> </span>--version<span class="w"> </span><span class="m">8</span>.0.0
