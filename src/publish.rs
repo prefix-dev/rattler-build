@@ -208,7 +208,7 @@ pub(crate) fn apply_build_number_override(
 }
 
 /// Helper function to determine the package subdirectory (platform)
-fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
+pub fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
     use rattler_conda_types::package::IndexJson;
     use rattler_package_streaming::seek::read_package_file;
 
@@ -328,7 +328,7 @@ async fn upload_to_s3(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_index::{IndexS3Config, index_s3};
+    use rattler_index::{IndexS3Config, ensure_channel_initialized_s3, index_s3};
     use rattler_upload::upload::upload_package_to_s3;
     use std::collections::HashSet;
 
@@ -338,6 +338,16 @@ async fn upload_to_s3(
     let auth_storage =
         tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+
+    // Use default AWS credential chain
+    let resolved_credentials = rattler_s3::ResolvedS3Credentials::from_sdk()
+        .await
+        .into_diagnostic()?;
+
+    // Ensure channel is initialized with noarch/repodata.json
+    ensure_channel_initialized_s3(url, &resolved_credentials)
+        .await
+        .map_err(|e| miette::miette!("Failed to initialize S3 channel: {}", e))?;
 
     // Collect unique subdirs from all packages
     let mut subdirs = HashSet::new();
@@ -358,11 +368,6 @@ async fn upload_to_s3(
     .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
 
     tracing::info!("Successfully uploaded packages to S3");
-
-    // Use default AWS credential chain
-    let resolved_credentials = rattler_s3::ResolvedS3Credentials::from_sdk()
-        .await
-        .into_diagnostic()?;
 
     for subdir in subdirs {
         // Run S3 indexing for each subdir
@@ -612,12 +617,21 @@ async fn upload_to_local_filesystem(
     package_paths: &[PathBuf],
     force: bool,
 ) -> miette::Result<()> {
+    use rattler_index::ensure_channel_initialized_fs;
     use std::collections::HashSet;
 
     tracing::info!(
         "Copying packages to local channel: {}",
         target_dir.display()
     );
+
+    // Create target directory if it doesn't exist
+    fs_err::create_dir_all(target_dir).into_diagnostic()?;
+
+    // Ensure channel is initialized with noarch/repodata.json
+    ensure_channel_initialized_fs(target_dir)
+        .await
+        .map_err(|e| miette::miette!("Failed to initialize local channel: {}", e))?;
 
     // Collect unique subdirs from all packages
     let mut subdirs = HashSet::new();
