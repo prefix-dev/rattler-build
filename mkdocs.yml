@@ -154,12 +154,18 @@ nav:
       - Package scripts: special_files.md
       - Package Internals: internals.md
       - System integration: system_integration.md
+  - Python Bindings:
+      - Reference:
+          - py-rattler-build/reference/python_bindings.md
+      - Tutorials:
+          - py-rattler-build/tutorials/recipe_rendering_basics.ipynb
+          - py-rattler-build/tutorials/multi_output_and_staging.ipynb
+          - py-rattler-build/tutorials/package_inspection_and_testing.ipynb
 
   - References:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
       - Jinja: reference/jinja.md
-      - Python Bindings: reference/python_bindings.md
 
 plugins:
   - search
@@ -178,6 +184,9 @@ plugins:
           options:
             separate_signature: true
             show_source: false
+  - mkdocs-jupyter:
+      execute: true
+      allow_errors: false
   - mike:
 # These fields are all optional; the defaults are as below...
 # alias_type: symlink

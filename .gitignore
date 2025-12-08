@@ -14,3 +14,6 @@ site
 .pixi
 target-pixi
 *.conda
+
+# python
+.ipynb_checkpoints
