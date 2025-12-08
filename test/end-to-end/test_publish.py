@@ -95,6 +95,8 @@ def test_publish_to_uninitialized_existing_channel_fails(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that publishing to an existing but uninitialized channel fails with a helpful error."""
+    from subprocess import STDOUT
+
     output_dir = tmp_path / "output"
     channel_dir = tmp_path / "channel"
 
@@ -112,6 +114,7 @@ def test_publish_to_uninitialized_existing_channel_fails(
             str(package),
             "--to",
             f"file://{channel_dir}",
+            stderr=STDOUT,
         )
 
     # The error message should mention that the channel is not initialized

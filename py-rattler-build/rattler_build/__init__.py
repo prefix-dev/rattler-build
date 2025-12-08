@@ -274,6 +274,7 @@ def upload_package_to_prefix(
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
     skip_existing: bool = False,
+    force: bool = False,
     generate_attestation: bool = False,
     attestation_file: Union[str, Path, None] = None,
 ) -> None:
@@ -287,6 +288,7 @@ def upload_package_to_prefix(
         api_key: The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file.
         auth_file: The authentication file.
         skip_existing: Skip upload if package is existed.
+        force: Whether to force overwrite existing packages.
         generate_attestation: Whether to generate an attestation for the uploaded packages.
         attestation_file: Path to an attestation file to upload along with the packages (note: only a single package can be uploaded when using this).
 
@@ -294,7 +296,7 @@ def upload_package_to_prefix(
         None
     """
     upload_package_to_prefix_py(
-        package_files, url, channels, api_key, auth_file, skip_existing, generate_attestation, attestation_file
+        package_files, url, channels, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file
     )
 
 
