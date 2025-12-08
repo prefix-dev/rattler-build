@@ -320,13 +320,13 @@ impl PackageBuilder {
         }
 
         // Write run_exports.json if provided
-        if let Some(run_exports) = self.run_exports {
-            if !run_exports.is_empty() {
-                let run_exports_path = info_dir.join("run_exports.json");
-                let run_exports_file = fs_err::File::create(&run_exports_path)?;
-                serde_json::to_writer_pretty(run_exports_file, &run_exports)?;
-                staged_files.push(run_exports_path);
-            }
+        if let Some(run_exports) = self.run_exports
+            && !run_exports.is_empty()
+        {
+            let run_exports_path = info_dir.join("run_exports.json");
+            let run_exports_file = fs_err::File::create(&run_exports_path)?;
+            serde_json::to_writer_pretty(run_exports_file, &run_exports)?;
+            staged_files.push(run_exports_path);
         }
 
         tracing::info!("Metadata files generated");
@@ -375,36 +375,36 @@ impl PackageBuilder {
         }
 
         // Step 5: Copy recipe files if provided and store_recipe is enabled
-        if self.config.store_recipe {
-            if let Some(recipe_dir) = &self.recipe_files {
-                let recipe_info_dir = info_dir.join("recipe");
-                fs_err::create_dir_all(&recipe_info_dir)?;
+        if self.config.store_recipe
+            && let Some(recipe_dir) = &self.recipe_files
+        {
+            let recipe_info_dir = info_dir.join("recipe");
+            fs_err::create_dir_all(&recipe_info_dir)?;
 
-                tracing::info!("Copying recipe files from {:?}", recipe_dir);
+            tracing::info!("Copying recipe files from {:?}", recipe_dir);
 
-                // Copy all files from recipe directory
-                if recipe_dir.is_dir() {
-                    for entry in walkdir::WalkDir::new(recipe_dir)
-                        .follow_links(false)
-                        .into_iter()
-                        .filter_map(|e| e.ok())
-                    {
-                        let path = entry.path();
-                        if path.is_file() {
-                            let relative = path.strip_prefix(recipe_dir)?;
-                            let dest = recipe_info_dir.join(relative);
+            // Copy all files from recipe directory
+            if recipe_dir.is_dir() {
+                for entry in walkdir::WalkDir::new(recipe_dir)
+                    .follow_links(false)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let relative = path.strip_prefix(recipe_dir)?;
+                        let dest = recipe_info_dir.join(relative);
 
-                            if let Some(parent) = dest.parent() {
-                                fs_err::create_dir_all(parent)?;
-                            }
-
-                            fs_err::copy(path, &dest)?;
-                            staged_files.push(dest);
+                        if let Some(parent) = dest.parent() {
+                            fs_err::create_dir_all(parent)?;
                         }
+
+                        fs_err::copy(path, &dest)?;
+                        staged_files.push(dest);
                     }
-                } else {
-                    tracing::warn!("Recipe directory not found: {:?}", recipe_dir);
                 }
+            } else {
+                tracing::warn!("Recipe directory not found: {:?}", recipe_dir);
             }
         }
 

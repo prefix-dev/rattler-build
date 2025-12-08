@@ -1,6 +1,7 @@
 //! File collection and transformation for package creation
 
 use content_inspector::ContentType;
+use fs_err as fs;
 use std::path::{Path, PathBuf};
 
 use crate::Result;
@@ -35,11 +36,11 @@ pub struct FileEntry {
 impl FileEntry {
     /// Create a FileEntry from source and destination paths
     pub fn from_paths(source: &Path, dest: &Path) -> Result<Self> {
-        let metadata = std::fs::symlink_metadata(source)?;
+        let metadata = fs::symlink_metadata(source)?;
         let is_symlink = metadata.is_symlink();
 
         let symlink_target = if is_symlink {
-            Some(std::fs::read_link(source)?)
+            Some(fs::read_link(source)?)
         } else {
             None
         };

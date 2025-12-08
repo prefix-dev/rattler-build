@@ -1,5 +1,6 @@
 //! PathsJson builder
 
+use fs_err as fs;
 use rattler_conda_types::Platform;
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry, PathsJson, PrefixPlaceholder};
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
@@ -87,11 +88,11 @@ impl PathsJsonBuilder {
 
     /// Create a PathsEntry for a single file
     fn create_paths_entry(&self, file: &FileEntry) -> Result<PathsEntry> {
-        let metadata = std::fs::symlink_metadata(&file.source)?;
+        let metadata = fs::symlink_metadata(&file.source)?;
 
         if metadata.is_dir() {
             // Check if directory is empty
-            let mut entries = std::fs::read_dir(&file.source)?;
+            let mut entries = fs::read_dir(&file.source)?;
             if entries.next().is_none() {
                 // Empty directory
                 return Ok(PathsEntry {
@@ -172,10 +173,10 @@ impl PathsJsonBuilder {
         use content_inspector::ContentType;
 
         // Skip .pyc and .pyo files
-        if let Some(ext) = file_path.extension() {
-            if ext == "pyc" || ext == "pyo" {
-                return Ok(None);
-            }
+        if let Some(ext) = file_path.extension()
+            && (ext == "pyc" || ext == "pyo")
+        {
+            return Ok(None);
         }
 
         // Check if file matches ignore patterns

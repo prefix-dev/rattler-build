@@ -68,11 +68,12 @@ pub use files::{FileCollector, FileEntry};
 pub use metadata::{AboutJsonBuilder, IndexJsonBuilder, PathsJsonBuilder};
 
 /// Archive type for the package
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArchiveType {
     /// .tar.bz2 format (legacy)
     TarBz2,
     /// .conda format (modern, preferred)
+    #[default]
     Conda,
 }
 
@@ -83,11 +84,5 @@ impl ArchiveType {
             ArchiveType::TarBz2 => ".tar.bz2",
             ArchiveType::Conda => ".conda",
         }
-    }
-}
-
-impl Default for ArchiveType {
-    fn default() -> Self {
-        ArchiveType::Conda
     }
 }

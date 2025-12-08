@@ -93,12 +93,11 @@ impl FileTransformer {
         let mut components: Vec<Component> = path.components().collect();
 
         // TODO(refactor): Do we need to handle `-script` suffixes?
-        if let Some(first) = components.first() {
-            if first == &Component::Normal("bin".as_ref())
-                || first == &Component::Normal("Scripts".as_ref())
-            {
-                components[0] = Component::Normal("python-scripts".as_ref());
-            }
+        if let Some(first) = components.first()
+            && (first == &Component::Normal("bin".as_ref())
+                || first == &Component::Normal("Scripts".as_ref()))
+        {
+            components[0] = Component::Normal("python-scripts".as_ref());
         }
 
         components.iter().collect()
@@ -128,10 +127,10 @@ impl FileTransformer {
         }
 
         // Make relative
-        if let Some(parent) = symlink_path.parent() {
-            if let Some(rel) = pathdiff::diff_paths(target, parent) {
-                return rel;
-            }
+        if let Some(parent) = symlink_path.parent()
+            && let Some(rel) = pathdiff::diff_paths(target, parent)
+        {
+            return rel;
         }
 
         target.to_path_buf()

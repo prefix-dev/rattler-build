@@ -102,15 +102,14 @@ impl FileCollector {
             // Get relative path for pattern matching
             let relative_path = path
                 .strip_prefix(&self.source_dir)
-                .map_err(|e| PackageError::StripPrefix(e))?;
+                .map_err(PackageError::StripPrefix)?;
 
             // Skip hidden files if not included
-            if !self.include_hidden {
-                if let Some(file_name) = path.file_name() {
-                    if file_name.to_string_lossy().starts_with('.') {
-                        continue;
-                    }
-                }
+            if !self.include_hidden
+                && let Some(file_name) = path.file_name()
+                && file_name.to_string_lossy().starts_with('.')
+            {
+                continue;
             }
 
             // Apply filters
