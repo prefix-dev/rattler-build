@@ -143,7 +143,6 @@ nav:
       - Reproducible builds: rebuild.md
 
   - Publishing packages:
-      # - Terminal User Interface (TUI): tui.md
       - Authentication & upload: authentication_and_upload.md
       - Publishing packages: publish.md
       - Publishing to conda-forge: conda_forge.md
