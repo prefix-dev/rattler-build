@@ -25,3 +25,4 @@ from rattler_build import Package
             - run_test
             - run_tests
             - to_dict
+:::

@@ -7,6 +7,7 @@ from rattler_build import RenderConfig, RenderedVariant
 ```
 
 ::: rattler_build.RenderConfig
+:::
 
 ::: rattler_build.RenderedVariant
     options:
@@ -16,3 +17,4 @@ from rattler_build import RenderConfig, RenderedVariant
             - hash_info
             - pin_subpackages
             - run_build
+:::

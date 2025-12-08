@@ -21,3 +21,4 @@ from rattler_build import Stage1Recipe
             - staging_caches
             - inherits_from
             - to_dict
+:::

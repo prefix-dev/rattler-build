@@ -21,6 +21,7 @@ from rattler_build import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe
             - to_dict
             - render
             - run_build
+:::
 
 ::: rattler_build.SingleOutputRecipe
     options:
@@ -31,6 +32,7 @@ from rattler_build import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe
             - build
             - requirements
             - about
+:::
 
 ::: rattler_build.MultiOutputRecipe
     options:
@@ -41,3 +43,4 @@ from rattler_build import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe
             - build
             - about
             - outputs
+:::
