@@ -28,7 +28,7 @@ rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel --gene
 The following schema is used:
 
 - prefix.dev: `https://prefix.dev/<channel-name>`
-- anaconda.org: `https://anaconda.org/<owner>/<label (optional)>` (e.g. https://anaconda.org/foobar)
+- anaconda.org: `https://anaconda.org/<owner>/<label (optional)>` (e.g. `https://anaconda.org/foobar`)
 - S3: `s3://bucket-name` (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)
 - Filesystem: `file:///path/to/channel`
 - Quetz: `quetz://server.my-company.com/<channel>`
@@ -47,7 +47,7 @@ Sometimes you want to package the same package again, but rebuild it with the la
 - By using a variant file, and updating it at certain times
 - By bumping the build number and re-publishing the package again
 
-The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. `--build-number=12`) or a _relative_ bump for all packages (e.g. `--build-number=+1` to add 1 to the _highest_ build number found in the publish channel). 
+The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. `--build-number=12`) or a _relative_ bump for all packages (e.g. `--build-number=+1` to add 1 to the _highest_ build number found in the publish channel).
 When bumping by a relative amount, we download the repodata and determine for each subdir/package combination that you are building the highest build number.
 
 When the recipe does not specify a build number, the build number is automatically bumped on `publish` to the _next available build number_.
@@ -59,6 +59,36 @@ If the recipe does specify a build number, you have to manually trigger an overr
 Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the `auth` subcommand: `rattler-build auth login`. Note: if you are already logged in with `pixi`, you are also logged in with `rattler-build` - they share credentials.
 
 Otherwise you can also use the same options as with `upload`, and supply tokens as environment variables or CLI arguments.
+
+## Channel Initialization
+
+When publishing to local filesystem or S3 channels, rattler-build automatically handles channel initialization:
+
+### New channels
+
+If the target channel doesn't exist yet, rattler-build will:
+
+1. Create the channel directory (for filesystem channels)
+2. Initialize it with an empty `noarch/repodata.json`
+3. Upload your package
+4. Run indexing to update the repodata
+
+```bash
+# This will create /path/to/my-channel if it doesn't exist
+rattler-build publish ./my-package.conda --to file:///path/to/my-channel
+
+# Same for S3 buckets
+rattler-build publish ./my-package.conda --to s3://my-bucket/channel
+```
+
+### Existing channels
+
+If the channel directory exists but is not properly initialized (missing `noarch/repodata.json`), rattler-build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.
+
+To initialize an existing directory as a channel, you can either:
+
+- Let rattler-build create it fresh (remove the directory first)
+- Manually create `noarch/repodata.json` with content `{"packages": {}, "packages.conda": {}}`
 
 ## Indexing S3 and Filesystem channels
 
