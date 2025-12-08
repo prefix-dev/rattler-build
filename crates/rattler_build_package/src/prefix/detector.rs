@@ -70,7 +70,7 @@ pub fn detect_prefix_text(file_path: &Path, prefix: &Path) -> Result<Option<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err as fs;
 
     #[test]
     fn test_detect_prefix_text() -> Result<()> {

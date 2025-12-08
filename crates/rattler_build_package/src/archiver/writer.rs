@@ -105,7 +105,7 @@ impl PackageWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err as fs;
 
     #[test]
     fn test_package_writer_tar_bz2() -> Result<()> {

@@ -29,7 +29,7 @@ pub fn detect_content_type(path: &Path) -> Result<ContentType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err as fs;
 
     #[test]
     fn test_text_file() -> Result<()> {
@@ -47,7 +47,7 @@ mod tests {
     fn test_binary_file() -> Result<()> {
         let temp_dir = tempfile::tempdir()?;
         let file_path = temp_dir.path().join("test.bin");
-        fs::write(&file_path, &[0u8, 1, 2, 3, 255])?;
+        fs::write(&file_path, [0u8, 1, 2, 3, 255])?;
 
         let ct = detect_content_type(&file_path)?;
         assert!(matches!(ct, ContentType::BINARY));

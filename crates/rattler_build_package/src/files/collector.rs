@@ -140,7 +140,7 @@ impl FileCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err as fs;
 
     #[test]
     fn test_collector_basic() -> Result<()> {

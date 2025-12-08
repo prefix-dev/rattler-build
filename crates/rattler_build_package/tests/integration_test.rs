@@ -1,10 +1,10 @@
 //! Integration tests for rattler_build_package
 
+use fs_err as fs;
 use rattler_build_package::{
     AboutJsonBuilder, ArchiveType, IndexJsonBuilder, PackageBuilder, PackageConfig,
 };
 use rattler_conda_types::{PackageName, Platform, VersionWithSource};
-use std::fs;
 
 #[cfg(feature = "recipe")]
 use rattler_build_recipe::stage1::{About, Build, Extra, Package, Recipe, Requirements};

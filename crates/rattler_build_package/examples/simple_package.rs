@@ -1,10 +1,10 @@
 //! Simple example of creating a conda package
 
+use fs_err as fs;
 use rattler_build_package::{
     AboutJsonBuilder, ArchiveType, IndexJsonBuilder, PackageBuilder, PackageConfig,
 };
 use rattler_conda_types::{PackageName, Platform, VersionWithSource};
-use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a temporary directory with some files

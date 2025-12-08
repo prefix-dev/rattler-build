@@ -226,7 +226,7 @@ impl PathsJsonBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err as fs;
 
     #[test]
     fn test_paths_builder_empty() -> Result<()> {
