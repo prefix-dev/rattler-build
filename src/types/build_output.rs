@@ -170,7 +170,11 @@ impl BuildOutput {
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();
         let identifier = self.identifier();
-        let span = tracing::info_span!("Build summary for", recipe = identifier, span_color = identifier);
+        let span = tracing::info_span!(
+            "Build summary for",
+            recipe = identifier,
+            span_color = identifier
+        );
         let _enter = span.enter();
 
         tracing::info!("{}", self);

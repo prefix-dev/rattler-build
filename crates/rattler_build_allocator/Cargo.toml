@@ -12,8 +12,8 @@ doctest = false
 
 # Use mimalloc on Windows
 [target.'cfg(windows)'.dependencies]
-mimalloc = "0.1.43"
+mimalloc = "0.1.48"
 
 # Use jemalloc on supported unix platforms (excluding OpenBSD and FreeBSD)
 [target.'cfg(all(not(windows), not(target_os = "openbsd"), not(target_os = "freebsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
-tikv-jemallocator = "0.6.0"
+tikv-jemallocator = "0.6.1"

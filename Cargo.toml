@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.53.0"
+version = "0.54.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -12,7 +12,11 @@ default-run = "rattler-build"
 rust-version = "1.89.0"
 
 [workspace]
-members = ["rust-tests", "crates/rattler_build_recipe_generator", "crates/rattler_build_allocator"]
+members = [
+  "rust-tests",
+  "crates/rattler_build_recipe_generator",
+  "crates/rattler_build_allocator",
+]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]
@@ -28,25 +32,25 @@ clap = { version = "4.5.53", features = ["derive"] }
 flate2 = "1.1.5"
 fs-err = "3.2.0"
 indexmap = "2.12.1"
-insta = "1.44.2"
+insta = "1.44.3"
 itertools = "0.14.0"
 miette = "7.6.0"
-rattler_conda_types = { version = "0.42.2", default-features = false }
-rattler_digest = { version = "1.2.0", default-features = false, features = [
+rattler_conda_types = { version = "0.42.3", default-features = false }
+rattler_digest = { version = "1.2.1", default-features = false, features = [
   "serde",
 ] }
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-serde_with = "3.16.0"
+serde_with = "3.16.1"
 serde_yaml = "0.9.34"
 sha2 = "0.10.9"
 tar = "0.4.44"
 tempfile = "3.23.0"
 tokio = { version = "1.48.0", features = ["rt", "macros"] }
 toml = "0.9.8"
-tracing = "0.1.41"
+tracing = "0.1.43"
 url = "2.5.7"
 zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 
@@ -116,7 +120,7 @@ serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true, features = ["env", "cargo", "suggestions"] }
-minijinja = { version = "2.12.0", features = [
+minijinja = { version = "2.13.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -133,7 +137,7 @@ tracing-subscriber = { version = "0.3", features = [
 marked-yaml = { version = "0.8.0" }
 miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
-goblin = "0.10.3"
+goblin = "0.10.4"
 scroll = "0.13.0"
 pathdiff = "0.2.3"
 comfy-table = "7.2.1"
@@ -144,7 +148,7 @@ thiserror = "2.0.17"
 tempfile = { workspace = true }
 chrono = "0.4.42"
 sha1 = "0.10.6"
-spdx = "0.12.0"
+spdx = "0.13.2"
 ignore = "0.4.25"
 globset = "0.4.18"
 clap-verbosity-flag = "3.0.4"
@@ -182,34 +186,34 @@ regex = { workspace = true }
 async-recursion = { workspace = true }
 
 # Rattler crates
-rattler_config = { version = "0.2.21" }
-rattler = { version = "0.39.5", default-features = false, features = [
+rattler_config = { version = "0.2.22" }
+rattler = { version = "0.39.6", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.6.4", default-features = false }
+rattler_cache = { version = "0.6.5", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.27.6", default-features = false }
-rattler_networking = { version = "0.25.27", default-features = false, features = [
+rattler_index = { version = "0.27.7", default-features = false }
+rattler_networking = { version = "0.25.28", default-features = false, features = [
   "rattler_config",
 ] }
-rattler_upload = { version = "0.4.5", default-features = false }
-rattler_s3 = { version = "0.1.16", optional = true }
+rattler_upload = { version = "0.4.6", default-features = false }
+rattler_s3 = { version = "0.1.17", optional = true }
 rattler_redaction = { version = "0.1.12" }
-rattler_repodata_gateway = { version = "0.25.5", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.25.6", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.25.13", default-features = false, features = [
+rattler_shell = { version = "0.25.14", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "4.1.0", default-features = false, features = [
+rattler_solve = { version = "4.1.1", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.3.2", default-features = false }
-rattler_package_streaming = { version = "0.23.19", default-features = false }
-rattler_menuinst = "0.2.40"
+rattler_virtual_packages = { version = "2.3.3", default-features = false }
+rattler_package_streaming = { version = "0.23.20", default-features = false }
+rattler_menuinst = "0.2.41"
 lazy_static = "1.5.0"
 reqwest-retry = "0.8.0"
 retry-policies = "0.5.1"
@@ -221,7 +225,7 @@ http-range-client = { git = "https://github.com/pka/http-range-client.git", defa
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.19.3"
+sevenz-rust2 = "0.20.0"
 dialoguer = "0.12.0"
 
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
@@ -241,7 +245,7 @@ rstest = "0.26.1"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
 serial_test = "3.2.0"
-criterion = { version = "0.7.0", features = ["html_reports"] }
+criterion = { version = "0.8.1", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
 
 [[bench]]
