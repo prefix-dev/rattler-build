@@ -625,36 +625,35 @@ pub async fn resolve_s3_credentials(
     let bucket_name = bucket_url.host_str().unwrap_or_default();
 
     // Check if we have custom S3 config for this bucket
-    if let Some(config) = s3_config.get(bucket_name) {
-        if let s3_middleware::S3Config::Custom {
+    if let Some(config) = s3_config.get(bucket_name)
+        && let s3_middleware::S3Config::Custom {
             endpoint_url,
             region,
             force_path_style,
         } = config
-        {
-            // Create S3Credentials from the config
-            let s3_creds = rattler_s3::S3Credentials {
-                endpoint_url: endpoint_url.clone(),
-                region: region.clone(),
-                addressing_style: if *force_path_style {
-                    rattler_s3::S3AddressingStyle::Path
-                } else {
-                    rattler_s3::S3AddressingStyle::VirtualHost
-                },
-                access_key_id: None,
-                secret_access_key: None,
-                session_token: None,
-            };
+    {
+        // Create S3Credentials from the config
+        let s3_creds = rattler_s3::S3Credentials {
+            endpoint_url: endpoint_url.clone(),
+            region: region.clone(),
+            addressing_style: if *force_path_style {
+                rattler_s3::S3AddressingStyle::Path
+            } else {
+                rattler_s3::S3AddressingStyle::VirtualHost
+            },
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
 
-            // Try to resolve with auth storage
-            let auth_storage = get_auth_store(auth_file.clone())?;
-            if let Some(resolved) = s3_creds.resolve(bucket_url, &auth_storage) {
-                tracing::debug!(
-                    "Resolved S3 credentials for bucket '{}' from config + auth storage",
-                    bucket_name
-                );
-                return Ok(resolved);
-            }
+        // Try to resolve with auth storage
+        let auth_storage = get_auth_store(auth_file.clone())?;
+        if let Some(resolved) = s3_creds.resolve(bucket_url, &auth_storage) {
+            tracing::debug!(
+                "Resolved S3 credentials for bucket '{}' from config + auth storage",
+                bucket_name
+            );
+            return Ok(resolved);
         }
     }
 
