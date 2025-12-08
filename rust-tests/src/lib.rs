@@ -728,4 +728,66 @@ requirements:
 
         assert!(rattler_build.status.success());
     }
+
+    #[test]
+    fn test_publish_to_local_filesystem() {
+        // Step 1: Build a package from a test recipe
+        let tmp = tmp("test_publish_local_fs");
+        let output_dir = tmp.as_dir().join("output");
+        let rattler_build =
+            rattler().build(recipes().join("rich"), output_dir.as_path(), None, None);
+        assert!(rattler_build.status.success());
+
+        // Step 2: Get the built package path
+        let pkg_path = get_package(&output_dir, "rich".to_string());
+        assert!(pkg_path.exists(), "Package should exist after build");
+
+        // Step 3: Create a local channel directory and publish
+        let channel_dir = tmp.as_dir().join("local-channel");
+        fs::create_dir_all(&channel_dir).unwrap();
+
+        let channel_url = format!("file://{}", channel_dir.display());
+        let rattler_publish =
+            rattler().with_args(["publish", pkg_path.to_str().unwrap(), "--to", &channel_url]);
+
+        let output = String::from_utf8(rattler_publish.stdout.clone()).unwrap();
+        assert!(
+            rattler_publish.status.success(),
+            "Publish should succeed. Output: {}",
+            output
+        );
+
+        // Step 4: Verify channel was initialized (noarch/repodata.json exists)
+        let noarch_repodata = channel_dir.join("noarch").join("repodata.json");
+        assert!(
+            noarch_repodata.exists(),
+            "noarch/repodata.json should exist after publish"
+        );
+
+        // Step 5: Verify the package was copied to the channel
+        // The package should be in the noarch subdir since 'rich' is a noarch package
+        let path = std::env::current_dir().unwrap();
+        _ = std::env::set_current_dir(&channel_dir);
+        let packages: Vec<_> = glob::glob("**/*.tar.bz2")
+            .expect("bad glob")
+            .filter_map(|p| p.ok())
+            .collect();
+        _ = std::env::set_current_dir(path);
+
+        assert!(
+            !packages.is_empty(),
+            "At least one package should exist in the channel"
+        );
+
+        // Step 6: Verify the repodata contains the package
+        let repodata: serde_json::Value =
+            serde_json::from_slice(&fs::read(&noarch_repodata).unwrap()).unwrap();
+
+        // Check that packages are indexed in repodata
+        let packages_obj = repodata.get("packages").or(repodata.get("packages.conda"));
+        assert!(
+            packages_obj.is_some(),
+            "repodata should contain packages or packages.conda"
+        );
+    }
 }

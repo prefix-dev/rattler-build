@@ -34,7 +34,7 @@ mod linux;
 mod macos;
 mod package_info;
 mod post_process;
-mod publish;
+pub mod publish;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;

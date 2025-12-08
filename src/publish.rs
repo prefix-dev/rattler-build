@@ -1,3 +1,5 @@
+//! Functions for publishing conda packages to various backends (local filesystem, S3, Quetz, etc.)
+
 use miette::IntoDiagnostic;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
