@@ -1,0 +1,33 @@
+python:
+  - if: unix
+    then: ["3.14", "3.15"]
+  - if: win
+    then: ["3.14"]
+
+c_compiler:
+  - if: linux
+    then: [gcc, clang]
+  - if: osx
+    then: [clang]
+  - if: win
+    then: [vs2019, vs2022]
+
+foobar:
+  - ${{ "unknown" if unix else "known" }}
+
+filter:
+  - ${{ "appears" if true }}
+  - ${{ "disappears" if false }}
+
+target:
+  - ${{ target_platform }}
+
+mixed:
+  - "static_value"
+  - if: linux
+    then: ["linux_only"]
+  - ${{ "jinja_value" }}
+
+unix_level:
+  - if: unix
+    then: 1

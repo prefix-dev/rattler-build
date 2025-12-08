@@ -1,0 +1,58 @@
+--- src/zig_llvm.cpp.orig	2024-06-29 18:28:29.158714044 -0500
++++ src/zig_llvm.cpp	2024-06-29 18:30:04.008411123 -0500
+@@ -204,7 +204,7 @@
+         std::error_code EC;
+         dest_asm_ptr = new(std::nothrow) raw_fd_ostream(asm_filename, EC, sys::fs::OF_None);
+         if (EC) {
+-            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());
++            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());
+             return true;
+         }
+     }
+@@ -212,7 +212,7 @@
+         std::error_code EC;
+         dest_bin_ptr = new(std::nothrow) raw_fd_ostream(bin_filename, EC, sys::fs::OF_None);
+         if (EC) {
+-            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());
++            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());
+             return true;
+         }
+     }
+@@ -220,7 +220,7 @@
+         std::error_code EC;
+         dest_bitcode_ptr = new(std::nothrow) raw_fd_ostream(bitcode_filename, EC, sys::fs::OF_None);
+         if (EC) {
+-            *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());
++            *error_message = _strdup((const char *)StringRef(EC.message()).bytes_begin());
+             return true;
+         }
+     }
+@@ -337,13 +337,13 @@
+
+     if (dest_bin && !lto) {
+         if (target_machine.addPassesToEmitFile(codegen_pm, *dest_bin, nullptr, CodeGenFileType::ObjectFile)) {
+-            *error_message = strdup("TargetMachine can't emit an object file");
++            *error_message = _strdup("TargetMachine can't emit an object file");
+             return true;
+         }
+     }
+     if (dest_asm) {
+         if (target_machine.addPassesToEmitFile(codegen_pm, *dest_asm, nullptr, CodeGenFileType::AssemblyFile)) {
+-            *error_message = strdup("TargetMachine can't emit an assembly file");
++            *error_message = _strdup("TargetMachine can't emit an assembly file");
+             return true;
+         }
+     }
+--- src/zig_llvm-ar.cpp.orig	2024-06-29 18:26:01.752074223 -0500
++++ src/zig_llvm-ar.cpp	2024-06-29 18:29:36.007910238 -0500
+@@ -619,8 +619,8 @@
+         sys::fs::setLastAccessAndModificationTime(FD, ModTimeOrErr.get()));
+   }
+
+-  if (close(FD))
+-    fail("Could not close the file");
++  if (_close(FD))
++    fail("Could not _close the file");
+ }
+
+ static bool shouldCreateArchive(ArchiveOperation Op) {

@@ -1,0 +1,11 @@
+---
+source: crates/rattler_build_variant_config/tests/error_tests.rs
+expression: error_with_source
+---
+  × parse error: Variant values for 'foobar' must be a list
+   ╭─[wrong_type.yaml:2:10]
+ 1 │     foobar:
+ 2 │ ╭─▶   mapping:
+ 3 │ ├─▶     other: key
+   · ╰──── Variant values for 'foobar' must be a list
+   ╰────

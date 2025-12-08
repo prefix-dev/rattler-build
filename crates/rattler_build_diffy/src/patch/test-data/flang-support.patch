@@ -1,0 +1,60 @@
+--- mumps/src/mumps_common_orig.h
++++ mumps/src/mumps_common.h
+@@ -27,7 +27,7 @@
+  *     knowledge, there is no way to perform the conversion with CPP
+  *     directives only.
+  */
+-#if defined(UPPER) || defined(MUMPS_WIN32)
++#if defined(UPPER)
+ # define F_SYMBOL(lower_case,upper_case) MUMPS_##upper_case
+ #elif defined(Add_)
+ # define F_SYMBOL(lower_case,upper_case) mumps_##lower_case##_
+--- mumps/src/mumps_c_orig.c
++++ mumps/src/mumps_c.c
+@@ -42,7 +42,7 @@
+  *   CMUMPS_XXX in the code to get rid of any symbol convention annoyance.
+  */
+ #if MUMPS_ARITH == MUMPS_ARITH_s
+-# if defined(UPPER) || defined(MUMPS_WIN32)
++# if defined(UPPER)
+ #  define F_SYM_ARITH(lower_case,upper_case) SMUMPS_##upper_case
+ # elif defined(Add_)
+ #  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case##_
+@@ -52,7 +52,7 @@
+ #  define F_SYM_ARITH(lower_case,upper_case) smumps_##lower_case
+ # endif
+ #elif MUMPS_ARITH == MUMPS_ARITH_d
+-# if defined(UPPER) || defined(MUMPS_WIN32)
++# if defined(UPPER)
+ #  define F_SYM_ARITH(lower_case,upper_case) DMUMPS_##upper_case
+ # elif defined(Add_)
+ #  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case##_
+@@ -62,7 +62,7 @@
+ #  define F_SYM_ARITH(lower_case,upper_case) dmumps_##lower_case
+ # endif
+ #elif MUMPS_ARITH == MUMPS_ARITH_c
+-# if defined(UPPER) || defined(MUMPS_WIN32)
++# if defined(UPPER)
+ #  define F_SYM_ARITH(lower_case,upper_case) CMUMPS_##upper_case
+ # elif defined(Add_)
+ #  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case##_
+@@ -72,7 +72,7 @@
+ #  define F_SYM_ARITH(lower_case,upper_case) cmumps_##lower_case
+ # endif
+ #elif MUMPS_ARITH == MUMPS_ARITH_z
+-# if defined(UPPER) || defined(MUMPS_WIN32)
++# if defined(UPPER)
+ #  define F_SYM_ARITH(lower_case,upper_case) ZMUMPS_##upper_case
+ # elif defined(Add_)
+ #  define F_SYM_ARITH(lower_case,upper_case) zmumps_##lower_case##_
+--- mumps/libseq/elapse_orig.h
++++ mumps/libseq/elapse.h
+@@ -24,7 +24,7 @@
+ #endif
+ #endif
+ 
+-#if (defined(_WIN32) && ! defined(__MINGW32__)) || defined(UPPER)
++#if defined(UPPER)
+ #define mumps_elapse MUMPS_ELAPSE
+ #elif defined(Add__)
+ #define mumps_elapse mumps_elapse__

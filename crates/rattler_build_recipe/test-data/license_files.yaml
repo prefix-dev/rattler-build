@@ -1,0 +1,10 @@
+package:
+  name: test-license-files
+  version: 1.0.0
+
+about:
+  license: GPL-1.0-or-later OR Artistic-1.0-Perl
+  license_file:
+    - LICENSE-ARTISTIC
+    - LICENSE-GPL
+  summary: Test multiple license files

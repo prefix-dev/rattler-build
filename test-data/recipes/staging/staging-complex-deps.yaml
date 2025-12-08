@@ -1,0 +1,72 @@
+# New test case: Complex dependency scenario with staging
+# Tests staging with both build and host dependencies, and ignore_run_exports
+
+schema_version: 1
+
+context:
+  version: "3.0.0"
+
+recipe:
+  name: complex-deps
+  version: ${{ version }}
+
+outputs:
+  # Staging output with complex dependency configuration
+  - staging:
+      name: complex-build
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+        - ${{ compiler('cxx') }}
+        - cmake
+        - make
+        - pkg-config
+      host:
+        - openssl
+        - zlib
+        - libcurl
+      ignore_run_exports:
+        by_name:
+          - openssl # Don't propagate openssl run_exports
+    build:
+      script:
+        - cmake --version
+        - if: unix
+          then: |
+            echo "Building with dependencies..."
+            mkdir -p $PREFIX/lib
+            echo "libcomplex.so" > $PREFIX/lib/libcomplex.so
+        - if: win
+          then: |
+            echo Building with dependencies...
+            mkdir %PREFIX%\lib
+            echo libcomplex.dll > %PREFIX%\lib\libcomplex.dll
+
+  # Package inheriting with run_exports
+  - package:
+      name: complex-deps-full
+      version: ${{ version }}
+    inherit:
+      from: complex-build
+      run_exports: true # Inherit run_exports from staging (except ignored ones)
+    requirements:
+      run:
+        - zlib # Explicit runtime dependency
+        - libcurl
+    build:
+      files:
+        - lib/**
+
+  # Package inheriting without run_exports
+  - package:
+      name: complex-deps-minimal
+      version: ${{ version }}
+    inherit:
+      from: complex-build
+      run_exports: false # Don't inherit any run_exports
+    requirements:
+      run:
+        - zlib # Only explicit dependencies
+    build:
+      files:
+        - lib/**

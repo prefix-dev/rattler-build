@@ -11,8 +11,8 @@ install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
   "build-release",
 ] }
-test = "cargo test"
-test-slow = "cargo test --release"
+test = "cargo test --workspace --all-targets"
+test-slow = "cargo test --release --workspace --all-targets"
 test-patch-extra = "cargo test --features patch-test-extra"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 test-ci = "cargo test --release -p rust-tests"
@@ -49,15 +49,17 @@ requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 boto3 = "*"
 
+
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
 cargo-deny = ">=0.18.3,<0.19"
 dprint = ">=0.50.0,<0.51"
 lefthook = ">=1.12.2,<2"
-ruff = ">=0.4.8,<0.5"
+ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
 typos = ">=1.23.1,<2"
+nbstripout = ">=0.8.2,<0.9"
 
 [feature.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
@@ -73,6 +75,7 @@ lint = { depends-on = [
 ], description = "Run all linters and formatters on all code" }
 lint-fast = { cmd = "lefthook run pre-commit --all-files --force", description = "Run all fast linters and formatters on all code (no clippy)" }
 lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "Run all slow linters and formatters on all code" }
+nbstripout = "nbstripout"
 pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
 ruff-format = "ruff format --force-exclude"
@@ -115,7 +118,10 @@ mkdocs-material = ">=9.7.0,<10"
 mkdocstrings = ">=0.30.1,<0.31"
 mkdocstrings-python = ">=1.18.2,<2"
 pillow = ">=11.3.0,<12"
-ruff = ">=0.13.1,<0.14"
+ruff = ">=0.14.7,<0.15"
+mkdocs-jupyter = ">=0.25.1,<0.26"
+py-rattler-build = { path = "./py-rattler-build" }
+jupyter = ">=1.1.1,<2"
 
 
 [environments]

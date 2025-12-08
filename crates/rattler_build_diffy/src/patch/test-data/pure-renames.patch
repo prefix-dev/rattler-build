@@ -1,0 +1,286 @@
+From 0f25b4b28954df4ea8ed489acbaa31265a1fafbe Mon Sep 17 00:00:00 2001
+From: George Hotz <72895+geohot@users.noreply.github.com>
+Date: Tue, 7 Oct 2025 10:42:22 +0800
+Subject: [PATCH] move frontend dir to nn [pr] (#12470)
+
+---
+ examples/benchmark_onnx.py                    | 2 +-
+ examples/compile_tensorflow.py                | 2 +-
+ examples/openpilot/compile3.py                | 2 +-
+ examples/openpilot/compile4.py                | 2 +-
+ examples/other_mnist/beautiful_mnist_torch.py | 2 +-
+ examples/yolov8-onnx.py                       | 2 +-
+ extra/huggingface_onnx/run_models.py          | 2 +-
+ extra/onnx_helpers.py                         | 2 +-
+ extra/torch_backend/test_inplace.py           | 2 +-
+ extra/torch_backend/test_multigpu.py          | 2 +-
+ setup.py                                      | 1 -
+ test/external/external_benchmark_openpilot.py | 2 +-
+ test/external/external_model_benchmark.py     | 2 +-
+ test/external/external_test_onnx_backend.py   | 2 +-
+ test/external/external_test_onnx_ops.py       | 2 +-
+ test/external/external_test_onnx_runner.py    | 2 +-
+ test/models/test_onnx.py                      | 2 +-
+ test/test_ops.py                              | 2 +-
+ test/test_quantize_onnx.py                    | 2 +-
+ tinygrad/frontend/__init__.py                 | 0
+ tinygrad/{frontend => nn}/onnx.py             | 0
+ tinygrad/{frontend => nn}/torch.py            | 0
+ 22 files changed, 18 insertions(+), 19 deletions(-)
+ delete mode 100644 tinygrad/frontend/__init__.py
+ rename tinygrad/{frontend => nn}/onnx.py (100%)
+ rename tinygrad/{frontend => nn}/torch.py (100%)
+
+diff --git a/examples/benchmark_onnx.py b/examples/benchmark_onnx.py
+index ad7c1ebb18ecd..27568117f32f6 100644
+--- a/examples/benchmark_onnx.py
++++ b/examples/benchmark_onnx.py
+@@ -1,6 +1,6 @@
+ import sys, time
+ from tinygrad import TinyJit, GlobalCounters, fetch, getenv
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from extra.onnx_helpers import get_example_inputs, validate
+ 
+ def load_onnx_model(onnx_file):
+diff --git a/examples/compile_tensorflow.py b/examples/compile_tensorflow.py
+index 33434c831cac3..1962661818890 100644
+--- a/examples/compile_tensorflow.py
++++ b/examples/compile_tensorflow.py
+@@ -8,7 +8,7 @@
+ import subprocess
+ import tensorflow as tf
+ import tf2onnx
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from tinygrad.tensor import Tensor
+ from tinygrad.helpers import to_mv
+ from extra.export_model import export_model_clang, compile_net, jit_model
+diff --git a/examples/openpilot/compile3.py b/examples/openpilot/compile3.py
+index 6159bca5d62bc..1eb4d1f46f188 100644
+--- a/examples/openpilot/compile3.py
++++ b/examples/openpilot/compile3.py
+@@ -10,7 +10,7 @@
+ from tinygrad.engine.realize import CompiledRunner
+ 
+ import onnx
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ 
+ OPENPILOT_MODEL = sys.argv[1] if len(sys.argv) > 1 else "https://github.com/commaai/openpilot/raw/v0.9.7/selfdrive/modeld/models/supercombo.onnx"
+ OUTPUT = sys.argv[2] if len(sys.argv) > 2 else "/tmp/openpilot.pkl"
+diff --git a/examples/openpilot/compile4.py b/examples/openpilot/compile4.py
+index 9f363ff2eac7b..3c13c58d460d0 100644
+--- a/examples/openpilot/compile4.py
++++ b/examples/openpilot/compile4.py
+@@ -1,7 +1,7 @@
+ import sys
+ from tinygrad import Tensor, fetch, GlobalCounters, dtypes
+ from tinygrad.uop.ops import UOp
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from tinygrad.schedule.kernelize import get_kernelize_map
+ from tinygrad.schedule.rangeify import get_rangeify_map
+ from tinygrad.helpers import RANGEIFY
+diff --git a/examples/other_mnist/beautiful_mnist_torch.py b/examples/other_mnist/beautiful_mnist_torch.py
+index 9fa597bae86ad..8e0b7dd64d27a 100644
+--- a/examples/other_mnist/beautiful_mnist_torch.py
++++ b/examples/other_mnist/beautiful_mnist_torch.py
+@@ -27,7 +27,7 @@ def forward(self, x):
+ 
+ if __name__ == "__main__":
+   if getenv("TINY_BACKEND"):
+-    import tinygrad.frontend.torch  # noqa: F401
++    import tinygrad.nn.torch  # noqa: F401
+     device = torch.device("tiny")
+   else:
+     device = torch.device({"METAL":"mps","NV":"cuda"}.get(Device.DEFAULT, "cpu"))
+diff --git a/examples/yolov8-onnx.py b/examples/yolov8-onnx.py
+index bc3d50ab9ede8..637d3b54e66e7 100644
+--- a/examples/yolov8-onnx.py
++++ b/examples/yolov8-onnx.py
+@@ -2,7 +2,7 @@
+ import os
+ from ultralytics import YOLO
+ from pathlib import Path
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from extra.onnx_helpers import get_example_inputs
+ 
+ os.chdir("/tmp")
+diff --git a/extra/huggingface_onnx/run_models.py b/extra/huggingface_onnx/run_models.py
+index fa8771a11afee..2989c58e74f3f 100644
+--- a/extra/huggingface_onnx/run_models.py
++++ b/extra/huggingface_onnx/run_models.py
+@@ -1,7 +1,7 @@
+ import onnx, yaml, tempfile, time, argparse, json
+ from pathlib import Path
+ from typing import Any
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from extra.onnx_helpers import validate, get_example_inputs
+ from extra.huggingface_onnx.huggingface_manager import DOWNLOADS_DIR, snapshot_download_with_retry
+ 
+diff --git a/extra/onnx_helpers.py b/extra/onnx_helpers.py
+index 632d5df8d726a..73a88da0b4444 100644
+--- a/extra/onnx_helpers.py
++++ b/extra/onnx_helpers.py
+@@ -1,6 +1,6 @@
+ from tinygrad import Tensor
+ from tinygrad.tensor import _to_np_dtype
+-from tinygrad.frontend.onnx import OnnxRunner, OnnxValue
++from tinygrad.nn.onnx import OnnxRunner, OnnxValue
+ import numpy as np
+ import onnxruntime as ort
+ 
+diff --git a/extra/torch_backend/test_inplace.py b/extra/torch_backend/test_inplace.py
+index e6f171f05f953..788f8d2eb3891 100644
+--- a/extra/torch_backend/test_inplace.py
++++ b/extra/torch_backend/test_inplace.py
+@@ -1,6 +1,6 @@
+ import unittest
+ import torch
+-import tinygrad.frontend.torch
++import tinygrad.nn.torch
+ torch.set_default_device("tiny")
+ import numpy as np
+ 
+diff --git a/extra/torch_backend/test_multigpu.py b/extra/torch_backend/test_multigpu.py
+index 9a21898132c7b..cff18bf2afe90 100644
+--- a/extra/torch_backend/test_multigpu.py
++++ b/extra/torch_backend/test_multigpu.py
+@@ -1,7 +1,7 @@
+ import unittest
+ from tinygrad.helpers import getenv
+ import torch
+-import tinygrad.frontend.torch
++import tinygrad.nn.torch
+ torch.set_default_device("tiny")
+ import numpy as np
+ 
+diff --git a/setup.py b/setup.py
+index f90a52b5845a1..39dd40da60481 100644
+--- a/setup.py
++++ b/setup.py
+@@ -31,7 +31,6 @@
+         'tinygrad.codegen.opt',
+         'tinygrad.codegen.late',
+         'tinygrad.engine',
+-        'tinygrad.frontend',
+         'tinygrad.nn',
+         'tinygrad.renderer',
+         'tinygrad.runtime',
+diff --git a/test/external/external_benchmark_openpilot.py b/test/external/external_benchmark_openpilot.py
+index 158f41f6a1326..4d097f91d13d3 100644
+--- a/test/external/external_benchmark_openpilot.py
++++ b/test/external/external_benchmark_openpilot.py
+@@ -1,6 +1,6 @@
+ import time, sys, hashlib
+ from pathlib import Path
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from tinygrad import Tensor, dtypes, TinyJit
+ from tinygrad.helpers import IMAGE, GlobalCounters, fetch, colored, getenv, trange
+ import numpy as np
+diff --git a/test/external/external_model_benchmark.py b/test/external/external_model_benchmark.py
+index b29892f2d9779..a5ecac462393a 100644
+--- a/test/external/external_model_benchmark.py
++++ b/test/external/external_model_benchmark.py
+@@ -4,7 +4,7 @@
+ torch.set_num_threads(1)
+ import onnxruntime as ort
+ from onnx2torch import convert
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from tinygrad.helpers import OSX, DEBUG, fetch, getenv
+ from tinygrad.dtype import _to_np_dtype
+ from tinygrad import Tensor, Device, dtypes
+diff --git a/test/external/external_test_onnx_backend.py b/test/external/external_test_onnx_backend.py
+index 112ccd797c395..6f6a4fbcb70ea 100644
+--- a/test/external/external_test_onnx_backend.py
++++ b/test/external/external_test_onnx_backend.py
+@@ -6,7 +6,7 @@
+ from tinygrad import Tensor, Device, dtypes
+ from tinygrad.helpers import getenv, OSX
+ from tinygrad.device import is_dtype_supported
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ 
+ # pip3 install tabulate
+ pytest_plugins = 'onnx.backend.test.report',
+diff --git a/test/external/external_test_onnx_ops.py b/test/external/external_test_onnx_ops.py
+index e4be34fa5eca8..02b700daa2431 100644
+--- a/test/external/external_test_onnx_ops.py
++++ b/test/external/external_test_onnx_ops.py
+@@ -5,7 +5,7 @@
+ from typing import Any
+ import unittest, onnx, tempfile
+ from tinygrad import dtypes, Tensor
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ import numpy as np
+ from extra.onnx_helpers import validate
+ from onnx.defs import ONNX_DOMAIN, AI_ONNX_PREVIEW_TRAINING_DOMAIN
+diff --git a/test/external/external_test_onnx_runner.py b/test/external/external_test_onnx_runner.py
+index f0d8941b4537e..0b853bc22ed15 100644
+--- a/test/external/external_test_onnx_runner.py
++++ b/test/external/external_test_onnx_runner.py
+@@ -3,7 +3,7 @@
+ from tinygrad import dtypes, Tensor
+ from tinygrad.uop.ops import Ops
+ from tinygrad.device import is_dtype_supported
+-from tinygrad.frontend.onnx import OnnxRunner, OnnxDataType
++from tinygrad.nn.onnx import OnnxRunner, OnnxDataType
+ from hypothesis import given, strategies as st
+ 
+ # copied from test_const_folding.py
+diff --git a/test/models/test_onnx.py b/test/models/test_onnx.py
+index 34e5a1320d9b3..34ed658e4316c 100644
+--- a/test/models/test_onnx.py
++++ b/test/models/test_onnx.py
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env python
+ import unittest
+ import numpy as np
+-from tinygrad.frontend.onnx import OnnxRunner
++from tinygrad.nn.onnx import OnnxRunner
+ from tinygrad.device import Device
+ from tinygrad.helpers import fetch, Context
+ 
+diff --git a/test/test_ops.py b/test/test_ops.py
+index dbd232edcf80d..952f3a84f0ac3 100644
+--- a/test/test_ops.py
++++ b/test/test_ops.py
+@@ -8,7 +8,7 @@
+ from tinygrad.device import is_dtype_supported
+ 
+ if getenv("TINY_BACKEND"):
+-  import tinygrad.frontend.torch # noqa: F401 # pylint: disable=unused-import
++  import tinygrad.nn.torch # noqa: F401 # pylint: disable=unused-import
+   torch.set_default_device("tiny")
+ 
+ if CI:
+diff --git a/test/test_quantize_onnx.py b/test/test_quantize_onnx.py
+index 005d978902047..cfaa44cc5d7f7 100644
+--- a/test/test_quantize_onnx.py
++++ b/test/test_quantize_onnx.py
+@@ -68,7 +68,7 @@ def test_quant_128(self, sz=128):
+       import onnx # noqa: F401 # pylint: disable=unused-import
+     except ImportError:
+       raise unittest.SkipTest()
+-    from tinygrad.frontend.onnx import OnnxRunner
++    from tinygrad.nn.onnx import OnnxRunner
+     out_file = get_quantized_model(sz)
+     run_onnx = OnnxRunner(out_file)
+     inp = Tensor(np.random.uniform(size=(sz, sz)).astype(np.float32))
+diff --git a/tinygrad/frontend/__init__.py b/tinygrad/frontend/__init__.py
+deleted file mode 100644
+index e69de29bb2d1d..0000000000000
+diff --git a/tinygrad/frontend/onnx.py b/tinygrad/nn/onnx.py
+similarity index 100%
+rename from tinygrad/frontend/onnx.py
+rename to tinygrad/nn/onnx.py
+diff --git a/tinygrad/frontend/torch.py b/tinygrad/nn/torch.py
+similarity index 100%
+rename from tinygrad/frontend/torch.py
+rename to tinygrad/nn/torch.py

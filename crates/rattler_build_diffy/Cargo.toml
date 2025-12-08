@@ -1,0 +1,21 @@
+[package]
+name = "rattler_build_diffy"
+version = "0.4.2"
+authors = ["Brandon Williams <bwilliams.eng@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Fork of diffy, for rattler-build with added multi-patch and fuzzy support. Tools for finding and manipulating differences between files"
+repository = "https://github.com/bmwill/diffy"
+readme = "README.md"
+keywords = ["diff", "patch", "merge"]
+categories = ["text-processing"]
+edition = "2024"
+
+[dependencies]
+nu-ansi-term = "0.50"
+strsim = "0.11.1"
+thiserror = "2.0.12"
+
+[dev-dependencies]
+insta = { workspace = true, features = ["glob"] }
+rstest = { workspace = true }
+fs-err = { workspace = true }

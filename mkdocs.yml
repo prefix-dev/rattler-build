@@ -104,8 +104,6 @@ nav:
   - Getting started: getting_started.md
   - High-level overview: highlevel.md
   - Understanding the logs: understanding_terminal_output.md
-  # - Tutorials:
-  #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
       - tutorials/index.md
       - "Python": tutorials/python.md
@@ -117,17 +115,13 @@ nav:
       - "R": tutorials/r.md
       - "Repackaging": tutorials/repackaging.md
       - "Converting from conda-build": converting_from_conda_build.md
-
   - Build options:
       - Advanced options: build_options.md
-
       - Selector syntax (if/then): selectors.md
       - Build script: build_script.md
       - Variants: variants.md
       - Configuration: config.md
-
       - Compilers and cross compilation: compilers.md
-
       - Experimental features: experimental_features.md
       - Multiple output cache: multiple_output_cache.md
       - Sandbox: sandbox.md
@@ -143,7 +137,6 @@ nav:
       - Reproducible builds: rebuild.md
 
   - Publishing packages:
-      # - Terminal User Interface (TUI): tui.md
       - Authentication & upload: authentication_and_upload.md
       - Publishing packages: publish.md
       - Publishing to conda-forge: conda_forge.md
@@ -154,12 +147,26 @@ nav:
       - Package scripts: special_files.md
       - Package Internals: internals.md
       - System integration: system_integration.md
+  - Python Bindings:
+      - Reference:
+          - py-rattler-build/reference/index.md
+          - py-rattler-build/reference/recipe_generation.md
+          - py-rattler-build/reference/stage0.md
+          - py-rattler-build/reference/stage1.md
+          - py-rattler-build/reference/rendering.md
+          - py-rattler-build/reference/package.md
+          - py-rattler-build/reference/configuration.md
+          - py-rattler-build/reference/upload.md
+          - py-rattler-build/reference/exceptions.md
+      - Tutorials:
+          - py-rattler-build/tutorials/recipe_rendering_basics.ipynb
+          - py-rattler-build/tutorials/multi_output_and_staging.ipynb
+          - py-rattler-build/tutorials/package_inspection_and_testing.ipynb
 
   - References:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
       - Jinja: reference/jinja.md
-      - Python Bindings: reference/python_bindings.md
 
 plugins:
   - search
@@ -178,6 +185,10 @@ plugins:
           options:
             separate_signature: true
             show_source: false
+            members_order: source
+  - mkdocs-jupyter:
+      execute: true
+      allow_errors: false
   - mike:
 # These fields are all optional; the defaults are as below...
 # alias_type: symlink

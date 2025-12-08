@@ -33,6 +33,7 @@ pre-commit:
       glob: "*.{py,pyi}"
       exclude:
         - test-data/conda-forge/**/*
+        - test-data/recipes/test-rendering/*
       stage_fixed: true
       group:
         piped: true
@@ -52,6 +53,8 @@ pre-commit:
       exclude:
         - test-data/recipes/test-parsing/*.yaml
         - test-data/conda-forge/**/*
+        # ignore them all because we need exact matches with newline at end etc.
+        - test-data/recipes/test-rendering/*
       group:
         jobs:
           - name: dprint check
@@ -59,6 +62,10 @@ pre-commit:
           - name: dprint fmt
             run: pixi {run} dprint-fmt {staged_files}
             stage_fixed: true
+    - name: nbstripout
+      glob: "*.ipynb"
+      stage_fixed: true
+      run: pixi {run} nbstripout {staged_files}
     - name: typos
       stage_fixed: true
       run: pixi {run} typos

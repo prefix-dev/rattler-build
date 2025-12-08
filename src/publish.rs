@@ -7,8 +7,8 @@ use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::BuildString;
 use crate::opt::PublishData;
-use crate::recipe::parser::BuildString;
 use crate::render::reporters::GatewayReporter;
 use crate::tool_configuration::{self, Configuration};
 use crate::types::Output;

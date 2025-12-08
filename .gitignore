@@ -5,6 +5,7 @@ target/
 __pycache__/
 .pytest_cache/
 .DS_STORE
+checkouts
 
 # mkdocs
 .cache
@@ -14,3 +15,6 @@ site
 .pixi
 target-pixi
 *.conda
+
+# python
+.ipynb_checkpoints
