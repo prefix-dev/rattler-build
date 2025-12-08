@@ -68,7 +68,7 @@ use rattler_conda_types::{
     package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_index::IndexFsConfig;
+use rattler_index::{ensure_channel_initialized_fs, ensure_channel_initialized_s3};
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
@@ -1198,60 +1198,65 @@ pub async fn publish_packages(
     publish_data: PublishData,
     log_handler: &Option<console_utils::LoggingOutputHandler>,
 ) -> Result<(), miette::Error> {
-    // Check if the target is a local channel and create initial index if needed
-    let target_url = publish_data.to.clone();
-    let (is_local, target_dir) = match &target_url {
-        NamedChannelOrUrl::Url(url) if url.scheme() == "file" => {
-            (true, Some(PathBuf::from(url.path())))
-        }
-        NamedChannelOrUrl::Path(path) => (true, Some(PathBuf::from(path.as_str()))),
-        NamedChannelOrUrl::Url(_) | NamedChannelOrUrl::Name(_) => (false, None),
-    };
-
-    // For local channels, create an initial empty index if it doesn't exist
-    if is_local && let Some(ref dir) = target_dir {
-        // Check if any repodata.json exists in the channel (either noarch or platform-specific)
-        let channel_exists = dir.exists()
-            && (dir.join("noarch").join("repodata.json").exists()
-                || dir
-                    .read_dir()
-                    .ok()
-                    .map(|entries| {
-                        entries
-                            .filter_map(Result::ok)
-                            .any(|entry| entry.path().join("repodata.json").exists())
-                    })
-                    .unwrap_or(false));
-
-        if !channel_exists {
-            tracing::info!(
-                "Creating initial index for local channel at {}",
-                dir.display()
-            );
-
-            // Create the subdirectory structure
-            fs::create_dir_all(dir.join("noarch")).into_diagnostic()?;
-
-            // Run initial indexing to create empty repodata
-            let index_config = IndexFsConfig {
-                channel: dir.clone(),
-                target_platform: Some(publish_data.build.target_platform),
-                repodata_patch: None,
-                write_zst: false,
-                write_shards: false,
-                force: false,
-                max_parallel: num_cpus::get_physical(),
-                multi_progress: None,
-            };
-
-            rattler_index::index_fs(index_config)
-                .await
-                .map_err(|e| miette::miette!("Failed to create initial index: {}", e))?;
-        }
-    }
-
     // Create tool configuration for cache clearing and building
     let tool_config = get_tool_config(&publish_data.build, log_handler)?;
+
+    // Convert target to a channel URL
+    let target_url = publish_data.to.clone();
+    let channel_url = target_url
+        .clone()
+        .into_base_url(&tool_config.channel_config)
+        .into_diagnostic()?;
+
+    // Ensure the channel is initialized based on its type
+    match channel_url.url().scheme() {
+        "file" => {
+            let dir = PathBuf::from(channel_url.url().path());
+            if !dir.exists() {
+                tracing::info!(
+                    "Creating initial index for local channel at {}",
+                    dir.display()
+                );
+
+                fs::create_dir_all(&dir).into_diagnostic()?;
+
+                ensure_channel_initialized_fs(&dir).await.map_err(|e| {
+                    miette::miette!(
+                        "Failed to initialize local channel at {}: {}",
+                        dir.display(),
+                        e
+                    )
+                })?;
+            } else {
+                // check if it is a valid channel by looking for `noarch/repodata.json` file
+                let noarch_repodata = dir.join("noarch").join("repodata.json");
+                if !noarch_repodata.exists() {
+                    return Err(miette::miette!(
+                        "The specified local channel at {} is not initialized (missing {}). Please initialize the channel first.",
+                        dir.display(),
+                        noarch_repodata.display()
+                    ));
+                }
+            }
+        }
+        #[cfg(feature = "s3")]
+        "s3" => {
+            // Resolve S3 credentials and ensure the channel is initialized
+            let resolved_s3_credentials = tool_configuration::resolve_s3_credentials(
+                &publish_data.build.common.s3_config,
+                publish_data.build.common.auth_file.clone(),
+                channel_url.url(),
+            )
+            .await
+            .into_diagnostic()?;
+
+            ensure_channel_initialized_s3(channel_url.as_ref(), &resolved_s3_credentials)
+                .await
+                .map_err(|e| miette::miette!("Failed to initialize S3 channel: {}", e))?;
+        }
+        // Remote channels (http/https, quetz, prefix, etc.) handle initialization on the server side
+        _ => {}
+    }
 
     // Check if we're publishing pre-built packages or building from recipes
     let built_packages = if !publish_data.package_files.is_empty() {
