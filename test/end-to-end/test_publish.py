@@ -30,7 +30,8 @@ def test_publish_to_new_local_channel(
     rattler_build(
         "publish",
         str(package),
-        "--to", f"file://{channel_dir}",
+        "--to",
+        f"file://{channel_dir}",
     )
 
     # Check that channel was created and initialized
@@ -46,7 +47,6 @@ def test_publish_to_new_local_channel(
     # Find the subdir where the package was uploaded
     package_found = False
     for repodata_file in repodata_files:
-
         packages_in_subdir = list(repodata_file.parent.glob("*.tar.bz2")) + list(
             repodata_file.parent.glob("*.conda")
         )
@@ -80,13 +80,12 @@ def test_publish_to_existing_local_channel(
     rattler_build(
         "publish",
         str(package),
-        "--to", f"file://{channel_dir}",
+        "--to",
+        f"file://{channel_dir}",
     )
 
     # Check that package was uploaded
-    package_found = any(
-        list(channel_dir.glob(f"*/{package.name}"))
-    ) or any(
+    package_found = any(list(channel_dir.glob(f"*/{package.name}"))) or any(
         p.name == package.name for p in channel_dir.rglob("*.tar.bz2")
     )
     assert package_found
@@ -111,12 +110,15 @@ def test_publish_to_uninitialized_existing_channel_fails(
         rattler_build(
             "publish",
             str(package),
-            "--to", f"file://{channel_dir}",
+            "--to",
+            f"file://{channel_dir}",
         )
 
     # The error message should mention that the channel is not initialized
-    assert "not initialized" in str(exc_info.value.output).lower() or \
-           "missing" in str(exc_info.value.output).lower()
+    assert (
+        "not initialized" in str(exc_info.value.output).lower()
+        or "missing" in str(exc_info.value.output).lower()
+    )
 
 
 def test_publish_recipe_to_local_channel(
@@ -129,7 +131,8 @@ def test_publish_recipe_to_local_channel(
     rattler_build(
         "publish",
         str(recipes / "globtest"),
-        "--to", f"file://{channel_dir}",
+        "--to",
+        f"file://{channel_dir}",
     )
 
     # Check that channel was created and has packages
@@ -159,7 +162,8 @@ def test_publish_with_force_overwrites(
     rattler_build(
         "publish",
         str(package),
-        "--to", f"file://{channel_dir}",
+        "--to",
+        f"file://{channel_dir}",
     )
 
     # Publishing again without --force should fail
@@ -167,14 +171,16 @@ def test_publish_with_force_overwrites(
         rattler_build(
             "publish",
             str(package),
-            "--to", f"file://{channel_dir}",
+            "--to",
+            f"file://{channel_dir}",
         )
 
     # Publishing with --force should succeed
     rattler_build(
         "publish",
         str(package),
-        "--to", f"file://{channel_dir}",
+        "--to",
+        f"file://{channel_dir}",
         "--force",
     )
 
@@ -194,7 +200,8 @@ def test_publish_with_path_syntax(
     rattler_build(
         "publish",
         str(package),
-        "--to", str(channel_dir),
+        "--to",
+        str(channel_dir),
     )
 
     # Check that channel was created
