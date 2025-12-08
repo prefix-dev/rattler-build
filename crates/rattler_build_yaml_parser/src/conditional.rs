@@ -132,8 +132,9 @@ where
         ParseError::expected_type("scalar", "non-scalar", get_span(condition_node))
     })?;
 
+    let condition_span = *condition_scalar.span();
     let condition = JinjaExpression::new(condition_scalar.as_str().to_string())
-        .map_err(|e| ParseError::jinja_error(e, *condition_scalar.span()))?;
+        .map_err(|e| ParseError::jinja_error(e, condition_span))?;
 
     // Get the "then" field
     let then_yaml = mapping
@@ -153,6 +154,7 @@ where
         condition,
         then,
         else_value,
+        condition_span: Some(condition_span),
     }))
 }
 

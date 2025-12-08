@@ -172,7 +172,6 @@ fn find_variants(
         .with_recipe_path(recipe_path)
         .with_os_env_var_keys(os_env_var_keys);
 
-    tracing::info!("All variants: {:#?}", variant_config.variants);
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
         render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)

@@ -63,8 +63,9 @@ fn parse_conditional_test_item(
             .with_message("'if' condition must be a string")
     })?;
 
+    let condition_span = *condition_str.span();
     let condition = JinjaExpression::new(condition_str.as_str().to_string())
-        .map_err(|e| ParseError::jinja_error(e, *condition_str.span()))?;
+        .map_err(|e| ParseError::jinja_error(e, condition_span))?;
 
     let then_node = mapping
         .get("then")
@@ -82,6 +83,7 @@ fn parse_conditional_test_item(
         condition,
         then: then_tests,
         else_value: else_tests,
+        condition_span: Some(condition_span),
     }))
 }
 

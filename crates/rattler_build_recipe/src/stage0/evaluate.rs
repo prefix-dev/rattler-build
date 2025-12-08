@@ -102,6 +102,7 @@ fn render_template_to_variable(
 ) -> Result<Variable, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
+    let undefined_behavior = jinja_config.undefined_behavior;
     let mut jinja = Jinja::new(jinja_config);
 
     // Use with_context to add all variables from the evaluation context
@@ -120,20 +121,8 @@ fn render_template_to_variable(
         // Extract the expression between ${{ and }}
         let expression = trimmed[3..trimmed.len() - 2].trim();
 
-        // Simple expression - use compile_expression for type-preserving evaluation
-        let env = jinja.env();
-        let compiled_expr = match env.compile_expression(expression) {
-            Ok(expr) => expr,
-            Err(e) => {
-                return Err(ParseError::jinja_error(
-                    format!("Failed to compile expression '{}': {}", expression, e),
-                    span.cloned().unwrap_or(Span::new_blank()),
-                ));
-            }
-        };
-
-        // Evaluate the expression with the context to get a typed Value
-        match compiled_expr.eval(jinja.context()) {
+        // Simple expression - use jinja.eval() for type-preserving evaluation with variable tracking
+        match jinja.eval(expression) {
             Ok(val) => val,
             Err(e) => {
                 // Transfer the tracked variables from Jinja to EvaluationContext
@@ -145,7 +134,10 @@ fn render_template_to_variable(
                 }
 
                 // Build error with suggestion based on undefined variables
-                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let undefined_vars: Vec<String> = jinja
+                    .undefined_variables_excluding_functions()
+                    .into_iter()
+                    .collect();
                 let mut error = ParseError::jinja_error(
                     format!("Failed to evaluate expression '{}': {}", expression, e),
                     span.cloned().unwrap_or(Span::new_blank()),
@@ -183,7 +175,10 @@ fn render_template_to_variable(
                 }
 
                 // Build error with suggestion based on undefined variables
-                let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+                let undefined_vars: Vec<String> = jinja
+                    .undefined_variables_excluding_functions()
+                    .into_iter()
+                    .collect();
                 let mut error = ParseError::jinja_error(
                     format!("Failed to render template: {}", e),
                     span.cloned().unwrap_or(Span::new_blank()),
@@ -208,6 +203,52 @@ fn render_template_to_variable(
             }
         };
 
+        // Transfer tracked variables and check for undefined ones
+        for var in jinja.accessed_variables() {
+            context.track_access(&var);
+        }
+        for var in jinja.undefined_variables() {
+            context.track_undefined(&var);
+        }
+
+        // Check for undefined variables and error out (even if rendering succeeded)
+        // Only error if we're not in Lenient mode
+        let undefined_vars: Vec<String> = jinja
+            .undefined_variables_excluding_functions()
+            .into_iter()
+            .collect();
+        if !undefined_vars.is_empty()
+            && !matches!(
+                undefined_behavior,
+                rattler_build_jinja::UndefinedBehavior::Lenient
+            )
+        {
+            let mut error = ParseError::jinja_error(
+                format!(
+                    "Undefined variable(s) in template: {}",
+                    undefined_vars
+                        .iter()
+                        .map(|s| format!("'{}'", s))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                span.cloned().unwrap_or(Span::new_blank()),
+            );
+            let suggestion = if undefined_vars.len() == 1 {
+                format!(
+                    "Variable '{}' is not defined in the context",
+                    undefined_vars[0]
+                )
+            } else {
+                format!(
+                    "Variables {} are not defined in the context",
+                    undefined_vars.join(", ")
+                )
+            };
+            error = error.with_suggestion(suggestion);
+            return Err(error);
+        }
+
         // Parse the string to detect type (for simple values like "true" or "42")
         // This is a fallback - it won't preserve types for complex expressions
         return Ok(parse_rendered_value(&rendered_str));
@@ -219,6 +260,45 @@ fn render_template_to_variable(
     }
     for var in jinja.undefined_variables() {
         context.track_undefined(&var);
+    }
+
+    // Check for undefined variables and error out (even if evaluation succeeded)
+    // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
+    // Only error if we're not in Lenient mode
+    let undefined_vars: Vec<String> = jinja
+        .undefined_variables_excluding_functions()
+        .into_iter()
+        .collect();
+    if !undefined_vars.is_empty()
+        && !matches!(
+            undefined_behavior,
+            rattler_build_jinja::UndefinedBehavior::Lenient
+        )
+    {
+        let mut error = ParseError::jinja_error(
+            format!(
+                "Undefined variable(s) in expression: {}",
+                undefined_vars
+                    .iter()
+                    .map(|s| format!("'{}'", s))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            span.cloned().unwrap_or(Span::new_blank()),
+        );
+        let suggestion = if undefined_vars.len() == 1 {
+            format!(
+                "Variable '{}' is not defined in the context",
+                undefined_vars[0]
+            )
+        } else {
+            format!(
+                "Variables {} are not defined in the context",
+                undefined_vars.join(", ")
+            )
+        };
+        error = error.with_suggestion(suggestion);
+        return Err(error);
     }
 
     // Wrap the minijinja::Value in our Variable type
@@ -320,6 +400,7 @@ fn render_template(
 ) -> Result<String, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
+    let undefined_behavior = jinja_config.undefined_behavior;
     let mut jinja = Jinja::new(jinja_config);
 
     // Use with_context to add all variables from the evaluation context
@@ -337,6 +418,46 @@ fn render_template(
             for var in jinja.undefined_variables() {
                 context.track_undefined(&var);
             }
+
+            // Check for undefined variables and error out (even if rendering succeeded)
+            // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
+            // Only error if we're not in Lenient mode
+            let undefined_vars: Vec<String> = jinja
+                .undefined_variables_excluding_functions()
+                .into_iter()
+                .collect();
+            if !undefined_vars.is_empty()
+                && !matches!(
+                    undefined_behavior,
+                    rattler_build_jinja::UndefinedBehavior::Lenient
+                )
+            {
+                let mut error = ParseError::jinja_error(
+                    format!(
+                        "Undefined variable(s) in template: {}",
+                        undefined_vars
+                            .iter()
+                            .map(|s| format!("'{}'", s))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    span.map_or_else(Span::new_blank, |s| *s),
+                );
+                let suggestion = if undefined_vars.len() == 1 {
+                    format!(
+                        "Variable '{}' is not defined in the context",
+                        undefined_vars[0]
+                    )
+                } else {
+                    format!(
+                        "Variables {} are not defined in the context",
+                        undefined_vars.join(", ")
+                    )
+                };
+                error = error.with_suggestion(suggestion);
+                return Err(error);
+            }
+
             Ok(result)
         }
         Err(e) => {
@@ -349,7 +470,10 @@ fn render_template(
             }
 
             // Build error suggestion based on undefined variables
-            let undefined_vars: Vec<String> = jinja.undefined_variables().into_iter().collect();
+            let undefined_vars: Vec<String> = jinja
+                .undefined_variables_excluding_functions()
+                .into_iter()
+                .collect();
             let mut error = ParseError::jinja_error(
                 format!("Template rendering failed: {} (template: {})", e, template),
                 span.map_or_else(Span::new_blank, |s| *s),
@@ -385,6 +509,7 @@ fn render_template(
 fn evaluate_condition(
     expr: &JinjaExpression,
     context: &EvaluationContext,
+    span: Option<&Span>,
 ) -> Result<bool, ParseError> {
     // Create a Jinja instance with the configuration from the evaluation context
     let jinja_config = context.jinja_config().clone();
@@ -398,7 +523,7 @@ fn evaluate_condition(
     let value = jinja.eval(expr.source()).map_err(|e| {
         ParseError::jinja_error(
             format!("Failed to evaluate condition '{}': {}", expr.source(), e),
-            Span::new_blank(),
+            span.cloned().unwrap_or(Span::new_blank()),
         )
     })?;
 
@@ -408,11 +533,13 @@ fn evaluate_condition(
     }
 
     // Check for undefined variables and error out
-    let undefined_vars = jinja.undefined_variables();
-    for var in &undefined_vars {
-        context.track_undefined(var);
+    // Track all undefined variables (including function names for completeness)
+    for var in jinja.undefined_variables() {
+        context.track_undefined(&var);
     }
 
+    // But only error on actual undefined variables (not function names)
+    let undefined_vars = jinja.undefined_variables_excluding_functions();
     if !undefined_vars.is_empty() {
         return Err(
             ParseError::jinja_error(
@@ -421,7 +548,7 @@ fn evaluate_condition(
                     expr.source(),
                     undefined_vars.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
                 ),
-                Span::new_blank(),
+                span.cloned().unwrap_or(Span::new_blank()),
             )
             .with_suggestion("Make sure all variables used in conditions are defined in the variant config or context")
         );
@@ -598,7 +725,8 @@ where
                 }
             }
             Item::Conditional(cond) => {
-                let condition_met = evaluate_condition(&cond.condition, context)?;
+                let condition_met =
+                    evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
 
                 let items_to_process = if condition_met {
                     &cond.then
@@ -2128,7 +2256,8 @@ pub fn evaluate_test(
         }
         Item::Conditional(cond) => {
             // Evaluate the condition
-            let condition_met = evaluate_condition(&cond.condition, context)?;
+            let condition_met =
+                evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
 
             let tests_to_evaluate = if condition_met {
                 &cond.then
@@ -2913,10 +3042,10 @@ mod tests {
         ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("unix".to_string()).unwrap();
-        assert!(evaluate_condition(&expr, &ctx).unwrap());
+        assert!(evaluate_condition(&expr, &ctx, None).unwrap());
 
         let expr2 = JinjaExpression::new("win".to_string()).unwrap();
-        assert!(!evaluate_condition(&expr2, &ctx).unwrap());
+        assert!(!evaluate_condition(&expr2, &ctx, None).unwrap());
     }
 
     #[test]
@@ -2926,10 +3055,10 @@ mod tests {
         ctx.insert("win".to_string(), Variable::from(false));
 
         let expr = JinjaExpression::new("not unix".to_string()).unwrap();
-        assert!(!evaluate_condition(&expr, &ctx).unwrap());
+        assert!(!evaluate_condition(&expr, &ctx, None).unwrap());
 
         let expr2 = JinjaExpression::new("not win".to_string()).unwrap();
-        assert!(evaluate_condition(&expr2, &ctx).unwrap());
+        assert!(evaluate_condition(&expr2, &ctx, None).unwrap());
     }
 
     #[test]
@@ -2990,6 +3119,7 @@ mod tests {
                     "msvc".to_string(),
                     None,
                 )])),
+                condition_span: None,
             }),
         ]);
 
@@ -3043,6 +3173,7 @@ mod tests {
                 "msvc".to_string(),
                 None,
             )])),
+            condition_span: None,
         })]);
 
         // Evaluate the list - only unix branch is taken
@@ -3175,6 +3306,136 @@ mod tests {
         assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("platform"));
         assert!(accessed.contains("arch"));
+    }
+
+    #[test]
+    fn test_undefined_variable_in_conditional_reports_correct_line() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // The conditional 'if: undefined_var' is on line 12
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: test-pkg
+  version: 1.0.0
+
+requirements:
+  run:
+    - python
+    - if: undefined_var
+      then:
+        - numpy
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::SingleOutput(recipe) => {
+                let ctx = EvaluationContext::new();
+                let result = recipe.evaluate(&ctx);
+
+                assert!(result.is_err());
+                let err = result.unwrap_err();
+
+                // Check that the error span points to the correct line
+                let span = err.span();
+                assert!(
+                    span.start().is_some(),
+                    "Error span should have start position"
+                );
+                let start = span.start().unwrap();
+                // The 'if: undefined_var' is on line 10 (1-indexed)
+                assert_eq!(
+                    start.line(),
+                    10,
+                    "Error should point to line 10 where 'undefined_var' is used"
+                );
+            }
+            _ => panic!("Expected single recipe"),
+        }
+    }
+
+    #[test]
+    fn test_undefined_variable_in_template_reports_correct_line() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // The undefined variable is used in the package name on line 7
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: ${{ UNDEFINED }}
+  version: 1.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::SingleOutput(recipe) => {
+                let ctx = EvaluationContext::new();
+                let result = recipe.evaluate(&ctx);
+
+                assert!(result.is_err());
+                let err = result.unwrap_err();
+
+                // Check that the error span points to the correct line
+                let span = err.span();
+                assert!(
+                    span.start().is_some(),
+                    "Error span should have start position"
+                );
+                let start = span.start().unwrap();
+                // The '${{ UNDEFINED }}' is on line 4 (1-indexed)
+                assert_eq!(
+                    start.line(),
+                    4,
+                    "Error should point to line 4 where 'UNDEFINED' is used in the package name"
+                );
+            }
+            _ => panic!("Expected single recipe"),
+        }
+    }
+
+    #[test]
+    fn test_undefined_variable_in_inline_conditional_reports_correct_line() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // The undefined variable is used in an inline conditional on line 4
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: ${{ "foo" if notsetstring else "bar" }}
+  version: 1.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::SingleOutput(recipe) => {
+                let ctx = EvaluationContext::new();
+                let result = recipe.evaluate(&ctx);
+
+                assert!(
+                    result.is_err(),
+                    "Should error on undefined variable in inline conditional"
+                );
+                let err = result.unwrap_err();
+
+                // Check that the error span points to the correct line
+                let span = err.span();
+                assert!(
+                    span.start().is_some(),
+                    "Error span should have start position"
+                );
+                let start = span.start().unwrap();
+                // The inline conditional with undefined variable is on line 4 (1-indexed)
+                assert_eq!(
+                    start.line(),
+                    4,
+                    "Error should point to line 4 where 'notsetstring' is used in inline conditional"
+                );
+            }
+            _ => panic!("Expected single recipe"),
+        }
     }
 
     #[test]

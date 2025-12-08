@@ -298,6 +298,43 @@ impl Jinja {
             .unwrap_or_default()
     }
 
+    /// Get the set of variables that were accessed but undefined,
+    /// excluding known Jinja function names that are registered in the environment.
+    ///
+    /// This is useful for error reporting because functions like `compiler`, `pin_subpackage`,
+    /// etc. are looked up in the context first (where they appear as "undefined"), but are
+    /// then resolved from the environment.
+    pub fn undefined_variables_excluding_functions(&self) -> HashSet<String> {
+        const KNOWN_FUNCTIONS: &[&str] = &[
+            "match",
+            "cdt",
+            "compiler",
+            "stdlib",
+            "pin_subpackage",
+            "pin_compatible",
+            "is_linux",
+            "is_osx",
+            "is_windows",
+            "is_unix",
+            "load_from_file",
+            "git",
+            "env",
+            "cmp",
+            "hash",
+        ];
+
+        self.undefined_variables
+            .lock()
+            .map(|undefined| {
+                undefined
+                    .iter()
+                    .filter(|name| !KNOWN_FUNCTIONS.contains(&name.as_str()))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Clear the accessed and undefined variables trackers
     pub fn clear_tracking(&self) {
         if let Ok(mut accessed) = self.accessed_variables.lock() {

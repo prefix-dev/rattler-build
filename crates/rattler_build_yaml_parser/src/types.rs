@@ -261,6 +261,9 @@ pub struct Conditional<T> {
     /// The values to use if condition is false
     #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
     pub else_value: Option<ListOrItem<Value<T>>>,
+    /// Optional span for the condition expression (for error reporting)
+    #[serde(skip)]
+    pub condition_span: Option<Span>,
 }
 
 impl<T> Conditional<T> {
