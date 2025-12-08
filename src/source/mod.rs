@@ -127,7 +127,7 @@ fn compute_dest_dir(work_dir: &Path, target_directory: Option<&PathBuf>) -> Path
 }
 
 /// Convert a stage1 GitSource to a cache GitSource
-fn convert_git_source(
+pub(crate) fn convert_git_source(
     git_src: &rattler_build_recipe::stage1::source::GitSource,
     recipe_dir: &Path,
 ) -> Result<CacheGitSource, SourceError> {
@@ -174,7 +174,7 @@ fn convert_git_source(
 }
 
 /// Convert a stage1 UrlSource to a cache UrlSource
-fn convert_url_source(
+pub(crate) fn convert_url_source(
     url_src: &rattler_build_recipe::stage1::source::UrlSource,
 ) -> Result<CacheUrlSource, SourceError> {
     use rattler_build_source_cache::Checksum;

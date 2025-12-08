@@ -951,9 +951,7 @@ mod tests {
 
         let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
         for source in sources {
-            use rattler_build_source_cache::{
-                Source as CacheSource, SourceCacheBuilder, UrlSource as CacheUrlSource,
-            };
+            use rattler_build_source_cache::{Source as CacheSource, SourceCacheBuilder};
 
             let comparison_dir = tempfile::tempdir().into_diagnostic()?;
 
@@ -976,13 +974,13 @@ mod tests {
             // Convert source and fetch from cache
             let cache_source = match &source {
                 Source::Git(git_src) => {
-                    let cache_git_source = git_src
-                        .to_cache_source(&recipe_dir)
+                    let cache_git_source = super::convert_git_source(git_src, &recipe_dir)
                         .expect("Failed to convert git source to cache source");
                     CacheSource::Git(cache_git_source)
                 }
                 Source::Url(url_src) => {
-                    let cache_url_source = CacheUrlSource::try_from(url_src).unwrap();
+                    let cache_url_source = super::convert_url_source(url_src)
+                        .expect("Failed to convert url source to cache source");
                     CacheSource::Url(cache_url_source)
                 }
                 Source::Path(_) => {
