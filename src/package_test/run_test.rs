@@ -773,7 +773,8 @@ impl CommandsTest {
         let deps = self.requirements.clone();
 
         let pkg_str = pkg.to_string();
-        let span = tracing::info_span!("Running script test for", recipe = %pkg_str, span_color = pkg_str);
+        let span =
+            tracing::info_span!("Running script test for", recipe = %pkg_str, span_color = pkg_str);
         let _guard = span.enter();
 
         let build_prefix = if !deps.build.is_empty() {
@@ -885,7 +886,11 @@ impl DownstreamTest {
         let downstream_spec = self.downstream.clone();
         let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
 
-        let span = tracing::info_span!("Running downstream test for", package = downstream_spec, span_color = pkg_id);
+        let span = tracing::info_span!(
+            "Running downstream test for",
+            package = downstream_spec,
+            span_color = pkg_id
+        );
         let _guard = span.enter();
 
         // first try to resolve an environment with the downstream spec and our

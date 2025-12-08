@@ -494,7 +494,9 @@ async fn upload_to_prefix(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_upload::upload::opt::PrefixData;
+    use rattler_upload::upload::opt::{
+        AttestationSource, ForceOverwrite, PrefixData, SkipExisting,
+    };
     use rattler_upload::upload::upload_package_to_prefix;
 
     tracing::info!("Uploading packages to Prefix.dev server: {}", url);
@@ -522,14 +524,21 @@ async fn upload_to_prefix(
         url.clone()
     };
 
-    // Create PrefixData with server URL, channel, optional API key, no attestation, attestation generation from publish_data and skip_existing=false
+    // Determine attestation source
+    let attestation = if publish_data.generate_attestation {
+        AttestationSource::GenerateAttestation
+    } else {
+        AttestationSource::NoAttestation
+    };
+
+    // Create PrefixData with server URL, channel, optional API key, attestation, skip_existing and force
     let prefix_data = PrefixData::new(
         server_url,
         channel,
         None,
-        None,
-        publish_data.generate_attestation,
-        false,
+        attestation,
+        SkipExisting(false),
+        ForceOverwrite(publish_data.force),
     );
 
     // Upload packages
@@ -548,7 +557,7 @@ async fn upload_to_anaconda(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_upload::upload::opt::AnacondaData;
+    use rattler_upload::upload::opt::{AnacondaData, ForceOverwrite};
     use rattler_upload::upload::upload_package_to_anaconda;
 
     tracing::info!("Uploading packages to Anaconda.org: {}", url);
@@ -584,7 +593,7 @@ async fn upload_to_anaconda(
         channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
         None,                     // API key from auth storage
         Some(url.clone()),
-        publish_data.force,
+        ForceOverwrite(publish_data.force),
     );
 
     // Upload packages
