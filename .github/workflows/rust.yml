@@ -7,7 +7,10 @@ on:
     paths:
       - ".github/workflows/rust.yml"
       - "src/**"
+      - "crates/**"
       - "Cargo.*"
+      - "rust-tests/**"
+      - "test/end-to-end/**"
   workflow_dispatch:
 
 name: CI
@@ -23,7 +26,41 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Build release binaries and upload as artifacts (shared across jobs)
+  build-binary:
+    name: Build binary (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
+        with:
+          submodules: recursive
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          # Use target-pixi to match pixi's CARGO_TARGET_DIR
+          workspaces: ". -> target-pixi"
+          shared-key: release-${{ matrix.os }}
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: prefix-dev/setup-pixi@v0.9.3
+        with:
+          cache: true
+      - name: Build release binary
+        run: pixi run build-release
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        with:
+          name: rattler-build-${{ matrix.os }}
+          path: |
+            target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
+          retention-days: 1
+
+  # Run Rust unit/integration tests (debug mode, runs in parallel with build-binary)
   test:
+    name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +75,10 @@ jobs:
           toolchain: "1.89.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          shared-key: test-${{ matrix.os }}
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
@@ -63,6 +104,50 @@ jobs:
           patch --version
           cargo test --features=tui,recipe-generation,patch-test-extra -- --nocapture --ignored
 
+  # Run end-to-end tests using pre-built binary
+  end-to-end:
+    name: End-to-end (${{ matrix.os }})
+    needs: build-binary
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
+        with:
+          submodules: recursive
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          # Use same cache key as build-binary for shared deps
+          workspaces: ". -> target-pixi"
+          shared-key: release-${{ matrix.os }}
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: prefix-dev/setup-pixi@v0.9.3
+        with:
+          cache: true
+      - name: Download pre-built binary
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4
+        with:
+          name: rattler-build-${{ matrix.os }}
+          path: target-pixi/release/
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x target-pixi/release/rattler-build
+      - name: Run rust-tests
+        run: pixi run test-ci
+      - name: Run end-to-end tests
+        run: pixi run test-end-to-end -v
+        env:
+          PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
+          ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
+
+  # Cross-platform release builds (only on main/tags/labeled PRs)
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
