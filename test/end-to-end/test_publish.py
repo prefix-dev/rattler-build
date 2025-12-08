@@ -46,7 +46,7 @@ def test_publish_to_new_local_channel(
     # Find the subdir where the package was uploaded
     package_found = False
     for repodata_file in repodata_files:
-        subdir = repodata_file.parent.name
+
         packages_in_subdir = list(repodata_file.parent.glob("*.tar.bz2")) + list(
             repodata_file.parent.glob("*.conda")
         )
