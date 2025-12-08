@@ -259,7 +259,9 @@ pub(crate) async fn upload_and_index_channel(
                 "artifactory" => upload_to_artifactory(url, package_paths, publish_data).await,
                 "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
                 "file" => {
-                    let path = PathBuf::from(url.path());
+                    let path = url
+                        .to_file_path()
+                        .map_err(|()| miette::miette!("Invalid file URL: {}", url))?;
                     upload_to_local_filesystem(&path, package_paths, publish_data.force).await
                 }
                 "http" | "https" => {

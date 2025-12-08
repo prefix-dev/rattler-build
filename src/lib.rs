@@ -1211,7 +1211,10 @@ pub async fn publish_packages(
     // Ensure the channel is initialized based on its type
     match channel_url.url().scheme() {
         "file" => {
-            let dir = PathBuf::from(channel_url.url().path());
+            let dir = channel_url
+                .url()
+                .to_file_path()
+                .map_err(|()| miette::miette!("Invalid file URL: {}", channel_url.url()))?;
             if !dir.exists() {
                 tracing::info!(
                     "Creating initial index for local channel at {}",
