@@ -18,9 +18,15 @@ jobs:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
         with:
           submodules: recursive
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          shared-key: lint
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Set up pixi
         uses: prefix-dev/setup-pixi@v0.9.3
         with:
           environments: lint
+          cache: true
       - name: lint (if this step fails, please 'pixi run lint' locally and push the changes)
         run: pixi run lint
