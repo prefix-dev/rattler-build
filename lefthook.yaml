@@ -62,6 +62,10 @@ pre-commit:
           - name: dprint fmt
             run: pixi {run} dprint-fmt {staged_files}
             stage_fixed: true
+    - name: nbstripout
+      glob: "*.ipynb"
+      stage_fixed: true
+      run: pixi {run} nbstripout {staged_files}
     - name: typos
       stage_fixed: true
       run: pixi {run} typos
