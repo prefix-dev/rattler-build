@@ -12,7 +12,7 @@ enum TarCompression<'a> {
     PlainTar(Box<dyn BufRead + 'a>),
     Gzip(flate2::read::GzDecoder<Box<dyn BufRead + 'a>>),
     Bzip2(bzip2::read::BzDecoder<Box<dyn BufRead + 'a>>),
-    Xz(lzma_rust2::XzReader<Box<dyn BufRead + 'a>>),
+    Xz(Box<lzma_rust2::XzReader<Box<dyn BufRead + 'a>>>),
     Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<Box<dyn BufRead + 'a>>>),
     Compress,
     Lzip,
@@ -69,7 +69,7 @@ fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> T
             TarCompression::Bzip2(bzip2::read::BzDecoder::new(file))
         }
         Some("lzma" | "tlz" | "xz" | "txz") => {
-            TarCompression::Xz(lzma_rust2::XzReader::new(file, true))
+            TarCompression::Xz(Box::new(lzma_rust2::XzReader::new(file, true)))
         }
         Some("zst" | "tzst") => {
             TarCompression::Zstd(zstd::stream::read::Decoder::new(file).unwrap())
