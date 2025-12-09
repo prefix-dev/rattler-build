@@ -12,7 +12,7 @@ enum TarCompression<'a> {
     PlainTar(Box<dyn BufRead + 'a>),
     Gzip(flate2::read::GzDecoder<Box<dyn BufRead + 'a>>),
     Bzip2(bzip2::read::BzDecoder<Box<dyn BufRead + 'a>>),
-    Xz2(xz2::read::XzDecoder<Box<dyn BufRead + 'a>>),
+    Xz(lzma_rust2::XzReader<Box<dyn BufRead + 'a>>),
     Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<Box<dyn BufRead + 'a>>>),
     Compress,
     Lzip,
@@ -31,7 +31,7 @@ pub fn is_tarball(file_name: &str) -> bool {
         ".tbz",
         ".tbz2",
         ".tz2",
-        // Xz2
+        // Xz/LZMA
         ".tar.lzma",
         ".tlz",
         ".tar.xz",
@@ -68,7 +68,9 @@ fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> T
         Some("bz2" | "tbz" | "tbz2" | "tz2") => {
             TarCompression::Bzip2(bzip2::read::BzDecoder::new(file))
         }
-        Some("lzma" | "tlz" | "xz" | "txz") => TarCompression::Xz2(xz2::read::XzDecoder::new(file)),
+        Some("lzma" | "tlz" | "xz" | "txz") => {
+            TarCompression::Xz(lzma_rust2::XzReader::new(file, true))
+        }
         Some("zst" | "tzst") => {
             TarCompression::Zstd(zstd::stream::read::Decoder::new(file).unwrap())
         }
@@ -85,7 +87,7 @@ impl std::io::Read for TarCompression<'_> {
             TarCompression::PlainTar(reader) => reader.read(buf),
             TarCompression::Gzip(reader) => reader.read(buf),
             TarCompression::Bzip2(reader) => reader.read(buf),
-            TarCompression::Xz2(reader) => reader.read(buf),
+            TarCompression::Xz(reader) => reader.read(buf),
             TarCompression::Zstd(reader) => reader.read(buf),
             TarCompression::Compress | TarCompression::Lzip | TarCompression::Lzop => {
                 todo!("unsupported for now")

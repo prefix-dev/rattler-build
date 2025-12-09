@@ -199,7 +199,8 @@ jobs:
 
       # Sets the default features which are always used also when `--no-default` is used.
       # Enable the `performance` feature for release builds to use optimized memory allocators.
-      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance' || 'recipe-generation' }}
+      # Include `s3` for S3 upload support in release builds.
+      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance,s3' || 'recipe-generation,s3' }}
 
     steps:
       - name: Checkout source code
