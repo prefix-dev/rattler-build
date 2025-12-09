@@ -28,13 +28,15 @@ class Stage0Recipe(ABC):
     """
     A parsed conda recipe (stage0).
 
-        This is an abstract base class. Use from_yaml(), from_file(), or from_dict()
-    to create concrete instances (SingleOutputRecipe or MultiOutputRecipe).
+    This is an abstract base class. Use `from_yaml()`, `from_file()`, or `from_dict()`
+    to create concrete instances (`SingleOutputRecipe` or `MultiOutputRecipe`).
 
     Example:
-        >>> recipe = Stage0Recipe.from_yaml(yaml_string)
-        >>> if isinstance(recipe, SingleOutputRecipe):
-        ...     print(recipe.package.name)
+        ```python
+        recipe = Stage0Recipe.from_yaml(yaml_string)
+        if isinstance(recipe, SingleOutputRecipe):
+            print(recipe.package.name)
+        ```
     """
 
     # Attributes set by concrete subclasses
@@ -84,16 +86,18 @@ class Stage0Recipe(ABC):
             PyRecipeParseError: If the dictionary structure is invalid or types don't match
 
         Example:
-            >>> recipe_dict = {
-            ...     "package": {
-            ...         "name": "my-package",
-            ...         "version": "1.0.0"
-            ...     },
-            ...     "build": {
-            ...         "number": 0
-            ...     }
-            ... }
-            >>> recipe = Stage0Recipe.from_dict(recipe_dict)
+            ```python
+            recipe_dict = {
+                "package": {
+                    "name": "my-package",
+                    "version": "1.0.0"
+                },
+                "build": {
+                    "number": 0
+                }
+            }
+            recipe = Stage0Recipe.from_dict(recipe_dict)
+            ```
         """
         wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
         if wrapper.is_single_output():
@@ -173,10 +177,12 @@ class Stage0Recipe(ABC):
             List of RenderedVariant objects (one for each variant combination)
 
         Example:
-            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
-            >>> variants = recipe.render(variant_config)
-            >>> for variant in variants:
-            ...     print(variant.recipe().package.name)
+            ```python
+            recipe = Stage0Recipe.from_yaml(yaml_string)
+            variants = recipe.render(variant_config)
+            for variant in variants:
+                print(variant.recipe().package.name)
+            ```
         """
         # Create empty variant config if not provided
         if variant_config is None:
@@ -230,16 +236,18 @@ class Stage0Recipe(ABC):
             list[BuildResult]: List of build results, one per variant built.
 
         Example:
-            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
-            >>> results = recipe.run_build(output_dir="./output")
-            >>> for result in results:
-            ...     print(f"Built {result.name} {result.version}")
-            ...     print(f"Package at: {result.packages[0]}")
+            ```python
+            recipe = Stage0Recipe.from_yaml(yaml_string)
+            results = recipe.run_build(output_dir="./output")
+            for result in results:
+                print(f"Built {result.name} {result.version}")
+                print(f"Package at: {result.packages[0]}")
 
-            >>> # Or with custom tool configuration
-            >>> from rattler_build import ToolConfiguration
-            >>> config = ToolConfiguration(keep_build=True, test_strategy="native")
-            >>> results = recipe.run_build(tool_config=config, output_dir="./output")
+            # Or with custom tool configuration
+            from rattler_build import ToolConfiguration
+            config = ToolConfiguration(keep_build=True, test_strategy="native")
+            results = recipe.run_build(tool_config=config, output_dir="./output")
+            ```
         """
 
         # Render the recipe to get Stage1 variants

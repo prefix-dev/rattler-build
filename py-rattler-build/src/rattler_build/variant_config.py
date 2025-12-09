@@ -23,25 +23,27 @@ class VariantConfig:
     This class provides a dict-like interface for managing variants.
 
     Example:
-        >>> # Create from dict
-        >>> config = VariantConfig({
-        ...     "python": ["3.8", "3.9", "3.10"],
-        ...     "numpy": ["1.21", "1.22"]
-        ... })
-        >>> len(config.combinations())  # 3 * 2 = 6 combinations
-        6
+        ```python
+        # Create from dict
+        config = VariantConfig({
+            "python": ["3.8", "3.9", "3.10"],
+            "numpy": ["1.21", "1.22"]
+        })
+        len(config.combinations())  # 3 * 2 = 6 combinations
+        # 6
 
-        >>> # Dict-like access
-        >>> print(config["python"])
-        ['3.8', '3.9', '3.10']
+        # Dict-like access
+        print(config["python"])
+        # ['3.8', '3.9', '3.10']
 
-        >>> # Get values
-        >>> print(config.get_values("python"))
-        ['3.8', '3.9', '3.10']
+        # Get values
+        print(config.get_values("python"))
+        # ['3.8', '3.9', '3.10']
 
-        >>> # Load from YAML file
-        >>> config = VariantConfig.from_file("variant_config.yaml")
-        >>> print(config.keys())
+        # Load from YAML file
+        config = VariantConfig.from_file("variant_config.yaml")
+        print(config.keys())
+        ```
     """
 
     def __init__(
@@ -59,17 +61,19 @@ class VariantConfig:
                      zipped together. Ensures that certain variant keys are synchronized.
 
         Example:
-            >>> # Create from dict
-            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
+            ```python
+            # Create from dict
+            config = VariantConfig({"python": ["3.9", "3.10"]})
 
-            >>> # Create with zip_keys
-            >>> config = VariantConfig(
-            ...     {"python": ["3.9", "3.10"], "numpy": ["1.21", "1.22"]},
-            ...     zip_keys=[["python", "numpy"]]
-            ... )
+            # Create with zip_keys
+            config = VariantConfig(
+                {"python": ["3.9", "3.10"], "numpy": ["1.21", "1.22"]},
+                zip_keys=[["python", "numpy"]]
+            )
 
-            >>> # Create empty
-            >>> config = VariantConfig()
+            # Create empty
+            config = VariantConfig()
+            ```
         """
 
         self._inner = _VariantConfig(variants=variants, zip_keys=zip_keys)
@@ -86,7 +90,9 @@ class VariantConfig:
             A new VariantConfig instance
 
         Example:
-            >>> config = VariantConfig.from_file("variants.yaml")
+            ```python
+            config = VariantConfig.from_file("variants.yaml")
+            ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_file(Path(path))
@@ -108,9 +114,12 @@ class VariantConfig:
             A new VariantConfig instance
 
         Example:
-            >>> from rattler_build import JinjaConfig
-            >>> jinja_config = JinjaConfig(target_platform="linux-64")
-            >>> config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
+            ```python
+            from rattler_build import JinjaConfig
+
+            jinja_config = JinjaConfig(target_platform="linux-64")
+            config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
+            ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_file_with_context(Path(path), jinja_config._config)
@@ -132,9 +141,12 @@ class VariantConfig:
             A new VariantConfig instance
 
         Example:
-            >>> from rattler_build import JinjaConfig
-            >>> jinja_config = JinjaConfig(target_platform="linux-64")
-            >>> config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
+            ```python
+            from rattler_build import JinjaConfig
+
+            jinja_config = JinjaConfig(target_platform="linux-64")
+            config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
+            ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_conda_build_config(Path(path), jinja_config._config)
@@ -152,12 +164,14 @@ class VariantConfig:
             A new VariantConfig instance
 
         Example:
-            >>> yaml_str = '''
-            ... python:
-            ...   - "3.8"
-            ...   - "3.9"
-            ... '''
-            >>> config = VariantConfig.from_yaml(yaml_str)
+            ```python
+            yaml_str = '''
+            python:
+              - "3.8"
+              - "3.9"
+            '''
+            config = VariantConfig.from_yaml(yaml_str)
+            ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_yaml(yaml)
@@ -179,16 +193,19 @@ class VariantConfig:
             A new VariantConfig instance
 
         Example:
-            >>> from rattler_build import JinjaConfig
-            >>> yaml_str = '''
-            ... c_compiler:
-            ...   - if: unix
-            ...     then: gcc
-            ...   - if: win
-            ...     then: msvc
-            ... '''
-            >>> jinja_config = JinjaConfig(target_platform="linux-64")
-            >>> config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
+            ```python
+            from rattler_build import JinjaConfig
+
+            yaml_str = '''
+            c_compiler:
+              - if: unix
+                then: gcc
+              - if: win
+                then: msvc
+            '''
+            jinja_config = JinjaConfig(target_platform="linux-64")
+            config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
+            ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_yaml_with_context(yaml, jinja_config._config)
@@ -202,9 +219,11 @@ class VariantConfig:
             List of variant key names
 
         Example:
-            >>> config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21"]})
-            >>> config.keys()
-            ['numpy', 'python']
+            ```python
+            config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21"]})
+            config.keys()
+            # ['numpy', 'python']
+            ```
         """
         return self._inner.keys()
 
@@ -221,12 +240,14 @@ class VariantConfig:
             List of groups (each group is a list of keys), or None if no zip keys are defined
 
         Example:
-            >>> config = VariantConfig(
-            ...     {"python": ["3.9", "3.10"], "numpy": ["1.20", "1.21"]},
-            ...     zip_keys=[["python", "numpy"]]
-            ... )
-            >>> len(config.combinations())  # 2, not 4
-            2
+            ```python
+            config = VariantConfig(
+                {"python": ["3.9", "3.10"], "numpy": ["1.20", "1.21"]},
+                zip_keys=[["python", "numpy"]]
+            )
+            len(config.combinations())  # 2, not 4
+            # 2
+            ```
         """
         return self._inner.zip_keys
 
@@ -241,9 +262,11 @@ class VariantConfig:
             List of values for the key, or None if key doesn't exist
 
         Example:
-            >>> config = VariantConfig({"python": ["3.8", "3.9", "3.10"]})
-            >>> config.get_values("python")
-            ['3.8', '3.9', '3.10']
+            ```python
+            config = VariantConfig({"python": ["3.8", "3.9", "3.10"]})
+            config.get_values("python")
+            # ['3.8', '3.9', '3.10']
+            ```
         """
         return self._inner.get_values(key)
 
@@ -255,9 +278,11 @@ class VariantConfig:
             Dictionary mapping variant keys to their value lists
 
         Example:
-            >>> config = VariantConfig({"python": ["3.8", "3.9"]})
-            >>> config.to_dict()
-            {'python': ['3.8', '3.9']}
+            ```python
+            config = VariantConfig({"python": ["3.8", "3.9"]})
+            config.to_dict()
+            # {'python': ['3.8', '3.9']}
+            ```
         """
         return self._inner.to_dict()
 
@@ -269,12 +294,14 @@ class VariantConfig:
             List of dictionaries, each representing one variant combination
 
         Example:
-            >>> config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21", "1.22"]})
-            >>> combos = config.combinations()
-            >>> len(combos)
-            4
-            >>> combos[0]
-            {'python': '3.8', 'numpy': '1.21'}
+            ```python
+            config = VariantConfig({"python": ["3.8", "3.9"], "numpy": ["1.21", "1.22"]})
+            combos = config.combinations()
+            len(combos)
+            # 4
+            combos[0]
+            # {'python': '3.8', 'numpy': '1.21'}
+            ```
         """
         return self._inner.combinations()
 
@@ -296,9 +323,11 @@ class VariantConfig:
             KeyError: If the key doesn't exist
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
-            >>> config["python"]
-            ['3.9', '3.10']
+            ```python
+            config = VariantConfig({"python": ["3.9", "3.10"]})
+            config["python"]
+            # ['3.9', '3.10']
+            ```
         """
         values = self._inner.get_values(key)
         if values is None:
@@ -316,11 +345,13 @@ class VariantConfig:
             True if the key exists, False otherwise
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9"]})
-            >>> "python" in config
-            True
-            >>> "ruby" in config
-            False
+            ```python
+            config = VariantConfig({"python": ["3.9"]})
+            "python" in config
+            # True
+            "ruby" in config
+            # False
+            ```
         """
         return self._inner.get_values(key) is not None
 
@@ -332,9 +363,11 @@ class VariantConfig:
             Iterator over variant key names
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9"], "numpy": ["1.21"]})
-            >>> list(config)
-            ['numpy', 'python']
+            ```python
+            config = VariantConfig({"python": ["3.9"], "numpy": ["1.21"]})
+            list(config)
+            # ['numpy', 'python']
+            ```
         """
         return iter(self.keys())
 
@@ -346,9 +379,11 @@ class VariantConfig:
             Iterator of (key, values) tuples
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
-            >>> dict(config.items())
-            {'python': ['3.9', '3.10']}
+            ```python
+            config = VariantConfig({"python": ["3.9", "3.10"]})
+            dict(config.items())
+            # {'python': ['3.9', '3.10']}
+            ```
         """
         return self.to_dict().items()
 
@@ -360,9 +395,11 @@ class VariantConfig:
             Iterator of value lists
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9", "3.10"]})
-            >>> list(config.values())
-            [['3.9', '3.10']]
+            ```python
+            config = VariantConfig({"python": ["3.9", "3.10"]})
+            list(config.values())
+            # [['3.9', '3.10']]
+            ```
         """
         return self.to_dict().values()
 
@@ -378,11 +415,13 @@ class VariantConfig:
             List of values for the key, or default if key doesn't exist
 
         Example:
-            >>> config = VariantConfig({"python": ["3.9"]})
-            >>> config.get("python")
-            ['3.9']
-            >>> config.get("ruby", ["2.7"])
-            ['2.7']
+            ```python
+            config = VariantConfig({"python": ["3.9"]})
+            config.get("python")
+            # ['3.9']
+            config.get("ruby", ["2.7"])
+            # ['2.7']
+            ```
         """
         values = self._inner.get_values(key)
         return values if values is not None else default

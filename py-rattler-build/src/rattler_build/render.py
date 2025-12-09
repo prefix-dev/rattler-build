@@ -35,10 +35,12 @@ class HashInfo:
         prefix: The hash prefix (e.g., 'py38' or 'np111')
 
     Example:
-        >>> hash_info = variant.hash_info()
-        >>> if hash_info:
-        ...     print(f"Hash: {hash_info.hash}")
-        ...     print(f"Prefix: {hash_info.prefix}")
+        ```python
+        hash_info = variant.hash_info()
+        if hash_info:
+            print(f"Hash: {hash_info.hash}")
+            print(f"Prefix: {hash_info.prefix}")
+        ```
     """
 
     _inner: _render.HashInfo
@@ -81,9 +83,11 @@ class PinSubpackageInfo:
         exact: Whether this is an exact pin
 
     Example:
-        >>> pins = variant.pin_subpackages()
-        >>> for name, info in pins.items():
-        ...     print(f"{name}: {info.version} (exact={info.exact})")
+        ```python
+        pins = variant.pin_subpackages()
+        for name, info in pins.items():
+            print(f"{name}: {info.version} (exact={info.exact})")
+        ```
     """
 
     def __init__(self, inner: _render.PinSubpackageInfo):
@@ -131,12 +135,15 @@ class RenderConfig:
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
-        >>> from rattler_build.tool_config import PlatformConfig
-        >>> platform = PlatformConfig("linux-64")
-        >>> config = RenderConfig(
-        ...     platform=platform,
-        ...     extra_context={"custom_var": "value", "build_num": 42}
-        ... )
+        ```python
+        from rattler_build.tool_config import PlatformConfig
+
+        platform = PlatformConfig("linux-64")
+        config = RenderConfig(
+            platform=platform,
+            extra_context={"custom_var": "value", "build_num": 42}
+        )
+        ```
     """
 
     platform: PlatformConfig | None
@@ -214,10 +221,12 @@ class RenderedVariant:
         pin_subpackages: Pin subpackage dependencies
 
     Example:
-        >>> for variant in rendered_variants:
-        ...     print(f"Package: {variant.recipe().package().name()}")
-        ...     print(f"Variant: {variant.variant()}")
-        ...     print(f"Build string: {variant.recipe().build().string()}")
+        ```python
+        for variant in rendered_variants:
+            print(f"Package: {variant.recipe().package.name}")
+            print(f"Variant: {variant.variant()}")
+            print(f"Build string: {variant.recipe().build.string}")
+        ```
     """
 
     def __init__(self, inner: _render.RenderedVariant):
@@ -247,11 +256,13 @@ class RenderedVariant:
             HashInfo object with 'hash' and 'prefix' attributes, or None
 
         Example:
-            >>> rendered = render_recipe(recipe, variant_config)[0]
-            >>> hash_info = rendered.hash_info()
-            >>> if hash_info:
-            ...     print(f"Hash: {hash_info.hash}")
-            ...     print(f"Prefix: {hash_info.prefix}")
+            ```python
+            rendered = recipe.render(variant_config)[0]
+            hash_info = rendered.hash_info()
+            if hash_info:
+                print(f"Hash: {hash_info.hash}")
+                print(f"Prefix: {hash_info.prefix}")
+            ```
         """
         inner = self._inner.hash_info()
         return HashInfo._from_inner(inner) if inner else None
@@ -263,9 +274,11 @@ class RenderedVariant:
             Dictionary mapping package names to PinSubpackageInfo objects
 
         Example:
-            >>> rendered = render_recipe(recipe, variant_config)[0]
-            >>> for name, info in rendered.pin_subpackages().items():
-            ...     print(f"{name}: version={info.version}, exact={info.exact}")
+            ```python
+            rendered = recipe.render(variant_config)[0]
+            for name, info in rendered.pin_subpackages().items():
+                print(f"{name}: version={info.version}, exact={info.exact}")
+            ```
         """
         inner_dict = self._inner.pin_subpackages()
         return {name: PinSubpackageInfo(info) for name, info in inner_dict.items()}
@@ -304,15 +317,15 @@ class RenderedVariant:
             BuildResult: Information about the built package including paths, metadata, and timing.
 
         Example:
-            >>> from rattler_build.stage0 import Stage0Recipe
-            >>> from rattler_build.variant_config import VariantConfig
-            >>> from rattler_build.render import render_recipe
-            >>>
-            >>> recipe = Stage0Recipe.from_yaml(yaml_string)
-            >>> rendered = render_recipe(recipe, VariantConfig())
-            >>> # Build just the first variant
-            >>> result = rendered[0].run_build(output_dir="./output")
-            >>> print(f"Built package: {result.packages[0]}")
+            ```python
+            from rattler_build import Stage0Recipe, VariantConfig
+
+            recipe = Stage0Recipe.from_yaml(yaml_string)
+            rendered = recipe.render(VariantConfig())
+            # Build just the first variant
+            result = rendered[0].run_build(output_dir="./output")
+            print(f"Built package: {result.packages[0]}")
+            ```
         """
         # Use default ToolConfiguration if not provided
         if tool_config is None:
@@ -375,27 +388,28 @@ def build_rendered_variants(
         list[BuildResult]: List of build results, one per variant built.
 
     Example:
-        >>> from rattler_build.stage0 import Stage0Recipe
-        >>> from rattler_build.variant_config import VariantConfig
-        >>> from rattler_build.render import render_recipe, build_rendered_variants
-        >>>
-        >>> # Parse and render recipe
-        >>> recipe = Stage0Recipe.from_yaml(yaml_string)
-        >>> variant_config = VariantConfig.from_yaml('''
-        ... python:
-        ...   - "3.9"
-        ...   - "3.10"
-        ...   - "3.11"
-        ... ''')
-        >>> rendered = render_recipe(recipe, variant_config)
-        >>>
-        >>> # Build all variants at once
-        >>> results = build_rendered_variants(rendered, output_dir="./output")
-        >>> for result in results:
-        ...     print(f"Built {result.name} {result.version} for {result.platform}")
-        >>>
-        >>> # Or build a subset
-        >>> results = build_rendered_variants(rendered[:2], output_dir="./output")
+        ```python
+        from rattler_build import Stage0Recipe, VariantConfig
+        from rattler_build.render import build_rendered_variants
+
+        # Parse and render recipe
+        recipe = Stage0Recipe.from_yaml(yaml_string)
+        variant_config = VariantConfig.from_yaml('''
+        python:
+          - "3.9"
+          - "3.10"
+          - "3.11"
+        ''')
+        rendered = recipe.render(variant_config)
+
+        # Build all variants at once
+        results = build_rendered_variants(rendered, output_dir="./output")
+        for result in results:
+            print(f"Built {result.name} {result.version} for {result.platform}")
+
+        # Or build a subset
+        results = build_rendered_variants(rendered[:2], output_dir="./output")
+        ```
     """
     results = []
     for variant in rendered_variants:

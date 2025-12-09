@@ -19,12 +19,14 @@ class Stage1Recipe:
     and all conditionals resolved.
 
     Example:
-        >>> # After parsing and rendering a Stage0Recipe
-        >>> stage0_recipe = Stage0Recipe.from_yaml(yaml_string)
-        >>> rendered = stage0_recipe.render(variant_config)
-        >>> stage1_recipe = rendered[0].recipe()
-        >>> print(stage1_recipe.package.name)
-        >>> print(stage1_recipe.package.version)
+        ```python
+        # After parsing and rendering a Stage0Recipe
+        stage0_recipe = Stage0Recipe.from_yaml(yaml_string)
+        rendered = stage0_recipe.render(variant_config)
+        stage1_recipe = rendered[0].recipe()
+        print(stage1_recipe.package.name)
+        print(stage1_recipe.package.version)
+        ```
     """
 
     def __init__(self, inner: _stage1.Stage1Recipe):

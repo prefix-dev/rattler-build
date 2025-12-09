@@ -4,18 +4,24 @@ This module provides functionality to load and inspect conda packages (.conda or
 examine their metadata and embedded tests, and run tests against them.
 
 Example:
-    >>> from rattler_build import Package
-    >>> pkg = Package.from_file("mypackage-1.0.0-py312_0.conda")
-    >>> print(pkg.name, pkg.version)
-    mypackage 1.0.0
-    >>> print(pkg.depends)
-    ['python >=3.12', 'numpy >=1.20']
-    >>> for test in pkg.tests:
-    ...     print(f"Test {test.index}: {test.kind}")
-    Test 0: python
-    >>> results = pkg.run_tests(channel=["conda-forge"])
-    >>> for r in results:
-    ...     print(f"Test {r.test_index}: {'PASS' if r.success else 'FAIL'}")
+    ```python
+    from rattler_build import Package
+
+    pkg = Package.from_file("mypackage-1.0.0-py312_0.conda")
+    print(pkg.name, pkg.version)
+    # mypackage 1.0.0
+
+    print(pkg.depends)
+    # ['python >=3.12', 'numpy >=1.20']
+
+    for test in pkg.tests:
+        print(f"Test {test.index}: {test.kind}")
+    # Test 0: python
+
+    results = pkg.run_tests(channel=["conda-forge"])
+    for r in results:
+        print(f"Test {r.test_index}: {'PASS' if r.success else 'FAIL'}")
+    ```
 """
 
 from pathlib import Path
@@ -75,9 +81,11 @@ class Package:
             RattlerBuildError: If the package cannot be loaded or parsed
 
         Example:
-            >>> pkg = Package.from_file("numpy-1.26.0-py312_0.conda")
-            >>> print(pkg.name)
-            numpy
+            ```python
+            pkg = Package.from_file("numpy-1.26.0-py312_0.conda")
+            print(pkg.name)
+            # numpy
+            ```
         """
         return cls(_package.Package.from_file(str(path)))
 
@@ -212,9 +220,11 @@ class Package:
             RattlerBuildError: If the test index is out of range or test execution fails
 
         Example:
-            >>> result = pkg.run_test(0, channel=["conda-forge"])
-            >>> if result.success:
-            ...     print("Test passed!")
+            ```python
+            result = pkg.run_test(0, channel=["conda-forge"])
+            if result.success:
+                print("Test passed!")
+            ```
         """
         return TestResult(
             self._inner.run_test(
@@ -263,10 +273,12 @@ class Package:
             List of TestResult objects, one per test
 
         Example:
-            >>> results = pkg.run_tests(channel=["conda-forge"])
-            >>> for r in results:
-            ...     status = "PASS" if r.success else "FAIL"
-            ...     print(f"Test {r.test_index}: {status}")
+            ```python
+            results = pkg.run_tests(channel=["conda-forge"])
+            for r in results:
+                status = "PASS" if r.success else "FAIL"
+                print(f"Test {r.test_index}: {status}")
+            ```
         """
         return [
             TestResult(r)

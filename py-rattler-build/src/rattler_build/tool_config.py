@@ -24,18 +24,20 @@ class PlatformConfig:
         recipe_path: Path to the recipe file (for relative path resolution)
 
     Example:
-        >>> # Create with default (current) platform
-        >>> config = PlatformConfig()
-        >>>
-        >>> # Create for a specific platform (build and host will default to target)
-        >>> config = PlatformConfig("linux-64")
-        >>>
-        >>> # Create with different platforms for cross-compilation
-        >>> config = PlatformConfig(
-        ...     target_platform="osx-arm64",
-        ...     build_platform="linux-64",
-        ...     host_platform="osx-arm64"
-        ... )
+        ```python
+        # Create with default (current) platform
+        config = PlatformConfig()
+
+        # Create for a specific platform (build and host will default to target)
+        config = PlatformConfig("linux-64")
+
+        # Create with different platforms for cross-compilation
+        config = PlatformConfig(
+            target_platform="osx-arm64",
+            build_platform="linux-64",
+            host_platform="osx-arm64"
+        )
+        ```
     """
 
     def __init__(
@@ -83,15 +85,17 @@ class ToolConfiguration:
         use_jlap: Whether to use JLAP when downloading repodata (default: False)
 
     Example:
-        >>> config = ToolConfiguration(
-        ...     keep_build=True,
-        ...     test_strategy="native",
-        ...     compression_threads=4
-        ... )
-        >>> print(config.keep_build)
-        True
-        >>> print(config.test_strategy)
-        Native
+        ```python
+        config = ToolConfiguration(
+            keep_build=True,
+            test_strategy="native",
+            compression_threads=4
+        )
+        print(config.keep_build)
+        # True
+        print(config.test_strategy)
+        # Native
+        ```
     """
 
     def __init__(

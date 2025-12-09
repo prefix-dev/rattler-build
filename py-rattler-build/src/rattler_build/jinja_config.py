@@ -14,9 +14,12 @@ class JinjaConfig:
         variant: Variant configuration dictionary
 
     Example:
-        >>> from rattler_build.tool_config import PlatformConfig
-        >>> platform = PlatformConfig("linux-64")
-        >>> config = JinjaConfig(platform=platform)
+        ```python
+        from rattler_build.tool_config import PlatformConfig
+
+        platform = PlatformConfig("linux-64")
+        config = JinjaConfig(platform=platform)
+        ```
     """
 
     _config: PyJinjaConfig

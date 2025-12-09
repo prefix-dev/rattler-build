@@ -31,10 +31,13 @@ def generate_pypi_recipe(package: str, version: str | None = None, use_mapping: 
     Example:
         Generate a recipe for the latest version of flit-core:
 
-        >>> from rattler_build import generate_pypi_recipe
-        >>> recipe = generate_pypi_recipe("flit-core")  # doctest: +SKIP
-        >>> recipe.as_single_output().package.name  # doctest: +SKIP
-        'flit-core'
+        ```python
+        from rattler_build import generate_pypi_recipe
+
+        recipe = generate_pypi_recipe("flit-core")
+        recipe.as_single_output().package.name
+        # 'flit-core'
+        ```
     """
     yaml = generate_pypi_recipe_string_py(package, version, use_mapping)
     return Stage0Recipe.from_yaml(yaml)
@@ -57,10 +60,13 @@ def generate_cran_recipe(package: str, universe: str | None = None) -> Stage0Rec
     Example:
         Generate a recipe for a CRAN package:
 
-        >>> from rattler_build import generate_cran_recipe
-        >>> recipe = generate_cran_recipe("assertthat")  # doctest: +SKIP
-        >>> recipe.as_single_output().package.name  # doctest: +SKIP
-        'r-assertthat'
+        ```python
+        from rattler_build import generate_cran_recipe
+
+        recipe = generate_cran_recipe("assertthat")
+        recipe.as_single_output().package.name
+        # 'r-assertthat'
+        ```
     """
     yaml = generate_r_recipe_string_py(package, universe)
     return Stage0Recipe.from_yaml(yaml)
@@ -82,10 +88,13 @@ def generate_cpan_recipe(package: str, version: str | None = None) -> Stage0Reci
     Example:
         Generate a recipe for a CPAN package:
 
-        >>> from rattler_build import generate_cpan_recipe
-        >>> recipe = generate_cpan_recipe("Try-Tiny")  # doctest: +SKIP
-        >>> recipe.as_single_output().package.name  # doctest: +SKIP
-        'perl-try-tiny'
+        ```python
+        from rattler_build import generate_cpan_recipe
+
+        recipe = generate_cpan_recipe("Try-Tiny")
+        recipe.as_single_output().package.name
+        # 'perl-try-tiny'
+        ```
     """
     yaml = generate_cpan_recipe_string_py(package, version)
     return Stage0Recipe.from_yaml(yaml)
@@ -110,10 +119,13 @@ def generate_luarocks_recipe(rock: str) -> Stage0Recipe:
     Example:
         Generate a recipe for a LuaRocks package:
 
-        >>> from rattler_build import generate_luarocks_recipe
-        >>> recipe = generate_luarocks_recipe("luafilesystem")  # doctest: +SKIP
-        >>> recipe.as_single_output().package.name  # doctest: +SKIP
-        'lua-luafilesystem'
+        ```python
+        from rattler_build import generate_luarocks_recipe
+
+        recipe = generate_luarocks_recipe("luafilesystem")
+        recipe.as_single_output().package.name
+        # 'lua-luafilesystem'
+        ```
     """
     yaml = generate_luarocks_recipe_string_py(rock)
     return Stage0Recipe.from_yaml(yaml)
