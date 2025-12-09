@@ -21,14 +21,11 @@ from rattler_build import VariantConfig, ToolConfiguration, PlatformConfig
             - get_values
             - to_dict
             - combinations
-:::
 
 ## Tool Configuration
 
 ::: rattler_build.ToolConfiguration
-:::
 
 ## Platform Configuration
 
 ::: rattler_build.PlatformConfig
-:::

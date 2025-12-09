@@ -158,10 +158,10 @@ nav:
           - py-rattler-build/reference/configuration.md
           - py-rattler-build/reference/upload.md
           - py-rattler-build/reference/exceptions.md
-      - Tutorials:
-          - py-rattler-build/tutorials/recipe_rendering_basics.ipynb
-          - py-rattler-build/tutorials/multi_output_and_staging.ipynb
-          - py-rattler-build/tutorials/package_inspection_and_testing.ipynb
+      # - Tutorials:
+      #     - py-rattler-build/tutorials/recipe_rendering_basics.ipynb
+      #     - py-rattler-build/tutorials/multi_output_and_staging.ipynb
+      #     - py-rattler-build/tutorials/package_inspection_and_testing.ipynb
 
   - References:
       - Recipe file: reference/recipe_file.md
@@ -186,9 +186,9 @@ plugins:
             separate_signature: true
             show_source: false
             members_order: source
-  - mkdocs-jupyter:
-      execute: true
-      allow_errors: false
+  # - mkdocs-jupyter:
+  #     execute: true
+  #     allow_errors: false
   - mike:
 # These fields are all optional; the defaults are as below...
 # alias_type: symlink
