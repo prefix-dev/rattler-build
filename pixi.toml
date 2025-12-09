@@ -120,8 +120,6 @@ mkdocstrings-python = ">=1.18.2,<2"
 pillow = ">=11.3.0,<12"
 ruff = ">=0.14.7,<0.15"
 py-rattler-build = { path = "./py-rattler-build" }
-
-[feature.docs.pypi-dependencies]
 markdown-exec = ">=1.9.0,<2"
 
 
