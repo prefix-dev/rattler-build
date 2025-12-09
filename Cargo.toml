@@ -167,7 +167,7 @@ zip = { workspace = true }
 bzip2 = "0.6.1"
 base64 = "0.22.1"
 flate2 = { workspace = true }
-xz2 = "0.1.7"
+lzma-rust2 = { version = "0.15", features = ["xz"] }
 zstd = "0.13.3"
 toml = { workspace = true }
 memmap2 = "0.9.9"

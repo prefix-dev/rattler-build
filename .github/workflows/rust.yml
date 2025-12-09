@@ -7,7 +7,10 @@ on:
     paths:
       - ".github/workflows/rust.yml"
       - "src/**"
+      - "crates/**"
       - "Cargo.*"
+      - "rust-tests/**"
+      - "test/end-to-end/**"
   workflow_dispatch:
 
 name: CI
@@ -23,7 +26,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Run Rust unit/integration tests (debug mode)
   test:
+    name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +43,10 @@ jobs:
           toolchain: "1.89.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          shared-key: test-${{ matrix.os }}
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
@@ -63,6 +72,44 @@ jobs:
           patch --version
           cargo test --features=tui,recipe-generation,patch-test-extra -- --nocapture --ignored
 
+  # Build release binary and run end-to-end tests (pipelined per OS)
+  build-and-test:
+    name: Build & E2E (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4
+        with:
+          submodules: recursive
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          # Use target-pixi to match pixi's CARGO_TARGET_DIR
+          workspaces: ". -> target-pixi"
+          shared-key: release-${{ matrix.os }}
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: prefix-dev/setup-pixi@v0.9.3
+        with:
+          cache: true
+      - name: Build release binary
+        run: pixi run build-release
+      - name: Run rust-tests
+        run: pixi run test-ci
+      - name: Run end-to-end tests
+        # Run pytest directly to avoid pixi's build-release dependency (already built above)
+        run: pixi run pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v
+        env:
+          PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
+          ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
+
+  # Cross-platform release builds (only on main/tags/labeled PRs)
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
@@ -114,7 +161,8 @@ jobs:
 
       # Sets the default features which are always used also when `--no-default` is used.
       # Enable the `performance` feature for release builds to use optimized memory allocators.
-      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance' || 'recipe-generation' }}
+      # Include `s3` for S3 upload support in release builds.
+      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance,s3' || 'recipe-generation,s3' }}
 
     steps:
       - name: Checkout source code

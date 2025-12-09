@@ -68,7 +68,9 @@ use rattler_conda_types::{
     package::ArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_index::{ensure_channel_initialized_fs, ensure_channel_initialized_s3};
+use rattler_index::ensure_channel_initialized_fs;
+#[cfg(feature = "s3")]
+use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
