@@ -100,8 +100,8 @@ print(f"Is multi-output: {isinstance(multi_recipe, MultiOutputRecipe)}")
 print(f"Number of outputs: {len(multi_recipe.outputs)}")
 
 print("\nOutputs:")
-for _idx, _output in enumerate(multi_recipe.outputs, 1):
-    print(f"  {_idx}. {_output.to_dict()['package']['name']}")
+for idx, output in enumerate(multi_recipe.outputs, 1):
+    print(f"  {idx}. {output.to_dict()['package']['name']}")
 
 # Render the recipe
 mo_variants = VariantConfig()
@@ -111,66 +111,66 @@ mo_results = multi_recipe.render(mo_variants, mo_render)
 print(f"\nRendered {len(mo_results)} package(s):")
 print("=" * 60)
 
-for _result in mo_results:
-    _stage1 = _result.recipe()
-    print(f"\nPackage: {_stage1.package.name} {_stage1.package.version}")
-    print(f"   Build script: {_stage1.build.script}")
-    print(f"   Run requirements: {_stage1.requirements.run}")
+for rendered in mo_results:
+    stage1 = rendered.recipe()
+    print(f"\nPackage: {stage1.package.name} {stage1.package.version}")
+    print(f"   Build script: {stage1.build.script}")
+    print(f"   Run requirements: {stage1.requirements.run}")
 ```
 
 <!--pytest-codeblocks:cont-->
 ```python exec="1" source="above" result="text" session="multi_output_and_staging"
 # Create persistent temp directories (clean up from previous runs)
-_recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output"
-_output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output_output"
+recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output"
+output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_multi_output_output"
 
 # Clean up from previous runs
-if _recipe_tmpdir.exists():
-    shutil.rmtree(_recipe_tmpdir)
-if _output_tmpdir.exists():
-    shutil.rmtree(_output_tmpdir)
+if recipe_tmpdir.exists():
+    shutil.rmtree(recipe_tmpdir)
+if output_tmpdir.exists():
+    shutil.rmtree(output_tmpdir)
 
 # Create the directories
-_recipe_tmpdir.mkdir(parents=True)
-_output_tmpdir.mkdir(parents=True)
+recipe_tmpdir.mkdir(parents=True)
+output_tmpdir.mkdir(parents=True)
 
 # Define dummy recipe path
-_recipe_path = _recipe_tmpdir / "recipe.yaml"
+recipe_path = recipe_tmpdir / "recipe.yaml"
 
 # Build each variant
 print("Building Example 1 packages...")
 print("=" * 60)
-print(f"Recipe directory: {_recipe_tmpdir}")
-print(f"Output directory: {_output_tmpdir}")
+print(f"Recipe directory: {recipe_tmpdir}")
+print(f"Output directory: {output_tmpdir}")
 
-for _i, _variant in enumerate(mo_results, 1):
-    print(f"\nBuilding variant {_i}/{len(mo_results)}")
-    _stage1_recipe = _variant.recipe()
-    _package = _stage1_recipe.package
-    _build = _stage1_recipe.build
+for i, variant in enumerate(mo_results, 1):
+    print(f"\nBuilding variant {i}/{len(mo_results)}")
+    stage1_recipe = variant.recipe()
+    package = stage1_recipe.package
+    build = stage1_recipe.build
 
-    print(f"  Package: {_package.name}")
-    print(f"  Version: {_package.version}")
-    print(f"  Build string: {_build.string}")
+    print(f"  Package: {package.name}")
+    print(f"  Version: {package.version}")
+    print(f"  Build string: {build.string}")
 
-    _result = _variant.run_build(
-        output_dir=_output_tmpdir,
-        recipe_path=_recipe_path,
+    result = variant.run_build(
+        output_dir=output_tmpdir,
+        recipe_path=recipe_path,
     )
 
     # Display build result information
-    print(f"  Build complete in {_result.build_time:.2f}s!")
-    print(f"  Package: {_result.packages[0]}")
-    if _result.variant:
-        print(f"  Variant: {_result.variant}")
+    print(f"  Build complete in {result.build_time:.2f}s!")
+    print(f"  Package: {result.packages[0]}")
+    if result.variant:
+        print(f"  Variant: {result.variant}")
 
     # Display build log
-    if _result.log:
-        print(f"  Build log: {len(_result.log)} messages captured")
+    if result.log:
+        print(f"  Build log: {len(result.log)} messages captured")
 
 print("\n" + "=" * 60)
 print("Example 1 builds completed successfully!")
-print(f"\nBuilt packages are available in: {_output_tmpdir}")
+print(f"\nBuilt packages are available in: {output_tmpdir}")
 ```
 
 ## Example 2: Staging Outputs - Shared Build Artifacts
@@ -249,16 +249,16 @@ print("=" * 60)
 print(f"Total outputs defined: {len(staging_recipe.outputs)}")
 
 print("\nOutput types:")
-for _idx, _output in enumerate(staging_recipe.outputs, 1):
-    _output_dict = _output.to_dict()
-    if "staging" in _output_dict:
-        print(f"  {_idx}. Staging: {_output_dict['staging']['name']}")
-    elif "package" in _output_dict:
-        _pkg_name = _output_dict["package"]["name"]
-        _inherits = _output_dict.get("inherits_from", None)
-        print(f"  {_idx}. Package: {_pkg_name}", end="")
-        if _inherits:
-            print(f" (inherits from: {_inherits})")
+for idx, output in enumerate(staging_recipe.outputs, 1):
+    output_dict = output.to_dict()
+    if "staging" in output_dict:
+        print(f"  {idx}. Staging: {output_dict['staging']['name']}")
+    elif "package" in output_dict:
+        pkg_name = output_dict["package"]["name"]
+        inherits = output_dict.get("inherits_from", None)
+        print(f"  {idx}. Package: {pkg_name}", end="")
+        if inherits:
+            print(f" (inherits from: {inherits})")
         else:
             print()
 
@@ -272,78 +272,78 @@ print(f"\nRendered {len(staging_results)} package(s)")
 print("(Staging outputs don't produce packages)")
 print("=" * 60)
 
-for _result in staging_results:
-    _stage1 = _result.recipe()
-    print(f"\n{_stage1.package.name} {_stage1.package.version}")
+for rendered in staging_results:
+    stage1 = rendered.recipe()
+    print(f"\n{stage1.package.name} {stage1.package.version}")
 
     # Check for staging caches
-    if _stage1.staging_caches:
-        print(f"   Uses {len(_stage1.staging_caches)} staging cache(s):")
-        for _cache in _stage1.staging_caches:
-            print(f"     - {_cache.name}")
-            print(f"       Build script: {_cache.build.script}")
+    if stage1.staging_caches:
+        print(f"   Uses {len(stage1.staging_caches)} staging cache(s):")
+        for cache in stage1.staging_caches:
+            print(f"     - {cache.name}")
+            print(f"       Build script: {cache.build.script}")
 
     # Check inheritance
-    if _stage1.inherits_from:
-        print(f"   Inherits from: {json.dumps(_stage1.inherits_from, indent=6)}")
+    if stage1.inherits_from:
+        print(f"   Inherits from: {json.dumps(stage1.inherits_from, indent=6)}")
 ```
 
 <!--pytest-codeblocks:cont-->
 ```python exec="1" source="above" result="text" session="multi_output_and_staging"
 # Create persistent temp directories (clean up from previous runs)
-_recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging"
-_output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging_output"
+staging_recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging"
+staging_output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_staging_output"
 
 # Clean up from previous runs
-if _recipe_tmpdir.exists():
-    shutil.rmtree(_recipe_tmpdir)
-if _output_tmpdir.exists():
-    shutil.rmtree(_output_tmpdir)
+if staging_recipe_tmpdir.exists():
+    shutil.rmtree(staging_recipe_tmpdir)
+if staging_output_tmpdir.exists():
+    shutil.rmtree(staging_output_tmpdir)
 
 # Create the directories
-_recipe_tmpdir.mkdir(parents=True)
-_output_tmpdir.mkdir(parents=True)
+staging_recipe_tmpdir.mkdir(parents=True)
+staging_output_tmpdir.mkdir(parents=True)
 
 # Define dummy recipe path
-_recipe_path = _recipe_tmpdir / "recipe.yaml"
+staging_recipe_path = staging_recipe_tmpdir / "recipe.yaml"
 
 # Build each variant
 print("Building Example 2 packages (with staging)...")
 print("=" * 60)
-print(f"Recipe directory: {_recipe_tmpdir}")
-print(f"Output directory: {_output_tmpdir}")
+print(f"Recipe directory: {staging_recipe_tmpdir}")
+print(f"Output directory: {staging_output_tmpdir}")
 
-for _i, _variant in enumerate(staging_results, 1):
-    print(f"\nBuilding variant {_i}/{len(staging_results)}")
-    _stage1_recipe = _variant.recipe()
-    _package = _stage1_recipe.package
-    _build = _stage1_recipe.build
+for i, variant in enumerate(staging_results, 1):
+    print(f"\nBuilding variant {i}/{len(staging_results)}")
+    stage1_recipe = variant.recipe()
+    package = stage1_recipe.package
+    build = stage1_recipe.build
 
-    print(f"  Package: {_package.name}")
-    print(f"  Version: {_package.version}")
-    print(f"  Build string: {_build.string}")
+    print(f"  Package: {package.name}")
+    print(f"  Version: {package.version}")
+    print(f"  Build string: {build.string}")
 
-    if _stage1_recipe.staging_caches:
-        print(f"  Staging caches: {[c.name for c in _stage1_recipe.staging_caches]}")
+    if stage1_recipe.staging_caches:
+        print(f"  Staging caches: {[c.name for c in stage1_recipe.staging_caches]}")
 
-    _result = _variant.run_build(
-        output_dir=_output_tmpdir,
-        recipe_path=_recipe_path,
+    result = variant.run_build(
+        output_dir=staging_output_tmpdir,
+        recipe_path=staging_recipe_path,
     )
 
     # Display build result information
-    print(f"  Build complete in {_result.build_time:.2f}s!")
-    print(f"  Package: {_result.packages[0]}")
-    if _result.variant:
-        print(f"  Variant: {_result.variant}")
+    print(f"  Build complete in {result.build_time:.2f}s!")
+    print(f"  Package: {result.packages[0]}")
+    if result.variant:
+        print(f"  Variant: {result.variant}")
 
     # Display build log
-    if _result.log:
-        print(f"  Build log: {len(_result.log)} messages captured")
+    if result.log:
+        print(f"  Build log: {len(result.log)} messages captured")
 
 print("\n" + "=" * 60)
 print("Example 2 builds completed successfully!")
-print(f"\nBuilt packages are available in: {_output_tmpdir}")
+print(f"\nBuilt packages are available in: {staging_output_tmpdir}")
 ```
 
 ## Summary

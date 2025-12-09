@@ -91,33 +91,33 @@ print(f"Package: {demo_recipe.package.name}")
 print(f"Version: {demo_recipe.package.version}")
 
 # Set up build directories
-_recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_test_demo"
-_output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_test_demo_output"
+recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_test_demo"
+output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_test_demo_output"
 
 # Clean up from previous runs
-if _recipe_tmpdir.exists():
-    shutil.rmtree(_recipe_tmpdir)
-if _output_tmpdir.exists():
-    shutil.rmtree(_output_tmpdir)
+if recipe_tmpdir.exists():
+    shutil.rmtree(recipe_tmpdir)
+if output_tmpdir.exists():
+    shutil.rmtree(output_tmpdir)
 
-_recipe_tmpdir.mkdir(parents=True)
-_output_tmpdir.mkdir(parents=True)
+recipe_tmpdir.mkdir(parents=True)
+output_tmpdir.mkdir(parents=True)
 
-_recipe_path = _recipe_tmpdir / "recipe.yaml"
+recipe_path = recipe_tmpdir / "recipe.yaml"
 
 # Build the package (skip tests during build, we'll run them manually)
 print("\nBuilding package...")
-_variant = demo_results[0]
+variant = demo_results[0]
 from rattler_build import ToolConfiguration
 
-_tool_config = ToolConfiguration(test_strategy="skip")
-_build_result = _variant.run_build(
-    tool_config=_tool_config,
-    output_dir=_output_tmpdir,
-    recipe_path=_recipe_path,
+tool_config = ToolConfiguration(test_strategy="skip")
+build_result = variant.run_build(
+    tool_config=tool_config,
+    output_dir=output_tmpdir,
+    recipe_path=recipe_path,
 )
 
-built_package_path = _build_result.packages[0]
+built_package_path = build_result.packages[0]
 print(f"Built: {built_package_path}")
 ```
 
@@ -227,13 +227,13 @@ print("=" * 60)
 print(f"Number of tests: {pkg.test_count()}")
 
 pkg_tests = pkg.tests
-for _test in pkg_tests:
-    print(f"\nTest {_test.index}: {_test.kind}")
+for test in pkg_tests:
+    print(f"\nTest {test.index}: {test.kind}")
     print("-" * 40)
-    print(f"  Type: {type(_test).__name__}")
-    print(f"  Kind: {_test.kind}")
-    print(f"  Index: {_test.index}")
-    print(f"  Repr: {repr(_test)}")
+    print(f"  Type: {type(test).__name__}")
+    print(f"  Kind: {test.kind}")
+    print(f"  Index: {test.index}")
+    print(f"  Repr: {repr(test)}")
 ```
 
 ## Step 6: Inspecting Specific Test Types
@@ -245,51 +245,51 @@ Each test type has specific properties. Use the `as_*_test()` methods to get typ
 print("Test Type Details")
 print("=" * 60)
 
-for _test in pkg_tests:
-    print(f"\nTest {_test.index}: {_test.kind}")
+for test in pkg_tests:
+    print(f"\nTest {test.index}: {test.kind}")
     print("-" * 40)
 
-    if _test.kind == "python":
-        _py_test = _test.as_python_test()
+    if test.kind == "python":
+        py_test = test.as_python_test()
         print("  Python Test:")
-        print(f"    Imports: {_py_test.imports}")
-        print(f"    Pip check: {_py_test.pip_check}")
-        if _py_test.python_version:
-            _pv = _py_test.python_version
-            if _pv.is_none():
+        print(f"    Imports: {py_test.imports}")
+        print(f"    Pip check: {py_test.pip_check}")
+        if py_test.python_version:
+            pv = py_test.python_version
+            if pv.is_none():
                 print("    Python version: any")
-            elif _pv.as_single():
-                print(f"    Python version: {_pv.as_single()}")
-            elif _pv.as_multiple():
-                print(f"    Python versions: {_pv.as_multiple()}")
+            elif pv.as_single():
+                print(f"    Python version: {pv.as_single()}")
+            elif pv.as_multiple():
+                print(f"    Python versions: {pv.as_multiple()}")
 
-    elif _test.kind == "commands":
-        _cmd_test = _test.as_commands_test()
+    elif test.kind == "commands":
+        cmd_test = test.as_commands_test()
         print("  Commands Test:")
-        print(f"    Script: {_cmd_test.script}")
-        print(f"    Run requirements: {_cmd_test.requirements_run}")
-        print(f"    Build requirements: {_cmd_test.requirements_build}")
+        print(f"    Script: {cmd_test.script}")
+        print(f"    Run requirements: {cmd_test.requirements_run}")
+        print(f"    Build requirements: {cmd_test.requirements_build}")
 
-    elif _test.kind == "package_contents":
-        _pc_test = _test.as_package_contents_test()
+    elif test.kind == "package_contents":
+        pc_test = test.as_package_contents_test()
         print("  Package Contents Test:")
-        print(f"    Strict mode: {_pc_test.strict}")
+        print(f"    Strict mode: {pc_test.strict}")
 
-        _sections = [
-            ("files", _pc_test.files),
-            ("site_packages", _pc_test.site_packages),
-            ("bin", _pc_test.bin),
-            ("lib", _pc_test.lib),
-            ("include", _pc_test.include),
+        sections = [
+            ("files", pc_test.files),
+            ("site_packages", pc_test.site_packages),
+            ("bin", pc_test.bin),
+            ("lib", pc_test.lib),
+            ("include", pc_test.include),
         ]
 
-        for _name, _checks in _sections:
-            if _checks.exists or _checks.not_exists:
-                print(f"    {_name}:")
-                if _checks.exists:
-                    print(f"      exists: {_checks.exists}")
-                if _checks.not_exists:
-                    print(f"      not_exists: {_checks.not_exists}")
+        for name, checks in sections:
+            if checks.exists or checks.not_exists:
+                print(f"    {name}:")
+                if checks.exists:
+                    print(f"      exists: {checks.exists}")
+                if checks.not_exists:
+                    print(f"      not_exists: {checks.not_exists}")
 ```
 
 ## Step 7: Running Tests
@@ -303,18 +303,18 @@ print("=" * 60)
 
 for i in range(pkg.test_count()):
     print(f"\nRunning test {i}...")
-    _result = pkg.run_test(i)
+    result = pkg.run_test(i)
 
-    _status = "PASS" if _result.success else "FAIL"
-    print(f"   {_status}")
-    print(f"   Test index: {_result.test_index}")
+    status = "PASS" if result.success else "FAIL"
+    print(f"   {status}")
+    print(f"   Test index: {result.test_index}")
 
-    if _result.output:
-        print(f"   Output ({len(_result.output)} lines):")
-        for _line in _result.output[:5]:  # Show first 5 lines
-            print(f"     {_line}")
-        if len(_result.output) > 5:
-            print(f"     ... and {len(_result.output) - 5} more lines")
+    if result.output:
+        print(f"   Output ({len(result.output)} lines):")
+        for line in result.output[:5]:  # Show first 5 lines
+            print(f"     {line}")
+        if len(result.output) > 5:
+            print(f"     ... and {len(result.output) - 5} more lines")
 ```
 
 <!--pytest-codeblocks:cont-->
@@ -325,19 +325,19 @@ print("=" * 60)
 all_results = pkg.run_tests()
 
 print(f"\nTotal tests: {len(all_results)}")
-_passed = sum(1 for r in all_results if r.success)
-_failed = len(all_results) - _passed
+passed = sum(1 for r in all_results if r.success)
+failed = len(all_results) - passed
 
-print(f"Passed: {_passed}")
-print(f"Failed: {_failed}")
+print(f"Passed: {passed}")
+print(f"Failed: {failed}")
 
 print("\nResults summary:")
-for _result in all_results:
-    _status = "PASS" if _result.success else "FAIL"
-    print(f"  {_status} Test {_result.test_index}")
+for result in all_results:
+    status = "PASS" if result.success else "FAIL"
+    print(f"  {status} Test {result.test_index}")
 
     # TestResult can be used as a boolean
-    if _result:
+    if result:
         print("     (result is truthy)")
     else:
         print("     (result is falsy)")
@@ -356,21 +356,21 @@ The `TestResult` object provides:
 print("TestResult Properties")
 print("=" * 60)
 
-for _result in all_results:
-    print(f"\nTest {_result.test_index}:")
-    print(f"  success:    {_result.success}")
-    print(f"  test_index: {_result.test_index}")
-    print(f"  output:     {len(_result.output)} lines")
-    print(f"  bool():     {bool(_result)}")
-    print(f"  repr():     {repr(_result)}")
+for result in all_results:
+    print(f"\nTest {result.test_index}:")
+    print(f"  success:    {result.success}")
+    print(f"  test_index: {result.test_index}")
+    print(f"  output:     {len(result.output)} lines")
+    print(f"  bool():     {bool(result)}")
+    print(f"  repr():     {repr(result)}")
 
 # Example: Filter results
 print("\n" + "=" * 60)
-_passed_tests = [r for r in all_results if r]
-_failed_tests = [r for r in all_results if not r]
+passed_tests = [r for r in all_results if r]
+failed_tests = [r for r in all_results if not r]
 
-print(f"Passed tests: {[r.test_index for r in _passed_tests]}")
-print(f"Failed tests: {[r.test_index for r in _failed_tests]}")
+print(f"Passed tests: {[r.test_index for r in passed_tests]}")
+print(f"Failed tests: {[r.test_index for r in failed_tests]}")
 ```
 
 ## Step 9: Running Tests with Custom Configuration
@@ -409,12 +409,12 @@ Available options for run_test() and run_tests():
 
 # Example with custom channel
 print("\nExample: Running test with conda-forge channel:")
-_result = pkg.run_test(
+result = pkg.run_test(
     0,
     channel=["conda-forge"],
     channel_priority="strict",
 )
-print(f"  Result: {'PASS' if _result.success else 'FAIL'}")
+print(f"  Result: {'PASS' if result.success else 'FAIL'}")
 ```
 
 ## Summary

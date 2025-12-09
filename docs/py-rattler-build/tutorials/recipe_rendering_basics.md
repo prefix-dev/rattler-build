@@ -182,20 +182,20 @@ print(f"Host requirements (raw): {simple_recipe.requirements.host}")
 print(f"\nRendered {len(rendered_variants)} variant(s)")
 print("=" * 60)
 
-for _i, _rendered_variant in enumerate(rendered_variants, 1):
-    _variant_values = _rendered_variant.variant()
-    _stage1_recipe = _rendered_variant.recipe()
+for i, rendered_variant in enumerate(rendered_variants, 1):
+    variant_values = rendered_variant.variant()
+    stage1_recipe = rendered_variant.recipe()
 
-    print(f"\nSTAGE 1 - Variant {_i} (Rendered, templates evaluated)")
+    print(f"\nSTAGE 1 - Variant {i} (Rendered, templates evaluated)")
     print("-" * 60)
-    print(f"  Variant config: {json.dumps(_variant_values, indent=4)}")
-    print(f"  Package name: {_stage1_recipe.package.name}")
-    print(f"  Package version: {_stage1_recipe.package.version}")
-    print(f"  Python: {_variant_values.get('python')}")
-    print(f"  Numpy: {_variant_values.get('numpy')}")
-    print(f"  Host requirements: {_stage1_recipe.requirements.host}")
-    print(f"  Run requirements: {_stage1_recipe.requirements.run}")
-    print(f"  Build string: {_stage1_recipe.build.string}")
+    print(f"  Variant config: {json.dumps(variant_values, indent=4)}")
+    print(f"  Package name: {stage1_recipe.package.name}")
+    print(f"  Package version: {stage1_recipe.package.version}")
+    print(f"  Python: {variant_values.get('python')}")
+    print(f"  Numpy: {variant_values.get('numpy')}")
+    print(f"  Host requirements: {stage1_recipe.requirements.host}")
+    print(f"  Run requirements: {stage1_recipe.requirements.run}")
+    print(f"  Build string: {stage1_recipe.build.string}")
 
 print("\n" + "=" * 60)
 print("Recipe rendering complete!")
@@ -210,61 +210,61 @@ Finally, let's actually build the package! We'll take the rendered variants and 
 import shutil
 
 # Create persistent temp directories (clean up from previous runs)
-_recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_recipe"
-_output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_output"
+recipe_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_recipe"
+output_tmpdir = Path(tempfile.gettempdir()) / "rattler_build_output"
 
 # Clean up from previous runs
-if _recipe_tmpdir.exists():
-    shutil.rmtree(_recipe_tmpdir)
-if _output_tmpdir.exists():
-    shutil.rmtree(_output_tmpdir)
+if recipe_tmpdir.exists():
+    shutil.rmtree(recipe_tmpdir)
+if output_tmpdir.exists():
+    shutil.rmtree(output_tmpdir)
 
 # Create the directories
-_recipe_tmpdir.mkdir(parents=True)
-_output_tmpdir.mkdir(parents=True)
+recipe_tmpdir.mkdir(parents=True)
+output_tmpdir.mkdir(parents=True)
 
 # Define dummy recipe path
-_recipe_path = _recipe_tmpdir / "recipe.yaml"
+recipe_path = recipe_tmpdir / "recipe.yaml"
 
 # Build each variant
 print("Building packages...")
 print("=" * 60)
-print(f"Recipe directory: {_recipe_tmpdir}")
-print(f"Output directory: {_output_tmpdir}")
+print(f"Recipe directory: {recipe_tmpdir}")
+print(f"Output directory: {output_tmpdir}")
 
-for _i, _variant in enumerate(rendered_variants, 1):
-    print(f"\nBuilding variant {_i}/{len(rendered_variants)}")
-    _stage1_recipe = _variant.recipe()
-    _package = _stage1_recipe.package
-    _build = _stage1_recipe.build
+for i, variant in enumerate(rendered_variants, 1):
+    print(f"\nBuilding variant {i}/{len(rendered_variants)}")
+    stage1_recipe = variant.recipe()
+    package = stage1_recipe.package
+    build = stage1_recipe.build
 
-    print(f"  Package: {_package.name}")
-    print(f"  Version: {_package.version}")
-    print(f"  Build string: {_build.string}")
+    print(f"  Package: {package.name}")
+    print(f"  Version: {package.version}")
+    print(f"  Build string: {build.string}")
 
-    _result = _variant.run_build(
-        output_dir=_output_tmpdir,
-        recipe_path=_recipe_path,
+    result = variant.run_build(
+        output_dir=output_tmpdir,
+        recipe_path=recipe_path,
     )
 
     # Display build result information
-    print(f"  Build complete in {_result.build_time:.2f}s!")
-    print(f"  Package: {_result.packages[0]}")
-    if _result.variant:
-        print(f"  Variant: {_result.variant}")
+    print(f"  Build complete in {result.build_time:.2f}s!")
+    print(f"  Package: {result.packages[0]}")
+    if result.variant:
+        print(f"  Variant: {result.variant}")
 
     # Display build log
-    if _result.log:
-        print(f"  Build log: {len(_result.log)} messages captured")
+    if result.log:
+        print(f"  Build log: {len(result.log)} messages captured")
         print("\n  Build log details:")
-        for _log_entry in _result.log[:10]:  # Show first 10 log entries
-            print(f"    {_log_entry}")
-        if len(_result.log) > 10:
-            print(f"    ... and {len(_result.log) - 10} more messages")
+        for log_entry in result.log[:10]:  # Show first 10 log entries
+            print(f"    {log_entry}")
+        if len(result.log) > 10:
+            print(f"    ... and {len(result.log) - 10} more messages")
 
 print("\n" + "=" * 60)
 print("All builds completed successfully!")
-print(f"\nBuilt packages are available in: {_output_tmpdir}")
+print(f"\nBuilt packages are available in: {output_tmpdir}")
 ```
 
 ## Summary
