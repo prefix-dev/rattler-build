@@ -108,6 +108,13 @@ jobs:
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
           S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
+      - name: Upload binary artifact
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        with:
+          name: rattler-build-${{ matrix.os }}
+          path: target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
+          retention-days: 7
 
   # Cross-platform release builds (only on main/tags/labeled PRs)
   build:
