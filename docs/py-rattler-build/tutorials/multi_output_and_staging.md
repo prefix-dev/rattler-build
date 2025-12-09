@@ -1,6 +1,6 @@
 # Multi-Output Recipes and Staging Caches
 
-This notebook teaches you about advanced recipe structures:
+This tutorial teaches you about advanced recipe structures:
 
 1. Multi-output recipes - Build multiple packages from one source
 2. Staging outputs - Create temporary build artifacts
@@ -348,7 +348,7 @@ print(f"\nBuilt packages are available in: {staging_output_tmpdir}")
 
 ## Summary
 
-In this notebook, you learned about multi-output recipes and staging:
+In this tutorial, you learned about multi-output recipes and staging:
 
 - **Multi-Output Recipes**: Build multiple packages from one recipe using the `outputs` list
 - **Staging Outputs**: Create temporary build artifacts with `staging:` that other packages can inherit

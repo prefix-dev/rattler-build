@@ -1,6 +1,6 @@
 # Package Inspection and Testing
 
-This notebook teaches you how to work with built conda packages:
+This tutorial teaches you how to work with built conda packages:
 
 1. Load packages from `.conda` or `.tar.bz2` files
 2. Inspect package metadata (name, version, dependencies)
@@ -419,7 +419,7 @@ print(f"  Result: {'PASS' if result.success else 'FAIL'}")
 
 ## Summary
 
-In this notebook, you learned how to:
+In this tutorial, you learned how to:
 
 - **Load packages**: Use `Package.from_file()` to load `.conda` or `.tar.bz2` files
 - **Inspect metadata**: Access `name`, `version`, `depends`, `license`, etc.

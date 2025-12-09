@@ -1,6 +1,6 @@
 # Recipe Rendering Basics
 
-Welcome to the rattler-build Python bindings tutorial! This notebook will teach you how to:
+Welcome to the rattler-build Python bindings tutorial! This tutorial will teach you how to:
 
 1. Load recipes from YAML strings and Python dictionaries
 2. Configure variants (different build configurations)
@@ -269,7 +269,7 @@ print(f"\nBuilt packages are available in: {output_tmpdir}")
 
 ## Summary
 
-In this notebook, you learned:
+In this tutorial, you learned:
 
 - **Recipe Creation**: Load recipes from YAML strings (`Stage0Recipe.from_yaml()`) or Python dicts (`Stage0Recipe.from_dict()`)
 - **VariantConfig**: Define build variants and use `zip_keys` to pair specific combinations
