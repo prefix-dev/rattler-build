@@ -32,6 +32,26 @@ class Package:
 
     This class provides access to package metadata, file contents, and embedded tests.
     The package is lazily extracted when needed (e.g., when accessing files or tests).
+
+    Attributes:
+        name: Package name (e.g., "numpy")
+        version: Package version (e.g., "1.26.0")
+        build_string: Build string (e.g., "py312_0")
+        build_number: Build number
+        subdir: Target platform subdirectory (e.g., "linux-64", "noarch")
+        noarch: NoArch type (None, "python", or "generic")
+        depends: List of runtime dependencies
+        constrains: List of dependency constraints
+        license: Package license
+        license_family: License family
+        timestamp: Build timestamp in milliseconds since epoch
+        arch: Architecture (e.g., "x86_64")
+        platform: Platform (e.g., "linux")
+        path: Path to the package file
+        archive_type: Archive format ("conda" or "tar.bz2")
+        filename: Filename of the package
+        files: List of all files in the package
+        tests: List of tests embedded in the package
     """
 
     def __init__(self, inner: _package.Package) -> None:
@@ -158,6 +178,7 @@ class Package:
     def run_test(
         self,
         index: int,
+        *,
         channel: "Sequence[str] | None" = None,
         channel_priority: str | None = None,
         debug: bool = False,
