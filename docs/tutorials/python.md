@@ -276,7 +276,7 @@ tests:
   - python:
       imports:
         - rattler
-      python_version: ["${{ python_min ~ '.*' }}"]  # (2)!
+      python_version: ${{ python_min }}.*  # (2)!
   # You could run `abi3audit` here, but it is not necessary
   # - script:
   #     - abi3audit ${{ SP_DIR }}/spam.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
