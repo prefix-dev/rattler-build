@@ -8,6 +8,10 @@ use dunce::canonicalize;
 
 use crate::utils::remove_dir_all_force;
 
+/// Sentinel file that marks directories created by rattler-build
+/// These directories will be skipped during source copying operations
+pub const RATTLER_BUILD_IGNORE_FILE: &str = ".rattler-build-ignore";
+
 /// Directories used during the build process
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Directories {
@@ -34,6 +38,17 @@ pub struct Directories {
     /// The output directory or local channel directory
     #[serde(skip)]
     pub output_dir: PathBuf,
+}
+
+/// Creates a sentinel file in the given directory to mark it as a rattler-build directory
+/// This prevents the directory from being recursively copied during source operations
+fn create_sentinel_file(dir: &Path) -> Result<(), std::io::Error> {
+    let sentinel_path = dir.join(RATTLER_BUILD_IGNORE_FILE);
+    fs::write(
+        &sentinel_path,
+        "# This directory was created by rattler-build and should not be copied during source operations\n",
+    )?;
+    Ok(())
 }
 
 fn get_build_dir(
@@ -64,8 +79,15 @@ impl Directories {
     ) -> Result<Directories, std::io::Error> {
         if !output_dir.exists() {
             fs::create_dir_all(output_dir)?;
+            create_sentinel_file(output_dir)?;
         }
         let output_dir = canonicalize(output_dir)?;
+
+        // Ensure sentinel file exists (in case directory already existed)
+        let sentinel_path = output_dir.join(RATTLER_BUILD_IGNORE_FILE);
+        if !sentinel_path.exists() {
+            create_sentinel_file(&output_dir)?;
+        }
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
@@ -189,6 +211,9 @@ impl Directories {
         fs::create_dir_all(&self.build_prefix)?;
         fs::create_dir_all(&self.host_prefix)?;
 
+        // Create sentinel file in output directory to prevent it from being copied during source operations
+        create_sentinel_file(&self.output_dir)?;
+
         // Log the build folder for debugging
         self.log_build_folder()?;
 
@@ -237,5 +262,63 @@ mod tests {
         assert_eq!(directories.build_dir, directories2.build_dir);
         assert_eq!(directories.build_prefix, directories2.build_prefix);
         assert_eq!(directories.host_prefix, directories2.host_prefix);
+    }
+
+    #[test]
+    fn test_sentinel_file_creation() {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let directories = Directories::setup(
+            "test_pkg",
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
+            false,
+            &chrono::Utc::now(),
+            false,
+        )
+        .unwrap();
+
+        // Verify sentinel file exists in output directory
+        assert!(
+            directories
+                .output_dir
+                .join(RATTLER_BUILD_IGNORE_FILE)
+                .exists(),
+            "Sentinel file should exist in output directory"
+        );
+
+        directories.recreate_directories().unwrap();
+
+        // Verify sentinel file exists in output directory after recreate
+        assert!(
+            directories
+                .output_dir
+                .join(RATTLER_BUILD_IGNORE_FILE)
+                .exists(),
+            "Sentinel file should exist in output directory after recreate"
+        );
+
+        // Verify sentinel files do NOT exist in build directories (only output_dir should have it)
+        assert!(
+            !directories
+                .work_dir
+                .join(RATTLER_BUILD_IGNORE_FILE)
+                .exists(),
+            "Sentinel file should NOT exist in work directory"
+        );
+        assert!(
+            !directories
+                .build_prefix
+                .join(RATTLER_BUILD_IGNORE_FILE)
+                .exists(),
+            "Sentinel file should NOT exist in build prefix"
+        );
+        assert!(
+            !directories
+                .host_prefix
+                .join(RATTLER_BUILD_IGNORE_FILE)
+                .exists(),
+            "Sentinel file should NOT exist in host prefix"
+        );
     }
 }

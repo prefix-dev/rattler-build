@@ -23,7 +23,7 @@ mod directories;
 
 pub use build_configuration::BuildConfiguration;
 pub use build_output::BuildOutput as Output;
-pub use directories::Directories;
+pub use directories::{Directories, RATTLER_BUILD_IGNORE_FILE};
 
 /// Settings when creating the package (compression etc.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
