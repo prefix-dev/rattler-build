@@ -28,10 +28,7 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
     }
 
     output.push_str("\nTo run the script manually, use the following command:\n\n");
-    output.push_str(&format!(
-        "  cd {:?} && bash -e ./conda_build.sh\n\n",
-        args.work_dir
-    ));
+    output.push_str(&format!("  cd {:?} && ./conda_build.sh\n\n", args.work_dir));
     output.push_str("To run commands interactively in the build environment:\n\n");
     output.push_str(&format!("  cd {:?} && source build_env.sh", args.work_dir));
 
@@ -60,7 +57,7 @@ impl Interpreter for BashInterpreter {
         }
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let mut cmd_args = vec!["bash", "-e"];
+        let mut cmd_args = vec!["bash"];
         if args.debug.is_enabled() {
             cmd_args.push("-x");
         }
