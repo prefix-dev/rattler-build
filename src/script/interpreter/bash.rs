@@ -28,7 +28,10 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
     }
 
     output.push_str("\nTo run the script manually, use the following command:\n\n");
-    output.push_str(&format!("  cd {:?} && ./conda_build.sh\n\n", args.work_dir));
+    output.push_str(&format!(
+        "  cd {:?} && bash -e ./conda_build.sh\n\n",
+        args.work_dir
+    ));
     output.push_str("To run commands interactively in the build environment:\n\n");
     output.push_str(&format!("  cd {:?} && source build_env.sh", args.work_dir));
 
