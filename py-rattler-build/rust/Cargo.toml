@@ -20,6 +20,7 @@ rattler_build_recipe = { path = "../../crates/rattler_build_recipe" }
 rattler_build_jinja = { path = "../../crates/rattler_build_jinja" }
 rattler_build_types = { path = "../../crates/rattler_build_types" }
 rattler_build_variant_config = { path = "../../crates/rattler_build_variant_config" }
+rattler_build_package = { path = "../../crates/rattler_build_package" }
 indexmap = "2.12.1"
 pyo3 = { version = "0.27.1", features = [
   "abi3-py38",

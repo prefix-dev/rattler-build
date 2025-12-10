@@ -8,6 +8,7 @@ mod cli_api;
 mod error;
 mod jinja_config;
 mod package;
+mod package_assembler;
 mod progress_callback;
 mod recipe_generation;
 mod render;
@@ -72,6 +73,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     render::register_render_module(_py, &m)?;
     tool_config::register_tool_config_module(_py, &m)?;
     package::register_package_module(_py, &m)?;
+    package_assembler::register_package_assembler_module(_py, &m)?;
 
     Ok(())
 }

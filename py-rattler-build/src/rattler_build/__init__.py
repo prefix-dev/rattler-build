@@ -18,6 +18,13 @@ from rattler_build.cli_api import (
     build_recipes,
     test_package,
 )
+from rattler_build.package_assembler import (
+    ArchiveType,
+    FileEntry,
+    PackageOutput,
+    assemble_package,
+    collect_files,
+)
 from rattler_build.jinja_config import JinjaConfig
 from rattler_build.package import (
     CommandsTest,
@@ -58,6 +65,13 @@ __all__ = [
     "rattler_build_version",
     "build_recipes",
     "test_package",
+    # Package assembly (low-level)
+    "assemble_package",
+    "collect_files",
+    "ArchiveType",
+    "FileEntry",
+    "PackageOutput",
+    # Upload
     "upload_package_to_quetz",
     "upload_package_to_artifactory",
     "upload_package_to_prefix",
