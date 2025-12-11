@@ -1,6 +1,6 @@
 <h1>
-  <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
+  <a href="https://prefix.dev/tools/rattler-build">
+    <img alt="banner" src="https://github.com/user-attachments/assets/6180c808-33a0-41b7-be8d-9006a8f6c530">
   </a>
 </h1>
 
