@@ -6,9 +6,10 @@
   "lsp": {
     "rust-analyzer": {
       "initialization_options": {
-        "linkedProjects": [
-          "./rust/Cargo.toml"
-        ]
+        "linkedProjects": ["./rust/Cargo.toml"]
+      },
+      "binary": {
+        "path": ".pixi/envs/default/bin/rust-analyzer"
       }
     }
   }
