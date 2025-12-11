@@ -22,13 +22,26 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]
 download-font = "bash docs/layouts/download-font-to-cache.sh"
-build-docs = { cmd = "mkdocs build --strict", depends-on = ["download-font"] }
-docs = { cmd = "mkdocs serve", depends-on = ["download-font"] }
+convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
+  "py-rattler-build/notebooks/*.ipynb",
+], outputs = [
+  "docs/py-rattler-build/tutorials/*.md",
+] }
+build-docs = { cmd = "mkdocs build --strict", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
+docs = { cmd = "mkdocs serve", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
 deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
   "download-font",
+  "convert-notebooks",
 ] }
 deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
   "download-font",
+  "convert-notebooks",
 ] }
 
 [dependencies]
@@ -120,7 +133,8 @@ mkdocstrings-python = ">=1.18.2,<2"
 pillow = ">=11.3.0,<12"
 ruff = ">=0.14.7,<0.15"
 py-rattler-build = { path = "./py-rattler-build" }
-markdown-exec = ">=1.9.0,<2"
+nbconvert = ">=7.16,<8"
+ipykernel = ">=6.29,<7"
 
 
 [environments]

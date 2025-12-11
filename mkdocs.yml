@@ -83,10 +83,6 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-        - name: python
-          class: python
-          validator: !!python/name:markdown_exec.validator
-          format: !!python/name:markdown_exec.formatter
 
 extra:
   homepage: https://prefix.dev
@@ -191,7 +187,6 @@ plugins:
           options:
             separate_signature: true
             show_source: false
-  - markdown-exec
   - mike:
 # These fields are all optional; the defaults are as below...
 # alias_type: symlink
