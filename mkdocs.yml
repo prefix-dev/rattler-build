@@ -162,7 +162,7 @@ nav:
       - Tutorials:
           - py-rattler-build/tutorials/recipe_rendering_basics.md
           - py-rattler-build/tutorials/multi_output_and_staging.md
-          - py-rattler-build/tutorials/package_inspection_and_testing.md
+          - py-rattler-build/tutorials/inspecting_built_packages.md
           - py-rattler-build/tutorials/package_assembly.md
 
   - References:

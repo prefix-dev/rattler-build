@@ -20,6 +20,16 @@ use rattler_conda_types::{
 };
 use rattler_package_streaming::seek::read_package_file;
 
+// Imports for rebuild functionality
+use ::rattler_build::{
+    console_utils::LoggingOutputHandler,
+    opt::{CommonData, PackageSource, RebuildData},
+    rebuild_package_core,
+    tool_configuration::TestStrategy,
+};
+use clap::ValueEnum;
+use rattler_config::config::ConfigBase;
+
 /// A loaded conda package for inspection and testing.
 #[pyclass(name = "Package")]
 pub struct PyPackage {
@@ -267,6 +277,66 @@ impl PyPackage {
             use_jlap,
             use_sharded,
         )
+    }
+
+    /// Rebuild this package from its embedded recipe.
+    ///
+    /// Extracts the recipe embedded in the package and rebuilds it,
+    /// then compares SHA256 hashes to verify reproducibility.
+    #[pyo3(signature = (test=None, compression_threads=None, output_dir=None, auth_file=None, allow_insecure_host=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+    #[allow(clippy::too_many_arguments)]
+    fn rebuild(
+        &self,
+        test: Option<String>,
+        compression_threads: Option<u32>,
+        output_dir: Option<PathBuf>,
+        auth_file: Option<PathBuf>,
+        allow_insecure_host: Option<Vec<String>>,
+        use_bz2: bool,
+        use_zstd: bool,
+        use_jlap: bool,
+        use_sharded: bool,
+    ) -> PyResult<PyRebuildResult> {
+        // Parse test strategy
+        let test_strategy = test
+            .map(|t| TestStrategy::from_str(&t, false).unwrap())
+            .unwrap_or_default();
+
+        // Create common data
+        let config = ConfigBase::<()>::default();
+        let common = CommonData::new(
+            output_dir,
+            false,
+            auth_file,
+            config,
+            None, // channel_priority
+            allow_insecure_host,
+            use_bz2,
+            use_zstd,
+            use_jlap,
+            use_sharded,
+        );
+
+        // Create rebuild data using the package path
+        let rebuild_data = RebuildData::new(
+            PackageSource::Path(self.path.clone()),
+            test_strategy,
+            compression_threads,
+            common,
+        );
+
+        // Create a simple logging handler
+        let log_handler = LoggingOutputHandler::default();
+
+        // Run the rebuild
+        let result = run_async_task(async { rebuild_package_core(rebuild_data, log_handler).await })?;
+
+        Ok(PyRebuildResult {
+            original_path: result.original_path,
+            rebuilt_path: result.rebuilt_path,
+            original_sha256: result.original_sha256,
+            rebuilt_sha256: result.rebuilt_sha256,
+        })
     }
 
     /// Convert to a Python dictionary with all metadata
@@ -1032,6 +1102,71 @@ impl PyPathEntry {
     }
 }
 
+/// Result of rebuilding a package
+#[pyclass(name = "RebuildResult")]
+pub struct PyRebuildResult {
+    /// Path to the original package
+    original_path: PathBuf,
+    /// Path to the rebuilt package
+    rebuilt_path: PathBuf,
+    /// SHA256 of the original package
+    original_sha256: String,
+    /// SHA256 of the rebuilt package
+    rebuilt_sha256: String,
+}
+
+#[pymethods]
+impl PyRebuildResult {
+    /// Path to the original package
+    #[getter]
+    fn original_path(&self) -> PathBuf {
+        self.original_path.clone()
+    }
+
+    /// Path to the rebuilt package
+    #[getter]
+    fn rebuilt_path(&self) -> PathBuf {
+        self.rebuilt_path.clone()
+    }
+
+    /// SHA256 hash of the original package (hex-encoded)
+    #[getter]
+    fn original_sha256(&self) -> &str {
+        &self.original_sha256
+    }
+
+    /// SHA256 hash of the rebuilt package (hex-encoded)
+    #[getter]
+    fn rebuilt_sha256(&self) -> &str {
+        &self.rebuilt_sha256
+    }
+
+    /// Returns true if the original and rebuilt packages are bit-for-bit identical
+    #[getter]
+    fn is_identical(&self) -> bool {
+        self.original_sha256 == self.rebuilt_sha256
+    }
+
+    /// Returns a new Package object for the rebuilt package
+    fn rebuilt_package(&self) -> PyResult<PyPackage> {
+        PyPackage::from_file(self.rebuilt_path.clone())
+    }
+
+    fn __repr__(&self) -> String {
+        let status = if self.is_identical() {
+            "identical"
+        } else {
+            "different"
+        };
+        format!(
+            "RebuildResult(original='{}', rebuilt='{}', status={})",
+            self.original_path.display(),
+            self.rebuilt_path.display(),
+            status
+        )
+    }
+}
+
 pub fn register_package_module(
     py: Python<'_>,
     parent_module: &Bound<'_, PyModule>,
@@ -1051,6 +1186,7 @@ pub fn register_package_module(
     package_module.add_class::<PyFileChecks>()?;
     package_module.add_class::<PyTestResult>()?;
     package_module.add_class::<PyPathEntry>()?;
+    package_module.add_class::<PyRebuildResult>()?;
 
     parent_module.add_submodule(&package_module)?;
     Ok(())

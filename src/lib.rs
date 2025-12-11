@@ -966,11 +966,34 @@ pub async fn run_test(
     Ok(())
 }
 
-/// Rebuild.
-pub async fn rebuild(
+/// Result of rebuilding a package.
+#[derive(Debug, Clone)]
+pub struct RebuildOutput {
+    /// Path to the original package
+    pub original_path: PathBuf,
+    /// Path to the rebuilt package
+    pub rebuilt_path: PathBuf,
+    /// SHA256 hash of the original package (hex-encoded)
+    pub original_sha256: String,
+    /// SHA256 hash of the rebuilt package (hex-encoded)
+    pub rebuilt_sha256: String,
+}
+
+impl RebuildOutput {
+    /// Returns true if the original and rebuilt packages are bit-for-bit identical.
+    pub fn is_identical(&self) -> bool {
+        self.original_sha256 == self.rebuilt_sha256
+    }
+}
+
+/// Core rebuild logic that extracts the recipe from a package and rebuilds it.
+///
+/// This function is the reusable core of the rebuild functionality, returning
+/// the result data for programmatic use (e.g., Python bindings).
+pub async fn rebuild_package_core(
     rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
-) -> miette::Result<()> {
+) -> miette::Result<RebuildOutput> {
     let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
         rebuild_data.common.auth_file,
         #[cfg(feature = "s3")]
@@ -1096,7 +1119,15 @@ pub async fn rebuild(
     let rebuilt_path = final_output_dir.join(&new_filename);
 
     // Move the rebuilt package to final location with new name
-    fs::rename(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+    // Use copy+remove as fallback for cross-device moves
+    if let Err(e) = fs::rename(&temp_rebuilt_path, &rebuilt_path) {
+        if e.kind() == std::io::ErrorKind::CrossesDevices {
+            fs::copy(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+            fs::remove_file(&temp_rebuilt_path).into_diagnostic()?;
+        } else {
+            return Err(e).into_diagnostic();
+        }
+    }
 
     // Now we can drop the temp directory
     drop(temp_output_dir);
@@ -1108,17 +1139,35 @@ pub async fn rebuild(
     tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
+    Ok(RebuildOutput {
+        original_path: package_path,
+        rebuilt_path,
+        original_sha256: format!("{:x}", original_sha),
+        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+    })
+}
+
+/// Rebuild a package from its embedded recipe (CLI entry point).
+///
+/// This function wraps [`rebuild_package_core`] and adds interactive features
+/// like diffoscope comparison prompts that are suitable for CLI use.
+pub async fn rebuild(
+    rebuild_data: RebuildData,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
+    let result = rebuild_package_core(rebuild_data, fancy_log_handler).await?;
+
     // Compare the SHA hashes
-    if original_sha == rebuilt_sha {
+    if result.is_identical() {
         tracing::info!(
             "✅ Rebuild successful! SHA256 hashes match. Packages are bit-for-bit identical!"
         );
     } else {
         tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
         tracing::info!("❌ Rebuild produced different output!");
-        tracing::info!("  Original SHA256: {:x}", original_sha);
-        tracing::info!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
-        tracing::info!("  Rebuilt package: {}", rebuilt_path.display());
+        tracing::info!("  Original SHA256: {}", result.original_sha256);
+        tracing::info!("  Rebuilt SHA256:  {}", result.rebuilt_sha256);
+        tracing::info!("  Rebuilt package: {}", result.rebuilt_path.display());
 
         // Check if diffoscope is available
         let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
@@ -1132,8 +1181,8 @@ pub async fn rebuild(
             if confirmation {
                 let mut command = Command::new("diffoscope");
                 command
-                    .arg(&package_path)
-                    .arg(&rebuilt_path)
+                    .arg(&result.original_path)
+                    .arg(&result.rebuilt_path)
                     .arg("--text-color")
                     .arg("always");
 

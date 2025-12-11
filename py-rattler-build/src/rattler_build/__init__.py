@@ -37,6 +37,7 @@ from rattler_build.package import (
     PerlTest,
     PythonTest,
     PythonVersion,
+    RebuildResult,
     RTest,
     RubyTest,
     TestResult,
@@ -109,6 +110,7 @@ __all__ = [
     "FileChecks",
     "TestResult",
     "PathEntry",
+    "RebuildResult",
     # Exceptions
     "RattlerBuildError",
     "AuthError",

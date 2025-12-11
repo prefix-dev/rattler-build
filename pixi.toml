@@ -24,6 +24,10 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 download-font = "bash docs/layouts/download-font-to-cache.sh"
 convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
   "py-rattler-build/notebooks/*.ipynb",
+  "py-rattler-build/rust/src/**/*.rs",
+  "py-rattler-build/src/**/*.py",
+  "src/**/*.rs",
+  "crates/**/*.rs",
 ], outputs = [
   "docs/py-rattler-build/tutorials/*.md",
 ] }

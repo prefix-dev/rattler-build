@@ -296,6 +296,73 @@ class Package:
             )
         ]
 
+    def rebuild(
+        self,
+        *,
+        test: str | None = None,
+        compression_threads: int | None = None,
+        output_dir: str | Path | None = None,
+        auth_file: str | Path | None = None,
+        allow_insecure_host: "Sequence[str] | None" = None,
+        use_bz2: bool = True,
+        use_zstd: bool = True,
+        use_jlap: bool = False,
+        use_sharded: bool = True,
+    ) -> "RebuildResult":
+        """Rebuild this package from its embedded recipe.
+
+        Extracts the recipe embedded in the package and rebuilds it,
+        then compares SHA256 hashes to verify reproducibility.
+
+        Args:
+            test: Test strategy ("skip", "native", "native-and-emulated").
+                  Defaults to "native".
+            compression_threads: Number of compression threads
+            output_dir: Output directory for rebuilt package. Defaults to
+                        current working directory.
+            auth_file: Path to authentication file
+            allow_insecure_host: List of hosts to allow insecure connections
+            use_bz2: Enable bz2 repodata (default: True)
+            use_zstd: Enable zstd repodata (default: True)
+            use_jlap: Enable JLAP incremental repodata (default: False)
+            use_sharded: Enable sharded repodata (default: True)
+
+        Returns:
+            RebuildResult with original/rebuilt paths, SHA256 hashes,
+            and the rebuilt Package for inspection
+
+        Example:
+            ```python
+            from rattler_build import Package
+
+            pkg = Package.from_file("mypackage-1.0.0-py312_0.conda")
+            result = pkg.rebuild(test="skip")
+
+            if result.is_identical:
+                print("Build is reproducible!")
+            else:
+                print(f"Original: {result.original_sha256}")
+                print(f"Rebuilt:  {result.rebuilt_sha256}")
+
+            # Inspect the rebuilt package
+            rebuilt = result.rebuilt_package
+            print(f"Rebuilt: {rebuilt.name}-{rebuilt.version}")
+            ```
+        """
+        return RebuildResult(
+            self._inner.rebuild(
+                test=test,
+                compression_threads=compression_threads,
+                output_dir=str(output_dir) if output_dir else None,
+                auth_file=str(auth_file) if auth_file else None,
+                allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
+                use_bz2=use_bz2,
+                use_zstd=use_zstd,
+                use_jlap=use_jlap,
+                use_sharded=use_sharded,
+            )
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Convert package metadata to a dictionary."""
         return self._inner.to_dict()
@@ -722,3 +789,63 @@ class PathEntry:
 
     def __repr__(self) -> str:
         return f"PathEntry('{self.relative_path}')"
+
+
+class RebuildResult:
+    """Result of rebuilding a package.
+
+    Contains the original and rebuilt package paths, their SHA256 hashes,
+    and provides access to the rebuilt Package object for inspection.
+
+    Attributes:
+        original_path: Path to the original package
+        rebuilt_path: Path to the rebuilt package
+        original_sha256: SHA256 hash of the original package (hex-encoded)
+        rebuilt_sha256: SHA256 hash of the rebuilt package (hex-encoded)
+        is_identical: Whether the hashes match (reproducible build)
+    """
+
+    def __init__(self, inner: _package.RebuildResult) -> None:
+        """Initialize from internal RebuildResult object.
+
+        Users should use Package.rebuild() instead of this constructor.
+        """
+        self._inner = inner
+
+    @property
+    def original_path(self) -> Path:
+        """Path to the original package."""
+        return Path(self._inner.original_path)
+
+    @property
+    def rebuilt_path(self) -> Path:
+        """Path to the rebuilt package."""
+        return Path(self._inner.rebuilt_path)
+
+    @property
+    def original_sha256(self) -> str:
+        """SHA256 hash of the original package (hex-encoded)."""
+        return self._inner.original_sha256
+
+    @property
+    def rebuilt_sha256(self) -> str:
+        """SHA256 hash of the rebuilt package (hex-encoded)."""
+        return self._inner.rebuilt_sha256
+
+    @property
+    def is_identical(self) -> bool:
+        """Whether the original and rebuilt packages are bit-for-bit identical."""
+        return self._inner.is_identical
+
+    @property
+    def rebuilt_package(self) -> Package:
+        """Get the rebuilt Package object for inspection.
+
+        Returns:
+            A Package object for the rebuilt package
+        """
+        return Package(self._inner.rebuilt_package())
+
+    def __repr__(self) -> str:
+        status = "identical" if self.is_identical else "different"
+        return f"RebuildResult(original='{self.original_path}', rebuilt='{self.rebuilt_path}', status={status})"
