@@ -32,7 +32,7 @@ from rattler_build.package import (
     FileChecks,
     Package,
     PackageContentsTest,
-    PackageTest,
+    PackageTestType,
     PathEntry,
     PerlTest,
     PythonTest,
@@ -98,7 +98,7 @@ __all__ = [
     "Stage1Recipe",
     # Package inspection and testing
     "Package",
-    "PackageTest",
+    "PackageTestType",
     "PythonTest",
     "PythonVersion",
     "CommandsTest",

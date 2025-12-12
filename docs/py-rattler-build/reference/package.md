@@ -5,7 +5,20 @@ Load, inspect, and test conda packages.
 You can import the package classes from `rattler_build`:
 
 ```python
-from rattler_build import Package, PackageTest, TestResult
+from rattler_build import Package, PythonTest, CommandsTest, PackageContentsTest, TestResult
+```
+
+The `tests` property returns a list of test objects that can be pattern matched (Python 3.10+):
+
+```python
+for test in pkg.tests:
+    match test:
+        case PythonTest() as py_test:
+            print(f"Python imports: {py_test.imports}")
+        case CommandsTest() as cmd_test:
+            print(f"Commands: {cmd_test.script}")
+        case PackageContentsTest() as pc_test:
+            print(f"Package contents check, strict={pc_test.strict}")
 ```
 
 ## `Package`
@@ -37,22 +50,6 @@ from rattler_build import Package, PackageTest, TestResult
             - run_tests
             - to_dict
 
-## `PackageTest`
-
-::: rattler_build.PackageTest
-    options:
-        members:
-            - kind
-            - index
-            - as_python_test
-            - as_commands_test
-            - as_perl_test
-            - as_r_test
-            - as_ruby_test
-            - as_downstream_test
-            - as_package_contents_test
-            - to_dict
-
 ## `TestResult`
 
 ::: rattler_build.TestResult
@@ -69,6 +66,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.PythonTest
     options:
         members:
+            - index
             - imports
             - pip_check
             - python_version
@@ -88,6 +86,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.CommandsTest
     options:
         members:
+            - index
             - script
             - requirements_run
             - requirements_build
@@ -98,6 +97,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.PerlTest
     options:
         members:
+            - index
             - uses
             - to_dict
 
@@ -106,6 +106,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.RTest
     options:
         members:
+            - index
             - libraries
             - to_dict
 
@@ -114,6 +115,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.RubyTest
     options:
         members:
+            - index
             - requires
             - to_dict
 
@@ -122,6 +124,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.DownstreamTest
     options:
         members:
+            - index
             - downstream
             - to_dict
 
@@ -130,6 +133,7 @@ from rattler_build import Package, PackageTest, TestResult
 ::: rattler_build.PackageContentsTest
     options:
         members:
+            - index
             - files
             - site_packages
             - bin

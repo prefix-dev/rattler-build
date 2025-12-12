@@ -6,6 +6,7 @@ examine their metadata and embedded tests, and run tests against them.
 Example:
     ```python
     from rattler_build import Package
+    from rattler_build.package import PythonTest, CommandsTest, PackageContentsTest
 
     pkg = Package.from_file("mypackage-1.0.0-py312_0.conda")
     print(pkg.name, pkg.version)
@@ -14,9 +15,15 @@ Example:
     print(pkg.depends)
     # ['python >=3.12', 'numpy >=1.20']
 
+    # Pattern match on test types (Python 3.10+)
     for test in pkg.tests:
-        print(f"Test {test.index}: {test.kind}")
-    # Test 0: python
+        match test:
+            case PythonTest() as py_test:
+                print(f"Python test {py_test.index}: imports={py_test.imports}")
+            case CommandsTest() as cmd_test:
+                print(f"Commands test {cmd_test.index}")
+            case PackageContentsTest() as pc_test:
+                print(f"Package contents test {pc_test.index}: strict={pc_test.strict}")
 
     results = pkg.run_tests(channel=["conda-forge"])
     for r in results:
@@ -25,12 +32,23 @@ Example:
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 from rattler_build._rattler_build import _package
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+# Type alias for test union
+PackageTestType = Union[
+    "PythonTest",
+    "CommandsTest",
+    "PerlTest",
+    "RTest",
+    "RubyTest",
+    "DownstreamTest",
+    "PackageContentsTest",
+]
 
 
 class Package:
@@ -175,9 +193,23 @@ class Package:
         return self._inner.files
 
     @property
-    def tests(self) -> list["PackageTest"]:
-        """List of tests embedded in the package."""
-        return [PackageTest(t) for t in self._inner.tests]
+    def tests(self) -> list[PackageTestType]:
+        """List of tests embedded in the package.
+
+        Returns a list of test objects that can be pattern matched:
+
+        ```python
+        for test in pkg.tests:
+            match test:
+                case PythonTest() as py_test:
+                    print(f"imports: {py_test.imports}")
+                case CommandsTest() as cmd_test:
+                    print(f"script: {cmd_test.script}")
+                case PackageContentsTest() as pc_test:
+                    print(f"strict: {pc_test.strict}")
+        ```
+        """
+        return [_wrap_test(t) for t in self._inner.tests]
 
     def test_count(self) -> int:
         """Get the number of tests in the package."""
@@ -372,79 +404,31 @@ class Package:
         return f"Package({self.name}-{self.version}-{self.build_string})"
 
 
-class PackageTest:
-    """A test embedded in a conda package.
-
-    Tests are stored in packages at info/tests/tests.yaml and can be
-    of various types: python, commands, perl, r, ruby, downstream,
-    or package_contents.
-
-    Attributes:
-        kind: Test type ("python", "commands", "perl", "r", "ruby",
-              "downstream", or "package_contents")
-        index: Index of this test in the package's test list
-    """
-
-    def __init__(self, inner: _package.PackageTest) -> None:
-        self._inner = inner
-
-    @property
-    def kind(self) -> str:
-        """Test kind: "python", "commands", "perl", "r", "ruby", "downstream", or "package_contents"."""
-        return self._inner.kind
-
-    @property
-    def index(self) -> int:
-        """Index of this test in the package's test list."""
-        return self._inner.index
-
-    def as_python_test(self) -> "PythonTest | None":
-        """Get Python test details (returns None if not a Python test)."""
-        inner = self._inner.as_python_test()
-        return PythonTest(inner) if inner else None
-
-    def as_commands_test(self) -> "CommandsTest | None":
-        """Get commands test details (returns None if not a commands test)."""
-        inner = self._inner.as_commands_test()
-        return CommandsTest(inner) if inner else None
-
-    def as_perl_test(self) -> "PerlTest | None":
-        """Get Perl test details (returns None if not a Perl test)."""
-        inner = self._inner.as_perl_test()
-        return PerlTest(inner) if inner else None
-
-    def as_r_test(self) -> "RTest | None":
-        """Get R test details (returns None if not an R test)."""
-        inner = self._inner.as_r_test()
-        return RTest(inner) if inner else None
-
-    def as_ruby_test(self) -> "RubyTest | None":
-        """Get Ruby test details (returns None if not a Ruby test)."""
-        inner = self._inner.as_ruby_test()
-        return RubyTest(inner) if inner else None
-
-    def as_downstream_test(self) -> "DownstreamTest | None":
-        """Get downstream test details (returns None if not a downstream test)."""
-        inner = self._inner.as_downstream_test()
-        return DownstreamTest(inner) if inner else None
-
-    def as_package_contents_test(self) -> "PackageContentsTest | None":
-        """Get package contents test details (returns None if not a package contents test)."""
-        inner = self._inner.as_package_contents_test()
-        return PackageContentsTest(inner) if inner else None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert test to a dictionary."""
-        return self._inner.to_dict()
-
-    def __repr__(self) -> str:
-        return f"PackageTest(index={self.index}, kind='{self.kind}')"
+def _wrap_test(inner: Any) -> PackageTestType:
+    """Wrap a raw test object in the appropriate Python wrapper class."""
+    if isinstance(inner, _package.PythonTest):
+        return PythonTest(inner)
+    elif isinstance(inner, _package.CommandsTest):
+        return CommandsTest(inner)
+    elif isinstance(inner, _package.PerlTest):
+        return PerlTest(inner)
+    elif isinstance(inner, _package.RTest):
+        return RTest(inner)
+    elif isinstance(inner, _package.RubyTest):
+        return RubyTest(inner)
+    elif isinstance(inner, _package.DownstreamTest):
+        return DownstreamTest(inner)
+    elif isinstance(inner, _package.PackageContentsTest):
+        return PackageContentsTest(inner)
+    else:
+        raise TypeError(f"Unknown test type: {type(inner)}")
 
 
 class PythonTest:
     """Python test - imports modules and optionally runs pip check.
 
     Attributes:
+        index: Index of this test in the package's test list
         imports: List of modules to import
         pip_check: Whether to run pip check (default: True)
         python_version: Python version specification
@@ -452,6 +436,11 @@ class PythonTest:
 
     def __init__(self, inner: _package.PythonTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def imports(self) -> list[str]:
@@ -512,6 +501,7 @@ class CommandsTest:
     """Commands test - runs arbitrary shell commands.
 
     Attributes:
+        index: Index of this test in the package's test list
         script: The script content (as dict)
         requirements_run: Extra runtime requirements for the test
         requirements_build: Extra build requirements for the test (e.g., emulators)
@@ -519,6 +509,11 @@ class CommandsTest:
 
     def __init__(self, inner: _package.CommandsTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def script(self) -> dict[str, Any]:
@@ -547,11 +542,17 @@ class PerlTest:
     """Perl test - tests Perl modules.
 
     Attributes:
+        index: Index of this test in the package's test list
         uses: List of Perl modules to load with 'use'
     """
 
     def __init__(self, inner: _package.PerlTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def uses(self) -> list[str]:
@@ -570,11 +571,17 @@ class RTest:
     """R test - tests R libraries.
 
     Attributes:
+        index: Index of this test in the package's test list
         libraries: List of R libraries to load with library()
     """
 
     def __init__(self, inner: _package.RTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def libraries(self) -> list[str]:
@@ -593,11 +600,17 @@ class RubyTest:
     """Ruby test - tests Ruby modules.
 
     Attributes:
+        index: Index of this test in the package's test list
         requires: List of Ruby modules to require
     """
 
     def __init__(self, inner: _package.RubyTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def requires(self) -> list[str]:
@@ -616,11 +629,17 @@ class DownstreamTest:
     """Downstream test - tests a downstream package that depends on this package.
 
     Attributes:
+        index: Index of this test in the package's test list
         downstream: Name of the downstream package to test
     """
 
     def __init__(self, inner: _package.DownstreamTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def downstream(self) -> str:
@@ -639,6 +658,7 @@ class PackageContentsTest:
     """Package contents test - checks that files exist or don't exist in the package.
 
     Attributes:
+        index: Index of this test in the package's test list
         files: File checks for all files
         site_packages: File checks for Python site-packages
         bin: File checks for binaries in bin/
@@ -649,6 +669,11 @@ class PackageContentsTest:
 
     def __init__(self, inner: _package.PackageContentsTest) -> None:
         self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
 
     @property
     def files(self) -> "FileChecks":

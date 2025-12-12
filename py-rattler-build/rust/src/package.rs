@@ -197,16 +197,67 @@ impl PyPackage {
 
     /// List of tests embedded in the package
     #[getter]
-    fn tests(&self) -> PyResult<Vec<PyPackageTest>> {
+    fn tests(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+        use pyo3::IntoPyObject;
         let tests = self.ensure_tests_loaded()?;
-        Ok(tests
+        tests
             .iter()
             .enumerate()
-            .map(|(index, test)| PyPackageTest {
-                inner: test.clone(),
-                index,
+            .map(|(index, test)| {
+                let obj: PyObject = match test {
+                    TestType::Python { python } => PyPythonTest {
+                        inner: python.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::Commands(cmd) => PyCommandsTest {
+                        inner: cmd.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::Perl { perl } => PyPerlTest {
+                        inner: perl.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::R { r } => PyRTest {
+                        inner: r.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::Ruby { ruby } => PyRubyTest {
+                        inner: ruby.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::Downstream(ds) => PyDownstreamTest {
+                        inner: ds.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::PackageContents { package_contents } => PyPackageContentsTest {
+                        inner: package_contents.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                };
+                Ok(obj)
             })
-            .collect())
+            .collect()
     }
 
     /// Number of tests in the package
@@ -568,122 +619,22 @@ where
     Ok(rt.block_on(async { future.await.map_err(RattlerBuildError::from) })?)
 }
 
-/// Wrapper for a test embedded in a package
-#[pyclass(name = "PackageTest")]
+/// Python test - imports modules and optionally runs pip check
+#[pyclass(name = "PythonTest")]
 #[derive(Clone)]
-pub struct PyPackageTest {
-    inner: TestType,
+pub struct PyPythonTest {
+    inner: PythonTest,
     index: usize,
 }
 
 #[pymethods]
-impl PyPackageTest {
-    /// Test kind: "python", "commands", "perl", "r", "ruby", "downstream", or "package_contents"
-    #[getter]
-    fn kind(&self) -> &str {
-        match &self.inner {
-            TestType::Python { .. } => "python",
-            TestType::Perl { .. } => "perl",
-            TestType::R { .. } => "r",
-            TestType::Ruby { .. } => "ruby",
-            TestType::Commands(_) => "commands",
-            TestType::Downstream(_) => "downstream",
-            TestType::PackageContents { .. } => "package_contents",
-        }
-    }
-
+impl PyPythonTest {
     /// Index of this test in the package's test list
     #[getter]
     fn index(&self) -> usize {
         self.index
     }
 
-    /// Get Python test details (returns None if not a Python test)
-    fn as_python_test(&self) -> Option<PyPythonTest> {
-        match &self.inner {
-            TestType::Python { python } => Some(PyPythonTest {
-                inner: python.clone(),
-            }),
-            _ => None,
-        }
-    }
-
-    /// Get commands test details (returns None if not a commands test)
-    fn as_commands_test(&self) -> Option<PyCommandsTest> {
-        match &self.inner {
-            TestType::Commands(cmd) => Some(PyCommandsTest { inner: cmd.clone() }),
-            _ => None,
-        }
-    }
-
-    /// Get Perl test details (returns None if not a Perl test)
-    fn as_perl_test(&self) -> Option<PyPerlTest> {
-        match &self.inner {
-            TestType::Perl { perl } => Some(PyPerlTest {
-                inner: perl.clone(),
-            }),
-            _ => None,
-        }
-    }
-
-    /// Get R test details (returns None if not an R test)
-    fn as_r_test(&self) -> Option<PyRTest> {
-        match &self.inner {
-            TestType::R { r } => Some(PyRTest { inner: r.clone() }),
-            _ => None,
-        }
-    }
-
-    /// Get Ruby test details (returns None if not a Ruby test)
-    fn as_ruby_test(&self) -> Option<PyRubyTest> {
-        match &self.inner {
-            TestType::Ruby { ruby } => Some(PyRubyTest {
-                inner: ruby.clone(),
-            }),
-            _ => None,
-        }
-    }
-
-    /// Get downstream test details (returns None if not a downstream test)
-    fn as_downstream_test(&self) -> Option<PyDownstreamTest> {
-        match &self.inner {
-            TestType::Downstream(ds) => Some(PyDownstreamTest { inner: ds.clone() }),
-            _ => None,
-        }
-    }
-
-    /// Get package contents test details (returns None if not a package contents test)
-    fn as_package_contents_test(&self) -> Option<PyPackageContentsTest> {
-        match &self.inner {
-            TestType::PackageContents { package_contents } => Some(PyPackageContentsTest {
-                inner: package_contents.clone(),
-            }),
-            _ => None,
-        }
-    }
-
-    /// Convert to a Python dictionary
-    fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
-        pythonize::pythonize(py, &json_value)
-            .map(|obj| obj.into())
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
-    }
-
-    fn __repr__(&self) -> String {
-        format!("PackageTest(index={}, kind='{}')", self.index, self.kind())
-    }
-}
-
-/// Python test - imports modules and optionally runs pip check
-#[pyclass(name = "PythonTest")]
-#[derive(Clone)]
-pub struct PyPythonTest {
-    inner: PythonTest,
-}
-
-#[pymethods]
-impl PyPythonTest {
     /// List of modules to import
     #[getter]
     fn imports(&self) -> Vec<String> {
@@ -763,10 +714,17 @@ impl PyPythonVersion {
 #[derive(Clone)]
 pub struct PyCommandsTest {
     inner: CommandsTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyCommandsTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// The script content
     #[getter]
     fn script(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -816,10 +774,17 @@ impl PyCommandsTest {
 #[derive(Clone)]
 pub struct PyPerlTest {
     inner: PerlTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyPerlTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// List of Perl modules to load with 'use'
     #[getter]
     fn uses(&self) -> Vec<String> {
@@ -843,10 +808,17 @@ impl PyPerlTest {
 #[derive(Clone)]
 pub struct PyRTest {
     inner: RTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyRTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// List of R libraries to load with library()
     #[getter]
     fn libraries(&self) -> Vec<String> {
@@ -870,10 +842,17 @@ impl PyRTest {
 #[derive(Clone)]
 pub struct PyRubyTest {
     inner: RubyTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyRubyTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// List of Ruby modules to require
     #[getter]
     fn requires(&self) -> Vec<String> {
@@ -897,10 +876,17 @@ impl PyRubyTest {
 #[derive(Clone)]
 pub struct PyDownstreamTest {
     inner: DownstreamTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyDownstreamTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// Name of the downstream package to test
     #[getter]
     fn downstream(&self) -> &str {
@@ -924,10 +910,17 @@ impl PyDownstreamTest {
 #[derive(Clone)]
 pub struct PyPackageContentsTest {
     inner: PackageContentsTest,
+    index: usize,
 }
 
 #[pymethods]
 impl PyPackageContentsTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
     /// File checks for all files
     #[getter]
     fn files(&self) -> PyFileChecks {
@@ -1174,7 +1167,6 @@ pub fn register_package_module(
     let package_module = PyModule::new(py, "_package")?;
 
     package_module.add_class::<PyPackage>()?;
-    package_module.add_class::<PyPackageTest>()?;
     package_module.add_class::<PyPythonTest>()?;
     package_module.add_class::<PyPythonVersion>()?;
     package_module.add_class::<PyCommandsTest>()?;
