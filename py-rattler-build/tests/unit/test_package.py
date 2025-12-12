@@ -6,8 +6,13 @@ from pathlib import Path
 import pytest
 
 import rattler_build
-from rattler_build import Package, PackageTest
-from rattler_build import TestResult as _TestResult
+from rattler_build import (
+    CommandsTest,
+    Package,
+    PackageContentsTest,
+    PythonTest,
+    TestResult,
+)
 
 
 @pytest.fixture
@@ -164,21 +169,6 @@ class TestPackageTests:
         assert isinstance(count, int)
         assert count == len(pkg.tests)
 
-    def test_test_kind(self, built_package: Path) -> None:
-        """Test getting test kind."""
-        pkg = Package.from_file(built_package)
-        for test in pkg.tests:
-            assert isinstance(test, PackageTest)
-            assert test.kind in (
-                "python",
-                "commands",
-                "perl",
-                "r",
-                "ruby",
-                "downstream",
-                "package_contents",
-            )
-
     def test_test_index(self, built_package: Path) -> None:
         """Test getting test index."""
         pkg = Package.from_file(built_package)
@@ -191,9 +181,8 @@ class TestPackageTests:
         if pkg.tests:
             test = pkg.tests[0]
             repr_str = repr(test)
-            assert "PackageTest" in repr_str
-            assert "index=" in repr_str
-            assert "kind=" in repr_str
+            # Should contain the class name
+            assert "Test" in repr_str
 
     def test_test_to_dict(self, built_package: Path) -> None:
         """Test converting test to dictionary."""
@@ -205,29 +194,41 @@ class TestPackageTests:
 
 
 class TestTestTypeAccessors:
-    """Tests for specific test type accessors."""
+    """Tests for specific test type accessors using pattern matching."""
 
-    def test_as_commands_test(self, built_package: Path) -> None:
-        """Test getting commands test details."""
+    def test_commands_test_match(self, built_package: Path) -> None:
+        """Test accessing commands test details via pattern matching."""
+        pkg = Package.from_file(built_package)
+        found_commands_test = False
+        for test in pkg.tests:
+            match test:
+                case CommandsTest() as cmd_test:
+                    found_commands_test = True
+                    # Check that script property exists
+                    assert hasattr(cmd_test, "script")
+                    assert hasattr(cmd_test, "requirements_run")
+                    assert hasattr(cmd_test, "requirements_build")
+                case _:
+                    pass
+        # The dummy package should have at least one commands test
+        assert found_commands_test
+
+    def test_pattern_matching_all_types(self, built_package: Path) -> None:
+        """Test that pattern matching works for all test types."""
         pkg = Package.from_file(built_package)
         for test in pkg.tests:
-            if test.kind == "commands":
-                cmd_test = test.as_commands_test()
-                assert cmd_test is not None
-                # Check that script property exists
-                assert hasattr(cmd_test, "script")
-                assert hasattr(cmd_test, "requirements_run")
-                assert hasattr(cmd_test, "requirements_build")
-            else:
-                # Should return None for non-commands tests
-                assert test.as_commands_test() is None
-
-    def test_as_python_test_returns_none_for_commands(self, built_package: Path) -> None:
-        """Test that as_python_test returns None for commands test."""
-        pkg = Package.from_file(built_package)
-        for test in pkg.tests:
-            if test.kind == "commands":
-                assert test.as_python_test() is None
+            match test:
+                case PythonTest() as py_test:
+                    assert hasattr(py_test, "imports")
+                    assert hasattr(py_test, "pip_check")
+                case CommandsTest() as cmd_test:
+                    assert hasattr(cmd_test, "script")
+                case PackageContentsTest() as pc_test:
+                    assert hasattr(pc_test, "strict")
+                case _:
+                    # Other test types should still have basic attributes
+                    assert hasattr(test, "index")
+                    assert hasattr(test, "to_dict")
 
 
 class TestRunTests:
@@ -238,7 +239,7 @@ class TestRunTests:
         pkg = Package.from_file(built_package)
         if pkg.test_count() > 0:
             result = pkg.run_test(0)
-            assert isinstance(result, _TestResult)
+            assert isinstance(result, TestResult)
             assert isinstance(result.success, bool)
             assert isinstance(result.output, list)
             assert result.test_index == 0
@@ -252,7 +253,7 @@ class TestRunTests:
             # Should have at least one result
             assert len(results) > 0
             for result in results:
-                assert isinstance(result, _TestResult)
+                assert isinstance(result, TestResult)
 
     def test_run_test_invalid_index(self, built_package: Path) -> None:
         """Test that running a test with invalid index raises error."""
