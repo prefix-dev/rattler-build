@@ -4,6 +4,8 @@ Tool configuration for rattler-build.
 This module provides a Pythonic API for configuring the build tool.
 """
 
+from typing import Literal
+
 from rattler_build._rattler_build import tool_config as _tool_config
 
 
@@ -105,11 +107,11 @@ class ToolConfiguration:
         keep_build: bool = False,
         compression_threads: int | None = None,
         io_concurrency_limit: int | None = None,
-        test_strategy: str | None = None,
-        skip_existing: str | None = None,
+        test_strategy: Literal["skip", "native", "tests"] = "skip",
+        skip_existing: Literal["none", "local", "all"] = "none",
         continue_on_failure: bool = False,
         noarch_build_platform: str | None = None,
-        channel_priority: str | None = None,
+        channel_priority: Literal["strict", "disabled"] = "strict",
         allow_insecure_host: list[str] | None = None,
         error_prefix_in_binary: bool = False,
         allow_symlinks_on_windows: bool = False,

@@ -32,7 +32,7 @@ Example:
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Literal, Union
 
 from rattler_build._rattler_build import _package
 
@@ -221,7 +221,7 @@ class Package:
         index: int,
         *,
         channel: "Sequence[str] | None" = None,
-        channel_priority: str | None = None,
+        channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
         debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
@@ -279,7 +279,7 @@ class Package:
         self,
         *,
         channel: "Sequence[str] | None" = None,
-        channel_priority: str | None = None,
+        channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
         debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
@@ -333,7 +333,7 @@ class Package:
     def rebuild(
         self,
         *,
-        test: str | None = None,
+        test: Literal["skip", "native", "native-and-emulated"] | None = None,
         compression_threads: int | None = None,
         output_dir: str | Path | None = None,
         auth_file: str | Path | None = None,
@@ -350,7 +350,7 @@ class Package:
 
         Args:
             test: Test strategy ("skip", "native", "native-and-emulated").
-                  Defaults to "native".
+                  Defaults to "native-and-emulated".
             compression_threads: Number of compression threads
             output_dir: Output directory for rebuilt package. Defaults to
                         current working directory.

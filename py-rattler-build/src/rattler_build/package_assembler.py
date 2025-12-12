@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from rattler_build._rattler_build import _package_assembler
 
@@ -202,7 +202,7 @@ def assemble_package(
     depends: Sequence[str] | None = None,
     constrains: Sequence[str] | None = None,
     build_number: int = 0,
-    noarch: str | None = None,
+    noarch: Literal["python", "generic"] | None = None,
     # Additional files (optional)
     license_files: Sequence[str | Path] | None = None,
     test_files: Sequence[str | Path] | None = None,

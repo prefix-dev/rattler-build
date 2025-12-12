@@ -9,7 +9,7 @@ ProgressCallback.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 
 class DownloadStartEvent:
@@ -59,7 +59,7 @@ class BuildStepEvent:
 class LogEvent:
     """Event fired for log messages."""
 
-    def __init__(self, level: str, message: str, span: str | None = None):
+    def __init__(self, level: Literal["error", "warn", "info"], message: str, span: str | None = None):
         self.level = level
         self.message = message
         self.span = span
@@ -399,14 +399,14 @@ default_callback = SimpleProgressCallback()
 
 
 def create_callback(
-    style: str = "simple",
+    style: Literal["simple", "rich"] | None = "simple",
     show_logs: bool = True,
     show_details: bool = False,
 ) -> ProgressCallback:
     """Create a progress callback of the specified style.
 
     Args:
-        style: Style of callback - "simple", "rich", or "none"
+        style: Style of callback - "simple", "rich", or None for no output
         show_logs: Show logs in rich output (only used with style="rich")
         show_details: Show detailed progress information (only used with style="rich")
 
@@ -425,14 +425,14 @@ def create_callback(
         callback = create_callback("rich", show_logs=True, show_details=True)
 
         # No output
-        callback = create_callback("none")
+        callback = create_callback(None)
         ```
     """
     if style == "simple":
         return SimpleProgressCallback()
     elif style == "rich":
         return RichProgressCallback(show_logs=show_logs, show_details=show_details)
-    elif style == "none":
+    elif style is None:
         # Empty callback that does nothing
         class NoOpCallback:
             def on_download_start(self, event: DownloadStartEvent) -> None:
