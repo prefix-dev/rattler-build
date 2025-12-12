@@ -49,7 +49,7 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     # Build each variant with progress reporting
     for i, variant in enumerate(rendered_variants, 1):
         print(f"\n🔨 Building variant {i}/{len(rendered_variants)}")
-        stage1_recipe = variant.recipe()
+        stage1_recipe = variant.recipe
         package = stage1_recipe.package
         build = stage1_recipe.build
         print(f"   Package: {package.name}")

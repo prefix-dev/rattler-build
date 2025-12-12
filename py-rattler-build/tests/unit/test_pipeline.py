@@ -45,7 +45,7 @@ requirements:
     assert len(rendered) == 1
 
     # Step 4: Access Stage1 recipe
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     # Note: The Python wrapper class name might differ from the import
     assert stage1 is not None
     assert stage1.package.name == "my-package"
@@ -69,7 +69,7 @@ def test_pipeline_from_dict_to_stage1() -> None:
     rendered = stage0.render(variant_config)
 
     # Step 3: Verify Stage1
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     assert stage1.package.name == "dict-package"
     assert stage1.package.version == "2.0.0"
 
@@ -99,10 +99,10 @@ requirements:
 
     # Each variant should have different python version in used_variant
     for i, variant in enumerate(rendered):
-        stage1 = variant.recipe()
+        stage1 = variant.recipe
         assert stage1.package.name == "variant-package"
         # Check that the variant was used
-        assert "python" in variant.variant()
+        assert "python" in variant.variant
 
 
 def test_pipeline_multi_output() -> None:
@@ -138,7 +138,7 @@ outputs:
     assert len(rendered) == 2
 
     # Check output names
-    names = {r.recipe().package.name for r in rendered}
+    names = {r.recipe.package.name for r in rendered}
     assert names == {"multi-lib", "multi-dev"}
 
 
@@ -161,7 +161,7 @@ package:
     rendered = stage0.render(variant_config, render_config)
 
     assert len(rendered) == 1
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     assert stage1.package.name == "platform-package"
 
 
@@ -178,7 +178,7 @@ package:
     rendered = stage0.render(variant_config)
 
     # Hash info should be available
-    hash_info = rendered[0].hash_info()
+    hash_info = rendered[0].hash_info
     assert hash_info is not None
     assert isinstance(hash_info.hash, str)
     assert len(hash_info.hash) == 7
@@ -210,14 +210,14 @@ outputs:
     # Find the pin-app output
     app_variant = None
     for variant in rendered:
-        if variant.recipe().package.name == "pin-app":
+        if variant.recipe.package.name == "pin-app":
             app_variant = variant
             break
 
     assert app_variant is not None
 
     # Check pin_subpackages
-    pins = app_variant.pin_subpackages()
+    pins = app_variant.pin_subpackages
     assert "pin-lib" in pins
     assert pins["pin-lib"].exact is True
 
@@ -251,7 +251,7 @@ build:
     rendered_original = stage0_original.render(variant_config)
 
     assert len(rendered_original) == 1
-    assert rendered_original[0].recipe().package.name == "roundtrip-package"
+    assert rendered_original[0].recipe.package.name == "roundtrip-package"
 
 
 def test_pipeline_stage1_properties() -> None:
@@ -284,7 +284,7 @@ about:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # Test all properties
     assert stage1.package.name == "props-package"
@@ -318,7 +318,7 @@ requirements:
     variant_config = VariantConfig({"python": ["3.10"]})
 
     rendered = stage0.render(variant_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # used_variant should contain python
     used_variant = stage1.used_variant
@@ -349,7 +349,7 @@ package:
     # Render and check Stage1 context
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     stage1_context = stage1.context
     assert "my_var" in stage1_context
@@ -376,8 +376,8 @@ package:
     assert len(rendered1) == 1
     assert len(rendered2) == 1
 
-    assert rendered1[0].recipe().package.name == "reusable-recipe"
-    assert rendered2[0].recipe().package.name == "reusable-recipe"
+    assert rendered1[0].recipe.package.name == "reusable-recipe"
+    assert rendered2[0].recipe.package.name == "reusable-recipe"
 
 
 def test_pipeline_from_dict_error_missing_package() -> None:
@@ -438,7 +438,7 @@ requirements:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     reqs = stage1.requirements
 
     # Test that requirements are accessible as lists
@@ -477,7 +477,7 @@ about:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     about = stage1.about
 
     assert about.summary == "This is a detailed test"
@@ -509,7 +509,7 @@ build:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     build = stage1.build
 
     assert build.number == 42
@@ -533,7 +533,7 @@ source:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # sources should be a list
     sources = stage1.sources
@@ -584,7 +584,7 @@ about:
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
 
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
     stage1_dict = stage1.to_dict()
 
     # Verify it's a proper dictionary with expected keys

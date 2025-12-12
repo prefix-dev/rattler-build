@@ -36,7 +36,7 @@ class HashInfo:
 
     Example:
         ```python
-        hash_info = variant.hash_info()
+        hash_info = variant.hash_info
         if hash_info:
             print(f"Hash: {hash_info.hash}")
             print(f"Prefix: {hash_info.prefix}")
@@ -84,7 +84,7 @@ class PinSubpackageInfo:
 
     Example:
         ```python
-        pins = variant.pin_subpackages()
+        pins = variant.pin_subpackages
         for name, info in pins.items():
             print(f"{name}: {info.version} (exact={info.exact})")
         ```
@@ -223,9 +223,9 @@ class RenderedVariant:
     Example:
         ```python
         for variant in rendered_variants:
-            print(f"Package: {variant.recipe().package.name}")
-            print(f"Variant: {variant.variant()}")
-            print(f"Build string: {variant.recipe().build.string}")
+            print(f"Package: {variant.recipe.package.name}")
+            print(f"Variant: {variant.variant}")
+            print(f"Build string: {variant.recipe.build.string}")
         ```
     """
 
@@ -233,6 +233,7 @@ class RenderedVariant:
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
 
+    @property
     def variant(self) -> dict[str, str]:
         """Get the variant combination used for this render.
 
@@ -241,6 +242,7 @@ class RenderedVariant:
         """
         return self._inner.variant()
 
+    @property
     def recipe(self) -> stage1.Stage1Recipe:
         """Get the rendered Stage1 recipe.
 
@@ -249,6 +251,7 @@ class RenderedVariant:
         """
         return self._inner.recipe()
 
+    @property
     def hash_info(self) -> HashInfo | None:
         """Get hash info if available.
 
@@ -258,7 +261,7 @@ class RenderedVariant:
         Example:
             ```python
             rendered = recipe.render(variant_config)[0]
-            hash_info = rendered.hash_info()
+            hash_info = rendered.hash_info
             if hash_info:
                 print(f"Hash: {hash_info.hash}")
                 print(f"Prefix: {hash_info.prefix}")
@@ -267,6 +270,7 @@ class RenderedVariant:
         inner = self._inner.hash_info()
         return HashInfo._from_inner(inner) if inner else None
 
+    @property
     def pin_subpackages(self) -> dict[str, PinSubpackageInfo]:
         """Get pin_subpackage information.
 
@@ -276,7 +280,7 @@ class RenderedVariant:
         Example:
             ```python
             rendered = recipe.render(variant_config)[0]
-            for name, info in rendered.pin_subpackages().items():
+            for name, info in rendered.pin_subpackages.items():
                 print(f"{name}: version={info.version}, exact={info.exact}")
             ```
         """

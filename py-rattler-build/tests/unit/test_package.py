@@ -165,7 +165,7 @@ class TestPackageTests:
     def test_test_count(self, built_package: Path) -> None:
         """Test getting test count."""
         pkg = Package.from_file(built_package)
-        count = pkg.test_count()
+        count = pkg.test_count
         assert isinstance(count, int)
         assert count == len(pkg.tests)
 
@@ -237,7 +237,7 @@ class TestRunTests:
     def test_run_test(self, built_package: Path) -> None:
         """Test running a specific test by index."""
         pkg = Package.from_file(built_package)
-        if pkg.test_count() > 0:
+        if pkg.test_count > 0:
             result = pkg.run_test(0)
             assert isinstance(result, TestResult)
             assert isinstance(result.success, bool)
@@ -247,7 +247,7 @@ class TestRunTests:
     def test_run_tests(self, built_package: Path) -> None:
         """Test running all tests."""
         pkg = Package.from_file(built_package)
-        if pkg.test_count() > 0:
+        if pkg.test_count > 0:
             results = pkg.run_tests()
             assert isinstance(results, list)
             # Should have at least one result
@@ -264,7 +264,7 @@ class TestRunTests:
     def test_test_result_bool(self, built_package: Path) -> None:
         """Test that TestResult can be used as boolean."""
         pkg = Package.from_file(built_package)
-        if pkg.test_count() > 0:
+        if pkg.test_count > 0:
             result = pkg.run_test(0)
             # TestResult should be truthy if successful
             if result.success:
@@ -275,7 +275,7 @@ class TestRunTests:
     def test_test_result_repr(self, built_package: Path) -> None:
         """Test TestResult string representation."""
         pkg = Package.from_file(built_package)
-        if pkg.test_count() > 0:
+        if pkg.test_count > 0:
             result = pkg.run_test(0)
             repr_str = repr(result)
             assert "TestResult" in repr_str

@@ -23,7 +23,7 @@ class Stage1Recipe:
         # After parsing and rendering a Stage0Recipe
         stage0_recipe = Stage0Recipe.from_yaml(yaml_string)
         rendered = stage0_recipe.render(variant_config)
-        stage1_recipe = rendered[0].recipe()
+        stage1_recipe = rendered[0].recipe
         print(stage1_recipe.package.name)
         print(stage1_recipe.package.version)
         ```

@@ -63,7 +63,7 @@ python:
     assert len(rendered) == 3
 
     # Check that each variant has the correct python value
-    python_versions = {variant.variant().get("python") for variant in rendered}
+    python_versions = {variant.variant.get("python") for variant in rendered}
     assert python_versions == {"3.9", "3.10", "3.11"}
 
 
@@ -100,7 +100,7 @@ outputs:
     assert len(rendered) == 2
 
     # Check package names
-    names = {variant.recipe().package.name for variant in rendered}
+    names = {variant.recipe.package.name for variant in rendered}
     assert names == {"multi-pkg-lib", "multi-pkg"}
 
 
@@ -145,14 +145,14 @@ outputs:
     # Find the -extra package
     extra_pkg = None
     for variant in rendered:
-        if variant.recipe().package.name == "my-pkg-extra":
+        if variant.recipe.package.name == "my-pkg-extra":
             extra_pkg = variant
             break
 
     assert extra_pkg is not None
 
     # Check pin_subpackages
-    pin_subpackages = extra_pkg.pin_subpackages()
+    pin_subpackages = extra_pkg.pin_subpackages
     assert "my-pkg" in pin_subpackages or "my_pkg" in pin_subpackages
 
 
@@ -180,10 +180,10 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     assert len(rendered) == 2
     assert isinstance(rendered[0], RenderedVariant)
 
-    assert rendered[0].recipe().package.name == "mixed-compiled"
-    assert rendered[0].recipe().package.version == "1.2.3"
-    assert len(rendered[0].recipe().staging_caches) == 1
-    assert rendered[0].recipe().about.to_dict() == snapshot(
+    assert rendered[0].recipe.package.name == "mixed-compiled"
+    assert rendered[0].recipe.package.version == "1.2.3"
+    assert len(rendered[0].recipe.staging_caches) == 1
+    assert rendered[0].recipe.about.to_dict() == snapshot(
         {
             "repository": "https://github.com/foobar/repo",
             "license": "Apache-2.0",
@@ -211,7 +211,7 @@ python:
     rendered = recipe.render(variant_config)
 
     assert len(rendered) >= 1
-    assert rendered[0].recipe().package.name == "string-test"
+    assert rendered[0].recipe.package.name == "string-test"
 
 
 def test_render_recipe_from_path(test_data_dir: Path) -> None:
@@ -224,7 +224,7 @@ def test_render_recipe_from_path(test_data_dir: Path) -> None:
     rendered = recipe.render(variant_config, render_config)
 
     assert len(rendered) == 2
-    assert rendered[0].recipe().package.name == "mixed-compiled"
+    assert rendered[0].recipe.package.name == "mixed-compiled"
 
 
 def test_render_variant_config_from_yaml_string() -> None:
@@ -250,7 +250,7 @@ python:
     rendered = recipe.render(variant_config)
 
     assert len(rendered) == 2
-    python_versions = {variant.variant().get("python") for variant in rendered}
+    python_versions = {variant.variant.get("python") for variant in rendered}
     assert python_versions == {"3.9", "3.10"}
 
 

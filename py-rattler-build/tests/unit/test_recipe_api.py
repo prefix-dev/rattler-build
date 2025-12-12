@@ -37,7 +37,7 @@ def test_recipe_all_sections() -> None:
     rendered = stage0.render(variant_config, render_config)
 
     assert len(rendered) == 1
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # Stage1 Package - fully evaluated
     assert stage1.package.name == "test-package"
@@ -82,7 +82,7 @@ def test_recipe_representations() -> None:
     # Render to Stage1
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # Stage1 recipe repr
     stage1_repr = repr(stage1)
@@ -123,13 +123,13 @@ def test_parse_recipe_with_platform_selectors() -> None:
     platform_config = PlatformConfig(target_platform="linux-64")
     linux_config = RenderConfig(platform=platform_config)
     rendered_linux = stage0.render(variant_config, linux_config)
-    stage1_linux = rendered_linux[0].recipe()
+    stage1_linux = rendered_linux[0].recipe
 
     # Render for Windows
     platform_config = PlatformConfig(target_platform="win-64")
     windows_config = RenderConfig(platform=platform_config)
     rendered_windows = stage0.render(variant_config, windows_config)
-    stage1_windows = rendered_windows[0].recipe()
+    stage1_windows = rendered_windows[0].recipe
 
     # Both should parse the same package
     assert stage1_linux.package.name == "test-package"
@@ -175,13 +175,13 @@ build:
     render_config = RenderConfig(extra_context={"build_number": "1"})
 
     rendered = stage0.render(variant_config, render_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     assert stage1.package.name == "variant-test"
     assert str(stage1.package.version) == "1.0.0"
 
     # Check that variant was used
-    variant_dict = rendered[0].variant()
+    variant_dict = rendered[0].variant
     assert "python" in variant_dict
     assert variant_dict["python"] == "3.11"
 
@@ -211,7 +211,7 @@ def test_stage0_to_stage1_complete_flow() -> None:
 
     # Access Stage1
     variant = rendered[0]
-    stage1 = variant.recipe()
+    stage1 = variant.recipe
 
     # Verify Stage1 properties are all accessible
     assert stage1.package is not None
@@ -272,12 +272,12 @@ about:
     assert len(rendered) == 2
 
     # Check both outputs
-    names = {r.recipe().package.name for r in rendered}
+    names = {r.recipe.package.name for r in rendered}
     assert names == {"multi-test-lib", "multi-test-dev"}
 
     # Both should be valid Stage1 recipes
     for variant in rendered:
-        stage1 = variant.recipe()
+        stage1 = variant.recipe
         assert stage1.package is not None
         assert stage1.build is not None
         assert stage1.requirements is not None
@@ -316,7 +316,7 @@ build:
     # Render to Stage1
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # Jinja should be evaluated
     assert stage1.package.name == "jinja-test"
@@ -344,7 +344,7 @@ def test_recipe_from_dict_api() -> None:
     # Render to Stage1
     variant_config = VariantConfig()
     rendered = stage0.render(variant_config)
-    stage1 = rendered[0].recipe()
+    stage1 = rendered[0].recipe
 
     # Verify all properties
     assert stage1.package.name == "dict-api-test"

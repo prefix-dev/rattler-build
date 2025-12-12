@@ -211,6 +211,7 @@ class Package:
         """
         return [_wrap_test(t) for t in self._inner.tests]
 
+    @property
     def test_count(self) -> int:
         """Get the number of tests in the package."""
         return self._inner.test_count()

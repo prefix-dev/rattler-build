@@ -27,7 +27,7 @@ package:
     variant = rendered[0]
 
     # Test hash_info - it always exists now
-    hash_info = variant.hash_info()
+    hash_info = variant.hash_info
 
     assert hash_info is not None
     # Check that we can access properties like a typed object
@@ -73,7 +73,7 @@ outputs:
     # Find the test-app output (should have pin_subpackages)
     app_variant = None
     for variant in rendered:
-        recipe_obj = variant.recipe()
+        recipe_obj = variant.recipe
         # Access package property (not method)
         if recipe_obj.package.name == "test-app":
             app_variant = variant
@@ -82,7 +82,7 @@ outputs:
     assert app_variant is not None, "test-app variant not found"
 
     # Test pin_subpackages
-    pin_subpackages = app_variant.pin_subpackages()
+    pin_subpackages = app_variant.pin_subpackages
 
     assert isinstance(pin_subpackages, dict)
 
@@ -121,7 +121,7 @@ package:
     render_config = RenderConfig()
     rendered = recipe.render(variant_config, render_config)
 
-    hash_info = rendered[0].hash_info()
+    hash_info = rendered[0].hash_info
     if hash_info is not None:
         repr_str = repr(hash_info)
         assert "HashInfo" in repr_str
@@ -157,8 +157,8 @@ outputs:
 
     # Find app output
     for variant in rendered:
-        if variant.recipe().package.name == "app":
-            pin_subpackages = variant.pin_subpackages()
+        if variant.recipe.package.name == "app":
+            pin_subpackages = variant.pin_subpackages
             if "lib" in pin_subpackages:
                 pin_info = pin_subpackages["lib"]
                 repr_str = repr(pin_info)
@@ -184,7 +184,7 @@ package:
     render_config = RenderConfig()
     rendered = recipe.render(variant_config, render_config)
 
-    hash_info = rendered[0].hash_info()
+    hash_info = rendered[0].hash_info
     # Hash info is always present
     assert hash_info is not None
     assert isinstance(hash_info.hash, str)
@@ -206,6 +206,6 @@ package:
     render_config = RenderConfig()
     rendered = recipe.render(variant_config, render_config)
 
-    pin_subpackages = rendered[0].pin_subpackages()
+    pin_subpackages = rendered[0].pin_subpackages
     assert isinstance(pin_subpackages, dict)
     assert len(pin_subpackages) == 0

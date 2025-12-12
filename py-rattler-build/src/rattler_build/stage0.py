@@ -181,7 +181,7 @@ class Stage0Recipe(ABC):
             recipe = Stage0Recipe.from_yaml(yaml_string)
             variants = recipe.render(variant_config)
             for variant in variants:
-                print(variant.recipe().package.name)
+                print(variant.recipe.package.name)
             ```
         """
         # Create empty variant config if not provided
