@@ -44,10 +44,9 @@ lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.t
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
-ipykernel = "*"
-
 lua = "*"
-# Python 3.8 is the minimum supported version, so we use that for testing
+
+# Python 3.10 is the minimum supported version, so we use that for testing
 python = "3.10.*"
 
 mypy = "~=1.5.1"
@@ -68,9 +67,12 @@ check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
 test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
 type-check = { cmd = "mypy" }
 
+[feature.notebooks.dependencies]
+jupyter = ">=1.1.1,<2"
+
 
 [environments]
-default = { features = ["test"], solve-group = "default" }
+default = { features = ["test", "notebooks"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 lint = { features = ["lint"] }
 

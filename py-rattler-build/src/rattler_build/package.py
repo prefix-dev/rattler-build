@@ -31,6 +31,7 @@ Example:
     ```
 """
 
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Union
 
@@ -68,7 +69,7 @@ class Package:
         constrains: List of dependency constraints
         license: Package license
         license_family: License family
-        timestamp: Build timestamp in milliseconds since epoch
+        timestamp: Build timestamp as a datetime object
         arch: Architecture (e.g., "x86_64")
         platform: Platform (e.g., "linux")
         path: Path to the package file
@@ -158,8 +159,8 @@ class Package:
         return self._inner.license_family
 
     @property
-    def timestamp(self) -> int | None:
-        """Build timestamp in milliseconds since epoch."""
+    def timestamp(self) -> datetime | None:
+        """Build timestamp as a datetime object (UTC timezone-aware)."""
         return self._inner.timestamp
 
     @property

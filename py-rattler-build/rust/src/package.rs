@@ -142,13 +142,13 @@ impl PyPackage {
         self.index.license_family.clone()
     }
 
-    /// Build timestamp (milliseconds since epoch)
+    /// Build timestamp as a datetime object
     #[getter]
-    fn timestamp(&self) -> Option<i64> {
+    fn timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.index
             .timestamp
             .as_ref()
-            .map(|ts| ts.timestamp_millis())
+            .map(|ts| ts.datetime().to_owned())
     }
 
     /// Architecture (e.g., "x86_64")

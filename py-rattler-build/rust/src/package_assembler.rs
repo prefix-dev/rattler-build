@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use pyo3::prelude::*;
 use rattler_build_package::{
     ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig,
@@ -261,7 +261,7 @@ pub fn assemble_package_py(
     // Build options
     compression_level: u8,
     archive_type: Option<PyArchiveType>,
-    timestamp: Option<i64>,
+    timestamp: Option<DateTime<Utc>>,
     compression_threads: Option<usize>,
     detect_prefix: bool,
 ) -> PyResult<PyPackageOutput> {
@@ -285,7 +285,7 @@ pub fn assemble_package_py(
     let config = PackageConfig {
         compression_level,
         archive_type: archive_type.map(Into::into).unwrap_or(ArchiveType::Conda),
-        timestamp: timestamp.and_then(DateTime::from_timestamp_millis),
+        timestamp,
         compression_threads: compression_threads.unwrap_or_else(|| {
             std::thread::available_parallelism()
                 .map(|n| n.get())
@@ -357,7 +357,7 @@ pub fn assemble_package_py(
         subdir: Some(platform.to_string()),
         license: license.clone(),
         license_family,
-        timestamp: timestamp.and_then(|ms| DateTime::from_timestamp_millis(ms).map(Into::into)),
+        timestamp: timestamp.map(Into::into),
         depends: depends.unwrap_or_default(),
         constrains: constrains.unwrap_or_default(),
         noarch: noarch_type,

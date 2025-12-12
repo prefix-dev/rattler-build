@@ -2,6 +2,7 @@
 
 import hashlib
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -199,8 +200,8 @@ class TestReproducibleBuilds:
         output_dir = tmp_path / "output"
         output_dir.mkdir()
 
-        # Fixed timestamp
-        timestamp = 1704067200000  # 2024-01-01 00:00:00 UTC
+        # Fixed timestamp: 2024-01-01 00:00:00 UTC
+        timestamp = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
         output1 = assemble_package(
             name="repro",

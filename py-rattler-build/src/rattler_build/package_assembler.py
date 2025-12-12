@@ -24,6 +24,7 @@ Example:
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -210,7 +211,7 @@ def assemble_package(
     # Build options (optional)
     compression_level: int = 9,
     archive_type: ArchiveType = ArchiveType.Conda,
-    timestamp: int | None = None,
+    timestamp: datetime | None = None,
     compression_threads: int | None = None,
     detect_prefix: bool = True,
 ) -> PackageOutput:
@@ -243,7 +244,7 @@ def assemble_package(
         recipe_dir: Path to recipe directory to include in info/recipe/.
         compression_level: Compression level 0-9 (default: 9, higher = smaller but slower).
         archive_type: Archive format (default: ArchiveType.Conda).
-        timestamp: Build timestamp in milliseconds since epoch for reproducible builds.
+        timestamp: Build timestamp as a datetime object for reproducible builds.
         compression_threads: Number of threads for compression (default: auto-detect).
         detect_prefix: Whether to detect and record prefix placeholders (default: True).
 
