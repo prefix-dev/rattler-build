@@ -10,6 +10,7 @@ from rattler_build._rattler_build import (
 
 def build_recipes(
     recipes: list[str | Path],
+    *,
     up_to: str | None = None,
     build_platform: str | None = None,
     target_platform: str | None = None,
@@ -135,6 +136,7 @@ def build_recipes(
 
 def test_package(
     package_file: str | Path,
+    *,
     channel: list[str] | None = None,
     compression_threads: int | None = None,
     auth_file: str | Path | None = None,

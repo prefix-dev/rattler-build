@@ -103,7 +103,7 @@ def test_recipe_representations() -> None:
 
 def test_render_config_with_variants() -> None:
     """Test RenderConfig with variant configuration."""
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
     render_config = RenderConfig(
         platform=platform_config,
         extra_context={"python": "3.11", "build_number": "1"},
@@ -120,13 +120,13 @@ def test_parse_recipe_with_platform_selectors() -> None:
     variant_config = VariantConfig()
 
     # Render for Linux
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
     linux_config = RenderConfig(platform=platform_config)
     rendered_linux = stage0.render(variant_config, linux_config)
     stage1_linux = rendered_linux[0].recipe()
 
     # Render for Windows
-    platform_config = PlatformConfig("win-64")
+    platform_config = PlatformConfig(target_platform="win-64")
     windows_config = RenderConfig(platform=platform_config)
     rendered_windows = stage0.render(variant_config, windows_config)
     stage1_windows = rendered_windows[0].recipe()
@@ -205,7 +205,7 @@ def test_stage0_to_stage1_complete_flow() -> None:
 
     # Render to Stage1
     variant_config = VariantConfig()
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
     render_config = RenderConfig(platform=platform_config)
     rendered = stage0.render(variant_config, render_config)
 

@@ -26,7 +26,7 @@ def test_data_dir() -> Path:
 
 def test_render_config_with_platforms() -> None:
     """Test RenderConfig with custom platforms."""
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
     config = RenderConfig(platform=platform_config)
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
@@ -159,7 +159,7 @@ outputs:
 def test_render_invalid_platform() -> None:
     """Test that invalid platform raises PlatformParseError."""
     with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
-        platform_config = PlatformConfig("invalid-platform")
+        platform_config = PlatformConfig(target_platform="invalid-platform")
         RenderConfig(platform=platform_config)
 
 

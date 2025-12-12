@@ -5,8 +5,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -393,8 +391,6 @@ environments:
   lint:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -557,8 +553,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -2759,15 +2753,12 @@ packages:
   version: 0.48.0
   build: py310h4656880_0
   subdir: win-64
-  variants:
-    python: '3.10'
-    target_platform: win-64
   depends:
   - python >=3.10
   - python_abi 3.10.* *_cp310
   license: BSD-3-Clause
   input:
-    hash: d7f5f722a2e2f26acd0a3cb09aad5f97a5f2ff597edb8efef38faec5aef0b03f
+    hash: 9eff1c411a8809f3d4b5df7f13cc20c921aa03f764fe8d0ca4a0f0f6635cf8dc
     globs:
     - pyproject.toml
 - conda: .
@@ -2775,9 +2766,6 @@ packages:
   version: 0.48.0
   build: py310h8e7c8fa_0
   subdir: linux-64
-  variants:
-    python: '3.10'
-    target_platform: linux-64
   depends:
   - python >=3.10
   - python_abi 3.10.* *_cp310
@@ -2785,7 +2773,7 @@ packages:
   - __glibc >=2.17
   license: BSD-3-Clause
   input:
-    hash: d7f5f722a2e2f26acd0a3cb09aad5f97a5f2ff597edb8efef38faec5aef0b03f
+    hash: 9eff1c411a8809f3d4b5df7f13cc20c921aa03f764fe8d0ca4a0f0f6635cf8dc
     globs:
     - pyproject.toml
 - conda: .
@@ -2793,9 +2781,6 @@ packages:
   version: 0.48.0
   build: py310h8ff6bd7_0
   subdir: osx-64
-  variants:
-    python: '3.10'
-    target_platform: osx-64
   depends:
   - python >=3.10
   - python_abi 3.10.* *_cp310
@@ -2803,7 +2788,7 @@ packages:
   - __osx >=10.13
   license: BSD-3-Clause
   input:
-    hash: d7f5f722a2e2f26acd0a3cb09aad5f97a5f2ff597edb8efef38faec5aef0b03f
+    hash: 9eff1c411a8809f3d4b5df7f13cc20c921aa03f764fe8d0ca4a0f0f6635cf8dc
     globs:
     - pyproject.toml
 - conda: .
@@ -2811,9 +2796,6 @@ packages:
   version: 0.48.0
   build: py310hbd7d6ef_0
   subdir: osx-arm64
-  variants:
-    python: '3.10'
-    target_platform: osx-arm64
   depends:
   - python >=3.10
   - python_abi 3.10.* *_cp310
@@ -2821,7 +2803,7 @@ packages:
   - __osx >=11.0
   license: BSD-3-Clause
   input:
-    hash: d7f5f722a2e2f26acd0a3cb09aad5f97a5f2ff597edb8efef38faec5aef0b03f
+    hash: 9eff1c411a8809f3d4b5df7f13cc20c921aa03f764fe8d0ca4a0f0f6635cf8dc
     globs:
     - pyproject.toml
 - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda

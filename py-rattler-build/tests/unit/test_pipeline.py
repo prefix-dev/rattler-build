@@ -154,7 +154,7 @@ package:
     variant_config = VariantConfig()
 
     # Create custom render config for linux
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
     render_config = RenderConfig(platform=platform_config)
 
     # Render with custom config

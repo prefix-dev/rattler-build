@@ -17,9 +17,9 @@ class PlatformConfig:
         target_platform: Target platform (e.g., "linux-64", "osx-arm64").
             If not specified, defaults to the current platform.
         build_platform: Build platform (where the build runs).
-            If not specified, defaults to the current platform.
+            If not specified, defaults to the target platform.
         host_platform: Host platform (for cross-compilation).
-            If not specified, defaults to the current platform.
+            If not specified, defaults to the target platform.
         experimental: Enable experimental features
         recipe_path: Path to the recipe file (for relative path resolution)
 
@@ -42,6 +42,7 @@ class PlatformConfig:
 
     def __init__(
         self,
+        *,
         target_platform: str | None = None,
         build_platform: str | None = None,
         host_platform: str | None = None,
@@ -100,6 +101,7 @@ class ToolConfiguration:
 
     def __init__(
         self,
+        *,
         keep_build: bool = False,
         compression_threads: int | None = None,
         io_concurrency_limit: int | None = None,

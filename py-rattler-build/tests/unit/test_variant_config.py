@@ -217,7 +217,7 @@ c_compiler:
 
     try:
         # Load with Linux context
-        platform_config = PlatformConfig("linux-64")
+        platform_config = PlatformConfig(target_platform="linux-64")
 
         jinja_config_linux = JinjaConfig(platform=platform_config)
         config_linux = VariantConfig.from_file_with_context(temp_path, jinja_config_linux)
@@ -228,7 +228,7 @@ c_compiler:
         assert "msvc" not in values_linux
 
         # Load with Windows context
-        platform_config = PlatformConfig("win-64")
+        platform_config = PlatformConfig(target_platform="win-64")
 
         jinja_config_win = JinjaConfig(platform=platform_config)
         config_win = VariantConfig.from_file_with_context(temp_path, jinja_config_win)
@@ -260,7 +260,7 @@ cxx_compiler:
 """
 
     # Load with Linux context
-    platform_config = PlatformConfig("linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64")
 
     jinja_config_linux = JinjaConfig(platform=platform_config)
     config_linux = VariantConfig.from_yaml_with_context(yaml_content, jinja_config_linux)
@@ -296,7 +296,7 @@ c_compiler:
 
     try:
         # Load with Linux context
-        platform_config = PlatformConfig("linux-64")
+        platform_config = PlatformConfig(target_platform="linux-64")
 
         jinja_config_linux = JinjaConfig(platform=platform_config)
         config_linux = VariantConfig.from_conda_build_config(temp_path, jinja_config_linux)
@@ -312,7 +312,7 @@ c_compiler:
         assert "vs2019" not in c_compiler_values
 
         # Load with macOS context
-        platform_config = PlatformConfig("osx-64")
+        platform_config = PlatformConfig(target_platform="osx-64")
 
         jinja_config_osx = JinjaConfig(platform=platform_config)
         config_osx = VariantConfig.from_conda_build_config(temp_path, jinja_config_osx)
@@ -327,7 +327,7 @@ c_compiler:
         assert "gcc" not in c_compiler_values_osx
 
         # Load with Windows context
-        platform_config = PlatformConfig("win-64")
+        platform_config = PlatformConfig(target_platform="win-64")
 
         jinja_config_win = JinjaConfig(platform=platform_config)
         config_win = VariantConfig.from_conda_build_config(temp_path, jinja_config_win)

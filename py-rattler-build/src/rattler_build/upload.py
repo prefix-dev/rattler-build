@@ -13,6 +13,7 @@ def upload_package_to_quetz(
     package_files: list[str],
     url: str,
     channels: str,
+    *,
     api_key: str | None = None,
     auth_file: str | Path | None = None,
 ) -> None:
@@ -36,6 +37,7 @@ def upload_package_to_artifactory(
     package_files: list[str],
     url: str,
     channels: str,
+    *,
     token: str | None = None,
     auth_file: str | Path | None = None,
 ) -> None:
@@ -59,6 +61,7 @@ def upload_package_to_prefix(
     package_files: list[str],
     url: str,
     channels: str,
+    *,
     api_key: str | None = None,
     auth_file: str | Path | None = None,
     skip_existing: bool = False,
@@ -89,6 +92,7 @@ def upload_package_to_prefix(
 def upload_package_to_anaconda(
     package_files: list[str],
     owner: str,
+    *,
     channel: list[str] | None = None,
     api_key: str | None = None,
     url: str | None = None,
@@ -118,6 +122,7 @@ def upload_packages_to_conda_forge(
     staging_token: str,
     feedstock: str,
     feedstock_token: str,
+    *,
     staging_channel: str | None = None,
     anaconda_url: str | None = None,
     validation_endpoint: str | None = None,

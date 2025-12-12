@@ -355,6 +355,7 @@ class RenderedVariant:
 
 def build_rendered_variants(
     rendered_variants: list[RenderedVariant],
+    *,
     tool_config: ToolConfiguration | None = None,
     output_dir: str | Path = ".",
     channels: list[str] | None = None,

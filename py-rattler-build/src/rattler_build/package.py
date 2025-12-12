@@ -244,6 +244,7 @@ class Package:
 
     def run_tests(
         self,
+        *,
         channel: "Sequence[str] | None" = None,
         channel_priority: str | None = None,
         debug: bool = False,

@@ -103,6 +103,7 @@ class FileEntry:
 
 def collect_files(
     source_dir: str | Path,
+    *,
     include_globs: Sequence[str] | None = None,
     exclude_globs: Sequence[str] | None = None,
     follow_symlinks: bool = False,
