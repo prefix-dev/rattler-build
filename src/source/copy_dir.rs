@@ -12,6 +12,7 @@ use ignore::WalkBuilder;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::recipe::parser::{GlobVec, GlobWithSource};
+use crate::types::RATTLER_BUILD_IGNORE_FILE;
 
 use super::SourceError;
 
@@ -224,7 +225,16 @@ impl<'a> CopyDir<'a> {
             .git_ignore(self.use_gitignore)
             // Always disable .ignore files - they should not affect source copying
             .ignore(false)
-            .hidden(self.hidden);
+            .hidden(self.hidden)
+            // Skip directories that contain the rattler-build sentinel file
+            .filter_entry(|entry| {
+                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    let sentinel_path = entry.path().join(RATTLER_BUILD_IGNORE_FILE);
+                    !sentinel_path.exists()
+                } else {
+                    true
+                }
+            });
 
         if self.use_condapackageignore {
             walk_builder.add_custom_ignore_filename(".condapackageignore");
@@ -737,6 +747,96 @@ mod test {
                 .join("target_dir")
                 .join("file_in_target.txt")
                 .exists()
+        );
+    }
+
+    #[test]
+    fn test_skip_directories_with_sentinel_file() {
+        use crate::types::RATTLER_BUILD_IGNORE_FILE;
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src_dir = tmp_dir.path().join("source");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        // Create some regular files and directories
+        fs::write(src_dir.join("file1.txt"), "content1").unwrap();
+        fs::create_dir_all(src_dir.join("normal_dir")).unwrap();
+        fs::write(src_dir.join("normal_dir").join("file2.txt"), "content2").unwrap();
+
+        // Create a directory with the sentinel file (should be skipped)
+        let ignored_dir = src_dir.join("ignored_dir");
+        fs::create_dir_all(&ignored_dir).unwrap();
+        fs::write(ignored_dir.join(RATTLER_BUILD_IGNORE_FILE), "sentinel").unwrap();
+        fs::write(ignored_dir.join("file3.txt"), "content3").unwrap();
+
+        // Create a nested directory structure with sentinel file
+        let nested_ignored = src_dir.join("nested").join("ignored_nested");
+        fs::create_dir_all(&nested_ignored).unwrap();
+        fs::write(nested_ignored.join(RATTLER_BUILD_IGNORE_FILE), "sentinel").unwrap();
+        fs::write(nested_ignored.join("file4.txt"), "content4").unwrap();
+
+        // Also create a normal file in the nested parent
+        fs::write(src_dir.join("nested").join("file5.txt"), "content5").unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+
+        let result = super::CopyDir::new(&src_dir, dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        // Verify that normal files and directories were copied
+        assert!(dest_dir.path().join("file1.txt").exists());
+        assert!(dest_dir.path().join("normal_dir").exists());
+        assert!(
+            dest_dir
+                .path()
+                .join("normal_dir")
+                .join("file2.txt")
+                .exists()
+        );
+        assert!(dest_dir.path().join("nested").join("file5.txt").exists());
+
+        // Verify that directories with sentinel files were NOT copied
+        assert!(!dest_dir.path().join("ignored_dir").exists());
+        assert!(
+            !dest_dir
+                .path()
+                .join("ignored_dir")
+                .join("file3.txt")
+                .exists()
+        );
+        assert!(
+            !dest_dir
+                .path()
+                .join("nested")
+                .join("ignored_nested")
+                .exists()
+        );
+        assert!(
+            !dest_dir
+                .path()
+                .join("nested")
+                .join("ignored_nested")
+                .join("file4.txt")
+                .exists()
+        );
+
+        // Verify that the copied_paths don't include files from ignored directories
+        let copied_path_strs: Vec<String> = result
+            .copied_paths()
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        assert!(
+            !copied_path_strs.iter().any(|p| p.contains("ignored_dir")),
+            "No paths from ignored_dir should be copied"
+        );
+        assert!(
+            !copied_path_strs
+                .iter()
+                .any(|p| p.contains("ignored_nested")),
+            "No paths from ignored_nested should be copied"
         );
     }
 }
