@@ -9,7 +9,7 @@
         "linkedProjects": ["./rust/Cargo.toml"]
       },
       "binary": {
-        "path": ".pixi/envs/default/bin/rust-analyzer"
+        "path": ".pixi/envs/lint/bin/rust-analyzer"
       }
     }
   }
