@@ -197,14 +197,14 @@ impl PyPackage {
 
     /// List of tests embedded in the package
     #[getter]
-    fn tests(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn tests(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         use pyo3::IntoPyObject;
         let tests = self.ensure_tests_loaded()?;
         tests
             .iter()
             .enumerate()
             .map(|(index, test)| {
-                let obj: PyObject = match test {
+                let obj: Py<PyAny> = match test {
                     TestType::Python { python } => PyPythonTest {
                         inner: python.clone(),
                         index,
@@ -380,7 +380,8 @@ impl PyPackage {
         let log_handler = LoggingOutputHandler::default();
 
         // Run the rebuild
-        let result = run_async_task(async { rebuild_package_core(rebuild_data, log_handler).await })?;
+        let result =
+            run_async_task(async { rebuild_package_core(rebuild_data, log_handler).await })?;
 
         Ok(PyRebuildResult {
             original_path: result.original_path,
