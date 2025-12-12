@@ -43,14 +43,9 @@ class HashInfo:
         ```
     """
 
-    _inner: _render.HashInfo
-
-    @classmethod
-    def _from_inner(cls, inner: _render.HashInfo) -> HashInfo:
+    def __init__(self, inner: _render.HashInfo) -> None:
         """Create a HashInfo from the Rust object (internal use only)."""
-        instance = cls.__new__(cls)
-        instance._inner = inner
-        return instance
+        self._inner = inner
 
     @property
     def hash(self) -> str:
@@ -268,7 +263,7 @@ class RenderedVariant:
             ```
         """
         inner = self._inner.hash_info()
-        return HashInfo._from_inner(inner) if inner else None
+        return HashInfo(inner) if inner else None
 
     @property
     def pin_subpackages(self) -> dict[str, PinSubpackageInfo]:
