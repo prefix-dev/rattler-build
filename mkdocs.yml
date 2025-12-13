@@ -1,7 +1,9 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
-site_name: "rattler-build"
-site_url: https://prefix-dev.github.io/rattler-build/
+site_name: "Rattler-Build"
+site_url: https://rattler-build.prefix.dev/
+repo_url: https://github.com/prefix-dev/rattler-build/
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -57,9 +59,6 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
-repo_url: https://github.com/prefix-dev/rattler-build/
-edit_uri: edit/main/docs/
-
 markdown_extensions:
   - admonition
   - def_list
@@ -86,7 +85,7 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra:
-  homepage: https://prefix.dev
+  homepage: https://rattler-build.prefix.dev
   social:
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/prefix_dev

@@ -531,3 +531,25 @@ table code {
 [data-md-color-scheme="slate"] .md-typeset a > code {
     color: var(--brand-blue);
 }
+
+/* TOC banner image */
+.md-sidebar--secondary::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 150px;
+  background-image: url('../assets/paxton-builder-mascot.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: left;
+  margin-top: -25px;
+  margin-bottom: 1rem;
+  margin-left: 0.5rem;
+}
+
+/* Adjust for small screens where TOC is hidden */
+@media screen and (max-width: 76.1875em) {
+  .md-sidebar--secondary::before {
+    display: none;
+  }
+}
