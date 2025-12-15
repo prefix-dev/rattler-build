@@ -198,7 +198,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
     let source = if let Some(source_node) = mapping.get("source") {
         parse_source(source_node)?
     } else {
-        Vec::new()
+        crate::stage0::ConditionalList::default()
     };
 
     // Parse optional tests section (can be empty)

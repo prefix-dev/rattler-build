@@ -77,7 +77,7 @@ pub fn parse_multi_output_recipe(
     let source = if let Some(source_node) = mapping.get("source") {
         parse_source(source_node)?
     } else {
-        Vec::new()
+        ConditionalList::default()
     };
 
     let build = if let Some(build_node) = mapping.get("build") {
@@ -245,7 +245,7 @@ fn parse_staging_output(
     let source = if let Some(source_node) = mapping.get("source") {
         parse_source(source_node)?
     } else {
-        Vec::new()
+        ConditionalList::default()
     };
 
     // Parse optional requirements (only build/host/ignore_run_exports allowed)
@@ -449,7 +449,7 @@ fn parse_package_output(
     let source = if let Some(source_node) = mapping.get("source") {
         parse_source(source_node)?
     } else {
-        Vec::new()
+        ConditionalList::default()
     };
 
     // Parse optional requirements

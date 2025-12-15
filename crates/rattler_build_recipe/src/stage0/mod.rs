@@ -29,7 +29,7 @@ pub use parser::{
 };
 pub use requirements::Requirements;
 pub use source::Source;
-pub use tests::TestType;
+pub use tests::{PythonVersion, TestType};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,
     JinjaTemplate, ListOrItem, Value,

@@ -87,19 +87,28 @@ fn parse_conditional_test_item(
     }))
 }
 
-/// Parse a test list from a sequence node and wrap each test in Value
+/// Parse a test list from a sequence node (or a single test mapping) and wrap each test in Value
 fn parse_test_list_as_values(node: &Node) -> Result<ListOrItem<Value<TestType>>, ParseError> {
-    let seq = node.as_sequence().ok_or_else(|| {
-        ParseError::expected_type("sequence", "non-sequence", get_span(node))
-            .with_message("'then' and 'else' must be sequences of tests")
-    })?;
-
-    let mut tests = Vec::new();
-    for item in seq.iter() {
-        let test = parse_single_test(item)?;
-        tests.push(Value::new_concrete(test, None));
+    // If it's a sequence, parse each item as a test
+    if let Some(seq) = node.as_sequence() {
+        let mut tests = Vec::new();
+        for item in seq.iter() {
+            let test = parse_single_test(item)?;
+            tests.push(Value::new_concrete(test, None));
+        }
+        Ok(ListOrItem::new(tests))
+    } else if node.as_mapping().is_some() {
+        // Single test mapping - parse as a single test
+        let test = parse_single_test(node)?;
+        Ok(ListOrItem::single(Value::new_concrete(test, None)))
+    } else {
+        Err(ParseError::expected_type(
+            "sequence or mapping",
+            "non-sequence/mapping",
+            get_span(node),
+        )
+        .with_message("'then' and 'else' must be sequences of tests or a single test"))
     }
-    Ok(ListOrItem::new(tests))
 }
 
 fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
@@ -191,12 +200,9 @@ fn parse_python_test(
 }
 
 fn parse_python_version(node: &Node) -> Result<PythonVersion, ParseError> {
-    if let Some(seq) = node.as_sequence() {
-        // Multiple versions
-        let mut versions = Vec::new();
-        for item in seq.iter() {
-            versions.push(parse_value(item)?);
-        }
+    if node.as_sequence().is_some() {
+        // Multiple versions (with if/then/else support)
+        let versions = parse_conditional_list(node)?;
         Ok(PythonVersion::Multiple(versions))
     } else {
         // Single version

@@ -2081,6 +2081,55 @@ impl Evaluate for Stage0Source {
     }
 }
 
+/// Evaluate a single source item (which can be a Value or Conditional), returning a vector
+/// (conditionals expand to multiple sources)
+pub fn evaluate_source(
+    source_item: &Item<Stage0Source>,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Source>, ParseError> {
+    match source_item {
+        Item::Value(value) => {
+            // Get the concrete Source from the Value
+            let source = value.as_concrete().ok_or_else(|| {
+                ParseError::invalid_value(
+                    "source",
+                    "source cannot be a template",
+                    crate::Span::new_blank(),
+                )
+            })?;
+            source.evaluate(context).map(|s| vec![s])
+        }
+        Item::Conditional(cond) => {
+            // Evaluate the condition
+            let condition_met =
+                evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
+
+            let sources_to_evaluate = if condition_met {
+                &cond.then
+            } else {
+                match &cond.else_value {
+                    Some(else_value) => else_value,
+                    None => return Ok(Vec::new()), // No else branch and condition is false
+                }
+            };
+
+            // Recursively evaluate the selected sources
+            let mut results = Vec::new();
+            for value in sources_to_evaluate.iter() {
+                let source = value.as_concrete().ok_or_else(|| {
+                    ParseError::invalid_value(
+                        "source",
+                        "source cannot be a template",
+                        crate::Span::new_blank(),
+                    )
+                })?;
+                results.push(source.evaluate(context)?);
+            }
+            Ok(results)
+        }
+    }
+}
+
 // Test type evaluations
 
 impl Evaluate for Stage0PythonVersion {
@@ -2113,13 +2162,15 @@ impl Evaluate for Stage0PythonVersion {
                 Ok(Stage1PythonVersion::Single(evaluated))
             }
             Stage0PythonVersion::Multiple(versions) => {
-                let mut evaluated = Vec::new();
-                for v in versions {
-                    let version_str = evaluate_string_value(v, context)?;
-                    validate_version(&version_str, v.span())?;
-                    evaluated.push(version_str);
+                // Evaluate the conditional list to get a flat list of version strings
+                let evaluated_versions = evaluate_string_list(versions, context)?;
+
+                // Validate each version
+                for version_str in &evaluated_versions {
+                    validate_version(version_str, None)?;
                 }
-                Ok(Stage1PythonVersion::Multiple(evaluated))
+
+                Ok(Stage1PythonVersion::Multiple(evaluated_versions))
             }
         }
     }
@@ -2341,10 +2392,10 @@ impl Evaluate for Stage0Recipe {
         let requirements = self.requirements.evaluate(&context_with_vars)?;
         let extra = self.extra.evaluate(&context_with_vars)?;
 
-        // Evaluate source list
+        // Evaluate source list (conditionals expand to multiple sources)
         let mut source = Vec::new();
         for src in &self.source {
-            source.push(src.evaluate(&context_with_vars)?);
+            source.extend(evaluate_source(src, &context_with_vars)?);
         }
 
         // Evaluate tests list (conditionals expand to multiple tests)
@@ -2716,16 +2767,16 @@ fn evaluate_package_output_to_recipe(
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
 
-    // Evaluate source list
+    // Evaluate source list (conditionals expand to multiple sources)
     // If inheriting from top-level, prepend top-level sources
     let mut source = Vec::new();
     if inherits_from_toplevel {
         for src in &recipe.source {
-            source.push(src.evaluate(context)?);
+            source.extend(evaluate_source(src, context)?);
         }
     }
     for src in &output.source {
-        source.push(src.evaluate(context)?);
+        source.extend(evaluate_source(src, context)?);
     }
 
     // Evaluate tests list
@@ -2882,12 +2933,13 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
+                // (conditionals expand to multiple sources)
                 let mut source = Vec::new();
                 for src in &self.source {
-                    source.push(src.evaluate(&context_with_vars)?);
+                    source.extend(evaluate_source(src, &context_with_vars)?);
                 }
                 for src in &staging_output.source {
-                    source.push(src.evaluate(&context_with_vars)?);
+                    source.extend(evaluate_source(src, &context_with_vars)?);
                 }
 
                 // Compute variant for staging output

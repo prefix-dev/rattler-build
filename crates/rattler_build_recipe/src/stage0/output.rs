@@ -42,8 +42,8 @@ pub struct SingleOutputRecipe {
     pub requirements: Requirements,
     pub about: About,
     pub extra: crate::stage0::extra::Extra,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<Source>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub source: ConditionalList<Source>,
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub tests: ConditionalList<TestType>,
 }
@@ -63,8 +63,8 @@ pub struct MultiOutputRecipe {
     pub recipe: RecipeMetadata,
 
     /// Top-level source (inheritable by outputs)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<Source>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub source: ConditionalList<Source>,
 
     /// Top-level build configuration (inheritable by outputs)
     #[serde(default)]
@@ -119,8 +119,8 @@ pub struct StagingOutput {
     pub staging: StagingMetadata,
 
     /// Source for this staging build
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<Source>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub source: ConditionalList<Source>,
 
     /// Requirements for staging build (only build/host/ignore_run_exports allowed)
     #[serde(default)]
@@ -165,8 +165,8 @@ pub struct PackageOutput {
     pub inherit: Inherit,
 
     /// Source for this output (in addition to or instead of inherited source)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<Source>,
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub source: ConditionalList<Source>,
 
     /// Requirements for this output
     #[serde(default)]
@@ -268,8 +268,8 @@ impl SingleOutputRecipe {
         vars.extend(requirements.used_variables());
         vars.extend(about.used_variables());
         vars.extend(extra.used_variables());
-        for src in source {
-            vars.extend(src.used_variables());
+        for src_item in source {
+            vars.extend(collect_source_item_variables(src_item));
         }
         for test_item in tests {
             vars.extend(collect_test_item_variables(test_item));
@@ -329,8 +329,8 @@ impl MultiOutputRecipe {
         vars.extend(build.used_variables());
         vars.extend(about.used_variables());
         vars.extend(extra.used_variables());
-        for src in source {
-            vars.extend(src.used_variables());
+        for src_item in source {
+            vars.extend(collect_source_item_variables(src_item));
         }
         for test_item in tests {
             vars.extend(collect_test_item_variables(test_item));
@@ -431,8 +431,8 @@ impl StagingOutput {
         let StagingMetadata { name } = staging;
 
         let mut vars = name.used_variables();
-        for src in source {
-            vars.extend(src.used_variables());
+        for src_item in source {
+            vars.extend(collect_source_item_variables(src_item));
         }
         vars.extend(requirements.used_variables());
         vars.extend(build.used_variables());
@@ -462,8 +462,8 @@ impl PackageOutput {
 
         let mut vars = package.used_variables();
         vars.extend(inherit.used_variables());
-        for src in source {
-            vars.extend(src.used_variables());
+        for src_item in source {
+            vars.extend(collect_source_item_variables(src_item));
         }
         vars.extend(requirements.used_variables());
         vars.extend(build.used_variables());
@@ -513,6 +513,41 @@ impl StagingBuild {
         vars.sort();
         vars.dedup();
         vars
+    }
+}
+
+/// Helper to collect used variables from a source Item
+/// This handles both Value (concrete Source) and Conditional cases
+fn collect_source_item_variables(item: &Item<Source>) -> Vec<String> {
+    match item {
+        Item::Value(value) => {
+            let mut vars = value.used_variables();
+            // If the value is concrete, also get the Source's own used variables
+            if let Some(src) = value.as_concrete() {
+                vars.extend(src.used_variables());
+            }
+            vars
+        }
+        Item::Conditional(cond) => {
+            let mut vars = cond.condition.used_variables().to_vec();
+            // Collect from then branch
+            for value in cond.then.iter() {
+                vars.extend(value.used_variables());
+                if let Some(src) = value.as_concrete() {
+                    vars.extend(src.used_variables());
+                }
+            }
+            // Collect from else branch if present
+            if let Some(else_value) = &cond.else_value {
+                for value in else_value.iter() {
+                    vars.extend(value.used_variables());
+                    if let Some(src) = value.as_concrete() {
+                        vars.extend(src.used_variables());
+                    }
+                }
+            }
+            vars
+        }
     }
 }
 

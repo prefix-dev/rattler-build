@@ -12,8 +12,8 @@ pub enum PythonVersion {
     /// A single python version
     /// TODO: possibly change to use `VersionSpec` for proper parsing?
     Single(Value<String>),
-    /// Multiple python versions
-    Multiple(Vec<Value<String>>),
+    /// Multiple python versions (with if/then/else support)
+    Multiple(ConditionalList<String>),
 }
 
 /// A special Python test that checks if the imports are available and runs `pip check`
@@ -197,10 +197,7 @@ impl TestType {
                     match python_version {
                         PythonVersion::Single(v) => vars.extend(v.used_variables()),
                         PythonVersion::Multiple(versions) => {
-                            // TODO(refactor): move to ConditionalList as well?
-                            for v in versions {
-                                vars.extend(v.used_variables());
-                            }
+                            vars.extend(versions.used_variables());
                         }
                     }
                 }

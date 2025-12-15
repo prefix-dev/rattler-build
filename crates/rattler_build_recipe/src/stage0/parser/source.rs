@@ -5,7 +5,7 @@ use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 use crate::stage0::{
     parser::helpers::get_span,
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-    types::{IncludeExclude, JinjaTemplate, Value},
+    types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, ListOrItem, Value},
 };
 
 use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
@@ -115,23 +115,128 @@ fn parse_source_filter(node: &Node) -> Result<IncludeExclude, ParseError> {
     ))
 }
 
-/// Parse source section from YAML (can be single or list)
-pub fn parse_source(node: &Node) -> Result<Vec<Source>, ParseError> {
+/// Parse source section from YAML (can be single or list, with if/then/else support)
+pub fn parse_source(node: &Node) -> Result<ConditionalList<Source>, ParseError> {
     match node {
         Node::Sequence(seq) => {
-            let mut sources = Vec::new();
-            for item in seq.iter() {
-                sources.push(parse_single_source(item)?);
+            let mut items = Vec::new();
+            for item_node in seq.iter() {
+                items.push(parse_source_item(item_node)?);
             }
-            Ok(sources)
+            Ok(ConditionalList::new(items))
         }
-        Node::Mapping(_) => Ok(vec![parse_single_source(node)?]),
+        Node::Mapping(_) => {
+            // Single mapping - could be a source or a conditional
+            let item = parse_source_item(node)?;
+            Ok(ConditionalList::new(vec![item]))
+        }
         _ => Err(ParseError::expected_type(
             "mapping or sequence",
             "non-mapping/sequence",
             get_span(node),
         )
         .with_message("Expected 'source' to be a mapping or sequence")),
+    }
+}
+
+/// Parse a single source item - either a Source or an if/then/else conditional
+fn parse_source_item(node: &Node) -> Result<Item<Source>, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Each source item must be a mapping")
+    })?;
+
+    // Check if this is an if/then/else conditional
+    if mapping.get("if").is_some() {
+        return parse_source_conditional(mapping);
+    }
+
+    // Otherwise, parse as a regular Source
+    let source = parse_single_source(node)?;
+    Ok(Item::Value(Value::new_concrete(source, Some(*node.span()))))
+}
+
+/// Parse an if/then/else conditional for Source
+fn parse_source_conditional(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<Item<Source>, ParseError> {
+    use rattler_build_jinja::JinjaExpression;
+    use rattler_build_yaml_parser::Conditional;
+
+    let mut condition = None;
+    let mut condition_span = None;
+    let mut then_values = None;
+    let mut else_values = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "if" => {
+                let scalar = value_node.as_scalar().ok_or_else(|| {
+                    ParseError::expected_type("string", "non-scalar", get_span(value_node))
+                })?;
+                condition = Some(
+                    JinjaExpression::new(scalar.as_str().to_string())
+                        .map_err(|e| ParseError::invalid_value("if", &e, *value_node.span()))?,
+                );
+                condition_span = Some(*value_node.span());
+            }
+            "then" => {
+                then_values = Some(parse_source_then_else(value_node)?);
+            }
+            "else" => {
+                else_values = Some(parse_source_then_else(value_node)?);
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "source conditional",
+                    format!("unknown field '{}' in conditional", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields in a conditional are: if, then, else"));
+            }
+        }
+    }
+
+    let condition = condition.ok_or_else(|| {
+        ParseError::missing_field("if", get_span(&Node::Mapping(mapping.clone())))
+    })?;
+
+    let then_values = then_values.ok_or_else(|| {
+        ParseError::missing_field("then", get_span(&Node::Mapping(mapping.clone())))
+    })?;
+
+    Ok(Item::Conditional(Conditional {
+        condition,
+        then: then_values,
+        else_value: else_values,
+        condition_span,
+    }))
+}
+
+/// Parse the then/else branch of a source conditional (can be single or list)
+fn parse_source_then_else(node: &Node) -> Result<ListOrItem<Value<Source>>, ParseError> {
+    match node {
+        Node::Sequence(seq) => {
+            let mut values = Vec::new();
+            for item in seq.iter() {
+                let source = parse_single_source(item)?;
+                values.push(Value::new_concrete(source, Some(*item.span())));
+            }
+            Ok(ListOrItem::new(values))
+        }
+        Node::Mapping(_) => {
+            let source = parse_single_source(node)?;
+            Ok(ListOrItem::single(Value::new_concrete(
+                source,
+                Some(*node.span()),
+            )))
+        }
+        _ => Err(
+            ParseError::expected_type("mapping or sequence", "other", get_span(node))
+                .with_message("Expected source or list of sources in then/else branch"),
+        ),
     }
 }
 
