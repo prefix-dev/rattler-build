@@ -1217,14 +1217,21 @@ pub fn evaluate_script(
 }
 
 /// Parse a boolean from a string (case-insensitive)
-fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
+fn parse_bool_from_str(
+    s: &str,
+    field_name: &str,
+    default_for_empty: bool,
+) -> Result<bool, ParseError> {
     match s.to_lowercase().as_str() {
         "true" => Ok(true),
         "false" => Ok(false),
+        // Empty string means the Jinja condition was false and there was no else branch
+        // Use the provided default value
+        "" => Ok(default_for_empty),
         _ => Err(ParseError::invalid_value(
             field_name,
             format!(
-                "Invalid boolean value for '{}': '{}' (expected true/false)",
+                "Invalid boolean value for '{}': '{}' (expected true/false or empty for default)",
                 field_name, s
             ),
             Span::new_blank(),
@@ -1233,16 +1240,20 @@ fn parse_bool_from_str(s: &str, field_name: &str) -> Result<bool, ParseError> {
 }
 
 /// Evaluate a Value<bool> into a bool
+///
+/// When the template evaluates to an empty string (e.g., `${{ true if osx }}` on non-osx),
+/// the `default_for_empty` value is used.
 pub fn evaluate_bool_value(
     value: &Value<bool>,
     context: &EvaluationContext,
     field_name: &str,
+    default_for_empty: bool,
 ) -> Result<bool, ParseError> {
     if let Some(b) = value.as_concrete() {
         Ok(*b)
     } else if let Some(template) = value.as_template() {
         let s = render_template(template.source(), context, value.span())?;
-        parse_bool_from_str(&s, field_name)
+        parse_bool_from_str(&s, field_name, default_for_empty)
     } else {
         unreachable!("Value must be either concrete or template")
     }
@@ -1595,16 +1606,19 @@ impl Evaluate for Stage0PythonBuild {
         let skip_pyc_compilation = evaluate_glob_vec_simple(&self.skip_pyc_compilation, context)?;
 
         // Evaluate version_independent (supports Jinja templates)
+        // Default is false - most packages are version-dependent
         let version_independent = match &self.version_independent {
-            Some(val) => evaluate_bool_value(val, context, "version_independent")?,
+            Some(val) => evaluate_bool_value(val, context, "version_independent", false)?,
             None => false,
         };
 
         // Evaluate use_python_app_entrypoint (supports Jinja templates)
+        // Default is false - most packages don't use this
         let use_python_app_entrypoint = evaluate_bool_value(
             &self.use_python_app_entrypoint,
             context,
             "use_python_app_entrypoint",
+            false,
         )?;
 
         Ok(Stage1PythonBuild {
@@ -1693,8 +1707,13 @@ impl Evaluate for Stage0PrefixDetection {
         };
 
         // Evaluate ignore_binary_files (supports Jinja templates)
-        let ignore_binary_files =
-            evaluate_bool_value(&self.ignore_binary_files, context, "ignore_binary_files")?;
+        // Default is false - binary files are checked for prefix by default
+        let ignore_binary_files = evaluate_bool_value(
+            &self.ignore_binary_files,
+            context,
+            "ignore_binary_files",
+            false,
+        )?;
 
         Ok(Stage1PrefixDetection {
             force_file_type: self.force_file_type.evaluate(context)?,
@@ -1742,10 +1761,16 @@ impl Evaluate for Stage0DynamicLinking {
                     match s.as_str() {
                         "true" | "True" | "yes" | "Yes" => true,
                         "false" | "False" | "no" | "No" => false,
+                        // Empty string means the condition was false and there was no else branch
+                        // Use the default value (true = relocate all binaries)
+                        "" => true,
                         _ => {
                             return Err(ParseError::invalid_value(
                                 "binary_relocation",
-                                format!("Invalid boolean value for binary_relocation: '{}'", s),
+                                format!(
+                                    "Invalid boolean value for binary_relocation: '{}'. Expected true/false or empty (for default)",
+                                    s
+                                ),
                                 val.span().copied().unwrap_or_else(Span::new_blank),
                             ));
                         }
@@ -1927,10 +1952,12 @@ impl Evaluate for Stage0Build {
         };
 
         // Evaluate merge_build_and_host_envs (supports Jinja templates)
+        // Default is false - environments are separate by default
         let merge_build_and_host_envs = evaluate_bool_value(
             &self.merge_build_and_host_envs,
             context,
             "merge_build_and_host_envs",
+            false,
         )?;
 
         Ok(Stage1Build {
@@ -2015,10 +2042,11 @@ impl Evaluate for Stage0GitSource {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
+            // Default is false - LFS is opt-in
             lfs: self
                 .lfs
                 .as_ref()
-                .map(|v| evaluate_bool_value(v, context, "lfs"))
+                .map(|v| evaluate_bool_value(v, context, "lfs", false))
                 .transpose()?
                 .unwrap_or(false),
             expected_commit: self
@@ -2219,7 +2247,8 @@ impl Evaluate for Stage0PythonTest {
 
         let pip_check = match &self.pip_check {
             None => true, // default to true
-            Some(v) => evaluate_bool_value(v, context, "pip_check")?,
+            // Default to true for empty Jinja results - pip_check is on by default
+            Some(v) => evaluate_bool_value(v, context, "pip_check", true)?,
         };
 
         let python_version = match &self.python_version {
