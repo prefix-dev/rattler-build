@@ -256,17 +256,161 @@ impl<'a, T> IntoIterator for &'a ListOrItem<T> {
     }
 }
 
+/// A list of items for then/else branches that supports nested conditionals
+#[derive(Debug, Clone, PartialEq)]
+pub struct NestedItemList<T> {
+    items: Vec<Item<T>>,
+}
+
+// Custom serialization: single item => just the item, multiple => array
+impl<T: Serialize> Serialize for NestedItemList<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.items.as_slice() {
+            [single] => single.serialize(serializer),
+            multiple => multiple.serialize(serializer),
+        }
+    }
+}
+
+// Custom deserialization: accept either single value or array
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for NestedItemList<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::marker::PhantomData;
+
+        struct NestedItemListVisitor<T>(PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for NestedItemListVisitor<T> {
+            type Value = NestedItemList<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a single value or a list of values")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element::<Item<T>>()? {
+                    items.push(item);
+                }
+                Ok(NestedItemList { items })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                // Deserialize a single string as a Value wrapped in Item
+                let item = Item::<T>::deserialize(de::value::StrDeserializer::new(v))?;
+                Ok(NestedItemList { items: vec![item] })
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let item = Item::<T>::deserialize(de::value::StringDeserializer::new(v))?;
+                Ok(NestedItemList { items: vec![item] })
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                // A map could be a conditional (if/then/else) or a value - deserialize as Item
+                let item = Item::<T>::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(NestedItemList { items: vec![item] })
+            }
+        }
+
+        deserializer.deserialize_any(NestedItemListVisitor(PhantomData))
+    }
+}
+
+impl<T> NestedItemList<T> {
+    /// Create from a list of items
+    pub fn new(items: Vec<Item<T>>) -> Self {
+        Self { items }
+    }
+
+    /// Create from a single item
+    pub fn single(item: Item<T>) -> Self {
+        Self { items: vec![item] }
+    }
+
+    /// Get the number of items
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Get an iterator over the items
+    pub fn iter(&self) -> impl Iterator<Item = &Item<T>> {
+        self.items.iter()
+    }
+
+    /// Convert to a vector
+    pub fn into_vec(self) -> Vec<Item<T>> {
+        self.items
+    }
+
+    /// Get as a slice
+    pub fn as_slice(&self) -> &[Item<T>] {
+        &self.items
+    }
+
+    /// Collect all used variables
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for item in &self.items {
+            vars.extend(item.used_variables());
+        }
+        vars
+    }
+}
+
+impl<T> IntoIterator for NestedItemList<T> {
+    type Item = Item<T>;
+    type IntoIter = std::vec::IntoIter<Item<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a NestedItemList<T> {
+    type Item = &'a Item<T>;
+    type IntoIter = std::slice::Iter<'a, Item<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
 /// A conditional with if/then/else branches
+/// Supports nested conditionals in then/else branches
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conditional<T> {
     /// The condition to evaluate
     #[serde(rename = "if")]
     pub condition: JinjaExpression,
-    /// The values to use if condition is true
-    pub then: ListOrItem<Value<T>>,
-    /// The values to use if condition is false
+    /// The values to use if condition is true (can include nested conditionals)
+    pub then: NestedItemList<T>,
+    /// The values to use if condition is false (can include nested conditionals)
     #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
-    pub else_value: Option<ListOrItem<Value<T>>>,
+    pub else_value: Option<NestedItemList<T>>,
     /// Optional span for the condition expression (for error reporting)
     #[serde(skip)]
     pub condition_span: Option<Span>,

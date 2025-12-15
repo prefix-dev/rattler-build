@@ -5,7 +5,7 @@ use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 use crate::stage0::{
     parser::helpers::get_span,
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-    types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, ListOrItem, Value},
+    types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, NestedItemList, Value},
 };
 
 use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
@@ -216,22 +216,20 @@ fn parse_source_conditional(
 }
 
 /// Parse the then/else branch of a source conditional (can be single or list)
-fn parse_source_then_else(node: &Node) -> Result<ListOrItem<Value<Source>>, ParseError> {
+/// Supports nested if/then/else conditionals
+fn parse_source_then_else(node: &Node) -> Result<NestedItemList<Source>, ParseError> {
     match node {
         Node::Sequence(seq) => {
-            let mut values = Vec::new();
-            for item in seq.iter() {
-                let source = parse_single_source(item)?;
-                values.push(Value::new_concrete(source, Some(*item.span())));
+            let mut items = Vec::new();
+            for item_node in seq.iter() {
+                items.push(parse_source_item(item_node)?);
             }
-            Ok(ListOrItem::new(values))
+            Ok(NestedItemList::new(items))
         }
         Node::Mapping(_) => {
-            let source = parse_single_source(node)?;
-            Ok(ListOrItem::single(Value::new_concrete(
-                source,
-                Some(*node.span()),
-            )))
+            // Single item - could be a source or a nested conditional
+            let item = parse_source_item(node)?;
+            Ok(NestedItemList::single(item))
         }
         _ => Err(
             ParseError::expected_type("mapping or sequence", "other", get_span(node))

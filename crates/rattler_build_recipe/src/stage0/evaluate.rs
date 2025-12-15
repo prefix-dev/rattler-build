@@ -706,18 +706,33 @@ where
 /// for different list types (strings, globs, dependencies, etc.).
 ///
 /// Works with both `ConditionalList` and `ConditionalListOrItem` via `.as_slice()`.
+/// Supports nested conditionals at any depth.
 fn evaluate_conditional_list<T, R, F>(
     list: &[Item<T>],
     context: &EvaluationContext,
-    mut process: F,
+    process: F,
 ) -> Result<Vec<R>, ParseError>
 where
     T: std::fmt::Debug,
     F: FnMut(&Value<T>, &EvaluationContext) -> Result<Option<R>, ParseError>,
 {
     let mut results = Vec::new();
+    evaluate_items_recursive(list, context, &mut results, process)?;
+    Ok(results)
+}
 
-    for item in list.iter() {
+/// Recursively evaluate items, handling nested conditionals
+fn evaluate_items_recursive<T, R, F>(
+    items: &[Item<T>],
+    context: &EvaluationContext,
+    results: &mut Vec<R>,
+    mut process: F,
+) -> Result<F, ParseError>
+where
+    T: std::fmt::Debug,
+    F: FnMut(&Value<T>, &EvaluationContext) -> Result<Option<R>, ParseError>,
+{
+    for item in items.iter() {
         match item {
             Item::Value(value) => {
                 if let Some(result) = process(value, context)? {
@@ -737,16 +752,18 @@ where
                     }
                 };
 
-                for val in items_to_process.iter() {
-                    if let Some(result) = process(val, context)? {
-                        results.push(result);
-                    }
-                }
+                // Recursively process nested items (supports nested conditionals)
+                process = evaluate_items_recursive(
+                    items_to_process.as_slice(),
+                    context,
+                    results,
+                    process,
+                )?;
             }
         }
     }
 
-    Ok(results)
+    Ok(process)
 }
 
 /// Evaluate a slice of Item<String> into Vec<String>
@@ -2107,6 +2124,7 @@ impl Evaluate for Stage0Source {
 
 /// Evaluate a single source item (which can be a Value or Conditional), returning a vector
 /// (conditionals expand to multiple sources)
+/// Supports nested conditionals at any depth.
 pub fn evaluate_source(
     source_item: &Item<Stage0Source>,
     context: &EvaluationContext,
@@ -2137,17 +2155,10 @@ pub fn evaluate_source(
                 }
             };
 
-            // Recursively evaluate the selected sources
+            // Recursively evaluate the selected sources (supports nested conditionals)
             let mut results = Vec::new();
-            for value in sources_to_evaluate.iter() {
-                let source = value.as_concrete().ok_or_else(|| {
-                    ParseError::invalid_value(
-                        "source",
-                        "source cannot be a template",
-                        crate::Span::new_blank(),
-                    )
-                })?;
-                results.push(source.evaluate(context)?);
+            for nested_item in sources_to_evaluate.iter() {
+                results.extend(evaluate_source(nested_item, context)?);
             }
             Ok(results)
         }
@@ -2313,6 +2324,7 @@ impl Evaluate for Stage0PackageContentsTest {
 
 /// Evaluate a single test item (which can be a Value or Conditional), returning a vector
 /// (conditionals expand to multiple tests)
+/// Supports nested conditionals at any depth.
 pub fn evaluate_test(
     test_item: &Item<Stage0TestType>,
     context: &EvaluationContext,
@@ -2343,17 +2355,10 @@ pub fn evaluate_test(
                 }
             };
 
-            // Recursively evaluate the selected tests
+            // Recursively evaluate the selected tests (supports nested conditionals)
             let mut results = Vec::new();
-            for value in tests_to_evaluate.iter() {
-                let test = value.as_concrete().ok_or_else(|| {
-                    ParseError::invalid_value(
-                        "test",
-                        "test cannot be a template",
-                        crate::Span::new_blank(),
-                    )
-                })?;
-                results.push(evaluate_test_type(test, context)?);
+            for nested_item in tests_to_evaluate.iter() {
+                results.extend(evaluate_test(nested_item, context)?);
             }
             Ok(results)
         }
@@ -3108,7 +3113,7 @@ mod tests {
 
     use super::*;
     use crate::stage0::types::{
-        Conditional, ConditionalList, Item, JinjaTemplate, ListOrItem, Value,
+        Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value,
     };
 
     #[test]
@@ -3190,11 +3195,14 @@ mod tests {
             Item::Value(Value::new_concrete("python".to_string(), None)),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
-                then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
-                else_value: Some(ListOrItem::new(vec![Value::new_concrete(
+                then: NestedItemList::new(vec![Item::Value(Value::new_concrete(
+                    "gcc".to_string(),
+                    None,
+                ))]),
+                else_value: Some(NestedItemList::new(vec![Item::Value(Value::new_concrete(
                     "msvc".to_string(),
                     None,
-                )])),
+                ))])),
                 condition_span: None,
             }),
         ]);
@@ -3244,11 +3252,14 @@ mod tests {
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
-            then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
-            else_value: Some(ListOrItem::new(vec![Value::new_concrete(
+            then: NestedItemList::new(vec![Item::Value(Value::new_concrete(
+                "gcc".to_string(),
+                None,
+            ))]),
+            else_value: Some(NestedItemList::new(vec![Item::Value(Value::new_concrete(
                 "msvc".to_string(),
                 None,
-            )])),
+            ))])),
             condition_span: None,
         })]);
 

@@ -518,6 +518,7 @@ impl StagingBuild {
 
 /// Helper to collect used variables from a source Item
 /// This handles both Value (concrete Source) and Conditional cases
+/// Supports nested conditionals at any depth.
 fn collect_source_item_variables(item: &Item<Source>) -> Vec<String> {
     match item {
         Item::Value(value) => {
@@ -530,20 +531,14 @@ fn collect_source_item_variables(item: &Item<Source>) -> Vec<String> {
         }
         Item::Conditional(cond) => {
             let mut vars = cond.condition.used_variables().to_vec();
-            // Collect from then branch
-            for value in cond.then.iter() {
-                vars.extend(value.used_variables());
-                if let Some(src) = value.as_concrete() {
-                    vars.extend(src.used_variables());
-                }
+            // Recursively collect from then branch (supports nested conditionals)
+            for nested_item in cond.then.iter() {
+                vars.extend(collect_source_item_variables(nested_item));
             }
-            // Collect from else branch if present
+            // Recursively collect from else branch if present
             if let Some(else_value) = &cond.else_value {
-                for value in else_value.iter() {
-                    vars.extend(value.used_variables());
-                    if let Some(src) = value.as_concrete() {
-                        vars.extend(src.used_variables());
-                    }
+                for nested_item in else_value.iter() {
+                    vars.extend(collect_source_item_variables(nested_item));
                 }
             }
             vars
@@ -553,6 +548,7 @@ fn collect_source_item_variables(item: &Item<Source>) -> Vec<String> {
 
 /// Helper to collect used variables from a test Item
 /// This handles both Value (concrete TestType) and Conditional cases
+/// Supports nested conditionals at any depth.
 fn collect_test_item_variables(item: &Item<TestType>) -> Vec<String> {
     match item {
         Item::Value(value) => {
@@ -565,20 +561,14 @@ fn collect_test_item_variables(item: &Item<TestType>) -> Vec<String> {
         }
         Item::Conditional(cond) => {
             let mut vars = cond.condition.used_variables().to_vec();
-            // Collect from then branch
-            for value in cond.then.iter() {
-                vars.extend(value.used_variables());
-                if let Some(test) = value.as_concrete() {
-                    vars.extend(test.used_variables());
-                }
+            // Recursively collect from then branch (supports nested conditionals)
+            for nested_item in cond.then.iter() {
+                vars.extend(collect_test_item_variables(nested_item));
             }
-            // Collect from else branch if present
+            // Recursively collect from else branch if present
             if let Some(else_value) = &cond.else_value {
-                for value in else_value.iter() {
-                    vars.extend(value.used_variables());
-                    if let Some(test) = value.as_concrete() {
-                        vars.extend(test.used_variables());
-                    }
+                for nested_item in else_value.iter() {
+                    vars.extend(collect_test_item_variables(nested_item));
                 }
             }
             vars

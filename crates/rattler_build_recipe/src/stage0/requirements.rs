@@ -89,7 +89,13 @@ impl Requirements {
             }
         };
 
-        for item in self.build.iter().chain(self.host.iter()) {
+        // Recursive helper to process items (supports nested conditionals)
+        fn process_item(
+            item: &super::types::Item<SerializableMatchSpec>,
+            specs: &mut Vec<PackageName>,
+            extract_name: impl Fn(&rattler_conda_types::PackageNameMatcher) -> Option<PackageName>
+            + Copy,
+        ) {
             match item {
                 super::types::Item::Value(value) => {
                     // Only process concrete (non-template) values
@@ -107,39 +113,21 @@ impl Requirements {
                     }
                 }
                 super::types::Item::Conditional(conditional) => {
-                    // Process both then and else branches
-                    for value in conditional.then.iter() {
-                        if let Some(val) = value.as_concrete() {
-                            let matchspec = &val.0;
-
-                            // A spec is "free" if it has no version and no build constraints
-                            if matchspec.version.is_none()
-                                && matchspec.build.is_none()
-                                && let Some(name) = &matchspec.name
-                                && let Some(pkg_name) = extract_name(name)
-                            {
-                                specs.push(pkg_name);
-                            }
-                        }
+                    // Recursively process both then and else branches
+                    for nested_item in conditional.then.iter() {
+                        process_item(nested_item, specs, extract_name);
                     }
                     if let Some(else_branch) = &conditional.else_value {
-                        for value in else_branch.iter() {
-                            if let Some(val) = value.as_concrete() {
-                                let matchspec = &val.0;
-
-                                // A spec is "free" if it has no version and no build constraints
-                                if matchspec.version.is_none()
-                                    && matchspec.build.is_none()
-                                    && let Some(name) = &matchspec.name
-                                    && let Some(pkg_name) = extract_name(name)
-                                {
-                                    specs.push(pkg_name);
-                                }
-                            }
+                        for nested_item in else_branch.iter() {
+                            process_item(nested_item, specs, extract_name);
                         }
                     }
                 }
             }
+        }
+
+        for item in self.build.iter().chain(self.host.iter()) {
+            process_item(item, &mut specs, extract_name);
         }
 
         specs.sort();

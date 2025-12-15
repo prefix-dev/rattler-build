@@ -3,9 +3,10 @@
 use marked_yaml::Node as MarkedNode;
 
 use crate::{
+    conditional::parse_item_with_converter,
     converter::{FromStrConverter, NodeConverter},
     error::ParseResult,
-    types::{ListOrItem, Value},
+    types::{ListOrItem, NestedItemList, Value},
     value::parse_value_with_converter,
 };
 
@@ -49,6 +50,51 @@ where
         // It's a single value
         let item = parse_value_with_converter(yaml, "item", converter)?;
         Ok(ListOrItem::single(item))
+    }
+}
+
+/// Parse a NestedItemList<T> from YAML
+///
+/// This handles both single values and lists of values, with support for
+/// nested if/then/else conditionals at any level.
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse (can be a scalar, mapping, or sequence)
+pub fn parse_nested_item_list<T>(yaml: &MarkedNode) -> ParseResult<NestedItemList<T>>
+where
+    T: std::str::FromStr + ToString,
+    T::Err: std::fmt::Display,
+{
+    parse_nested_item_list_with_converter(yaml, &FromStrConverter::new())
+}
+
+/// Parse a NestedItemList<T> from YAML using a custom converter
+///
+/// This handles both single values and lists of values, with support for
+/// nested if/then/else conditionals at any level.
+///
+/// # Arguments
+/// * `yaml` - The YAML node to parse (can be a scalar, mapping, or sequence)
+/// * `converter` - The converter to use for parsing concrete values
+pub fn parse_nested_item_list_with_converter<T, C>(
+    yaml: &MarkedNode,
+    converter: &C,
+) -> ParseResult<NestedItemList<T>>
+where
+    C: NodeConverter<T>,
+{
+    if let Some(sequence) = yaml.as_sequence() {
+        // It's a list - parse each item which can be a value or conditional
+        let mut items = Vec::new();
+        for item in sequence.iter() {
+            let parsed = parse_item_with_converter(item, converter)?;
+            items.push(parsed);
+        }
+        Ok(NestedItemList::new(items))
+    } else {
+        // It's a single item (scalar, mapping, or conditional)
+        let item = parse_item_with_converter(yaml, converter)?;
+        Ok(NestedItemList::single(item))
     }
 }
 

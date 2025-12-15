@@ -6,7 +6,7 @@ use rattler_build_yaml_parser::{
 use crate::{
     ParseError,
     stage0::{
-        Conditional, ConditionalList, ConditionalListOrItem, Item, JinjaExpression, ListOrItem,
+        Conditional, ConditionalList, ConditionalListOrItem, Item, JinjaExpression, NestedItemList,
         Value,
         parser::helpers::get_span,
         tests::{
@@ -87,20 +87,20 @@ fn parse_conditional_test_item(
     }))
 }
 
-/// Parse a test list from a sequence node (or a single test mapping) and wrap each test in Value
-fn parse_test_list_as_values(node: &Node) -> Result<ListOrItem<Value<TestType>>, ParseError> {
-    // If it's a sequence, parse each item as a test
+/// Parse a test list from a sequence node (or a single test mapping)
+/// Supports nested if/then/else conditionals
+fn parse_test_list_as_values(node: &Node) -> Result<NestedItemList<TestType>, ParseError> {
+    // If it's a sequence, parse each item as a test or conditional
     if let Some(seq) = node.as_sequence() {
-        let mut tests = Vec::new();
-        for item in seq.iter() {
-            let test = parse_single_test(item)?;
-            tests.push(Value::new_concrete(test, None));
+        let mut items = Vec::new();
+        for item_node in seq.iter() {
+            items.push(parse_test_item(item_node)?);
         }
-        Ok(ListOrItem::new(tests))
+        Ok(NestedItemList::new(items))
     } else if node.as_mapping().is_some() {
-        // Single test mapping - parse as a single test
-        let test = parse_single_test(node)?;
-        Ok(ListOrItem::single(Value::new_concrete(test, None)))
+        // Single test mapping - could be a test or a nested conditional
+        let item = parse_test_item(node)?;
+        Ok(NestedItemList::single(item))
     } else {
         Err(ParseError::expected_type(
             "sequence or mapping",

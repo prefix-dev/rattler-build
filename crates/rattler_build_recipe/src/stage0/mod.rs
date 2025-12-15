@@ -32,7 +32,7 @@ pub use source::Source;
 pub use tests::{PythonVersion, TestType};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,
-    JinjaTemplate, ListOrItem, Value,
+    JinjaTemplate, ListOrItem, NestedItemList, Value,
 };
 
 /// Backwards compatibility alias for Stage0Recipe

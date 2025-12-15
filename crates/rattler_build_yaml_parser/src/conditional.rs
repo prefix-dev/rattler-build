@@ -7,7 +7,7 @@ use crate::{
     converter::{FromStrConverter, NodeConverter},
     error::{ParseError, ParseResult},
     helpers::get_span,
-    list::parse_list_or_item_with_converter,
+    list::parse_nested_item_list_with_converter,
     types::{Conditional, ConditionalList, ConditionalListOrItem, Item},
     value::parse_value_with_converter,
 };
@@ -97,8 +97,9 @@ where
 
 /// Parse an Item<T> from YAML using a custom converter
 ///
-/// This handles both simple values and conditional (if/then/else) items
-fn parse_item_with_converter<T, C>(yaml: &MarkedNode, converter: &C) -> ParseResult<Item<T>>
+/// This handles both simple values and conditional (if/then/else) items.
+/// Supports nested conditionals at any depth.
+pub fn parse_item_with_converter<T, C>(yaml: &MarkedNode, converter: &C) -> ParseResult<Item<T>>
 where
     C: NodeConverter<T>,
 {
@@ -115,6 +116,9 @@ where
 }
 
 /// Parse a Conditional<T> from YAML using a custom converter
+///
+/// Supports nested conditionals at any depth - the then/else branches
+/// can contain nested if/then/else conditionals.
 fn parse_conditional_with_converter<T, C>(yaml: &MarkedNode, converter: &C) -> ParseResult<Item<T>>
 where
     C: NodeConverter<T>,
@@ -136,16 +140,16 @@ where
     let condition = JinjaExpression::new(condition_scalar.as_str().to_string())
         .map_err(|e| ParseError::jinja_error(e, condition_span))?;
 
-    // Get the "then" field
+    // Get the "then" field - parse as NestedItemList to support nested conditionals
     let then_yaml = mapping
         .get("then")
         .ok_or_else(|| ParseError::missing_field("then", get_span(yaml)))?;
 
-    let then = parse_list_or_item_with_converter(then_yaml, converter)?;
+    let then = parse_nested_item_list_with_converter(then_yaml, converter)?;
 
-    // Get optional "else" field
+    // Get optional "else" field - also parse as NestedItemList
     let else_value = if let Some(else_yaml) = mapping.get("else") {
-        Some(parse_list_or_item_with_converter(else_yaml, converter)?)
+        Some(parse_nested_item_list_with_converter(else_yaml, converter)?)
     } else {
         None
     };

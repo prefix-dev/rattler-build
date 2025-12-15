@@ -394,3 +394,78 @@ fn test_parse_binary_relocation_template() {
         }
     }
 }
+
+#[test]
+fn test_parse_nested_conditionals() {
+    // Load the test data file with 3 levels of nesting
+    let yaml = include_str!("../test-data/nested_conditionals.yaml");
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    // Check package name
+    assert_eq!(
+        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        "nested-conditionals-test"
+    );
+
+    // The script should have 2 top-level items (unix and win conditionals)
+    let script_content = recipe
+        .build
+        .script
+        .content
+        .as_ref()
+        .expect("Script content should exist");
+    let script_items = script_content.as_slice();
+    assert_eq!(
+        script_items.len(),
+        2,
+        "Should have 2 top-level conditionals"
+    );
+
+    // First item should be the unix conditional
+    let unix_cond = script_items[0]
+        .as_conditional()
+        .expect("First item should be conditional");
+    assert!(
+        unix_cond.condition.source().contains("unix"),
+        "First condition should be 'unix'"
+    );
+
+    // The unix conditional's then branch should have 4 items:
+    // 1. export EXTRA_FLAGS=""
+    // 2. if: linux (nested conditional)
+    // 3. if: osx (nested conditional)
+    // 4. make $EXTRA_FLAGS
+    assert_eq!(
+        unix_cond.then.len(),
+        4,
+        "Unix then branch should have 4 items"
+    );
+
+    // Check that the second item is a nested linux conditional
+    let linux_cond = unix_cond.then.as_slice()[1]
+        .as_conditional()
+        .expect("Second item in unix.then should be a conditional");
+    assert!(
+        linux_cond.condition.source().contains("linux"),
+        "Nested condition should be 'linux'"
+    );
+
+    // Check that the third item is a nested osx conditional
+    let osx_cond = unix_cond.then.as_slice()[2]
+        .as_conditional()
+        .expect("Third item in unix.then should be a conditional");
+    assert!(
+        osx_cond.condition.source().contains("osx"),
+        "Nested condition should be 'osx'"
+    );
+
+    // Second top-level item should be the win conditional
+    let win_cond = script_items[1]
+        .as_conditional()
+        .expect("Second item should be conditional");
+    assert!(
+        win_cond.condition.source().contains("win"),
+        "Second condition should be 'win'"
+    );
+}

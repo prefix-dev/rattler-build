@@ -9,7 +9,7 @@ pub use rattler_build_jinja::{JinjaExpression, JinjaTemplate};
 
 // Re-export all basic parsing types from the shared parser
 pub use rattler_build_yaml_parser::{
-    Conditional, ConditionalList, ConditionalListOrItem, Item, ListOrItem, Value,
+    Conditional, ConditionalList, ConditionalListOrItem, Item, ListOrItem, NestedItemList, Value,
 };
 
 // Additional recipe-specific types below

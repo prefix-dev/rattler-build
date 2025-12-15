@@ -39,47 +39,57 @@ fn evaluate_conditional_list(
     let mut result = Vec::new();
 
     for item in list.iter() {
-        match item {
-            Item::Value(value) => {
-                if let Some(evaluated) = evaluate_value(value, jinja, key)? {
-                    result.push(evaluated);
-                }
+        evaluate_item(item, jinja, key, &mut result)?;
+    }
+
+    Ok(result)
+}
+
+/// Evaluate a single item (value or conditional) and push results to the result vector
+fn evaluate_item(
+    item: &Item<Variable>,
+    jinja: &Jinja,
+    key: &NormalizedKey,
+    result: &mut Vec<Variable>,
+) -> Result<(), VariantConfigError> {
+    match item {
+        Item::Value(value) => {
+            if let Some(evaluated) = evaluate_value(value, jinja, key)? {
+                result.push(evaluated);
             }
-            Item::Conditional(conditional) => {
-                // Evaluate the condition
-                let condition_result = jinja
-                    .eval(conditional.condition.source())
-                    .map_err(|e| {
-                        VariantConfigError::InvalidConfig(format!(
-                            "Failed to evaluate condition '{}' for variant key '{:?}': {}",
-                            conditional.condition.source(),
-                            key,
-                            e
-                        ))
-                    })?
-                    .is_true();
+        }
+        Item::Conditional(conditional) => {
+            // Evaluate the condition
+            let condition_result = jinja
+                .eval(conditional.condition.source())
+                .map_err(|e| {
+                    VariantConfigError::InvalidConfig(format!(
+                        "Failed to evaluate condition '{}' for variant key '{:?}': {}",
+                        conditional.condition.source(),
+                        key,
+                        e
+                    ))
+                })?
+                .is_true();
 
-                // Choose the appropriate branch
-                let branch = if condition_result {
-                    &conditional.then
-                } else if let Some(else_branch) = &conditional.else_value {
-                    else_branch
-                } else {
-                    // No else branch and condition is false - skip
-                    continue;
-                };
+            // Choose the appropriate branch
+            let branch = if condition_result {
+                &conditional.then
+            } else if let Some(else_branch) = &conditional.else_value {
+                else_branch
+            } else {
+                // No else branch and condition is false - skip
+                return Ok(());
+            };
 
-                // Evaluate all values in the branch
-                for value in branch.iter() {
-                    if let Some(evaluated) = evaluate_value(value, jinja, key)? {
-                        result.push(evaluated);
-                    }
-                }
+            // Recursively evaluate all items in the branch (supports nested conditionals)
+            for nested_item in branch.iter() {
+                evaluate_item(nested_item, jinja, key, result)?;
             }
         }
     }
 
-    Ok(result)
+    Ok(())
 }
 
 /// Evaluate a single Value<Variable> to produce an optional Variable
