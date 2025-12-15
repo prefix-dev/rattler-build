@@ -30,7 +30,7 @@ rust = ">=1.89.0,<1.90"
 ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]
-fmt = { depends-on = ["fmt-python", "fmt-rust"] }
+
 fmt-python = "ruff format src/rattler_build examples tests"
 fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
 # checks for the CI
@@ -38,9 +38,10 @@ fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
 fmt-python-check = "ruff format src/rattler_build examples tests --diff"
 fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
 
-lint = { depends-on = ["lint-python", "lint-rust"] }
 lint-python = "ruff check ."
 lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
+
+lint = { depends-on = ["lint-python", "fmt-python", "lint-rust", "fmt-rust"] }
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
