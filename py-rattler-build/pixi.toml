@@ -34,8 +34,6 @@ ruff = ">=0.3.3,<0.4"
 fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
 # checks for the CI
 fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
-fmt-python-check = "ruff format src/rattler_build examples tests --diff"
-fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
 
 lint-python = "ruff check ."
 lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
