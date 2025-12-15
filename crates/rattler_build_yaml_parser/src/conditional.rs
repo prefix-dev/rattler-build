@@ -7,7 +7,6 @@ use crate::{
     converter::{FromStrConverter, NodeConverter},
     error::{ParseError, ParseResult},
     helpers::get_span,
-    list::parse_list_or_item_with_converter,
     types::{Conditional, ConditionalList, ConditionalListOrItem, Item},
     value::parse_value_with_converter,
 };
@@ -115,6 +114,9 @@ where
 }
 
 /// Parse a Conditional<T> from YAML using a custom converter
+///
+/// This function now supports nested conditionals - the `then` and `else` branches
+/// can contain more conditional items, enabling recursive conditional structures.
 fn parse_conditional_with_converter<T, C>(yaml: &MarkedNode, converter: &C) -> ParseResult<Item<T>>
 where
     C: NodeConverter<T>,
@@ -136,16 +138,18 @@ where
     let condition = JinjaExpression::new(condition_scalar.as_str().to_string())
         .map_err(|e| ParseError::jinja_error(e, condition_span))?;
 
-    // Get the "then" field
+    // Get the "then" field - parse as Item<T> to support nested conditionals
     let then_yaml = mapping
         .get("then")
         .ok_or_else(|| ParseError::missing_field("then", get_span(yaml)))?;
 
-    let then = parse_list_or_item_with_converter(then_yaml, converter)?;
+    let then = parse_list_or_item_items_with_converter(then_yaml, converter)?;
 
-    // Get optional "else" field
+    // Get optional "else" field - parse as Item<T> to support nested conditionals
     let else_value = if let Some(else_yaml) = mapping.get("else") {
-        Some(parse_list_or_item_with_converter(else_yaml, converter)?)
+        Some(parse_list_or_item_items_with_converter(
+            else_yaml, converter,
+        )?)
     } else {
         None
     };
@@ -156,6 +160,31 @@ where
         else_value,
         condition_span: Some(condition_span),
     }))
+}
+
+/// Parse a ListOrItem<Item<T>> from YAML - supports nested conditionals
+///
+/// This parses either a single item or a list of items, where each item can be
+/// either a value or a conditional (enabling nested conditional structures).
+fn parse_list_or_item_items_with_converter<T, C>(
+    yaml: &MarkedNode,
+    converter: &C,
+) -> ParseResult<crate::types::ListOrItem<crate::types::Item<T>>>
+where
+    C: NodeConverter<T>,
+{
+    if let Some(sequence) = yaml.as_sequence() {
+        // It's a list - parse each item (which may be a value or nested conditional)
+        let mut items = Vec::new();
+        for item in sequence.iter() {
+            items.push(parse_item_with_converter(item, converter)?);
+        }
+        Ok(crate::types::ListOrItem::new(items))
+    } else {
+        // It's a single item - could be a value or a conditional
+        let item = parse_item_with_converter(yaml, converter)?;
+        Ok(crate::types::ListOrItem::single(item))
+    }
 }
 
 #[cfg(test)]
@@ -268,6 +297,125 @@ val:
             assert_eq!(cond.else_value.as_ref().unwrap().len(), 1);
         } else {
             panic!("Expected conditional");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_conditionals() {
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+val:
+  - if: outer
+    then:
+      - if: inner
+        then: "nested-true"
+        else: "nested-false"
+    else: "outer-false"
+"#,
+        )
+        .unwrap();
+        let node = yaml.as_mapping().unwrap().get("val").unwrap();
+        let list: ConditionalList<String> = parse_conditional_list(node).unwrap();
+        assert_eq!(list.len(), 1);
+
+        // Check outer conditional
+        if let Item::Conditional(outer_cond) = list.iter().next().unwrap() {
+            // Check then branch contains a nested conditional
+            assert_eq!(outer_cond.then.len(), 1);
+            if let Item::Conditional(inner_cond) = outer_cond.then.iter().next().unwrap() {
+                // Verify inner conditional structure
+                assert_eq!(inner_cond.then.len(), 1);
+                assert!(inner_cond.else_value.is_some());
+                assert_eq!(inner_cond.else_value.as_ref().unwrap().len(), 1);
+            } else {
+                panic!("Expected nested conditional in then branch");
+            }
+
+            // Check else branch is a simple value
+            assert!(outer_cond.else_value.is_some());
+            assert_eq!(outer_cond.else_value.as_ref().unwrap().len(), 1);
+        } else {
+            panic!("Expected outer conditional");
+        }
+    }
+
+    #[test]
+    fn test_parse_deeply_nested_conditionals() {
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+val:
+  - if: level1
+    then:
+      - if: level2
+        then:
+          - if: level3
+            then: "deep"
+"#,
+        )
+        .unwrap();
+        let node = yaml.as_mapping().unwrap().get("val").unwrap();
+        let list: ConditionalList<String> = parse_conditional_list(node).unwrap();
+        assert_eq!(list.len(), 1);
+
+        // Navigate through 3 levels of nesting
+        if let Item::Conditional(level1) = list.iter().next().unwrap() {
+            if let Item::Conditional(level2) = level1.then.iter().next().unwrap() {
+                if let Item::Conditional(level3) = level2.then.iter().next().unwrap() {
+                    // Verify deepest level has a value
+                    if let Item::Value(value) = level3.then.iter().next().unwrap() {
+                        assert!(value.is_concrete());
+                    } else {
+                        panic!("Expected value at deepest level");
+                    }
+                } else {
+                    panic!("Expected level3 conditional");
+                }
+            } else {
+                panic!("Expected level2 conditional");
+            }
+        } else {
+            panic!("Expected level1 conditional");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_conditional_with_multiple_values() {
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+val:
+  - if: outer
+    then:
+      - "value1"
+      - if: inner
+        then: ["nested1", "nested2"]
+      - "value2"
+"#,
+        )
+        .unwrap();
+        let node = yaml.as_mapping().unwrap().get("val").unwrap();
+        let list: ConditionalList<String> = parse_conditional_list(node).unwrap();
+        assert_eq!(list.len(), 1);
+
+        if let Item::Conditional(outer_cond) = list.iter().next().unwrap() {
+            // Then branch should have 3 items: value, conditional, value
+            assert_eq!(outer_cond.then.len(), 3);
+
+            let items: Vec<_> = outer_cond.then.iter().collect();
+            assert!(items[0].is_value()); // "value1"
+            assert!(items[1].is_conditional()); // nested conditional
+            assert!(items[2].is_value()); // "value2"
+
+            // Check the nested conditional
+            if let Item::Conditional(inner_cond) = items[1] {
+                assert_eq!(inner_cond.then.len(), 2);
+            } else {
+                panic!("Expected nested conditional");
+            }
+        } else {
+            panic!("Expected outer conditional");
         }
     }
 }

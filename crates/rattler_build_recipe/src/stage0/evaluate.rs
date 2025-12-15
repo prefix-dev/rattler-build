@@ -737,9 +737,39 @@ where
                     }
                 };
 
-                for val in items_to_process.iter() {
-                    if let Some(result) = process(val, context)? {
-                        results.push(result);
+                // Process nested items using a work queue to avoid recursion limit
+                let mut work_queue: Vec<&Item<T>> = items_to_process.iter().collect();
+
+                while let Some(work_item) = work_queue.pop() {
+                    match work_item {
+                        Item::Value(value) => {
+                            if let Some(result) = process(value, context)? {
+                                results.push(result);
+                            }
+                        }
+                        Item::Conditional(nested_cond) => {
+                            // Evaluate nested conditional's condition
+                            let nested_condition_met = evaluate_condition(
+                                &nested_cond.condition,
+                                context,
+                                nested_cond.condition_span.as_ref(),
+                            )?;
+
+                            let nested_items = if nested_condition_met {
+                                &nested_cond.then
+                            } else {
+                                match &nested_cond.else_value {
+                                    Some(else_items) => else_items,
+                                    None => continue,
+                                }
+                            };
+
+                            // Add nested items to work queue (process in reverse to maintain order)
+                            let nested_vec: Vec<_> = nested_items.iter().collect();
+                            for nested_item in nested_vec.into_iter().rev() {
+                                work_queue.push(nested_item);
+                            }
+                        }
                     }
                 }
             }
@@ -2169,9 +2199,12 @@ impl Evaluate for Stage0CommandsTestFiles {
     type Output = Stage1CommandsTestFiles;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Convert ConditionalListOrItem to ConditionalList for evaluation
+        let source_list: ConditionalList<String> = self.source.clone().into();
+        let recipe_list: ConditionalList<String> = self.recipe.clone().into();
         Ok(Stage1CommandsTestFiles {
-            source: evaluate_glob_vec_simple(&self.source, context)?,
-            recipe: evaluate_glob_vec_simple(&self.recipe, context)?,
+            source: evaluate_glob_vec_simple(&source_list, context)?,
+            recipe: evaluate_glob_vec_simple(&recipe_list, context)?,
         })
     }
 }
@@ -2268,17 +2301,12 @@ pub fn evaluate_test(
                 }
             };
 
-            // Recursively evaluate the selected tests
+            // Recursively evaluate the selected tests (handles nested conditionals)
             let mut results = Vec::new();
-            for value in tests_to_evaluate.iter() {
-                let test = value.as_concrete().ok_or_else(|| {
-                    ParseError::invalid_value(
-                        "test",
-                        "test cannot be a template",
-                        crate::Span::new_blank(),
-                    )
-                })?;
-                results.push(evaluate_test_type(test, context)?);
+            for item in tests_to_evaluate.iter() {
+                // Recursively evaluate each item (which may be a value or nested conditional)
+                let evaluated = evaluate_test(item, context)?;
+                results.extend(evaluated);
             }
             Ok(results)
         }
@@ -3114,11 +3142,14 @@ mod tests {
             Item::Value(Value::new_concrete("python".to_string(), None)),
             Item::Conditional(Conditional {
                 condition: JinjaExpression::new("unix".to_string()).unwrap(),
-                then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
-                else_value: Some(ListOrItem::new(vec![Value::new_concrete(
+                then: ListOrItem::new(vec![Item::Value(Value::new_concrete(
+                    "gcc".to_string(),
+                    None,
+                ))]),
+                else_value: Some(ListOrItem::new(vec![Item::Value(Value::new_concrete(
                     "msvc".to_string(),
                     None,
-                )])),
+                ))])),
                 condition_span: None,
             }),
         ]);
@@ -3168,11 +3199,14 @@ mod tests {
 
         let list = ConditionalList::new(vec![Item::Conditional(Conditional {
             condition: JinjaExpression::new("unix".to_string()).unwrap(),
-            then: ListOrItem::new(vec![Value::new_concrete("gcc".to_string(), None)]),
-            else_value: Some(ListOrItem::new(vec![Value::new_concrete(
+            then: ListOrItem::new(vec![Item::Value(Value::new_concrete(
+                "gcc".to_string(),
+                None,
+            ))]),
+            else_value: Some(ListOrItem::new(vec![Item::Value(Value::new_concrete(
                 "msvc".to_string(),
                 None,
-            )])),
+            ))])),
             condition_span: None,
         })]);
 

@@ -51,6 +51,8 @@ fn parse_test_item(node: &Node) -> Result<Item<TestType>, ParseError> {
 }
 
 /// Parse a conditional test item with if/then/else branches
+///
+/// Now supports nested conditionals within the then/else branches
 fn parse_conditional_test_item(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<Item<TestType>, ParseError> {
@@ -71,10 +73,10 @@ fn parse_conditional_test_item(
         .get("then")
         .ok_or_else(|| ParseError::missing_field("then", *mapping.span()))?;
 
-    let then_tests = parse_test_list_as_values(then_node)?;
+    let then_tests = parse_test_list_as_items(then_node)?;
 
     let else_tests = if let Some(else_node) = mapping.get("else") {
-        Some(parse_test_list_as_values(else_node)?)
+        Some(parse_test_list_as_items(else_node)?)
     } else {
         None
     };
@@ -87,8 +89,12 @@ fn parse_conditional_test_item(
     }))
 }
 
-/// Parse a test list from a sequence node and wrap each test in Value
-fn parse_test_list_as_values(node: &Node) -> Result<ListOrItem<Value<TestType>>, ParseError> {
+/// Parse a test list from a sequence node as Item<TestType> to support nested conditionals
+///
+/// The then/else branches can now contain:
+/// - Regular test objects wrapped in Value
+/// - Nested if/then/else conditionals
+fn parse_test_list_as_items(node: &Node) -> Result<ListOrItem<Item<TestType>>, ParseError> {
     let seq = node.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(node))
             .with_message("'then' and 'else' must be sequences of tests")
@@ -96,8 +102,8 @@ fn parse_test_list_as_values(node: &Node) -> Result<ListOrItem<Value<TestType>>,
 
     let mut tests = Vec::new();
     for item in seq.iter() {
-        let test = parse_single_test(item)?;
-        tests.push(Value::new_concrete(test, None));
+        // Each item can be either a regular test or a nested conditional
+        tests.push(parse_test_item(item)?);
     }
     Ok(ListOrItem::new(tests))
 }
@@ -343,17 +349,17 @@ fn parse_commands_test_requirements(
 fn parse_commands_test_files(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<CommandsTestFiles, ParseError> {
-    let mut source = ConditionalList::default();
-    let mut recipe = ConditionalList::default();
+    let mut source = ConditionalListOrItem::default();
+    let mut recipe = ConditionalListOrItem::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
         match key {
             "source" => {
-                source = parse_conditional_list(value_node)?;
+                source = parse_conditional_list_or_item(value_node)?;
             }
             "recipe" => {
-                recipe = parse_conditional_list(value_node)?;
+                recipe = parse_conditional_list_or_item(value_node)?;
             }
             _ => {
                 return Err(ParseError::invalid_value(

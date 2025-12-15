@@ -72,12 +72,12 @@ pub struct CommandsTestRequirements {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
     /// Files to be copied from the source directory to the test directory.
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub source: ConditionalList<String>,
+    #[serde(default, skip_serializing_if = "ConditionalListOrItem::is_empty")]
+    pub source: ConditionalListOrItem<String>,
 
     /// Files to be copied from the recipe directory to the test directory.
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub recipe: ConditionalList<String>,
+    #[serde(default, skip_serializing_if = "ConditionalListOrItem::is_empty")]
+    pub recipe: ConditionalListOrItem<String>,
 }
 
 /// A test that executes a script in a freshly created environment

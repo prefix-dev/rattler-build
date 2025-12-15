@@ -69,17 +69,61 @@ fn evaluate_conditional_list(
                     continue;
                 };
 
-                // Evaluate all values in the branch
-                for value in branch.iter() {
-                    if let Some(evaluated) = evaluate_value(value, jinja, key)? {
-                        result.push(evaluated);
-                    }
+                // Evaluate all items in the branch (recursively handles nested conditionals)
+                for item in branch.iter() {
+                    evaluate_item_recursive(item, jinja, key, &mut result)?;
                 }
             }
         }
     }
 
     Ok(result)
+}
+
+/// Recursively evaluate an Item<Variable> (which can be a Value or a nested Conditional)
+fn evaluate_item_recursive(
+    item: &Item<Variable>,
+    jinja: &Jinja,
+    key: &NormalizedKey,
+    result: &mut Vec<Variable>,
+) -> Result<(), VariantConfigError> {
+    match item {
+        Item::Value(value) => {
+            if let Some(evaluated) = evaluate_value(value, jinja, key)? {
+                result.push(evaluated);
+            }
+        }
+        Item::Conditional(conditional) => {
+            // Evaluate the nested conditional
+            let condition_result = jinja
+                .eval(conditional.condition.source())
+                .map_err(|e| {
+                    VariantConfigError::InvalidConfig(format!(
+                        "Failed to evaluate nested condition '{}' for variant key '{:?}': {}",
+                        conditional.condition.source(),
+                        key,
+                        e
+                    ))
+                })?
+                .is_true();
+
+            // Choose the appropriate branch
+            let branch = if condition_result {
+                &conditional.then
+            } else if let Some(else_branch) = &conditional.else_value {
+                else_branch
+            } else {
+                // No else branch and condition is false - skip
+                return Ok(());
+            };
+
+            // Recursively evaluate all items in the nested branch
+            for nested_item in branch.iter() {
+                evaluate_item_recursive(nested_item, jinja, key, result)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Evaluate a single Value<Variable> to produce an optional Variable

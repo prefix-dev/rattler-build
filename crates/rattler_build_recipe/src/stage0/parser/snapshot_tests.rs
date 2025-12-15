@@ -169,3 +169,90 @@ fn test_single_output_compatibility() {
 
     insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
 }
+
+#[test]
+fn test_nested_conditionals_snapshot() {
+    let source = r#"
+package:
+  name: test-nested-conditionals
+  version: "1.0.0"
+
+requirements:
+  build:
+    - if: unix
+      then:
+        - gcc
+        - if: linux
+          then:
+            - binutils
+          else:
+            - llvm
+      else:
+        - msvc
+
+tests:
+  - if: unix
+    then:
+      - script:
+          - echo "Unix test"
+  - script:
+      - echo "Always runs"
+"#;
+    let recipe =
+        parse_recipe_from_source(source).expect("Failed to parse nested conditionals recipe");
+    insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
+}
+
+#[test]
+fn test_single_string_files_snapshot() {
+    let source = r#"
+package:
+  name: test-files-string
+  version: "1.0.0"
+
+tests:
+  - script:
+      - pytest
+    files:
+      recipe: run_test.py
+      source:
+        - test_data/file1.txt
+        - test_data/file2.txt
+    requirements:
+      run:
+        - pytest
+  - script:
+      - python helper.py
+    files:
+      recipe:
+        - helper.py
+        - config.yaml
+      source: single_file.txt
+"#;
+    let recipe =
+        parse_recipe_from_source(source).expect("Failed to parse single string files recipe");
+    insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
+}
+
+#[test]
+fn test_deeply_nested_conditionals_snapshot() {
+    let source = r#"
+package:
+  name: test-deep-nesting
+  version: "1.0.0"
+
+requirements:
+  run:
+    - if: level1
+      then:
+        - package-l1
+        - if: level2
+          then:
+            - package-l2
+            - if: level3
+              then: package-l3
+"#;
+    let recipe = parse_recipe_from_source(source)
+        .expect("Failed to parse deeply nested conditionals recipe");
+    insta::assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
+}

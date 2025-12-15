@@ -251,35 +251,39 @@ impl<'a, T> IntoIterator for &'a ListOrItem<T> {
 }
 
 /// A conditional with if/then/else branches
+///
+/// This is a recursive type that supports nested conditionals - the `then` and `else`
+/// branches can contain more conditionals, creating an "ouroboros" structure where
+/// `Conditional<T>` contains `Item<T>`, and `Item<T>` can contain `Conditional<T>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conditional<T> {
     /// The condition to evaluate
     #[serde(rename = "if")]
     pub condition: JinjaExpression,
-    /// The values to use if condition is true
-    pub then: ListOrItem<Value<T>>,
-    /// The values to use if condition is false
+    /// The values to use if condition is true (can include nested conditionals)
+    pub then: ListOrItem<Item<T>>,
+    /// The values to use if condition is false (can include nested conditionals)
     #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
-    pub else_value: Option<ListOrItem<Value<T>>>,
+    pub else_value: Option<ListOrItem<Item<T>>>,
     /// Optional span for the condition expression (for error reporting)
     #[serde(skip)]
     pub condition_span: Option<Span>,
 }
 
 impl<T> Conditional<T> {
-    /// Get all variables used in this conditional
+    /// Get all variables used in this conditional (recursively includes nested conditionals)
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = self.condition.used_variables().to_vec();
 
-        // Collect from then branch
-        for value in self.then.iter() {
-            vars.extend(value.used_variables());
+        // Collect from then branch (recursively handles nested conditionals)
+        for item in self.then.iter() {
+            vars.extend(item.used_variables());
         }
 
-        // Collect from else branch if present
+        // Collect from else branch if present (recursively handles nested conditionals)
         if let Some(else_value) = &self.else_value {
-            for value in else_value.iter() {
-                vars.extend(value.used_variables());
+            for item in else_value.iter() {
+                vars.extend(item.used_variables());
             }
         }
 
