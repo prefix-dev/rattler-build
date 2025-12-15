@@ -7,9 +7,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use pyo3::prelude::*;
-use rattler_build_package::{
-    ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig,
-};
+use rattler_build_package::{ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig};
 use rattler_conda_types::package::IndexJson;
 use rattler_conda_types::{NoArchType, PackageName, Platform, VersionWithSource};
 
@@ -163,7 +161,10 @@ impl PyFileCollector {
             .collect()
             .map_err(|e| RattlerBuildError::Other(e.to_string()))?;
 
-        Ok(files.into_iter().map(|f| PyFileEntry { inner: f }).collect())
+        Ok(files
+            .into_iter()
+            .map(|f| PyFileEntry { inner: f })
+            .collect())
     }
 
     fn __repr__(&self) -> String {
@@ -269,17 +270,19 @@ pub fn assemble_package_py(
     let pkg_name = PackageName::try_from(name)
         .map_err(|e| RattlerBuildError::Other(format!("Invalid package name: {}", e)))?;
 
-    let pkg_version: VersionWithSource = version
-        .parse()
-        .map_err(|e: rattler_conda_types::ParseVersionError| {
-            RattlerBuildError::Other(format!("Invalid version: {}", e))
-        })?;
+    let pkg_version: VersionWithSource =
+        version
+            .parse()
+            .map_err(|e: rattler_conda_types::ParseVersionError| {
+                RattlerBuildError::Other(format!("Invalid version: {}", e))
+            })?;
 
-    let platform: Platform = target_platform
-        .parse()
-        .map_err(|e: rattler_conda_types::ParsePlatformError| {
-            RattlerBuildError::Other(format!("Invalid platform: {}", e))
-        })?;
+    let platform: Platform =
+        target_platform
+            .parse()
+            .map_err(|e: rattler_conda_types::ParsePlatformError| {
+                RattlerBuildError::Other(format!("Invalid platform: {}", e))
+            })?;
 
     // Build config
     let config = PackageConfig {
@@ -406,7 +409,10 @@ pub fn register_package_assembler_module(
     package_assembler_module.add_class::<PyFileEntry>()?;
     package_assembler_module.add_class::<PyFileCollector>()?;
     package_assembler_module.add_class::<PyPackageOutput>()?;
-    package_assembler_module.add_function(wrap_pyfunction!(assemble_package_py, &package_assembler_module)?)?;
+    package_assembler_module.add_function(wrap_pyfunction!(
+        assemble_package_py,
+        &package_assembler_module
+    )?)?;
 
     parent_module.add_submodule(&package_assembler_module)?;
     Ok(())

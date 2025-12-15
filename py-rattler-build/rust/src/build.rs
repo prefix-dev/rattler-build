@@ -19,9 +19,9 @@ use std::{
 
 use crate::error::RattlerBuildError;
 use crate::render;
+use crate::run_async_task;
 use crate::tool_config;
 use crate::tracing_subscriber;
-use crate::run_async_task;
 
 /// Result of a successful package build
 #[pyclass(name = "BuildResult")]
@@ -104,8 +104,7 @@ pub fn build_rendered_variant_py(
     let channels: Vec<NamedChannelOrUrl> = channels
         .iter()
         .map(|c| {
-            NamedChannelOrUrl::from_str(c)
-                .map_err(|e| RattlerBuildError::Channel(e.to_string()))
+            NamedChannelOrUrl::from_str(c).map_err(|e| RattlerBuildError::Channel(e.to_string()))
         })
         .collect::<Result<_, _>>()?;
 
