@@ -1,1 +1,8 @@
-{}
+{
+  "quoted_bool": "true",
+  "quoted_int": "5",
+  "xboolean": true,
+  "xfloat": "1.23",
+  "xinteger": 5,
+  "xstring": "blah"
+}
