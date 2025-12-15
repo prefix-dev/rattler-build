@@ -15,6 +15,8 @@ use rattler_networking::{
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
+#[cfg(feature = "s3")]
+use thiserror::Error;
 use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;
@@ -483,4 +485,86 @@ impl ConfigurationBuilder {
             environments_externally_managed: self.environments_externally_managed,
         }
     }
+}
+
+/// Error type for S3 credential resolution
+#[cfg(feature = "s3")]
+#[derive(Debug, Error)]
+pub enum S3CredentialError {
+    /// Failed to get authentication storage
+    #[error("Failed to get authentication storage: {0}")]
+    AuthStorageError(#[from] AuthenticationStorageError),
+
+    /// Failed to load credentials from AWS SDK
+    #[error("Failed to load credentials from AWS SDK: {0}")]
+    SdkError(#[from] rattler_s3::FromSDKError),
+
+    /// No credentials found
+    #[error(
+        "No S3 credentials found for bucket '{bucket}'. Please configure credentials via `rattler auth` or AWS environment variables."
+    )]
+    NoCredentials {
+        /// The bucket name
+        bucket: String,
+    },
+}
+
+/// Resolve S3 credentials for the given bucket URL.
+///
+/// This function tries to resolve S3 credentials in the following order:
+/// 1. If S3 config is present for the bucket in the configuration, use it with auth storage
+/// 2. Fall back to AWS SDK default credential chain
+///
+/// # Arguments
+/// * `s3_config` - S3 middleware configuration (from rattler config)
+/// * `auth_file` - Optional path to an authentication file
+/// * `bucket_url` - The S3 bucket URL to resolve credentials for
+#[cfg(feature = "s3")]
+pub async fn resolve_s3_credentials(
+    s3_config: &HashMap<String, s3_middleware::S3Config>,
+    auth_file: Option<PathBuf>,
+    bucket_url: &Url,
+) -> Result<rattler_s3::ResolvedS3Credentials, S3CredentialError> {
+    let bucket_name = bucket_url.host_str().unwrap_or_default();
+
+    // Check if we have custom S3 config for this bucket
+    if let Some(config) = s3_config.get(bucket_name)
+        && let s3_middleware::S3Config::Custom {
+            endpoint_url,
+            region,
+            force_path_style,
+        } = config
+    {
+        // Create S3Credentials from the config
+        let s3_creds = rattler_s3::S3Credentials {
+            endpoint_url: endpoint_url.clone(),
+            region: region.clone(),
+            addressing_style: if *force_path_style {
+                rattler_s3::S3AddressingStyle::Path
+            } else {
+                rattler_s3::S3AddressingStyle::VirtualHost
+            },
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
+
+        // Try to resolve with auth storage
+        let auth_storage = get_auth_store(auth_file.clone())?;
+        if let Some(resolved) = s3_creds.resolve(bucket_url, &auth_storage) {
+            tracing::debug!(
+                "Resolved S3 credentials for bucket '{}' from config + auth storage",
+                bucket_name
+            );
+            return Ok(resolved);
+        }
+    }
+
+    // Fall back to AWS SDK default credential chain
+    tracing::debug!(
+        "Using AWS SDK default credential chain for bucket '{}'",
+        bucket_name
+    );
+    let resolved = rattler_s3::ResolvedS3Credentials::from_sdk().await?;
+    Ok(resolved)
 }

@@ -1,5 +1,3 @@
-<img style="max-width: 30%" src="assets/paxton-builder-mascot.svg" />
-
 ## A fast conda package builder: `rattler-build`
 
 The `rattler-build` tool creates cross-platform relocatable packages from a simple recipe format. 

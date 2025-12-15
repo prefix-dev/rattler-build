@@ -4,7 +4,8 @@ use pyo3::prelude::*;
 use rattler_build::tool_configuration;
 use rattler_upload::upload;
 use rattler_upload::upload::opt::{
-    AnacondaData, ArtifactoryData, CondaForgeData, PrefixData, QuetzData,
+    AnacondaData, ArtifactoryData, AttestationSource, CondaForgeData, ForceOverwrite, PrefixData,
+    QuetzData, SkipExisting as UploadSkipExisting,
 };
 use url::Url;
 
@@ -50,7 +51,7 @@ pub fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, generate_attestation, attestation_file))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file))]
 #[allow(clippy::too_many_arguments)]
 pub fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
@@ -59,13 +60,29 @@ pub fn upload_package_to_prefix_py(
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
     skip_existing: bool,
+    force: bool,
     generate_attestation: bool,
     attestation_file: Option<PathBuf>,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
-    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, generate_attestation, skip_existing);
+
+    // Convert attestation parameters to AttestationSource
+    let attestation = match (attestation_file, generate_attestation) {
+        (Some(path), false) => AttestationSource::Attestation(path),
+        (None, true) => AttestationSource::GenerateAttestation,
+        _ => AttestationSource::NoAttestation,
+    };
+
+    let prefix_data = PrefixData::new(
+        url,
+        channel,
+        api_key,
+        attestation,
+        UploadSkipExisting(skip_existing),
+        ForceOverwrite(force),
+    );
 
     run_async_task(async {
         upload::upload_package_to_prefix(&store, &package_files, prefix_data).await?;
@@ -90,7 +107,7 @@ pub fn upload_package_to_anaconda_py(
         .map(|u| Url::parse(&u))
         .transpose()
         .map_err(RattlerBuildError::from)?;
-    let anaconda_data = AnacondaData::new(owner, channel, api_key, url, force);
+    let anaconda_data = AnacondaData::new(owner, channel, api_key, url, ForceOverwrite(force));
 
     run_async_task(async {
         upload::upload_package_to_anaconda(&store, &package_files, anaconda_data).await?;

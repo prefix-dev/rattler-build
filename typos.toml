@@ -8,6 +8,7 @@ extend-exclude = [
   "test-data/conda_forge/**/*",
   "test-data/patch_application/**/*",
   "**/*.ipynb",
+  "**/__marimo__/",
 ]
 ignore-hidden = false
 
@@ -16,3 +17,6 @@ ratatui = "ratatui"
 ND = "ND"
 FreeTakServer = "FreeTakServer"
 BA = "BA"
+
+[default.extend-words]
+placehold = "placehold"

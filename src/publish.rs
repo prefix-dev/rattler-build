@@ -1,3 +1,5 @@
+//! Functions for publishing conda packages to various backends (local filesystem, S3, Quetz, etc.)
+
 use miette::IntoDiagnostic;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
@@ -208,7 +210,7 @@ pub(crate) fn apply_build_number_override(
 }
 
 /// Helper function to determine the package subdirectory (platform)
-fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
+pub fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
     use rattler_conda_types::package::IndexJson;
     use rattler_package_streaming::seek::read_package_file;
 
@@ -257,7 +259,9 @@ pub(crate) async fn upload_and_index_channel(
                 "artifactory" => upload_to_artifactory(url, package_paths, publish_data).await,
                 "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
                 "file" => {
-                    let path = PathBuf::from(url.path());
+                    let path = url
+                        .to_file_path()
+                        .map_err(|()| miette::miette!("Invalid file URL: {}", url))?;
                     upload_to_local_filesystem(&path, package_paths, publish_data.force).await
                 }
                 "http" | "https" => {
@@ -328,7 +332,8 @@ async fn upload_to_s3(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_index::{IndexS3Config, index_s3};
+    use rattler_index::{IndexS3Config, ensure_channel_initialized_s3, index_s3};
+    use rattler_networking::s3_middleware;
     use rattler_upload::upload::upload_package_to_s3;
     use std::collections::HashSet;
 
@@ -339,6 +344,51 @@ async fn upload_to_s3(
         tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
             .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
+    // Resolve S3 credentials using config + auth storage, falling back to AWS SDK
+    let resolved_credentials = tool_configuration::resolve_s3_credentials(
+        &publish_data.build.common.s3_config,
+        publish_data.build.common.auth_file.clone(),
+        url,
+    )
+    .await
+    .into_diagnostic()?;
+
+    // Create S3Credentials from the config if available (for upload_package_to_s3)
+    let bucket_name = url.host_str().unwrap_or_default();
+    let s3_credentials = publish_data
+        .build
+        .common
+        .s3_config
+        .get(bucket_name)
+        .and_then(|config| {
+            if let s3_middleware::S3Config::Custom {
+                endpoint_url,
+                region,
+                force_path_style,
+            } = config
+            {
+                Some(rattler_s3::S3Credentials {
+                    endpoint_url: endpoint_url.clone(),
+                    region: region.clone(),
+                    addressing_style: if *force_path_style {
+                        rattler_s3::S3AddressingStyle::Path
+                    } else {
+                        rattler_s3::S3AddressingStyle::VirtualHost
+                    },
+                    access_key_id: None,
+                    secret_access_key: None,
+                    session_token: None,
+                })
+            } else {
+                None
+            }
+        });
+
+    // Ensure channel is initialized with noarch/repodata.json
+    ensure_channel_initialized_s3(url, &resolved_credentials)
+        .await
+        .map_err(|e| miette::miette!("Failed to initialize S3 channel: {}", e))?;
+
     // Collect unique subdirs from all packages
     let mut subdirs = HashSet::new();
     for package_path in package_paths {
@@ -346,11 +396,11 @@ async fn upload_to_s3(
         subdirs.insert(subdir);
     }
 
-    // Upload packages to S3 (credentials come from AWS SDK default chain)
+    // Upload packages to S3
     upload_package_to_s3(
         &auth_storage,
         url.clone(),
-        None, // Use default AWS credential chain
+        s3_credentials,
         &package_paths.to_vec(),
         publish_data.force,
     )
@@ -358,11 +408,6 @@ async fn upload_to_s3(
     .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
 
     tracing::info!("Successfully uploaded packages to S3");
-
-    // Use default AWS credential chain
-    let resolved_credentials = rattler_s3::ResolvedS3Credentials::from_sdk()
-        .await
-        .into_diagnostic()?;
 
     for subdir in subdirs {
         // Run S3 indexing for each subdir
@@ -494,7 +539,9 @@ async fn upload_to_prefix(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_upload::upload::opt::PrefixData;
+    use rattler_upload::upload::opt::{
+        AttestationSource, ForceOverwrite, PrefixData, SkipExisting,
+    };
     use rattler_upload::upload::upload_package_to_prefix;
 
     tracing::info!("Uploading packages to Prefix.dev server: {}", url);
@@ -522,14 +569,21 @@ async fn upload_to_prefix(
         url.clone()
     };
 
-    // Create PrefixData with server URL, channel, optional API key, no attestation, attestation generation from publish_data and skip_existing=false
+    // Determine attestation source
+    let attestation = if publish_data.generate_attestation {
+        AttestationSource::GenerateAttestation
+    } else {
+        AttestationSource::NoAttestation
+    };
+
+    // Create PrefixData with server URL, channel, optional API key, attestation, skip_existing and force
     let prefix_data = PrefixData::new(
         server_url,
         channel,
         None,
-        None,
-        publish_data.generate_attestation,
-        false,
+        attestation,
+        SkipExisting(false),
+        ForceOverwrite(publish_data.force),
     );
 
     // Upload packages
@@ -548,7 +602,7 @@ async fn upload_to_anaconda(
     package_paths: &[PathBuf],
     publish_data: &PublishData,
 ) -> miette::Result<()> {
-    use rattler_upload::upload::opt::AnacondaData;
+    use rattler_upload::upload::opt::{AnacondaData, ForceOverwrite};
     use rattler_upload::upload::upload_package_to_anaconda;
 
     tracing::info!("Uploading packages to Anaconda.org: {}", url);
@@ -584,7 +638,7 @@ async fn upload_to_anaconda(
         channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
         None,                     // API key from auth storage
         Some(url.clone()),
-        publish_data.force,
+        ForceOverwrite(publish_data.force),
     );
 
     // Upload packages
@@ -603,12 +657,21 @@ async fn upload_to_local_filesystem(
     package_paths: &[PathBuf],
     force: bool,
 ) -> miette::Result<()> {
+    use rattler_index::ensure_channel_initialized_fs;
     use std::collections::HashSet;
 
     tracing::info!(
         "Copying packages to local channel: {}",
         target_dir.display()
     );
+
+    // Create target directory if it doesn't exist
+    fs_err::create_dir_all(target_dir).into_diagnostic()?;
+
+    // Ensure channel is initialized with noarch/repodata.json
+    ensure_channel_initialized_fs(target_dir)
+        .await
+        .map_err(|e| miette::miette!("Failed to initialize local channel: {}", e))?;
 
     // Collect unique subdirs from all packages
     let mut subdirs = HashSet::new();

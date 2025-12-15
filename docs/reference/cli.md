@@ -809,17 +809,22 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 
 - `--attestation <ATTESTATION>`
 
-	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
+	Upload an attestation file alongside the package. Note: if you add an attestation, you can _only_ upload a single package. Mutually exclusive with --generate-attestation
 
 
 - `--generate-attestation`
 
-	Automatically generate attestations when using trusted publishing
+	Automatically generate attestation using cosign in CI. Mutually exclusive with --attestation
 
 
 - `-s`, `--skip-existing`
 
-	Skip upload if package is existed
+	Skip upload if package already exists
+
+
+- `--force`
+
+	Force overwrite existing packages
 
 
 
