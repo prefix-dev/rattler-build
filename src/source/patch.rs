@@ -974,12 +974,12 @@ mod tests {
             // Convert source and fetch from cache
             let cache_source = match &source {
                 Source::Git(git_src) => {
-                    let cache_git_source = super::convert_git_source(git_src, &recipe_dir)
+                    let cache_git_source = crate::source::convert_git_source(git_src, &recipe_dir)
                         .expect("Failed to convert git source to cache source");
                     CacheSource::Git(cache_git_source)
                 }
                 Source::Url(url_src) => {
-                    let cache_url_source = super::convert_url_source(url_src)
+                    let cache_url_source = crate::source::convert_url_source(url_src)
                         .expect("Failed to convert url source to cache source");
                     CacheSource::Url(cache_url_source)
                 }
