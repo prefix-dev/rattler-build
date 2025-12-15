@@ -1,11 +1,15 @@
 """Tests for the package builder (assemble_package) API."""
 
 import hashlib
+import json
+import tarfile
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import zstandard
 
 from rattler_build import (
     ArchiveType,
@@ -97,13 +101,6 @@ class TestAssemblePackageMetadata:
             constrains=["scipy >=1.0"],
             build_number=5,
         )
-
-        # Extract and check index.json
-        import json
-        import tarfile
-        import tempfile
-
-        import zstandard
 
         with zipfile.ZipFile(output.path, "r") as zf:
             # Find the info archive
