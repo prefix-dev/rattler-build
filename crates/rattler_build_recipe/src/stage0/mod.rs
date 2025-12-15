@@ -15,7 +15,7 @@ mod tests;
 mod types;
 
 pub use about::{About, License};
-pub use build::Build;
+pub use build::{BinaryRelocation, Build};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{

@@ -62,7 +62,7 @@ pub struct Build {
 
     /// Merge build and host environments
     #[serde(default)]
-    pub merge_build_and_host_envs: bool,
+    pub merge_build_and_host_envs: Value<bool>,
 
     /// Files to include/exclude in the package (glob patterns or include/exclude mapping)
     #[serde(default)]
@@ -96,7 +96,7 @@ impl Default for Build {
             skip: ConditionalList::default(),
             always_copy_files: ConditionalList::default(),
             always_include_files: ConditionalList::default(),
-            merge_build_and_host_envs: false,
+            merge_build_and_host_envs: Value::new_concrete(false, None),
             files: IncludeExclude::default(),
             dynamic_linking: DynamicLinking::default(),
             variant: VariantKeyUsage::default(),
@@ -190,7 +190,7 @@ pub struct PrefixDetection {
     pub ignore: PrefixIgnore,
     /// Ignore binary files for prefix replacement (Unix only)
     #[serde(default)]
-    pub ignore_binary_files: bool,
+    pub ignore_binary_files: Value<bool>,
 }
 
 /// Post-processing operations using regex replacements
@@ -218,12 +218,12 @@ pub struct PythonBuild {
 
     /// Use Python.app on macOS for GUI applications
     #[serde(default)]
-    pub use_python_app_entrypoint: bool,
+    pub use_python_app_entrypoint: Value<bool>,
 
     /// Whether the package is Python version independent
     /// This is used for abi3 packages that are not tied to a specific Python version
-    #[serde(default)]
-    pub version_independent: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_independent: Option<Value<bool>>,
 
     /// The relative site-packages path that a Python build exports for other packages to use
     /// This setting only makes sense for the `python` package itself
@@ -238,7 +238,7 @@ impl PartialEq for PythonBuild {
         self.entry_points.len() == other.entry_points.len()
             && self.skip_pyc_compilation == other.skip_pyc_compilation
             && self.use_python_app_entrypoint == other.use_python_app_entrypoint
-            && self.version_independent == other.version_independent
+            && self.version_independent.is_some() == other.version_independent.is_some()
             && self.site_packages_path == other.site_packages_path
     }
 }
@@ -272,7 +272,7 @@ impl Build {
             skip,
             always_copy_files,
             always_include_files,
-            merge_build_and_host_envs: _,
+            merge_build_and_host_envs,
             files,
             dynamic_linking,
             variant,
@@ -314,13 +314,18 @@ impl Build {
         let PythonBuild {
             entry_points,
             skip_pyc_compilation,
-            use_python_app_entrypoint: _,
-            version_independent: _,
+            use_python_app_entrypoint,
+            version_independent,
             site_packages_path,
         } = python;
 
         vars.extend(entry_points.used_variables());
         vars.extend(skip_pyc_compilation.used_variables());
+        vars.extend(use_python_app_entrypoint.used_variables());
+
+        if let Some(version_independent) = version_independent {
+            vars.extend(version_independent.used_variables());
+        }
 
         if let Some(site_packages_path) = site_packages_path {
             vars.extend(site_packages_path.used_variables());
@@ -328,6 +333,7 @@ impl Build {
 
         vars.extend(always_copy_files.used_variables());
         vars.extend(always_include_files.used_variables());
+        vars.extend(merge_build_and_host_envs.used_variables());
         vars.extend(files.used_variables());
 
         // Dynamic linking
@@ -382,7 +388,7 @@ impl Build {
         let PrefixDetection {
             force_file_type,
             ignore,
-            ignore_binary_files: _,
+            ignore_binary_files,
         } = prefix_detection;
 
         let ForceFileType { text, binary } = force_file_type;
@@ -398,6 +404,7 @@ impl Build {
                 vars.extend(list.used_variables());
             }
         }
+        vars.extend(ignore_binary_files.used_variables());
 
         // Post-process
         for pp in post_process {

@@ -20,7 +20,6 @@ build:
     entry_points: []
     skip_pyc_compilation: []
     use_python_app_entrypoint: false
-    version_independent: false
     site_packages_path: null
   skip: []
   always_copy_files: []
@@ -71,7 +70,6 @@ outputs:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      version_independent: false
       site_packages_path: null
     skip: []
     always_copy_files: []
@@ -125,7 +123,6 @@ outputs:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      version_independent: false
       site_packages_path: null
     skip: []
     always_copy_files: []
@@ -180,7 +177,6 @@ outputs:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      version_independent: false
       site_packages_path: null
     skip: []
     always_copy_files: []

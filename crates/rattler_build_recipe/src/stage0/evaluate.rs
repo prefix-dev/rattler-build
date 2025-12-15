@@ -1577,11 +1577,24 @@ impl Evaluate for Stage0PythonBuild {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let skip_pyc_compilation = evaluate_glob_vec_simple(&self.skip_pyc_compilation, context)?;
 
+        // Evaluate version_independent (supports Jinja templates)
+        let version_independent = match &self.version_independent {
+            Some(val) => evaluate_bool_value(val, context, "version_independent")?,
+            None => false,
+        };
+
+        // Evaluate use_python_app_entrypoint (supports Jinja templates)
+        let use_python_app_entrypoint = evaluate_bool_value(
+            &self.use_python_app_entrypoint,
+            context,
+            "use_python_app_entrypoint",
+        )?;
+
         Ok(Stage1PythonBuild {
             entry_points: evaluate_entry_point_list(&self.entry_points, context)?,
             skip_pyc_compilation,
-            use_python_app_entrypoint: self.use_python_app_entrypoint,
-            version_independent: self.version_independent,
+            use_python_app_entrypoint,
+            version_independent,
             site_packages_path: evaluate_optional_string_value(&self.site_packages_path, context)?,
         })
     }
@@ -1662,10 +1675,14 @@ impl Evaluate for Stage0PrefixDetection {
             }
         };
 
+        // Evaluate ignore_binary_files (supports Jinja templates)
+        let ignore_binary_files =
+            evaluate_bool_value(&self.ignore_binary_files, context, "ignore_binary_files")?;
+
         Ok(Stage1PrefixDetection {
             force_file_type: self.force_file_type.evaluate(context)?,
             ignore,
-            ignore_binary_files: self.ignore_binary_files,
+            ignore_binary_files,
         })
     }
 }
@@ -1892,6 +1909,13 @@ impl Evaluate for Stage0Build {
             unreachable!("Value must be either concrete or template")
         };
 
+        // Evaluate merge_build_and_host_envs (supports Jinja templates)
+        let merge_build_and_host_envs = evaluate_bool_value(
+            &self.merge_build_and_host_envs,
+            context,
+            "merge_build_and_host_envs",
+        )?;
+
         Ok(Stage1Build {
             number,
             string,
@@ -1901,7 +1925,7 @@ impl Evaluate for Stage0Build {
             skip,
             always_copy_files,
             always_include_files,
-            merge_build_and_host_envs: self.merge_build_and_host_envs,
+            merge_build_and_host_envs,
             files,
             dynamic_linking,
             variant,

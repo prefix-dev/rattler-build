@@ -328,3 +328,69 @@ fn test_parse_conditional_tests_yaml() {
         _ => panic!("Expected Python test"),
     }
 }
+
+#[test]
+fn test_parse_version_independent_template() {
+    // Load the test data file
+    let yaml = include_str!("../test-data/version_independent_template.yaml");
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    // Check package name
+    assert_eq!(
+        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        "version-independent-test"
+    );
+
+    // Check that version_independent is a template
+    let python_build = &recipe.build.python;
+    assert!(
+        python_build.version_independent.is_some(),
+        "version_independent should be set"
+    );
+
+    let version_independent = python_build.version_independent.as_ref().unwrap();
+    assert!(
+        version_independent.as_template().is_some(),
+        "version_independent should be a Jinja template"
+    );
+
+    let template = version_independent.as_template().unwrap();
+    assert!(
+        template.source().contains("build_abi3"),
+        "Template should contain build_abi3"
+    );
+}
+
+#[test]
+fn test_parse_binary_relocation_template() {
+    // Load the test data file
+    let yaml = include_str!("../test-data/binary_relocation_template.yaml");
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    // Check package name
+    assert_eq!(
+        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        "binary-relocation-test"
+    );
+
+    // Check that binary_relocation is a template
+    use rattler_build_recipe::stage0::BinaryRelocation;
+    match &recipe.build.dynamic_linking.binary_relocation {
+        BinaryRelocation::Boolean(val) => {
+            assert!(
+                val.as_template().is_some(),
+                "binary_relocation should be a Jinja template"
+            );
+            let template = val.as_template().unwrap();
+            assert!(
+                template.source().contains("osx"),
+                "Template should contain 'osx'"
+            );
+        }
+        BinaryRelocation::Patterns(_) => {
+            panic!("Expected Boolean variant with template, not Patterns")
+        }
+    }
+}

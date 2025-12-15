@@ -25,6 +25,7 @@ macro_rules! parse_field {
 /// Parse a boolean value from a YAML scalar node
 ///
 /// Supports: true, True, yes, Yes, false, False, no, No
+#[allow(dead_code)]
 fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
     let scalar = node.as_scalar().ok_or_else(|| {
         ParseError::expected_type("scalar", "non-scalar", get_span(node))
@@ -40,22 +41,83 @@ fn parse_bool(node: &Node, field_name: &str) -> Result<bool, ParseError> {
     })
 }
 
+/// Parse a boolean value that can also be a Jinja template
+///
+/// Supports: true/false literals, or Jinja templates like `${{ false if osx else true }}`
+fn parse_bool_value(node: &Node, field_name: &str) -> Result<Value<bool>, ParseError> {
+    let scalar = node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(node)).with_message(format!(
+            "Expected '{}' to be a boolean or Jinja template",
+            field_name
+        ))
+    })?;
+
+    // First check if it's a plain boolean
+    if let Some(bool_val) = scalar.as_bool() {
+        return Ok(Value::new_concrete(bool_val, Some(*scalar.span())));
+    }
+
+    // Check if it's a Jinja template
+    let str_val = scalar.as_str();
+    if str_val.contains("${{") {
+        let template = crate::stage0::types::JinjaTemplate::new(str_val.to_string())
+            .map_err(|e| ParseError::jinja_error(e, *scalar.span()))?;
+        return Ok(Value::new_template(template, Some(*scalar.span())));
+    }
+
+    // Not a boolean or template - return error
+    Err(ParseError::invalid_value(
+        field_name,
+        format!(
+            "expected boolean ('true', 'false') or Jinja template (${{{{ ... }}}}), got '{}'",
+            str_val
+        ),
+        *scalar.span(),
+    ))
+}
+
 /// Parse a field that can be either a boolean or a list of patterns
 ///
 /// This is used for fields like `binary_relocation` and `prefix_detection.ignore`
 /// that support both `true`/`false` and list of glob patterns.
+/// Also supports Jinja templates like `${{ false if osx else true }}`.
 ///
 /// Returns an enum with either Boolean(Value<bool>) or Patterns(ConditionalList<String>)
 fn parse_bool_or_patterns<T>(
     node: &Node,
-    _field_name: &str,
+    field_name: &str,
     bool_variant: fn(Value<bool>) -> T,
     patterns_variant: fn(crate::stage0::types::ConditionalList<String>) -> T,
 ) -> Result<T, ParseError> {
     // Try to parse as a scalar (boolean or template)
-    if let Some(scalar) = node.as_scalar().and_then(|s| s.as_bool()) {
-        let value = Value::new_concrete(scalar, Some(*node.span()));
-        return Ok(bool_variant(value));
+    if let Some(scalar) = node.as_scalar() {
+        // First check if it's a plain boolean
+        if let Some(bool_val) = scalar.as_bool() {
+            let value = Value::new_concrete(bool_val, Some(*node.span()));
+            return Ok(bool_variant(value));
+        }
+
+        // Check if it's a Jinja template
+        let str_val = scalar.as_str();
+        if str_val.contains("${{") {
+            let template = crate::stage0::types::JinjaTemplate::new(str_val.to_string())
+                .map_err(|e| ParseError::jinja_error(e, *scalar.span()))?;
+            return Ok(bool_variant(Value::new_template(
+                template,
+                Some(*scalar.span()),
+            )));
+        }
+
+        // Not a boolean or template - return error
+        return Err(ParseError::expected_type(
+            "boolean or Jinja template",
+            "string",
+            get_span(node),
+        )
+        .with_message(format!(
+            "Expected '{}' to be a boolean (true/false) or Jinja template (${{{{ ... }}}})",
+            field_name
+        )));
     }
 
     // Try to parse as a list of patterns
@@ -385,7 +447,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             }
             "merge_build_and_host_envs" => {
                 build.merge_build_and_host_envs =
-                    parse_bool(value_node, "merge_build_and_host_envs")?;
+                    parse_bool_value(value_node, "merge_build_and_host_envs")?;
             }
             "files" => {
                 build.files = parse_build_files(value_node)?;
@@ -491,10 +553,11 @@ fn parse_python_build(node: &Node) -> Result<PythonBuild, ParseError> {
             }
             "use_python_app_entrypoint" => {
                 python.use_python_app_entrypoint =
-                    parse_bool(value_node, "use_python_app_entrypoint")?;
+                    parse_bool_value(value_node, "use_python_app_entrypoint")?;
             }
             "version_independent" => {
-                python.version_independent = parse_bool(value_node, "version_independent")?;
+                python.version_independent =
+                    Some(parse_field!("python.version_independent", value_node));
             }
             "site_packages_path" => {
                 python.site_packages_path =
@@ -611,7 +674,7 @@ fn parse_prefix_detection(node: &Node) -> Result<PrefixDetection, ParseError> {
             }
             "ignore_binary_files" => {
                 prefix_detection.ignore_binary_files =
-                    parse_bool(value_node, "ignore_binary_files")?;
+                    parse_bool_value(value_node, "ignore_binary_files")?;
             }
             _ => {
                 return Err(ParseError::invalid_value(

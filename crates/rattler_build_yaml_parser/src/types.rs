@@ -120,6 +120,12 @@ impl<T: fmt::Display> fmt::Display for Value<T> {
     }
 }
 
+impl<T: Default> Default for Value<T> {
+    fn default() -> Self {
+        Self::new_concrete(T::default(), None)
+    }
+}
+
 /// A list or a single item
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListOrItem<T>(Vec<T>);
