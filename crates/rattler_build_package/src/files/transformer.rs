@@ -168,6 +168,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_relativize_symlink() {
         let transformer = FileTransformer::new();
 
