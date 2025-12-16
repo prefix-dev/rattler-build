@@ -333,6 +333,14 @@ impl ParseMapping for MarkedNode {
         })?;
 
         if let Some(node) = mapping.get(field_name) {
+            // Handle null/empty values - in YAML, `field:` with no value or `field: null`
+            // becomes an empty scalar. We treat this as "not present" rather than an error.
+            if let Some(scalar) = node.as_scalar() {
+                let s = scalar.as_str();
+                if s.is_empty() || s == "null" || s == "~" {
+                    return Ok(None);
+                }
+            }
             Ok(Some(node.parse_conditional_list_with(converter)?))
         } else {
             Ok(None)
@@ -375,6 +383,65 @@ mod tests {
         let value: Value<i32> = node.parse_value("val").unwrap();
         assert!(value.is_concrete());
         assert_eq!(value.as_concrete(), Some(&42));
+    }
+
+    #[test]
+    fn test_try_get_conditional_list_null_value() {
+        // Test that `run:` with no value is treated as None
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+requirements:
+  host:
+    - pkg
+  run:
+"#,
+        )
+        .unwrap();
+        let req = yaml.as_mapping().unwrap().get("requirements").unwrap();
+
+        // run: with nothing after it should be treated as None
+        let run: Option<ConditionalList<String>> = req.try_get_conditional_list("run").unwrap();
+        assert!(run.is_none(), "Empty run: should be treated as None");
+
+        // host: with values should work normally
+        let host: Option<ConditionalList<String>> = req.try_get_conditional_list("host").unwrap();
+        assert!(host.is_some());
+        assert_eq!(host.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_try_get_conditional_list_explicit_null() {
+        // Test that `run: null` is treated as None
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+requirements:
+  run: null
+"#,
+        )
+        .unwrap();
+        let req = yaml.as_mapping().unwrap().get("requirements").unwrap();
+
+        let run: Option<ConditionalList<String>> = req.try_get_conditional_list("run").unwrap();
+        assert!(run.is_none(), "run: null should be treated as None");
+    }
+
+    #[test]
+    fn test_try_get_conditional_list_tilde_null() {
+        // Test that `run: ~` (YAML null syntax) is treated as None
+        let yaml = marked_yaml::parse_yaml(
+            0,
+            r#"
+requirements:
+  run: ~
+"#,
+        )
+        .unwrap();
+        let req = yaml.as_mapping().unwrap().get("requirements").unwrap();
+
+        let run: Option<ConditionalList<String>> = req.try_get_conditional_list("run").unwrap();
+        assert!(run.is_none(), "run: ~ should be treated as None");
     }
 
     #[test]

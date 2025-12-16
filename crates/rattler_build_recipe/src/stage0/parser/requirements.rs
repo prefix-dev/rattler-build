@@ -210,6 +210,41 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_requirements_with_empty_run() {
+        // Test that `run:` with no value is treated as empty, not as an error
+        // This is a common pattern in recipes where run dependencies are optional
+        let yaml_str = r#"
+  host:
+    - m2-conda-epoch =20250515
+  run:"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        let reqs = parse_requirements(&yaml).unwrap();
+
+        assert_eq!(reqs.host.len(), 1);
+        assert!(
+            reqs.run.is_empty(),
+            "Empty run: should be treated as empty list"
+        );
+    }
+
+    #[test]
+    fn test_parse_requirements_with_null_run() {
+        // Test that `run: null` is treated as empty
+        let yaml_str = r#"
+  host:
+    - pkg
+  run: null"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        let reqs = parse_requirements(&yaml).unwrap();
+
+        assert_eq!(reqs.host.len(), 1);
+        assert!(
+            reqs.run.is_empty(),
+            "run: null should be treated as empty list"
+        );
+    }
+
+    #[test]
     fn test_parse_requirements_with_build() {
         let yaml_str = r#"
   build:
