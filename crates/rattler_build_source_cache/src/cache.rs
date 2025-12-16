@@ -589,7 +589,7 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
             CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
         })?;
     } else if name.ends_with(".tar.xz") || name.ends_with(".txz") {
-        let mut archive = tar::Archive::new(xz2::read::XzDecoder::new(file));
+        let mut archive = tar::Archive::new(lzma_rust2::XzReader::new(file, true));
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.xz: {}", e)))?;

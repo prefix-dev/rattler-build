@@ -97,7 +97,6 @@ urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.0"
 windows-sys = "0.59"
-xz2 = "0.1.7"
 zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 spdx = "0.12.0"
@@ -106,6 +105,7 @@ marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.10.6" }
+lzma-rust2 = { version = "0.15", features = ["xz"] }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3']
@@ -211,14 +211,6 @@ clap_complete = "4.5.61"
 clap_complete_nushell = "4.5.10"
 tokio-util = { version = "0.7.17", features = ["codec", "compat"] }
 
-
-tar = { workspace = true }
-zip = { workspace = true }
-bzip2 = "0.6.1"
-base64 = "0.22.1"
-flate2 = { workspace = true }
-lzma-rust2 = { version = "0.15", features = ["xz"] }
-zstd = "0.13.3"
 toml = { workspace = true }
 memmap2 = "0.9.9"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
