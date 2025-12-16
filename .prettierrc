@@ -1,0 +1,7 @@
+{
+  "printWidth": 100,
+  "bracketSpacing": false,
+  "tabWidth": 2,
+  "singleQuote": false,
+  "proseWrap": "preserve"
+}

@@ -2,6 +2,7 @@ lefthook: pixi run --no-progress lefthook
 
 templates:
   run: run --quiet --no-progress --environment=lint
+  run-py: run --quiet --no-progress --manifest-path py-rattler-build/pixi.toml --environment lint
 
 colors: true
 
@@ -48,20 +49,22 @@ pre-commit:
       exclude:
         - schema/examples/invalid/*.toml
       run: pixi {run} toml-format {staged_files}
-    - name: dprint
+    - name: prettier
       glob: "*.{yaml,yml}"
-      exclude:
-        - test-data/recipes/test-parsing/*.yaml
-        - test-data/conda-forge/**/*
-        # ignore them all because we need exact matches with newline at end etc.
-        - test-data/recipes/test-rendering/*
       group:
         jobs:
-          - name: dprint check
-            run: pixi {run} dprint-check {staged_files}
-          - name: dprint fmt
-            run: pixi {run} dprint-fmt {staged_files}
+          - name: prettier check
+            run: pixi {run} prettier-check {staged_files}
+          - name: prettier fmt
+            run: pixi {run} prettier-fmt {staged_files}
             stage_fixed: true
+    - name: py-rattler-build-cargo-fmt
+      glob: "py-rattler-build/rust/**/*.rs"
+      stage_fixed: true
+      run: pixi {run-py} fmt-rust
+    - name: py-rattler-build-ruff
+      glob: "py-rattler-build/**/*.{py,pyi}"
+      run: pixi {run-py} lint-python
     - name: nbstripout
       glob: "*.ipynb"
       stage_fixed: true
@@ -75,3 +78,6 @@ pre-push:
     - name: cargo-clippy
       glob: "*.rs"
       run: pixi {run} cargo-clippy
+    - name: py-rattler-build-cargo-clippy
+      glob: "py-rattler-build/rust/**/*.rs"
+      run: pixi {run-py} lint-rust

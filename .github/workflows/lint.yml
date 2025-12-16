@@ -30,3 +30,9 @@ jobs:
           cache: true
       - name: lint (if this step fails, please 'pixi run lint' locally and push the changes)
         run: pixi run lint
+      - name: Check for uncommitted changes
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Formatting changes detected! Run 'pixi run lint' locally and commit the changes."
+            exit 1
+          fi
