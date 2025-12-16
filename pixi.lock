@@ -1197,7 +1197,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/keyutils-1.6.3-hb9d3cd8_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/krb5-1.21.3-h659f571_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/ld_impl_linux-64-2.45-default_hbd61a6d_104.conda
-      - conda: https://prefix.dev/conda-forge/linux-64/lefthook-1.13.6-hfc2019e_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libclang-cpp18.1-18.1.8-default_h99862b1_16.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libcurl-8.10.1-hbbe4b11_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libedit-3.1.20250104-pl5321h7949ede_0.conda
@@ -1335,7 +1334,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-64/krb5-1.21.3-h37d8d59_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/ld64-609-ha91a046_15.conda
       - conda: https://prefix.dev/conda-forge/osx-64/ld64_osx-64-609-h0fd476b_15.conda
-      - conda: https://prefix.dev/conda-forge/osx-64/lefthook-1.13.6-hccc6df8_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/libclang-cpp15-15.0.7-default_h7151d67_5.conda
       - conda: https://prefix.dev/conda-forge/osx-64/libcurl-8.10.1-h58e7537_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/libcxx-21.1.7-h3d58e20_0.conda
@@ -1467,7 +1465,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/krb5-1.21.3-h237132a_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/ld64-609-h89fa09d_15.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/ld64_osx-arm64-609-hc4dc95b_15.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/lefthook-1.13.6-h820172f_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/libclang-cpp15-15.0.7-default_he012953_5.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/libcurl-8.10.1-h13a7ad3_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/libcxx-21.1.7-hf598326_0.conda
@@ -1584,7 +1581,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/noarch/jsonschema-specifications-2025.9.1-pyhcf101f3_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/jupyter_core-5.9.1-pyh6dadd2b_0.conda
       - conda: https://prefix.dev/conda-forge/win-64/krb5-1.21.3-hdf4eb48_0.conda
-      - conda: https://prefix.dev/conda-forge/win-64/lefthook-1.13.6-h11686cb_0.conda
       - conda: https://prefix.dev/conda-forge/win-64/libcurl-8.10.1-h1ee3ff0_0.conda
       - conda: https://prefix.dev/conda-forge/win-64/libexpat-2.7.3-hac47afa_0.conda
       - conda: https://prefix.dev/conda-forge/win-64/libffi-3.5.2-h52bdfb6_0.conda
@@ -1660,6 +1656,20 @@ environments:
       - conda: https://prefix.dev/conda-forge/win-64/yaml-0.2.5-h6a83c73_3.conda
       - conda: https://prefix.dev/conda-forge/win-64/zstandard-0.25.0-py312he5662c2_1.conda
       - conda: https://prefix.dev/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
+  pre-commit:
+    channels:
+    - url: https://prefix.dev/conda-forge/
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
+    packages:
+      linux-64:
+      - conda: https://prefix.dev/conda-forge/linux-64/lefthook-1.13.6-hfc2019e_0.conda
+      osx-64:
+      - conda: https://prefix.dev/conda-forge/osx-64/lefthook-1.13.6-hccc6df8_0.conda
+      osx-arm64:
+      - conda: https://prefix.dev/conda-forge/osx-arm64/lefthook-1.13.6-h820172f_0.conda
+      win-64:
+      - conda: https://prefix.dev/conda-forge/win-64/lefthook-1.13.6-h11686cb_0.conda
 packages:
 - conda: https://prefix.dev/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
   sha256: fe51de6107f9edc7aa4f786a70f4a883943bc9d39b3bb7307c04c41410990726

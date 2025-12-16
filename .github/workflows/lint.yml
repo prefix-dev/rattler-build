@@ -26,13 +26,13 @@ jobs:
       - name: Set up pixi
         uses: prefix-dev/setup-pixi@v0.9.3
         with:
-          environments: lint
+          environments: pre-commit lint
           cache: true
-      - name: lint (if this step fails, please 'pixi run lint' locally and push the changes)
-        run: pixi run lint
+      - name: lint (if this step fails, please 'pixi run -e pre-commit lint' locally and push the changes)
+        run: pixi run -e pre-commit lint
       - name: Check for uncommitted changes
         run: |
           if ! git diff --exit-code; then
-            echo "::error::Formatting changes detected! Run 'pixi run lint' locally and commit the changes."
+            echo "::error::Formatting changes detected! Run 'pixi run -e pre-commit lint' locally and commit the changes."
             exit 1
           fi

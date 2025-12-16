@@ -71,7 +71,6 @@ boto3 = "*"
 actionlint = ">=1.7.4,<2"
 cargo-deny = ">=0.18.3,<0.19"
 prettier = ">=3.7.0,<4"
-lefthook = ">=1.12.2,<2"
 ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
@@ -85,6 +84,17 @@ cargo-deny = "cargo deny --workspace check license --deny warnings"
 cargo-fmt = "cargo fmt"
 prettier-check = { cmd = "prettier --check", description = "Check YAML formatting with prettier" }
 prettier-fmt = { cmd = "prettier --write", description = "Format YAML with prettier" }
+nbstripout = "nbstripout"
+ruff-format = "ruff format --force-exclude"
+ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
+toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
+toml-lint = "taplo lint --verbose **/pixi.toml"
+typos = "typos --force-exclude"
+
+[feature.pre-commit.dependencies]
+lefthook = ">=1.12.2,<2"
+
+[feature.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
 lint = { depends-on = [
   "lint-fast",
@@ -92,14 +102,8 @@ lint = { depends-on = [
 ], description = "Run all linters and formatters on all code" }
 lint-fast = { cmd = "lefthook run pre-commit --all-files --force", description = "Run all fast linters and formatters on all code (no clippy)" }
 lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "Run all slow linters and formatters on all code" }
-nbstripout = "nbstripout"
 pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
-ruff-format = "ruff format --force-exclude"
-ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
-toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
-toml-lint = "taplo lint --verbose **/pixi.toml"
-typos = "typos --force-exclude"
 
 [feature.dev.dependencies]
 tbump = "*"
@@ -147,6 +151,7 @@ default = { features = [
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
+pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 
 # pixi build
