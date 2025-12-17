@@ -3,6 +3,8 @@ import json
 import os
 import platform
 import re
+import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,8 +15,6 @@ import boto3
 import pytest
 import requests
 import yaml
-import subprocess
-import shutil
 from helpers import (
     RattlerBuild,
     check_build_output,
@@ -171,6 +171,64 @@ def test_render_only_with_solve_does_not_download_packages(
         if isinstance(build, dict):
             resolved_len = len(build.get("resolved", []))
     assert resolved_len >= 1
+
+
+def test_render_only_ignores_nonexistent_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only ignores --output-dir even if it doesn't exist.
+
+    When using --render-only, no output files are produced, so the output
+    directory should not be required to be writable.
+    """
+    # Create a file and try to use a subdirectory of it as output-dir
+    # This path cannot be created because the parent is a file, not a directory
+    blocking_file = tmp_path / "blocking_file"
+    blocking_file.write_text("I am a file, not a directory")
+    invalid_output_dir = blocking_file / "subdir"
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipes / "toml"),
+        "--output-dir",
+        str(invalid_output_dir),
+        "--render-only",
+        need_result_object=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, f"render-only failed: {result.stderr}"
+
+
+def test_render_only_does_not_create_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only does not create the output directory.
+
+    Even when the output directory path is writable, --render-only should
+    not create it since no output files are produced.
+    """
+    output_dir = tmp_path / "should" / "not" / "be" / "created"
+    assert not output_dir.exists()
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipes / "toml"),
+        "--output-dir",
+        str(output_dir),
+        "--render-only",
+        need_result_object=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert not output_dir.exists(), (
+        "output directory should not be created with --render-only"
+    )
+    assert result.returncode == 0, f"render-only failed: {result.stderr}"
 
 
 def test_run_exports(
