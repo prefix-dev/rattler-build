@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ x86_64-macos, arm64-macos ]
+install-name:    '/usr/lib/libSystem.B.dylib'
+current-version: 1351
+exports:
+  - targets:         [ x86_64-macos, arm64-macos ]
+    symbols:         [ _mach_init_routine ]

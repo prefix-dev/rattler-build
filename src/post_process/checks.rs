@@ -17,6 +17,8 @@ use crate::{
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
+use text_stub_library::TbdVersionedRecord;
+use walkdir::WalkDir;
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -146,6 +148,46 @@ fn resolved_run_dependencies(
         .collect()
 }
 
+/// Extract install names from .tbd files in the given sysroot directory.
+/// This parses the text-based stub files that macOS SDKs use to represent
+/// dynamic libraries, extracting the actual runtime library paths.
+fn extract_tbd_install_names(sysroot: &Path) -> Vec<String> {
+    let mut install_names = Vec::new();
+
+    for entry in WalkDir::new(sysroot)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "tbd"))
+    {
+        let Ok(content) = std::fs::read_to_string(entry.path()) else {
+            continue;
+        };
+
+        let Ok(records) = text_stub_library::parse_str(&content) else {
+            tracing::warn!(
+                "Failed to parse .tbd file at {}",
+                entry.path().display()
+            );
+            continue;
+        };
+
+        for record in records {
+            let install_name = match &record {
+                TbdVersionedRecord::V1(r) => &r.install_name,
+                TbdVersionedRecord::V2(r) => &r.install_name,
+                TbdVersionedRecord::V3(r) => &r.install_name,
+                TbdVersionedRecord::V4(r) => &r.install_name,
+            };
+
+            if !install_name.is_empty() {
+                install_names.push(install_name.clone());
+            }
+        }
+    }
+
+    install_names
+}
+
 /// Returns the system libraries found in sysroot.
 fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
     let mut system_libs = GlobSetBuilder::new();
@@ -159,15 +201,28 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             "/System/Library/Frameworks/*.framework/*",
         ];
 
+        // Always include the default sysroot paths as a fallback
+        for v in default_sysroot {
+            system_libs.add(Glob::new(v)?);
+        }
+
+        // If CONDA_BUILD_SYSROOT is set, parse .tbd files to extract install names
+        // This matches conda-build's behavior of reading the actual runtime library
+        // paths from the SDK's text-based stub files
         if let Some(sysroot) = output
             .build_configuration
             .variant
             .get(&"CONDA_BUILD_SYSROOT".into())
         {
-            system_libs.add(Glob::new(&format!("{}/**/*", sysroot))?);
-        } else {
-            for v in default_sysroot {
-                system_libs.add(Glob::new(v)?);
+            let sysroot_str = sysroot.to_string();
+            let sysroot_path = Path::new(&sysroot_str);
+            if sysroot_path.exists() {
+                let install_names = extract_tbd_install_names(sysroot_path);
+                for name in install_names {
+                    // The install names are exact paths like "/usr/lib/libSystem.B.dylib"
+                    // We add them directly as they represent the actual runtime library paths
+                    system_libs.add(Glob::new(&name)?);
+                }
             }
         }
 
@@ -397,4 +452,41 @@ pub fn perform_linking_checks(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_tbd_install_names() {
+        let test_sysroot = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/tbd_files");
+
+        let install_names = extract_tbd_install_names(&test_sysroot);
+
+        // Should extract install names from both .tbd files
+        assert!(
+            install_names.contains(&"/usr/lib/libSystem.B.dylib".to_string()),
+            "Should contain libSystem.B.dylib, got: {:?}",
+            install_names
+        );
+        assert!(
+            install_names.contains(&"/usr/lib/libz.1.dylib".to_string()),
+            "Should contain libz.1.dylib, got: {:?}",
+            install_names
+        );
+    }
+
+    #[test]
+    fn test_extract_tbd_install_names_empty_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let install_names = extract_tbd_install_names(temp_dir.path());
+        assert!(install_names.is_empty());
+    }
+
+    #[test]
+    fn test_extract_tbd_install_names_nonexistent_dir() {
+        let install_names = extract_tbd_install_names(Path::new("/nonexistent/path"));
+        assert!(install_names.is_empty());
+    }
 }

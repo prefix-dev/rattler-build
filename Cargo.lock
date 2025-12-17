@@ -3198,6 +3198,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "834e592123b39b7b3ba3fdc4b7e4822fad3ced449010f8229f843fe6dd1a33f1"
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4432,6 +4438,7 @@ dependencies = [
  "tar",
  "tempfile",
  "terminal_size",
+ "text-stub-library",
  "thiserror 2.0.17",
  "throbber-widgets-tui",
  "tokio",
@@ -6237,6 +6244,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "text-stub-library"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48070939e80c2662b5dd403a0b09cb97e8467a248d67e373e23f85dbdacd882"
+dependencies = [
+ "serde",
+ "serde_yaml",
+ "yaml-rust",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7634,6 +7652,15 @@ name = "xmlparser"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
+
+[[package]]
+name = "yaml-rust"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
+dependencies = [
+ "linked-hash-map",
+]
 
 [[package]]
 name = "yaml-rust2"
