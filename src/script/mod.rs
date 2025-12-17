@@ -729,6 +729,39 @@ mod tests {
         }
     }
 
+    /// Test that when interpreter is explicitly set to "cmd", error level checks
+    /// are injected regardless of the build platform. This is important for
+    /// cross-platform builds where Windows packages may be built on Linux.
+    #[test]
+    fn test_cmd_errorlevel_injected_with_explicit_interpreter() {
+        use crate::recipe::parser::{Script, ScriptContent};
+        let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
+        let script = Script {
+            content: ScriptContent::Commands(commands.clone()),
+            // Explicitly set interpreter to "cmd" - this should trigger error level injection
+            // on ALL platforms, not just Windows
+            interpreter: Some("cmd".to_string()),
+            env: IndexMap::new(),
+            secrets: Vec::new(),
+            cwd: None,
+        };
+
+        let recipe_dir = std::path::Path::new(".");
+        let extensions = &["bat"];
+
+        let resolved = script
+            .resolve_content(recipe_dir, None, extensions)
+            .unwrap();
+
+        // With explicit interpreter="cmd", error level checks should ALWAYS be injected,
+        // regardless of the build platform (cfg!(windows))
+        let expected = "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\necho World\nif %errorlevel% neq 0 exit /b %errorlevel%";
+        match resolved {
+            ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
+            _ => panic!("Expected Inline variant"),
+        }
+    }
+
     #[test]
     fn test_crlf_normalizer_no_crlf() {
         let mut normalizer = CrLfNormalizer::default();
