@@ -543,6 +543,7 @@ pub async fn get_build_output(
                     build_data.no_build_id,
                     &timestamp,
                     recipe.build().merge_build_and_host_envs,
+                    !build_data.render_only, // create_directories
                 )
                 .into_diagnostic()?,
                 channels,

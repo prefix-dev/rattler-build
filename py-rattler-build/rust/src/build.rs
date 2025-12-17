@@ -198,6 +198,7 @@ pub fn build_rendered_variant_py(
                 no_build_id,
                 &timestamp,
                 false, // merge_build_and_host_envs - we can infer from recipe if needed
+                true,  // create_directories
             )
             .map_err(|e| RattlerBuildError::Other(format!("Directory setup error: {}", e)))?,
             channels: channels_urls.clone(),

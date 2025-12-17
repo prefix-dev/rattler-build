@@ -54,6 +54,9 @@ fn get_build_dir(
 
 impl Directories {
     /// Create all directories needed for the building of a package
+    ///
+    /// When `create_directories` is false, no directories are created on the filesystem.
+    /// This is useful for rendering recipes without producing any output files.
     pub fn setup(
         name: &str,
         recipe_path: &Path,
@@ -61,11 +64,16 @@ impl Directories {
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
         merge_build_and_host: bool,
+        create_directories: bool,
     ) -> Result<Directories, std::io::Error> {
-        if !output_dir.exists() {
-            fs::create_dir_all(output_dir)?;
-        }
-        let output_dir = canonicalize(output_dir)?;
+        let output_dir = if create_directories {
+            if !output_dir.exists() {
+                fs::create_dir_all(output_dir)?;
+            }
+            canonicalize(output_dir)?
+        } else {
+            output_dir.to_path_buf()
+        };
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
@@ -227,6 +235,7 @@ mod tests {
             false,
             &chrono::Utc::now(),
             false,
+            true, // create_directories
         )
         .unwrap();
         directories.create_build_dir(false).unwrap();
