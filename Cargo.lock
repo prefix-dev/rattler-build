@@ -2096,6 +2096,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "flickzeug"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76884df95026be09b84d9fc84294364198f2ec4d6a9e28ebebb32616e84b7f6e"
+dependencies = [
+ "nu-ansi-term",
+ "strsim",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "float-cmp"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2938,12 +2949,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5c943d4415edd8153251b6f197de5eb1640e56d84e8d9159bea190421c73698"
 dependencies = [
  "console 0.15.11",
- "globset",
  "once_cell",
  "regex",
  "serde",
  "similar",
- "walkdir",
 ]
 
 [[package]]
@@ -4365,6 +4374,7 @@ dependencies = [
  "crossterm 0.28.1",
  "dialoguer",
  "dunce",
+ "flickzeug",
  "fs-err",
  "futures",
  "globset",
@@ -4389,7 +4399,6 @@ dependencies = [
  "ratatui",
  "rattler",
  "rattler_build_allocator",
- "rattler_build_diffy",
  "rattler_build_jinja",
  "rattler_build_networking",
  "rattler_build_recipe",
@@ -4460,18 +4469,6 @@ version = "0.1.0"
 dependencies = [
  "mimalloc",
  "tikv-jemallocator",
-]
-
-[[package]]
-name = "rattler_build_diffy"
-version = "0.4.2"
-dependencies = [
- "fs-err",
- "insta",
- "nu-ansi-term",
- "rstest",
- "strsim",
- "thiserror 2.0.17",
 ]
 
 [[package]]

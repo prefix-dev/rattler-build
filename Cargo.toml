@@ -23,7 +23,6 @@ members = [
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
   "crates/rattler_build_script",
-  "crates/rattler_build_diffy",
   "crates/rattler_build_yaml_parser",
   "crates/rattler_build_allocator",
   "crates/rattler_build_package",
@@ -210,7 +209,7 @@ which = "8.0.0"
 clap_complete = "4.5.61"
 clap_complete_nushell = "4.5.10"
 tokio-util = { version = "0.7.17", features = ["codec", "compat"] }
-
+flickzeug = { version = "0.4.3" }
 toml = { workspace = true }
 memmap2 = "0.9.9"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
@@ -284,7 +283,6 @@ rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
   "variant-config",
 ] }
 rattler_git = { path = "crates/rattler_git" }
-rattler_build_diffy = { path = "crates/rattler_build_diffy" }
 rattler_build_networking = { path = "crates/rattler_build_networking", features = [
   "middleware",
 ] }

@@ -5,7 +5,7 @@
 use fs_err as fs;
 use globset::{Glob, GlobSet};
 use miette::Diagnostic;
-use rattler_build_diffy::DiffOptions;
+use flickzeug::DiffOptions;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::ErrorKind;
@@ -516,13 +516,13 @@ fn process_modified_files(
                                 path_to_patch_format(&patch_path)
                             ))
                             .create_patch(&original_content, &modified_content);
-                        let formatted = rattler_build_diffy::PatchFormatter::new()
+                        let formatted = flickzeug::PatchFormatter::new()
                             .fmt_patch(&patch)
                             .to_string();
                         patch_content.push_str(&formatted);
                         tracing::info!(
                             "{}",
-                            rattler_build_diffy::PatchFormatter::new()
+                            flickzeug::PatchFormatter::new()
                                 .with_color()
                                 .fmt_patch(&patch)
                         );
@@ -544,7 +544,7 @@ fn process_modified_files(
                         .set_original_filename("/dev/null")
                         .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                         .create_patch("", &modified_content);
-                    let formatted = rattler_build_diffy::PatchFormatter::new()
+                    let formatted = flickzeug::PatchFormatter::new()
                         .fmt_patch(&patch)
                         .to_string();
                     patch_content.push_str(&formatted);
@@ -554,7 +554,7 @@ fn process_modified_files(
                     );
                     tracing::info!(
                         "{}",
-                        rattler_build_diffy::PatchFormatter::new()
+                        flickzeug::PatchFormatter::new()
                             .with_color()
                             .fmt_patch(&patch)
                     );
@@ -612,7 +612,7 @@ fn process_deleted_files(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch("", "");
-                let formatted = rattler_build_diffy::PatchFormatter::new()
+                let formatted = flickzeug::PatchFormatter::new()
                     .fmt_patch(&patch)
                     .to_string();
                 patch_content.push_str(&formatted);
@@ -628,13 +628,13 @@ fn process_deleted_files(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch(&original_content, "");
-                let formatted = rattler_build_diffy::PatchFormatter::new()
+                let formatted = flickzeug::PatchFormatter::new()
                     .fmt_patch(&patch)
                     .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    rattler_build_diffy::PatchFormatter::new()
+                    flickzeug::PatchFormatter::new()
                         .with_color()
                         .fmt_patch(&patch)
                 );

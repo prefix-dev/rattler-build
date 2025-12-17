@@ -12,7 +12,7 @@ use std::{
 
 use fs_err::File;
 use itertools::Itertools;
-use rattler_build_diffy::{
+use flickzeug::{
     ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
     Patch, apply_bytes_with_config, patch_from_bytes_with_config,
 };
@@ -96,6 +96,7 @@ fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError> {
         input,
         ParserConfig {
             hunk_strategy: HunkRangeStrategy::Recount,
+            skip_order_check: true,
         },
     )
 }
