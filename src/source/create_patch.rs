@@ -2,10 +2,10 @@
 //! We take all files found in this directory and compare them to the original files
 //! from the source cache. Any differences will be written to a patch file.
 
+use flickzeug::DiffOptions;
 use fs_err as fs;
 use globset::{Glob, GlobSet};
 use miette::Diagnostic;
-use flickzeug::DiffOptions;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::ErrorKind;

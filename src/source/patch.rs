@@ -10,12 +10,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use fs_err::File;
-use itertools::Itertools;
 use flickzeug::{
     ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
     Patch, apply_bytes_with_config, patch_from_bytes_with_config,
 };
+use fs_err::File;
+use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
