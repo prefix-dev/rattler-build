@@ -536,15 +536,16 @@ pub async fn get_build_output(
                 .into_diagnostic()?,
                 hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
-                directories: Directories::setup(
+                directories: Directories::builder(
                     &build_name,
                     recipe_path,
                     &output_dir,
-                    build_data.no_build_id,
                     &timestamp,
-                    recipe.build().merge_build_and_host_envs,
-                    !build_data.render_only, // create_directories
                 )
+                .no_build_id(build_data.no_build_id)
+                .merge_build_and_host(recipe.build().merge_build_and_host_envs)
+                .skip_directory_creation(build_data.render_only)
+                .build()
                 .into_diagnostic()?,
                 channels,
                 channel_priority: tool_config.channel_priority,
