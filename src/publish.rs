@@ -584,6 +584,7 @@ async fn upload_to_prefix(
         attestation,
         SkipExisting(false),
         ForceOverwrite(publish_data.force),
+        false, // store_github_attestation
     );
 
     // Upload packages

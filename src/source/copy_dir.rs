@@ -739,4 +739,73 @@ mod test {
                 .exists()
         );
     }
+
+    /// Test that `.condapackageignore` with `*` inside a directory ignores all contents.
+    /// This is useful for excluding output directories when using `path: ../` in source configs.
+    #[test]
+    fn test_condapackageignore_ignores_directory_contents() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src_dir = tmp_dir.path().join("source");
+
+        // Create directory structure:
+        // source/
+        //   regular_file.txt
+        //   included_dir/
+        //     included.txt
+        //   ignored_dir/
+        //     .condapackageignore  <- contains "*" to ignore all contents
+        //     should_be_ignored.txt
+        //     nested/
+        //       also_ignored.txt
+
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("regular_file.txt"), "content").unwrap();
+
+        let included_dir = src_dir.join("included_dir");
+        fs::create_dir_all(&included_dir).unwrap();
+        fs::write(included_dir.join("included.txt"), "content").unwrap();
+
+        let ignored_dir = src_dir.join("ignored_dir");
+        fs::create_dir_all(&ignored_dir).unwrap();
+        // Create .condapackageignore with "*" to ignore all contents in this directory
+        fs::write(ignored_dir.join(".condapackageignore"), "*\n").unwrap();
+        fs::write(ignored_dir.join("should_be_ignored.txt"), "content").unwrap();
+
+        let nested_ignored = ignored_dir.join("nested");
+        fs::create_dir_all(&nested_ignored).unwrap();
+        fs::write(nested_ignored.join("also_ignored.txt"), "content").unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+        let copy_result = super::CopyDir::new(&src_dir, dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        // Should have copied regular_file.txt and included_dir/included.txt
+        assert!(dest_dir.path().join("regular_file.txt").exists());
+        assert!(dest_dir.path().join("included_dir/included.txt").exists());
+
+        // Should NOT have copied anything from ignored_dir (including the dir itself)
+        assert!(!dest_dir.path().join("ignored_dir").exists());
+        assert!(
+            !dest_dir
+                .path()
+                .join("ignored_dir/should_be_ignored.txt")
+                .exists()
+        );
+        assert!(
+            !dest_dir
+                .path()
+                .join("ignored_dir/nested/also_ignored.txt")
+                .exists()
+        );
+
+        // Verify the copied paths don't include the ignored directory
+        let copied_paths: HashSet<_> = copy_result.copied_paths().iter().collect();
+        assert!(
+            copied_paths
+                .iter()
+                .all(|p| !p.to_string_lossy().contains("ignored_dir"))
+        );
+    }
 }
