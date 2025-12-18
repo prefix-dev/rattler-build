@@ -86,16 +86,6 @@ pub(crate) fn write_test_files(
                 command_test.script.cwd = Some(cwd);
             }
 
-            // For Windows targets, ensure the interpreter is set to "cmd" so that
-            // error level checks are injected. This is necessary because the default
-            // interpreter detection uses cfg!(windows) which is a compile-time check,
-            // and we may be building Windows packages on a non-Windows host.
-            if output.build_configuration.target_platform.is_windows()
-                && command_test.script.interpreter.is_none()
-            {
-                command_test.script.interpreter = Some("cmd".to_string());
-            }
-
             // Try to render the script contents here
             // Note: we want to improve this with better rendering in the future
             let contents = command_test.script.resolve_content(

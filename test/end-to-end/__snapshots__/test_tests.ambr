@@ -15,3 +15,20 @@
   
   '''
 # ---
+# name: test_win_errorlevel_injection
+  '''
+  - script:
+      interpreter: cmd
+      content: |-
+        echo "This test is designed to fail."
+        if %errorlevel% neq 0 exit /b %errorlevel%
+        python.exe -c "import sys; sys.exit(1)"
+        if %errorlevel% neq 0 exit /b %errorlevel%
+        echo "This line will not be executed."
+        if %errorlevel% neq 0 exit /b %errorlevel%
+    requirements:
+      run:
+      - python
+  
+  '''
+# ---
