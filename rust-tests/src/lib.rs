@@ -248,7 +248,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     fn get_package(folder: impl AsRef<Path>, mut glob_str: String) -> PathBuf {

@@ -653,6 +653,7 @@ fn upload_package_to_prefix_py(
         attestation,
         UploadSkipExisting(skip_existing),
         ForceOverwrite(force),
+        false, // store_github_attestation
     );
 
     run_async_task(async {
