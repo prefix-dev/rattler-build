@@ -191,14 +191,14 @@ pub fn build_rendered_variant_py(
             .map_err(|e| RattlerBuildError::Other(format!("Platform detection error: {}", e)))?,
             hash: hash_info,
             variant,
-            directories: Directories::setup(
+            directories: Directories::builder(
                 &build_name,
                 &safe_recipe_path,
                 &output_dir,
-                no_build_id,
                 &timestamp,
-                false, // merge_build_and_host_envs - we can infer from recipe if needed
             )
+            .no_build_id(no_build_id)
+            .build()
             .map_err(|e| RattlerBuildError::Other(format!("Directory setup error: {}", e)))?,
             channels: channels_urls.clone(),
             channel_priority: tool_config.channel_priority,
