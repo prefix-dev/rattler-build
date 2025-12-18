@@ -329,11 +329,6 @@ pub(crate) fn apply_patches(
     recipe_dir: &Path,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<(), SourceError> {
-    // Early out to avoid unnecessary work
-    if patches.is_empty() {
-        return Ok(());
-    }
-
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
 
