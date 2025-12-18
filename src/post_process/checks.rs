@@ -185,49 +185,54 @@ fn extract_tbd_install_names(sysroot: &Path) -> Vec<String> {
     install_names
 }
 
-/// Returns the system libraries found in sysroot.
-fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
-    let mut system_libs = GlobSetBuilder::new();
-    if output.build_configuration.target_platform.is_osx() {
-        // Match conda-build behavior: allow any library found in sysroot directories
-        // See: https://github.com/conda/conda-build/blob/61e9bb24588d8b353321c11de5452d57aa2f85ca/conda_build/post.py#L1371-L1384
-        let default_sysroot = vec![
-            "/usr/lib/**/*",
-            "/opt/X11/**/*.dylib",
-            // e.g. /System/Library/Frameworks/AGL.framework/*
-            "/System/Library/Frameworks/*.framework/*",
-        ];
-
-        // If CONDA_BUILD_SYSROOT is set, parse .tbd files to extract install names
-        // This matches conda-build's behavior of reading the actual runtime library
-        // paths from the SDK's text-based stub files
-        if let Some(sysroot) = output
-            .build_configuration
-            .variant
-            .get(&"CONDA_BUILD_SYSROOT".into())
-        {
-            let sysroot_str = sysroot.to_string();
-            let sysroot_path = Path::new(&sysroot_str);
-            if sysroot_path.exists() {
-                let install_names = extract_tbd_install_names(sysroot_path);
-                for name in install_names {
-                    // The install names are exact paths like "/usr/lib/libSystem.B.dylib"
-                    // We add them directly as they represent the actual runtime library paths
-                    system_libs.add(Glob::new(&name)?);
-                }
+fn add_osx_system_libs(
+    output: &Output,
+    system_libs: &mut GlobSetBuilder,
+) -> Result<(), globset::Error> {
+    // If CONDA_BUILD_SYSROOT is set, parse .tbd files to extract install names.
+    // This matches conda-build's behavior of reading actual runtime library
+    // paths from the SDK's text-based stub files.
+    if let Some(sysroot) = output
+        .build_configuration
+        .variant
+        .get(&"CONDA_BUILD_SYSROOT".into())
+    {
+        let sysroot_path = PathBuf::from(sysroot.to_string());
+        if sysroot_path.exists() {
+            for name in extract_tbd_install_names(&sysroot_path) {
+                system_libs.add(Glob::new(&name)?);
             }
+            return Ok(());
         }
-
-        return system_libs.build();
     }
 
-    if output.build_configuration.target_platform.is_windows() {
-        for v in WIN_ALLOWLIST {
-            system_libs.add(Glob::new(v)?);
-        }
-        return system_libs.build();
+    // Fallback: match conda-build behavior - allow any library in sysroot directories
+    // https://github.com/conda/conda-build/blob/61e9bb24588d8b353321c11de5452d57aa2f85ca/conda_build/post.py#L1371-L1384
+    const DEFAULT_SYSROOT_PATTERNS: &[&str] = &[
+        "/usr/lib/**/*",
+        "/opt/X11/**/*.dylib",
+        // e.g. /System/Library/Frameworks/AGL.framework/*
+        "/System/Library/Frameworks/*.framework/*",
+    ];
+
+    for pattern in DEFAULT_SYSROOT_PATTERNS {
+        system_libs.add(Glob::new(pattern)?);
     }
 
+    Ok(())
+}
+
+fn add_windows_system_libs(system_libs: &mut GlobSetBuilder) -> Result<(), globset::Error> {
+    for pattern in WIN_ALLOWLIST {
+        system_libs.add(Glob::new(pattern)?);
+    }
+    Ok(())
+}
+
+fn add_linux_system_libs(
+    output: &Output,
+    system_libs: &mut GlobSetBuilder,
+) -> Result<(), globset::Error> {
     if let Some(sysroot_package) = output
         .finalized_dependencies
         .clone()
@@ -264,6 +269,22 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             }
         }
     }
+    Ok(())
+}
+
+/// Returns the system libraries found in sysroot.
+fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
+    let mut system_libs = GlobSetBuilder::new();
+    let platform = &output.build_configuration.target_platform;
+
+    if platform.is_osx() {
+        add_osx_system_libs(output, &mut system_libs)?;
+    } else if platform.is_windows() {
+        add_windows_system_libs(&mut system_libs)?;
+    } else {
+        add_linux_system_libs(output, &mut system_libs)?;
+    }
+
     system_libs.build()
 }
 
