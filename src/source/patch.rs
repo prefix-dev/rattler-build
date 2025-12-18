@@ -329,20 +329,11 @@ pub(crate) fn apply_patches(
     recipe_dir: &Path,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<(), SourceError> {
-    // Early out to avoid unnecessary work
-    if patches.is_empty() {
-        return Ok(());
-    }
-
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
 
         if !patch_file_path.exists() {
-            tracing::warn!(
-                "Patch file not found, skipping: {}",
-                patch_file_path.display()
-            );
-            continue;
+            return Err(SourceError::PatchNotFound(patch_file_path));
         }
 
         tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
@@ -777,6 +768,30 @@ mod tests {
         let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
         let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
         assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
+    }
+
+    #[test]
+    fn test_missing_patch_file_returns_error() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Try to apply a patch that doesn't exist (simulating a typo in the patch filename)
+        // This could happen e.g. when git format-patch creates a file with a double period
+        // due to a commit message ending with a period, and the user accidentally removes one period
+        let result = apply_patches(
+            &[PathBuf::from("nonexistent-patch-file..patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // The build should fail with PatchNotFound error, not silently continue
+        assert!(result.is_err(), "Missing patch file should cause an error");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, SourceError::PatchNotFound(_)),
+            "Expected PatchNotFound error, got: {:?}",
+            err
+        );
     }
 
     /// Prepare all information needed to test patches for package info path.
