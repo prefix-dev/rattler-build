@@ -110,7 +110,7 @@ jobs:
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
       - name: Upload binary artifact
         if: always()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: rattler-build-${{ matrix.os }}
           path: target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -211,7 +211,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@cf46383a970594553a83cc6140075ef6a7f54dee # v2
+        uses: taiki-e/install-action@69e777b377e4ec209ddad9426ae3e0c1008b0ef3 # v2
         with:
           tool: cross
 
@@ -293,7 +293,7 @@ jobs:
           echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: ${{ steps.package.outputs.pkg-name }}
           path: ${{ steps.package.outputs.pkg-path }}
@@ -349,7 +349,7 @@ jobs:
           submodules: recursive
 
       - name: Download rattler-build artifact
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
         with:
           name: rattler-build-x86_64-unknown-linux-musl.tar.gz
           path: ./
