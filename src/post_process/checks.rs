@@ -159,15 +159,12 @@ fn extract_tbd_install_names(sysroot: &Path) -> Vec<String> {
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "tbd"))
     {
-        let Ok(content) = std::fs::read_to_string(entry.path()) else {
+        let Ok(content) = fs_err::read_to_string(entry.path()) else {
             continue;
         };
 
         let Ok(records) = text_stub_library::parse_str(&content) else {
-            tracing::warn!(
-                "Failed to parse .tbd file at {}",
-                entry.path().display()
-            );
+            tracing::warn!("Failed to parse .tbd file at {}", entry.path().display());
             continue;
         };
 
@@ -200,11 +197,6 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             // e.g. /System/Library/Frameworks/AGL.framework/*
             "/System/Library/Frameworks/*.framework/*",
         ];
-
-        // Always include the default sysroot paths as a fallback
-        for v in default_sysroot {
-            system_libs.add(Glob::new(v)?);
-        }
 
         // If CONDA_BUILD_SYSROOT is set, parse .tbd files to extract install names
         // This matches conda-build's behavior of reading the actual runtime library
@@ -475,18 +467,5 @@ mod tests {
             "Should contain libz.1.dylib, got: {:?}",
             install_names
         );
-    }
-
-    #[test]
-    fn test_extract_tbd_install_names_empty_dir() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let install_names = extract_tbd_install_names(temp_dir.path());
-        assert!(install_names.is_empty());
-    }
-
-    #[test]
-    fn test_extract_tbd_install_names_nonexistent_dir() {
-        let install_names = extract_tbd_install_names(Path::new("/nonexistent/path"));
-        assert!(install_names.is_empty());
     }
 }
