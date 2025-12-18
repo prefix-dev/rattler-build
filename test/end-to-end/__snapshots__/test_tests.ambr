@@ -18,7 +18,6 @@
 # name: test_win_errorlevel_injection
   '''
   - script:
-      interpreter: cmd
       content: |-
         echo "This test is designed to fail."
         if %errorlevel% neq 0 exit /b %errorlevel%
