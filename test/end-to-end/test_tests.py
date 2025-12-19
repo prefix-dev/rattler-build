@@ -28,3 +28,20 @@ def test_r_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, sna
     content = (pkg / "info" / "tests" / "tests.yaml").read_text()
 
     assert snapshot == content
+
+
+@pytest.mark.skipif(
+    os.name != "nt", reason="recipe does not support execution on windows"
+)
+def test_win_errorlevel_injection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
+    rattler_build.build(
+        recipes / "test-errorlevel-injection", tmp_path, extra_args=["--test=skip"]
+    )
+    pkg = get_extracted_package(tmp_path, "test-errorlevel-injection")
+
+    assert (pkg / "info" / "tests" / "tests.yaml").exists()
+    content = (pkg / "info" / "tests" / "tests.yaml").read_text()
+
+    assert snapshot == content

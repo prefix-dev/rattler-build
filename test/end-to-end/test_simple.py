@@ -246,7 +246,7 @@ def test_run_exports(
 
     assert (pkg / "info/index.json").exists()
     index_json = json.loads((pkg / "info/index.json").read_text())
-    assert index_json.get("depends") is None
+    assert index_json.get("depends") == []
 
     rendered = rattler_build.render(
         recipes / "run_exports/multi_run_exports_list.yaml", tmp_path
@@ -1181,7 +1181,7 @@ def test_run_exports_from(
     assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
 
     index_json = json.loads((pkg / "info/index.json").read_text())
-    assert index_json.get("depends") is None
+    assert index_json.get("depends") == []
 
 
 def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -2245,6 +2245,7 @@ def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path
     (test_dir / "included.txt").write_text("This should be included")
     (test_dir / "ignored.txt").write_text("This should be ignored")
     (test_dir / "test.pyc").write_text("This should also be ignored")
+
 
     output_dir = tmp_path / "output"
     rattler_build.build(test_dir, output_dir)

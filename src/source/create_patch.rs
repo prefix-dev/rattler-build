@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::source::patch::{apply_patch_custom, apply_patches, summarize_single_patch};
+use crate::source::patch::{apply_patch_custom, summarize_single_patch};
 use crate::source::{SourceError, SourceInformation};
 use rattler_build_recipe::stage1::Source;
 
@@ -819,13 +819,7 @@ fn apply_baseline_patches(
                 patch.display(),
                 rel_path.display()
             );
-            apply_patches(
-                std::slice::from_ref(&patch.clone()),
-                tmp_path,
-                patch_output_dir,
-                apply_patch_custom,
-            )
-            .map_err(GeneratePatchError::SourceError)?;
+            apply_patch_custom(tmp_path, &patch_path).map_err(GeneratePatchError::SourceError)?;
         }
     }
 

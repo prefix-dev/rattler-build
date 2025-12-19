@@ -18,6 +18,8 @@ use crate::{
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
+use text_stub_library::TbdVersionedRecord;
+use walkdir::WalkDir;
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -147,41 +149,91 @@ fn resolved_run_dependencies(
         .collect()
 }
 
-/// Returns the system libraries found in sysroot.
-fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
-    let mut system_libs = GlobSetBuilder::new();
-    if output.build_configuration.target_platform.is_osx() {
-        // Match conda-build behavior: allow any library found in sysroot directories
-        // See: https://github.com/conda/conda-build/blob/61e9bb24588d8b353321c11de5452d57aa2f85ca/conda_build/post.py#L1371-L1384
-        let default_sysroot = vec![
-            "/usr/lib/**/*",
-            "/opt/X11/**/*.dylib",
-            // e.g. /System/Library/Frameworks/AGL.framework/*
-            "/System/Library/Frameworks/*.framework/*",
-        ];
+/// Extract install names from .tbd files in the given sysroot directory.
+/// This parses the text-based stub files that macOS SDKs use to represent
+/// dynamic libraries, extracting the actual runtime library paths.
+fn extract_tbd_install_names(sysroot: &Path) -> Vec<String> {
+    let mut install_names = Vec::new();
 
-        if let Some(sysroot) = output
-            .build_configuration
-            .variant
-            .get(&"CONDA_BUILD_SYSROOT".into())
-        {
-            system_libs.add(Glob::new(&format!("{}/**/*", sysroot))?);
-        } else {
-            for v in default_sysroot {
-                system_libs.add(Glob::new(v)?);
+    for entry in WalkDir::new(sysroot)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "tbd"))
+    {
+        let Ok(content) = fs_err::read_to_string(entry.path()) else {
+            continue;
+        };
+
+        let Ok(records) = text_stub_library::parse_str(&content) else {
+            tracing::warn!("Failed to parse .tbd file at {}", entry.path().display());
+            continue;
+        };
+
+        for record in records {
+            let install_name = match &record {
+                TbdVersionedRecord::V1(r) => &r.install_name,
+                TbdVersionedRecord::V2(r) => &r.install_name,
+                TbdVersionedRecord::V3(r) => &r.install_name,
+                TbdVersionedRecord::V4(r) => &r.install_name,
+            };
+
+            if !install_name.is_empty() {
+                install_names.push(install_name.clone());
             }
         }
-
-        return system_libs.build();
     }
 
-    if output.build_configuration.target_platform.is_windows() {
-        for v in WIN_ALLOWLIST {
-            system_libs.add(Glob::new(v)?);
+    install_names
+}
+
+fn add_osx_system_libs(
+    output: &Output,
+    system_libs: &mut GlobSetBuilder,
+) -> Result<(), globset::Error> {
+    // If CONDA_BUILD_SYSROOT is set, parse .tbd files to extract install names.
+    // This matches conda-build's behavior of reading actual runtime library
+    // paths from the SDK's text-based stub files.
+    if let Some(sysroot) = output
+        .build_configuration
+        .variant
+        .get(&"CONDA_BUILD_SYSROOT".into())
+    {
+        let sysroot_path = PathBuf::from(sysroot.to_string());
+        if sysroot_path.exists() {
+            for name in extract_tbd_install_names(&sysroot_path) {
+                system_libs.add(Glob::new(&name)?);
+            }
+            return Ok(());
         }
-        return system_libs.build();
     }
 
+    // Fallback: match conda-build behavior - allow any library in sysroot directories
+    // https://github.com/conda/conda-build/blob/61e9bb24588d8b353321c11de5452d57aa2f85ca/conda_build/post.py#L1371-L1384
+    const DEFAULT_SYSROOT_PATTERNS: &[&str] = &[
+        "/usr/lib/**/*",
+        "/opt/X11/**/*.dylib",
+        // e.g. /System/Library/Frameworks/AGL.framework/*
+        "/System/Library/Frameworks/*.framework/*",
+    ];
+
+    for pattern in DEFAULT_SYSROOT_PATTERNS {
+        system_libs.add(Glob::new(pattern)?);
+    }
+
+    Ok(())
+}
+
+fn add_windows_system_libs(system_libs: &mut GlobSetBuilder) -> Result<(), globset::Error> {
+    for pattern in WIN_ALLOWLIST {
+        system_libs.add(Glob::new(pattern)?);
+    }
+    Ok(())
+}
+
+fn add_linux_system_libs(
+    output: &Output,
+    system_libs: &mut GlobSetBuilder,
+) -> Result<(), globset::Error> {
     if let Some(sysroot_package) = output
         .finalized_dependencies
         .clone()
@@ -218,6 +270,22 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             }
         }
     }
+    Ok(())
+}
+
+/// Returns the system libraries found in sysroot.
+fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
+    let mut system_libs = GlobSetBuilder::new();
+    let platform = &output.build_configuration.target_platform;
+
+    if platform.is_osx() {
+        add_osx_system_libs(output, &mut system_libs)?;
+    } else if platform.is_windows() {
+        add_windows_system_libs(&mut system_libs)?;
+    } else {
+        add_linux_system_libs(output, &mut system_libs)?;
+    }
+
     system_libs.build()
 }
 
@@ -398,4 +466,28 @@ pub fn perform_linking_checks(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_tbd_install_names() {
+        let test_sysroot = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/tbd_files");
+
+        let install_names = extract_tbd_install_names(&test_sysroot);
+
+        // Should extract install names from both .tbd files
+        assert!(
+            install_names.contains(&"/usr/lib/libSystem.B.dylib".to_string()),
+            "Should contain libSystem.B.dylib, got: {:?}",
+            install_names
+        );
+        assert!(
+            install_names.contains(&"/usr/lib/libz.1.dylib".to_string()),
+            "Should contain libz.1.dylib, got: {:?}",
+            install_names
+        );
+    }
 }
