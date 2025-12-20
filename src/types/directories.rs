@@ -143,16 +143,17 @@ impl Directories {
             if !output_dir.exists() {
                 fs::create_dir_all(output_dir)?;
             }
+
+            // Write .condapackageignore to exclude the output directory from source copying.
+            // This prevents the output directory from being included when users use `path: ../`
+            // in their source configuration.
+            let ignore_file = output_dir.join(".condapackageignore");
+            if !ignore_file.exists() {
+                fs::write(&ignore_file, "*\n")?;
+            }
+
             canonicalize(output_dir)?
         };
-
-        // Write .condapackageignore to exclude the output directory from source copying.
-        // This prevents the output directory from being included when users use `path: ../`
-        // in their source configuration.
-        let ignore_file = output_dir.join(".condapackageignore");
-        if !ignore_file.exists() {
-            fs::write(&ignore_file, "*\n")?;
-        }
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
