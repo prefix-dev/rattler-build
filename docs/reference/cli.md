@@ -817,6 +817,11 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 	Automatically generate attestation using cosign in CI. Mutually exclusive with --attestation
 
 
+- `--store-github-attestation`
+
+	Also store the generated attestation to GitHub's attestation API. Requires `GITHUB_TOKEN` environment variable and only works in GitHub Actions. The attestation will be associated with the current repository
+
+
 - `-s`, `--skip-existing`
 
 	Skip upload if package already exists
