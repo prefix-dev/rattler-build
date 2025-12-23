@@ -1124,7 +1124,7 @@ context:
   version: "5.1.2"
   # later keys can reference previous keys
   # and use jinja functions to compute new values
-  major_version: ${{ version.split('.')[0] }}
+  major_version: ${{ (version | split('.'))[0] }}
   tests_to_skip:
     # fails for one reason
     - test_foo
