@@ -1,0 +1,53 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+zip_keys:
+  - - c_compiler_version
+    - cxx_compiler_version
+    - fortran_compiler_version
+    - docker_image
+  - - cudnn
+    - cuda_compiler_version
+  - - python
+    - numpy
+    - python_impl
+  - - arrow_cpp
+    - libarrow
+abseil_cpp:
+  - "20220623.0"
+alsa_lib:
+  - 1.2.8
+arb:
+  - "2.23"
+arpack:
+  - "3.7"
+arrow_cpp:
+  - 11.0.0
+  - 10.0.1
+  - 9.0.0
+  - 8.0.1
+assimp:
+  - 5.2.5
+aws_sdk_cpp:
+  - "4.5"
+blas_impl:
+  - openblas
+  - mkl
+  - blis
+boolean:
+  - true
+integer:
+  - 5
+libblas:
+  - 3.9 *netlib
+libcblas:
+  - 3.9 *netlib
+liblapack:
+  - 3.9 *netlib
+liblapacke:
+  - 3.9 *netlib
+noboolean:
+  - "true"
+nointeger:
+  - "5"

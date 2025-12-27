@@ -1,0 +1,38 @@
+package:
+  name: library-with-exports
+  version: 3.2.1
+
+about:
+  homepage: https://example.com
+  license: BSD-3-Clause
+  summary: Library that exports dependencies
+
+requirements:
+  build:
+    - gcc
+  host:
+    - python
+  run:
+    - python
+  run_exports:
+    noarch:
+      - library-with-exports-noarch
+    strong:
+      - library-with-exports
+      - libfoo >=1.0
+    strong_constraints:
+      - libbar <2.0
+    weak:
+      - optional-dep
+    weak_constraints:
+      - another-optional <3.0
+  ignore_run_exports:
+    by_name:
+      - ignored-lib
+      - another-ignored
+    from_package:
+      - problematic-package
+
+extra:
+  recipe-maintainers:
+    - maintainer

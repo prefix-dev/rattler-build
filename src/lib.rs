@@ -4,45 +4,40 @@
 
 pub mod build;
 pub mod bump_recipe;
-pub mod cache;
-pub mod conda_build_config;
+// pub mod cache;
+// pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
-mod normalized_key;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
-pub mod recipe;
 pub mod render;
 pub mod script;
-pub mod selectors;
 pub mod source;
+pub mod staging;
 pub mod system_tools;
 pub mod tool_configuration;
+
+// Re-export recipe generator
+#[cfg(feature = "recipe-generation")]
+pub use rattler_build_recipe_generator as recipe_generator;
 #[cfg(feature = "tui")]
 pub mod tui;
 pub mod types;
-pub mod used_variables;
 pub mod utils;
-pub mod variant_config;
-mod variant_render;
 
 mod consts;
 mod env_vars;
-pub mod hash;
 mod linux;
 mod macos;
 mod package_info;
 mod post_process;
 pub mod publish;
 pub mod rebuild;
-#[cfg(feature = "recipe-generation")]
-pub mod recipe_generator;
 mod unix;
 mod windows;
 
 mod package_cache_reporter;
-pub mod source_code;
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -59,10 +54,21 @@ use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
-pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, graph::NodeIndex, visit::DfsPostOrder};
+use rattler_build_recipe::{
+    stage0,
+    stage1::{Dependency, Recipe, TestType},
+    variant_render::{RenderConfig, render_recipe_with_variant_config},
+};
+use rattler_build_variant_config::VariantConfig;
+
+// Re-export types needed by Python bindings and external consumers
+pub use rattler_build_jinja::Variable;
+pub use rattler_build_recipe::stage1::build::BuildString;
+pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
+pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
     package::ArchiveType,
@@ -73,12 +79,8 @@ use rattler_index::ensure_channel_initialized_fs;
 use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
-use recipe::parser::{BuildString, Dependency, TestType, find_outputs_from_src};
-use recipe::variable::Variable;
 use render::resolved_dependencies::RunExportsDownload;
-use selectors::SelectorConfig;
 use source::patch::apply_patch_custom;
-use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -86,15 +88,144 @@ use types::{
     BuildConfiguration, BuildSummary, PackageIdentifier, PackagingSettings,
     build_reindexed_channels,
 };
-use variant_config::VariantConfig;
 
-use crate::{
-    metadata::{Debug, Output, PlatformWithVirtualPackages},
-    publish::{
-        BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
-        upload_and_index_channel,
-    },
+use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::publish::{
+    BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
+    upload_and_index_channel,
 };
+use indexmap::IndexSet;
+use rattler_conda_types::NoArchType;
+
+/// A discovered output from variant expansion
+#[allow(missing_docs)]
+#[derive(Debug, Clone)]
+pub struct DiscoveredOutput {
+    pub name: String,
+    pub version: String,
+    pub build_string: String,
+    pub noarch_type: NoArchType,
+    pub target_platform: Platform,
+    pub used_vars: BTreeMap<NormalizedKey, Variable>,
+    pub recipe: Recipe,
+    pub hash: HashInfo,
+}
+
+impl Eq for DiscoveredOutput {}
+
+impl PartialEq for DiscoveredOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.build_string == other.build_string
+            && self.noarch_type == other.noarch_type
+            && self.target_platform == other.target_platform
+    }
+}
+
+impl std::hash::Hash for DiscoveredOutput {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.version.hash(state);
+        self.build_string.hash(state);
+        self.noarch_type.hash(state);
+        self.target_platform.hash(state);
+    }
+}
+
+/// Find all variants from the recipe and variant config
+fn find_variants(
+    variant_config: &VariantConfig,
+    recipe_path: &std::path::Path,
+    recipe_content: &str,
+    target_platform: Platform,
+    build_platform: Platform,
+    host_platform: Platform,
+    experimental: bool,
+) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
+    // Parse the recipe
+    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
+        .map_err(|e| {
+            // Use Source type which implements AsRef<str> for better span expansion
+            // TODO: possibly move this to stage0::parse_recipe_or_multi_from_source
+            let source = rattler_build_recipe::source_code::Source::from_string(
+                recipe_path.display().to_string(),
+                recipe_content.to_string(),
+            );
+            // Use ParseErrorWithSource for better span highlighting
+            let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(source, e);
+            miette::Report::new(error_with_source)
+        })
+        .wrap_err("Failed to parse recipe")?;
+
+    // Get OS environment variable keys that can be overridden by variant config
+    // We use an empty prefix path since we just need the keys, not the values
+    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
+        .keys()
+        .cloned()
+        .collect();
+
+    // Build render config with platform information, experimental flag, and recipe path
+    let render_config = RenderConfig::new()
+        .with_target_platform(target_platform)
+        .with_build_platform(build_platform)
+        .with_host_platform(host_platform)
+        .with_experimental(experimental)
+        .with_recipe_path(recipe_path)
+        .with_os_env_var_keys(os_env_var_keys);
+
+    // Render with variant config (handles both single and multi-output recipes)
+    let rendered_variants =
+        render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)
+            .map_err(|e| {
+                let source = miette::NamedSource::new(
+                    recipe_path.display().to_string(),
+                    recipe_content.to_string(),
+                );
+                miette::Report::new(e).with_source_code(source)
+            })
+            .wrap_err("Failed to render recipe with variants")?;
+
+    // Apply topological sorting to ensure correct build order for multi-output recipes
+    let rendered_variants =
+        rattler_build_recipe::variant_render::topological_sort_variants(rendered_variants)
+            .map_err(|e| miette::miette!("{}", e))?;
+
+    // Convert to DiscoveredOutputs
+    let mut recipes = IndexSet::new();
+    for rendered in rendered_variants {
+        let recipe = rendered.recipe;
+        let variant = rendered.variant;
+
+        let effective_target_platform = if recipe.build().noarch.is_none() {
+            target_platform
+        } else {
+            Platform::NoArch
+        };
+
+        // The recipe has already been evaluated and has its build string resolved
+        // (including proper variant filtering for noarch python)
+        // Extract the build string and hash from the already-evaluated recipe
+        let build_string = recipe
+            .build()
+            .string
+            .as_resolved()
+            .expect("Recipe build string should be resolved after evaluation");
+
+        recipes.insert(DiscoveredOutput {
+            name: recipe.package().name().as_source().to_string(),
+            version: recipe.package().version().to_string(),
+            build_string: build_string.to_string(),
+            noarch_type: recipe.build().noarch.unwrap_or(NoArchType::none()),
+            target_platform: effective_target_platform,
+            used_vars: variant,
+            recipe,
+            hash: rendered.hash_info.expect("Should be set after evaluation"),
+        });
+    }
+
+    Ok(recipes)
+}
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -206,25 +337,11 @@ pub async fn get_build_output(
         build_data.target_platform
     );
 
-    let selector_config = SelectorConfig {
-        // We ignore noarch here
-        target_platform: build_data.target_platform,
-        host_platform: build_data.host_platform,
-        hash: None,
-        build_platform: build_data.build_platform,
-        variant: BTreeMap::new(),
-        experimental: build_data.common.experimental,
-        // allow undefined while finding the variants
-        allow_undefined: true,
-        recipe_path: Some(recipe_path.to_path_buf()),
-    };
-
     let span = tracing::info_span!("Finding outputs from recipe");
     let enter = span.enter();
 
-    // First find all outputs from the recipe
-    let named_source = Source::from_path(recipe_path).into_diagnostic()?;
-    let outputs = find_outputs_from_src(named_source.clone())?;
+    // Read the recipe content
+    let recipe_content = fs::read_to_string(recipe_path).into_diagnostic()?;
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -257,7 +374,33 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
+    let mut variant_config = VariantConfig::from_files(&variant_configs).map_err(|e| {
+        // Check if this is a ParseError with a file path
+        if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } = &e {
+            // Read the file to provide source code context
+            if let Ok(content) = fs_err::read_to_string(path) {
+                let source_code = rattler_build_recipe::source_code::Source::from_string(
+                    path.display().to_string(),
+                    content,
+                );
+                let error_with_source =
+                    rattler_build_recipe::ParseErrorWithSource::new(source_code, source.clone());
+                return miette::Report::new(error_with_source);
+            }
+        }
+        // Fallback to original error if we can't provide source context
+        miette::Report::new(e)
+    })?;
+
+    // Always insert target_platform and build_platform
+    variant_config.variants.insert(
+        "target_platform".into(),
+        vec![Variable::from(build_data.target_platform.to_string())],
+    );
+    variant_config.variants.insert(
+        "build_platform".into(),
+        vec![Variable::from(build_data.build_platform.to_string())],
+    );
 
     // Apply variant overrides from command line
     for (key, values) in &build_data.variant_overrides {
@@ -266,12 +409,19 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
-    let outputs_and_variants =
-        variant_config.find_variants(&outputs, named_source, &selector_config)?;
+    let outputs_and_variants = find_variants(
+        &variant_config,
+        recipe_path,
+        &recipe_content,
+        build_data.target_platform,
+        build_data.build_platform,
+        build_data.host_platform,
+        build_data.common.experimental,
+    )?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
-        let skipped = if discovered_output.recipe.build().skip() {
+        let skipped = if !discovered_output.recipe.build().skip.is_empty() {
             console::style(" (skipped)").red().to_string()
         } else {
             "".to_string()
@@ -300,17 +450,21 @@ pub async fn get_build_output(
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
 
+    // For multi-output recipes, all outputs (including staging caches) need to use the same
+    // build directory so that paths are consistent across outputs.
+    // TODO(refactor): use the top-level `recipe` name if available
     let global_build_name = outputs_and_variants
         .first()
         .map(|o| o.name.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| "build".to_string());
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
-        if recipe.build().skip() {
-            continue;
-        }
+        // TODO: handle skipped builds
+        // if recipe.build().skip() {
+        //     continue;
+        // }
 
         subpackages.insert(
             recipe.package().name().clone(),
@@ -321,11 +475,9 @@ pub async fn get_build_output(
             },
         );
 
-        let build_name = if recipe.cache.is_some() {
-            global_build_name.clone()
-        } else {
-            recipe.package().name().as_normalized().to_string()
-        };
+        // Use the global build name for all outputs in a multi-output recipe
+        // This ensures staging caches and their dependent packages share the same build directory
+        let build_name = global_build_name.clone();
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -369,7 +521,7 @@ pub async fn get_build_output(
         let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = Output {
-            recipe: recipe.clone(),
+            recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages::detect_for_platform(
@@ -384,14 +536,16 @@ pub async fn get_build_output(
                 .into_diagnostic()?,
                 hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
-                directories: Directories::setup(
+                directories: Directories::builder(
                     &build_name,
                     recipe_path,
                     &output_dir,
-                    build_data.no_build_id,
                     &timestamp,
-                    recipe.build().merge_build_and_host_envs(),
                 )
+                .no_build_id(build_data.no_build_id)
+                .merge_build_and_host(recipe.build().merge_build_and_host_envs)
+                .skip_directory_creation(build_data.render_only)
+                .build()
                 .into_diagnostic()?,
                 channels,
                 channel_priority: tool_config.channel_priority,
@@ -499,21 +653,28 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 
     // Also check that for all script tests
     for test in output.recipe.tests() {
-        if let TestType::Command(command) = test {
+        if let TestType::Commands(command) = test {
             for dep in command
                 .requirements
                 .build
                 .iter()
                 .chain(command.requirements.run.iter())
             {
-                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
-                if all_output_names.iter().any(|o| {
-                    Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                        (*o).clone(),
-                    )) == dep_spec.name.as_ref()
-                }) {
+                let dep_name = dep.name();
+                if all_output_names.iter().any(|o| Some(*o) == dep_name) {
                     // this dependency might not be built yet
-                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+                    // For pin_subpackage/pin_compatible, we only check name match
+                    // For regular specs, we also check version/build if specified
+                    let is_built = match dep {
+                        rattler_build_recipe::stage1::Dependency::Spec(spec) => {
+                            done_outputs.iter().any(|o| check_if_matches(spec, o))
+                        }
+                        _ => {
+                            // For pins, just check if any output with that name is built
+                            done_outputs.iter().any(|o| Some(o.name()) == dep_name)
+                        }
+                    };
+                    if !is_built {
                         return false;
                     }
                 }
@@ -537,7 +698,7 @@ pub async fn run_build_from_args(
         .iter()
         .map(|o| o.name())
         .collect::<Vec<_>>();
-
+    tracing::info!("Starting build of {} outputs", outputs_to_build.len());
     for (index, output) in outputs_to_build.iter().enumerate() {
         let (output, archive) = match run_build(
             output.clone(),
@@ -809,11 +970,34 @@ pub async fn run_test(
     Ok(())
 }
 
-/// Rebuild.
-pub async fn rebuild(
+/// Result of rebuilding a package.
+#[derive(Debug, Clone)]
+pub struct RebuildOutput {
+    /// Path to the original package
+    pub original_path: PathBuf,
+    /// Path to the rebuilt package
+    pub rebuilt_path: PathBuf,
+    /// SHA256 hash of the original package (hex-encoded)
+    pub original_sha256: String,
+    /// SHA256 hash of the rebuilt package (hex-encoded)
+    pub rebuilt_sha256: String,
+}
+
+impl RebuildOutput {
+    /// Returns true if the original and rebuilt packages are bit-for-bit identical.
+    pub fn is_identical(&self) -> bool {
+        self.original_sha256 == self.rebuilt_sha256
+    }
+}
+
+/// Core rebuild logic that extracts the recipe from a package and rebuilds it.
+///
+/// This function is the reusable core of the rebuild functionality, returning
+/// the result data for programmatic use (e.g., Python bindings).
+pub async fn rebuild_package_core(
     rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
-) -> miette::Result<()> {
+) -> miette::Result<RebuildOutput> {
     let reqwest_client = tool_configuration::reqwest_client_from_auth_storage(
         rebuild_data.common.auth_file,
         #[cfg(feature = "s3")]
@@ -939,7 +1123,15 @@ pub async fn rebuild(
     let rebuilt_path = final_output_dir.join(&new_filename);
 
     // Move the rebuilt package to final location with new name
-    fs::rename(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+    // Use copy+remove as fallback for cross-device moves
+    if let Err(e) = fs::rename(&temp_rebuilt_path, &rebuilt_path) {
+        if e.kind() == std::io::ErrorKind::CrossesDevices {
+            fs::copy(&temp_rebuilt_path, &rebuilt_path).into_diagnostic()?;
+            fs::remove_file(&temp_rebuilt_path).into_diagnostic()?;
+        } else {
+            return Err(e).into_diagnostic();
+        }
+    }
 
     // Now we can drop the temp directory
     drop(temp_output_dir);
@@ -951,17 +1143,35 @@ pub async fn rebuild(
     tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
+    Ok(RebuildOutput {
+        original_path: package_path,
+        rebuilt_path,
+        original_sha256: format!("{:x}", original_sha),
+        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+    })
+}
+
+/// Rebuild a package from its embedded recipe (CLI entry point).
+///
+/// This function wraps [`rebuild_package_core`] and adds interactive features
+/// like diffoscope comparison prompts that are suitable for CLI use.
+pub async fn rebuild(
+    rebuild_data: RebuildData,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
+    let result = rebuild_package_core(rebuild_data, fancy_log_handler).await?;
+
     // Compare the SHA hashes
-    if original_sha == rebuilt_sha {
+    if result.is_identical() {
         tracing::info!(
             "✅ Rebuild successful! SHA256 hashes match. Packages are bit-for-bit identical!"
         );
     } else {
         tracing::warn!("❌ Rebuild produced different output! SHA256 hashes do not match.");
         tracing::info!("❌ Rebuild produced different output!");
-        tracing::info!("  Original SHA256: {:x}", original_sha);
-        tracing::info!("  Rebuilt SHA256:  {:x}", rebuilt_sha);
-        tracing::info!("  Rebuilt package: {}", rebuilt_path.display());
+        tracing::info!("  Original SHA256: {}", result.original_sha256);
+        tracing::info!("  Rebuilt SHA256:  {}", result.rebuilt_sha256);
+        tracing::info!("  Rebuilt package: {}", result.rebuilt_path.display());
 
         // Check if diffoscope is available
         let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
@@ -975,8 +1185,8 @@ pub async fn rebuild(
             if confirmation {
                 let mut command = Command::new("diffoscope");
                 command
-                    .arg(&package_path)
-                    .arg(&rebuilt_path)
+                    .arg(&result.original_path)
+                    .arg(&result.rebuilt_path)
                     .arg("--text-color")
                     .arg("always");
 
@@ -1023,19 +1233,16 @@ pub fn sort_build_outputs_topologically(
     for (output_idx, output) in outputs.iter().enumerate() {
         let output_node = output_to_node[output_idx];
         for dep in output.recipe.requirements().run_build_host() {
-            let dep_name = match dep {
-                Dependency::Spec(spec) => {
-                    match spec
-                        .name
-                        .clone()
-                        .expect("MatchSpec should always have a name")
-                    {
-                        rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+            let dep_name: Option<PackageName> = match dep {
+                Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| {
+                    use rattler_conda_types::PackageNameMatcher;
+                    match matcher {
+                        PackageNameMatcher::Exact(name) => Some(name),
                         _ => None,
                     }
-                }
-                Dependency::PinSubpackage(pin) => Some(pin.pin_value().name.clone()),
-                Dependency::PinCompatible(pin) => Some(pin.pin_value().name.clone()),
+                }),
+                Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
+                Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
             };
 
             if let Some(dep_name) = dep_name
@@ -1116,6 +1323,10 @@ pub async fn build_recipes(
     let tool_config = get_tool_config(&build_data, log_handler)?;
     let mut outputs = Vec::new();
     for recipe_path in &recipe_paths {
+        tracing::info!(
+            "Processing recipe at path: {}",
+            recipe_path.canonicalize().unwrap().display()
+        );
         let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
         outputs.extend(output);
     }

@@ -1,0 +1,93 @@
+- pin:
+    name: "foo"
+    lower_bound: "x.x"
+    upper_bound: "x.x.x"
+  spec: 9.0 hash
+  expected: "foo >=9.0,<9.0.1.0a0"
+- pin:
+    name: "foo"
+    lower_bound: "x.x"
+    upper_bound: "x.x"
+  spec: 1.2.3 hash
+  expected: "foo >=1.2,<1.3.0a0"
+- pin:
+    name: "foo"
+    lower_bound: "x.x.x.x"
+    upper_bound: "x.x.x"
+  spec: 9 hash
+  expected: "foo >=9,<9.0.1.0a0"
+- pin:
+    name: jpeg
+    upper_bound: "x.x"
+  spec: 9d hash
+  expected: "jpeg <9d.1.0a0"
+- pin:
+    name: jpeg
+    upper_bound: "x"
+  spec: 9d hash
+  expected: "jpeg <10a"
+- pin:
+    name: jpeg
+    lower_bound: "x"
+    upper_bound: "x"
+  spec: 9d hash
+  expected: "jpeg >=9d,<10a"
+- pin:
+    name: "test"
+    lower_bound: "x.x.x"
+  spec: 1.2.3 hash
+  expected: "test >=1.2.3"
+- pin:
+    name: "test"
+    lower_bound: "x.x.x"
+    upper_bound: "x.x"
+  spec: 1.2.3 hash
+  expected: "test >=1.2.3,<1.3.0a0"
+- pin:
+    name: openssl
+    upper_bound: "x.x.x"
+    lower_bound: "x.x.x"
+  spec: 1.0.2j hash
+  expected: "openssl >=1.0.2j,<1.0.3a"
+- pin:
+    name: openssl
+    lower_bound: "x.x.x"
+    upper_bound: "x.x.x.x"
+  spec: 1.0.2j hash
+  expected: "openssl >=1.0.2j,<1.0.2j.1.0a0"
+- pin:
+    name: epoch
+    lower_bound: "x.x"
+    upper_bound: "x.x.x"
+  spec: 5!1.2.3 hash
+  expected: "epoch >=5!1.2,<5!1.2.4.0a0"
+- pin:
+    name: local
+    lower_bound: "x.x"
+    upper_bound: "x.x.x"
+  spec: 5!1.2.3+3.4 hash
+  expected: "local >=5!1.2+3.4,<5!1.2.4.0a0"
+- pin:
+    name: "bounds"
+    lower_bound: "1.2"
+    upper_bound: "1.2.5"
+  spec: 1.2.3 hash
+  expected: "bounds >=1.2,<1.2.5"
+- pin:
+    name: "bounds"
+    lower_bound: "1.2"
+    upper_bound: "1.2.5"
+  spec: 1.2.3 hash
+  expected: "bounds >=1.2,<1.2.5"
+- pin:
+    name: "bounds"
+    lower_bound: x
+    upper_bound: "1.2.9"
+  spec: 1.2.3 hash
+  expected: "bounds >=1,<1.2.9"
+- pin:
+    name: "bounds"
+    lower_bound: "1.0.1"
+    upper_bound: x.x
+  spec: 1.2.3 hash
+  expected: "bounds >=1.0.1,<1.3.0a0"
