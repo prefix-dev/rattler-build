@@ -108,6 +108,7 @@ lzma-rust2 = { version = "0.15", features = ["xz"] }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3']
+pkl = ['rattler_build_recipe/pkl']
 # Enable optimized memory allocators for release builds.
 # This provides significant performance improvements, especially on Linux musl.
 # Disabled by default due to increased compile time.

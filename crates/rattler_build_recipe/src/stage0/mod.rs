@@ -28,11 +28,15 @@ pub use parser::{
     parse_recipe_or_multi_from_source,
 };
 pub use requirements::Requirements;
-pub use source::Source;
-pub use tests::{PythonVersion, TestType};
+pub use source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource};
+pub use tests::{
+    CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
+    PackageContentsCheckFiles, PackageContentsTest, PerlTest, PythonTest, PythonVersion, RTest,
+    RubyTest, TestType,
+};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,
-    JinjaTemplate, ListOrItem, NestedItemList, Value,
+    JinjaTemplate, ListOrItem, NestedItemList, Script, Value,
 };
 
 /// Backwards compatibility alias for Stage0Recipe

@@ -1,4 +1,6 @@
 pub mod error;
+#[cfg(feature = "pkl")]
+pub mod pkl;
 #[cfg(feature = "miette")]
 pub mod source_code;
 pub mod stage0;

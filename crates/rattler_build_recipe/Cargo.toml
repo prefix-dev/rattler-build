@@ -11,6 +11,7 @@ description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
 default = ["miette", "variant-config"]
 miette = ["dep:miette", "dep:pathdiff"]
 variant-config = ["dep:rattler_build_variant_config", "dep:petgraph"]
+pkl = ["dep:rpkl-parser", "dep:rpkl-runtime", "dep:rpkl-stdlib"]
 
 [dependencies]
 rattler_build_types = { workspace = true }
@@ -42,6 +43,11 @@ fs-err = { workspace = true }
 regex = { workspace = true }
 sha1 = { workspace = true }
 petgraph = { workspace = true, optional = true, default-features = false }
+
+# PKL support (optional)
+rpkl-parser = { path = "../../../pkl-rust/crates/rpkl-parser", optional = true }
+rpkl-runtime = { path = "../../../pkl-rust/crates/rpkl-runtime", optional = true }
+rpkl-stdlib = { path = "../../../pkl-rust/crates/rpkl-stdlib", optional = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }

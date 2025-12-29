@@ -133,6 +133,13 @@ impl std::hash::Hash for DiscoveredOutput {
     }
 }
 
+/// Check if a recipe path is a PKL file
+fn is_pkl_recipe(path: &std::path::Path) -> bool {
+    path.extension()
+        .map(|ext| ext.eq_ignore_ascii_case("pkl"))
+        .unwrap_or(false)
+}
+
 /// Find all variants from the recipe and variant config
 fn find_variants(
     variant_config: &VariantConfig,
@@ -143,7 +150,27 @@ fn find_variants(
     host_platform: Platform,
     experimental: bool,
 ) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
-    // Parse the recipe
+    // Check if this is a PKL recipe
+    #[cfg(feature = "pkl")]
+    if is_pkl_recipe(recipe_path) {
+        return find_variants_pkl(
+            variant_config,
+            recipe_path,
+            target_platform,
+            build_platform,
+            host_platform,
+            experimental,
+        );
+    }
+
+    #[cfg(not(feature = "pkl"))]
+    if is_pkl_recipe(recipe_path) {
+        return Err(miette::miette!(
+            "PKL recipes require the 'pkl' feature. Rebuild with --features pkl"
+        ));
+    }
+
+    // Parse the YAML recipe
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
             // Use Source type which implements AsRef<str> for better span expansion
@@ -227,6 +254,171 @@ fn find_variants(
     Ok(recipes)
 }
 
+/// Find all variants from a PKL recipe
+#[cfg(feature = "pkl")]
+fn find_variants_pkl(
+    variant_config: &VariantConfig,
+    recipe_path: &std::path::Path,
+    target_platform: Platform,
+    build_platform: Platform,
+    host_platform: Platform,
+    _experimental: bool,
+) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
+    use rattler_build_recipe::pkl;
+
+    // Step 1: Extract used variant keys via static analysis
+    let used_variant_keys = pkl::extract_used_variants(recipe_path)
+        .map_err(|e| miette::miette!("Failed to analyze PKL recipe: {}", e))?;
+
+    tracing::debug!(
+        "PKL recipe uses variant keys: {:?}",
+        used_variant_keys
+    );
+
+    // Step 2: Build variant combinations from the config, filtered by used keys
+    let variant_combinations = build_variant_combinations(variant_config, &used_variant_keys);
+
+    tracing::info!(
+        "Found {} variant combinations for PKL recipe",
+        variant_combinations.len()
+    );
+
+    // Step 3: Evaluate the PKL for each variant combination
+    let mut recipes = IndexSet::new();
+    for variant in variant_combinations {
+        // Convert BTreeMap to IndexMap for pkl::parse_pkl_recipe_with_variants
+        let variant_config_map: indexmap::IndexMap<String, String> = variant
+            .iter()
+            .map(|(k, v)| (k.0.clone(), v.to_string()))
+            .collect();
+
+        // Evaluate the PKL with this variant configuration
+        let pkl_result = pkl::parse_pkl_recipe_with_variants(
+            recipe_path,
+            &target_platform.to_string(),
+            &variant_config_map,
+        )
+        .map_err(|e| miette::miette!("Failed to evaluate PKL recipe: {}", e))?;
+
+        // Convert the Stage0 recipe to Stage1
+        // For PKL, we need to go through the same rendering process as YAML
+        let stage0_recipe = pkl_result.recipe;
+
+        // Get OS environment variable keys
+        let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
+            .keys()
+            .cloned()
+            .collect();
+
+        // Build render config
+        let render_config = RenderConfig::new()
+            .with_target_platform(target_platform)
+            .with_build_platform(build_platform)
+            .with_host_platform(host_platform)
+            .with_experimental(_experimental)
+            .with_recipe_path(recipe_path)
+            .with_os_env_var_keys(os_env_var_keys);
+
+        // Create a minimal variant config just for this specific variant
+        let mut single_variant_config = VariantConfig::default();
+        for (key, value) in &variant {
+            single_variant_config.variants.insert(
+                key.clone(),
+                vec![Variable::from_string(&value.to_string())],
+            );
+        }
+        // Add platform variants
+        single_variant_config.variants.insert(
+            "target_platform".into(),
+            vec![Variable::from(target_platform.to_string())],
+        );
+        single_variant_config.variants.insert(
+            "build_platform".into(),
+            vec![Variable::from(build_platform.to_string())],
+        );
+
+        // Render the recipe (this handles Jinja evaluation and build string computation)
+        let rendered_variants = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &single_variant_config,
+            render_config,
+        )
+        .map_err(|e| miette::miette!("Failed to render PKL recipe: {}", e))?;
+
+        // Convert rendered variants to DiscoveredOutputs
+        for rendered in rendered_variants {
+            let recipe = rendered.recipe;
+
+            let effective_target_platform = if recipe.build().noarch.is_none() {
+                target_platform
+            } else {
+                Platform::NoArch
+            };
+
+            let build_string = recipe
+                .build()
+                .string
+                .as_resolved()
+                .expect("Recipe build string should be resolved after evaluation");
+
+            recipes.insert(DiscoveredOutput {
+                name: recipe.package().name().as_source().to_string(),
+                version: recipe.package().version().to_string(),
+                build_string: build_string.to_string(),
+                noarch_type: recipe.build().noarch.unwrap_or(NoArchType::none()),
+                target_platform: effective_target_platform,
+                used_vars: rendered.variant,
+                recipe,
+                hash: rendered.hash_info.expect("Should be set after evaluation"),
+            });
+        }
+    }
+
+    Ok(recipes)
+}
+
+/// Build variant combinations from the config, filtered by the keys actually used in the recipe
+#[cfg(feature = "pkl")]
+fn build_variant_combinations(
+    variant_config: &VariantConfig,
+    used_keys: &[String],
+) -> Vec<BTreeMap<NormalizedKey, Variable>> {
+    if used_keys.is_empty() {
+        // No variants used, return a single empty combination
+        return vec![BTreeMap::new()];
+    }
+
+    // Filter variant config to only include used keys
+    let mut filtered_variants: BTreeMap<NormalizedKey, Vec<Variable>> = BTreeMap::new();
+    for key in used_keys {
+        let normalized_key = NormalizedKey::from(key.as_str());
+        if let Some(values) = variant_config.variants.get(&normalized_key) {
+            filtered_variants.insert(normalized_key, values.clone());
+        }
+    }
+
+    if filtered_variants.is_empty() {
+        // No matching variants in config, return single empty combination
+        return vec![BTreeMap::new()];
+    }
+
+    // Generate cartesian product of all variant values
+    let mut combinations = vec![BTreeMap::new()];
+    for (key, values) in filtered_variants {
+        let mut new_combinations = Vec::new();
+        for existing in &combinations {
+            for value in &values {
+                let mut new_combo = existing.clone();
+                new_combo.insert(key.clone(), value.clone());
+                new_combinations.push(new_combo);
+            }
+        }
+        combinations = new_combinations;
+    }
+
+    combinations
+}
+
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
     let recipe_path = canonicalize(path);
@@ -255,15 +447,28 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
     }
     let mut recipe_path = recipe_path.into_diagnostic()?;
 
-    // If the recipe_path is a directory, look for "recipe.yaml" in the directory.
+    // If the recipe_path is a directory, look for recipe files in the directory.
+    // Priority: recipe.yaml, then recipe.pkl (if pkl feature enabled)
     if recipe_path.is_dir() {
         let recipe_yaml_path = recipe_path.join("recipe.yaml");
         if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
             recipe_path = recipe_yaml_path;
         } else {
+            #[cfg(feature = "pkl")]
+            {
+                let recipe_pkl_path = recipe_path.join("recipe.pkl");
+                if recipe_pkl_path.exists() && recipe_pkl_path.is_file() {
+                    return Ok(recipe_pkl_path);
+                }
+            }
             return Err(miette::miette!(
-                "'recipe.yaml' not found in the directory {}",
-                path.to_string_lossy()
+                "No recipe file found in the directory {} (looked for recipe.yaml{})",
+                path.to_string_lossy(),
+                if cfg!(feature = "pkl") {
+                    " and recipe.pkl"
+                } else {
+                    ""
+                }
             ));
         }
     }
