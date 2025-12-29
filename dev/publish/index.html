@@ -14,7 +14,7 @@
         <link rel="prev" href="../authentication_and_upload/">
       
       
-        <link rel="next" href="../conda_forge/">
+        <link rel="next" href="../sigstore/">
       
       
         
@@ -1366,6 +1366,8 @@
       
         
       
+        
+      
     
     
     
@@ -1583,10 +1585,49 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#sigstore-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sigstore attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sigstore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sigstore attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2116,6 +2157,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#sigstore-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sigstore attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2212,6 +2264,11 @@ When bumping by a relative amount, we download the repodata and determine for ea
 </ul>
 <h2 id="indexing-s3-and-filesystem-channels">Indexing S3 and Filesystem channels<a class="headerlink" href="#indexing-s3-and-filesystem-channels" title="Permanent link">#</a></h2>
 <p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
+<h2 id="sigstore-attestations">Sigstore attestations<a class="headerlink" href="#sigstore-attestations" title="Permanent link">#</a></h2>
+<p>When publishing to prefix.dev, you can automatically generate Sigstore attestations to cryptographically sign your packages and provide verifiable build provenance. Use the <code>--generate-attestation</code> flag:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+</span></code></pre></div>
+<p>For more information about Sigstore attestations, verification, and manual attestation creation, see the <a href="../sigstore/">Sigstore attestations</a> documentation.</p>
 
 
 
@@ -2303,16 +2360,16 @@ When bumping by a relative amount, we download the repodata and determine for ea
           
             
             <a
-              href="../conda_forge/"
+              href="../sigstore/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Publishing to conda-forge"
+              aria-label="Next: Sigstore attestations"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Publishing to conda-forge
+                  Sigstore attestations
                 </div>
               </div>
               <div class="md-footer__button md-icon">

@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/highlevel/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/sigstore/">
       
       
-        <link rel="prev" href="../getting_started/">
+        <link rel="prev" href="../publish/">
       
       
-        <link rel="next" href="../understanding_terminal_output/">
+        <link rel="next" href="../conda_forge/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>High-level overview - Rattler-Build</title>
+        <title>Sigstore attestations - Rattler-Build</title>
       
     
     
@@ -63,15 +63,15 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="High-level overview - Rattler-Build" />
-<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/highlevel.png" />
+<meta property="og:title" content="Sigstore attestations - Rattler-Build" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/sigstore.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://rattler-build.prefix.dev/dev/highlevel/" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/dev/sigstore/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="High-level overview - Rattler-Build" />
-<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/highlevel.png" />
+<meta property="twitter:title" content="Sigstore attestations - Rattler-Build" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/sigstore.png" />
 </head>
   
   
@@ -91,7 +91,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#what-is-rattler-build" class="md-skip">
+        <a href="#sigstore-attestations" class="md-skip">
           Skip to content
         </a>
       
@@ -130,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              High-level overview
+              Sigstore attestations
             
           </span>
         </div>
@@ -336,37 +336,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    High-level overview
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../highlevel/" class="md-nav__link">
         
   
   
@@ -382,59 +355,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How does rattler-build work?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to run rattler-build
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview of a recipe.yaml
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1431,8 +1351,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1450,11 +1372,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -1475,7 +1397,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1546,10 +1468,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../sigstore/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sigstore attestations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1565,6 +1514,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-a-sigstore-attestation-provide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What does a Sigstore attestation provide?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automatic-attestation-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic attestation generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Automatic attestation generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manual-attestation-with-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual attestation with GitHub Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifying-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying attestations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verifying attestations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-github-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the GitHub CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-cosign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using cosign
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-sigstore-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using sigstore-python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-benefits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security benefits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2012,10 +2114,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
+  <a href="#what-does-a-sigstore-attestation-provide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How does rattler-build work?
+        What does a Sigstore attestation provide?
       
     </span>
   </a>
@@ -2023,10 +2125,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
+  <a href="#automatic-attestation-generation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How to run rattler-build
+        Automatic attestation generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Automatic attestation generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manual-attestation-with-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual attestation with GitHub Actions
       
     </span>
   </a>
@@ -2034,10 +2164,82 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
+  <a href="#verifying-attestations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview of a recipe.yaml
+        Verifying attestations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verifying attestations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-github-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the GitHub CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-cosign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using cosign
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-sigstore-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using sigstore-python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-benefits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security benefits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
       
     </span>
   </a>
@@ -2061,7 +2263,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/highlevel.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/sigstore.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -2069,140 +2271,155 @@
   
 
 
-<h1 id="what-is-rattler-build">What is <code>rattler-build</code>?<a class="headerlink" href="#what-is-rattler-build" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> is a tool to build and package software so that it can be
-installed on any operating system – with any compatible package manager such as
-<code>mamba</code>, <code>conda</code>, or <code>rattler</code>. We are also intending for <code>rattler-build</code> to be
-used as a library to drive builds of packages from any other recipe format in
-the future.</p>
-<h3 id="how-does-rattler-build-work">How does <code>rattler-build</code> work?<a class="headerlink" href="#how-does-rattler-build-work" title="Permanent link">#</a></h3>
-<p>Building of packages consists of several steps. It all begins with a
-<code>recipe.yaml</code> file that specifies how the package is to be built and what the
-dependencies are. From the recipe file, <code>rattler-build</code> executes several steps:</p>
+<h1 id="sigstore-attestations">Sigstore attestations<a class="headerlink" href="#sigstore-attestations" title="Permanent link">#</a></h1>
+<p>Sigstore is a way to cryptographically sign packages (or any binary artifacts). It was pioneered in the container space, but has been adopted by many packaging ecosystems: PyPI, Python releases, Rust crates, Homebrew, and Rubygems.</p>
+<p>Rattler-build supports creating Sigstore attestations for conda packages, allowing you to cryptographically sign your packages and provide verifiable provenance information.</p>
+<h2 id="what-does-a-sigstore-attestation-provide">What does a Sigstore attestation provide?<a class="headerlink" href="#what-does-a-sigstore-attestation-provide" title="Permanent link">#</a></h2>
+<p>A Sigstore attestation ties the producer of a package (for example, a GitHub Actions workflow) to the package artifact. When the attestation is created, metadata about the artifact is registered in a "Transparency Log" which can be inspected at any time. The metadata contains information such as:</p>
+<ul>
+<li>The name and SHA256 hash of the package</li>
+<li>The CI workflow that built the package</li>
+<li>The repository Git hash that contained the CI workflow</li>
+<li>The organization and username that built the package</li>
+</ul>
+<p>Using this information, you can attest that a given package was created and uploaded by a certain GitHub organization, and this is transparently logged on both the server and the Sigstore public good instance.</p>
+<p>The attestation follows <a href="https://conda.org/learn/ceps/cep-0027">CEP-27</a>, which standardizes the in-toto attestation format with a Conda-specific predicate containing:</p>
+<ul>
+<li>The SHA256 hash of the package (guaranteed to be unique)</li>
+<li>The full filename (<code>{name}-{version}-{buildstring}.conda</code>)</li>
+<li>Optionally, the target channel URL (e.g., <code>https://prefix.dev/my-channel</code>)</li>
+</ul>
+<h2 id="automatic-attestation-generation">Automatic attestation generation<a class="headerlink" href="#automatic-attestation-generation" title="Permanent link">#</a></h2>
+<p>The easiest way to create Sigstore attestations is using the <code>--generate-attestation</code> flag when publishing to <a href="https://prefix.dev">prefix.dev</a>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+</span></code></pre></div>
+<p>This automatically:</p>
+<ol>
+<li>Builds your package(s) from the recipe</li>
+<li>Creates a Sigstore attestation using the OIDC identity from your CI environment</li>
+<li>Uploads both the package and attestation to prefix.dev</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Requirements</p>
+<p>The <code>--generate-attestation</code> flag only works when:</p>
+<ul>
+<li>Uploading to prefix.dev channels</li>
+<li>Using Trusted Publishing (OIDC authentication)</li>
+<li>Running in a supported CI environment (e.g., GitHub Actions)</li>
+</ul>
+</div>
+<h3 id="github-actions-example">GitHub Actions example<a class="headerlink" href="#github-actions-example" title="Permanent link">#</a></h3>
+<p>Here's a complete example workflow using automatic attestation generation:</p>
+<div class="language-yaml highlight"><span class="filename">.github/workflows/build.yml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build and publish with attestation</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">push</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">jobs</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="c1"># These permissions are needed for OIDC authentication</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Set up rattler-build</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/rattler-build-action@v0.2.34</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build and publish with attestation</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">          </span><span class="no">rattler-build publish ./recipe.yaml \</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">            </span><span class="no">--to https://prefix.dev/my-channel \</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">            </span><span class="no">--generate-attestation</span>
+</span></code></pre></div>
+<h2 id="manual-attestation-with-github-actions">Manual attestation with GitHub Actions<a class="headerlink" href="#manual-attestation-with-github-actions" title="Permanent link">#</a></h2>
+<p>If you need more control over the attestation process, you can use GitHub's official attest action to create the attestation separately:</p>
+<div class="language-yaml highlight"><span class="filename">.github/workflows/build.yml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Package and sign</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">push</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">jobs</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c1"># These permissions are needed to create a sigstore certificate</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">attestations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build conda package</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/rattler-build-action@v0.2.34</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">      </span><span class="c1"># Use GitHub&#39;s official attest action with the Conda predicate</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/attest@v1</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">attest</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">          </span><span class="nt">subject-path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;**/*.conda&quot;</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">          </span><span class="nt">predicate-type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">          </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{&quot;targetChannel&quot;:</span><span class="nv"> </span><span class="s">&quot;https://prefix.dev/my-channel&quot;}&#39;</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">      </span><span class="c1"># Upload with the attestation bundle</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload the package</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">          </span><span class="no">rattler-build upload prefix -c my-channel ./output/**/*.conda \</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">            </span><span class="no">--attestation ${{ steps.attest.outputs.bundle-path }}</span>
+</span></code></pre></div>
+<p>This approach gives you full control over the attestation creation and allows you to customize the predicate or add additional attestation metadata.</p>
+<h2 id="verifying-attestations">Verifying attestations<a class="headerlink" href="#verifying-attestations" title="Permanent link">#</a></h2>
+<p>Once packages are published with attestations, they can be verified using several tools:</p>
+<h3 id="using-the-github-cli">Using the GitHub CLI<a class="headerlink" href="#using-the-github-cli" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span>my-package-0.1.0-h123_0.conda<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--owner<span class="w"> </span>my-org<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--predicate-type<span class="w"> </span><span class="s2">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
+</span></code></pre></div>
+<h3 id="using-cosign">Using cosign<a class="headerlink" href="#using-cosign" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/.*&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
+</span></code></pre></div>
+<h3 id="using-sigstore-python">Using sigstore-python<a class="headerlink" href="#using-sigstore-python" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>sigstore
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>sigstore<span class="w"> </span>verify<span class="w"> </span>identity<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--cert-identity<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/my-repo/.github/workflows/build.yml@refs/heads/main&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--cert-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
+</span></code></pre></div>
+<h2 id="viewing-attestations">Viewing attestations<a class="headerlink" href="#viewing-attestations" title="Permanent link">#</a></h2>
+<p>You can find attestations for packages published to prefix.dev in several places:</p>
+<ul>
+<li><strong>GitHub</strong>: View attestations in your repository's attestations tab (e.g., <code>https://github.com/my-org/my-repo/attestations</code>)</li>
+<li><strong>Sigstore public goods instance</strong>: Search by package hash at <a href="https://search.sigstore.dev">search.sigstore.dev</a></li>
+<li><strong>prefix.dev</strong>: View attestations on the package page</li>
+</ul>
+<h2 id="security-benefits">Security benefits<a class="headerlink" href="#security-benefits" title="Permanent link">#</a></h2>
+<p>Sigstore attestations provide several security benefits:</p>
 <ol>
 <li>
-<p><strong>Rendering</strong>:
-Parse the recipe file and evaluate conditionals, Jinja expressions, and
-variables, and variants.</p>
+<p><strong>Unforgeability</strong>: Attestations cryptographically bind a package to its producer, preventing forgery of provenance metadata.</p>
 </li>
 <li>
-<p><strong>Fetch source</strong>:
-Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths.
-Additionally, this step will apply patches that can be specified alongside the source file.</p>
+<p><strong>Transparency</strong>: All attestations are logged in a public, append-only transparency log. This means attackers cannot perform targeted attacks without leaving a public trace.</p>
 </li>
 <li>
-<p><strong>Install build environments</strong>:
-Download and install dependencies into temporary "host" and "build" workspaces.
-Any dependencies that are needed at build time are installed in this step.</p>
+<p><strong>No long-lived keys</strong>: Sigstore uses ephemeral keys bound to identities (like GitHub Actions workflows), eliminating the risk of key compromise.</p>
 </li>
 <li>
-<p><strong>Build source</strong>:
-Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
-</li>
-<li>
-<p><strong>Prepare package files</strong>:
-Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
-specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
-</li>
-<li>
-<p><strong>Package</strong>:
-Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
-This also creates the test files that are bundled with the package.</p>
-</li>
-<li>
-<p><strong>Test</strong>:
-Run any tests specified in the recipe.
-The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
+<p><strong>Build provenance</strong>: Machine identities in the attestation provide verifiable information about exactly which workflow, repository, and commit produced the package.</p>
 </li>
 </ol>
-<p>After this process, a package is created. This package can be uploaded to somewhere like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
-<h3 id="how-to-run-rattler-build">How to run <code>rattler-build</code><a class="headerlink" href="#how-to-run-rattler-build" title="Permanent link">#</a></h3>
-<p>Running <code>rattler-build</code> is straightforward. It can be done on the command line:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
-</span></code></pre></div>
-<p>A custom channel that is not conda-forge (the default) can be specified like so:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>robostack<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
-</span></code></pre></div>
-<p>You can also use the <code>--recipe-dir</code> argument if you want to build all the packages in a directory:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe-dir<span class="w"> </span>myrecipes/
-</span></code></pre></div>
-<h3 id="overview-of-a-recipeyaml">Overview of a <code>recipe.yaml</code><a class="headerlink" href="#overview-of-a-recipeyaml" title="Permanent link">#</a></h3>
-<p>A <code>recipe.yaml</code> file is separated into multiple sections and can conditionally
-include or exclude sections. Recipe files also support a limited amount of
-string interpolation with Jinja (specifically <code>minijinja</code> in our case).</p>
-<p>A simple example of a recipe file for the <code>zlib</code> package would look as follows:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># variables from the context section can be used in the rest of the recipe</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># in jinja expressions</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.2.13</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://zlib.net/zlib-${{ version }}.tar.gz</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="c1"># build numbers can be set arbitrarily</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="c1"># build script to install the package into the $PREFIX (host prefix)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./configure --prefix=$PREFIX</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make -j$CPU_COUNT</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake -G &quot;Ninja&quot; -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja install</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="c1"># compiler is a special function.</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&quot;c&quot;) }}</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">    </span><span class="c1"># The following two dependencies are only needed on Windows,</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">    </span><span class="c1"># and thus conditionally selected</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja</span>
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make</span>
-</span></code></pre></div>
-<p>The sections of a recipe are:</p>
-<table>
-<thead>
-<tr>
-<th>sections</th>
-<th>description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>context</code></td>
-<td>Defines variables that can be used in the Jinja context later in the recipe (e.g. name and version are commonly interpolated in strings)</td>
-</tr>
-<tr>
-<td><code>package</code></td>
-<td>This section defines the name and version of the package you are currently building and will be the name of the final output</td>
-</tr>
-<tr>
-<td><code>source</code></td>
-<td>Defines where the source code is going to be downloaded from and checksums</td>
-</tr>
-<tr>
-<td><code>build</code></td>
-<td>Settings for the build and the build script</td>
-</tr>
-<tr>
-<td><code>requirements</code></td>
-<td>Allows the definition of build, host, run and run-constrained dependencies</td>
-</tr>
-</tbody>
-</table>
+<h2 id="further-reading">Further reading<a class="headerlink" href="#further-reading" title="Permanent link">#</a></h2>
+<ul>
+<li><a href="https://conda.org/learn/ceps/cep-0027">CEP-27: Standardizing a publish attestation for the conda ecosystem</a></li>
+<li><a href="https://prefix.dev/blog/securing-the-conda-package-supply-chain-with-sigstore">Securing the Conda Package Supply Chain with Sigstore</a> (prefix.dev blog)</li>
+<li><a href="https://docs.sigstore.dev/">Sigstore documentation</a></li>
+<li><a href="https://github.com/prefix-dev/sigstore-example">Example repository with full source code</a></li>
+</ul>
 
 
 
@@ -2271,9 +2488,9 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../getting_started/"
+              href="../publish/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Getting started"
+              aria-label="Previous: Publishing packages"
             >
               <div class="md-footer__button md-icon">
                 
@@ -2284,7 +2501,7 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Getting started
+                  Publishing packages
                 </div>
               </div>
             </a>
@@ -2294,16 +2511,16 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../understanding_terminal_output/"
+              href="../conda_forge/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Understanding the logs"
+              aria-label="Next: Publishing to conda-forge"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Understanding the logs
+                  Publishing to conda-forge
                 </div>
               </div>
               <div class="md-footer__button md-icon">
