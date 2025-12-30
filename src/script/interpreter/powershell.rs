@@ -8,11 +8,22 @@ use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, f
 
 pub(crate) struct PowerShellInterpreter;
 
+const POWERSHELL_PREAMBLE: &str = r#"
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+
+foreach ($envVar in Get-ChildItem Env:) {
+    Set-Variable -Name $envVar.Name -Value $envVar.Value
+}
+
+"#;
+
 // PowerShell interpreter calls cmd.exe interpreter for activation and then runs PowerShell script
 impl Interpreter for PowerShellInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
         let ps1_script = args.work_dir.join("conda_build_script.ps1");
-        tokio::fs::write(&ps1_script, args.script.script()).await?;
+        let contents = POWERSHELL_PREAMBLE.to_owned() + args.script.script();
+        tokio::fs::write(&ps1_script, contents).await?;
 
         let args = ExecutionArgs {
             script: ResolvedScriptContents::Inline(format!(
