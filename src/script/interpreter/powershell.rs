@@ -13,7 +13,9 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 foreach ($envVar in Get-ChildItem Env:) {
-    Set-Variable -Name $envVar.Name -Value $envVar.Value
+    if (-not (Test-Path -Path Variable:$($envVar.Name))) {
+        Set-Variable -Name $envVar.Name -Value $envVar.Value
+    }
 }
 
 "#;
