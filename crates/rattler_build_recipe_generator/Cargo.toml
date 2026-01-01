@@ -8,8 +8,15 @@ repository.workspace = true
 description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
 
 [features]
-default = []
+default = ['rustls-tls']
 cli = ["dep:clap"]
+native-tls = [
+  'reqwest/native-tls',
+]
+rustls-tls = [
+  'reqwest/rustls-tls',
+  'reqwest/rustls-tls-native-roots',
+]
 
 [dependencies]
 clap = { workspace = true, optional = true }
