@@ -519,11 +519,15 @@ fn process_modified_files(
                                 path_to_patch_format(&patch_path)
                             ))
                             .create_patch(&original_content, &modified_content);
-                        let formatted = flickzeug::PatchFormatter::new().fmt_patch(&patch).to_string();
+                        let formatted = flickzeug::PatchFormatter::new()
+                            .fmt_patch(&patch)
+                            .to_string();
                         patch_content.push_str(&formatted);
                         tracing::info!(
                             "{}",
-                            flickzeug::PatchFormatter::new().with_color().fmt_patch(&patch)
+                            flickzeug::PatchFormatter::new()
+                                .with_color()
+                                .fmt_patch(&patch)
                         );
                     } else {
                         tracing::debug!(
@@ -543,7 +547,9 @@ fn process_modified_files(
                         .set_original_filename("/dev/null")
                         .set_modified_filename(format!("b/{}", path_to_patch_format(&patch_path)))
                         .create_patch("", &modified_content);
-                    let formatted = flickzeug::PatchFormatter::new().fmt_patch(&patch).to_string();
+                    let formatted = flickzeug::PatchFormatter::new()
+                        .fmt_patch(&patch)
+                        .to_string();
                     patch_content.push_str(&formatted);
                     tracing::info!(
                         "New file (matched --add pattern): {}",
@@ -551,7 +557,9 @@ fn process_modified_files(
                     );
                     tracing::info!(
                         "{}",
-                        flickzeug::PatchFormatter::new().with_color().fmt_patch(&patch)
+                        flickzeug::PatchFormatter::new()
+                            .with_color()
+                            .fmt_patch(&patch)
                     );
                 } else {
                     tracing::debug!(
@@ -607,7 +615,9 @@ fn process_deleted_files(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch("", "");
-                let formatted = flickzeug::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = flickzeug::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 continue;
             }
@@ -621,11 +631,15 @@ fn process_deleted_files(
                     .set_original_filename(format!("a/{}", path_to_patch_format(&patch_path)))
                     .set_modified_filename("/dev/null")
                     .create_patch(&original_content, "");
-                let formatted = flickzeug::PatchFormatter::new().fmt_patch(&patch).to_string();
+                let formatted = flickzeug::PatchFormatter::new()
+                    .fmt_patch(&patch)
+                    .to_string();
                 patch_content.push_str(&formatted);
                 tracing::info!(
                     "{}",
-                    flickzeug::PatchFormatter::new().with_color().fmt_patch(&patch)
+                    flickzeug::PatchFormatter::new()
+                        .with_color()
+                        .fmt_patch(&patch)
                 );
             }
         }
