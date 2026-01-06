@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy::{ApplyStats, Diff, Patch};
+use flickzeug::{ApplyStats, Diff, Patch};
 use fs_err::File;
 use itertools::Itertools;
 
@@ -88,11 +88,12 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchError> {
-    diffy::patch_from_bytes_with_config(
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, flickzeug::ParsePatchError> {
+    flickzeug::patch_from_bytes_with_config(
         input,
-        diffy::ParserConfig {
-            hunk_strategy: diffy::HunkRangeStrategy::Recount,
+        flickzeug::ParserConfig {
+            hunk_strategy: flickzeug::HunkRangeStrategy::Recount,
+            skip_order_check: true,
         },
     )
 }
@@ -100,12 +101,12 @@ fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchEr
 fn apply(
     base_image: &[u8],
     diff: &Diff<'_, [u8]>,
-) -> Result<(Vec<u8>, ApplyStats), diffy::ApplyError> {
-    diffy::apply_bytes_with_config(
+) -> Result<(Vec<u8>, ApplyStats), flickzeug::ApplyError> {
+    flickzeug::apply_bytes_with_config(
         base_image,
         diff,
-        &diffy::ApplyConfig {
-            fuzzy_config: diffy::FuzzyConfig {
+        &flickzeug::ApplyConfig {
+            fuzzy_config: flickzeug::FuzzyConfig {
                 max_fuzz: 2,
                 ignore_whitespace: true,
                 ignore_case: false,
@@ -953,7 +954,7 @@ mod tests {
         #[exclude("mumps")]
         // Failed to download source
         #[exclude("petsc")]
-        // GNU patch fails and diffy succeeds, seemingly correctly from the diff output.
+        // GNU patch fails and flickzeug succeeds, seemingly correctly from the diff output.
         #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)")]
         // Parse fails, since createrepo-c/438.patch contains two mail
         // messages in one file. Fix postponed until parser
@@ -1029,7 +1030,7 @@ mod tests {
             match (custom_res, gnu_patch_res) {
                 (Ok(_), Ok(_)) => (),
                 (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
-                (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
+                (Err(err), Ok(_)) => panic!("flickzeug patch failed:\n{}", err),
                 (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
             }
 

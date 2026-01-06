@@ -62,7 +62,7 @@ pub enum SourceError {
     PatchNotFound(PathBuf),
 
     #[error("Patch application error: {0}")]
-    PatchApplyError(#[from] diffy::ApplyError),
+    PatchApplyError(#[from] flickzeug::ApplyError),
 
     #[error("Failed to parse patch: {0}")]
     PatchParseFailed(PathBuf),

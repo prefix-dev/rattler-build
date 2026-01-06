@@ -1718,16 +1718,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
-name = "diffy"
-version = "0.4.2"
-source = "git+https://github.com/prefix-dev/diffy.git?branch=master#14af95df9775591c31d186ba20b64caeb3b64abd"
-dependencies = [
- "nu-ansi-term",
- "strsim",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,6 +2093,17 @@ dependencies = [
  "crc32fast",
  "libz-rs-sys",
  "miniz_oxide",
+]
+
+[[package]]
+name = "flickzeug"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "407eaf1e36f361cbf10ad2f3f4f834e5d7fec6c481b16798c333d33f353e3d27"
+dependencies = [
+ "nu-ansi-term",
+ "strsim",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4351,7 +4352,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.55.0"
+version = "0.55.1"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -4370,9 +4371,9 @@ dependencies = [
  "criterion",
  "crossterm 0.28.1",
  "dialoguer",
- "diffy",
  "dunce",
  "flate2",
+ "flickzeug",
  "fs-err",
  "futures",
  "globset",

@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.55.0"
+version = "0.55.1"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -221,7 +221,7 @@ retry-policies = "0.5.1"
 strum = "0.27.2"
 unicode-normalization = "0.1.25"
 line-ending = "1.5.1"
-diffy = { git = "https://github.com/prefix-dev/diffy.git", branch = "master" }
+flickzeug = "0.4.4"
 http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
