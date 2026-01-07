@@ -68,6 +68,7 @@ def upload_package_to_prefix(
     force: bool = False,
     generate_attestation: bool = False,
     attestation_file: str | Path | None = None,
+    store_github_attestation: bool = False,
 ) -> None:
     """
     Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.
@@ -82,12 +83,13 @@ def upload_package_to_prefix(
         force: Whether to force overwrite existing packages.
         generate_attestation: Whether to generate an attestation for the uploaded packages.
         attestation_file: Path to an attestation file to upload along with the packages (note: only a single package can be uploaded when using this).
+        store_github_attestation: Whether to store the GitHub attestation.
 
     Returns:
         None
     """
     upload_package_to_prefix_py(
-        package_files, url, channels, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file
+        package_files, url, channels, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file, store_github_attestation
     )
 
 
