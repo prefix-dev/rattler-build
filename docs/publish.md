@@ -93,3 +93,13 @@ To initialize an existing directory as a channel, you can either:
 ## Indexing S3 and Filesystem channels
 
 Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use `rattler-index` to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.
+
+## Sigstore attestations
+
+When publishing to prefix.dev, you can automatically generate Sigstore attestations to cryptographically sign your packages and provide verifiable build provenance. Use the `--generate-attestation` flag:
+
+```bash
+rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel --generate-attestation
+```
+
+For more information about Sigstore attestations, verification, and manual attestation creation, see the [Sigstore attestations](sigstore.md) documentation.

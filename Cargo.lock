@@ -2097,9 +2097,9 @@ dependencies = [
 
 [[package]]
 name = "flickzeug"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76884df95026be09b84d9fc84294364198f2ec4d6a9e28ebebb32616e84b7f6e"
+checksum = "407eaf1e36f361cbf10ad2f3f4f834e5d7fec6c481b16798c333d33f353e3d27"
 dependencies = [
  "nu-ansi-term",
  "strsim",
@@ -2614,8 +2614,7 @@ dependencies = [
 [[package]]
 name = "http-range-client"
 version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d5f72a73344fc9576e74e42a0f1d7a05d7c6c50950a15f44faea133a91f622b"
+source = "git+https://github.com/pka/http-range-client.git#fccfa852dbe7e875a50802c55ee6c5f69c634827"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -4362,7 +4361,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.55.0"
+version = "0.55.1"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
