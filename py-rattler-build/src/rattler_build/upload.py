@@ -89,7 +89,16 @@ def upload_package_to_prefix(
         None
     """
     upload_package_to_prefix_py(
-        package_files, url, channels, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file, store_github_attestation
+        package_files,
+        url,
+        channels,
+        api_key,
+        auth_file,
+        skip_existing,
+        force,
+        generate_attestation,
+        attestation_file,
+        store_github_attestation,
     )
 
 
