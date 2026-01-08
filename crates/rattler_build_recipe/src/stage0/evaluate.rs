@@ -1588,14 +1588,62 @@ impl Evaluate for Stage0Requirements {
     }
 }
 
-// Pass through Extra as-is without evaluation
+// Evaluate Extra field with Jinja template support
 impl Evaluate for Stage0Extra {
     type Output = Stage1Extra;
 
-    fn evaluate(&self, _context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        Ok(Stage1Extra {
-            extra: self.extra.clone(),
-        })
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Recursively evaluate all values in the extra map, rendering any Jinja templates
+        let extra = self
+            .extra
+            .iter()
+            .map(|(key, value)| {
+                let evaluated_value = evaluate_serde_value(value, context)?;
+                Ok((key.clone(), evaluated_value))
+            })
+            .collect::<Result<indexmap::IndexMap<_, _>, ParseError>>()?;
+
+        Ok(Stage1Extra { extra })
+    }
+}
+
+/// Helper function to recursively evaluate serde_value::Value, rendering Jinja templates
+fn evaluate_serde_value(
+    value: &serde_value::Value,
+    context: &EvaluationContext,
+) -> Result<serde_value::Value, ParseError> {
+    match value {
+        serde_value::Value::String(s) => {
+            // Check if this string contains a Jinja template
+            if s.contains("${{") && s.contains("}}") {
+                // Render the Jinja template using the render_template helper
+                let rendered = render_template(s, context, None)?;
+                Ok(serde_value::Value::String(rendered))
+            } else {
+                Ok(value.clone())
+            }
+        }
+        serde_value::Value::Map(map) => {
+            // Recursively evaluate all values in the map
+            let evaluated_map = map
+                .iter()
+                .map(|(k, v)| {
+                    let evaluated_value = evaluate_serde_value(v, context)?;
+                    Ok((k.clone(), evaluated_value))
+                })
+                .collect::<Result<BTreeMap<_, _>, ParseError>>()?;
+            Ok(serde_value::Value::Map(evaluated_map))
+        }
+        serde_value::Value::Seq(seq) => {
+            // Recursively evaluate all items in the sequence
+            let evaluated_seq = seq
+                .iter()
+                .map(|v| evaluate_serde_value(v, context))
+                .collect::<Result<Vec<_>, ParseError>>()?;
+            Ok(serde_value::Value::Seq(evaluated_seq))
+        }
+        // For other types (numbers, booleans, etc.), pass through as-is
+        _ => Ok(value.clone()),
     }
 }
 
@@ -4326,5 +4374,127 @@ build:
             "is_abi3 should be tracked from skip expression (since match() succeeds, the 'and' evaluates the second operand). Accessed vars: {:?}",
             accessed
         );
+    }
+
+    #[test]
+    fn test_evaluate_extra_with_templates() {
+        use serde_value::Value as SerdeValue;
+
+        // Create a Stage0Extra with template values
+        let mut extra_map = indexmap::IndexMap::new();
+        extra_map.insert(
+            "feedstock-name".to_string(),
+            SerdeValue::String("${{ repo_name }}".to_string()),
+        );
+        extra_map.insert(
+            "custom-field".to_string(),
+            SerdeValue::String("custom-value".to_string()),
+        );
+        extra_map.insert(
+            "version-str".to_string(),
+            SerdeValue::String("Version: ${{ version }}".to_string()),
+        );
+
+        let extra = Stage0Extra { extra: extra_map };
+
+        // Create evaluation context with variables
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("repo_name".to_string(), Variable::from_string("my-repo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.2.3"));
+
+        // Evaluate the extra
+        let result = extra.evaluate(&ctx).unwrap();
+
+        // Check that templates were rendered
+        assert_eq!(
+            result.extra.get("feedstock-name"),
+            Some(&SerdeValue::String("my-repo".to_string()))
+        );
+        assert_eq!(
+            result.extra.get("custom-field"),
+            Some(&SerdeValue::String("custom-value".to_string()))
+        );
+        assert_eq!(
+            result.extra.get("version-str"),
+            Some(&SerdeValue::String("Version: 1.2.3".to_string()))
+        );
+
+        // Check that variables were tracked
+        let accessed = ctx.accessed_variables();
+        assert!(
+            accessed.contains("repo_name"),
+            "repo_name should be tracked from extra template"
+        );
+        assert!(
+            accessed.contains("version"),
+            "version should be tracked from extra template"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_extra_with_nested_structures() {
+        use serde_value::Value as SerdeValue;
+        use std::collections::BTreeMap;
+
+        // Create a Stage0Extra with nested structures
+        let mut extra_map = indexmap::IndexMap::new();
+
+        // Add a nested map with templates
+        let mut nested_map = BTreeMap::new();
+        nested_map.insert(
+            SerdeValue::String("key1".to_string()),
+            SerdeValue::String("${{ var1 }}".to_string()),
+        );
+        nested_map.insert(
+            SerdeValue::String("key2".to_string()),
+            SerdeValue::String("static".to_string()),
+        );
+        extra_map.insert("nested".to_string(), SerdeValue::Map(nested_map));
+
+        // Add a list with templates
+        extra_map.insert(
+            "list".to_string(),
+            SerdeValue::Seq(vec![
+                SerdeValue::String("${{ var2 }}".to_string()),
+                SerdeValue::String("fixed".to_string()),
+            ]),
+        );
+
+        let extra = Stage0Extra { extra: extra_map };
+
+        // Create evaluation context
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("var1".to_string(), Variable::from_string("value1"));
+        ctx.insert("var2".to_string(), Variable::from_string("value2"));
+
+        // Evaluate
+        let result = extra.evaluate(&ctx).unwrap();
+
+        // Check nested map
+        if let Some(SerdeValue::Map(map)) = result.extra.get("nested") {
+            assert_eq!(
+                map.get(&SerdeValue::String("key1".to_string())),
+                Some(&SerdeValue::String("value1".to_string()))
+            );
+            assert_eq!(
+                map.get(&SerdeValue::String("key2".to_string())),
+                Some(&SerdeValue::String("static".to_string()))
+            );
+        } else {
+            panic!("nested should be a map");
+        }
+
+        // Check list
+        if let Some(SerdeValue::Seq(seq)) = result.extra.get("list") {
+            assert_eq!(seq[0], SerdeValue::String("value2".to_string()));
+            assert_eq!(seq[1], SerdeValue::String("fixed".to_string()));
+        } else {
+            panic!("list should be a sequence");
+        }
+
+        // Check variables were tracked
+        let accessed = ctx.accessed_variables();
+        assert!(accessed.contains("var1"));
+        assert!(accessed.contains("var2"));
     }
 }

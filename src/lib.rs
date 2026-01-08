@@ -475,9 +475,14 @@ pub async fn get_build_output(
             },
         );
 
-        // Use the global build name for all outputs in a multi-output recipe
+        // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
-        let build_name = global_build_name.clone();
+        // Otherwise, use the output's own name for the build directory
+        let build_name = if recipe.inherits_from.is_some() {
+            global_build_name.clone()
+        } else {
+            recipe.package().name().as_normalized().to_string()
+        };
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars

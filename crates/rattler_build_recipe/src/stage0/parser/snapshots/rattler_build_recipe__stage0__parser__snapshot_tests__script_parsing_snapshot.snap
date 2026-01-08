@@ -64,12 +64,14 @@ tests:
       else: echo "This is not a unix-like system"
 - script:
     content:
-    - '#!/usr/bin/env bash'
-    - echo "This is a script provided as content"
+    - |
+      #!/usr/bin/env bash
+      echo "This is a script provided as content"
 - script:
     interpreter: bash
     content:
-    - echo "This is a script provided as content"
+    - |
+      echo "This is a script provided as content"
 - script:
     file: test.sh
 - script:
@@ -80,4 +82,5 @@ tests:
       TEST_ENV: Hello, world!
       FOOBAR: '42'
     content:
-    - echo "This is a script with environment variables"
+    - |
+      echo "This is a script with environment variables"

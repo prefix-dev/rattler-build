@@ -201,17 +201,8 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
             });
         }
 
-        // Split multiline string by newlines and filter empty lines
-        let lines: Vec<String> = script_str
-            .lines()
-            .map(|s| s.to_string())
-            .filter(|s| !s.trim().is_empty())
-            .collect();
-
-        let items: Vec<Item<String>> = lines
-            .into_iter()
-            .map(|line| Item::Value(Value::new_concrete(line, Some(span))))
-            .collect();
+        // Keep the entire multiline string as a single item to preserve multiline formatting
+        let items = vec![Item::Value(Value::new_concrete(script_str.to_string(), Some(span)))];
 
         return Ok(Script {
             content: Some(ConditionalList::new(items)),
@@ -291,24 +282,13 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                                 )),
                             ]));
                         } else {
-                            // Plain string - split by newlines if multiline
-                            let lines: Vec<String> = content_str
-                                .lines()
-                                .map(|s| s.to_string())
-                                .filter(|s| !s.trim().is_empty())
-                                .collect();
-
-                            let items: Vec<crate::stage0::types::Item<String>> = lines
-                                .into_iter()
-                                .map(|line| {
-                                    crate::stage0::types::Item::Value(Value::new_concrete(
-                                        line,
-                                        Some(span),
-                                    ))
-                                })
-                                .collect();
-
-                            content = Some(crate::stage0::types::ConditionalList::new(items));
+                            // Keep the entire multiline string as a single item to preserve multiline formatting
+                            content = Some(crate::stage0::types::ConditionalList::new(vec![
+                                crate::stage0::types::Item::Value(Value::new_concrete(
+                                    content_str.to_string(),
+                                    Some(span),
+                                ))
+                            ]));
                         }
                     } else {
                         // Parse as a list (with possible conditionals)
