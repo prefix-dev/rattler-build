@@ -2246,7 +2246,6 @@ def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path
     (test_dir / "ignored.txt").write_text("This should be ignored")
     (test_dir / "test.pyc").write_text("This should also be ignored")
 
-
     output_dir = tmp_path / "output"
     rattler_build.build(test_dir, output_dir)
 

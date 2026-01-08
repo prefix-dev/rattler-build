@@ -95,7 +95,7 @@ typos = "typos --force-exclude"
 lefthook = ">=1.12.2,<2"
 
 [feature.pre-commit.tasks]
-lefthook = { cmd = "lefthook", description = "Run lefthook" }
+# lefthook = { cmd = "lefthook", description = "Run lefthook" }
 lint = { depends-on = [
   "lint-fast",
   "lint-slow",
