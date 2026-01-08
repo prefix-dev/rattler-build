@@ -379,6 +379,149 @@ fn collect_used_variables(
         .collect()
 }
 
+/// Evaluate requirements with a variant combination and extract free specs
+/// that are also variant keys (not yet in the combination)
+fn discover_new_variant_keys_from_evaluation(
+    stage0_recipe: &Stage0Recipe,
+    combination: &BTreeMap<NormalizedKey, Variable>,
+    variant_config: &VariantConfig,
+    config: &RenderConfig,
+) -> Result<HashSet<NormalizedKey>, ParseError> {
+    let context = build_evaluation_context(combination, config, stage0_recipe)?;
+
+    // Get requirements and evaluate them
+    let free_specs: Vec<rattler_conda_types::PackageName> = match stage0_recipe {
+        Stage0Recipe::SingleOutput(recipe) => {
+            let evaluated = recipe.requirements.evaluate(&context)?;
+            evaluated.free_specs()
+        }
+        Stage0Recipe::MultiOutput(recipe) => {
+            let mut all_free_specs = Vec::new();
+            for output in &recipe.outputs {
+                let reqs = match output {
+                    stage0::Output::Staging(staging) => &staging.requirements,
+                    stage0::Output::Package(pkg) => &pkg.requirements,
+                };
+                if let Ok(evaluated) = reqs.evaluate(&context) {
+                    all_free_specs.extend(evaluated.free_specs());
+                }
+            }
+            all_free_specs
+        }
+    };
+
+    // Find free specs that are variant keys but not in current combination
+    let mut new_keys = HashSet::new();
+    for spec in free_specs {
+        let key = NormalizedKey::from(spec.as_normalized());
+        if variant_config.get(&key).is_some() && !combination.contains_key(&key) {
+            new_keys.insert(key);
+        }
+    }
+
+    Ok(new_keys)
+}
+
+/// Expand a variant combination with new keys, creating all combinations
+fn expand_combination_with_keys(
+    base: &BTreeMap<NormalizedKey, Variable>,
+    new_keys: &HashSet<NormalizedKey>,
+    variant_config: &VariantConfig,
+) -> Vec<BTreeMap<NormalizedKey, Variable>> {
+    if new_keys.is_empty() {
+        return vec![base.clone()];
+    }
+
+    // Get values for each new key
+    let key_values: Vec<(NormalizedKey, Vec<Variable>)> = new_keys
+        .iter()
+        .filter_map(|key| {
+            variant_config
+                .get(key)
+                .map(|values| (key.clone(), values.clone()))
+        })
+        .collect();
+
+    if key_values.is_empty() {
+        return vec![base.clone()];
+    }
+
+    // Create cross-product of all new key values
+    let mut results = vec![base.clone()];
+    for (key, values) in key_values {
+        let mut new_results = Vec::new();
+        for combo in &results {
+            for value in &values {
+                let mut new_combo = combo.clone();
+                new_combo.insert(key.clone(), value.clone());
+                new_results.push(new_combo);
+            }
+        }
+        results = new_results;
+    }
+
+    results
+}
+
+/// Recursively expand variant combinations by discovering new variant keys from evaluation
+/// This implements a tree-based approach where each combination can spawn new combinations
+/// if its evaluated free specs reveal new variant keys
+fn expand_variants_tree(
+    stage0_recipe: &Stage0Recipe,
+    initial_combinations: Vec<BTreeMap<NormalizedKey, Variable>>,
+    variant_config: &VariantConfig,
+    config: &RenderConfig,
+) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, ParseError> {
+    let mut final_combinations = Vec::new();
+    let mut to_process = initial_combinations;
+
+    // Limit iterations to prevent infinite loops
+    const MAX_ITERATIONS: usize = 10;
+    let mut iteration = 0;
+
+    while !to_process.is_empty() && iteration < MAX_ITERATIONS {
+        iteration += 1;
+        let mut next_round = Vec::new();
+
+        for combination in to_process {
+            // Discover new variant keys from evaluation
+            let new_keys = discover_new_variant_keys_from_evaluation(
+                stage0_recipe,
+                &combination,
+                variant_config,
+                config,
+            )?;
+
+            if new_keys.is_empty() {
+                // No new keys - this combination is final
+                final_combinations.push(combination);
+            } else {
+                // Expand with new keys and process in next round
+                let expanded =
+                    expand_combination_with_keys(&combination, &new_keys, variant_config);
+                next_round.extend(expanded);
+            }
+        }
+
+        to_process = next_round;
+    }
+
+    // Add any remaining combinations (in case we hit iteration limit)
+    final_combinations.extend(to_process);
+
+    // Deduplicate combinations
+    let mut seen = HashSet::new();
+    final_combinations.retain(|combo| {
+        let key: Vec<_> = combo
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect();
+        seen.insert(key)
+    });
+
+    Ok(final_combinations)
+}
+
 /// Helper function to build an evaluation context from variant values and config
 fn build_evaluation_context(
     variant: &BTreeMap<NormalizedKey, Variable>,
@@ -732,20 +875,25 @@ fn render_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    // Collect used variables
+    // Collect initially used variables (from templates and stage0 free specs)
     let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
 
-    // Compute all variant combinations
-    let combinations = variant_config
+    // Compute initial variant combinations
+    let initial_combinations = variant_config
         .combinations(&used_vars)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     // If no combinations, render once with just the extra context
-    if combinations.is_empty() {
+    if initial_combinations.is_empty() {
         return render_with_empty_combinations(stage0_recipe, &config);
     }
 
-    // Render recipe for each variant combination
+    // Expand combinations tree-style: evaluate each combination, discover new variant keys
+    // from free specs, and expand combinations if new keys are found
+    let combinations =
+        expand_variants_tree(stage0_recipe, initial_combinations, variant_config, &config)?;
+
+    // Render recipe for each final variant combination
     let mut results = Vec::with_capacity(combinations.len());
 
     for combination in combinations {
@@ -1431,6 +1579,143 @@ outputs:
             result.is_ok(),
             "Staging outputs should work with experimental flag: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_variant_discovery_from_conditional_template() {
+        // Test that `host: ["${{ 'openssl' if unix }}"]` discovers 'openssl' as a variant key
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - ${{ 'openssl' if unix }}
+"#;
+
+        let variant_yaml = r#"
+openssl:
+  - "1.1"
+  - "3.0"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        // Use linux platform to ensure `unix` is true
+        let config =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        // Should create 2 variants for openssl (1.1 and 3.0)
+        assert_eq!(
+            rendered.len(),
+            2,
+            "Should have 2 variants from openssl in conditional template"
+        );
+
+        // Check that openssl is in the variants
+        let openssl_versions: Vec<String> = rendered
+            .iter()
+            .filter_map(|r| r.variant.get(&"openssl".into()).map(|v| v.to_string()))
+            .collect();
+
+        assert!(
+            openssl_versions.contains(&"1.1".to_string()),
+            "Should have openssl 1.1 variant"
+        );
+        assert!(
+            openssl_versions.contains(&"3.0".to_string()),
+            "Should have openssl 3.0 variant"
+        );
+    }
+
+    #[test]
+    fn test_variant_discovery_from_variable_template() {
+        // Test tree-based variant discovery:
+        // - `host: ["${{ mpi }}"]` with `mpi: [openmpi, mpich]`
+        // - After evaluating mpi=openmpi, free spec 'openmpi' is discovered as a variant key
+        // - After evaluating mpi=mpich, free spec 'mpich' is discovered as a variant key
+        // - This creates a tree of variants
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - ${{ mpi }}
+"#;
+
+        let variant_yaml = r#"
+mpi:
+  - openmpi
+  - mpich
+openmpi:
+  - "4.0"
+  - "4.1"
+mpich:
+  - "3.4"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Tree-based variant discovery should create:
+        // - {mpi: openmpi, openmpi: 4.0}
+        // - {mpi: openmpi, openmpi: 4.1}
+        // - {mpi: mpich, mpich: 3.4}
+        assert_eq!(
+            rendered.len(),
+            3,
+            "Should have 3 variants: 2 for openmpi × openmpi versions, 1 for mpich × mpich version"
+        );
+
+        // Check mpi=openmpi variants have openmpi key
+        let openmpi_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| {
+                r.variant.get(&"mpi".into()).map(|v| v.to_string()) == Some("openmpi".to_string())
+            })
+            .collect();
+        assert_eq!(openmpi_variants.len(), 2, "Should have 2 openmpi variants");
+
+        let openmpi_versions: Vec<String> = openmpi_variants
+            .iter()
+            .filter_map(|r| r.variant.get(&"openmpi".into()).map(|v| v.to_string()))
+            .collect();
+        assert!(
+            openmpi_versions.contains(&"4.0".to_string()),
+            "Should have openmpi 4.0"
+        );
+        assert!(
+            openmpi_versions.contains(&"4.1".to_string()),
+            "Should have openmpi 4.1"
+        );
+
+        // Check mpi=mpich variant has mpich key
+        let mpich_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| {
+                r.variant.get(&"mpi".into()).map(|v| v.to_string()) == Some("mpich".to_string())
+            })
+            .collect();
+        assert_eq!(mpich_variants.len(), 1, "Should have 1 mpich variant");
+        assert_eq!(
+            mpich_variants[0]
+                .variant
+                .get(&"mpich".into())
+                .map(|v| v.to_string()),
+            Some("3.4".to_string()),
+            "mpich variant should have mpich=3.4"
         );
     }
 }
