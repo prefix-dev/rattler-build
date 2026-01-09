@@ -202,7 +202,10 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
         }
 
         // Keep the entire multiline string as a single item to preserve multiline formatting
-        let items = vec![Item::Value(Value::new_concrete(script_str.to_string(), Some(span)))];
+        let items = vec![Item::Value(Value::new_concrete(
+            script_str.to_string(),
+            Some(span),
+        ))];
 
         return Ok(Script {
             content: Some(ConditionalList::new(items)),
@@ -287,7 +290,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                                 crate::stage0::types::Item::Value(Value::new_concrete(
                                     content_str.to_string(),
                                     Some(span),
-                                ))
+                                )),
                             ]));
                         }
                     } else {
