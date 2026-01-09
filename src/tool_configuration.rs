@@ -110,11 +110,18 @@ impl BaseClient {
                 .read_timeout(std::time::Duration::from_secs(timeout))
         };
 
+        // Retry middleware must come before mirror middleware so that when a mirror
+        // returns a server error (e.g. 500), the retry will go through the mirror
+        // middleware again, which will then select a different mirror due to the
+        // recorded failure.
         let client_builder = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
                 .build()
                 .expect("failed to create client"),
         )
+        .with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
         .with(mirror_middleware);
 
         #[cfg(feature = "s3")]
@@ -124,9 +131,6 @@ impl BaseClient {
             .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
                 auth_storage.clone(),
             )))
-            .with(RetryTransientMiddleware::new_with_policy(
-                ExponentialBackoff::builder().build_with_max_retries(3),
-            ))
             .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
