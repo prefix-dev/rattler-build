@@ -2486,12 +2486,24 @@ impl Evaluate for Stage0Recipe {
     type Output = Stage1Recipe;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // First, evaluate the context variables and merge them into a new context
+        // Track variables accessed before context evaluation so we can identify
+        // which variables were accessed during context evaluation (before shadowing)
+        let accessed_before_context = context.accessed_variables();
+
+        // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
             (context.clone(), IndexMap::new())
         };
+
+        // Variables accessed during context evaluation (these came from the variant
+        // before being shadowed by context variables)
+        let accessed_during_context: HashSet<String> = context_with_vars
+            .accessed_variables()
+            .difference(&accessed_before_context)
+            .cloned()
+            .collect();
         let package = self.package.evaluate(&context_with_vars)?;
         let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
@@ -2541,10 +2553,18 @@ impl Evaluate for Stage0Recipe {
                 let key_str = k.as_str();
 
                 // Context variables (defined in the context: section) should not be included
-                // in the variant for hash computation. We need to determine which variables
-                // are context variables vs variant variables.
-                // Exclude context variables (from context: section)
-                if self.context.contains_key(key_str) {
+                // in the variant for hash computation, UNLESS they reference a variant variable
+                // with the same name. This happens when you have:
+                //   context:
+                //     foobar: ${{ foobar }}
+                // Here, foobar in context references the variant foobar, and the variant
+                // should still be tracked even though context shadows it.
+                //
+                // We detect this by checking if the variable was accessed from the variant
+                // DURING context evaluation (before shadowing). This is different from
+                // accessed_vars which includes all accesses including after shadowing.
+                if self.context.contains_key(key_str) && !accessed_during_context.contains(key_str)
+                {
                     return false;
                 }
                 // Exclude if it's a noarch-excluded key
@@ -2765,6 +2785,7 @@ fn evaluate_package_output_to_recipe(
     recipe: &stage0::MultiOutputRecipe,
     context: &EvaluationContext,
     staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
+    accessed_during_context: &HashSet<String>,
 ) -> Result<Stage1Recipe, ParseError> {
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
@@ -2951,8 +2972,9 @@ fn evaluate_package_output_to_recipe(
         .filter(|(k, _)| {
             let key_str = k.as_str();
 
-            // Exclude recipe context variables
-            if recipe.context.contains_key(key_str) {
+            // Exclude recipe context variables UNLESS they were accessed from the variant
+            // DURING context evaluation (before shadowing)
+            if recipe.context.contains_key(key_str) && !accessed_during_context.contains(key_str) {
                 return false;
             }
             // Exclude if it's a noarch-excluded key
@@ -3013,12 +3035,24 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         use crate::stage1::StagingCache;
 
-        // First, evaluate the context variables and merge them into a new context
+        // Track variables accessed before context evaluation so we can identify
+        // which variables were accessed during context evaluation (before shadowing)
+        let accessed_before_context = context.accessed_variables();
+
+        // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
             (context.clone(), IndexMap::new())
         };
+
+        // Variables accessed during context evaluation (these came from the variant
+        // before being shadowed by context variables)
+        let accessed_during_context: HashSet<String> = context_with_vars
+            .accessed_variables()
+            .difference(&accessed_before_context)
+            .cloned()
+            .collect();
 
         // First pass: Evaluate all staging outputs and collect them
         let mut staging_caches = IndexMap::new();
@@ -3064,7 +3098,11 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     .iter()
                     .filter(|(k, _)| {
                         let key_str = k.as_str();
-                        if self.context.contains_key(key_str) {
+                        // Exclude context variables UNLESS they were accessed from the variant
+                        // DURING context evaluation (before shadowing)
+                        if self.context.contains_key(key_str)
+                            && !accessed_during_context.contains(key_str)
+                        {
                             return false;
                         }
                         accessed_vars.contains(key_str)
@@ -3099,6 +3137,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     self,
                     &context_with_vars,
                     &staging_caches,
+                    &accessed_during_context,
                 )?;
                 recipe.context = evaluated_context.clone();
 

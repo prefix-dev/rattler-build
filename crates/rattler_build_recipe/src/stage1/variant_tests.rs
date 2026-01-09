@@ -793,4 +793,80 @@ build:
         // Build string should be in format "py{python_version}_h{hash}"
         assert!(build_str.contains("py3") && build_str.contains("_h"));
     }
+
+    #[test]
+    fn test_context_variable_shadowing_variant_variable() {
+        // Test case: when context defines a variable that references a variant variable
+        // with the same name, the variant variable should still be tracked as used.
+        //
+        // Example:
+        //   context:
+        //     foobar: ${{ foobar }}
+        //   package:
+        //     name: foobar-${{ foobar }}
+        //
+        // Here, `foobar` in context references the variant `foobar`, and even though
+        // the context variable shadows it, we should track `foobar` as a used variant.
+        let yaml = r#"
+context:
+  foobar: ${{ foobar }}
+
+package:
+  name: foobar-${{ foobar }}
+  version: "1.0.0"
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("foobar".to_string(), Variable::from("baz"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // The foobar variant should be tracked even though it's shadowed by context
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("foobar")),
+            "foobar should be in used_variant because it was accessed from the variant \
+             before being shadowed by the context variable. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // Verify the recipe was evaluated correctly
+        assert_eq!(recipe.package().name().as_source(), "foobar-baz");
+    }
+
+    #[test]
+    fn test_context_variable_not_from_variant() {
+        // Test case: when context defines a variable with a literal value,
+        // it should NOT be tracked as a used variant (since it's not from the variant).
+        let yaml = r#"
+context:
+  myvar: "literal_value"
+
+package:
+  name: test-${{ myvar }}
+  version: "1.0.0"
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("myvar".to_string(), Variable::from("variant_value"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // myvar should NOT be in used_variant because the context defined it as a literal,
+        // not as a reference to the variant
+        assert!(
+            !used_variant.contains_key(&NormalizedKey::from("myvar")),
+            "myvar should NOT be in used_variant because context defines it as a literal"
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // Verify the context value (literal) was used, not the variant value
+        assert_eq!(recipe.package().name().as_source(), "test-literal_value");
+    }
 }
