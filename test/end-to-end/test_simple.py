@@ -2310,6 +2310,32 @@ def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
 
     assert (pkg / "info/index.json").exists()
 
+def test_simple_powershell_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "simple-powershell-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-powershell-test")
+
+    assert (pkg / "info/index.json").exists()
+
+def test_powershell_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "powershell-extension-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "powershell-extension-test")
+
+    assert (pkg / "info/index.json").exists()
+
+def test_powershell(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "powershell-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "powershell-test")
+
+    assert (pkg / "info/index.json").exists()
 
 @pytest.mark.skipif(
     platform.system() != "Windows", reason="PE header test only relevant on Windows"

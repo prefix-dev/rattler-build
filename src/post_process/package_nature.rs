@@ -32,6 +32,7 @@ pub enum PackageNature {
     InterpreterPython,
     InterpreterRuby,
     InterpreterNodeJs,
+    InterpreterPowerShell,
     /// R or Python library with DSOs
     PluginLibraryR,
     PluginLibraryPython,
@@ -69,6 +70,8 @@ impl PackageNature {
             return PackageNature::InterpreterRuby;
         } else if package_name == "nodejs" {
             return PackageNature::InterpreterNodeJs;
+        } else if package_name == "powershell" {
+            return PackageNature::InterpreterPowerShell;
         }
         let run_exports_json = PathBuf::from("info/run_exports.json");
         if prefix_record.files.contains(&run_exports_json) {

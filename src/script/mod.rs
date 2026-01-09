@@ -9,7 +9,8 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NodeJsInterpreter,
-    NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter, RubyInterpreter,
+    NuShellInterpreter, PerlInterpreter, PowerShellInterpreter, PythonInterpreter, RInterpreter,
+    RubyInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -327,6 +328,7 @@ impl Script {
             "rscript" => RInterpreter.run(exec_args).await?,
             "ruby" => RubyInterpreter.run(exec_args).await?,
             "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
+            "powershell" => PowerShellInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::other(format!(
                     "Unsupported interpreter: {}",
