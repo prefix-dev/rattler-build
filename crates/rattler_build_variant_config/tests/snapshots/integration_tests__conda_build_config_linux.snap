@@ -1,0 +1,17 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+c_compiler_version:
+  - "9"
+  - "10"
+  - "11"
+compiler:
+  - gcc
+  - clang
+python:
+  - "3.9"
+  - "3.10"
+  - "3.11"
+target_platform:
+  - linux-64

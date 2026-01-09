@@ -1,0 +1,38 @@
+# Converted from test-data/recipes/cache/recipe-cmake.yaml
+# Tests staging output with build dependencies (cmake)
+
+schema_version: 1
+
+context:
+  version: 0.1.0
+  build_num: 0
+
+recipe:
+  name: cache-installation
+  version: ${{ version }}
+
+build:
+  number: ${{ build_num }}
+
+outputs:
+  # Staging output with cmake dependency
+  - staging:
+      name: cmake-stage
+    requirements:
+      build:
+        - cmake
+    build:
+      script:
+        - cmake --version
+
+  # First package output
+  - package:
+      name: check-1
+      version: ${{ version }}
+    inherit: cmake-stage
+
+  # Second package output
+  - package:
+      name: check-2
+      version: ${{ version }}
+    inherit: cmake-stage

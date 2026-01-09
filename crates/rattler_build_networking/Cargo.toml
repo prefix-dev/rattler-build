@@ -1,0 +1,26 @@
+[package]
+name = "rattler_build_networking"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Networking utilities for rattler-build"
+
+[features]
+default = []
+middleware = ["rattler_networking"]
+
+[dependencies]
+reqwest = { workspace = true, features = [
+  "multipart",
+  "rustls-tls",
+  "rustls-tls-native-roots",
+] }
+reqwest-middleware = { workspace = true, features = ["rustls-tls"] }
+reqwest-retry = { workspace = true }
+rattler_networking = { version = "0.25.16", optional = true }
+url = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

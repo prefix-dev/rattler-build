@@ -1,0 +1,21 @@
+python:
+  - "3.9"
+  - "3.10"
+  - "3.11"
+
+numpy:
+  - "1.20"
+  - "1.21"
+  - "1.22"
+
+compiler:
+  - gcc
+  - clang
+
+compiler_version:
+  - "9"
+  - "10"
+
+zip_keys:
+  - [python, numpy]
+  - [compiler, compiler_version]

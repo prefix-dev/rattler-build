@@ -8,6 +8,70 @@ use dunce::canonicalize;
 
 use crate::utils::remove_dir_all_force;
 
+/// Builder for creating [`Directories`] with a fluent API.
+#[derive(Debug, Clone)]
+pub struct DirectoriesBuilder<'a> {
+    name: &'a str,
+    recipe_path: &'a Path,
+    output_dir: &'a Path,
+    timestamp: &'a DateTime<Utc>,
+    no_build_id: bool,
+    merge_build_and_host: bool,
+    skip_directory_creation: bool,
+}
+
+impl<'a> DirectoriesBuilder<'a> {
+    /// Create a new builder with required parameters.
+    pub fn new(
+        name: &'a str,
+        recipe_path: &'a Path,
+        output_dir: &'a Path,
+        timestamp: &'a DateTime<Utc>,
+    ) -> Self {
+        Self {
+            name,
+            recipe_path,
+            output_dir,
+            timestamp,
+            no_build_id: false,
+            merge_build_and_host: false,
+            skip_directory_creation: false,
+        }
+    }
+
+    /// When true, omit the build ID (timestamp) from the build directory name.
+    pub fn no_build_id(mut self, no_build_id: bool) -> Self {
+        self.no_build_id = no_build_id;
+        self
+    }
+
+    /// When true, use the same prefix for both build and host environments.
+    pub fn merge_build_and_host(mut self, merge: bool) -> Self {
+        self.merge_build_and_host = merge;
+        self
+    }
+
+    /// Skip creating directories on the filesystem.
+    /// Useful for render-only mode where no output files are produced.
+    pub fn skip_directory_creation(mut self, skip: bool) -> Self {
+        self.skip_directory_creation = skip;
+        self
+    }
+
+    /// Build the [`Directories`] struct.
+    pub fn build(self) -> Result<Directories, std::io::Error> {
+        Directories::setup_internal(
+            self.name,
+            self.recipe_path,
+            self.output_dir,
+            self.no_build_id,
+            self.timestamp,
+            self.merge_build_and_host,
+            self.skip_directory_creation,
+        )
+    }
+}
+
 /// Directories used during the build process
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Directories {
@@ -53,27 +117,43 @@ fn get_build_dir(
 }
 
 impl Directories {
-    /// Create all directories needed for the building of a package
-    pub fn setup(
+    /// Create a new [`DirectoriesBuilder`] with the required parameters.
+    pub fn builder<'a>(
+        name: &'a str,
+        recipe_path: &'a Path,
+        output_dir: &'a Path,
+        timestamp: &'a DateTime<Utc>,
+    ) -> DirectoriesBuilder<'a> {
+        DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp)
+    }
+
+    /// Internal setup function called by the builder.
+    fn setup_internal(
         name: &str,
         recipe_path: &Path,
         output_dir: &Path,
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
         merge_build_and_host: bool,
+        skip_directory_creation: bool,
     ) -> Result<Directories, std::io::Error> {
-        if !output_dir.exists() {
-            fs::create_dir_all(output_dir)?;
-        }
-        let output_dir = canonicalize(output_dir)?;
+        let output_dir = if skip_directory_creation {
+            output_dir.to_path_buf()
+        } else {
+            if !output_dir.exists() {
+                fs::create_dir_all(output_dir)?;
+            }
 
-        // Write .condapackageignore to exclude the output directory from source copying.
-        // This prevents the output directory from being included when users use `path: ../`
-        // in their source configuration.
-        let ignore_file = output_dir.join(".condapackageignore");
-        if !ignore_file.exists() {
-            fs::write(&ignore_file, "*\n")?;
-        }
+            // Write .condapackageignore to exclude the output directory from source copying.
+            // This prevents the output directory from being included when users use `path: ../`
+            // in their source configuration.
+            let ignore_file = output_dir.join(".condapackageignore");
+            if !ignore_file.exists() {
+                fs::write(&ignore_file, "*\n")?;
+            }
+
+            canonicalize(output_dir)?
+        };
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
@@ -119,8 +199,9 @@ impl Directories {
             output_dir,
         };
 
-        // Log the build folder for debugging
-        directories.log_build_folder()?;
+        if !skip_directory_creation {
+            directories.log_build_folder()?;
+        }
 
         Ok(directories)
     }
@@ -236,14 +317,13 @@ mod tests {
     fn test_directories_yaml_rendering() {
         let tempdir = tempfile::tempdir().unwrap();
 
-        let directories = Directories::setup(
+        let directories = Directories::builder(
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            false,
             &chrono::Utc::now(),
-            false,
         )
+        .build()
         .unwrap();
         directories.create_build_dir(false).unwrap();
 

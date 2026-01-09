@@ -1,62 +1,109 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-
-use crate::{
-    metadata::Output,
-    packaging::PackagingError,
-    recipe::{
-        Jinja,
-        parser::{CommandsTest, ScriptContent, TestType},
-    },
-    script::ResolvedScriptContents,
+use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::CommandsTest};
+use rattler_build_script::{
+    ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
 };
+use rattler_conda_types::{MatchSpec, PackageNameMatcher};
 
-impl CommandsTest {
-    fn write_to_folder(
-        &self,
-        folder: &Path,
-        output: &Output,
-    ) -> Result<Vec<PathBuf>, PackagingError> {
-        let mut test_files = Vec::new();
+use crate::{metadata::Output, packaging::PackagingError};
 
-        if !self.files.recipe.is_empty() || !self.files.source.is_empty() {
-            fs::create_dir_all(folder)?;
+/// Resolve a dependency, converting PinSubpackage/PinCompatible to concrete MatchSpecs
+fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
+    match dep {
+        Dependency::Spec(_) => dep.clone(),
+        Dependency::PinSubpackage(pin) => {
+            let name = &pin.pin_subpackage.name;
+            if let Some(subpackage) = output.build_configuration.subpackages.get(name) {
+                // Apply the pin to get a concrete MatchSpec
+                match pin
+                    .pin_subpackage
+                    .apply(&subpackage.version, &subpackage.build_string)
+                {
+                    Ok(spec) => Dependency::Spec(Box::new(spec)),
+                    Err(_) => {
+                        // If apply fails, fall back to just the package name
+                        Dependency::Spec(Box::new(MatchSpec {
+                            name: Some(PackageNameMatcher::Exact(name.clone())),
+                            ..Default::default()
+                        }))
+                    }
+                }
+            } else {
+                // Subpackage not found, fall back to just the package name
+                Dependency::Spec(Box::new(MatchSpec {
+                    name: Some(PackageNameMatcher::Exact(name.clone())),
+                    ..Default::default()
+                }))
+            }
         }
-
-        if !self.files.recipe.is_empty() {
-            let globs = &self.files.recipe;
-            let copy_dir = crate::source::copy_dir::CopyDir::new(
-                &output.build_configuration.directories.recipe_dir,
-                folder,
-            )
-            .with_globvec(globs)
-            .use_gitignore(false)
-            .run()?;
-
-            test_files.extend(copy_dir.copied_paths().iter().cloned());
+        Dependency::PinCompatible(pin) => {
+            // For pin_compatible in tests, we just use the package name
+            // since we don't have compatibility_specs available here
+            let name = &pin.pin_compatible.name;
+            Dependency::Spec(Box::new(MatchSpec {
+                name: Some(PackageNameMatcher::Exact(name.clone())),
+                ..Default::default()
+            }))
         }
-
-        if !self.files.source.is_empty() {
-            let globs = &self.files.source;
-            let copy_dir = crate::source::copy_dir::CopyDir::new(
-                &output.build_configuration.directories.work_dir,
-                folder,
-            )
-            .with_globvec(globs)
-            .use_gitignore(false)
-            .run()?;
-
-            test_files.extend(copy_dir.copied_paths().iter().cloned());
-        }
-
-        Ok(test_files)
     }
 }
 
-fn default_jinja_context(output: &Output) -> Jinja {
-    let selector_config = output.build_configuration.selector_config();
-    Jinja::new(selector_config).with_context(&output.recipe.context)
+/// Resolve all dependencies in a CommandsTest requirements
+fn resolve_test_requirements(command_test: &mut CommandsTest, output: &Output) {
+    command_test.requirements.run = command_test
+        .requirements
+        .run
+        .iter()
+        .map(|dep| resolve_dependency(dep, output))
+        .collect();
+    command_test.requirements.build = command_test
+        .requirements
+        .build
+        .iter()
+        .map(|dep| resolve_dependency(dep, output))
+        .collect();
+}
+
+pub fn write_command_test_files(
+    command_test: &CommandsTest,
+    folder: &Path,
+    output: &Output,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let mut test_files = Vec::new();
+
+    if !command_test.files.recipe.is_empty() || !command_test.files.source.is_empty() {
+        fs::create_dir_all(folder)?;
+    }
+
+    if !command_test.files.recipe.is_empty() {
+        let globs = &command_test.files.recipe;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.recipe_dir,
+            folder,
+        )
+        .with_globvec(globs)
+        .use_gitignore(false)
+        .run()?;
+
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
+
+    if !command_test.files.source.is_empty() {
+        let globs = &command_test.files.source;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.work_dir,
+            folder,
+        )
+        .with_globvec(globs)
+        .use_gitignore(false)
+        .run()?;
+
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
+
+    Ok(test_files)
 }
 
 /// Write out the test files for the final package
@@ -69,17 +116,20 @@ pub(crate) fn write_test_files(
     let name = output.name().as_normalized();
 
     // extract test section from the original recipe
-    let mut tests = output.recipe.tests().clone();
+    let mut tests = output.recipe.tests.clone();
 
     // remove the package contents tests as they are not needed in the final package
     tests.retain(|test| !matches!(test, TestType::PackageContents { .. }));
 
     // For each `Command` test, we need to copy the test files to the package
     for (idx, test) in tests.iter_mut().enumerate() {
-        if let TestType::Command(command_test) = test {
+        if let TestType::Commands(command_test) = test {
+            // Resolve pin_subpackage dependencies to concrete MatchSpecs
+            resolve_test_requirements(command_test, output);
+
             let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
-            let files = command_test.write_to_folder(&folder, output)?;
+            let files = write_command_test_files(command_test, &folder, output)?;
             if !files.is_empty() {
                 test_files.extend(files);
                 // store the cwd in the rendered test
@@ -87,10 +137,11 @@ pub(crate) fn write_test_files(
             }
 
             // Try to render the script contents here
-            // Note: we want to improve this with better rendering in the future
+            // TODO(refactor): properly render script here.
+            let jinja_renderer = output.jinja_renderer();
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
-                Some(default_jinja_context(output)),
+                Some(jinja_renderer),
                 &["sh", "bat"],
             )?;
 
@@ -99,7 +150,10 @@ pub(crate) fn write_test_files(
                 ResolvedScriptContents::Inline(contents) => {
                     command_test.script.content = ScriptContent::Command(contents)
                 }
-                ResolvedScriptContents::Path(_path, contents) => {
+                ResolvedScriptContents::Path(path, contents) => {
+                    if command_test.script.interpreter.is_none() {
+                        command_test.script.interpreter = determine_interpreter_from_path(&path);
+                    }
                     command_test.script.content = ScriptContent::Command(contents);
                 }
                 ResolvedScriptContents::Missing => {

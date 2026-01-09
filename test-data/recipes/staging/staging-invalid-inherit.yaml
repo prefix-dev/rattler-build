@@ -1,0 +1,11 @@
+schema_version: 1
+
+recipe:
+  name: invalid-test
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: invalid-pkg
+      version: 1.0.0
+    inherit: nonexistent-cache

@@ -1,0 +1,8 @@
+package:
+  name: error-matchspec
+  version: 1.0.0
+
+requirements:
+  build:
+    - python
+    - foobar ><1234 # error in parsing
