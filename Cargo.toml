@@ -66,6 +66,7 @@ native-tls = [
   'rattler_repodata_gateway/native-tls',
   'rattler_networking/native-tls',
   'rattler_package_streaming/native-tls',
+  'rattler_index/native-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -75,6 +76,7 @@ rustls-tls = [
   'rattler_repodata_gateway/rustls-tls',
   'rattler_networking/rustls-tls',
   'rattler_package_streaming/rustls-tls',
+  'rattler_index/rustls-tls',
 ]
 tui = [
   'ratatui',
