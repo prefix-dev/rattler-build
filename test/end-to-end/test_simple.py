@@ -1890,6 +1890,8 @@ def test_interpreter_detection(
         expected_output = "Hello from Nushell!"
     elif interpreter == "r":
         expected_output = "Hello from R!"
+    elif interpreter == "powershell":
+        expected_output = "Hello from PowerShell!"
     else:
         expected_output = f"Hello from {interpreter.upper()}!"
 
