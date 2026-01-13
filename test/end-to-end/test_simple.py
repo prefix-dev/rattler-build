@@ -1853,6 +1853,7 @@ def test_relative_file_loading(
         "pl",
         "nu",
         "r",
+        "powershell",
     ],
 )
 def test_interpreter_detection(
@@ -2319,21 +2320,36 @@ def test_simple_powershell_test(rattler_build: RattlerBuild, recipes: Path, tmp_
 
     assert (pkg / "info/index.json").exists()
 
-def test_powershell_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "powershell-extension-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "powershell-extension-test")
-
-    assert (pkg / "info/index.json").exists()
-
 def test_powershell(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "powershell-test/recipe.yaml",
         tmp_path,
     )
     pkg = get_extracted_package(tmp_path, "powershell-test")
+
+    assert (pkg / "info/index.json").exists()
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="powershell default test only relevant on Windows"
+)
+def test_powershell_default(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "powershell-default/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "powershell-default")
+
+    assert (pkg / "info/index.json").exists()
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="prefer bat test only relevant on Windows"
+)
+def test_prefer_bat(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "prefer-bat/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "prefer-bat")
 
     assert (pkg / "info/index.json").exists()
 
