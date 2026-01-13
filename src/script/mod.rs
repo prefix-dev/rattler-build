@@ -261,8 +261,13 @@ impl Script {
     ) -> Result<(), InterpreterError> {
         // Determine the valid script extensions based on the available interpreters.
         let mut valid_script_extensions = Vec::new();
+        let mut inferred_interpreter: Option<&str> = None;
         if cfg!(windows) {
             valid_script_extensions.push("bat");
+            if !recipe_dir.join("build.bat").exists() && recipe_dir.join("build.ps1").exists() {
+                valid_script_extensions.push("ps1");
+                inferred_interpreter = Some("powershell");
+            }
         } else {
             valid_script_extensions.push("sh");
         }
@@ -319,7 +324,12 @@ impl Script {
             debug,
         };
 
-        match self.interpreter() {
+        let interpreter = self
+            .interpreter
+            .as_deref()
+            .or(inferred_interpreter)
+            .unwrap_or(self.interpreter());
+        match interpreter {
             "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
             "bash" => BashInterpreter.run(exec_args).await?,
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
