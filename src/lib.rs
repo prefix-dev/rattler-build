@@ -153,6 +153,7 @@ pub fn get_tool_config(
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
         .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_allow_absolute_license_paths(build_data.allow_absolute_license_paths)
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
         .with_sharded_repodata_enabled(build_data.common.use_sharded)
@@ -1104,6 +1105,7 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        allow_absolute_license_paths: false,
         exclude_newer: None,
     };
 

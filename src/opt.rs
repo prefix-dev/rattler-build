@@ -489,6 +489,10 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
 
+    /// Allow absolute paths in license_file entries (defaults to false)
+    #[arg(long, help_heading = "Modifying result")]
+    pub allow_absolute_license_paths: bool,
+
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
@@ -524,6 +528,7 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -558,6 +563,7 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         Self {
@@ -596,6 +602,7 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            allow_absolute_license_paths,
             exclude_newer,
         }
     }
@@ -645,6 +652,7 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.allow_absolute_license_paths,
             opts.exclude_newer,
         )
     }

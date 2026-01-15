@@ -97,10 +97,11 @@ pub enum PackagingError {
 /// This function copies the license files to the info/licenses folder.
 /// License files are selected from the recipe directory and the source (work) folder.
 /// If the same file is found in both locations, the file from the recipe directory is used.
-/// Absolute paths are also supported and will be copied directly.
+/// Absolute paths are also supported when `allow_absolute_license_paths` is true.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
+    allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
     if output.recipe.about().license_file.is_empty() {
         Ok(None)
@@ -123,6 +124,18 @@ fn copy_license_files(
         // Handle absolute paths directly
         for glob_with_source in &absolute_paths {
             let abs_path = Path::new(glob_with_source.source());
+
+            // Check if absolute paths are allowed
+            if !allow_absolute_license_paths {
+                return Err(PackagingError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!(
+                        "Absolute paths in license_file are not allowed. \
+                        Use --allow-absolute-license-paths to enable. Path: {}",
+                        abs_path.display()
+                    ),
+                )));
+            }
 
             if abs_path.exists() {
                 // Get the file name to use as destination
@@ -465,7 +478,11 @@ pub fn package_conda(
 
     // TODO move things below also to metadata.rs
     tracing::info!("Copying license files");
-    if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
+    if let Some(license_files) = copy_license_files(
+        output,
+        tmp.temp_dir.path(),
+        tool_configuration.allow_absolute_license_paths,
+    )? {
         tmp.add_files(license_files);
     }
 

@@ -231,6 +231,9 @@ pub struct Configuration {
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
 
+    /// Whether to allow absolute paths in license_file entries (defaults to false)
+    pub allow_absolute_license_paths: bool,
+
     /// Whether the environments are externally managed (e.g. by `pixi-build`).
     /// This is only useful for other libraries that build their own environments and only use rattler-build
     /// to execute scripts / bundle up files.
@@ -293,6 +296,7 @@ pub struct ConfigurationBuilder {
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    allow_absolute_license_paths: bool,
     environments_externally_managed: bool,
 }
 
@@ -327,6 +331,7 @@ impl ConfigurationBuilder {
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
             allow_symlinks_on_windows: false,
+            allow_absolute_license_paths: false,
             environments_externally_managed: false,
         }
     }
@@ -360,6 +365,14 @@ impl ConfigurationBuilder {
     pub fn with_allow_symlinks_on_windows(self, allow_symlinks_on_windows: bool) -> Self {
         Self {
             allow_symlinks_on_windows,
+            ..self
+        }
+    }
+
+    /// Whether to allow absolute paths in license_file entries
+    pub fn with_allow_absolute_license_paths(self, allow_absolute_license_paths: bool) -> Self {
+        Self {
+            allow_absolute_license_paths,
             ..self
         }
     }
@@ -568,6 +581,7 @@ impl ConfigurationBuilder {
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            allow_absolute_license_paths: self.allow_absolute_license_paths,
             environments_externally_managed: self.environments_externally_managed,
         }
     }
