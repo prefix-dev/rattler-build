@@ -32,7 +32,7 @@ impl Interpreter for PowerShellInterpreter {
             let ver = out
                 .trim()
                 .split(' ')
-                .last()?
+                .next_back()?
                 .split('.')
                 .collect::<Vec<&str>>();
             if ver.len() < 2 {
@@ -45,7 +45,7 @@ impl Interpreter for PowerShellInterpreter {
                 new_enough = false;
             }
 
-            return Some(());
+            Some(())
         });
         if result.is_none() {
             shell_cmd = "powershell";
