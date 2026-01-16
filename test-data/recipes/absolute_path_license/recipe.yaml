@@ -14,7 +14,7 @@ build:
         - echo "absolute path test" > /tmp/rattler_test_licenses/external_license.txt
     - if: win
       then:
-        - mkdir %TEMP%\rattler_test_licenses
+        - if not exist "%TEMP%\rattler_test_licenses" mkdir "%TEMP%\rattler_test_licenses"
         - echo "absolute path test" > %TEMP%\rattler_test_licenses\external_license.txt
 
 about:
