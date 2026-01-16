@@ -86,6 +86,7 @@ def build_recipes(
     debug: bool = False,
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
+    allow_absolute_license_paths: bool = False,
     exclude_newer: Union[datetime, None] = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
@@ -124,6 +125,7 @@ def build_recipes(
         debug: Enable or disable debug mode. (default: False)
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
+        allow_absolute_license_paths: Allow absolute paths in license files. (default: False)
         exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
@@ -163,6 +165,7 @@ def build_recipes(
         debug,
         error_prefix_in_binary,
         allow_symlinks_on_windows,
+        allow_absolute_license_paths,
         exclude_newer,
         use_bz2,
         use_zstd,
