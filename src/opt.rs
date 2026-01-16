@@ -537,7 +537,7 @@ pub struct BuildOpts {
     pub allow_symlinks_on_windows: bool,
 
     /// Allow absolute paths in license_file entries (defaults to false)
-    #[arg(long, help_heading = "Modifying result")]
+    #[arg(long, hide = true, help_heading = "Modifying result")]
     pub allow_absolute_license_paths: bool,
 
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
