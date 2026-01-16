@@ -161,6 +161,20 @@ impl<S: SourceCode> Stage1Render<S> {
 
         all_vars.extend(used_vars_jinja.iter().cloned());
 
+        // Get recipe once to use throughout
+        let recipe = &self.inner[idx].recipe;
+
+        // Filter out any ignore keys
+        let ignore_keys: HashSet<NormalizedKey> = recipe
+            .build()
+            .variant()
+            .ignore_keys
+            .iter()
+            .map(|k| k.as_str().into())
+            .collect();
+
+        all_vars.retain(|var| !ignore_keys.contains(var));
+
         // extract variant
         let mut variant = BTreeMap::new();
         for var in all_vars {
@@ -170,14 +184,12 @@ impl<S: SourceCode> Stage1Render<S> {
         }
 
         // Add in virtual packages
-        let recipe = &self.inner[idx].recipe;
         for run_requirement in recipe.requirements().run() {
-            if let Dependency::Spec(spec) = run_requirement {
-                if let Some(ref name) = spec.name {
-                    if name.as_normalized().starts_with("__") {
-                        variant.insert(name.as_normalized().into(), spec.to_string().into());
-                    }
-                }
+            if let Dependency::Spec(spec) = run_requirement
+                && let Some(ref name) = spec.name
+                && name.to_string().starts_with("__")
+            {
+                variant.insert(name.to_string().into(), spec.to_string().into());
             }
         }
 
@@ -243,18 +255,21 @@ impl<S: SourceCode> Stage1Render<S> {
 
             // Helper closure to add edges for dependencies
             let mut add_edge = |req_name: &PackageName| {
-                if req_name != output_name {
-                    if let Some(&req_idx) = name_to_idx.get(req_name) {
-                        graph.add_edge(req_idx, current_node, ());
-                    }
+                if req_name != output_name
+                    && let Some(&req_idx) = name_to_idx.get(req_name)
+                {
+                    graph.add_edge(req_idx, current_node, ());
                 }
             };
 
             // If we find any keys that reference another output, add an edge
             for req in output.build_time_requirements() {
-                if let Dependency::Spec(spec) = req {
-                    add_edge(spec.name.as_ref().expect("Dependency should have a name"));
-                };
+                if let Dependency::Spec(spec) = req
+                    && let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) =
+                        spec.name.as_ref()
+                {
+                    add_edge(name);
+                }
             }
 
             for pin in output.requirements().all_pin_subpackage() {
@@ -328,10 +343,8 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 if let Dependency::Spec(spec) = dep {
                     let is_simple = spec.version.is_none() && spec.build.is_none();
                     // add in the variant key for this dependency that has no version specifier
-                    if is_simple {
-                        if let Some(ref name) = spec.name {
-                            additional_variables.insert(name.as_normalized().into());
-                        }
+                    if is_simple && let Some(ref name) = spec.name {
+                        additional_variables.insert(name.to_string().into());
                     }
                 }
             }

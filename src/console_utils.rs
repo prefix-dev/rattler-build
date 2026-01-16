@@ -1,7 +1,9 @@
 //! This module contains utilities for logging and progress bar handling.
 use std::{
     borrow::Cow,
+    collections::hash_map::DefaultHasher,
     future::Future,
+    hash::{Hash, Hasher},
     io,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -9,7 +11,7 @@ use std::{
 };
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use console::style;
+use console::{Style, style};
 use indicatif::{
     HumanBytes, HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle,
 };
@@ -28,6 +30,29 @@ use tracing_subscriber::{
 };
 
 use crate::consts;
+
+/// A palette of colors used for different package builds.
+/// These are chosen to be visually distinct and readable on both light and dark terminals.
+const SPAN_COLOR_PALETTE: &[console::Color] = &[
+    console::Color::Cyan,
+    console::Color::Green,
+    console::Color::Yellow,
+    console::Color::Blue,
+    console::Color::Magenta,
+    console::Color::Color256(208), // Orange
+    console::Color::Color256(141), // Light purple
+    console::Color::Color256(43),  // Teal
+];
+
+/// Returns a deterministic color for a given package identifier.
+/// The color is chosen by hashing the identifier and selecting from the palette.
+fn get_span_color(identifier: &str) -> Style {
+    let mut hasher = DefaultHasher::new();
+    identifier.hash(&mut hasher);
+    let hash = hasher.finish();
+    let color_index = (hash as usize) % SPAN_COLOR_PALETTE.len();
+    Style::new().fg(SPAN_COLOR_PALETTE[color_index])
+}
 
 /// A custom formatter for tracing events.
 pub struct TracingFormatter;
@@ -56,23 +81,36 @@ where
     }
 }
 
-#[derive(Debug)]
 struct SpanInfo {
     id: Id,
     start_time: Instant,
     header: String,
     header_printed: bool,
+    /// The color style used for this span's tree characters.
+    /// This is inherited from parent spans or computed from the package identifier.
+    color: Style,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct SharedState {
     span_stack: Vec<SpanInfo>,
     warnings: Vec<String>,
 }
 
+impl std::fmt::Debug for SharedState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedState")
+            .field("span_stack_len", &self.span_stack.len())
+            .field("warnings", &self.warnings)
+            .finish()
+    }
+}
+
 struct CustomVisitor<'a> {
     writer: &'a mut dyn io::Write,
     result: io::Result<()>,
+    /// Captures the span_color field for deterministic color computation.
+    span_color: Option<String>,
 }
 
 impl<'a> CustomVisitor<'a> {
@@ -80,6 +118,7 @@ impl<'a> CustomVisitor<'a> {
         Self {
             writer,
             result: Ok(()),
+            span_color: None,
         }
     }
 }
@@ -88,6 +127,11 @@ impl field::Visit for CustomVisitor<'_> {
     fn record_str(&mut self, field: &Field, value: &str) {
         if self.result.is_err() {
             return;
+        }
+
+        // Capture span_color field for deterministic color computation
+        if field.name() == "span_color" {
+            self.span_color = Some(value.to_string());
         }
 
         self.record_debug(field, &format_args!("{}", value))
@@ -146,12 +190,13 @@ fn chunk_string_without_ansi(input: &str, max_chunk_length: usize) -> Vec<String
     chunks
 }
 
-fn indent_levels(indent: usize) -> String {
+/// Creates an indentation string with vertical bars colored according to each span's color.
+fn indent_levels_colored(span_stack: &[SpanInfo]) -> String {
     let mut s = String::new();
-    for _ in 0..indent {
-        s.push_str(" │");
+    for span_info in span_stack {
+        s.push_str(&format!(" {}", span_info.color.apply_to("│")));
     }
-    format!("{}", style(s).cyan())
+    s
 }
 
 impl<S> Layer<S> for LoggingOutputHandler
@@ -168,9 +213,13 @@ where
 
         if let Some(span) = ctx.span(id) {
             let mut s = Vec::new();
-            let mut w = io::Cursor::new(&mut s);
-            attrs.record(&mut CustomVisitor::new(&mut w));
-            let s = String::from_utf8_lossy(w.get_ref());
+            let color_key = {
+                let mut w = io::Cursor::new(&mut s);
+                let mut visitor = CustomVisitor::new(&mut w);
+                attrs.record(&mut visitor);
+                visitor.span_color
+            };
+            let s = String::from_utf8_lossy(&s);
 
             let name = if s.is_empty() {
                 span.name().to_string()
@@ -178,14 +227,27 @@ where
                 format!("{}{}", span.name(), s)
             };
 
-            let indent = indent_levels(state.span_stack.len());
-            let header = format!("{indent}\n{indent} {} {}", style("╭─").cyan(), name);
+            // Determine the color for this span:
+            // - If there's a span_color field, compute color from it
+            // - Otherwise, inherit from parent span
+            // - If no parent, use gray (for initial/setup output)
+            let span_color = if let Some(ref key) = color_key {
+                get_span_color(key)
+            } else if let Some(parent) = state.span_stack.last() {
+                parent.color.clone()
+            } else {
+                Style::new().dim()
+            };
+
+            let indent = indent_levels_colored(&state.span_stack);
+            let header = format!("{indent}\n{indent} {} {}", span_color.apply_to("╭─"), name);
 
             state.span_stack.push(SpanInfo {
                 id: id.clone(),
                 start_time: Instant::now(),
                 header,
                 header_printed: false,
+                color: span_color,
             });
         }
     }
@@ -196,18 +258,22 @@ where
         if let Some(pos) = state.span_stack.iter().position(|info| &info.id == id) {
             let elapsed = state.span_stack[pos].start_time.elapsed();
             let header_printed = state.span_stack[pos].header_printed;
+            let span_color = state.span_stack[pos].color.clone();
+
+            // Get the indent before truncating (parent spans only)
+            let indent = indent_levels_colored(&state.span_stack[..pos]);
+            // For indent_plus_one, we need to include this span's color too
+            let indent_plus_one = format!("{} {}", indent, span_color.apply_to("│"));
+
             state.span_stack.truncate(pos);
 
             if !header_printed {
                 return;
             }
 
-            let indent = indent_levels(pos);
-            let indent_plus_one = indent_levels(pos + 1);
-
             eprintln!(
                 "{indent_plus_one}\n{indent} {} (took {})",
-                style("╰───────────────────").cyan(),
+                span_color.apply_to("╰───────────────────"),
                 HumanDuration(elapsed)
             );
         }
@@ -215,7 +281,7 @@ where
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let mut state = self.state.lock().unwrap();
-        let indent = indent_levels(state.span_stack.len());
+        let indent = indent_levels_colored(&state.span_stack);
 
         // Print pending headers
         for span_info in &mut state.span_stack {
@@ -299,10 +365,10 @@ impl Default for LoggingOutputHandler {
 
 impl LoggingOutputHandler {
     /// Return a string with the current indentation level (bars added to the
-    /// front of the string).
+    /// front of the string), colored according to each span's color.
     pub fn with_indent_levels(&self, template: &str) -> String {
         let state = self.state.lock().unwrap();
-        let indent_str = indent_levels(state.span_stack.len());
+        let indent_str = indent_levels_colored(&state.span_stack);
         format!("{} {}", indent_str, template)
     }
 

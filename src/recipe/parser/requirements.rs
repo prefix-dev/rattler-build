@@ -243,6 +243,7 @@ impl Language {
 
 /// A combination of all possible dependencies.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Dependency {
     /// A regular matchspec
     Spec(MatchSpec),
@@ -589,7 +590,12 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
                 Ok(specs) => {
                     ignore_run_exports.by_name = specs
                         .into_iter()
-                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .filter_map(|ms: MatchSpec| {
+                            match ms.name.expect("MatchSpec must have a name") {
+                                rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+                                _ => None,
+                            }
+                        })
                         .collect();
                 }
                 Err(e) => errors.extend(e),
@@ -601,7 +607,12 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
                 Ok(specs) => {
                     ignore_run_exports.from_package = specs
                         .into_iter()
-                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .filter_map(|ms: MatchSpec| {
+                            match ms.name.expect("MatchSpec must have a name") {
+                                rattler_conda_types::PackageNameMatcher::Exact(name) => Some(name),
+                                _ => None,
+                            }
+                        })
                         .collect();
                 }
                 Err(e) => errors.extend(e),

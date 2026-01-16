@@ -167,10 +167,10 @@ mod tests {
     }
 
     fn rattler() -> RattlerBuild {
-        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
-            if let Some(ret) = RattlerBuild::with_binary(path) {
-                return ret;
-            }
+        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH")
+            && let Some(ret) = RattlerBuild::with_binary(path)
+        {
+            return ret;
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
@@ -248,7 +248,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     fn get_package(folder: impl AsRef<Path>, mut glob_str: String) -> PathBuf {
@@ -767,5 +767,18 @@ requirements:
         let pkg = get_extracted_package(tmp.as_dir(), "absolute-path-license");
         assert!(pkg.join("info/licenses/LICENSE").exists());
         assert!(pkg.join("info/licenses/external_license.txt").exists());
+    }
+
+    #[test]
+    fn test_sourceforge_redirects() {
+        let tmp = tmp("test_sourceforge_redirects");
+        let rattler_build = rattler().build(
+            recipes().join("sourceforge-redirects"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(rattler_build.status.success());
     }
 }

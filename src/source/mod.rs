@@ -62,7 +62,7 @@ pub enum SourceError {
     PatchNotFound(PathBuf),
 
     #[error("Patch application error: {0}")]
-    PatchApplyError(#[from] diffy::ApplyError),
+    PatchApplyError(#[from] flickzeug::ApplyError),
 
     #[error("Failed to parse patch: {0}")]
     PatchParseFailed(PathBuf),
@@ -90,6 +90,15 @@ pub enum SourceError {
 
     #[error("Failed to run git command: {0}")]
     GitErrorStr(&'static str),
+
+    #[error(
+        "Git commit mismatch: expected commit '{expected}' but got '{actual}' for revision '{rev}'"
+    )]
+    GitCommitMismatch {
+        expected: String,
+        actual: String,
+        rev: String,
+    },
 
     #[error("{0}")]
     UnknownError(String),
@@ -120,8 +129,8 @@ pub(crate) async fn fetch_source(
     system_tools: &SystemTools,
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
-) -> Result<(), SourceError> {
-    match &src {
+) -> Result<Option<PathBuf>, SourceError> {
+    let extracted_folder = match &src {
         Source::Git(src) => {
             tracing::info!("Fetching source from git repo: {}", src.url());
             let result = git_source::git_src(system_tools, src, cache_src, recipe_dir)?;
@@ -152,6 +161,8 @@ pub(crate) async fn fetch_source(
             if !src.patches().is_empty() {
                 patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
             }
+
+            Some(result.0)
         }
         Source::Url(src) => {
             let first_url = src.urls().first().expect("we should have at least one URL");
@@ -174,8 +185,7 @@ pub(crate) async fn fetch_source(
                 fs::create_dir_all(&dest_dir)?;
             }
 
-            // Copy source code to work dir
-            if res.is_dir() {
+            let extracted = if res.is_dir() {
                 tracing::info!(
                     "Copying source from url: {} to {}",
                     res.display(),
@@ -189,6 +199,7 @@ pub(crate) async fn fetch_source(
                             .run()
                     },
                 )?;
+                Some(res)
             } else {
                 tracing::info!(
                     "Copying source from url: {} to {}",
@@ -199,13 +210,15 @@ pub(crate) async fn fetch_source(
                 let file_name = src.file_name().unwrap_or(&file_name_from_url);
                 let target = dest_dir.join(file_name);
                 fs::copy(&res, &target)?;
-            }
+                None
+            };
 
             if !src.patches().is_empty() {
                 patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
             }
 
             rendered_sources.push(Source::Url(src.clone()));
+            extracted
         }
         Source::Path(src) => {
             let rel_src_path = src.path();
@@ -228,15 +241,13 @@ pub(crate) async fn fetch_source(
                 return Err(SourceError::FileNotFound(src_path));
             }
 
-            // check if the source path is a directory
-            if src_path.is_dir() {
+            let extracted = if src_path.is_dir() {
                 let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
                     "copying source into isolated environment",
                     || {
                         copy_dir::CopyDir::new(&src_path, &dest_dir)
                             .use_gitignore(src.use_gitignore())
                             .with_globvec(&src.filter)
-                            .exclude_git_dirs(true)
                             .run()
                     },
                 )?;
@@ -244,6 +255,7 @@ pub(crate) async fn fetch_source(
                     "Copied {} files into isolated environment",
                     copy_result.copied_paths().len()
                 );
+                Some(src_path.clone())
             } else if is_tarball(
                 src_path
                     .file_name()
@@ -253,12 +265,15 @@ pub(crate) async fn fetch_source(
             ) {
                 extract_tar(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
                 tracing::info!("Extracted to {}", dest_dir.display());
+                Some(src_path.clone())
             } else if src_path.extension() == Some(OsStr::new("zip")) {
                 extract_zip(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
                 tracing::info!("Extracted zip to {}", dest_dir.display());
+                Some(src_path.clone())
             } else if src_path.extension() == Some(OsStr::new("7z")) {
                 extract_7z(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
                 tracing::info!("Extracted 7z to {}", dest_dir.display());
+                Some(src_path.clone())
             } else if let Some(file_name) = src
                 .file_name()
                 .cloned()
@@ -270,15 +285,16 @@ pub(crate) async fn fetch_source(
                     src_path.display(),
                     dest.display()
                 );
-                if let Some(checksum) = Checksum::from_path_source(src) {
-                    if !checksum.validate(&src_path) {
-                        return Err(SourceError::ValidationFailed);
-                    }
+                if let Some(checksum) = Checksum::from_path_source(src)
+                    && !checksum.validate(&src_path)
+                {
+                    return Err(SourceError::ValidationFailed);
                 }
                 fs::copy(&src_path, dest)?;
+                None
             } else {
                 return Err(SourceError::FileNotFound(src_path));
-            }
+            };
 
             if !src.patches().is_empty() {
                 patch::apply_patches(src.patches(), &dest_dir, recipe_dir, apply_patch)?;
@@ -286,9 +302,10 @@ pub(crate) async fn fetch_source(
             }
 
             rendered_sources.push(Source::Path(src.clone()));
+            extracted
         }
-    }
-    Ok(())
+    };
+    Ok(extracted_folder)
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -311,9 +328,10 @@ pub async fn fetch_sources(
     fs::create_dir_all(&cache_src)?;
 
     let mut rendered_sources = Vec::new();
+    let mut extracted_folders = Vec::new();
 
     for src in sources {
-        fetch_source(
+        let extracted = fetch_source(
             src,
             &mut rendered_sources,
             work_dir,
@@ -324,6 +342,7 @@ pub async fn fetch_sources(
             apply_patch,
         )
         .await?;
+        extracted_folders.push(extracted);
     }
 
     // add a hidden JSON file with the source information
@@ -331,6 +350,7 @@ pub async fn fetch_sources(
         recipe_path: directories.recipe_path.clone(),
         source_cache: cache_src.clone(),
         sources: rendered_sources.clone(),
+        extracted_folders: Some(extracted_folders),
     };
     let source_info_path = work_dir.join(".source_info.json");
     fs::write(
@@ -352,6 +372,10 @@ pub struct SourceInformation {
 
     /// The sources used in the recipe
     pub sources: Vec<Source>,
+
+    /// Extracted source folders for each source (None if source is a single file or not extracted)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_folders: Option<Vec<Option<PathBuf>>>,
 }
 
 impl Output {

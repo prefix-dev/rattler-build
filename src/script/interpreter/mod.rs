@@ -42,7 +42,8 @@ pub enum InterpreterError {
     ExecutionFailed(#[from] std::io::Error),
 }
 
-pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
+pub const BASH_PREAMBLE: &str = r#"#!/usr/bin/env bash
+set -e
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
     source "((script_path))"

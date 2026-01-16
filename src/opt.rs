@@ -10,10 +10,13 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
 };
+use rattler_config::config::ConfigBase;
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_networking::{mirror_middleware, s3_middleware};
+use rattler_networking::mirror_middleware;
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_solve::ChannelPriority;
-use rattler_upload::upload::opt::{Config, UploadOpts};
+use rattler_upload::upload::opt::UploadOpts;
 use serde_json::{Value, json};
 use url::Url;
 
@@ -32,6 +35,11 @@ use crate::{
 pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
+
+    /// Publish packages to a channel.
+    /// This command builds packages from recipes (or uses already built packages),
+    /// uploads them to a channel, and runs indexing.
+    Publish(PublishOpts),
 
     /// Run a test for a single package
     ///
@@ -70,6 +78,41 @@ pub enum SubCommands {
 
     /// Create a patch for a directory
     CreatePatch(CreatePatchOpts),
+
+    /// Open a debug shell in the build environment
+    DebugShell(DebugShellOpts),
+
+    /// Package-related subcommands
+    #[command(subcommand)]
+    Package(PackageCommands),
+
+    /// Bump a recipe to a new version
+    ///
+    /// This command updates the version and SHA256 checksum(s) in a recipe file.
+    /// It can either use a specified version or auto-detect the latest version
+    /// from supported providers (GitHub, PyPI, crates.io).
+    BumpRecipe(BumpRecipeOpts),
+}
+
+/// Options for the debug-shell command
+#[derive(Parser, Debug, Clone)]
+pub struct DebugShellOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Output directory containing rattler-build-log.txt
+    #[arg(short, long, default_value = "./output")]
+    pub output_dir: PathBuf,
+}
+
+/// Package-related subcommands.
+#[derive(Parser, Debug, Clone)]
+pub enum PackageCommands {
+    /// Inspect and display information about a built package
+    Inspect(InspectOpts),
+    /// Extract a conda package to a directory
+    Extract(ExtractOpts),
 }
 
 /// Shell completion options.
@@ -231,6 +274,7 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    #[cfg(feature = "s3")]
     pub s3_config: HashMap<String, s3_middleware::S3Config>,
     pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
@@ -247,7 +291,7 @@ impl CommonData {
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
-        config: Config,
+        config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
         use_zstd: bool,
@@ -285,11 +329,14 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
+        #[cfg(feature = "s3")]
         let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
+
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
+            #[cfg(feature = "s3")]
             s3_config,
             mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
@@ -301,7 +348,7 @@ impl CommonData {
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
+    fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -496,7 +543,132 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
 }
+
+/// Publish options for the `publish` command.
+///
+/// This command either builds packages from recipes OR publishes pre-built packages,
+/// then uploads them to a specified channel (local or remote), followed by running indexing.
+#[derive(Parser, Clone)]
+pub struct PublishOpts {
+    /// Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish.
+    /// If .conda or .tar.bz2 files are provided, they will be published directly without building.
+    /// If .yaml files are provided, they will be built first, then published.
+    /// Use --recipe-dir (from build options below) to scan a directory for recipes instead.
+    /// Defaults to "recipe.yaml" in the current directory if not specified.
+    #[arg(default_value = "recipe.yaml")]
+    pub package_or_recipe: Vec<PathBuf>,
+
+    /// The channel or URL to publish the package to.
+    ///
+    /// Examples:
+    /// - prefix.dev: https://prefix.dev/my-channel
+    /// - anaconda.org: https://anaconda.org/my-org
+    /// - S3: s3://my-bucket
+    /// - Filesystem: file:///path/to/channel or /path/to/channel
+    /// - Quetz: quetz://server.company.com/channel
+    /// - Artifactory: artifactory://server.company.com/channel
+    ///
+    /// Note: This channel is also used as the highest priority channel when solving dependencies.
+    #[arg(long = "to", help_heading = "Publishing")]
+    pub to: NamedChannelOrUrl,
+
+    /// Override the build number for all outputs.
+    /// Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`).
+    /// When using a relative bump, the highest build number from the target channel is used as the base.
+    #[arg(long, help_heading = "Publishing")]
+    pub build_number: Option<String>,
+
+    /// Force upload even if the package already exists (not recommended - may break lockfiles).
+    /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
+    #[arg(long, help_heading = "Publishing")]
+    pub force: bool,
+
+    /// Automatically generate attestations when uploading to prefix.dev channels.
+    /// Only works when uploading to prefix.dev channels with trusted publishing enabled.
+    #[arg(long, help_heading = "Publishing")]
+    pub generate_attestation: bool,
+
+    /// Build options.
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug)]
+pub struct PublishData {
+    pub to: NamedChannelOrUrl,
+    pub build_number: Option<String>,
+    pub force: bool,
+    pub generate_attestation: bool,
+    pub package_files: Vec<PathBuf>,
+    pub recipe_paths: Vec<PathBuf>,
+    pub build: BuildData,
+}
+
+impl PublishData {
+    /// Generate a new PublishData struct from PublishOpts and an optional config.
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
+        // Separate package files from recipe paths based on file extension
+        let mut package_files = Vec::new();
+        let mut recipe_paths = Vec::new();
+
+        // If recipe_dir is specified (from BuildOpts), use it; otherwise use positional arguments
+        if let Some(ref recipe_dir) = opts.build.recipe_dir {
+            // Use recipe_dir - will be expanded later to find all recipes in the directory
+            recipe_paths.push(recipe_dir.clone());
+        } else {
+            // Process positional arguments
+            for path in opts.package_or_recipe {
+                if path.is_dir() && path.join("recipe.yaml").is_file() {
+                    // If it's a directory containing recipe.yaml, treat it as a recipe path
+                    recipe_paths.push(path);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy();
+                    if ext_str == "conda" || ext_str == "bz2" {
+                        package_files.push(path);
+                        continue;
+                    } else if ext_str == "yaml" || ext_str == "yml" {
+                        recipe_paths.push(path);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Prepend the --to channel to the list of channels for dependency resolution
+        let mut build_opts = opts.build;
+        let to_channel = opts.to.clone();
+
+        // Add the to channel as the first channel (highest priority)
+        let channels = if let Some(mut channels) = build_opts.channels.take() {
+            channels.insert(0, to_channel.clone());
+            Some(channels)
+        } else {
+            Some(vec![to_channel.clone()])
+        };
+
+        build_opts.channels = channels;
+
+        Self {
+            to: opts.to,
+            build_number: opts.build_number,
+            force: opts.force,
+            generate_attestation: opts.generate_attestation,
+            package_files,
+            recipe_paths,
+            build: BuildData::from_opts_and_config(build_opts, config),
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
@@ -530,6 +702,7 @@ pub struct BuildData {
     pub allow_symlinks_on_windows: bool,
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub build_num_override: Option<u64>,
 }
 
 impl BuildData {
@@ -565,6 +738,7 @@ impl BuildData {
         allow_symlinks_on_windows: bool,
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        build_num_override: Option<u64>,
     ) -> Self {
         Self {
             up_to,
@@ -604,6 +778,7 @@ impl BuildData {
             allow_symlinks_on_windows,
             allow_absolute_license_paths,
             exclude_newer,
+            build_num_override,
         }
     }
 }
@@ -611,7 +786,7 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
@@ -654,6 +829,7 @@ impl BuildData {
             opts.allow_symlinks_on_windows,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
+            opts.build_num,
         )
     }
 }
@@ -743,7 +919,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -840,7 +1016,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -929,7 +1105,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: DebugOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<ConfigBase<()>>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
@@ -948,9 +1124,10 @@ impl DebugData {
 /// Options for the `create-patch` command.
 #[derive(Parser, Debug, Clone)]
 pub struct CreatePatchOpts {
-    /// Directory where we want to create the patch
+    /// Directory where we want to create the patch.
+    /// Defaults to current directory if not specified.
     #[arg(short, long)]
-    pub directory: PathBuf,
+    pub directory: Option<PathBuf>,
 
     /// The name for the patch file to create.
     #[arg(long, default_value = "changes")]
@@ -968,7 +1145,100 @@ pub struct CreatePatchOpts {
     #[arg(long, value_delimiter = ',')]
     pub exclude: Option<Vec<String>>,
 
-    /// Perform a dry-run: analyse changes and log the diff, but don't write the patch file.
+    /// Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+    #[arg(long, value_delimiter = ',')]
+    pub add: Option<Vec<String>>,
+
+    /// Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs")
+    /// If not specified, all modified files are included (subject to --exclude)
+    #[arg(long, value_delimiter = ',')]
+    pub include: Option<Vec<String>>,
+
+    /// Perform a dry-run: analyze changes and log the diff, but don't write the patch file.
     #[arg(long, default_value = "false")]
     pub dry_run: bool,
+}
+
+/// Options for the `package inspect` command.
+#[derive(Parser, Debug, Clone)]
+pub struct InspectOpts {
+    /// Path to the package file (.conda, .tar.bz2)
+    pub package_file: PathBuf,
+
+    /// Show detailed file listing with hashes and sizes
+    #[arg(long)]
+    pub paths: bool,
+
+    /// Show extended about information
+    #[arg(long)]
+    pub about: bool,
+
+    /// Show run exports
+    #[arg(long)]
+    pub run_exports: bool,
+
+    /// Show all available information
+    #[arg(long)]
+    pub all: bool,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl InspectOpts {
+    /// Check if paths should be shown (either explicitly or via --all)
+    pub fn show_paths(&self) -> bool {
+        self.paths || self.all
+    }
+
+    /// Check if about info should be shown (either explicitly or via --all)
+    pub fn show_about(&self) -> bool {
+        self.about || self.all
+    }
+
+    /// Check if run exports should be shown (either explicitly or via --all)
+    pub fn show_run_exports(&self) -> bool {
+        self.run_exports || self.all
+    }
+}
+
+/// Options for the `package extract` command.
+#[derive(Parser, Debug, Clone)]
+pub struct ExtractOpts {
+    /// Path to the package file (.conda, .tar.bz2) or a URL to download from
+    pub package_file: PackageSource,
+
+    /// Destination directory for extraction (defaults to package name without extension)
+    #[arg(short = 'd', long)]
+    pub dest: Option<PathBuf>,
+}
+
+/// Options for the `bump-recipe` command.
+#[derive(Parser, Debug, Clone)]
+pub struct BumpRecipeOpts {
+    /// Path to the recipe file (recipe.yaml). Defaults to current directory.
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// The new version to bump to. If not specified, will auto-detect the latest
+    /// version from the source URL's provider (GitHub, PyPI, crates.io).
+    #[arg(long)]
+    pub version: Option<String>,
+
+    /// Include pre-release versions when auto-detecting (e.g., alpha, beta, rc).
+    #[arg(long, default_value = "false")]
+    pub include_prerelease: bool,
+
+    /// Only check for updates without modifying the recipe.
+    #[arg(long, default_value = "false")]
+    pub check_only: bool,
+
+    /// Perform a dry-run: show what would be changed without writing to the file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
+
+    /// Keep the current build number instead of resetting it to 0.
+    #[arg(long, default_value = "false")]
+    pub keep_build_number: bool,
 }

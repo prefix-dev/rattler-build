@@ -1,0 +1,16 @@
+diff --git a/to_be_deleted.txt b/to_be_deleted.txt
+deleted file mode 100644
+index 1234567..0000000
+--- a/to_be_deleted.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-This file will be deleted
+-by the patch
+diff --git a/newly_created.txt b/newly_created.txt
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/newly_created.txt
+@@ -0,0 +1,2 @@
++This is a newly created file
++via patch application

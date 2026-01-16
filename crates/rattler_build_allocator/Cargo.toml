@@ -1,0 +1,19 @@
+[package]
+name = "rattler_build_allocator"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A crate that provides the best memory allocator for different platforms"
+
+[lib]
+doctest = false
+
+# Use mimalloc on Windows
+[target.'cfg(windows)'.dependencies]
+mimalloc = "0.1.48"
+
+# Use jemalloc on supported unix platforms (excluding OpenBSD and FreeBSD)
+[target.'cfg(all(not(windows), not(target_os = "openbsd"), not(target_os = "freebsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
+tikv-jemallocator = "0.6.1"

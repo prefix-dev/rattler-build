@@ -206,7 +206,13 @@ pub enum VariantConfigError<S: SourceCode> {
 
     #[error(transparent)]
     #[diagnostic(transparent)]
-    NewParseError(#[from] ParsingError<S>),
+    NewParseError(Box<ParsingError<S>>),
+}
+
+impl<S: SourceCode> From<ParsingError<S>> for VariantConfigError<S> {
+    fn from(e: ParsingError<S>) -> Self {
+        Self::NewParseError(Box::new(e))
+    }
 }
 
 /// An error that indicates variant configuration is invalid.
@@ -397,10 +403,10 @@ impl VariantConfig {
                         Some(value) => value,
                     };
 
-                    if let Some(l) = prev_len {
-                        if l != value.len() {
-                            return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
-                        }
+                    if let Some(l) = prev_len
+                        && l != value.len()
+                    {
+                        return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
                     }
                     prev_len = Some(value.len());
                 }
@@ -443,10 +449,10 @@ impl VariantConfig {
         let variant_keys = used_vars
             .iter()
             .filter_map(|key| {
-                if let Some(values) = self.variants.get(key) {
-                    if !zip_keys.iter().any(|zip| zip.contains(key)) {
-                        return Some(VariantKey::Key(key.clone(), values.clone()));
-                    }
+                if let Some(values) = self.variants.get(key)
+                    && !zip_keys.iter().any(|zip| zip.contains(key))
+                {
+                    return Some(VariantKey::Key(key.clone(), values.clone()));
                 }
                 None
             })
@@ -669,7 +675,13 @@ pub enum VariantError<S: SourceCode> {
 
     #[error(transparent)]
     #[diagnostic(transparent)]
-    ParseErrors(#[from] VariantConfigError<S>),
+    ParseErrors(Box<VariantConfigError<S>>),
+}
+
+impl<S: SourceCode> From<VariantConfigError<S>> for VariantError<S> {
+    fn from(e: VariantConfigError<S>) -> Self {
+        Self::ParseErrors(Box::new(e))
+    }
 }
 
 fn find_combinations(

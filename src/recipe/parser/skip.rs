@@ -68,7 +68,7 @@ impl Skip {
                 Err(e) => {
                     return Err(vec![_partialerror!(
                         condition.1,
-                        ErrorKind::JinjaRendering(e),
+                        ErrorKind::JinjaRendering(Box::new(e)),
                     )]);
                 }
             }

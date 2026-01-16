@@ -6,15 +6,19 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_networking::{
     AuthenticationMiddleware, AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
-    mirror_middleware, s3_middleware,
+    mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
+#[cfg(feature = "s3")]
+use thiserror::Error;
 use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;
@@ -85,12 +89,13 @@ impl BaseClient {
     pub fn new(
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
-        s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+        #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
         mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     ) -> Result<Self, AuthenticationStorageError> {
         let auth_storage = get_auth_store(auth_file)?;
         let timeout = 5 * 60;
 
+        #[cfg(feature = "s3")]
         let s3_middleware =
             s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
         let mirror_middleware =
@@ -101,23 +106,32 @@ impl BaseClient {
                 .no_gzip()
                 .pool_max_idle_per_host(20)
                 .user_agent(APP_USER_AGENT)
+                .referer(false)
                 .read_timeout(std::time::Duration::from_secs(timeout))
         };
 
-        let client = reqwest_middleware::ClientBuilder::new(
+        // Retry middleware must come before mirror middleware so that when a mirror
+        // returns a server error (e.g. 500), the retry will go through the mirror
+        // middleware again, which will then select a different mirror due to the
+        // recorded failure.
+        let client_builder = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
                 .build()
                 .expect("failed to create client"),
         )
-        .with(mirror_middleware)
-        .with(s3_middleware)
-        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-            auth_storage.clone(),
-        )))
         .with(RetryTransientMiddleware::new_with_policy(
             ExponentialBackoff::builder().build_with_max_retries(3),
         ))
-        .build();
+        .with(mirror_middleware);
+
+        #[cfg(feature = "s3")]
+        let client_builder = client_builder.with(s3_middleware);
+
+        let client = client_builder
+            .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+                auth_storage.clone(),
+            )))
+            .build();
 
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
             common_settings(reqwest::Client::builder())
@@ -156,10 +170,10 @@ impl BaseClient {
 
     /// Returns true if SSL verification should be disabled for the given URL
     fn disable_ssl(&self, url: &Url) -> bool {
-        if let Some(hosts) = &self.allow_insecure_host {
-            if let Some(host) = url.host_str() {
-                return hosts.iter().any(|h| h == host);
-            }
+        if let Some(hosts) = &self.allow_insecure_host
+            && let Some(host) = url.host_str()
+        {
+            return hosts.iter().any(|h| h == host);
         }
         false
     }
@@ -262,13 +276,14 @@ pub fn get_auth_store(
 /// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-    s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<BaseClient, AuthenticationStorageError> {
     BaseClient::new(
         auth_file,
         allow_insecure_host,
+        #[cfg(feature = "s3")]
         s3_middleware_config,
         mirror_middleware_config,
     )
@@ -585,4 +600,86 @@ impl ConfigurationBuilder {
             environments_externally_managed: self.environments_externally_managed,
         }
     }
+}
+
+/// Error type for S3 credential resolution
+#[cfg(feature = "s3")]
+#[derive(Debug, Error)]
+pub enum S3CredentialError {
+    /// Failed to get authentication storage
+    #[error("Failed to get authentication storage: {0}")]
+    AuthStorageError(#[from] AuthenticationStorageError),
+
+    /// Failed to load credentials from AWS SDK
+    #[error("Failed to load credentials from AWS SDK: {0}")]
+    SdkError(#[from] rattler_s3::FromSDKError),
+
+    /// No credentials found
+    #[error(
+        "No S3 credentials found for bucket '{bucket}'. Please configure credentials via `rattler auth` or AWS environment variables."
+    )]
+    NoCredentials {
+        /// The bucket name
+        bucket: String,
+    },
+}
+
+/// Resolve S3 credentials for the given bucket URL.
+///
+/// This function tries to resolve S3 credentials in the following order:
+/// 1. If S3 config is present for the bucket in the configuration, use it with auth storage
+/// 2. Fall back to AWS SDK default credential chain
+///
+/// # Arguments
+/// * `s3_config` - S3 middleware configuration (from rattler config)
+/// * `auth_file` - Optional path to an authentication file
+/// * `bucket_url` - The S3 bucket URL to resolve credentials for
+#[cfg(feature = "s3")]
+pub async fn resolve_s3_credentials(
+    s3_config: &HashMap<String, s3_middleware::S3Config>,
+    auth_file: Option<PathBuf>,
+    bucket_url: &Url,
+) -> Result<rattler_s3::ResolvedS3Credentials, S3CredentialError> {
+    let bucket_name = bucket_url.host_str().unwrap_or_default();
+
+    // Check if we have custom S3 config for this bucket
+    if let Some(config) = s3_config.get(bucket_name)
+        && let s3_middleware::S3Config::Custom {
+            endpoint_url,
+            region,
+            force_path_style,
+        } = config
+    {
+        // Create S3Credentials from the config
+        let s3_creds = rattler_s3::S3Credentials {
+            endpoint_url: endpoint_url.clone(),
+            region: region.clone(),
+            addressing_style: if *force_path_style {
+                rattler_s3::S3AddressingStyle::Path
+            } else {
+                rattler_s3::S3AddressingStyle::VirtualHost
+            },
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
+
+        // Try to resolve with auth storage
+        let auth_storage = get_auth_store(auth_file.clone())?;
+        if let Some(resolved) = s3_creds.resolve(bucket_url, &auth_storage) {
+            tracing::debug!(
+                "Resolved S3 credentials for bucket '{}' from config + auth storage",
+                bucket_name
+            );
+            return Ok(resolved);
+        }
+    }
+
+    // Fall back to AWS SDK default credential chain
+    tracing::debug!(
+        "Using AWS SDK default credential chain for bucket '{}'",
+        bucket_name
+    );
+    let resolved = rattler_s3::ResolvedS3Credentials::from_sdk().await?;
+    Ok(resolved)
 }

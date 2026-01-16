@@ -32,6 +32,7 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 9] = [
 // Check if the `cache` top-level key is present. If it does not contain a
 // source, but there is a top-level `source` key, then we should warn the user
 // because this key was moved to the `cache`
+#[allow(clippy::result_large_err)]
 fn check_src_cache(root: &MarkedMappingNode) -> Result<(), PartialParsingError> {
     if let Some(cache) = root.get("cache") {
         let has_top_level_source = root.contains_key("source");
@@ -54,6 +55,7 @@ fn check_src_cache(root: &MarkedMappingNode) -> Result<(), PartialParsingError> 
 }
 
 /// Retrieve all outputs from the recipe source (YAML)
+#[allow(clippy::result_large_err)]
 pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, ParsingError<S>> {
     let root_node = parse_yaml(0, src.clone())?;
     let root_map = root_node.as_mapping().ok_or_else(|| {

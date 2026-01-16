@@ -7,7 +7,7 @@ In the second example we will build a package for `numpy` which contains compile
 
 Rattler-build provides a command to generate a recipe for a package from PyPI.
 The generated recipe can be used as a starting point for your recipe.
-The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the `sdist` source distriution.
+The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the `sdist` source distribution.
 
 ```bash
 rattler-build generate-recipe pypi ipywidgets

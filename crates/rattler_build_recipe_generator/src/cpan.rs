@@ -2,7 +2,6 @@
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
-use serde_with::{OneOrMany, serde_as};
 use std::{
     collections::{HashMap, HashSet},
     process::Command,
@@ -54,6 +53,7 @@ struct CpanRelease {
     author: String,
     distribution: String,
     name: String,
+    main_module: Option<String>,
     r#abstract: Option<String>,
     license: Option<Vec<String>>,
     metadata: Option<CpanReleaseMetadata>,
@@ -67,20 +67,17 @@ struct CpanReleaseMetadata {
     author: Option<Vec<String>>,
 }
 
-#[serde_as]
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
 struct CpanModule {
     name: String,
     version: Option<String>,
-    documentation: Option<String>,
-    r#abstract: Option<String>,
-    #[serde_as(as = "OneOrMany<_>")]
-    author: Vec<String>,
+    author: String,
     authorized: bool,
     indexed: bool,
     status: String,
     distribution: String,
+    path: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -115,7 +112,14 @@ struct MetaCpanResponse<T> {
 #[allow(dead_code)]
 struct MetaCpanHits<T> {
     hits: Vec<MetaCpanHit<T>>,
-    total: i32,
+    total: MetaCpanTotal,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
+struct MetaCpanTotal {
+    value: i32,
+    relation: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -145,13 +149,10 @@ fn get_core_modules_from_perl() -> Result<HashSet<String>, std::io::Error> {
         .output()?;
 
     if !output.status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "Perl command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        ));
+        return Err(std::io::Error::other(format!(
+            "Perl command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
     }
 
     let modules_text = String::from_utf8_lossy(&output.stdout);
@@ -263,8 +264,8 @@ fn process_dependencies(dependencies: &[CpanDependency]) -> (Vec<String>, Vec<St
     let mut run_deps = Vec::new();
 
     for dep in dependencies {
-        // Skip develop dependencies
-        if dep.phase == "develop" {
+        // Skip develop dependencies and custom phases (like x_Dist_Zilla)
+        if dep.phase == "develop" || dep.phase == "test" || dep.phase.starts_with("x_") {
             continue;
         }
 
@@ -562,37 +563,28 @@ make install"#
         }
 
         // Add bugtracker URL if available
-        if let Some(bugtracker) = &resources.bugtracker {
-            if recipe.about.repository.is_none() {
-                recipe.about.repository = bugtracker.web.clone();
-            }
+        if let Some(bugtracker) = &resources.bugtracker
+            && recipe.about.repository.is_none()
+        {
+            recipe.about.repository = bugtracker.web.clone();
         }
     }
 
     // Add author information
-    if let Some(metadata) = &metadata.release.metadata {
-        if let Some(authors) = &metadata.author {
-            if !authors.is_empty() {
-                let authors_str = authors.join(", ");
-                recipe.about.description = Some(format!("By {}", authors_str));
-            }
-        }
+    if let Some(metadata) = &metadata.release.metadata
+        && let Some(authors) = &metadata.author
+        && !authors.is_empty()
+    {
+        let authors_str = authors.join(", ");
+        recipe.about.description = Some(format!("By {}", authors_str));
     }
 
-    // Add additional metadata from modules if not already set
-    if !metadata.modules.is_empty() {
-        let main_module = &metadata.modules[0];
-        if recipe.about.summary.is_none() && main_module.r#abstract.is_some() {
-            recipe.about.summary = main_module.r#abstract.clone();
-        }
-
-        if let Some(doc) = &main_module.documentation {
-            // Convert module documentation to MetaCPAN URL
-            recipe.about.documentation = Some(format!(
-                "https://metacpan.org/pod/{}",
-                doc.replace("::", "%3A%3A")
-            ));
-        }
+    // Add documentation URL using main_module from release
+    if let Some(main_module) = &metadata.release.main_module {
+        recipe.about.documentation = Some(format!(
+            "https://metacpan.org/pod/{}",
+            main_module.replace("::", "%3A%3A")
+        ));
     }
 
     // Set homepage to MetaCPAN page if not already set

@@ -67,6 +67,7 @@ pub enum Node {
 }
 
 /// Parse YAML from a string and return a Node representing the content.
+#[allow(clippy::result_large_err)]
 pub fn parse_yaml<S: SourceCode>(
     init_span_index: usize,
     src: S,
@@ -93,6 +94,7 @@ impl Node {
     /// type here is the generic Node enumeration to make it potentially easier
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
+    #[allow(clippy::result_large_err)]
     pub fn parse_yaml<S: SourceCode>(
         init_span_index: usize,
         src: S,
@@ -155,10 +157,11 @@ impl Render<Node> for Node {
 impl Render<Node> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            let label = jinja_error_to_label(&err);
             vec![_partialerror!(
                 *self.span(),
-                ErrorKind::JinjaRendering(err),
-                label = jinja_error_to_label(&err)
+                ErrorKind::JinjaRendering(Box::new(err)),
+                label = label
             )]
         })?;
 
@@ -177,10 +180,11 @@ impl Render<Option<ScalarNode>> for ScalarNode {
         _name: &str,
     ) -> Result<std::option::Option<ScalarNode>, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            let label = jinja_error_to_label(&err);
             vec![_partialerror!(
                 *self.span(),
-                ErrorKind::JinjaRendering(err),
-                label = jinja_error_to_label(&err)
+                ErrorKind::JinjaRendering(Box::new(err)),
+                label = label
             )]
         })?;
 
@@ -893,10 +897,11 @@ impl IfSelector {
     /// chosen node.
     pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, Vec<PartialParsingError>> {
         let cond = jinja.eval(self.cond.as_str()).map_err(|err| {
+            let label = err.to_string();
             vec![_partialerror!(
                 *self.cond.span(),
-                ErrorKind::JinjaRendering(err),
-                label = err.to_string(),
+                ErrorKind::JinjaRendering(Box::new(err)),
+                label = label,
                 help = "error evaluating if-selector condition"
             )]
         })?;

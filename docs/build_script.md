@@ -33,8 +33,8 @@ build:
         - cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh
     - if: win
       then:
-        - mkdir %PREFIX%\bin
-        - copy %RECIPE_DIR%\my_script_with_recipe.bat %PREFIX%\bin\super-cool-script.bat
+        - mkdir %LIBRARY_BIN%
+        - copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 ```
 
 ## Environment variables

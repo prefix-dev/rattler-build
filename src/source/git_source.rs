@@ -219,7 +219,34 @@ pub fn git_src(
                 GitUrl::Ssh(url) => url.to_string(),
                 _ => unreachable!(),
             };
-            // If the cache_path exists, initialize the repo and fetch the specified revision.
+
+            // If the cache_path exists, validate it's a usable git repository before trying to fetch.
+            // We verify by running `git rev-parse --git-dir` which will fail if not a valid repo.
+            // This handles cases like empty directories, missing .git, or corrupted repositories.
+            if cache_path.exists() {
+                let is_valid_repo = Command::new("git")
+                    .args(["rev-parse", "--git-dir"])
+                    .current_dir(&cache_path)
+                    .output()
+                    .map(|output| output.status.success())
+                    .unwrap_or(false);
+
+                if !is_valid_repo {
+                    tracing::warn!(
+                        "Detected corrupted git cache at {} (not a valid git repository), removing and re-cloning",
+                        cache_path.display()
+                    );
+                    if let Err(remove_error) = fs_err::remove_dir_all(&cache_path) {
+                        tracing::error!(
+                            "Failed to remove corrupted cache directory: {}",
+                            remove_error
+                        );
+                        return Err(SourceError::FileSystemError(remove_error));
+                    }
+                }
+            }
+
+            // If the cache_path doesn't exist (or was just removed due to corruption), clone it.
             if !cache_path.exists() {
                 let mut command = git_command(system_tools, "clone")?;
                 command
@@ -279,6 +306,18 @@ pub fn git_src(
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
         .trim()
         .to_owned();
+
+    // Verify expected commit if specified
+    if let Some(expected) = source.expected_commit() {
+        if ref_git != expected {
+            return Err(SourceError::GitCommitMismatch {
+                expected: expected.to_string(),
+                actual: ref_git,
+                rev: rev.to_string(),
+            });
+        }
+        tracing::info!("Verified expected commit: {}", expected);
+    }
 
     // only do lfs pull if a requirement!
     if source.lfs() {
@@ -390,6 +429,116 @@ mod tests {
                 res.0.to_string_lossy(),
                 cache_dir.join(repo_name).to_string_lossy()
             );
+        }
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_expected_commit_success() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("rattler-build-test-expected-commit");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
+        let system_tools = crate::system_tools::SystemTools::new();
+
+        // First, fetch without expected commit to find out what the actual commit is
+        let source_without_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: None,
+        };
+
+        let (_, actual_commit) = git_src(
+            &system_tools,
+            &source_without_expected,
+            &cache_dir,
+            &recipe_dir,
+        )
+        .unwrap();
+
+        // Now test with the correct expected commit
+        let source_with_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: Some(actual_commit.clone()),
+        };
+
+        let result = git_src(
+            &system_tools,
+            &source_with_expected,
+            &cache_dir,
+            &recipe_dir,
+        );
+        assert!(result.is_ok());
+        let (_, commit) = result.unwrap();
+        assert_eq!(commit, actual_commit);
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_expected_commit_mismatch() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir
+            .path()
+            .join("rattler-build-test-expected-commit-mismatch");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
+        let system_tools = crate::system_tools::SystemTools::new();
+
+        // Test with an incorrect expected commit
+        let source_with_wrong_expected = GitSource {
+            url: GitUrl::Url(
+                "https://github.com/prefix-dev/rattler-build"
+                    .parse()
+                    .unwrap(),
+            ),
+            rev: GitRev::Tag("v0.1.0".to_owned()),
+            depth: None,
+            patches: vec![],
+            target_directory: None,
+            lfs: false,
+            expected_commit: Some("0000000000000000000000000000000000000000".to_string()),
+        };
+
+        let result = git_src(
+            &system_tools,
+            &source_with_wrong_expected,
+            &cache_dir,
+            &recipe_dir,
+        );
+        assert!(result.is_err());
+
+        // Verify the error is specifically a GitCommitMismatch
+        let err = result.unwrap_err();
+        match err {
+            crate::source::SourceError::GitCommitMismatch {
+                expected,
+                actual,
+                rev,
+            } => {
+                assert_eq!(expected, "0000000000000000000000000000000000000000");
+                assert!(!actual.is_empty());
+                assert_eq!(rev, "refs/tags/v0.1.0");
+            }
+            _ => panic!("Expected GitCommitMismatch error, got: {:?}", err),
         }
     }
 }

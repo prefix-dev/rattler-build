@@ -128,10 +128,10 @@ impl Tests {
                 // copy all test files to a temporary directory and set it as the working
                 // directory
                 CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
-                    TestError::IoError(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Failed to copy test files: {}", e),
-                    ))
+                    TestError::IoError(std::io::Error::other(format!(
+                        "Failed to copy test files: {}",
+                        e
+                    )))
                 })?;
 
                 script
@@ -458,14 +458,14 @@ pub async fn run_test(
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
-        if let Some(test_index) = config.test_index {
-            if test_index >= tests.len() {
-                return Err(TestError::TestFailed(format!(
-                    "Test index {} out of range (0..{})",
-                    test_index,
-                    tests.len()
-                )));
-            }
+        if let Some(test_index) = config.test_index
+            && test_index >= tests.len()
+        {
+            return Err(TestError::TestFailed(format!(
+                "Test index {} out of range (0..{})",
+                test_index,
+                tests.len()
+            )));
         }
 
         let tests = if let Some(test_index) = config.test_index {
@@ -536,7 +536,8 @@ impl PythonTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running python test(s)");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running python test(s)", span_color = pkg_id);
         let _guard = span.enter();
 
         // The version spec of the package being built
@@ -695,7 +696,8 @@ impl PerlTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running perl test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running perl test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -770,7 +772,9 @@ impl CommandsTest {
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
 
-        let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
+        let pkg_str = pkg.to_string();
+        let span =
+            tracing::info_span!("Running script test for", recipe = %pkg_str, span_color = pkg_str);
         let _guard = span.enter();
 
         let build_prefix = if !deps.build.is_empty() {
@@ -845,10 +849,10 @@ impl CommandsTest {
         // directory
         let test_dir = test_directory.join("test");
         CopyDir::new(path, &test_dir).run().map_err(|e| {
-            TestError::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to copy test files: {}", e),
-            ))
+            TestError::IoError(std::io::Error::other(format!(
+                "Failed to copy test files: {}",
+                e
+            )))
         })?;
 
         tracing::info!("Testing commands:");
@@ -880,8 +884,13 @@ impl DownstreamTest {
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
         let downstream_spec = self.downstream.clone();
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
 
-        let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+        let span = tracing::info_span!(
+            "Running downstream test for",
+            package = downstream_spec,
+            span_color = pkg_id
+        );
         let _guard = span.enter();
 
         // first try to resolve an environment with the downstream spec and our
@@ -914,7 +923,11 @@ impl DownstreamTest {
                 // package!
                 let downstream_package = solution
                     .iter()
-                    .find(|s| s.package_record.name == spec_name)
+                    .find(|s| {
+                        rattler_conda_types::PackageNameMatcher::Exact(
+                            s.package_record.name.clone(),
+                        ) == spec_name
+                    })
                     .ok_or_else(|| {
                         TestError::TestFailed(
                             "Could not find package in the resolved environment".to_string(),
@@ -967,7 +980,8 @@ impl RTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running R test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running R test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -1038,7 +1052,8 @@ impl RubyTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running Ruby test");
+        let pkg_id = format!("{}-{}-{}", pkg.name, pkg.version, pkg.build_string);
+        let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(

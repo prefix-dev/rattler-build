@@ -10,14 +10,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy::{Diff, Patch};
+use flickzeug::{ApplyStats, Diff, Patch};
 use fs_err::File;
-use fs_err::read;
 use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
     let trimmed = path.trim();
     trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
+}
+
+/// Summarize a single patch file by reading and parsing it.
+pub fn summarize_single_patch(
+    patch_path: &Path,
+    work_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let data = fs_err::read(patch_path).map_err(SourceError::Io)?;
+    let patch = patch_from_bytes(&data)
+        .map_err(|_| SourceError::PatchParseFailed(patch_path.to_path_buf()))?;
+    summarize_patch(&patch, work_dir)
 }
 
 /// Normalizes backup file paths (.orig/.bak) to their actual file paths
@@ -36,13 +46,13 @@ fn normalize_backup_paths(
     }
 
     // Check if original file is a backup of the modified file
-    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension()) {
-        if let Some(mod_filename) = modified.file_name() {
-            if matches!(orig_ext.to_str(), Some("orig" | "bak")) && orig_stem == mod_filename {
-                // Original is a backup of modified file, treat as modifying the actual file
-                return (Some(modified.clone()), Some(modified.clone()));
-            }
-        }
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension())
+        && let Some(mod_filename) = modified.file_name()
+        && matches!(orig_ext.to_str(), Some("orig" | "bak"))
+        && orig_stem == mod_filename
+    {
+        // Original is a backup of modified file, treat as modifying the actual file
+        return (Some(modified.clone()), Some(modified.clone()));
     }
 
     (original_path, modified_path)
@@ -78,21 +88,25 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     affected_files
 }
 
-fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, diffy::ParsePatchError> {
-    diffy::patch_from_bytes_with_config(
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, flickzeug::ParsePatchError> {
+    flickzeug::patch_from_bytes_with_config(
         input,
-        diffy::ParserConfig {
-            hunk_strategy: diffy::HunkRangeStrategy::Recount,
+        flickzeug::ParserConfig {
+            hunk_strategy: flickzeug::HunkRangeStrategy::Recount,
+            skip_order_check: true,
         },
     )
 }
 
-fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, diffy::ApplyError> {
-    diffy::apply_bytes_with_config(
+fn apply(
+    base_image: &[u8],
+    diff: &Diff<'_, [u8]>,
+) -> Result<(Vec<u8>, ApplyStats), flickzeug::ApplyError> {
+    flickzeug::apply_bytes_with_config(
         base_image,
         diff,
-        &diffy::ApplyConfig {
-            fuzzy_config: diffy::FuzzyConfig {
+        &flickzeug::ApplyConfig {
+            fuzzy_config: flickzeug::FuzzyConfig {
                 max_fuzz: 2,
                 ignore_whitespace: true,
                 ignore_case: false,
@@ -277,7 +291,7 @@ pub(crate) fn apply_patch_custom(
             (None, None) => continue,
             (None, Some(m)) => {
                 let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
-                write_patch_content(&new_file_content, &m)?;
+                write_patch_content(&new_file_content.0, &m)?;
             }
             (Some(o), None) => {
                 fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
@@ -288,7 +302,7 @@ pub(crate) fn apply_patch_custom(
                 if !o.exists() {
                     let new_file_content =
                         apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
-                    write_patch_content(&new_file_content, &m)?;
+                    write_patch_content(&new_file_content.0, &m)?;
                 } else {
                     let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
@@ -299,7 +313,7 @@ pub(crate) fn apply_patch_custom(
                         fs_err::remove_file(&o).map_err(SourceError::Io)?;
                     }
 
-                    write_patch_content(&new_file_content, &m)?;
+                    write_patch_content(&new_file_content.0, &m)?;
                 }
             }
         }
@@ -316,20 +330,14 @@ pub(crate) fn apply_patches(
     recipe_dir: &Path,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<(), SourceError> {
-    // Early out to avoid unnecessary work
-    if patches.is_empty() {
-        return Ok(());
-    }
-
     for patch_path_relative in patches {
         let patch_file_path = recipe_dir.join(patch_path_relative);
-
-        tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
 
         if !patch_file_path.exists() {
             return Err(SourceError::PatchNotFound(patch_file_path));
         }
 
+        tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
         apply_patch(work_dir, patch_file_path.as_path())?;
     }
     Ok(())
@@ -363,26 +371,6 @@ pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats
         }
     }
     Ok(stats)
-}
-
-/// Summarize multiple patch files by reading and parsing each patch.
-pub fn summarize_patches(
-    patches: &[PathBuf],
-    work_dir: &Path,
-    patch_dir: &Path,
-) -> Result<PatchStats, SourceError> {
-    let mut total = PatchStats::default();
-    for patch_file in patches {
-        let full_path = patch_dir.join(patch_file);
-        let data = read(&full_path)?;
-        let patch = patch_from_bytes(&data)
-            .map_err(|_| SourceError::PatchParseFailed(full_path.clone()))?;
-        let stats = summarize_patch(&patch, work_dir)?;
-        total.changed.extend(stats.changed);
-        total.added.extend(stats.added);
-        total.removed.extend(stats.removed);
-    }
-    Ok(total)
 }
 
 #[cfg(test)]
@@ -446,18 +434,16 @@ mod tests {
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
-        assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("text.md")));
 
         let patch_file_content =
             fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
         let patched_paths = parse_patch(&patch);
-        assert_eq!(patched_paths.len(), 2);
-        assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
-        assert!(patched_paths.contains(&PathBuf::from("b/CMakeLists.txt")));
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("CMakeLists.txt")));
     }
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
@@ -678,6 +664,77 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_pure_rename_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch with pure renames (100% similarity, no content changes)
+        apply_patches(
+            &[PathBuf::from("test_pure_rename.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Pure rename patch should apply successfully");
+
+        // Check that the __init__.py file was deleted
+        let init_file = tempdir.path().join("workdir/tinygrad/frontend/__init__.py");
+        assert!(
+            !init_file.exists(),
+            "frontend/__init__.py should be deleted"
+        );
+
+        // Check that onnx.py was renamed from frontend to nn
+        let old_onnx = tempdir.path().join("workdir/tinygrad/frontend/onnx.py");
+        let new_onnx = tempdir.path().join("workdir/tinygrad/nn/onnx.py");
+        assert!(!old_onnx.exists(), "frontend/onnx.py should not exist");
+        assert!(new_onnx.exists(), "nn/onnx.py should exist");
+        let onnx_content = fs_err::read_to_string(&new_onnx).unwrap();
+        assert_eq!(
+            onnx_content, "# onnx code\n",
+            "onnx.py content should be preserved"
+        );
+
+        // Check that torch.py was renamed from frontend to nn
+        let old_torch = tempdir.path().join("workdir/tinygrad/frontend/torch.py");
+        let new_torch = tempdir.path().join("workdir/tinygrad/nn/torch.py");
+        assert!(!old_torch.exists(), "frontend/torch.py should not exist");
+        assert!(new_torch.exists(), "nn/torch.py should exist");
+        let torch_content = fs_err::read_to_string(&new_torch).unwrap();
+        assert_eq!(
+            torch_content, "# torch code\n",
+            "torch.py content should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_apply_create_delete_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Create the file that will be deleted
+        let to_delete = tempdir.path().join("workdir/to_be_deleted.txt");
+        fs_err::write(&to_delete, "This file will be deleted\nby the patch\n").unwrap();
+
+        // Apply patch with creation and deletion
+        apply_patches(
+            &[PathBuf::from("test_create_delete.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Create/delete patch should apply successfully");
+
+        // Check that the file was deleted
+        assert!(!to_delete.exists(), "to_be_deleted.txt should be deleted");
+
+        // Check that the new file was created with correct content
+        let created_file = tempdir.path().join("workdir/newly_created.txt");
+        assert!(created_file.exists(), "newly_created.txt should exist");
+        let content = fs_err::read_to_string(&created_file).unwrap();
+        assert!(content.contains("This is a newly created file"));
+        assert!(content.contains("via patch application"));
+    }
+
+    #[test]
     fn test_apply_0001_increase_minimum_cmake_version_patch() {
         let (tempdir, _) = setup_patch_test_dir();
 
@@ -712,6 +769,30 @@ mod tests {
         let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
         let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
         assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
+    }
+
+    #[test]
+    fn test_missing_patch_file_returns_error() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Try to apply a patch that doesn't exist (simulating a typo in the patch filename)
+        // This could happen e.g. when git format-patch creates a file with a double period
+        // due to a commit message ending with a period, and the user accidentally removes one period
+        let result = apply_patches(
+            &[PathBuf::from("nonexistent-patch-file..patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // The build should fail with PatchNotFound error, not silently continue
+        assert!(result.is_err(), "Missing patch file should cause an error");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, SourceError::PatchNotFound(_)),
+            "Expected PatchNotFound error, got: {:?}",
+            err
+        );
     }
 
     /// Prepare all information needed to test patches for package info path.
@@ -873,7 +954,7 @@ mod tests {
         #[exclude("mumps")]
         // Failed to download source
         #[exclude("petsc")]
-        // GNU patch fails and diffy succeeds, seemingly correctly from the diff output.
+        // GNU patch fails and flickzeug succeeds, seemingly correctly from the diff output.
         #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)")]
         // Parse fails, since createrepo-c/438.patch contains two mail
         // messages in one file. Fix postponed until parser
@@ -949,7 +1030,7 @@ mod tests {
             match (custom_res, gnu_patch_res) {
                 (Ok(_), Ok(_)) => (),
                 (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
-                (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
+                (Err(err), Ok(_)) => panic!("flickzeug patch failed:\n{}", err),
                 (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
             }
 

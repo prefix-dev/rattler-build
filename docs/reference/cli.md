@@ -9,6 +9,7 @@ This document contains the help content for the `rattler-build` command-line pro
 ##### **Subcommands:**
 
 * `build` — Build a package from a recipe
+* `publish` — Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing
 * `test` — Run a test for a single package
 * `rebuild` — Rebuild a package from a package file instead of a recipe
 * `upload` — Upload a package
@@ -17,6 +18,9 @@ This document contains the help content for the `rattler-build` command-line pro
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe by setting up the environment without running the build script
 * `create-patch` — Create a patch for a directory
+* `debug-shell` — Open a debug shell in the build environment
+* `package` — Package-related subcommands
+* `bump-recipe` — Bump a recipe to a new version
 
 ##### **Options:**
 
@@ -263,6 +267,276 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
 
 
+- `--build-num <BUILD_NUM>`
+
+	Override the build number for all outputs (defaults to the build number in the recipe)
+
+
+###### **Sandbox arguments**
+
+- `--sandbox`
+
+	Enable the sandbox
+
+
+- `--allow-network`
+
+	Allow network access during build (default: false if sandbox is enabled)
+
+
+- `--allow-read <ALLOW_READ>`
+
+	Allow read access to the specified paths
+
+
+- `--allow-read-execute <ALLOW_READ_EXECUTE>`
+
+	Allow read and execute access to the specified paths
+
+
+- `--allow-read-write <ALLOW_READ_WRITE>`
+
+	Allow read and write access to the specified paths
+
+
+- `--overwrite-default-sandbox-config`
+
+	Overwrite the default sandbox configuration
+
+
+
+
+
+### `publish`
+
+Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing
+
+**Usage:** `rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...`
+
+##### **Arguments:**
+
+- `<PACKAGE_OR_RECIPE>`
+
+	Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish. If .conda or .tar.bz2 files are provided, they will be published directly without building. If .yaml files are provided, they will be built first, then published. Use --recipe-dir (from build options below) to scan a directory for recipes instead. Defaults to "recipe.yaml" in the current directory if not specified
+
+	- Default value: `recipe.yaml`
+
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPES>`
+
+	The recipe file or directory containing `recipe.yaml`. Defaults to the current directory
+
+	- Default value: `.`
+
+- `--recipe-dir <RECIPE_DIR>`
+
+	The directory that contains recipes
+
+
+- `--up-to <UP_TO>`
+
+	Build recipes up to the specified package
+
+
+- `--build-platform <BUILD_PLATFORM>`
+
+	The build platform to use for the build (e.g. for building with emulation, or rendering)
+
+
+- `--target-platform <TARGET_PLATFORM>`
+
+	The target platform for the build
+
+
+- `--host-platform <HOST_PLATFORM>`
+
+	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
+
+
+- `-c`, `--channel <CHANNELS>`
+
+	Add a channel to search for dependencies in
+
+
+- `-m`, `--variant-config <VARIANT_CONFIG>`
+
+	Variant configuration files for the build
+
+
+- `--variant <VARIANT_OVERRIDES>`
+
+	Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+
+
+- `--ignore-recipe-variants`
+
+	Do not read the `variants.yaml` file next to a recipe
+
+
+- `--render-only`
+
+	Render the recipe files without executing the build
+
+
+- `--with-solve`
+
+	Render the recipe files with solving dependencies
+
+
+- `--keep-build`
+
+	Keep intermediate build artifacts after the build
+
+
+- `--no-build-id`
+
+	Don't use build id(timestamp) when creating build directory name
+
+
+- `--compression-threads <COMPRESSION_THREADS>`
+
+	The number of threads to use for compression (only relevant when also using `--package-format conda`)
+
+
+- `--io-concurrency-limit <IO_CONCURRENCY_LIMIT>`
+
+	The maximum number of concurrent I/O operations to use when installing packages This can be controlled by the `RATTLER_IO_CONCURRENCY_LIMIT` environment variable Defaults to 8 times the number of CPUs
+
+
+- `--experimental`
+
+	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+- `--extra-meta <EXTRA_META>`
+
+	Extra metadata to include in about.json
+
+
+- `--continue-on-failure`
+
+	Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
+
+
+###### **Modifying result**
+
+- `--package-format <PACKAGE_FORMAT>`
+
+	The package format to use for the build. Can be one of `tar-bz2` or
+`conda`. You can also add a compression level to the package format,
+e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
+22).
+
+
+- `--no-include-recipe`
+
+	Don't store the recipe in the final package
+
+
+- `--test <TEST>`
+
+	The strategy to use for running tests
+
+	- Possible values:
+		- `skip`:
+			Skip the tests
+		- `native`:
+			Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed
+		- `native-and-emulated`:
+			Always run the tests
+
+
+- `--color-build-log`
+
+	Don't force colors in the output of the build script
+
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+
+- `--skip-existing <SKIP_EXISTING>`
+
+	Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
+
+	- Possible values:
+		- `none`:
+			Do not skip any packages
+		- `local`:
+			Skip packages that already exist locally
+		- `all`:
+			Skip packages that already exist in any channel
+
+
+- `--noarch-build-platform <NOARCH_BUILD_PLATFORM>`
+
+	Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
+
+
+- `--debug`
+
+	Enable debug output in build scripts
+
+
+- `--error-prefix-in-binary`
+
+	Error if the host prefix is detected in any binary files
+
+
+- `--allow-symlinks-on-windows`
+
+	Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+
+
+- `--exclude-newer <EXCLUDE_NEWER>`
+
+	Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+
+
+- `--build-num <BUILD_NUM>`
+
+	Override the build number for all outputs (defaults to the build number in the recipe)
+
+
+###### **Publishing**
+
+- `--to <TO>`
+
+	The channel or URL to publish the package to.
+	
+	Examples: - prefix.dev: https://prefix.dev/my-channel - anaconda.org: https://anaconda.org/my-org - S3: s3://my-bucket - Filesystem: file:///path/to/channel or /path/to/channel - Quetz: quetz://server.company.com/channel - Artifactory: artifactory://server.company.com/channel
+	
+	Note: This channel is also used as the highest priority channel when solving dependencies.
+
+
+- `--build-number <BUILD_NUMBER>`
+
+	Override the build number for all outputs. Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`). When using a relative bump, the highest build number from the target channel is used as the base
+
+
+- `--force`
+
+	Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels
+
+
+- `--generate-attestation`
+
+	Automatically generate attestations when uploading to prefix.dev channels. Only works when uploading to prefix.dev channels with trusted publishing enabled
+
+
 ###### **Sandbox arguments**
 
 - `--sandbox`
@@ -449,26 +723,9 @@ Upload a package
 
 ##### **Options:**
 
-- `--experimental`
-
-	Enable experimental features
-
-
 - `--allow-insecure-host <ALLOW_INSECURE_HOST>`
 
 	List of hosts for which SSL certificate verification should be skipped
-
-
-- `--channel-priority <CHANNEL_PRIORITY>`
-
-	Channel priority to use when solving
-
-
-###### **Modifying result**
-
-- `--output-dir <OUTPUT_DIR>`
-
-	Output directory for build artifacts.
 
 
 
@@ -552,12 +809,27 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 
 - `--attestation <ATTESTATION>`
 
-	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
+	Upload an attestation file alongside the package. Note: if you add an attestation, you can _only_ upload a single package. Mutually exclusive with --generate-attestation
+
+
+- `--generate-attestation`
+
+	Automatically generate attestation using cosign in CI. Mutually exclusive with --attestation
+
+
+- `--store-github-attestation`
+
+	Also store the generated attestation to GitHub's attestation API. Requires `GITHUB_TOKEN` environment variable and only works in GitHub Actions. The attestation will be associated with the current repository
 
 
 - `-s`, `--skip-existing`
 
-	Skip upload if package is existed
+	Skip upload if package already exists
+
+
+- `--force`
+
+	Force overwrite existing packages
 
 
 
@@ -987,13 +1259,13 @@ Debug a recipe by setting up the environment without running the build script
 
 Create a patch for a directory
 
-**Usage:** `rattler-build create-patch [OPTIONS] --directory <DIRECTORY>`
+**Usage:** `rattler-build create-patch [OPTIONS]`
 
 ##### **Options:**
 
 - `-d`, `--directory <DIRECTORY>`
 
-	Directory where we want to create the patch
+	Directory where we want to create the patch. Defaults to current directory if not specified
 
 
 - `--name <NAME>`
@@ -1017,9 +1289,166 @@ Create a patch for a directory
 	Comma-separated list of file names (or glob patterns) that should be excluded from the diff
 
 
+- `--add <ADD>`
+
+	Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+
+
+- `--include <INCLUDE>`
+
+	Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs") If not specified, all modified files are included (subject to --exclude)
+
+
 - `--dry-run`
 
-	Perform a dry-run: analyse changes and log the diff, but don't write the patch file
+	Perform a dry-run: analyze changes and log the diff, but don't write the patch file
+
+
+
+
+
+### `debug-shell`
+
+Open a debug shell in the build environment
+
+**Usage:** `rattler-build debug-shell [OPTIONS]`
+
+##### **Options:**
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `-o`, `--output-dir <OUTPUT_DIR>`
+
+	Output directory containing rattler-build-log.txt
+
+	- Default value: `./output`
+
+
+
+
+### `package`
+
+Package-related subcommands
+
+**Usage:** `rattler-build package <COMMAND>`
+
+##### **Subcommands:**
+
+* `inspect` — Inspect and display information about a built package
+* `extract` — Extract a conda package to a directory
+
+
+
+#### `inspect`
+
+Inspect and display information about a built package
+
+**Usage:** `rattler-build package inspect [OPTIONS] <PACKAGE_FILE>`
+
+##### **Arguments:**
+
+- `<PACKAGE_FILE>`
+
+	Path to the package file (.conda, .tar.bz2)
+
+
+
+##### **Options:**
+
+- `--paths`
+
+	Show detailed file listing with hashes and sizes
+
+
+- `--about`
+
+	Show extended about information
+
+
+- `--run-exports`
+
+	Show run exports
+
+
+- `--all`
+
+	Show all available information
+
+
+- `--json`
+
+	Output as JSON
+
+
+
+
+
+#### `extract`
+
+Extract a conda package to a directory
+
+**Usage:** `rattler-build package extract [OPTIONS] <PACKAGE_FILE>`
+
+##### **Arguments:**
+
+- `<PACKAGE_FILE>`
+
+	Path to the package file (.conda, .tar.bz2) or a URL to download from
+
+
+
+##### **Options:**
+
+- `-d`, `--dest <DEST>`
+
+	Destination directory for extraction (defaults to package name without extension)
+
+
+
+
+
+### `bump-recipe`
+
+Bump a recipe to a new version
+
+This command updates the version and SHA256 checksum(s) in a recipe file. It can either use a specified version or auto-detect the latest version from supported providers (GitHub, PyPI, crates.io).
+
+**Usage:** `rattler-build bump-recipe [OPTIONS]`
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPE>`
+
+	Path to the recipe file (recipe.yaml). Defaults to current directory
+
+	- Default value: `.`
+
+- `--version <VERSION>`
+
+	The new version to bump to. If not specified, will auto-detect the latest version from the source URL's provider (GitHub, PyPI, crates.io)
+
+
+- `--include-prerelease`
+
+	Include pre-release versions when auto-detecting (e.g., alpha, beta, rc)
+
+
+- `--check-only`
+
+	Only check for updates without modifying the recipe
+
+
+- `--dry-run`
+
+	Perform a dry-run: show what would be changed without writing to the file
+
+
+- `--keep-build-number`
+
+	Keep the current build number instead of resetting it to 0
 
 
 

@@ -272,10 +272,12 @@ impl ResolvedDependencies {
             .resolved
             .iter()
             .map(|r| {
-                let spec = self
-                    .specs
-                    .iter()
-                    .find(|s| s.spec().name.as_ref() == Some(&r.package_record.name));
+                let spec = self.specs.iter().find(|s| {
+                    s.spec().name.as_ref()
+                        == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                            r.package_record.name.clone(),
+                        ))
+                });
 
                 if let Some(s) = spec {
                     (r, Some(s))
@@ -342,7 +344,12 @@ impl ResolvedDependencies {
                     .iter()
                     // Run export dependencies are not direct dependencies
                     .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
-                    .any(|s| s.spec().name.as_ref() == Some(&record.package_record.name))
+                    .any(|s| {
+                        s.spec().name.as_ref()
+                            == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                                record.package_record.name.clone(),
+                            ))
+                    })
             {
                 continue;
             }
@@ -362,6 +369,39 @@ impl Display for ResolvedDependencies {
     }
 }
 
+/// Render dependencies as (name, rest) pairs, sorted by name.
+/// When multiple dependencies have the same name, they will be grouped together.
+/// Empty specs are shown as "*" to indicate "any version".
+fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(String, String)> {
+    // Collect all dependencies as (name, rest) pairs
+    // The rendered string format is "name spec (annotation)" so we split on first space
+    let mut items: Vec<(String, String)> = deps
+        .iter()
+        .map(|d| {
+            let rendered = d.render(long);
+            // Split on first space to separate name from the rest
+            if let Some((name, rest)) = rendered.split_once(' ') {
+                (name.to_string(), rest.to_string())
+            } else {
+                // No space means just a name with no version spec
+                (rendered.clone(), String::new())
+            }
+        })
+        .collect();
+
+    // Replace empty specs with "*" to indicate "any version"
+    for (_, rest) in &mut items {
+        if rest.is_empty() {
+            *rest = "*".to_string();
+        }
+    }
+
+    // Sort alphabetically by name
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    items
+}
+
 impl FinalizedRunDependencies {
     pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
         let mut table = table;
@@ -369,41 +409,59 @@ impl FinalizedRunDependencies {
             .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
             .set_header(vec!["Name", "Spec"]);
 
-        // Helper function to add a section with optional padding
-        let mut add_section = |section_name: &str, items: &[String], needs_padding: bool| {
-            if items.is_empty() {
-                return needs_padding;
-            }
-
-            if needs_padding {
-                table.add_row(vec!["", ""]);
-            }
-
+        // Helper function to add a section header
+        fn add_section_header(table: &mut comfy_table::Table, section_name: &str) {
             let mut row = comfy_table::Row::new();
             row.add_cell(
                 comfy_table::Cell::new(section_name).add_attribute(comfy_table::Attribute::Bold),
             );
             table.add_row(row);
+        }
 
-            items.iter().for_each(|item| {
+        // Helper function to add grouped dependencies
+        // When multiple deps have the same name, only the first shows the name
+        fn add_grouped_items(table: &mut comfy_table::Table, items: &[(String, String)]) {
+            let mut prev_name: Option<&str> = None;
+            for (name, rest) in items {
+                // Only show name if different from previous
+                let display_name = if prev_name == Some(name.as_str()) {
+                    ""
+                } else {
+                    prev_name = Some(name.as_str());
+                    name.as_str()
+                };
+
+                table.add_row(vec![display_name, rest.as_str()]);
+            }
+        }
+
+        // Helper function to add simple string items
+        fn add_simple_items(table: &mut comfy_table::Table, items: &[String]) {
+            for item in items {
                 table.add_row(item.splitn(2, ' ').collect::<Vec<&str>>());
-            });
+            }
+        }
 
-            true
-        };
+        let mut has_previous_section = false;
 
-        // Add dependencies section
-        let depends_rendered: Vec<String> = self.depends.iter().map(|d| d.render(long)).collect();
-        let mut has_previous_section = add_section("Run dependencies", &depends_rendered, false);
+        // Add dependencies section (grouped by name)
+        let depends_rendered = render_grouped_dependencies(&self.depends, long);
+        if !depends_rendered.is_empty() {
+            add_section_header(&mut table, "Run dependencies");
+            add_grouped_items(&mut table, &depends_rendered);
+            has_previous_section = true;
+        }
 
-        // Add constraints section
-        let constraints_rendered: Vec<String> =
-            self.constraints.iter().map(|d| d.render(long)).collect();
-        has_previous_section = add_section(
-            "Run constraints",
-            &constraints_rendered,
-            has_previous_section,
-        );
+        // Add constraints section (grouped by name)
+        let constraints_rendered = render_grouped_dependencies(&self.constraints, long);
+        if !constraints_rendered.is_empty() {
+            if has_previous_section {
+                table.add_row(vec!["", ""]);
+            }
+            add_section_header(&mut table, "Run constraints");
+            add_grouped_items(&mut table, &constraints_rendered);
+            has_previous_section = true;
+        }
 
         // Add run exports sections if not empty
         if !self.run_exports.is_empty() {
@@ -417,11 +475,12 @@ impl FinalizedRunDependencies {
 
             for (name, exports) in sections {
                 if !exports.is_empty() {
-                    has_previous_section = add_section(
-                        &format!("Run exports ({name})"),
-                        exports,
-                        has_previous_section,
-                    );
+                    if has_previous_section {
+                        table.add_row(vec!["", ""]);
+                    }
+                    add_section_header(&mut table, &format!("Run exports ({name})"));
+                    add_simple_items(&mut table, exports);
+                    has_previous_section = true;
                 }
             }
         }
@@ -506,29 +565,30 @@ pub fn apply_variant(
             match s {
                 Dependency::Spec(m) => {
                     let m = m.clone();
-                    if build_time && m.version.is_none() && m.build.is_none() {
-                        if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
-                                // if the variant starts with an alphanumeric character,
-                                // we have to add a '=' to the version spec
-                                let mut spec = version.to_string();
+                    if build_time
+                        && m.version.is_none()
+                        && m.build.is_none()
+                        && let Some(name) = &m.name
+                        && let Some(version) = variant.get(&name.to_string().into())
+                    {
+                        // if the variant starts with an alphanumeric character,
+                        // we have to add a '=' to the version spec
+                        let mut spec = version.to_string();
 
-                                // check if all characters are alphanumeric or ., in that case add
-                                // a '=' to get "startswith" behavior
-                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={spec}");
-                                }
-
-                                let variant = name.as_normalized().to_string();
-                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
-                                    ResolveError::VariantSpecParseError(variant.clone(), e)
-                                })?;
-
-                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
-
-                                return Ok(VariantDependency { spec, variant }.into());
-                            }
+                        // check if all characters are alphanumeric or ., in that case add
+                        // a '=' to get "startswith" behavior
+                        if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                            spec = format!("={spec}");
                         }
+
+                        let variant = name.to_string();
+                        let spec: NamelessMatchSpec = spec
+                            .parse()
+                            .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
+
+                        let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                        return Ok(VariantDependency { spec, variant }.into());
                     }
                     Ok(SourceDependency { spec: m }.into())
                 }
@@ -830,19 +890,19 @@ pub(crate) async fn resolve_dependencies(
     let output_ignore_run_exports = requirements.ignore_run_exports(None);
     let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_build_env) = &cache.build {
-            let cache_build_run_exports = cache_build_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_build_run_exports, "cache-build")?;
-            build_run_exports.extend(&filtered);
-        }
+    if let Some(cache) = &output.finalized_cache_dependencies
+        && let Some(cache_build_env) = &cache.build
+    {
+        let cache_build_run_exports = cache_build_env.run_exports(true);
+        let filtered = output
+            .recipe
+            .cache
+            .as_ref()
+            .expect("recipe should have cache section")
+            .requirements
+            .ignore_run_exports(Some(&output_ignore_run_exports))
+            .filter(&cache_build_run_exports, "cache-build")?;
+        build_run_exports.extend(&filtered);
     }
 
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
@@ -970,19 +1030,19 @@ pub(crate) async fn resolve_dependencies(
     // And filter the run exports
     let mut host_run_exports = output_ignore_run_exports.filter(&host_run_exports, "host")?;
 
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_host_env) = &cache.host {
-            let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
-            host_run_exports.extend(&filtered);
-        }
+    if let Some(cache) = &output.finalized_cache_dependencies
+        && let Some(cache_host_env) = &cache.host
+    {
+        let cache_host_run_exports = cache_host_env.run_exports(true);
+        let filtered = output
+            .recipe
+            .cache
+            .as_ref()
+            .expect("recipe should have cache section")
+            .requirements
+            .ignore_run_exports(Some(&output_ignore_run_exports))
+            .filter(&cache_host_run_exports, "cache-host")?;
+        host_run_exports.extend(&filtered);
     }
 
     // add the host run exports to the run dependencies
@@ -1011,7 +1071,12 @@ pub(crate) async fn resolve_dependencies(
 
                 let by_name = spec_name
                     .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
+                    .and_then(|n| match n {
+                        rattler_conda_types::PackageNameMatcher::Exact(name) => {
+                            Some(ignore_run_exports.by_name().contains(name))
+                        }
+                        _ => None,
+                    })
                     .unwrap_or(false);
                 let by_package = source_package
                     .map(|s| ignore_run_exports.from_package().contains(&s))

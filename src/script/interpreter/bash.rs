@@ -57,7 +57,7 @@ impl Interpreter for BashInterpreter {
         }
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let mut cmd_args = vec!["bash", "-e"];
+        let mut cmd_args = vec!["bash"];
         if args.debug.is_enabled() {
             cmd_args.push("-x");
         }
@@ -79,8 +79,7 @@ impl Interpreter for BashInterpreter {
             let status_code = output.status.code().unwrap_or(1);
             tracing::error!("Script failed with status {}", status_code);
             tracing::error!("{}", print_debug_info(&args));
-            return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
                 "Script failed".to_string(),
             )));
         }

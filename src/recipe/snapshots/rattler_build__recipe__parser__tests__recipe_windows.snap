@@ -168,10 +168,12 @@ Recipe {
             Spec(
                 MatchSpec {
                     name: Some(
-                        PackageName {
-                            normalized: None,
-                            source: "vs2017_win-64",
-                        },
+                        Exact(
+                            PackageName {
+                                normalized: None,
+                                source: "vs2017_win-64",
+                            },
+                        ),
                     ),
                     version: None,
                     build: None,
@@ -185,15 +187,18 @@ Recipe {
                     sha256: None,
                     url: None,
                     license: None,
+                    condition: None,
                 },
             ),
             Spec(
                 MatchSpec {
                     name: Some(
-                        PackageName {
-                            normalized: None,
-                            source: "cmake",
-                        },
+                        Exact(
+                            PackageName {
+                                normalized: None,
+                                source: "cmake",
+                            },
+                        ),
                     ),
                     version: None,
                     build: None,
@@ -207,6 +212,7 @@ Recipe {
                     sha256: None,
                     url: None,
                     license: None,
+                    condition: None,
                 },
             ),
         ],
@@ -214,10 +220,12 @@ Recipe {
             Spec(
                 MatchSpec {
                     name: Some(
-                        PackageName {
-                            normalized: None,
-                            source: "xtl",
-                        },
+                        Exact(
+                            PackageName {
+                                normalized: None,
+                                source: "xtl",
+                            },
+                        ),
                     ),
                     version: Some(
                         Group(
@@ -251,6 +259,7 @@ Recipe {
                     sha256: None,
                     url: None,
                     license: None,
+                    condition: None,
                 },
             ),
         ],
@@ -258,10 +267,12 @@ Recipe {
             Spec(
                 MatchSpec {
                     name: Some(
-                        PackageName {
-                            normalized: None,
-                            source: "xtl",
-                        },
+                        Exact(
+                            PackageName {
+                                normalized: None,
+                                source: "xtl",
+                            },
+                        ),
                     ),
                     version: Some(
                         Group(
@@ -295,6 +306,7 @@ Recipe {
                     sha256: None,
                     url: None,
                     license: None,
+                    condition: None,
                 },
             ),
         ],
@@ -302,10 +314,12 @@ Recipe {
             Spec(
                 MatchSpec {
                     name: Some(
-                        PackageName {
-                            normalized: None,
-                            source: "xsimd",
-                        },
+                        Exact(
+                            PackageName {
+                                normalized: None,
+                                source: "xsimd",
+                            },
+                        ),
                     ),
                     version: Some(
                         Group(
@@ -339,6 +353,7 @@ Recipe {
                     sha256: None,
                     url: None,
                     license: None,
+                    condition: None,
                 },
             ),
         ],

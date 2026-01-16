@@ -1,6 +1,6 @@
 <h1>
-  <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
+  <a href="https://prefix.dev/tools/rattler-build">
+    <img alt="banner" src="https://github.com/user-attachments/assets/456f8ef1-1c7b-463d-ad88-de3496b05db2">
   </a>
 </h1>
 
@@ -26,10 +26,9 @@
 The `rattler-build` tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
-run is a package that can be installed using `mamba`, `rattler` or `conda`.
+run is a package that can be installed using [`pixi`](https://github.com/prefix-dev/pixi), [`mamba`](https://github.com/mamba-org/mamba), or [`conda`](https://conda.org).
 
-`rattler-build` does not have any dependencies on `conda-build` or Python and
-works as a standalone binary.
+`rattler-build` is a standalone binary written from scratch in Rust, and does not have any dependencies on `conda-build` or Python.
 
 ![](https://github.com/prefix-dev/rattler-build/assets/885054/98377399-aae4-45a5-a4e9-982a3c7b2d50)
 

@@ -7,6 +7,8 @@ extend-exclude = [
   "tests/data/mapping_files/*",
   "test-data/conda_forge/**/*",
   "test-data/patch_application/**/*",
+  "**/*.ipynb",
+  "**/__marimo__/",
 ]
 ignore-hidden = false
 
@@ -14,3 +16,6 @@ ignore-hidden = false
 ratatui = "ratatui"
 ND = "ND"
 FreeTakServer = "FreeTakServer"
+
+[default.extend-words]
+placehold = "placehold"

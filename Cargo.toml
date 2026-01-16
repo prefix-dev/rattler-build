@@ -1,5 +1,22 @@
+[package]
+name = "rattler-build"
+version = "0.55.1"
+authors = ["rattler-build contributors <hi@prefix.dev>"]
+repository = "https://github.com/prefix-dev/rattler-build"
+edition = "2024"
+license = "BSD-3-Clause"
+readme = "README.md"
+description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
+documentation = "https://prefix-dev.github.io/rattler-build"
+default-run = "rattler-build"
+rust-version = "1.89.0"
+
 [workspace]
-members = ["rust-tests", "crates/rattler_build_recipe_generator"]
+members = [
+  "rust-tests",
+  "crates/rattler_build_recipe_generator",
+  "crates/rattler_build_allocator",
+]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]
@@ -11,53 +28,45 @@ repository = "https://github.com/prefix-dev/rattler-build"
 [workspace.dependencies]
 async-once-cell = "0.5.4"
 async-recursion = "1.1.1"
-clap = { version = "4.5.45", features = ["derive"] }
-flate2 = "1.1.2"
-fs-err = "3.1.1"
-indexmap = "2.11.4"
-insta = "1.41.1"
+clap = { version = "4.5.53", features = ["derive"] }
+flate2 = "1.1.5"
+fs-err = "3.2.0"
+indexmap = "2.12.1"
+insta = "1.44.3"
 itertools = "0.14.0"
 miette = "7.6.0"
-rattler_conda_types = { version = "0.40.0", default-features = false }
-rattler_digest = { version = "1.1.5", default-features = false, features = [
+rattler_conda_types = { version = "0.42.4", default-features = false }
+rattler_digest = { version = "1.2.2", default-features = false, features = [
   "serde",
 ] }
-regex = "1.11.1"
-reqwest = { version = "0.12.23", default-features = false, features = ["json"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.142"
-serde_with = "3.14.0"
+regex = "1.12.2"
+reqwest = { version = "0.12.24", default-features = false, features = ["json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serde_with = "3.16.1"
 serde_yaml = "0.9.34"
 sha2 = "0.10.9"
 tar = "0.4.44"
-tempfile = "3.21.0"
-tokio = { version = "1.47.1", features = ["rt", "macros"] }
-toml = "0.9.5"
-tracing = "0.1.41"
-url = "2.5.4"
-zip = { version = "5.1.1", default-features = false, features = ["deflate"] }
-
-[package]
-name = "rattler-build"
-version = "0.48.1"
-authors = ["rattler-build contributors <hi@prefix.dev>"]
-repository = "https://github.com/prefix-dev/rattler-build"
-edition = "2024"
-license = "BSD-3-Clause"
-readme = "README.md"
-description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
-documentation = "https://prefix-dev.github.io/rattler-build"
-default-run = "rattler-build"
-rust-version = "1.86.0"
+tempfile = "3.23.0"
+tokio = { version = "1.48.0", features = ["rt", "macros"] }
+toml = "0.9.8"
+tracing = "0.1.43"
+url = "2.5.7"
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 
 [features]
-default = ['rustls-tls', 'recipe-generation']
+default = ['rustls-tls', 'recipe-generation', 's3']
+# Enable optimized memory allocators for release builds.
+# This provides significant performance improvements, especially on Linux musl.
+# Disabled by default due to increased compile time.
+performance = ["rattler_build_allocator"]
 native-tls = [
   'reqwest/native-tls',
   'rattler/native-tls',
   'rattler_repodata_gateway/native-tls',
   'rattler_networking/native-tls',
   'rattler_package_streaming/native-tls',
+  'rattler_index/native-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -67,6 +76,7 @@ rustls-tls = [
   'rattler_repodata_gateway/rustls-tls',
   'rattler_networking/rustls-tls',
   'rattler_package_streaming/rustls-tls',
+  'rattler_index/rustls-tls',
 ]
 tui = [
   'ratatui',
@@ -75,6 +85,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
+s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'dep:rattler_s3']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -93,8 +104,8 @@ path = "./scripts/patch-apply-gen-test-data.rs"
 [dependencies]
 serde = { workspace = true }
 serde_yaml = { workspace = true }
-serde-untagged = "0.1.8"
-anyhow = "1.0.99"
+serde-untagged = "0.1.9"
+anyhow = "1.0.100"
 walkdir = "2.5.0"
 hex = "0.4.3"
 serde_json = { workspace = true }
@@ -110,12 +121,16 @@ content_inspector = "0.2.4"
 serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
-clap = { workspace = true, features = ["env", "cargo"] }
-minijinja = { version = "2.11.0", features = [
+clap = { workspace = true, features = ["env", "cargo", "suggestions"] }
+minijinja = { version = "2.13.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
-tracing-subscriber = { version = "0.3.19", features = [
+# Ansi colored logging using tracing subscriber is broken since 0.3.20. Rattler-build doesnt really
+# care about this because it uses a custom formatter. However, downstream packages might care,
+# therefor we explicitly loosen the bounds on tracing-subscriber.
+# See: https://github.com/tokio-rs/tracing/issues/3378
+tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "fmt",
   "ansi",
@@ -124,105 +139,102 @@ tracing-subscriber = { version = "0.3.19", features = [
 marked-yaml = { version = "0.8.0" }
 miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
-goblin = "0.10.1"
+goblin = "0.10.4"
 scroll = "0.13.0"
 pathdiff = "0.2.3"
-comfy-table = "7.1.4"
+comfy-table = "7.2.1"
 futures = "0.3.31"
 indicatif = { version = "0.18.0", features = ["in_memory"] }
 console = { version = "0.16.1", features = ["windows-console-colors"] }
 thiserror = "2.0.17"
 tempfile = { workspace = true }
-chrono = "0.4.41"
+chrono = "0.4.42"
 sha1 = "0.10.6"
-spdx = "0.12.0"
-ignore = "0.4.23"
-globset = "0.4.16"
-clap-verbosity-flag = "3.0.3"
-tracing-core = "0.1.34"
-petgraph = "0.8.2"
+spdx = "0.13.2"
+ignore = "0.4.25"
+globset = "0.4.18"
+text-stub-library = "0.9.0"
+clap-verbosity-flag = "3.0.4"
+tracing-core = "0.1.35"
+petgraph = "0.8.3"
 indexmap = { workspace = true }
 dunce = "1.0.5"
 fs-err = { workspace = true }
 which = "8.0.0"
-clap_complete = "4.5.57"
-clap_complete_nushell = "4.5.8"
-tokio-util = { version = "0.7.16", features = ["codec", "compat"] }
+clap_complete = "4.5.61"
+clap_complete_nushell = "4.5.10"
+tokio-util = { version = "0.7.17", features = ["codec", "compat"] }
 
 tar = { workspace = true }
 zip = { workspace = true }
-bzip2 = "0.6.0"
+bzip2 = "0.6.1"
 base64 = "0.22.1"
 flate2 = { workspace = true }
-xz2 = "0.1.7"
+lzma-rust2 = { version = "0.15", features = ["xz"] }
 zstd = "0.13.3"
 toml = { workspace = true }
-memmap2 = "0.9.7"
+memmap2 = "0.9.9"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = { workspace = true }
 terminal_size = "0.4.3"
-memchr = "2.7.5"
+memchr = "2.7.6"
 ratatui = { version = "0.29.0", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.14.0", optional = true }
-reflink-copy = "0.1.26"
+reflink-copy = "0.1.28"
 rayon = "1.11.0"
 regex = { workspace = true }
 async-recursion = { workspace = true }
-opendal = { version = "0.54.0", default-features = false, features = [
-  "services-s3",
-] }
 
 # Rattler crates
-rattler_config = { version = "0.2.11" }
-rattler = { version = "0.37.7", default-features = false, features = [
+rattler_config = { version = "0.2.23" }
+rattler = { version = "0.39.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.37", default-features = false }
+rattler_cache = { version = "0.6.6", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.25.5", default-features = false }
-rattler_networking = { version = "0.25.16", default-features = false, features = [
-  "s3",
+rattler_index = { version = "0.27.8", default-features = false }
+rattler_networking = { version = "0.25.29", default-features = false, features = [
   "rattler_config",
 ] }
-rattler_upload = { version = "0.3.4", default-features = false, features = [
-  "s3",
-] }
-rattler_redaction = { version = "0.1.12" }
-rattler_repodata_gateway = { version = "0.24.7", default-features = false, features = [
+rattler_upload = { version = "0.4.6", default-features = false }
+rattler_s3 = { version = "0.1.17", optional = true }
+rattler_redaction = { version = "0.1.13" }
+rattler_repodata_gateway = { version = "0.25.6", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.25.2", default-features = false, features = [
+rattler_shell = { version = "0.25.15", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "3.0.5", default-features = false, features = [
+rattler_solve = { version = "4.1.2", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.2.1", default-features = false }
-rattler_package_streaming = { version = "0.23.7", default-features = false }
-rattler_menuinst = "0.2.29"
+rattler_virtual_packages = { version = "2.3.4", default-features = false }
+rattler_package_streaming = { version = "0.23.21", default-features = false }
+rattler_menuinst = "0.2.42"
 lazy_static = "1.5.0"
-reqwest-retry = "0.7.0"
+reqwest-retry = "0.8.0"
 retry-policies = "0.5.1"
 strum = "0.27.2"
-unicode-normalization = "0.1.24"
+unicode-normalization = "0.1.25"
 line-ending = "1.5.1"
-diffy = { git = "https://github.com/prefix-dev/diffy.git", branch = "master" }
+flickzeug = "0.4.4"
 http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
 ] }
-sevenz-rust2 = "0.19.1"
+sevenz-rust2 = "0.20.0"
 dialoguer = "0.12.0"
 
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
   "cli",
 ] }
+rattler_build_allocator = { path = "crates/rattler_build_allocator", optional = true }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }
@@ -236,7 +248,7 @@ rstest = "0.26.1"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
 serial_test = "3.2.0"
-criterion = { version = "0.7.0", features = ["html_reports"] }
+criterion = { version = "0.8.1", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
 
 [[bench]]
