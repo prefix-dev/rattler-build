@@ -420,6 +420,7 @@ fn build_recipes_py(
     debug: bool,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    allow_absolute_license_paths: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     use_bz2: bool,
     use_zstd: bool,
