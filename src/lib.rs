@@ -65,7 +65,7 @@ use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, graph::NodeIndex, visit::DfsPostOrder};
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
-    package::ArchiveType,
+    package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -1414,7 +1414,7 @@ pub async fn debug_recipe(
         with_solve: true,
         no_build_id: false,
         package_format: PackageFormatAndCompression {
-            archive_type: ArchiveType::Conda,
+            archive_type: CondaArchiveType::Conda,
             compression_level: CompressionLevel::Default,
         },
         compression_threads: None,

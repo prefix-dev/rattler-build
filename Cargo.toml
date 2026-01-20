@@ -35,7 +35,7 @@ indexmap = "2.12.1"
 insta = "1.44.3"
 itertools = "0.14.0"
 miette = "7.6.0"
-rattler_conda_types = { version = "0.42.4", default-features = false }
+rattler_conda_types = { version = "0.43.0", default-features = false }
 rattler_digest = { version = "1.2.2", default-features = false, features = [
   "serde",
 ] }

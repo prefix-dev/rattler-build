@@ -7,7 +7,7 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::package::{
-    AboutJson, ArchiveType, IndexJson, PathType, PathsJson, RunExportsJson,
+    AboutJson, CondaArchiveType, IndexJson, PathType, PathsJson, RunExportsJson,
 };
 use rattler_networking::{AuthenticationMiddleware, AuthenticationStorage};
 use rattler_package_streaming::seek::read_package_file;
@@ -332,7 +332,7 @@ fn output_human_readable(
 
 /// Strips package extensions (.tar.bz2 or .conda) from a filename
 fn strip_package_extension(filename: &str) -> &str {
-    ArchiveType::split_str(filename)
+    CondaArchiveType::split_str(filename)
         .map(|(base, _)| base)
         .unwrap_or(filename)
 }

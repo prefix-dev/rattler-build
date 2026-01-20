@@ -19,7 +19,7 @@ use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
-    package::{ArchiveIdentifier, IndexJson, PackageFile},
+    package::{CondaArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_shell::{
@@ -350,7 +350,7 @@ pub async fn run_test(
 
     let cache_dir = rattler::default_cache_dir()?;
 
-    let pkg = ArchiveIdentifier::try_from_path(package_file)
+    let pkg = CondaArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
     // if the package is already in the cache, remove it.
@@ -531,7 +531,7 @@ impl PythonTest {
     /// Execute the Python test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
@@ -691,7 +691,7 @@ impl PerlTest {
     /// Execute the Perl test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
@@ -764,7 +764,7 @@ impl CommandsTest {
     /// Execute the command test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         test_directory: &Path,
         config: &TestConfiguration,
@@ -878,7 +878,7 @@ impl DownstreamTest {
     /// Execute the command test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
@@ -975,7 +975,7 @@ impl RTest {
     /// Execute the R test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
@@ -1047,7 +1047,7 @@ impl RubyTest {
     /// Execute the Ruby test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
