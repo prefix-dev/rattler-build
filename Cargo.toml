@@ -201,7 +201,7 @@ rattler_index = { version = "0.27.8", default-features = false }
 rattler_networking = { version = "0.25.29", default-features = false, features = [
   "rattler_config",
 ] }
-rattler_upload = { version = "0.4.6", default-features = false, features = ["sigstore_sign"] }
+rattler_upload = { version = "0.4.6", default-features = false, features = ["sigstore-sign"] }
 rattler_s3 = { version = "0.1.17", optional = true }
 rattler_redaction = { version = "0.1.13" }
 rattler_repodata_gateway = { version = "0.25.6", default-features = false, features = [
