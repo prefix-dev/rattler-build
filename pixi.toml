@@ -92,7 +92,7 @@ toml-lint = "taplo lint --verbose **/pixi.toml"
 typos = "typos --force-exclude"
 
 [feature.pre-commit.dependencies]
-lefthook = ">=1.12.2,<2"
+lefthook = ">=2.0.11,<3"
 
 [feature.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
