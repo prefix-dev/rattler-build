@@ -157,7 +157,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # pixi build
 [package.build.backend]
 name = "pixi-build-rust"
-version = "0.3.*"
+version = "*"
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
