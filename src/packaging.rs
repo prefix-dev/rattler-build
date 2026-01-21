@@ -161,10 +161,8 @@ fn copy_license_files(
         // Only process relative globs if there are any
         if !relative_globs.is_empty() {
             // Create a new GlobVec with only relative patterns
-            let relative_globvec = crate::recipe::parser::GlobVec::from_vec(
-                relative_globs.iter().map(|g| g.source()).collect(),
-                None,
-            );
+            let relative_globvec =
+                GlobVec::from_vec(relative_globs.iter().map(|g| g.source()).collect(), None);
 
             let copy_dir_work = copy_dir::CopyDir::new(
                 &output.build_configuration.directories.work_dir,

@@ -3723,6 +3723,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "ordered-float"
+version = "2.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "ordered-multimap"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4358,8 +4367,6 @@ dependencies = [
  "anyhow",
  "async-once-cell",
  "async-recursion",
- "base64",
- "bzip2",
  "chrono",
  "clap",
  "clap-verbosity-flag",
@@ -4372,7 +4379,6 @@ dependencies = [
  "crossterm 0.28.1",
  "dialoguer",
  "dunce",
- "flate2",
  "flickzeug",
  "fs-err",
  "futures",
@@ -4387,8 +4393,6 @@ dependencies = [
  "itertools 0.14.0",
  "lazy_static",
  "line-ending",
- "lzma-rust2",
- "marked-yaml",
  "memchr",
  "memmap2",
  "miette",
@@ -4400,15 +4404,24 @@ dependencies = [
  "ratatui",
  "rattler",
  "rattler_build_allocator",
+ "rattler_build_jinja",
+ "rattler_build_networking",
+ "rattler_build_recipe",
  "rattler_build_recipe_generator",
+ "rattler_build_script",
+ "rattler_build_source_cache",
+ "rattler_build_types",
+ "rattler_build_variant_config",
  "rattler_cache",
  "rattler_conda_types",
  "rattler_config",
  "rattler_digest",
+ "rattler_git",
  "rattler_index",
  "rattler_menuinst",
  "rattler_networking",
  "rattler_package_streaming",
+ "rattler_prefix_guard",
  "rattler_redaction",
  "rattler_repodata_gateway",
  "rattler_s3",
@@ -4434,9 +4447,8 @@ dependencies = [
  "sevenz-rust2",
  "sha1",
  "sha2",
- "spdx",
+ "spdx 0.13.3",
  "strum 0.27.2",
- "tar",
  "tempfile",
  "terminal_size",
  "text-stub-library",
@@ -4455,8 +4467,6 @@ dependencies = [
  "url",
  "walkdir",
  "which",
- "zip",
- "zstd",
 ]
 
 [[package]]
@@ -4465,6 +4475,107 @@ version = "0.1.0"
 dependencies = [
  "mimalloc",
  "tikv-jemallocator",
+]
+
+[[package]]
+name = "rattler_build_jinja"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fs-err",
+ "indexmap 2.12.1",
+ "insta",
+ "itertools 0.14.0",
+ "lazy_static",
+ "minijinja",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "strum 0.27.2",
+ "tempfile",
+ "thiserror 2.0.17",
+ "toml",
+]
+
+[[package]]
+name = "rattler_build_networking"
+version = "0.1.0"
+dependencies = [
+ "rattler_networking",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "rattler_build_package"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "content_inspector",
+ "fs-err",
+ "globset",
+ "indicatif",
+ "insta",
+ "memchr",
+ "memmap2",
+ "pathdiff",
+ "rattler_build_jinja",
+ "rattler_build_recipe",
+ "rattler_build_types",
+ "rattler_conda_types",
+ "rattler_digest",
+ "rattler_package_streaming",
+ "rayon",
+ "rstest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tracing",
+ "url",
+ "walkdir",
+]
+
+[[package]]
+name = "rattler_build_recipe"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "fs-err",
+ "globset",
+ "indexmap 2.12.1",
+ "insta",
+ "itertools 0.14.0",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "pathdiff",
+ "petgraph",
+ "rattler_build_jinja",
+ "rattler_build_script",
+ "rattler_build_types",
+ "rattler_build_variant_config",
+ "rattler_build_yaml_parser",
+ "rattler_conda_types",
+ "rattler_digest",
+ "regex",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha1",
+ "spdx 0.12.0",
+ "thiserror 2.0.17",
+ "url",
+ "walkdir",
 ]
 
 [[package]]
@@ -4496,6 +4607,114 @@ dependencies = [
  "tracing",
  "url",
  "zip",
+]
+
+[[package]]
+name = "rattler_build_script"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "console 0.16.2",
+ "fs-err",
+ "futures",
+ "indexmap 2.12.1",
+ "insta",
+ "itertools 0.14.0",
+ "minijinja",
+ "rattler_conda_types",
+ "rattler_shell",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "which",
+]
+
+[[package]]
+name = "rattler_build_source_cache"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bzip2",
+ "chrono",
+ "dunce",
+ "flate2",
+ "fs-err",
+ "futures",
+ "hex",
+ "indicatif",
+ "lzma-rust2",
+ "md-5",
+ "rattler_build_networking",
+ "rattler_git",
+ "rattler_prefix_guard",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sevenz-rust2",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "url",
+ "walkdir",
+ "zip",
+ "zstd",
+]
+
+[[package]]
+name = "rattler_build_types"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "globset",
+ "insta",
+ "itertools 0.14.0",
+ "rattler_conda_types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "rattler_build_variant_config"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "insta",
+ "marked-yaml",
+ "miette",
+ "minijinja",
+ "rattler_build_jinja",
+ "rattler_build_types",
+ "rattler_build_yaml_parser",
+ "rattler_conda_types",
+ "rstest",
+ "serde",
+ "serde_yaml",
+ "serial_test",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "rattler_build_yaml_parser"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "marked-yaml",
+ "miette",
+ "rattler_build_jinja",
+ "serde",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4609,6 +4828,26 @@ dependencies = [
  "sha2",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "rattler_git"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "dunce",
+ "fs-err",
+ "rattler_prefix_guard",
+ "reqwest",
+ "reqwest-middleware",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "url",
+ "urlencoding",
+ "which",
 ]
 
 [[package]]
@@ -4753,6 +4992,18 @@ dependencies = [
  "url",
  "zip",
  "zstd",
+]
+
+[[package]]
+name = "rattler_prefix_guard"
+version = "0.1.0"
+dependencies = [
+ "fs-err",
+ "libc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5650,6 +5901,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-value"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
+dependencies = [
+ "ordered-float",
+ "serde",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6007,6 +6268,15 @@ checksum = "17129e116933cf371d018bb80ae557e889637989d8638274fb25622827b03881"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "spdx"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41cf87c0efffc158b9dde4d6e0567a43e4383adc4c949e687a2039732db2f23a"
+dependencies = [
+ "smallvec",
 ]
 
 [[package]]
