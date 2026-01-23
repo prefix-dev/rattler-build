@@ -27,7 +27,7 @@ pub mod types;
 pub mod utils;
 
 mod consts;
-mod env_vars;
+pub mod env_vars;
 mod linux;
 mod macos;
 mod package_info;
@@ -374,23 +374,28 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config = VariantConfig::from_files(&variant_configs).map_err(|e| {
-        // Check if this is a ParseError with a file path
-        if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } = &e {
-            // Read the file to provide source code context
-            if let Ok(content) = fs_err::read_to_string(path) {
-                let source_code = rattler_build_recipe::source_code::Source::from_string(
-                    path.display().to_string(),
-                    content,
-                );
-                let error_with_source =
-                    rattler_build_recipe::ParseErrorWithSource::new(source_code, source.clone());
-                return miette::Report::new(error_with_source);
+    let mut variant_config =
+        VariantConfig::from_files(&variant_configs, build_data.target_platform).map_err(|e| {
+            // Check if this is a ParseError with a file path
+            if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } =
+                &e
+            {
+                // Read the file to provide source code context
+                if let Ok(content) = fs_err::read_to_string(path) {
+                    let source_code = rattler_build_recipe::source_code::Source::from_string(
+                        path.display().to_string(),
+                        content,
+                    );
+                    let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(
+                        source_code,
+                        source.clone(),
+                    );
+                    return miette::Report::new(error_with_source);
+                }
             }
-        }
-        // Fallback to original error if we can't provide source context
-        miette::Report::new(e)
-    })?;
+            // Fallback to original error if we can't provide source context
+            miette::Report::new(e)
+        })?;
 
     // Always insert target_platform and build_platform
     variant_config.variants.insert(

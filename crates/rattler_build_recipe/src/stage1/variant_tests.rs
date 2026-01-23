@@ -869,4 +869,144 @@ build:
         // Verify the context value (literal) was used, not the variant value
         assert_eq!(recipe.package().name().as_source(), "test-literal_value");
     }
+
+    #[test]
+    fn test_cdt_function_tracks_cdt_name_from_variant() {
+        // This test verifies that when the cdt() function is used in a recipe,
+        // and cdt_name is provided in the variant, it gets tracked in used_variant.
+        // This is important for hash computation - different cdt_name values should
+        // produce different hashes.
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert(
+            "target_platform".to_string(),
+            Variable::from("linux-aarch64"),
+        );
+        variant.insert("cdt_name".to_string(), Variable::from("conda"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_name is in used_variant because cdt() function accessed it
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("cdt_name")),
+            "cdt_name should be in used_variant when cdt() function uses it from the variant. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the custom cdt_name
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names.iter().any(|n| n == "mesa-libgbm-conda-aarch64"),
+            "Expected mesa-libgbm-conda-aarch64 in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn test_cdt_function_with_default_cdt_name() {
+        // This test verifies that when the cdt() function is used but cdt_name
+        // is NOT provided in the variant, it uses the default and does NOT track
+        // cdt_name (since it wasn't read from the variant).
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert(
+            "target_platform".to_string(),
+            Variable::from("linux-aarch64"),
+        );
+        // Note: NOT providing cdt_name - should use default "cos7" for aarch64
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_name is NOT in used_variant because it used the default
+        assert!(
+            !used_variant.contains_key(&NormalizedKey::from("cdt_name")),
+            "cdt_name should NOT be in used_variant when using default value. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the default cdt_name
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names.iter().any(|n| n == "mesa-libgbm-cos7-aarch64"),
+            "Expected mesa-libgbm-cos7-aarch64 (default for aarch64) in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn test_cdt_function_tracks_cdt_arch_from_variant() {
+        // This test verifies that when cdt_arch is provided in the variant,
+        // it gets tracked in used_variant.
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("cdt_arch".to_string(), Variable::from("custom_arch"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_arch is in used_variant
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("cdt_arch")),
+            "cdt_arch should be in used_variant when cdt() function uses it from the variant. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the custom cdt_arch
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names
+                .iter()
+                .any(|n| n == "mesa-libgbm-cos6-custom_arch"),
+            "Expected mesa-libgbm-cos6-custom_arch in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
 }

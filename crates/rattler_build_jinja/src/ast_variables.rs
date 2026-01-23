@@ -307,6 +307,10 @@ fn collect_variables_from_call(
                     }
                 }
             }
+            "cdt" => {
+                // Add cdt_name to variables
+                variables.insert("cdt_name".to_string());
+            }
             _ => {
                 // For other functions, collect the function name and arguments normally
                 collect_variables_from_expr(&call.expr, variables);

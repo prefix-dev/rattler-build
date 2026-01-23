@@ -4397,6 +4397,7 @@ dependencies = [
  "rattler_build_types",
  "rattler_build_yaml_parser",
  "rattler_conda_types",
+ "regex",
  "serde",
  "serde_yaml",
  "thiserror 2.0.17",

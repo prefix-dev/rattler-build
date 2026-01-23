@@ -4697,6 +4697,7 @@ dependencies = [
  "rattler_build_types",
  "rattler_build_yaml_parser",
  "rattler_conda_types",
+ "regex",
  "rstest",
  "serde",
  "serde_yaml",

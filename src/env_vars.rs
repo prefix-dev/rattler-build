@@ -120,6 +120,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
+/// Returns a map of environment variables for all supported languages (Python, R).
 pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 

@@ -232,6 +232,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
         let mut content = None;
         let mut file = None;
         let mut cwd = None;
+        let mut content_explicit = false;
 
         for (key_node, value_node) in mapping.iter() {
             let key = key_node.as_str();
@@ -267,6 +268,8 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                     }
                 }
                 "content" => {
+                    // Mark that content was explicitly specified via `content:` field
+                    content_explicit = true;
                     // Content can be either a string or a list
                     if let Some(scalar) = value_node.as_scalar() {
                         // Single string - convert to ConditionalList with one item
@@ -324,6 +327,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
             content,
             file,
             cwd,
+            content_explicit,
         });
     }
 

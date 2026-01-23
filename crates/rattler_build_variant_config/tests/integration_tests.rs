@@ -133,7 +133,11 @@ fn test_multi_file_merge() {
     let base = test_data_dir().join("multi_file/base.yaml");
     let override_file = test_data_dir().join("multi_file/override.yaml");
 
-    let config = VariantConfig::from_files(&[base, override_file]).unwrap();
+    let config = VariantConfig::from_files(
+        &[base, override_file],
+        rattler_conda_types::Platform::Linux64,
+    )
+    .unwrap();
     insta::assert_yaml_snapshot!("multi_file_merged", config);
 
     // Python should be overridden to ["3.11", "3.12"]
@@ -147,7 +151,11 @@ fn test_multi_file_combinations() {
     let base = test_data_dir().join("multi_file/base.yaml");
     let override_file = test_data_dir().join("multi_file/override.yaml");
 
-    let config = VariantConfig::from_files(&[base, override_file]).unwrap();
+    let config = VariantConfig::from_files(
+        &[base, override_file],
+        rattler_conda_types::Platform::Linux64,
+    )
+    .unwrap();
 
     let mut used_vars = HashSet::new();
     used_vars.insert("python".into());

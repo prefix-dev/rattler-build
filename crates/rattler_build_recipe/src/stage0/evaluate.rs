@@ -836,6 +836,35 @@ pub fn evaluate_skip_list(
     })
 }
 
+/// Check if any skip condition in the list evaluates to true
+///
+/// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
+/// Returns true if ANY condition evaluates to true (OR logic).
+fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
+    for condition in skip_conditions {
+        // Create a Jinja instance with the configuration from the evaluation context
+        let jinja_config = context.jinja_config().clone();
+        let mut jinja = Jinja::new(jinja_config);
+
+        // Use with_context to add all variables from the evaluation context
+        jinja = jinja.with_context(context.variables());
+
+        // Evaluate the skip condition as a boolean expression
+        match jinja.eval(condition) {
+            Ok(value) => {
+                if value.is_true() {
+                    return true;
+                }
+            }
+            Err(_) => {
+                // If evaluation fails, we can't determine if it's skipped
+                // Continue to check other conditions
+            }
+        }
+    }
+    false
+}
+
 /// Evaluate a string list, preserving templates with undefined variables
 /// This is used for script content where build-time environment variables might be referenced
 pub fn evaluate_string_list_lenient(
@@ -912,12 +941,20 @@ pub fn evaluate_package_name_list(
 }
 
 /// Helper function to validate and evaluate glob patterns from a ConditionalList
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "loguru" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
 fn evaluate_glob_patterns(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let pattern = evaluate_string_value(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        if pattern.is_empty() {
+            return Ok(None);
+        }
         // Validate the glob pattern immediately with proper error reporting
         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
             Ok(_) => Ok(Some(pattern)),
@@ -1190,13 +1227,17 @@ pub fn evaluate_script(
 
         let content = if commands.is_empty() {
             ScriptContentOutput::Default
-        } else if commands.len() == 1 && !has_additional_options {
-            // Single command with no additional options - use CommandOrPath for backward compat
+        } else if commands.len() == 1 && !has_additional_options && !script.content_explicit {
+            // Single command with no additional options and NOT explicitly using content: field
             // This serializes as a simple string: `script: "cmd"`
             ScriptContentOutput::CommandOrPath(commands.into_iter().next().unwrap())
+        } else if commands.len() == 1 && script.content_explicit {
+            // Single command with explicit content: field
+            // This serializes as `script: { content: "..." }`
+            ScriptContentOutput::Command(commands.into_iter().next().unwrap())
         } else {
-            // Multiple commands OR has additional options - use Commands
-            // This serializes as a list inside the content field: `script: { content: [...] }`
+            // Multiple commands OR has additional options
+            // This serializes with content field: `script: { content: [...] }`
             ScriptContentOutput::Commands(commands)
         };
         (content, None)
@@ -1213,6 +1254,7 @@ pub fn evaluate_script(
         secrets,
         content,
         cwd,
+        content_explicit: script.content_explicit,
     })
 }
 
@@ -2786,7 +2828,7 @@ fn evaluate_package_output_to_recipe(
     context: &EvaluationContext,
     staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
     accessed_during_context: &HashSet<String>,
-) -> Result<Stage1Recipe, ParseError> {
+) -> Result<Option<Stage1Recipe>, ParseError> {
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
     let name = PackageName::from_str(&name_str).map_err(|e| {
@@ -2876,6 +2918,14 @@ fn evaluate_package_output_to_recipe(
 
         output_build
     };
+
+    // Check if this output is skipped based on the merged skip conditions.
+    // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
+    // We skip evaluating requirements, tests, sources, etc. to avoid errors from
+    // platform-specific functions (like stdlib('c') on Windows) that would fail.
+    if is_skipped(&build.skip, context) {
+        return Ok(None);
+    }
 
     // Evaluate about section
     // Always merge top-level about with output about (output fields take precedence)
@@ -2982,10 +3032,13 @@ fn evaluate_package_output_to_recipe(
                 return false;
             }
 
-            // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+            // Include if accessed, part of our (free) dependencies,
+            // if it's an always-include variable, or if it's an OS env var key
+            let os_env_var_keys = context.os_env_var_keys();
             accessed_vars.contains(key_str)
                 || free_specs.contains(&NormalizedKey::from(key_str))
                 || ALWAYS_INCLUDED_VARS.contains(&key_str)
+                || os_env_var_keys.contains(key_str)
         })
         .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
         .collect();
@@ -3014,7 +3067,7 @@ fn evaluate_package_output_to_recipe(
     // added to the variant (which happens in variant_render.rs after evaluation).
     // The build string will remain unresolved until finalize_build_strings() is called.
 
-    Ok(Stage1Recipe::new(
+    Ok(Some(Stage1Recipe::new(
         package,
         build,
         about,
@@ -3024,7 +3077,7 @@ fn evaluate_package_output_to_recipe(
         tests,
         resolved_context,
         actual_variant,
-    ))
+    )))
 }
 
 /// Implement Evaluate for MultiOutputRecipe
@@ -3093,6 +3146,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 const ALWAYS_INCLUDE: &[&str] =
                     &["target_platform", "channel_targets", "channel_sources"];
 
+                let os_env_var_keys = context_with_vars.os_env_var_keys();
                 let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
                     .variables()
                     .iter()
@@ -3108,6 +3162,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         accessed_vars.contains(key_str)
                             || free_specs.contains(&NormalizedKey::from(key_str))
                             || ALWAYS_INCLUDE.contains(&key_str)
+                            || os_env_var_keys.contains(key_str)
                     })
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
@@ -3132,13 +3187,17 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             if let crate::stage0::Output::Package(pkg_output) = output {
                 context_with_vars.clear_accessed();
 
-                let mut recipe = evaluate_package_output_to_recipe(
+                let Some(mut recipe) = evaluate_package_output_to_recipe(
                     pkg_output.as_ref(),
                     self,
                     &context_with_vars,
                     &staging_caches,
                     &accessed_during_context,
-                )?;
+                )?
+                else {
+                    continue;
+                };
+
                 recipe.context = evaluated_context.clone();
 
                 // Set staging_caches and inherits_from based on the inherit field
@@ -4535,5 +4594,230 @@ build:
         let accessed = ctx.accessed_variables();
         assert!(accessed.contains("var1"));
         assert!(accessed.contains("var2"));
+    }
+
+    #[test]
+    fn test_evaluate_glob_patterns_filters_empty_strings() {
+        // Test that glob patterns with conditional expressions that evaluate to empty strings
+        // are filtered out. This handles cases like `${{ "loguru" if unix }}` on non-unix platforms.
+
+        // Create list with some normal patterns and one that will evaluate to empty
+        let list = ConditionalList::new(vec![
+            Item::Value(Value::new_concrete("*.txt".to_string(), None)),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("${{ \"loguru\" if unix else \"\" }}".to_string()).unwrap(),
+                None,
+            )),
+            Item::Value(Value::new_concrete("*.md".to_string(), None)),
+        ]);
+
+        // Test with unix = false (should filter out empty string)
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("unix".to_string(), Variable::from(false));
+
+        let result = evaluate_glob_patterns(&list, &ctx).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "*.txt");
+        assert_eq!(result[1], "*.md");
+
+        // Test with unix = true (should include "loguru")
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(true));
+
+        let result2 = evaluate_glob_patterns(&list, &ctx2).unwrap();
+        assert_eq!(result2.len(), 3);
+        assert_eq!(result2[0], "*.txt");
+        assert_eq!(result2[1], "loguru");
+        assert_eq!(result2[2], "*.md");
+    }
+
+    #[test]
+    fn test_evaluate_glob_patterns_simple_conditional_template() {
+        // Test the simpler form: `${{ "value" if condition }}`
+        // which renders to empty string when condition is false
+
+        let list = ConditionalList::new(vec![
+            Item::Value(Value::new_concrete("pattern1".to_string(), None)),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("${{ \"Library/bin/logurud.dll\" if win }}".to_string())
+                    .unwrap(),
+                None,
+            )),
+        ]);
+
+        // When win is false, the template evaluates to empty and should be filtered
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let result = evaluate_glob_patterns(&list, &ctx).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "pattern1");
+
+        // When win is true, the pattern should be included
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("win".to_string(), Variable::from(true));
+
+        let result2 = evaluate_glob_patterns(&list, &ctx2).unwrap();
+        assert_eq!(result2.len(), 2);
+        assert_eq!(result2[0], "pattern1");
+        assert_eq!(result2[1], "Library/bin/logurud.dll");
+    }
+
+    #[test]
+    fn test_skipped_output_does_not_evaluate_requirements() {
+        // Test that when an output is skipped (e.g., skip: win), its requirements
+        // are not evaluated. This is important because platform-specific functions
+        // like stdlib('c') may fail on certain platforms where they have no default.
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                // Test on Windows - the output should be skipped and not fail
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Win64,
+                    build_platform: rattler_conda_types::Platform::Win64,
+                    host_platform: rattler_conda_types::Platform::Win64,
+                    // Note: no c_stdlib in variant - stdlib('c') would fail on Windows
+                    variant: std::collections::BTreeMap::new(),
+                    ..Default::default()
+                };
+                let mut ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("win-64"),
+                );
+                ctx.insert("win".to_string(), Variable::from(true));
+                ctx.insert("unix".to_string(), Variable::from(false));
+
+                // This should NOT fail even though stdlib('c') has no default on Windows
+                // because the output is skipped (skip: win)
+                let result = multi.evaluate(&ctx);
+                assert!(
+                    result.is_ok(),
+                    "Skipped output should not fail on requirement evaluation. Error: {:?}",
+                    result.err()
+                );
+
+                let recipes = result.unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                // The output should have skip conditions and empty requirements
+                let recipe = &recipes[0];
+                assert!(
+                    recipe.build.skip.contains(&"win".to_string()),
+                    "Skip conditions should be preserved"
+                );
+                assert!(
+                    recipe.requirements.build.is_empty(),
+                    "Requirements should be empty for skipped output"
+                );
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_non_skipped_output_evaluates_requirements() {
+        // Test that non-skipped outputs still have their requirements evaluated
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                // Test on Linux - the output should NOT be skipped and requirements should be evaluated
+                let mut variant = std::collections::BTreeMap::new();
+                variant.insert("c_stdlib".into(), Variable::from_string("sysroot"));
+                variant.insert("c_stdlib_version".into(), Variable::from_string("2.17"));
+                variant.insert("cxx_compiler".into(), Variable::from_string("gxx"));
+                variant.insert("cxx_compiler_version".into(), Variable::from_string("12"));
+
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    variant,
+                    ..Default::default()
+                };
+                let mut ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+                ctx.insert("win".to_string(), Variable::from(false));
+                ctx.insert("unix".to_string(), Variable::from(true));
+
+                let result = multi.evaluate(&ctx);
+                assert!(
+                    result.is_ok(),
+                    "Non-skipped output should evaluate requirements"
+                );
+
+                let recipes = result.unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                // The output should NOT be skipped and should have requirements
+                let recipe = &recipes[0];
+                assert!(
+                    !recipe.requirements.build.is_empty(),
+                    "Requirements should NOT be empty for non-skipped output"
+                );
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
     }
 }

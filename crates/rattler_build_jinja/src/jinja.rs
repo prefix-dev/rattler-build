@@ -688,11 +688,16 @@ fn set_jinja(
     });
 
     let variant_clone = variant.clone();
+    let accessed_clone = accessed_variables.clone();
     env.add_function("cdt", move |package_name: String| {
         let arch = host_platform.arch().or_else(|| build_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
+        // Track access to cdt_arch if it exists in the variant
         let cdt_arch = if let Some(s) = variant_clone.get(&"cdt_arch".into()) {
+            if let Ok(mut accessed) = accessed_clone.lock() {
+                accessed.insert("cdt_arch".to_string());
+            }
             s.to_string()
         } else {
             match arch {
@@ -710,15 +715,20 @@ fn set_jinja(
             }
         };
 
-        let cdt_name = variant_clone.get(&"cdt_name".into()).map_or_else(
-            || match arch {
+        // Track access to cdt_name if it exists in the variant
+        let cdt_name = if let Some(s) = variant_clone.get(&"cdt_name".into()) {
+            if let Ok(mut accessed) = accessed_clone.lock() {
+                accessed.insert("cdt_name".to_string());
+            }
+            s.to_string()
+        } else {
+            match arch {
                 Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => {
                     "cos7".to_string()
                 }
                 _ => "cos6".to_string(),
-            },
-            |s| s.to_string(),
-        );
+            }
+        };
 
         let res = package_name.split_once(' ').map_or_else(
             || format!("{package_name}-{cdt_name}-{cdt_arch}"),
@@ -1542,6 +1552,137 @@ mod tests {
         // Variables should be cleared
         assert!(jinja.accessed_variables().is_empty());
         assert!(jinja.undefined_variables().is_empty());
+    }
+
+    #[test]
+    fn test_cdt_tracks_cdt_name_variable() {
+        // Test that when cdt() function uses cdt_name from the variant,
+        // it tracks the variable access
+        let variant = BTreeMap::from_iter(vec![("cdt_name".into(), "conda".into())]);
+        let options = JinjaConfig {
+            target_platform: Platform::LinuxAarch64,
+            host_platform: Platform::LinuxAarch64,
+            build_platform: Platform::LinuxAarch64,
+            variant,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Call cdt() which should use and track cdt_name
+        let result = jinja.eval("cdt('mesa-libgbm')").expect("cdt evaluation");
+        assert_eq!(result.to_string(), "mesa-libgbm-conda-aarch64");
+
+        // cdt_name should be in the accessed variables
+        let accessed = jinja.accessed_variables();
+        assert!(
+            accessed.contains("cdt_name"),
+            "cdt_name should be tracked when used by cdt() function. Accessed: {:?}",
+            accessed
+        );
+    }
+
+    #[test]
+    fn test_cdt_tracks_cdt_arch_variable() {
+        // Test that when cdt() function uses cdt_arch from the variant,
+        // it tracks the variable access
+        let variant = BTreeMap::from_iter(vec![("cdt_arch".into(), "custom_arch".into())]);
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Call cdt() which should use and track cdt_arch
+        let result = jinja.eval("cdt('mesa-libgbm')").expect("cdt evaluation");
+        assert_eq!(result.to_string(), "mesa-libgbm-cos6-custom_arch");
+
+        // cdt_arch should be in the accessed variables
+        let accessed = jinja.accessed_variables();
+        assert!(
+            accessed.contains("cdt_arch"),
+            "cdt_arch should be tracked when used by cdt() function. Accessed: {:?}",
+            accessed
+        );
+    }
+
+    #[test]
+    fn test_cdt_does_not_track_when_using_default() {
+        // Test that when cdt() uses default values (no cdt_name in variant),
+        // it does NOT track the variable (since it wasn't actually read from the variant)
+        let variant = BTreeMap::new();
+        let options = JinjaConfig {
+            target_platform: Platform::LinuxAarch64,
+            host_platform: Platform::LinuxAarch64,
+            build_platform: Platform::LinuxAarch64,
+            variant,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Call cdt() which should use default cdt_name
+        let result = jinja.eval("cdt('mesa-libgbm')").expect("cdt evaluation");
+        assert_eq!(result.to_string(), "mesa-libgbm-cos7-aarch64");
+
+        // cdt_name should NOT be in the accessed variables since it used the default
+        let accessed = jinja.accessed_variables();
+        assert!(
+            !accessed.contains("cdt_name"),
+            "cdt_name should NOT be tracked when using default value. Accessed: {:?}",
+            accessed
+        );
+    }
+
+    #[test]
+    fn test_compiler_dash_underscore_variant_tracking() {
+        // Test that when compiler("go-cgo") is called, the accessed variables
+        // are tracked with underscores (go_cgo_compiler, go_cgo_compiler_version)
+        // not dashes (go-cgo_compiler, go-cgo_compiler_version)
+        // This is important because variant configs use normalized keys with underscores
+        let variant = BTreeMap::from_iter(vec![
+            ("go_cgo_compiler".into(), "go_cgo".into()),
+            ("go_cgo_compiler_version".into(), "1.24".into()),
+        ]);
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Call compiler("go-cgo") with a dash
+        let result = jinja
+            .eval("compiler('go-cgo')")
+            .expect("compiler evaluation");
+        assert_eq!(result.to_string(), "go_cgo_linux-64 =1.24");
+
+        // The accessed variables should use underscores, not dashes
+        let accessed = jinja.accessed_variables();
+        assert!(
+            accessed.contains("go_cgo_compiler"),
+            "go_cgo_compiler should be tracked (with underscore). Accessed: {:?}",
+            accessed
+        );
+        assert!(
+            accessed.contains("go_cgo_compiler_version"),
+            "go_cgo_compiler_version should be tracked (with underscore). Accessed: {:?}",
+            accessed
+        );
+        // Ensure the dash versions are NOT tracked
+        assert!(
+            !accessed.contains("go-cgo_compiler"),
+            "go-cgo_compiler (with dash) should NOT be tracked. Accessed: {:?}",
+            accessed
+        );
+        assert!(
+            !accessed.contains("go-cgo_compiler_version"),
+            "go-cgo_compiler_version (with dash) should NOT be tracked. Accessed: {:?}",
+            accessed
+        );
     }
 
     #[test]

@@ -20,6 +20,10 @@ pub struct Script {
 
     /// The current working directory for the script.
     pub cwd: Option<PathBuf>,
+
+    /// Whether content was explicitly specified via `content:` field.
+    /// When true, serialization should always use `{content: ...}` structure.
+    pub content_explicit: bool,
 }
 
 impl Serialize for Script {
@@ -59,11 +63,14 @@ impl Serialize for Script {
             && self.secrets.is_empty()
             && self.cwd.is_none();
 
+        // When content_explicit is true, always use the Object form with content: field
         let raw_script = match &self.content {
-            ScriptContent::CommandOrPath(content) if only_content => {
+            ScriptContent::CommandOrPath(content) if only_content && !self.content_explicit => {
                 RawScript::CommandOrPath(content)
             }
-            ScriptContent::Commands(content) if only_content => RawScript::Commands(content),
+            ScriptContent::Commands(content) if only_content && !self.content_explicit => {
+                RawScript::Commands(content)
+            }
             _ => RawScript::Object {
                 interpreter: self.interpreter.as_ref(),
                 env: &self.env,
@@ -129,20 +136,27 @@ impl<'de> Deserialize<'de> for Script {
                 secrets,
                 content,
                 cwd,
-            } => Self {
-                interpreter,
-                env,
-                secrets,
-                cwd,
-                content: match content {
-                    Some(RawScriptContent::Command { content }) => ScriptContent::Command(content),
-                    Some(RawScriptContent::Commands { content }) => {
-                        ScriptContent::Commands(content)
-                    }
-                    Some(RawScriptContent::Path { file }) => ScriptContent::Path(file),
-                    None => ScriptContent::Default,
-                },
-            },
+            } => {
+                // When deserializing from Object form, content was explicitly specified
+                let content_explicit = content.is_some();
+                Self {
+                    interpreter,
+                    env,
+                    secrets,
+                    cwd,
+                    content: match content {
+                        Some(RawScriptContent::Command { content }) => {
+                            ScriptContent::Command(content)
+                        }
+                        Some(RawScriptContent::Commands { content }) => {
+                            ScriptContent::Commands(content)
+                        }
+                        Some(RawScriptContent::Path { file }) => ScriptContent::Path(file),
+                        None => ScriptContent::Default,
+                    },
+                    content_explicit,
+                }
+            }
         })
     }
 }
@@ -194,6 +208,7 @@ impl From<ScriptContent> for Script {
             secrets: Default::default(),
             content: value,
             cwd: None,
+            content_explicit: false,
         }
     }
 }

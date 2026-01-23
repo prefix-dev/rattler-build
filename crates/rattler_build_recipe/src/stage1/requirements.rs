@@ -289,6 +289,16 @@ impl Requirements {
             .chain(self.run.iter())
     }
 
+    pub fn run_exports_and_constraints(&self) -> impl Iterator<Item = &Dependency> {
+        self.run_exports
+            .noarch
+            .iter()
+            .chain(self.run_exports.strong.iter())
+            .chain(self.run_exports.strong_constraints.iter())
+            .chain(self.run_exports.weak.iter())
+            .chain(self.run_exports.weak_constraints.iter())
+    }
+
     /// Get the free specs of the rendered dependencies (any MatchSpec without pins)
     pub fn free_specs(&self) -> Vec<PackageName> {
         use rattler_conda_types::PackageNameMatcher;

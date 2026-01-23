@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_yaml_parser::ParseError;
+use rattler_conda_types::{NoArchType, PackageNameMatcher};
 use serde::{Deserialize, Serialize};
 
 use rattler_build_jinja::{JinjaConfig, Variable};
@@ -21,7 +22,7 @@ use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::stage0::evaluate::ALWAYS_INCLUDED_VARS;
-use crate::stage1::HashInfo;
+use crate::stage1::{Dependency, HashInfo, build::BuildString};
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
@@ -654,9 +655,6 @@ fn render_with_empty_combinations(
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
 fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
-    use crate::stage1::{HashInfo, build::BuildString};
-    use rattler_conda_types::NoArchType;
-
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -698,12 +696,9 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
 
 /// Helper function to extract all dependency package names from a recipe
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
-    use crate::stage1::requirements::Dependency;
-    use rattler_conda_types::PackageNameMatcher;
-
     recipe
         .requirements
-        .all_requirements()
+        .run_build_host()
         .filter_map(|dep| match dep {
             Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| match matcher {
                 PackageNameMatcher::Exact(name) => Some(name),
@@ -733,12 +728,34 @@ fn create_jinja_config(
     config: &RenderConfig,
     variant: &BTreeMap<NormalizedKey, Variable>,
 ) -> JinjaConfig {
+    // Check if the variant specifies a target_platform - if so, use it
+    // This allows rendering recipes for platforms different from the current platform
+    // (e.g., rendering a Windows variant on Linux to check if outputs would be skipped)
+    let target_platform = variant
+        .get(&"target_platform".into())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .unwrap_or(config.target_platform);
+
+    // Similarly for host_platform (defaults to target_platform if not specified)
+    let host_platform = variant
+        .get(&"host_platform".into())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .unwrap_or_else(|| {
+            // If host_platform not in variant, use config.host_platform if it differs from default,
+            // otherwise use the (potentially variant-derived) target_platform
+            if config.host_platform != config.target_platform {
+                config.host_platform
+            } else {
+                target_platform
+            }
+        });
+
     JinjaConfig {
         experimental: config.experimental,
         recipe_path: config.recipe_path.clone(),
-        target_platform: config.target_platform,
+        target_platform,
         build_platform: config.build_platform,
-        host_platform: config.host_platform,
+        host_platform,
         variant: variant.clone(),
         ..Default::default()
     }
@@ -805,7 +822,7 @@ pub fn render_recipe_with_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
 
     // Load variant configuration
-    let variant_config = VariantConfig::from_files(variant_files)
+    let variant_config = VariantConfig::from_files(variant_files, config.target_platform)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     render_recipe_with_variant_config(&stage0_recipe, &variant_config, config)
@@ -1716,6 +1733,65 @@ mpich:
                 .map(|v| v.to_string()),
             Some("3.4".to_string()),
             "mpich variant should have mpich=3.4"
+        );
+    }
+
+    #[test]
+    fn test_skipped_output_with_platform_specific_requirements() {
+        // Test that when an output is skipped (e.g., skip: win), its requirements
+        // are not evaluated. This prevents errors from platform-specific functions
+        // like stdlib('c') which may not have defaults on certain platforms.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        // Variant for Windows - the output should be skipped
+        let variant_config = VariantConfig::default();
+
+        // RenderConfig with Windows as target platform
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+
+        // The rendering should NOT fail - even though stdlib('c') would fail on Windows,
+        // the output is skipped (skip: win) so requirements should not be evaluated
+        let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config);
+
+        // Check if result is OK - it should be because the output is skipped
+        assert!(
+            result.is_ok(),
+            "Rendering skipped output should not fail. Error: {:?}",
+            result.err()
+        );
+
+        let rendered = result.unwrap();
+        assert_eq!(rendered.len(), 1, "Should have 1 output");
+
+        // The output should be marked as skipped (skip contains "win")
+        let recipe = &rendered[0].recipe;
+        assert!(
+            recipe.build.skip.contains(&"win".to_string()),
+            "Output should have win in skip conditions"
         );
     }
 }
