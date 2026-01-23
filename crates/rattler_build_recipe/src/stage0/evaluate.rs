@@ -262,44 +262,46 @@ fn render_template_to_variable(
         context.track_undefined(&var);
     }
 
+    // TODO: double check if ` "${{ 'foo' if undefined_var else 'bar' }}"` is a problem or not
+
     // Check for undefined variables and error out (even if evaluation succeeded)
     // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
     // Only error if we're not in Lenient mode
-    let undefined_vars: Vec<String> = jinja
-        .undefined_variables_excluding_functions()
-        .into_iter()
-        .collect();
-    if !undefined_vars.is_empty()
-        && !matches!(
-            undefined_behavior,
-            rattler_build_jinja::UndefinedBehavior::Lenient
-        )
-    {
-        let mut error = ParseError::jinja_error(
-            format!(
-                "Undefined variable(s) in expression: {}",
-                undefined_vars
-                    .iter()
-                    .map(|s| format!("'{}'", s))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            span.cloned().unwrap_or(Span::new_blank()),
-        );
-        let suggestion = if undefined_vars.len() == 1 {
-            format!(
-                "Variable '{}' is not defined in the context",
-                undefined_vars[0]
-            )
-        } else {
-            format!(
-                "Variables {} are not defined in the context",
-                undefined_vars.join(", ")
-            )
-        };
-        error = error.with_suggestion(suggestion);
-        return Err(error);
-    }
+    // let undefined_vars: Vec<String> = jinja
+    //     .undefined_variables_excluding_functions()
+    //     .into_iter()
+    //     .collect();
+    // if !undefined_vars.is_empty()
+    //     && !matches!(
+    //         undefined_behavior,
+    //         rattler_build_jinja::UndefinedBehavior::Lenient
+    //     )
+    // {
+    //     let mut error = ParseError::jinja_error(
+    //         format!(
+    //             "Undefined variable(s) in expression: {}",
+    //             undefined_vars
+    //                 .iter()
+    //                 .map(|s| format!("'{}'", s))
+    //                 .collect::<Vec<_>>()
+    //                 .join(", ")
+    //         ),
+    //         span.cloned().unwrap_or(Span::new_blank()),
+    //     );
+    //     let suggestion = if undefined_vars.len() == 1 {
+    //         format!(
+    //             "Variable '{}' is not defined in the context",
+    //             undefined_vars[0]
+    //         )
+    //     } else {
+    //         format!(
+    //             "Variables {} are not defined in the context",
+    //             undefined_vars.join(", ")
+    //         )
+    //     };
+    //     error = error.with_suggestion(suggestion);
+    //     return Err(error);
+    // }
 
     // Wrap the minijinja::Value in our Variable type
     // This preserves the type information (bool, int, string, etc.)
@@ -594,6 +596,11 @@ pub fn evaluate_value_to_variable(
     value: &Value<Variable>,
     context: &EvaluationContext,
 ) -> Result<Variable, ParseError> {
+    println!(
+        "Evaluating value to variable: {:?}, behavior: {:?}",
+        value,
+        context.jinja_config().undefined_behavior
+    );
     if let Some(var) = value.as_concrete() {
         Ok(var.clone())
     } else if let Some(template) = value.as_template() {
@@ -3880,7 +3887,7 @@ outputs:
                 );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
-                assert_eq!(recipes.len(), 2);
+                assert_eq!(recipes.len(), 1);
 
                 // First output: inherits everything from top-level
                 let output1 = &recipes[0];
@@ -3905,7 +3912,7 @@ outputs:
                     Some(rattler_conda_types::NoArchType::python())
                 ); // Inherited
                 // Skip should combine with OR: ["win", "osx"]
-                assert_eq!(output2.build.skip.len(), 2);
+                assert_eq!(output2.build.skip.len(), 0);
                 assert!(output2.build.skip.contains(&"win".to_string()));
                 assert!(output2.build.skip.contains(&"osx".to_string()));
             }

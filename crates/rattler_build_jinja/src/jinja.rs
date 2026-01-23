@@ -484,8 +484,8 @@ fn compiler_stdlib_eval(
     prefix: &str,
     accessed_variables: &Arc<Mutex<HashSet<String>>>,
 ) -> Result<String, minijinja::Error> {
-    let variant_key = format!("{lang}_{prefix}");
-    let variant_key_version = format!("{lang}_{prefix}_version");
+    let variant_key = NormalizedKey(format!("{lang}_{prefix}")).normalize();
+    let variant_key_version = NormalizedKey(format!("{lang}_{prefix}_version")).normalize();
 
     // Track that we're accessing these variant keys
     if let Ok(mut accessed) = accessed_variables.lock() {

@@ -6,6 +6,7 @@
 use std::collections::BTreeSet;
 use std::fmt::Display;
 
+use minijinja::machinery::ast::Expr;
 use serde::{Deserialize, Serialize};
 
 /// A validated Jinja2 template with pre-computed variable dependencies
@@ -246,8 +247,6 @@ fn collect_variables_from_call(
     call: &minijinja::machinery::ast::Call,
     variables: &mut BTreeSet<String>,
 ) {
-    use minijinja::machinery::ast::Expr;
-
     // Check if this is a special function call that we should expand
     if let Expr::Var(var) = &call.expr {
         let function_name = var.id.to_string();

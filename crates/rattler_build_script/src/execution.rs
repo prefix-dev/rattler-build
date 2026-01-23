@@ -622,6 +622,7 @@ mod tests {
             env: IndexMap::new(),
             secrets: Vec::new(),
             cwd: None,
+            content_explicit: false,
         };
 
         // Use dummy paths for recipe_dir and extensions
