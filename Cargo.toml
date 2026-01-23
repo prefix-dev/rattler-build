@@ -35,7 +35,7 @@ indexmap = "2.12.1"
 insta = "1.44.3"
 itertools = "0.14.0"
 miette = "7.6.0"
-rattler_conda_types = { version = "0.42.4", default-features = false }
+rattler_conda_types = { version = "0.43.1", default-features = false }
 rattler_digest = { version = "1.2.2", default-features = false, features = [
   "serde",
 ] }
@@ -85,7 +85,7 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'dep:rattler_s3']
+s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'dep:rattler_s3', 'rattler_index/s3']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -189,7 +189,7 @@ regex = { workspace = true }
 async-recursion = { workspace = true }
 
 # Rattler crates
-rattler_config = { version = "0.2.23" }
+rattler_config = { version = "0.2.24" }
 rattler = { version = "0.39.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
@@ -204,7 +204,7 @@ rattler_networking = { version = "0.25.29", default-features = false, features =
 rattler_upload = { version = "0.4.6", default-features = false }
 rattler_s3 = { version = "0.1.17", optional = true }
 rattler_redaction = { version = "0.1.13" }
-rattler_repodata_gateway = { version = "0.25.6", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.25.9", default-features = false, features = [
   "gateway",
 ] }
 rattler_shell = { version = "0.25.15", default-features = false, features = [

@@ -13,7 +13,7 @@ use metadata::clean_url;
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
-    package::{ArchiveType, FileMode, PackageFile, PathType, PathsJson},
+    package::{CondaArchiveType, FileMode, PackageFile, PathType, PathsJson},
 };
 use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_package};
 use unicode_normalization::UnicodeNormalization;
@@ -801,7 +801,7 @@ pub fn package_conda(
     );
 
     match packaging_settings.archive_type {
-        ArchiveType::TarBz2 => {
+        CondaArchiveType::TarBz2 => {
             write_tar_bz2_package(
                 tempfile_in_output.as_file(),
                 tmp.temp_dir.path(),
@@ -811,7 +811,7 @@ pub fn package_conda(
                 Some(Box::new(ProgressBar { progress_bar })),
             )?;
         }
-        ArchiveType::Conda => {
+        CondaArchiveType::Conda => {
             write_conda_package(
                 tempfile_in_output.as_file(),
                 tmp.temp_dir.path(),
