@@ -6,7 +6,7 @@ package:
   name: test-script-parsing
   version: 0.1.0
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

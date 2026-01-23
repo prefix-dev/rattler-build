@@ -353,7 +353,7 @@ impl Output {
                 .expect("Should always be valid"),
             version: self.version().clone(),
             build: self.build_string().into_owned(),
-            build_number: recipe.build().number,
+            build_number: recipe.build().number.unwrap_or(0),
             arch,
             platform,
             subdir: Some(self.build_configuration.target_platform.to_string()),

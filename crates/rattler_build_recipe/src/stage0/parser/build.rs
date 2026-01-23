@@ -410,7 +410,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
 
         match key {
             "number" => {
-                build.number = parse_field!("build.number", value_node);
+                build.number = Some(parse_field!("build.number", value_node));
             }
             "string" => {
                 build.string = Some(parse_field!("build.string", value_node));
@@ -833,11 +833,8 @@ mod tests {
         let yaml = "{}";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        if let Some(n) = build.number.as_concrete() {
-            assert_eq!(*n, 0);
-        } else {
-            panic!("Expected concrete value");
-        }
+        // When number is not specified, it should be None (inherit from top-level)
+        assert!(build.number.is_none());
         assert!(build.string.is_none());
         assert!(build.script.is_default());
     }
@@ -847,10 +844,14 @@ mod tests {
         let yaml = "number: 5";
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        if let Some(n) = build.number.as_concrete() {
-            assert_eq!(*n, 5);
+        if let Some(ref value) = build.number {
+            if let Some(n) = value.as_concrete() {
+                assert_eq!(*n, 5);
+            } else {
+                panic!("Expected concrete value");
+            }
         } else {
-            panic!("Expected concrete value");
+            panic!("Expected Some(number)");
         }
     }
 

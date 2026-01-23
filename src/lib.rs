@@ -599,7 +599,7 @@ pub async fn get_build_output(
         );
         for output in &mut outputs {
             // Update the build number
-            output.recipe.build.number = build_num_override;
+            output.recipe.build.number = Some(build_num_override);
 
             // Extract the hash from the current build string and recompute with new build number
             // Build string format is: {hash}_{build_number}

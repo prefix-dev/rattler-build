@@ -6,7 +6,7 @@ package:
   name: library-with-exports
   version: 3.2.1
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

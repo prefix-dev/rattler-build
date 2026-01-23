@@ -270,7 +270,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(
         vars,
         "PKG_BUILDNUM",
-        output.recipe.build().number.to_string()
+        output.recipe.build().number.unwrap_or(0).to_string()
     );
 
     let hash = output.build_configuration.hash.clone();

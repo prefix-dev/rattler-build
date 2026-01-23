@@ -61,7 +61,7 @@ mod tests {
         recipe
             .build
             .string
-            .resolve(&hash_info, recipe.build.number, &context)
+            .resolve(&hash_info, recipe.build.number.unwrap_or(0), &context)
             .unwrap();
 
         // Extract used variant from recipe

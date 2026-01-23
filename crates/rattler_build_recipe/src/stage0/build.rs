@@ -6,11 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
 
-/// Default build number is 0
-fn default_build_number() -> Value<u64> {
-    Value::new_concrete(0, None)
-}
-
 /// Variant key usage configuration
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct VariantKeyUsage {
@@ -30,8 +25,9 @@ pub struct VariantKeyUsage {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Build {
     /// Build number (increments with each rebuild)
-    #[serde(default = "default_build_number")]
-    pub number: Value<u64>,
+    /// None means inherit from top-level, Some(n) means use n (even if n is 0)
+    #[serde(default)]
+    pub number: Option<Value<u64>>,
 
     /// Build string (usually auto-generated from variant hash)
     pub string: Option<Value<String>>,
@@ -88,7 +84,7 @@ pub struct Build {
 impl Default for Build {
     fn default() -> Self {
         Self {
-            number: default_build_number(),
+            number: None,
             string: None,
             script: Script::default(),
             noarch: None,
@@ -248,7 +244,10 @@ impl Display for Build {
         write!(
             f,
             "Build {{ number: {}, string: {}, script: {}, noarch: {}, skip: [{}] }}",
-            self.number,
+            self.number
+                .as_ref()
+                .map(|v| format!("{}", v))
+                .unwrap_or_else(|| "inherited".to_string()),
             self.string.as_ref().into_iter().format(", "),
             self.script,
             self.noarch
@@ -282,7 +281,9 @@ impl Build {
 
         let mut vars = Vec::new();
 
-        vars.extend(number.used_variables());
+        if let Some(number) = number {
+            vars.extend(number.used_variables());
+        }
 
         if let Some(string) = string {
             vars.extend(string.used_variables());

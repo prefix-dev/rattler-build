@@ -301,8 +301,9 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     /// Build number (increments with each rebuild)
-    #[serde(default)]
-    pub number: u64,
+    /// None means inherit from top-level, Some(n) means use n (even if n is 0)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<u64>,
 
     /// Build string - can be unresolved (template) or resolved (with hash)
     /// Serializes only the resolved string value
@@ -495,14 +496,14 @@ impl Build {
     /// Create a build with a specific number
     pub fn with_number(number: u64) -> Self {
         Self {
-            number,
+            number: Some(number),
             ..Default::default()
         }
     }
 
     /// Check if the build section is empty (all default values)
     pub fn is_default(&self) -> bool {
-        self.number == 0
+        self.number.is_none()
             && matches!(self.string, BuildString::Default)
             && self.script.is_default()
             && self.noarch.is_none()
@@ -541,13 +542,13 @@ mod tests {
     fn test_build_creation() {
         let build = Build::new();
         assert!(build.is_default());
-        assert_eq!(build.number, 0);
+        assert_eq!(build.number, None);
     }
 
     #[test]
     fn test_build_with_number() {
         let build = Build::with_number(5);
-        assert_eq!(build.number, 5);
+        assert_eq!(build.number, Some(5));
         assert!(!build.is_default());
     }
 

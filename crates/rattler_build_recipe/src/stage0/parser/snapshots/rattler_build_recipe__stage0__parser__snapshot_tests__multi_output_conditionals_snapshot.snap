@@ -7,7 +7,7 @@ recipe:
   name: conditional-pkg
   version: 3.0.0
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null
@@ -85,7 +85,7 @@ outputs:
     - if: win
       then: vs2019-runtime
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null

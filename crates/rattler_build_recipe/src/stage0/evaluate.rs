@@ -2018,27 +2018,34 @@ impl Evaluate for Stage0Build {
         }
 
         // Evaluate build number
-        let number = if let Some(n) = self.number.as_concrete() {
-            *n
-        } else if let Some(template) = self.number.as_template() {
-            let s = render_template(template.source(), context, self.number.span())?;
-            // If we render to an empty string, treat it as 0
-            if s.is_empty() {
-                0
-            } else {
-                s.parse::<u64>().map_err(|_| {
-                    ParseError::invalid_value(
-                        "build number",
-                        format!(
-                            "Invalid build number: '{}' is not a valid positive integer",
-                            s
-                        ),
-                        self.number.span().copied().unwrap_or_else(Span::new_blank),
-                    )
-                })?
+        // None means inherit from top-level, Some(n) means use n (even if n is 0)
+        let number = match &self.number {
+            None => None,
+            Some(value) => {
+                let n = if let Some(n) = value.as_concrete() {
+                    *n
+                } else if let Some(template) = value.as_template() {
+                    let s = render_template(template.source(), context, value.span())?;
+                    // If we render to an empty string, treat it as 0
+                    if s.is_empty() {
+                        0
+                    } else {
+                        s.parse::<u64>().map_err(|_| {
+                            ParseError::invalid_value(
+                                "build number",
+                                format!(
+                                    "Invalid build number: '{}' is not a valid positive integer",
+                                    s
+                                ),
+                                value.span().copied().unwrap_or_else(Span::new_blank),
+                            )
+                        })?
+                    }
+                } else {
+                    unreachable!("Value must be either concrete or template")
+                };
+                Some(n)
             }
-        } else {
-            unreachable!("Value must be either concrete or template")
         };
 
         // Evaluate merge_build_and_host_envs (supports Jinja templates)
@@ -2724,12 +2731,8 @@ fn merge_stage1_build(
         _ => output.string,
     };
 
-    // Build number: use output if non-zero, otherwise inherit from top-level
-    let number = if output.number == 0 {
-        toplevel.number
-    } else {
-        output.number
-    };
+    // Build number: use output if set, otherwise inherit from top-level
+    let number = output.number.or(toplevel.number);
 
     // Noarch: inherit from top-level if not set in output
     let noarch = output.noarch.or(toplevel.noarch);
@@ -3923,12 +3926,12 @@ outputs:
                 );
 
                 let recipes = multi.evaluate(&ctx).unwrap();
-                assert_eq!(recipes.len(), 1);
+                assert_eq!(recipes.len(), 2);
 
                 // First output: inherits everything from top-level
                 let output1 = &recipes[0];
                 assert_eq!(output1.package.name.as_normalized(), "output-with-defaults");
-                assert_eq!(output1.build.number, 5); // Inherited
+                assert_eq!(output1.build.number, Some(5)); // Inherited
                 assert_eq!(
                     output1.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
@@ -3942,15 +3945,80 @@ outputs:
                     output2.package.name.as_normalized(),
                     "output-with-overrides"
                 );
-                assert_eq!(output2.build.number, 10); // Overridden
+                assert_eq!(output2.build.number, Some(10)); // Overridden
                 assert_eq!(
                     output2.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
                 ); // Inherited
                 // Skip should combine with OR: ["win", "osx"]
-                assert_eq!(output2.build.skip.len(), 0);
+                assert_eq!(output2.build.skip.len(), 2);
                 assert!(output2.build.skip.contains(&"win".to_string()));
                 assert!(output2.build.skip.contains(&"osx".to_string()));
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_build_number_zero_not_inherited() {
+        // Regression test: build number 0 should NOT be inherited from top-level
+        // when explicitly set in an output (0 is a valid build number)
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  build_number: 1
+  server_build_number: 0
+  server_version: "2.3.0"
+  version: "5.2.0"
+
+recipe:
+  name: jupyter-lsp-meta
+  version: ${{ version }}
+
+build:
+  number: 1234
+  noarch: python
+
+outputs:
+  - package:
+      name: jupyterlab-lsp
+      version: ${{ version }}
+    build:
+      number: ${{ build_number }}
+
+  - package:
+      name: jupyter-lsp
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: jupyterlab-lsp with build_number = 1
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "jupyterlab-lsp");
+                assert_eq!(output1.build.number, Some(1)); // From context variable
+
+                // Second output: jupyter-lsp with server_build_number = 0
+                // This is the key assertion - 0 should NOT be replaced with 1234
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "jupyter-lsp");
+                assert_eq!(output2.build.number, Some(0)); // Explicitly set to 0, NOT inherited 1234
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }

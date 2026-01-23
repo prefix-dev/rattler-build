@@ -684,11 +684,11 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
         let eval_ctx = EvaluationContext::from_variables(variables);
 
         // Resolve the build string template with the hash
-        result
-            .recipe
-            .build
-            .string
-            .resolve(&hash_info, result.recipe.build.number, &eval_ctx)?;
+        result.recipe.build.string.resolve(
+            &hash_info,
+            result.recipe.build.number.unwrap_or(0),
+            &eval_ctx,
+        )?;
         result.hash_info = Some(hash_info);
     }
     Ok(())
