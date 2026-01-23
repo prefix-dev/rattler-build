@@ -283,9 +283,7 @@ impl Requirements {
 
     /// Get all requirements in one iterator.
     pub fn build_host(&self) -> impl Iterator<Item = &Dependency> {
-        self.build
-            .iter()
-            .chain(self.host.iter())
+        self.build.iter().chain(self.host.iter())
     }
 
     pub fn run_exports_and_constraints(&self) -> impl Iterator<Item = &Dependency> {

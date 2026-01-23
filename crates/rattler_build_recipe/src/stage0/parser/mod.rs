@@ -25,7 +25,9 @@ mod unit_tests;
 
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
-use rattler_build_yaml_parser::{ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml};
+use rattler_build_yaml_parser::{
+    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml,
+};
 
 use crate::Span;
 

@@ -243,7 +243,10 @@ fn build_dependency_graph(
         let current_name = &variant.recipe.package.name;
 
         // Check all dependencies in requirements
-        println!("Dependency names: {:?}", extract_dependency_names(&variant.recipe));
+        println!(
+            "Dependency names: {:?}",
+            extract_dependency_names(&variant.recipe)
+        );
         for dep_name in extract_dependency_names(&variant.recipe) {
             // Skip self-dependencies
             if &dep_name == current_name {
@@ -707,7 +710,9 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
     let requirements = recipe.requirements();
 
     // Collect names from build/host/run dependencies
-    let build_host_run = requirements.build_host().filter_map(|dep| dep.name().cloned());
+    let build_host_run = requirements
+        .build_host()
+        .filter_map(|dep| dep.name().cloned());
 
     // Also collect pin_subpackage names from run_exports (these reference other outputs)
     let run_export_pins = requirements

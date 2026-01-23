@@ -11,8 +11,8 @@ use crate::stage0::{
     types::{IncludeExclude, Value},
 };
 use rattler_build_yaml_parser::{
-    helpers::contains_jinja_template,
-    parse_conditional_list, parse_conditional_list_or_item, parse_value_with_name,
+    helpers::contains_jinja_template, parse_conditional_list, parse_conditional_list_or_item,
+    parse_value_with_name,
 };
 
 /// Macro to parse a value with automatic field name inference for better error messages

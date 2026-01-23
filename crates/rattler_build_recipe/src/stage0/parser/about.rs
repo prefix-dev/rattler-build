@@ -2,8 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser::{
-    ParseMapping, parse_conditional_list, parse_value_with_name,
-    helpers::contains_jinja_template,
+    ParseMapping, helpers::contains_jinja_template, parse_conditional_list, parse_value_with_name,
 };
 
 use crate::{
