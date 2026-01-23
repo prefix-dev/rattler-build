@@ -596,11 +596,6 @@ pub fn evaluate_value_to_variable(
     value: &Value<Variable>,
     context: &EvaluationContext,
 ) -> Result<Variable, ParseError> {
-    println!(
-        "Evaluating value to variable: {:?}, behavior: {:?}",
-        value,
-        context.jinja_config().undefined_behavior
-    );
     if let Some(var) = value.as_concrete() {
         Ok(var.clone())
     } else if let Some(template) = value.as_template() {

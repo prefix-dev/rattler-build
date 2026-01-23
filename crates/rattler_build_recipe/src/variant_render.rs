@@ -243,10 +243,6 @@ fn build_dependency_graph(
         let current_name = &variant.recipe.package.name;
 
         // Check all dependencies in requirements
-        println!(
-            "Dependency names: {:?}",
-            extract_dependency_names(&variant.recipe)
-        );
         for dep_name in extract_dependency_names(&variant.recipe) {
             // Skip self-dependencies
             if &dep_name == current_name {
