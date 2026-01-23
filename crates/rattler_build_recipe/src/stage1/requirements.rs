@@ -282,11 +282,10 @@ impl Requirements {
     }
 
     /// Get all requirements in one iterator.
-    pub fn run_build_host(&self) -> impl Iterator<Item = &Dependency> {
+    pub fn build_host(&self) -> impl Iterator<Item = &Dependency> {
         self.build
             .iter()
             .chain(self.host.iter())
-            .chain(self.run.iter())
     }
 
     pub fn run_exports_and_constraints(&self) -> impl Iterator<Item = &Dependency> {
@@ -297,6 +296,8 @@ impl Requirements {
             .chain(self.run_exports.strong_constraints.iter())
             .chain(self.run_exports.weak.iter())
             .chain(self.run_exports.weak_constraints.iter())
+            .chain(self.run_constraints.iter())
+            .chain(self.run.iter())
     }
 
     /// Get the free specs of the rendered dependencies (any MatchSpec without pins)

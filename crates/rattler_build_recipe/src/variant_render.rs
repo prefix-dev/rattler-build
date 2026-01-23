@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::{NoArchType, PackageNameMatcher};
+use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
 
 use rattler_build_jinja::{JinjaConfig, Variable};
@@ -243,6 +243,7 @@ fn build_dependency_graph(
         let current_name = &variant.recipe.package.name;
 
         // Check all dependencies in requirements
+        println!("Dependency names: {:?}", extract_dependency_names(&variant.recipe));
         for dep_name in extract_dependency_names(&variant.recipe) {
             // Skip self-dependencies
             if &dep_name == current_name {
@@ -694,20 +695,29 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
     Ok(())
 }
 
-/// Helper function to extract all dependency package names from a recipe
+/// Helper function to extract all dependency package names from a recipe.
+///
+/// This collects:
+/// - All named dependencies from build/host/run requirements
+/// - All pin_subpackage references from run_exports (these reference other outputs
+///   and create build-order dependencies even though they're not direct build deps)
+///
+/// Note: May contain duplicates, which is acceptable for dependency graph construction.
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
-    recipe
-        .requirements
-        .run_build_host()
+    let requirements = recipe.requirements();
+
+    // Collect names from build/host/run dependencies
+    let build_host_run = requirements.build_host().filter_map(|dep| dep.name().cloned());
+
+    // Also collect pin_subpackage names from run_exports (these reference other outputs)
+    let run_export_pins = requirements
+        .run_exports_and_constraints()
         .filter_map(|dep| match dep {
-            Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| match matcher {
-                PackageNameMatcher::Exact(name) => Some(name),
-                _ => None,
-            }),
             Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
-            Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
-        })
-        .collect()
+            _ => None,
+        });
+
+    build_host_run.chain(run_export_pins).collect()
 }
 
 /// Helper function to build name-to-indices mapping for topological sort

@@ -1243,7 +1243,7 @@ pub fn sort_build_outputs_topologically(
     // Add edges based on dependencies
     for (output_idx, output) in outputs.iter().enumerate() {
         let output_node = output_to_node[output_idx];
-        for dep in output.recipe.requirements().run_build_host() {
+        for dep in output.recipe.requirements().build_host() {
             let dep_name: Option<PackageName> = match dep {
                 Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| {
                     use rattler_conda_types::PackageNameMatcher;
