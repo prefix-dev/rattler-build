@@ -25,7 +25,7 @@ mod unit_tests;
 
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
-use rattler_build_yaml_parser::{ParseError, ParseResult, parse_yaml};
+use rattler_build_yaml_parser::{ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml};
 
 use crate::Span;
 
@@ -342,7 +342,7 @@ fn parse_context_scalar(
     let s = scalar.as_str();
     let span = *scalar.span();
 
-    if s.contains("${{") && s.contains("}}") {
+    if contains_jinja_template(s) {
         let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
             .map_err(|e| ParseError::jinja_error(e, span))?;
         Ok(crate::stage0::types::Value::new_template(

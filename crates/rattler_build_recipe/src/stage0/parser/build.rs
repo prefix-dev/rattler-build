@@ -11,6 +11,7 @@ use crate::stage0::{
     types::{IncludeExclude, Value},
 };
 use rattler_build_yaml_parser::{
+    helpers::contains_jinja_template,
     parse_conditional_list, parse_conditional_list_or_item, parse_value_with_name,
 };
 
@@ -190,7 +191,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
         let span = *scalar.span();
 
         // Check if it's a template
-        if script_str.contains("${{") && script_str.contains("}}") {
+        if contains_jinja_template(script_str) {
             // It's a templated script - keep as is
             let template = crate::stage0::types::JinjaTemplate::new(script_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, span))?;
@@ -277,7 +278,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                         let span = *scalar.span();
 
                         // Check if it's a template
-                        if content_str.contains("${{") && content_str.contains("}}") {
+                        if contains_jinja_template(content_str) {
                             let template =
                                 crate::stage0::types::JinjaTemplate::new(content_str.to_string())
                                     .map_err(|e| ParseError::jinja_error(e, span))?;

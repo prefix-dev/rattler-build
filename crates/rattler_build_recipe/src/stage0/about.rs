@@ -9,6 +9,31 @@ use url::Url;
 #[derive(Clone, PartialEq, Debug)]
 pub struct License(pub spdx::Expression);
 
+/// Error type for parsing SPDX license expressions with helpful guidance
+#[derive(Debug)]
+pub struct LicenseParseError {
+    input: String,
+    inner: spdx::ParseError,
+}
+
+impl Display for LicenseParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to parse SPDX license: '{}', because:\n{}\n\n\
+             See <https://spdx.org/licenses> for the list of valid licenses.\n\
+             Use 'LicenseRef-<MyLicense>' if you are using a custom license.",
+            self.input, self.inner
+        )
+    }
+}
+
+impl std::error::Error for LicenseParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.inner)
+    }
+}
+
 impl Serialize for License {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -30,10 +55,15 @@ impl<'de> Deserialize<'de> for License {
 }
 
 impl FromStr for License {
-    type Err = spdx::ParseError;
+    type Err = LicenseParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<spdx::Expression>().map(License)
+        s.parse::<spdx::Expression>()
+            .map(License)
+            .map_err(|e| LicenseParseError {
+                input: s.to_string(),
+                inner: e,
+            })
     }
 }
 
