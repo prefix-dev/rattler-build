@@ -132,7 +132,14 @@ impl RenderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderedVariant {
     /// The variant combination used (variable name -> value)
+    /// This is the "used" variant - only variables actually referenced by this output
     pub variant: BTreeMap<NormalizedKey, Variable>,
+    /// The full combination that was used to evaluate this output.
+    /// This includes ALL variant keys from the combination, not just the ones
+    /// this specific output references. This is needed for matching pin_subpackage
+    /// dependencies to their correct variants.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub full_combination: BTreeMap<NormalizedKey, Variable>,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
     /// Pin subpackage dependencies that need to be tracked for exact pinning
@@ -143,17 +150,21 @@ pub struct RenderedVariant {
     pub hash_info: Option<HashInfo>,
 }
 
-/// Helper function to extract pin_subpackage information from a recipe
+/// Helper function to extract pin_subpackage information from a recipe.
+/// Note: version and build_string are initially placeholders (from the current recipe).
+/// They will be updated by `add_pins_to_variant` with the actual pinned package's values.
 fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, PinSubpackageInfo> {
     recipe
         .requirements
         .exact_pin_subpackages()
         .map(|pin| {
             let key = NormalizedKey::from(pin.pin_subpackage.name.as_normalized());
+            // Note: version and build_string are placeholders here.
+            // The actual values from the pinned package will be set in add_pins_to_variant.
             let info = PinSubpackageInfo {
                 name: pin.pin_subpackage.name.clone(),
-                version: recipe.package.version.clone(),
-                build_string: recipe.build.string.as_resolved().map(|s| s.to_string()),
+                version: recipe.package.version.clone(), // Placeholder, will be updated
+                build_string: None,                       // Will be populated with pinned package's build string
                 exact: pin.pin_subpackage.args.exact,
             };
             (key, info)
@@ -167,28 +178,62 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
 /// so that the hash includes this information. This ensures that packages with
 /// different pinned dependencies get different hashes.
 ///
+/// When there are multiple variants of the pinned package, we match by finding the one
+/// whose `full_combination` matches the current variant's `full_combination`. This ensures
+/// that e.g. pillow-tests (python=3.11) pins to pillow (python=3.11), not pillow (python=3.10).
+///
+/// This function also updates `pin_subpackages` with the actual version and build_string
+/// from the matched pinned variant.
+///
 /// Returns an error if a pinned package cannot be found in the rendered outputs.
 fn add_pins_to_variant(
     self_name: &rattler_conda_types::PackageName,
     variant: &mut BTreeMap<NormalizedKey, Variable>,
-    pin_subpackages: &BTreeMap<NormalizedKey, PinSubpackageInfo>,
+    full_combination: &BTreeMap<NormalizedKey, Variable>,
+    pin_subpackages: &mut BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
 ) -> Result<(), String> {
-    for (pin_name, pin_info) in pin_subpackages {
+    for (pin_name, pin_info) in pin_subpackages.iter_mut() {
         // Ignore ourselves
         if self_name == &pin_info.name {
             continue;
         }
 
-        // Find the rendered variant for this pinned package
-        if let Some(pinned_variant) = all_rendered
+        // Find the rendered variant for this pinned package.
+        // When there are multiple variants (e.g., pillow for python 3.10, 3.11, 3.12),
+        // we need to find the one whose full_combination matches ours.
+        let matching_variants: Vec<_> = all_rendered
             .iter()
-            .find(|v| v.recipe.package.name == pin_info.name)
-        {
+            .filter(|v| v.recipe.package.name == pin_info.name)
+            .collect();
+
+        let pinned_variant = if matching_variants.len() <= 1 {
+            // Only one variant (or none), use it directly
+            matching_variants.first().copied()
+        } else {
+            // Multiple variants - find the one whose full_combination matches ours
+            // We look for the variant with the most matching keys from our combination
+            matching_variants
+                .iter()
+                .max_by_key(|v| {
+                    // Count how many keys match between our combination and this variant's combination
+                    full_combination
+                        .iter()
+                        .filter(|(key, value)| v.full_combination.get(*key) == Some(*value))
+                        .count()
+                })
+                .copied()
+        };
+
+        if let Some(pinned_variant) = pinned_variant {
+            // Update pin_info with the actual version and build_string from the pinned package
+            pin_info.version = pinned_variant.recipe.package.version.clone();
+            pin_info.build_string = pinned_variant.recipe.build.string.as_resolved().map(|s| s.to_string());
+
             // Add the pinned package to the variant with format "version build_string"
             let variant_value =
-                if let Some(build_string) = pinned_variant.recipe.build.string.as_resolved() {
-                    format!("{} {}", pinned_variant.recipe.package.version, build_string)
+                if let Some(build_string) = &pin_info.build_string {
+                    format!("{} {}", pin_info.version, build_string)
                 } else {
                     unreachable!("Should not happen when topological ordering succeeded");
                 };
@@ -609,6 +654,7 @@ fn render_with_empty_combinations(
 
             RenderedVariant {
                 variant,
+                full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
                 recipe,
                 pin_subpackages: BTreeMap::new(),
                 hash_info: None,
@@ -623,13 +669,12 @@ fn render_with_empty_combinations(
     // Resolve build strings in topological order
     // For each variant, we:
     // 1. Extract its pin_subpackages (which may reference already-resolved variants)
-    // 2. Add those pins to its variant
+    // 2. Add those pins to its variant (and update pin_subpackages with actual version/build_string)
     // 3. Compute its hash and finalize its build string
     // This ensures that when variant B pins variant A, A's build string is already finalized
     for i in 0..results.len() {
         // Extract pin_subpackages for this variant
-        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
-        results[i].pin_subpackages = pin_subpackages.clone();
+        let mut pin_subpackages = extract_pin_subpackages(&results[i].recipe);
 
         // Add pin information to this variant's variant map
         if !pin_subpackages.is_empty() {
@@ -637,11 +682,15 @@ fn render_with_empty_combinations(
             add_pins_to_variant(
                 results_snapshot[i].recipe.package.name(),
                 &mut results[i].variant,
-                &pin_subpackages,
+                &results_snapshot[i].full_combination,
+                &mut pin_subpackages,
                 &results_snapshot,
             )
             .map_err(ParseError::from_message)?;
         }
+
+        // Store the updated pin_subpackages
+        results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
         finalize_build_string_single(&mut results[i])?;
@@ -959,6 +1008,7 @@ fn render_with_variants(
 
             results.push(RenderedVariant {
                 variant,
+                full_combination: combination.clone(), // Track the full combination for pin matching
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
                 hash_info: None,
@@ -972,20 +1022,23 @@ fn render_with_variants(
     // Resolve build strings in topological order
     for i in 0..results.len() {
         // Extract pin_subpackages for this variant
-        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
-        results[i].pin_subpackages = pin_subpackages.clone();
+        let mut pin_subpackages = extract_pin_subpackages(&results[i].recipe);
 
-        // Add pin information to variant if needed
+        // Add pin information to variant if needed (also updates pin_subpackages with actual version/build_string)
         if !pin_subpackages.is_empty() {
             let results_snapshot = results.clone();
             add_pins_to_variant(
                 results_snapshot[i].recipe.package().name(),
                 &mut results[i].variant,
-                &pin_subpackages,
+                &results_snapshot[i].full_combination,
+                &mut pin_subpackages,
                 &results_snapshot,
             )
             .map_err(ParseError::from_message)?;
         }
+
+        // Store the updated pin_subpackages
+        results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
         finalize_build_string_single(&mut results[i])?;
@@ -1803,6 +1856,104 @@ outputs:
         assert!(
             recipe.build.skip.contains(&"win".to_string()),
             "Output should have win in skip conditions"
+        );
+    }
+
+    #[test]
+    fn test_pin_subpackage_inherits_variants_from_pinned_output() {
+        // Test the case where:
+        // - Output A (pillow) has python as a host/run dependency -> creates 3 variants
+        // - Output B (pillow-tests) ONLY uses pin_subpackage("pillow", exact=True)
+        //   -> should ALSO create 3 variants, one for each pillow variant
+        //
+        // This is the user's exact scenario from the pillow-expansion recipe.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "12.1.0"
+
+recipe:
+  name: pillow-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: pillow
+    requirements:
+      host:
+        - python
+      run:
+        - python
+
+  - package:
+      name: pillow-tests
+    requirements:
+      run:
+        - ${{ pin_subpackage("pillow", exact=True) }}
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10"
+  - "3.11"
+  - "3.12"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Count outputs by name
+        let pillow_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "pillow")
+            .collect();
+
+        let pillow_tests_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "pillow-tests")
+            .collect();
+
+        // pillow should have 3 variants (one for each Python version)
+        assert_eq!(
+            pillow_variants.len(),
+            3,
+            "pillow should have 3 variants (one per Python version)"
+        );
+
+        // pillow-tests should ALSO have 3 variants because pin_subpackage(exact=True)
+        // should cause it to inherit variants from pillow
+        assert_eq!(
+            pillow_tests_variants.len(),
+            3,
+            "pillow-tests should have 3 variants because pin_subpackage(exact=True) \
+             should cause variant inheritance from pillow. Currently has {} variants.",
+            pillow_tests_variants.len()
+        );
+
+        // Additionally, each pillow-tests should pin a DIFFERENT pillow variant
+        let pinned_build_strings: std::collections::HashSet<String> = pillow_tests_variants
+            .iter()
+            .filter_map(|v| {
+                v.pin_subpackages
+                    .get(&"pillow".into())
+                    .and_then(|p| p.build_string.clone())
+            })
+            .collect();
+
+        assert_eq!(
+            pinned_build_strings.len(),
+            3,
+            "Each pillow-tests variant should pin a different pillow variant. \
+             Pinned build strings: {:?}",
+            pinned_build_strings
         );
     }
 }
