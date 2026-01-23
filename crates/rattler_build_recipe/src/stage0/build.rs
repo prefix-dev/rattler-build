@@ -4,7 +4,7 @@ use itertools::Itertools as _;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, Script, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
 
 /// Default build number is 0
 fn default_build_number() -> Value<u64> {
@@ -82,7 +82,7 @@ pub struct Build {
 
     /// Post-processing operations
     #[serde(default)]
-    pub post_process: Vec<PostProcess>,
+    pub post_process: ConditionalList<PostProcess>,
 }
 
 impl Default for Build {
@@ -101,7 +101,7 @@ impl Default for Build {
             dynamic_linking: DynamicLinking::default(),
             variant: VariantKeyUsage::default(),
             prefix_detection: PrefixDetection::default(),
-            post_process: Vec::new(),
+            post_process: ConditionalList::default(),
         }
     }
 }
@@ -406,21 +406,40 @@ impl Build {
         }
         vars.extend(ignore_binary_files.used_variables());
 
-        // Post-process
-        for pp in post_process {
-            let PostProcess {
-                files,
-                regex,
-                replacement,
-            } = pp;
-
-            vars.extend(files.used_variables());
-            vars.extend(regex.used_variables());
-            vars.extend(replacement.used_variables());
-        }
+        // Post-process (handle conditional items)
+        vars.extend(post_process.used_variables());
+        collect_post_process_vars(post_process.iter(), &mut vars);
 
         vars.sort();
         vars.dedup();
         vars
+    }
+}
+
+/// Helper function to recursively collect variables from PostProcess items
+/// This handles both concrete values and nested conditionals
+fn collect_post_process_vars<'a>(
+    items: impl Iterator<Item = &'a Item<PostProcess>>,
+    vars: &mut Vec<String>,
+) {
+    for item in items {
+        match item {
+            Item::Value(value) => {
+                // For concrete values, extract variables from fields
+                if let Some(pp) = value.as_concrete() {
+                    vars.extend(pp.files.used_variables());
+                    vars.extend(pp.regex.used_variables());
+                    vars.extend(pp.replacement.used_variables());
+                }
+            }
+            Item::Conditional(cond) => {
+                // Recursively collect from then branch
+                collect_post_process_vars(cond.then.iter(), vars);
+                // Recursively collect from else branch if present
+                if let Some(else_value) = &cond.else_value {
+                    collect_post_process_vars(else_value.iter(), vars);
+                }
+            }
+        }
     }
 }

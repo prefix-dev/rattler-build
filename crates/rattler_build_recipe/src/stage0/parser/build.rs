@@ -3,6 +3,7 @@ use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 
 use crate::stage0::{
+    Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
         BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
         PrefixIgnore, PythonBuild, VariantKeyUsage,
@@ -727,18 +728,99 @@ fn parse_post_process(node: &Node) -> Result<PostProcess, ParseError> {
     })
 }
 
-fn parse_post_process_list(node: &Node) -> Result<Vec<PostProcess>, ParseError> {
+/// Parse post_process list section from YAML (expects a sequence)
+/// Returns a ConditionalList<PostProcess> which supports if/then/else conditionals
+fn parse_post_process_list(node: &Node) -> Result<ConditionalList<PostProcess>, ParseError> {
     let sequence = node.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(node))
             .with_message("Expected 'post_process' to be a list")
     })?;
 
-    let mut post_process_list = Vec::new();
+    let mut items = Vec::new();
     for item in sequence.iter() {
-        post_process_list.push(parse_post_process(item)?);
+        items.push(parse_post_process_item(item)?);
     }
 
-    Ok(post_process_list)
+    Ok(ConditionalList::new(items))
+}
+
+/// Parse a single post_process item which can be either a PostProcess or a conditional
+fn parse_post_process_item(node: &Node) -> Result<Item<PostProcess>, ParseError> {
+    // Check if it's a conditional (mapping with "if" key)
+    if let Some(mapping) = node.as_mapping()
+        && mapping.get("if").is_some()
+    {
+        return parse_conditional_post_process_item(mapping);
+    }
+
+    // Not a conditional - parse as a regular PostProcess
+    let post_process = parse_post_process(node)?;
+    Ok(Item::Value(Value::new_concrete(post_process, None)))
+}
+
+/// Parse a conditional post_process item with if/then/else branches
+fn parse_conditional_post_process_item(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<Item<PostProcess>, ParseError> {
+    let if_node = mapping
+        .get("if")
+        .ok_or_else(|| ParseError::missing_field("if", *mapping.span()))?;
+
+    let condition_str = if_node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(if_node))
+            .with_message("'if' condition must be a string")
+    })?;
+
+    let condition_span = *condition_str.span();
+    let condition = JinjaExpression::new(condition_str.as_str().to_string())
+        .map_err(|e| ParseError::jinja_error(e, condition_span))?;
+
+    let then_node = mapping
+        .get("then")
+        .ok_or_else(|| ParseError::missing_field("then", *mapping.span()))?;
+
+    let then_items = parse_post_process_list_as_values(then_node)?;
+
+    let else_items = if let Some(else_node) = mapping.get("else") {
+        Some(parse_post_process_list_as_values(else_node)?)
+    } else {
+        None
+    };
+
+    Ok(Item::Conditional(Conditional {
+        condition,
+        then: then_items,
+        else_value: else_items,
+        condition_span: Some(condition_span),
+    }))
+}
+
+/// Parse a post_process list from a sequence node (or a single post_process mapping)
+/// Supports nested if/then/else conditionals
+fn parse_post_process_list_as_values(
+    node: &Node,
+) -> Result<NestedItemList<PostProcess>, ParseError> {
+    // If it's a sequence, parse each item as a post_process or conditional
+    if let Some(seq) = node.as_sequence() {
+        let mut items = Vec::new();
+        for item_node in seq.iter() {
+            items.push(parse_post_process_item(item_node)?);
+        }
+        Ok(NestedItemList::new(items))
+    } else if node.as_mapping().is_some() {
+        // Single post_process mapping - could be a post_process or a nested conditional
+        let item = parse_post_process_item(node)?;
+        Ok(NestedItemList::single(item))
+    } else {
+        Err(ParseError::expected_type(
+            "sequence or mapping",
+            "non-sequence/mapping",
+            get_span(node),
+        )
+        .with_message(
+            "'then' and 'else' must be sequences of post_process items or a single post_process",
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -804,5 +886,71 @@ script:
         assert!(matches!(err, ParseError::InvalidValue { .. }));
         let err_string = err.to_string();
         assert!(err_string.contains("unknown field"));
+    }
+
+    #[test]
+    fn test_parse_post_process_conditional() {
+        let yaml = r#"
+post_process:
+  - if: unix
+    then:
+      - files:
+          - "*.txt"
+        regex: "foo"
+        replacement: "bar"
+  - files:
+      - "*.md"
+    regex: "old"
+    replacement: "new"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+
+        // Should have 2 items: one conditional and one direct
+        assert_eq!(build.post_process.len(), 2);
+
+        // First item should be a conditional
+        let first = build.post_process.iter().next().unwrap();
+        assert!(matches!(first, crate::stage0::Item::Conditional(_)));
+
+        // Second item should be a direct value
+        let second = build.post_process.iter().nth(1).unwrap();
+        assert!(matches!(second, crate::stage0::Item::Value(_)));
+    }
+
+    #[test]
+    fn test_parse_post_process_nested_conditional() {
+        let yaml = r#"
+post_process:
+  - if: unix
+    then:
+      - if: osx
+        then:
+          - files:
+              - "*.dylib"
+            regex: "macos"
+            replacement: "darwin"
+        else:
+          - files:
+              - "*.so"
+            regex: "linux"
+            replacement: "gnu"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+
+        // Should have 1 conditional item at the top level
+        assert_eq!(build.post_process.len(), 1);
+
+        // First item should be a conditional
+        let first = build.post_process.iter().next().unwrap();
+        if let crate::stage0::Item::Conditional(cond) = first {
+            // The 'then' branch should contain another conditional
+            assert_eq!(cond.then.len(), 1);
+            let inner = cond.then.iter().next().unwrap();
+            assert!(matches!(inner, crate::stage0::Item::Conditional(_)));
+        } else {
+            panic!("Expected conditional item");
+        }
     }
 }

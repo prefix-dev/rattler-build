@@ -2013,10 +2013,10 @@ impl Evaluate for Stage0Build {
         // Evaluate prefix_detection
         let prefix_detection = self.prefix_detection.evaluate(context)?;
 
-        // Evaluate post_process
+        // Evaluate post_process (supports conditional items with if/then/else)
         let mut post_process = Vec::new();
-        for pp in &self.post_process {
-            post_process.push(pp.evaluate(context)?);
+        for item in &self.post_process {
+            post_process.extend(evaluate_post_process_item(item, context)?);
         }
 
         // Evaluate build number
@@ -2523,6 +2523,49 @@ impl Evaluate for Stage0TestType {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         evaluate_test_type(self, context)
+    }
+}
+
+/// Evaluate a single post_process item (which can be a Value or Conditional), returning a vector
+/// (conditionals expand to multiple post_process entries)
+/// Supports nested conditionals at any depth.
+fn evaluate_post_process_item(
+    item: &Item<Stage0PostProcess>,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1PostProcess>, ParseError> {
+    match item {
+        Item::Value(value) => {
+            // Get the concrete PostProcess from the Value
+            let pp = value.as_concrete().ok_or_else(|| {
+                ParseError::invalid_value(
+                    "post_process",
+                    "post_process cannot be a template",
+                    crate::Span::new_blank(),
+                )
+            })?;
+            pp.evaluate(context).map(|p| vec![p])
+        }
+        Item::Conditional(cond) => {
+            // Evaluate the condition
+            let condition_met =
+                evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
+
+            let items_to_evaluate = if condition_met {
+                &cond.then
+            } else {
+                match &cond.else_value {
+                    Some(else_value) => else_value,
+                    None => return Ok(Vec::new()), // No else branch and condition is false
+                }
+            };
+
+            // Recursively evaluate the selected items (supports nested conditionals)
+            let mut results = Vec::new();
+            for nested_item in items_to_evaluate.iter() {
+                results.extend(evaluate_post_process_item(nested_item, context)?);
+            }
+            Ok(results)
+        }
     }
 }
 
@@ -4821,5 +4864,79 @@ outputs:
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
+    }
+
+    #[test]
+    fn test_conditional_post_process_evaluation() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+package:
+  name: test-pkg
+  version: 1.0.0
+
+build:
+  post_process:
+    - if: unix
+      then:
+        - files:
+            - "*.txt"
+          regex: "unix_pattern"
+          replacement: "unix_replacement"
+    - if: win
+      then:
+        - files:
+            - "*.txt"
+          regex: "win_pattern"
+          replacement: "win_replacement"
+    - files:
+        - "*.md"
+      regex: "always"
+      replacement: "present"
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+
+        // Test with unix=true, win=false
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert(
+            "target_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+
+        let result = parsed.evaluate(&ctx).unwrap();
+
+        // Should have 2 post_process entries: the unix one and the unconditional one
+        assert_eq!(result.build.post_process.len(), 2);
+
+        // First should be the unix post_process
+        assert_eq!(result.build.post_process[0].regex.as_str(), "unix_pattern");
+
+        // Second should be the unconditional one
+        assert_eq!(result.build.post_process[1].regex.as_str(), "always");
+
+        // Test with unix=false, win=true
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(false));
+        ctx2.insert("win".to_string(), Variable::from(true));
+        ctx2.insert(
+            "target_platform".to_string(),
+            Variable::from_string("win-64"),
+        );
+
+        let result2 = parsed.evaluate(&ctx2).unwrap();
+
+        // Should have 2 post_process entries: the win one and the unconditional one
+        assert_eq!(result2.build.post_process.len(), 2);
+
+        // First should be the win post_process
+        assert_eq!(result2.build.post_process[0].regex.as_str(), "win_pattern");
+
+        // Second should be the unconditional one
+        assert_eq!(result2.build.post_process[1].regex.as_str(), "always");
     }
 }
