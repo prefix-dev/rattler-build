@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.55.1"
+version = "0.56.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -118,6 +118,7 @@ native-tls = [
   'rattler_repodata_gateway/native-tls',
   'rattler_networking/native-tls',
   'rattler_package_streaming/native-tls',
+  'rattler_index/native-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -127,6 +128,7 @@ rustls-tls = [
   'rattler_repodata_gateway/rustls-tls',
   'rattler_networking/rustls-tls',
   'rattler_package_streaming/rustls-tls',
+  'rattler_index/rustls-tls',
 ]
 tui = [
   'ratatui',
@@ -269,7 +271,7 @@ dialoguer = "0.12.0"
 http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
   "rustls-tls",
-]}
+] }
 
 # Local rattler-build crates
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [

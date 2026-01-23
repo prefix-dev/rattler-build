@@ -92,7 +92,7 @@ toml-lint = "taplo lint --verbose **/pixi.toml"
 typos = "typos --force-exclude"
 
 [feature.pre-commit.dependencies]
-lefthook = ">=1.12.2,<2"
+lefthook = ">=2.0.11,<3"
 
 [feature.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
@@ -157,7 +157,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # pixi build
 [package.build.backend]
 name = "pixi-build-rust"
-version = "0.3.*"
+version = "*"
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
