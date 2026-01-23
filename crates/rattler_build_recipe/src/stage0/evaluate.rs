@@ -262,46 +262,44 @@ fn render_template_to_variable(
         context.track_undefined(&var);
     }
 
-    // TODO: double check if ` "${{ 'foo' if undefined_var else 'bar' }}"` is a problem or not
-
     // Check for undefined variables and error out (even if evaluation succeeded)
     // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
     // Only error if we're not in Lenient mode
-    // let undefined_vars: Vec<String> = jinja
-    //     .undefined_variables_excluding_functions()
-    //     .into_iter()
-    //     .collect();
-    // if !undefined_vars.is_empty()
-    //     && !matches!(
-    //         undefined_behavior,
-    //         rattler_build_jinja::UndefinedBehavior::Lenient
-    //     )
-    // {
-    //     let mut error = ParseError::jinja_error(
-    //         format!(
-    //             "Undefined variable(s) in expression: {}",
-    //             undefined_vars
-    //                 .iter()
-    //                 .map(|s| format!("'{}'", s))
-    //                 .collect::<Vec<_>>()
-    //                 .join(", ")
-    //         ),
-    //         span.cloned().unwrap_or(Span::new_blank()),
-    //     );
-    //     let suggestion = if undefined_vars.len() == 1 {
-    //         format!(
-    //             "Variable '{}' is not defined in the context",
-    //             undefined_vars[0]
-    //         )
-    //     } else {
-    //         format!(
-    //             "Variables {} are not defined in the context",
-    //             undefined_vars.join(", ")
-    //         )
-    //     };
-    //     error = error.with_suggestion(suggestion);
-    //     return Err(error);
-    // }
+    let undefined_vars: Vec<String> = jinja
+        .undefined_variables_excluding_functions()
+        .into_iter()
+        .collect();
+    if !undefined_vars.is_empty()
+        && !matches!(
+            undefined_behavior,
+            rattler_build_jinja::UndefinedBehavior::Lenient
+        )
+    {
+        let mut error = ParseError::jinja_error(
+            format!(
+                "Undefined variable(s) in expression: {}",
+                undefined_vars
+                    .iter()
+                    .map(|s| format!("'{}'", s))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            span.cloned().unwrap_or(Span::new_blank()),
+        );
+        let suggestion = if undefined_vars.len() == 1 {
+            format!(
+                "Variable '{}' is not defined in the context",
+                undefined_vars[0]
+            )
+        } else {
+            format!(
+                "Variables {} are not defined in the context",
+                undefined_vars.join(", ")
+            )
+        };
+        error = error.with_suggestion(suggestion);
+        return Err(error);
+    }
 
     // Wrap the minijinja::Value in our Variable type
     // This preserves the type information (bool, int, string, etc.)
