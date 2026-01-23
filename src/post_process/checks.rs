@@ -240,7 +240,7 @@ fn add_linux_system_libs(
         .build
         .and_then(|deps| {
             deps.resolved.into_iter().find(|v| {
-                v.file_name.starts_with(&format!(
+                v.identifier.identifier.name.starts_with(&format!(
                     "sysroot_{}",
                     output.build_configuration.target_platform
                 ))
