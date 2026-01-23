@@ -128,9 +128,9 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
         if let Some(err) = &last_err {
             match retry_policy.should_retry(request_start, current_try) {
                 RetryDecision::DoNotRetry => {
-                    return Err(last_err.unwrap_or(std::io::Error::other(
-                        "Directory could not be deleted",
-                    )));
+                    return Err(
+                        last_err.unwrap_or(std::io::Error::other("Directory could not be deleted"))
+                    );
                 }
                 RetryDecision::Retry { execute_after } => {
                     let sleep_for = execute_after
@@ -158,9 +158,10 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
                 current_try += 1;
             }
             Err(e) => {
-                return Err(std::io::Error::other(
-                    format!("Failed to remove directory {:?}: {}", path, e),
-                ));
+                return Err(std::io::Error::other(format!(
+                    "Failed to remove directory {:?}: {}",
+                    path, e
+                )));
             }
         }
     }
