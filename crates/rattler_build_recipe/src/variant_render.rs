@@ -164,7 +164,7 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
             let info = PinSubpackageInfo {
                 name: pin.pin_subpackage.name.clone(),
                 version: recipe.package.version.clone(), // Placeholder, will be updated
-                build_string: None,                       // Will be populated with pinned package's build string
+                build_string: None, // Will be populated with pinned package's build string
                 exact: pin.pin_subpackage.args.exact,
             };
             (key, info)
@@ -228,15 +228,19 @@ fn add_pins_to_variant(
         if let Some(pinned_variant) = pinned_variant {
             // Update pin_info with the actual version and build_string from the pinned package
             pin_info.version = pinned_variant.recipe.package.version.clone();
-            pin_info.build_string = pinned_variant.recipe.build.string.as_resolved().map(|s| s.to_string());
+            pin_info.build_string = pinned_variant
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .map(|s| s.to_string());
 
             // Add the pinned package to the variant with format "version build_string"
-            let variant_value =
-                if let Some(build_string) = &pin_info.build_string {
-                    format!("{} {}", pin_info.version, build_string)
-                } else {
-                    unreachable!("Should not happen when topological ordering succeeded");
-                };
+            let variant_value = if let Some(build_string) = &pin_info.build_string {
+                format!("{} {}", pin_info.version, build_string)
+            } else {
+                unreachable!("Should not happen when topological ordering succeeded");
+            };
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
         } else {
@@ -317,7 +321,12 @@ fn build_dependency_graph(
     Ok((graph, idx_to_node))
 }
 
-/// Perform a stable topological sort that preserves original order when possible
+/// Perform a stable topological sort that preserves original order when possible.
+///
+/// This sort uses `full_combination` to match dependencies: when checking if a dependency
+/// is satisfied, we only require the variant with the **matching** combination to be added,
+/// not ALL variants of that dependency. This preserves the interleaved order:
+/// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11), ...`
 fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
     _graph: &DependencyGraph,
@@ -340,6 +349,7 @@ fn stable_topological_sort(
             // Check if all dependencies are already added
             let mut can_add = true;
             let current_name = &variants[idx].recipe.package.name;
+            let current_combination = &variants[idx].full_combination;
 
             // Check all dependencies in requirements
             for dep_name in extract_dependency_names(&variants[idx].recipe) {
@@ -349,14 +359,31 @@ fn stable_topological_sort(
                 }
 
                 if let Some(dep_indices) = name_to_indices.get(&dep_name) {
-                    for &dep_idx in dep_indices {
+                    // Find the matching dependency variant based on full_combination.
+                    // We only require the variant with the most matching keys to be added,
+                    // not ALL variants of this dependency.
+                    let matching_dep_idx = if dep_indices.len() <= 1 {
+                        dep_indices.first().copied()
+                    } else {
+                        dep_indices
+                            .iter()
+                            .max_by_key(|&&dep_idx| {
+                                // Count matching keys between current combination and dep's combination
+                                current_combination
+                                    .iter()
+                                    .filter(|(key, value)| {
+                                        variants[dep_idx].full_combination.get(*key) == Some(*value)
+                                    })
+                                    .count()
+                            })
+                            .copied()
+                    };
+
+                    if let Some(dep_idx) = matching_dep_idx {
                         if !added[dep_idx] {
                             can_add = false;
                             break;
                         }
-                    }
-                    if !can_add {
-                        break;
                     }
                 }
             }
@@ -1955,5 +1982,49 @@ python:
              Pinned build strings: {:?}",
             pinned_build_strings
         );
+
+        // Verify the order is interleaved: pillow(3.10), pillow-tests(3.10), pillow(3.11), ...
+        // Each pillow should be immediately followed by its matching pillow-tests
+        let output_names: Vec<_> = rendered
+            .iter()
+            .map(|r| r.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        assert_eq!(
+            output_names,
+            vec![
+                "pillow",
+                "pillow-tests",
+                "pillow",
+                "pillow-tests",
+                "pillow",
+                "pillow-tests"
+            ],
+            "Order should be interleaved: each pillow immediately followed by its pillow-tests"
+        );
+
+        // Additionally verify that each pillow-tests pins the immediately preceding pillow
+        for i in (1..rendered.len()).step_by(2) {
+            let pillow_idx = i - 1;
+            let pillow_tests_idx = i;
+
+            let pillow_build_string = rendered[pillow_idx]
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .unwrap();
+            let pinned_build_string = rendered[pillow_tests_idx]
+                .pin_subpackages
+                .get(&"pillow".into())
+                .and_then(|p| p.build_string.as_ref())
+                .unwrap();
+
+            assert_eq!(
+                pillow_build_string, pinned_build_string,
+                "pillow-tests at index {} should pin pillow at index {}",
+                pillow_tests_idx, pillow_idx
+            );
+        }
     }
 }
