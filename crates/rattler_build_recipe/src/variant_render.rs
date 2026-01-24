@@ -460,7 +460,7 @@ fn discover_new_variant_keys_from_evaluation(
     variant_config: &VariantConfig,
     config: &RenderConfig,
 ) -> Result<HashSet<NormalizedKey>, ParseError> {
-    let context = build_evaluation_context(combination, config, stage0_recipe)?;
+    let context = build_evaluation_context(combination, config)?;
 
     // Get requirements and evaluate them
     let free_specs: Vec<rattler_conda_types::PackageName> = match stage0_recipe {
@@ -599,7 +599,6 @@ fn expand_variants_tree(
 fn build_evaluation_context(
     variant: &BTreeMap<NormalizedKey, Variable>,
     config: &RenderConfig,
-    stage0_recipe: &Stage0Recipe,
 ) -> Result<EvaluationContext, ParseError> {
     // Build context map from variant values and extra context
     // Merge variant into the variables map for template rendering
@@ -612,19 +611,14 @@ fn build_evaluation_context(
     let jinja_config = create_jinja_config(config, variant);
 
     // Create evaluation context with variables, config, and OS env var keys
-    let context = EvaluationContext::with_variables_config_and_os_env_keys(
+    // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
+    // Calling it here would cause double-evaluation of context templates, leading to bugs
+    // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
+    Ok(EvaluationContext::with_variables_config_and_os_env_keys(
         context_map,
         jinja_config,
         config.os_env_var_keys.clone(),
-    );
-
-    // Evaluate and merge recipe context variables
-    let (context, _evaluated_context) = match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
-        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
-    };
-
-    Ok(context)
+    ))
 }
 
 /// Helper function to evaluate a recipe (handles both single and multi-output)
@@ -644,16 +638,11 @@ fn render_with_empty_combinations(
     config: &RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
     // Create context with just extra_context (no variant for empty combinations)
+    // NOTE: Do NOT call with_context() here - Stage0Recipe::evaluate() handles context evaluation
     let empty_variant = BTreeMap::new();
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config);
-
-    // Evaluate and merge recipe context variables
-    let (context, _evaluated_context) = match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
-        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
-    };
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -744,17 +733,18 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
         // Always resolve/re-resolve the build string with the current hash
         // This ensures we use the latest hash that includes all pin information
         // Create a temporary evaluation context for build string resolution
-        // Merge both recipe context variables and variant variables
+        // Merge both variant variables and recipe context variables
         let mut variables = IndexMap::new();
 
-        // First add recipe context variables (from context: section)
-        for (k, v) in &result.recipe.context {
-            variables.insert(k.clone(), v.clone());
-        }
-
-        // Then add variant variables (which may override context variables)
+        // First add variant variables (base values from variant config)
         for (k, v) in &result.variant {
             variables.insert(k.0.as_str().to_string(), v.clone());
+        }
+
+        // Then add recipe context variables (which may transform/override variant values)
+        // Context takes precedence because it's the user's way of transforming variant values
+        for (k, v) in &result.recipe.context {
+            variables.insert(k.clone(), v.clone());
         }
 
         let eval_ctx = EvaluationContext::from_variables(variables);
@@ -1001,7 +991,7 @@ fn render_with_variants(
     let mut results = Vec::with_capacity(combinations.len());
 
     for combination in combinations {
-        let context = build_evaluation_context(&combination, &config, stage0_recipe)?;
+        let context = build_evaluation_context(&combination, &config)?;
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
         // Convert each output to a RenderedVariant

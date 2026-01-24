@@ -49,7 +49,7 @@ mod tests {
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Strict,
         };
 
-        let context = EvaluationContext::with_variables_and_config(variant, jinja_config);
+        let context = EvaluationContext::with_variables_and_config(variant.clone(), jinja_config);
 
         let mut recipe = single.as_ref().evaluate(&context).unwrap();
 
@@ -57,11 +57,28 @@ mod tests {
         let noarch = recipe.build.noarch.unwrap_or(NoArchType::none());
         let hash_info = HashInfo::from_variant(&recipe.used_variant, &noarch);
 
+        // Build a context for build string resolution that includes both:
+        // 1. Variant variables (base values)
+        // 2. Recipe context variables (which may transform/override variant values)
+        // Context takes precedence - this mirrors finalize_build_string_single in variant_render.rs
+        let mut resolve_vars = IndexMap::new();
+        for (k, v) in &recipe.used_variant {
+            resolve_vars.insert(k.normalize(), v.clone());
+        }
+        for (k, v) in &recipe.context {
+            resolve_vars.insert(k.clone(), v.clone());
+        }
+        let resolve_context = EvaluationContext::from_variables(resolve_vars);
+
         // Resolve the build string with the computed hash info
         recipe
             .build
             .string
-            .resolve(&hash_info, recipe.build.number.unwrap_or(0), &context)
+            .resolve(
+                &hash_info,
+                recipe.build.number.unwrap_or(0),
+                &resolve_context,
+            )
             .unwrap();
 
         // Extract used variant from recipe
@@ -868,6 +885,83 @@ build:
 
         // Verify the context value (literal) was used, not the variant value
         assert_eq!(recipe.package().name().as_source(), "test-literal_value");
+    }
+
+    #[test]
+    fn test_context_variable_concatenation_with_variant() {
+        // Test case: when context defines variables using concatenation with a variant variable,
+        // the variant variable should be tracked as used.
+        //
+        // This tests the full scenario from examples/contextused/recipe.yaml:
+        //   context:
+        //     mpi: ${{ mpi ~ "foobar" }}
+        //     extra_mpi: ${{ "extra" ~ mpi }}  # Uses the already-transformed mpi from context
+        //   build:
+        //     string: ${{ mpi ~ extra_mpi }}
+        //
+        // Key behaviors:
+        // 1. `mpi` in context uses the variant `mpi` via concatenation
+        // 2. `extra_mpi` uses the already-transformed context `mpi` (sequential evaluation)
+        // 3. The variant should track the ORIGINAL `mpi` value ("bla"), not transformed
+        // 4. The build string should use the context-transformed values
+        let yaml = r#"
+context:
+  mpi: ${{ mpi ~ "foobar" }}
+  extra_mpi: ${{ "extra" ~ mpi }}
+
+package:
+  name: contextused
+  version: "1.0.0"
+
+build:
+  string: ${{ mpi ~ extra_mpi }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("mpi".to_string(), Variable::from("bla"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // The mpi variant should be tracked even though it's shadowed by context
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("mpi")),
+            "mpi should be in used_variant because it was accessed from the variant \
+             via concatenation before being shadowed by the context variable. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // The variant should contain the ORIGINAL value from the variant config, not the
+        // context-transformed value. This is important for variant tracking and hash computation.
+        assert_eq!(
+            used_variant
+                .get(&NormalizedKey::from("mpi"))
+                .unwrap()
+                .to_string(),
+            "bla",
+            "Variant should contain the original value 'bla', not the context-transformed 'blafoobar'"
+        );
+
+        // Verify the context variables were evaluated correctly:
+        // - mpi = "bla" ~ "foobar" = "blafoobar"
+        // - extra_mpi = "extra" ~ "blafoobar" = "extrablafoobar" (uses already-transformed mpi)
+        assert_eq!(
+            recipe.context.get("mpi").unwrap().to_string(),
+            "blafoobar",
+            "Context mpi should be 'blafoobar'"
+        );
+        assert_eq!(
+            recipe.context.get("extra_mpi").unwrap().to_string(),
+            "extrablafoobar",
+            "Context extra_mpi should use the transformed mpi value"
+        );
+
+        // Build string uses the context values: mpi ~ extra_mpi = "blafoobar" ~ "extrablafoobar"
+        assert_eq!(
+            recipe.build.string.as_resolved().unwrap(),
+            "blafoobarextrablafoobar",
+            "Build string should use the concatenated context values"
+        );
     }
 
     #[test]

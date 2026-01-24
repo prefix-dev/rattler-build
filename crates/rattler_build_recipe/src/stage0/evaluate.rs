@@ -2638,6 +2638,19 @@ impl Evaluate for Stage0Recipe {
         // Get OS environment variable keys that can be overridden by variant config
         let os_env_var_keys = context_with_vars.os_env_var_keys();
 
+        // Build the actual variant from accessed variables
+        // IMPORTANT: For variables that were accessed during context evaluation (i.e., variant
+        // variables that were used by context templates), we must use the ORIGINAL value from
+        // the variant, not the context-transformed value. This ensures the variant correctly
+        // captures the input that varied between builds.
+        //
+        // Example:
+        //   variant: mpi: ["bla", "ble"]
+        //   context: mpi: ${{ mpi ~ "foobar" }}
+        //
+        // The variant should record mpi: "bla", not mpi: "blafoobar"
+        let original_variables = context.variables();
+
         let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
             .variables()
             .iter()
@@ -2671,7 +2684,19 @@ impl Evaluate for Stage0Recipe {
                     || ALWAYS_INCLUDED_VARS.contains(&key_str)
                     || os_env_var_keys.contains(key_str)
             })
-            .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+            .map(|(k, _)| {
+                let key_str = k.as_str();
+                // For variables accessed during context evaluation, use the original value
+                // from the variant (before context transformation)
+                let value = if accessed_during_context.contains(key_str) {
+                    original_variables.get(key_str).cloned().unwrap_or_else(|| {
+                        context_with_vars.variables().get(key_str).unwrap().clone()
+                    })
+                } else {
+                    context_with_vars.variables().get(key_str).unwrap().clone()
+                };
+                (NormalizedKey::from(key_str), value)
+            })
             .collect();
 
         // Ensure that `target_platform` is set to "noarch" for noarch packages
