@@ -47,7 +47,7 @@ use crate::{
         },
         source::{
             GitRev as Stage0GitRev, GitSource as Stage0GitSource, PathSource as Stage0PathSource,
-            UrlSource as Stage0UrlSource,
+            SigstoreConfig as Stage0SigstoreConfig, UrlSource as Stage0UrlSource,
         },
         tests::{
             CommandsTest as Stage0CommandsTest, CommandsTestFiles as Stage0CommandsTestFiles,
@@ -75,7 +75,8 @@ use crate::{
         },
         source::{
             GitRev as Stage1GitRev, GitSource as Stage1GitSource, GitUrl as Stage1GitUrl,
-            PathSource as Stage1PathSource, Source as Stage1Source, UrlSource as Stage1UrlSource,
+            PathSource as Stage1PathSource, SigstoreConfig as Stage1SigstoreConfig,
+            Source as Stage1Source, UrlSource as Stage1UrlSource,
         },
         tests::{
             CommandsTest as Stage1CommandsTest, CommandsTestFiles as Stage1CommandsTestFiles,
@@ -2173,6 +2174,13 @@ impl Evaluate for Stage0UrlSource {
             urls.push(url);
         }
 
+        // Evaluate sigstore config if present
+        let sigstore = self
+            .sigstore
+            .as_ref()
+            .map(|config| config.evaluate(context))
+            .transpose()?;
+
         Ok(Stage1UrlSource {
             url: urls,
             sha256: self
@@ -2195,6 +2203,45 @@ impl Evaluate for Stage0UrlSource {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
+            sigstore,
+        })
+    }
+}
+
+impl Evaluate for Stage0SigstoreConfig {
+    type Output = Stage1SigstoreConfig;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Evaluate bundle_url if present
+        let bundle_url = self
+            .bundle_url
+            .as_ref()
+            .map(|v| {
+                let url_str = evaluate_string_value(v, context)?;
+                url::Url::parse(&url_str).map_err(|e| {
+                    ParseError::invalid_value(
+                        "sigstore.bundle_url",
+                        format!("Invalid URL '{}': {}", url_str, e),
+                        Span::new_blank(),
+                    )
+                })
+            })
+            .transpose()?;
+
+        // Evaluate inline bundle if present
+        let bundle = evaluate_optional_string_value(&self.bundle, context)?;
+
+        // Evaluate identity if present
+        let identity = evaluate_optional_string_value(&self.identity, context)?;
+
+        // Evaluate issuer if present
+        let issuer = evaluate_optional_string_value(&self.issuer, context)?;
+
+        Ok(Stage1SigstoreConfig {
+            bundle_url,
+            bundle,
+            identity,
+            issuer,
         })
     }
 }

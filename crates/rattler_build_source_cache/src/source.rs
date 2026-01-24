@@ -121,12 +121,27 @@ impl GitSource {
     }
 }
 
+/// Sigstore verification configuration for the cache layer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SigstoreVerification {
+    /// URL to download the sigstore bundle from, or None if using inline bundle
+    pub bundle_url: Option<url::Url>,
+    /// Inline sigstore bundle JSON content
+    pub bundle: Option<String>,
+    /// Expected identity/publisher URI (e.g., "https://github.com/pallets/flask")
+    pub identity: Option<String>,
+    /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com")
+    pub issuer: Option<String>,
+}
+
 /// URL source specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UrlSource {
     pub urls: Vec<url::Url>,
     pub checksum: Option<Checksum>,
     pub file_name: Option<String>,
+    /// Optional sigstore verification
+    pub sigstore: Option<SigstoreVerification>,
 }
 
 /// Source types that can be cached

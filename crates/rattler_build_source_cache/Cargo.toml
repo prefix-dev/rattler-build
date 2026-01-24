@@ -45,6 +45,9 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 rattler_git = { path = "../rattler_git" }
 hex = { workspace = true }
+sigstore-verify = { workspace = true }
+sigstore-trust-root = { workspace = true }
+sigstore-types = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

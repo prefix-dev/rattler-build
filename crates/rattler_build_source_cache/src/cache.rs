@@ -9,10 +9,175 @@ use crate::{
     error::CacheError,
     index::{CacheEntry, CacheIndex, SourceType},
     lock::LockManager,
-    source::{Checksum, GitSource, Source, UrlSource},
+    source::{Checksum, GitSource, SigstoreVerification, Source, UrlSource},
 };
 use rattler_build_networking::BaseClient;
 use rattler_git::resolver::GitResolver;
+use sigstore_trust_root::TrustedRoot;
+use sigstore_types::Bundle;
+use sigstore_verify::{VerificationPolicy, Verifier};
+
+/// PyPI PEP 740 attestation format - used at /integrity/.../.../provenance endpoints
+mod pypi_attestation {
+    use serde::Deserialize;
+
+    /// Root structure of PyPI provenance response
+    #[derive(Debug, Deserialize)]
+    pub struct ProvenanceResponse {
+        pub attestation_bundles: Vec<AttestationBundle>,
+    }
+
+    /// A bundle containing publisher info and attestations
+    #[derive(Debug, Deserialize)]
+    pub struct AttestationBundle {
+        #[allow(dead_code)]
+        pub publisher: Publisher,
+        pub attestations: Vec<Attestation>,
+    }
+
+    /// Publisher information (GitHub, GitLab, etc.)
+    #[derive(Debug, Deserialize)]
+    pub struct Publisher {
+        #[allow(dead_code)]
+        pub kind: String,
+        #[allow(dead_code)]
+        #[serde(default)]
+        pub repository: Option<String>,
+    }
+
+    /// Individual attestation - this is the sigstore bundle format
+    #[derive(Debug, Deserialize)]
+    pub struct Attestation {
+        /// The DSSE envelope containing the signed statement (PyPI format)
+        pub envelope: PyPiEnvelope,
+        /// Verification material (certificate, transparency log entry, etc.)
+        /// Note: PyPI uses snake_case (verification_material), sigstore uses camelCase
+        pub verification_material: serde_json::Value,
+    }
+
+    /// PyPI-style DSSE envelope (different from standard sigstore format)
+    #[derive(Debug, Deserialize)]
+    pub struct PyPiEnvelope {
+        /// Base64-encoded signature
+        pub signature: String,
+        /// Base64-encoded statement (in-toto statement)
+        pub statement: String,
+    }
+
+    impl Attestation {
+        /// Convert PyPI attestation to standard sigstore bundle JSON
+        ///
+        /// PyPI uses a simplified envelope format:
+        /// ```json
+        /// { "signature": "...", "statement": "..." }
+        /// ```
+        ///
+        /// Sigstore expects the standard DSSE envelope format:
+        /// ```json
+        /// {
+        ///   "payloadType": "application/vnd.in-toto+json",
+        ///   "payload": "...",
+        ///   "signatures": [{"sig": "..."}]
+        /// }
+        /// ```
+        pub fn to_sigstore_bundle(&self) -> serde_json::Value {
+            // Convert PyPI envelope to standard DSSE envelope format
+            let dsse_envelope = serde_json::json!({
+                "payloadType": "application/vnd.in-toto+json",
+                "payload": self.envelope.statement,
+                "signatures": [{
+                    "sig": self.envelope.signature
+                }]
+            });
+
+            // Convert verification_material from snake_case to camelCase
+            let verification_material = convert_to_camel_case(&self.verification_material);
+
+            serde_json::json!({
+                "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+                "verificationMaterial": verification_material,
+                "dsseEnvelope": dsse_envelope
+            })
+        }
+    }
+
+    /// Recursively convert JSON object keys from snake_case to camelCase
+    /// Also handles special field name mappings and value transformations for PyPI -> sigstore conversion
+    fn convert_to_camel_case(value: &serde_json::Value) -> serde_json::Value {
+        convert_value_with_key(value, None)
+    }
+
+    /// Convert a value, with optional key context for special transformations
+    fn convert_value_with_key(value: &serde_json::Value, key: Option<&str>) -> serde_json::Value {
+        // Handle special value transformations based on key
+        if let Some(k) = key {
+            // Certificate needs to be wrapped in { "rawBytes": "..." }
+            if k == "certificate" {
+                if let serde_json::Value::String(cert_str) = value {
+                    return serde_json::json!({
+                        "rawBytes": cert_str
+                    });
+                }
+            }
+        }
+
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut new_map = serde_json::Map::new();
+                for (k, val) in map {
+                    let camel_key = convert_key_name(k);
+                    new_map.insert(camel_key, convert_value_with_key(val, Some(k)));
+                }
+                serde_json::Value::Object(new_map)
+            }
+            serde_json::Value::Array(arr) => serde_json::Value::Array(
+                arr.iter().map(|v| convert_value_with_key(v, key)).collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+
+    /// Convert a key name from PyPI format to sigstore format
+    /// Handles special cases and general snake_case to camelCase conversion
+    fn convert_key_name(key: &str) -> String {
+        // Special mappings for PyPI -> sigstore field names
+        match key {
+            "transparency_entries" => "tlogEntries".to_string(),
+            "canonicalized_body" => "canonicalizedBody".to_string(),
+            "inclusion_promise" => "inclusionPromise".to_string(),
+            "inclusion_proof" => "inclusionProof".to_string(),
+            "signed_entry_timestamp" => "signedEntryTimestamp".to_string(),
+            "integrated_time" => "integratedTime".to_string(),
+            "kind_version" => "kindVersion".to_string(),
+            "log_id" => "logId".to_string(),
+            "log_index" => "logIndex".to_string(),
+            "key_id" => "keyId".to_string(),
+            "root_hash" => "rootHash".to_string(),
+            "tree_size" => "treeSize".to_string(),
+            // General conversion for other fields
+            _ => snake_to_camel(key),
+        }
+    }
+
+    /// Convert snake_case to camelCase
+    fn snake_to_camel(s: &str) -> String {
+        let mut result = String::new();
+        let mut capitalize_next = false;
+
+        for c in s.chars() {
+            if c == '_' {
+                capitalize_next = true;
+            } else if capitalize_next {
+                result.push(c.to_ascii_uppercase());
+                capitalize_next = false;
+            } else {
+                result.push(c);
+            }
+        }
+
+        result
+    }
+}
 
 /// Result of fetching a source from the cache
 #[derive(Debug, Clone)]
@@ -212,7 +377,12 @@ impl SourceCache {
 
         for url in &source.urls {
             match self
-                .try_url(url, source.checksum.as_ref(), source.file_name.as_deref())
+                .try_url(
+                    url,
+                    source.checksum.as_ref(),
+                    source.file_name.as_deref(),
+                    source.sigstore.as_ref(),
+                )
                 .await
             {
                 Ok(path) => {
@@ -237,6 +407,7 @@ impl SourceCache {
         url: &url::Url,
         checksum: Option<&Checksum>,
         file_name: Option<&str>,
+        sigstore: Option<&SigstoreVerification>,
     ) -> Result<PathBuf, CacheError> {
         let key = CacheIndex::generate_cache_key(url, checksum);
 
@@ -291,6 +462,11 @@ impl SourceCache {
             return Err(CacheError::ValidationFailed { path: cache_path });
         }
 
+        // Perform sigstore verification if configured
+        if let Some(sigstore_config) = sigstore {
+            self.verify_sigstore(&cache_path, sigstore_config).await?;
+        }
+
         // Extract if needed and no explicit filename was provided
         let final_path = if file_name.is_none() && self.should_extract(&cache_path) {
             let extracted_dir = self.cache_dir.join(format!("{}_extracted", key));
@@ -329,6 +505,149 @@ impl SourceCache {
         self.index.insert(key, entry).await?;
 
         Ok(final_path.unwrap_or(cache_path))
+    }
+
+    /// Verify a downloaded file using sigstore
+    async fn verify_sigstore(
+        &self,
+        file_path: &Path,
+        sigstore_config: &SigstoreVerification,
+    ) -> Result<(), CacheError> {
+        tracing::info!("Verifying sigstore signature for: {}", file_path.display());
+
+        // Get the sigstore bundle - prefer bundle_url over inline bundle
+        let bundle_json = if let Some(url) = &sigstore_config.bundle_url {
+            tracing::info!("Downloading sigstore bundle from: {}", url);
+            self.download_sigstore_bundle(url).await?
+        } else if let Some(json) = &sigstore_config.bundle {
+            json.clone()
+        } else {
+            return Err(CacheError::InvalidSigstoreBundle(
+                "No bundle_url or bundle provided in sigstore config".to_string(),
+            ));
+        };
+
+        // Parse the bundle
+        let bundle: Bundle = serde_json::from_str(&bundle_json).map_err(|e| {
+            CacheError::InvalidSigstoreBundle(format!("Failed to parse sigstore bundle: {}", e))
+        })?;
+
+        // Initialize the trust root (production sigstore infrastructure)
+        let trusted_root = TrustedRoot::production().map_err(|e| {
+            CacheError::SigstoreTrustRoot(format!("Failed to get sigstore trust root: {}", e))
+        })?;
+
+        // Create verifier with the trusted root
+        let verifier = Verifier::new_with_trusted_root(&trusted_root);
+
+        // Create verification policy with identity and issuer if provided
+        let mut policy = VerificationPolicy::default();
+        if let Some(identity) = &sigstore_config.identity {
+            tracing::info!("Requiring identity: {}", identity);
+            policy = policy.require_identity(identity);
+        }
+        if let Some(issuer) = &sigstore_config.issuer {
+            tracing::info!("Requiring issuer: {}", issuer);
+            policy = policy.require_issuer(issuer);
+        }
+
+        // Read file and verify with raw bytes
+        let artifact_bytes = std::fs::read(file_path).map_err(|e| {
+            CacheError::SigstoreVerification(format!("Failed to read file for verification: {}", e))
+        })?;
+
+        verifier
+            .verify(artifact_bytes.as_slice(), &bundle, &policy)
+            .map_err(|e| {
+                CacheError::SigstoreVerification(format!("Sigstore verification failed: {}", e))
+            })?;
+
+        tracing::info!(
+            "Sigstore signature verified successfully for: {}",
+            file_path.display()
+        );
+        Ok(())
+    }
+
+    /// Download a sigstore bundle from a URL
+    ///
+    /// Supports both standard sigstore bundle format and PyPI PEP 740 provenance format.
+    /// PyPI provenance URLs typically end in `/provenance` and return attestation bundles
+    /// that need to be converted to standard sigstore bundle format.
+    async fn download_sigstore_bundle(&self, url: &url::Url) -> Result<String, CacheError> {
+        let response = self
+            .client
+            .for_host(url)
+            .get(url.clone())
+            .send()
+            .await
+            .map_err(|e| CacheError::SigstoreBundleDownload {
+                url: url.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        if !response.status().is_success() {
+            return Err(CacheError::SigstoreBundleDownload {
+                url: url.to_string(),
+                reason: format!("HTTP error: {}", response.status()),
+            });
+        }
+
+        let response_text =
+            response
+                .text()
+                .await
+                .map_err(|e| CacheError::SigstoreBundleDownload {
+                    url: url.to_string(),
+                    reason: format!("Failed to read response body: {}", e),
+                })?;
+
+        // Check if this is a PyPI provenance response (PEP 740 format)
+        // PyPI provenance URLs end in /provenance and return attestation_bundles
+        let is_pypi_provenance =
+            url.path().ends_with("/provenance") || response_text.contains("attestation_bundles");
+
+        if is_pypi_provenance {
+            tracing::info!(
+                "Detected PyPI PEP 740 provenance format, converting to sigstore bundle"
+            );
+            self.convert_pypi_provenance_to_bundle(&response_text, url)
+        } else {
+            // Standard sigstore bundle format - return as-is
+            Ok(response_text)
+        }
+    }
+
+    /// Convert PyPI PEP 740 provenance response to standard sigstore bundle JSON
+    fn convert_pypi_provenance_to_bundle(
+        &self,
+        provenance_json: &str,
+        url: &url::Url,
+    ) -> Result<String, CacheError> {
+        let provenance: pypi_attestation::ProvenanceResponse =
+            serde_json::from_str(provenance_json).map_err(|e| {
+                CacheError::SigstoreBundleDownload {
+                    url: url.to_string(),
+                    reason: format!("Failed to parse PyPI provenance response: {}", e),
+                }
+            })?;
+
+        // Get the first attestation from the first bundle
+        let attestation = provenance
+            .attestation_bundles
+            .first()
+            .and_then(|bundle| bundle.attestations.first())
+            .ok_or_else(|| CacheError::SigstoreBundleDownload {
+                url: url.to_string(),
+                reason: "No attestations found in PyPI provenance response".to_string(),
+            })?;
+
+        // Convert to standard sigstore bundle format
+        let bundle = attestation.to_sigstore_bundle();
+        serde_json::to_string(&bundle).map_err(|e| CacheError::SigstoreBundleDownload {
+            url: url.to_string(),
+            reason: format!("Failed to serialize sigstore bundle: {}", e),
+        })
     }
 
     /// Download a URL to the cache

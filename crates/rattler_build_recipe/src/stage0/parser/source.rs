@@ -4,7 +4,7 @@ use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 
 use crate::stage0::{
     parser::helpers::get_span,
-    source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
+    source::{GitRev, GitSource, GitUrl, PathSource, SigstoreConfig, Source, UrlSource},
     types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, NestedItemList, Value},
 };
 
@@ -349,6 +349,50 @@ fn parse_git_source(
     })
 }
 
+/// Parse a sigstore configuration section
+fn parse_sigstore_config(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<SigstoreConfig, ParseError> {
+    let mut bundle_url = None;
+    let mut bundle = None;
+    let mut identity = None;
+    let mut issuer = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "bundle_url" => {
+                bundle_url = Some(parse_value(value_node)?);
+            }
+            "bundle" => {
+                bundle = Some(parse_value(value_node)?);
+            }
+            "identity" => {
+                identity = Some(parse_value(value_node)?);
+            }
+            "issuer" => {
+                issuer = Some(parse_value(value_node)?);
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "sigstore",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: bundle_url, bundle, identity, issuer"));
+            }
+        }
+    }
+
+    Ok(SigstoreConfig {
+        bundle_url,
+        bundle,
+        identity,
+        issuer,
+    })
+}
+
 fn parse_url_source(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<UrlSource, ParseError> {
@@ -360,6 +404,7 @@ fn parse_url_source(
     let mut file_name = None;
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
+    let mut sigstore = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -390,6 +435,17 @@ fn parse_url_source(
             "target_directory" => {
                 target_directory = Some(parse_value(value_node)?);
             }
+            "sigstore" => {
+                if let Some(sig_mapping) = value_node.as_mapping() {
+                    sigstore = Some(parse_sigstore_config(sig_mapping)?);
+                } else {
+                    return Err(ParseError::invalid_value(
+                        "sigstore",
+                        "expected a mapping with bundle_url or bundle",
+                        get_span(value_node),
+                    ));
+                }
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
@@ -397,7 +453,7 @@ fn parse_url_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory",
+                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, sigstore",
                 ));
             }
         }
@@ -417,6 +473,7 @@ fn parse_url_source(
         file_name,
         patches,
         target_directory,
+        sigstore,
     })
 }
 

@@ -151,6 +151,39 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// Sigstore verification configuration (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SigstoreConfig {
+    /// URL to download the sigstore bundle from (e.g., .sigstore.json file)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle_url: Option<Url>,
+
+    /// Inline sigstore bundle JSON content
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<String>,
+
+    /// Expected identity/publisher URI (e.g., "https://github.com/pallets/flask")
+    /// This verifies who signed the artifact
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<String>,
+
+    /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com" for GitHub Actions)
+    /// This verifies which identity provider issued the signing certificate
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+}
+
+impl SigstoreConfig {
+    /// Check if the sigstore config is empty (no verification configured)
+    pub fn is_empty(&self) -> bool {
+        self.bundle_url.is_none() && self.bundle.is_none()
+    }
+}
+
+fn sigstore_is_none_or_empty(s: &Option<SigstoreConfig>) -> bool {
+    s.as_ref().map(|c| c.is_empty()).unwrap_or(true)
+}
+
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -181,6 +214,10 @@ pub struct UrlSource {
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<PathBuf>,
+
+    /// Optional sigstore verification configuration
+    #[serde(default, skip_serializing_if = "sigstore_is_none_or_empty")]
+    pub sigstore: Option<SigstoreConfig>,
 }
 
 /// A local path source (evaluated)

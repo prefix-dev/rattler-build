@@ -76,6 +76,53 @@ pub struct GitSource {
     pub expected_commit: Option<Value<String>>,
 }
 
+/// Sigstore verification configuration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SigstoreConfig {
+    /// URL to download the sigstore bundle from (e.g., .sigstore.json file)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle_url: Option<Value<String>>,
+
+    /// Inline sigstore bundle JSON content
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<Value<String>>,
+
+    /// Expected identity/publisher URI (e.g., "https://github.com/pallets/flask")
+    /// This verifies who signed the artifact
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<Value<String>>,
+
+    /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com" for GitHub Actions)
+    /// This verifies which identity provider issued the signing certificate
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<Value<String>>,
+}
+
+impl SigstoreConfig {
+    /// Check if the sigstore config is empty (no verification configured)
+    pub fn is_empty(&self) -> bool {
+        self.bundle_url.is_none() && self.bundle.is_none()
+    }
+
+    /// Collect all variables used in this sigstore config
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        if let Some(bundle_url) = &self.bundle_url {
+            vars.extend(bundle_url.used_variables());
+        }
+        if let Some(bundle) = &self.bundle {
+            vars.extend(bundle.used_variables());
+        }
+        if let Some(identity) = &self.identity {
+            vars.extend(identity.used_variables());
+        }
+        if let Some(issuer) = &self.issuer {
+            vars.extend(issuer.used_variables());
+        }
+        vars
+    }
+}
+
 /// A url source (usually a tar.gz or tar.bz2 archive)
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,6 +160,10 @@ pub struct UrlSource {
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<Value<PathBuf>>,
+
+    /// Optional sigstore verification configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sigstore: Option<SigstoreConfig>,
 }
 
 /// A local path source
@@ -277,6 +328,7 @@ impl UrlSource {
             file_name,
             patches,
             target_directory,
+            sigstore,
         } = self;
 
         let mut vars = Vec::new();
@@ -298,6 +350,9 @@ impl UrlSource {
         }
         if let Some(td) = target_directory {
             vars.extend(td.used_variables());
+        }
+        if let Some(sigstore) = sigstore {
+            vars.extend(sigstore.used_variables());
         }
         vars.sort();
         vars.dedup();

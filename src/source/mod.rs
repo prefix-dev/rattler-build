@@ -177,15 +177,31 @@ pub(crate) fn convert_git_source(
 pub(crate) fn convert_url_source(
     url_src: &rattler_build_recipe::stage1::source::UrlSource,
 ) -> Result<CacheUrlSource, SourceError> {
-    use rattler_build_source_cache::Checksum;
+    use rattler_build_source_cache::{Checksum, SigstoreVerification};
 
-    // Convert checksum if present
-    let checksum = url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()));
+    // Convert checksum if present - prefer SHA256 over MD5
+    let checksum = if let Some(sha256) = &url_src.sha256 {
+        Some(Checksum::Sha256(sha256.to_vec()))
+    } else {
+        url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
+    };
+
+    // Convert sigstore config if present
+    let sigstore = url_src
+        .sigstore
+        .as_ref()
+        .map(|config| SigstoreVerification {
+            bundle_url: config.bundle_url.clone(),
+            bundle: config.bundle.clone(),
+            identity: config.identity.clone(),
+            issuer: config.issuer.clone(),
+        });
 
     Ok(CacheUrlSource {
         urls: url_src.url.clone(),
         checksum,
         file_name: url_src.file_name.clone(),
+        sigstore,
     })
 }
 
@@ -355,6 +371,7 @@ async fn fetch_source(
                         patches: path_src.patches.clone(),
                         file_name: None,
                         target_directory: path_src.target_directory.clone(),
+                        sigstore: None, // Path sources don't have sigstore verification
                     };
 
                     let cache_url_source = convert_url_source(&temp_url_source)?;
