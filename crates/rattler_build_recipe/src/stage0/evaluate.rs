@@ -840,7 +840,7 @@ pub fn evaluate_skip_list(
 ///
 /// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
 /// Returns true if ANY condition evaluates to true (OR logic).
-fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
+pub fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
     for condition in skip_conditions {
         // Create a Jinja instance with the configuration from the evaluation context
         let jinja_config = context.jinja_config().clone();
@@ -2582,6 +2582,9 @@ impl Evaluate for Stage0Recipe {
         // which variables were accessed during context evaluation (before shadowing)
         let accessed_before_context = context.accessed_variables();
 
+        // Get the set of original variable names (variant variables) before context merge
+        let original_variable_keys: HashSet<String> = context.variables().keys().cloned().collect();
+
         // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
@@ -2589,11 +2592,18 @@ impl Evaluate for Stage0Recipe {
             (context.clone(), IndexMap::new())
         };
 
-        // Variables accessed during context evaluation (these came from the variant
-        // before being shadowed by context variables)
+        // Variables accessed during context evaluation that were ALSO in the original context.
+        // This filters out context variables that were accessed by other context variables.
+        // For example, if we have:
+        //   context:
+        //     build_drafts: ${{ drafts == "ON" }}
+        //     build_prefix: "${{ 'drafts_' if build_drafts else '' }}"
+        // Then `drafts` is a variant variable (should be tracked), but `build_drafts` is a
+        // context variable accessed by `build_prefix` (should NOT be tracked as a variant variable).
         let accessed_during_context: HashSet<String> = context_with_vars
             .accessed_variables()
             .difference(&accessed_before_context)
+            .filter(|var| original_variable_keys.contains(*var))
             .cloned()
             .collect();
         let package = self.package.evaluate(&context_with_vars)?;
@@ -2658,16 +2668,15 @@ impl Evaluate for Stage0Recipe {
                 let key_str = k.as_str();
 
                 // Context variables (defined in the context: section) should not be included
-                // in the variant for hash computation, UNLESS they reference a variant variable
-                // with the same name. This happens when you have:
+                // in the variant, UNLESS they shadow a variant variable that was accessed
+                // during context evaluation. This happens with patterns like:
                 //   context:
                 //     foobar: ${{ foobar }}
-                // Here, foobar in context references the variant foobar, and the variant
-                // should still be tracked even though context shadows it.
+                // where foobar in context references and shadows the variant foobar.
                 //
-                // We detect this by checking if the variable was accessed from the variant
-                // DURING context evaluation (before shadowing). This is different from
-                // accessed_vars which includes all accesses including after shadowing.
+                // Since accessed_during_context is already filtered to only contain original
+                // variant variables (not context variables), we simply check if this context
+                // variable name is in that set.
                 if self.context.contains_key(key_str) && !accessed_during_context.contains(key_str)
                 {
                     return false;
@@ -3093,8 +3102,10 @@ fn evaluate_package_output_to_recipe(
         .filter(|(k, _)| {
             let key_str = k.as_str();
 
-            // Exclude recipe context variables UNLESS they were accessed from the variant
-            // DURING context evaluation (before shadowing)
+            // Context variables (defined in the context: section) should not be included
+            // in the variant, UNLESS they shadow a variant variable that was accessed
+            // during context evaluation. Since accessed_during_context is already filtered
+            // to only contain original variant variables, we simply check membership.
             if recipe.context.contains_key(key_str) && !accessed_during_context.contains(key_str) {
                 return false;
             }
@@ -3163,6 +3174,9 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
         // which variables were accessed during context evaluation (before shadowing)
         let accessed_before_context = context.accessed_variables();
 
+        // Get the set of original variable names (variant variables) before context merge
+        let original_variable_keys: HashSet<String> = context.variables().keys().cloned().collect();
+
         // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
@@ -3170,11 +3184,12 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             (context.clone(), IndexMap::new())
         };
 
-        // Variables accessed during context evaluation (these came from the variant
-        // before being shadowed by context variables)
+        // Variables accessed during context evaluation that were ALSO in the original context.
+        // This filters out context variables that were accessed by other context variables.
         let accessed_during_context: HashSet<String> = context_with_vars
             .accessed_variables()
             .difference(&accessed_before_context)
+            .filter(|var| original_variable_keys.contains(*var))
             .cloned()
             .collect();
 

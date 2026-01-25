@@ -463,20 +463,57 @@ fn discover_new_variant_keys_from_evaluation(
     let context = build_evaluation_context(combination, config)?;
 
     // Get requirements and evaluate them
+    // NOTE: We need to merge the recipe's context variables into the evaluation context
+    // before evaluating requirements, so that variables like `name` defined in the
+    // context section are available.
     let free_specs: Vec<rattler_conda_types::PackageName> = match stage0_recipe {
         Stage0Recipe::SingleOutput(recipe) => {
-            let evaluated = recipe.requirements.evaluate(&context)?;
+            // Merge recipe context variables into evaluation context
+            let (context_with_vars, _) = if !recipe.context.is_empty() {
+                context.with_context(&recipe.context)?
+            } else {
+                (context.clone(), IndexMap::new())
+            };
+            let evaluated = recipe.requirements.evaluate(&context_with_vars)?;
             evaluated.free_specs()
         }
         Stage0Recipe::MultiOutput(recipe) => {
+            // Merge recipe context variables into evaluation context
+            let (context_with_vars, _) = if !recipe.context.is_empty() {
+                context.with_context(&recipe.context)?
+            } else {
+                (context.clone(), IndexMap::new())
+            };
             let mut all_free_specs = Vec::new();
             for output in &recipe.outputs {
-                let reqs = match output {
-                    stage0::Output::Staging(staging) => &staging.requirements,
-                    stage0::Output::Package(pkg) => &pkg.requirements,
+                // For package outputs, check if the output should be skipped before
+                // evaluating requirements. This prevents errors from platform-specific
+                // functions like stdlib('c') when the output is skipped for that platform.
+                let (reqs, should_skip) = match output {
+                    stage0::Output::Staging(staging) => {
+                        // Staging outputs don't have skip conditions
+                        (&staging.requirements, false)
+                    }
+                    stage0::Output::Package(pkg) => {
+                        // Evaluate skip conditions to determine if output should be skipped
+                        let skip_conditions = crate::stage0::evaluate::evaluate_skip_list(
+                            &pkg.build.skip,
+                            &context_with_vars,
+                        )
+                        .unwrap_or_default();
+                        let is_skipped = crate::stage0::evaluate::is_skipped(
+                            &skip_conditions,
+                            &context_with_vars,
+                        );
+                        (&pkg.requirements, is_skipped)
+                    }
                 };
-                if let Ok(evaluated) = reqs.evaluate(&context) {
-                    all_free_specs.extend(evaluated.free_specs());
+
+                // Only evaluate requirements for non-skipped outputs
+                if !should_skip {
+                    if let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
+                        all_free_specs.extend(evaluated.free_specs());
+                    }
                 }
             }
             all_free_specs
@@ -2016,5 +2053,204 @@ python:
                 pillow_tests_idx, pillow_idx
             );
         }
+    }
+
+    #[test]
+    fn test_single_output_pin_subpackage_with_context_variable() {
+        // Test that single-output recipes can use context variables in pin_subpackage.
+        // This was a regression where `pin_subpackage(name)` would fail with
+        // "Undefined variable 'name'" even though `name` was defined in the context section.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: 0.1.0
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+requirements:
+  run_exports:
+    - ${{ pin_subpackage(name, upper_bound='x.x.x') }}
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // This should succeed - the `name` variable from context should be available
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new());
+
+        assert!(
+            rendered.is_ok(),
+            "pin_subpackage(name) should work with context variables. Error: {:?}",
+            rendered.err()
+        );
+
+        let rendered = rendered.unwrap();
+        assert_eq!(rendered.len(), 1);
+
+        // Verify the pin_subpackage was correctly evaluated
+        let recipe = &rendered[0].recipe;
+        assert_eq!(recipe.package.name.as_normalized(), "test-pkg");
+
+        // Check that run_exports contains the pin_subpackage
+        let weak_exports = &recipe.requirements.run_exports.weak;
+        assert_eq!(weak_exports.len(), 1, "Should have one run_export");
+
+        // The pin_subpackage should reference "test-pkg"
+        if let Dependency::PinSubpackage(pin) = &weak_exports[0] {
+            assert_eq!(
+                pin.pin_subpackage.name.as_normalized(),
+                "test-pkg",
+                "pin_subpackage should reference the context variable value"
+            );
+        } else {
+            panic!("Expected PinSubpackage dependency");
+        }
+    }
+
+    #[test]
+    fn test_context_variables_not_included_in_variant() {
+        // Test that context variables like build_drafts and build_prefix are NOT included
+        // in the variant, even when they are accessed during context evaluation.
+        // Only actual variant keys (like drafts) should be in the variant.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: zeromq
+  version: 4.3.5
+  build: 9
+  build_drafts: ${{ drafts == "ON" }}
+  build_prefix: "${{ 'drafts_' if build_drafts else '' }}"
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+build:
+  number: ${{ build }}
+  string: ${{ build_prefix }}h${{ hash }}_${{ build }}
+"#;
+
+        let variant_yaml = r#"
+drafts:
+  - "ON"
+  - "OFF"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(
+            rendered.len(),
+            2,
+            "Should have 2 variants (drafts ON and OFF)"
+        );
+
+        for variant in &rendered {
+            // The variant should contain 'drafts' (actual variant key) and 'target_platform'
+            // but NOT 'build_drafts' or 'build_prefix' (which are context variables)
+            assert!(
+                variant.variant.contains_key(&"drafts".into()),
+                "Variant should contain 'drafts'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build_drafts".into()),
+                "Variant should NOT contain context variable 'build_drafts'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build_prefix".into()),
+                "Variant should NOT contain context variable 'build_prefix'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"name".into()),
+                "Variant should NOT contain context variable 'name'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"version".into()),
+                "Variant should NOT contain context variable 'version'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build".into()),
+                "Variant should NOT contain context variable 'build'"
+            );
+        }
+
+        // Check that build strings are correct
+        let build_strings: Vec<_> = rendered
+            .iter()
+            .map(|r| r.recipe.build.string.as_resolved().unwrap().to_string())
+            .collect();
+
+        // One should have drafts_ prefix, one shouldn't
+        assert!(
+            build_strings.iter().any(|s| s.starts_with("drafts_")),
+            "One build string should have 'drafts_' prefix for drafts=ON"
+        );
+        assert!(
+            build_strings.iter().any(|s| !s.starts_with("drafts_")),
+            "One build string should NOT have 'drafts_' prefix for drafts=OFF"
+        );
+    }
+
+    #[test]
+    fn test_context_variable_same_name_as_variant_included() {
+        // Test that when a context variable has the same name as a variant variable
+        // and references it (like `context: { mpi: ${{ mpi }} }`), the variant
+        // variable IS included in the variant.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  mpi: ${{ mpi }}
+
+package:
+  name: test-pkg
+  version: 1.0.0
+
+build:
+  string: ${{ mpi }}_h${{ hash }}_0
+"#;
+
+        let variant_yaml = r#"
+mpi:
+  - openmpi
+  - mpich
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 2, "Should have 2 variants (mpi values)");
+
+        for variant in &rendered {
+            // The variant SHOULD contain 'mpi' because it references a variant variable
+            // of the same name
+            assert!(
+                variant.variant.contains_key(&"mpi".into()),
+                "Variant should contain 'mpi' since context.mpi references variant.mpi"
+            );
+        }
+
+        // Check mpi values are correct
+        let mpi_values: Vec<_> = rendered
+            .iter()
+            .map(|r| r.variant.get(&"mpi".into()).unwrap().to_string())
+            .collect();
+
+        assert!(mpi_values.contains(&"openmpi".to_string()));
+        assert!(mpi_values.contains(&"mpich".to_string()));
     }
 }
