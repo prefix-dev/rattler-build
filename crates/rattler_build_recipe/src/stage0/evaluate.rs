@@ -3114,10 +3114,12 @@ fn evaluate_package_output_to_recipe(
                 return false;
             }
 
-            // Include if accessed, part of our (free) dependencies,
-            // if it's an always-include variable, or if it's an OS env var key
+            // Include if accessed (either during this output evaluation or during context
+            // evaluation), part of our (free) dependencies, if it's an always-include variable,
+            // or if it's an OS env var key
             let os_env_var_keys = context.os_env_var_keys();
             accessed_vars.contains(key_str)
+                || accessed_during_context.contains(key_str)
                 || free_specs.contains(&NormalizedKey::from(key_str))
                 || ALWAYS_INCLUDED_VARS.contains(&key_str)
                 || os_env_var_keys.contains(key_str)
@@ -3246,6 +3248,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                             return false;
                         }
                         accessed_vars.contains(key_str)
+                            || accessed_during_context.contains(key_str)
                             || free_specs.contains(&NormalizedKey::from(key_str))
                             || ALWAYS_INCLUDE.contains(&key_str)
                             || os_env_var_keys.contains(key_str)

@@ -1103,4 +1103,67 @@ requirements:
             dep_names
         );
     }
+
+    #[test]
+    fn test_variant_variable_used_in_context_without_shadowing() {
+        // Test case: when a variant variable is used in context expressions but the
+        // context variable has a DIFFERENT name (not shadowing), the variant variable
+        // should still be tracked as used.
+        //
+        // This tests the pattern from the is_abi3 use case:
+        //   context:
+        //     use_abi3: ${{ is_abi3 }}
+        //     build_abi3: ${{ is_abi3 and match(python, "3.10.*") }}
+        //
+        // Here, `is_abi3` is a variant variable used to compute context variables
+        // `use_abi3` and `build_abi3`. Even though `is_abi3` is NOT shadowed by a
+        // context variable with the same name, it should still be tracked in used_variant.
+        let yaml = r#"
+context:
+  use_abi3: ${{ is_abi3 }}
+  build_abi3: ${{ is_abi3 and match(python, "3.10.*") }}
+
+package:
+  name: test-abi3
+  version: "1.0.0"
+
+build:
+  number: 0
+  python:
+    version_independent: ${{ build_abi3 }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("is_abi3".to_string(), Variable::from(true));
+        variant.insert("python".to_string(), Variable::from("3.10.* *_cpython"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify is_abi3 is in used_variant because it was accessed during context evaluation
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("is_abi3")),
+            "is_abi3 should be in used_variant when used in context expressions (even without shadowing). \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the context variables were evaluated correctly
+        assert_eq!(
+            recipe.context.get("use_abi3").unwrap().to_string(),
+            "true",
+            "Context use_abi3 should be 'true'"
+        );
+        assert_eq!(
+            recipe.context.get("build_abi3").unwrap().to_string(),
+            "true",
+            "Context build_abi3 should be 'true' (is_abi3=true, python matches 3.10.*)"
+        );
+
+        // Verify the variant contains the original value from the variant config
+        assert_eq!(
+            used_variant.get(&NormalizedKey::from("is_abi3")).unwrap().to_string(),
+            "true",
+            "Variant should contain the original 'true' value for is_abi3"
+        );
+    }
 }
