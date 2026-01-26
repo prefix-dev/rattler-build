@@ -150,8 +150,8 @@ pub fn extract_used_variants(path: &Path) -> PklResult<Vec<String>> {
 
 /// Extract used variant keys from PKL source code
 pub fn extract_used_variants_from_source(source: &str) -> PklResult<Vec<String>> {
-    let module = rpkl_parser::parse_module(source)
-        .map_err(|e| PklError::ParseError(format!("{}", e)))?;
+    let module =
+        rpkl_parser::parse_module(source).map_err(|e| PklError::ParseError(format!("{}", e)))?;
 
     let mut variants = std::collections::HashSet::new();
     extract_variants_from_module(&module, &mut variants);
@@ -261,9 +261,7 @@ fn extract_variants_from_object_body(
                     extract_variants_from_object_body(else_body, variants);
                 }
             }
-            rpkl_parser::ObjectMember::For {
-                iterable, body, ..
-            } => {
+            rpkl_parser::ObjectMember::For { iterable, body, .. } => {
                 extract_variants_from_expr(iterable, variants);
                 extract_variants_from_object_body(body, variants);
             }
@@ -590,15 +588,15 @@ fn convert_package(value: &rpkl_runtime::VmValue) -> PklResult<Package> {
         .ok_or_else(|| PklError::MissingField("package.version".to_string()))?;
 
     // Parse the name using rattler_conda_types::PackageName
-    let inner_name: rattler_conda_types::PackageName = name_str
-        .parse()
-        .map_err(|e| PklError::conversion_field(format!("Invalid package name: {}", e), "package.name"))?;
+    let inner_name: rattler_conda_types::PackageName = name_str.parse().map_err(|e| {
+        PklError::conversion_field(format!("Invalid package name: {}", e), "package.name")
+    })?;
     let name = PackageName(inner_name);
 
     // Parse version
-    let version: rattler_conda_types::VersionWithSource = version_str
-        .parse()
-        .map_err(|e| PklError::conversion_field(format!("Invalid version: {}", e), "package.version"))?;
+    let version: rattler_conda_types::VersionWithSource = version_str.parse().map_err(|e| {
+        PklError::conversion_field(format!("Invalid version: {}", e), "package.version")
+    })?;
 
     Ok(Package {
         name: Value::new_concrete(name, None),
@@ -612,9 +610,9 @@ fn convert_source_list(value: &rpkl_runtime::VmValue) -> PklResult<ConditionalLi
         // Single source object
         rpkl_runtime::VmValue::Object(_) => {
             let source = convert_source(value)?;
-            Ok(ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                source, None,
-            ))]))
+            Ok(ConditionalList::new(vec![Item::Value(
+                Value::new_concrete(source, None),
+            )]))
         }
         // List of sources
         rpkl_runtime::VmValue::List(list) => {
@@ -664,33 +662,37 @@ fn convert_url_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
     let sha256 = get_property(obj, "sha256")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| {
-            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s)
-                .ok_or_else(|| PklError::conversion_field(format!("Invalid sha256: {}", s), "source.sha256"))
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+                PklError::conversion_field(format!("Invalid sha256: {}", s), "source.sha256")
+            })
         })
         .transpose()?;
 
     let md5 = get_property(obj, "md5")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| {
-            rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s)
-                .ok_or_else(|| PklError::conversion_field(format!("Invalid md5: {}", s), "source.md5"))
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
+                PklError::conversion_field(format!("Invalid md5: {}", s), "source.md5")
+            })
         })
         .transpose()?;
 
-    let file_name = get_property(obj, "file_name")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let file_name =
+        get_property(obj, "file_name").and_then(|v| v.as_string().map(|s| s.to_string()));
 
     let patches = convert_string_list(obj, "patches")?;
 
-    let target_directory = get_property(obj, "target_directory")
-        .and_then(|v| v.as_string().map(|s| std::path::PathBuf::from(s.to_string())));
+    let target_directory = get_property(obj, "target_directory").and_then(|v| {
+        v.as_string()
+            .map(|s| std::path::PathBuf::from(s.to_string()))
+    });
 
     Ok(Source::Url(UrlSource {
         url: vec![Value::new_concrete(url, None)],
         sha256: sha256.map(|h| Value::new_concrete(h, None)),
         md5: md5.map(|h| Value::new_concrete(h, None)),
         file_name: file_name.map(|s| Value::new_concrete(s, None)),
-        patches,
+        patches: patches.unwrap_or_default(),
         target_directory: target_directory.map(|p| Value::new_concrete(p, None)),
     }))
 }
@@ -702,26 +704,24 @@ fn convert_git_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .ok_or_else(|| PklError::MissingField("source.url (git)".to_string()))?;
 
-    let rev = get_property(obj, "rev")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let rev = get_property(obj, "rev").and_then(|v| v.as_string().map(|s| s.to_string()));
 
-    let tag = get_property(obj, "tag")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let tag = get_property(obj, "tag").and_then(|v| v.as_string().map(|s| s.to_string()));
 
-    let branch = get_property(obj, "branch")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let branch = get_property(obj, "branch").and_then(|v| v.as_string().map(|s| s.to_string()));
 
     let depth = get_property(obj, "depth")
         .and_then(|v| v.as_int())
         .map(|i| i as i32);
 
-    let lfs = get_property(obj, "lfs")
-        .and_then(|v| v.as_bool());
+    let lfs = get_property(obj, "lfs").and_then(|v| v.as_bool());
 
     let patches = convert_string_list(obj, "patches")?;
 
-    let target_directory = get_property(obj, "target_directory")
-        .and_then(|v| v.as_string().map(|s| std::path::PathBuf::from(s.to_string())));
+    let target_directory = get_property(obj, "target_directory").and_then(|v| {
+        v.as_string()
+            .map(|s| std::path::PathBuf::from(s.to_string()))
+    });
 
     Ok(Source::Git(GitSource {
         url: GitUrl(Value::new_concrete(url, None)),
@@ -729,7 +729,7 @@ fn convert_git_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
         tag: tag.map(|s| GitRev::Value(Value::new_concrete(s, None))),
         branch: branch.map(|s| GitRev::Value(Value::new_concrete(s, None))),
         depth: depth.map(|d| Value::new_concrete(d, None)),
-        patches,
+        patches: patches.unwrap_or_default(),
         target_directory: target_directory.map(|p| Value::new_concrete(p, None)),
         lfs: lfs.map(|b| Value::new_concrete(b, None)),
         expected_commit: None,
@@ -739,7 +739,10 @@ fn convert_git_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
 /// Convert a Path source
 fn convert_path_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
     let path = get_property(obj, "path")
-        .and_then(|v| v.as_string().map(|s| std::path::PathBuf::from(s.to_string())))
+        .and_then(|v| {
+            v.as_string()
+                .map(|s| std::path::PathBuf::from(s.to_string()))
+        })
         .ok_or_else(|| PklError::MissingField("source.path".to_string()))?;
 
     let use_gitignore = get_property(obj, "use_gitignore")
@@ -748,14 +751,16 @@ fn convert_path_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
 
     let patches = convert_string_list(obj, "patches")?;
 
-    let target_directory = get_property(obj, "target_directory")
-        .and_then(|v| v.as_string().map(|s| std::path::PathBuf::from(s.to_string())));
+    let target_directory = get_property(obj, "target_directory").and_then(|v| {
+        v.as_string()
+            .map(|s| std::path::PathBuf::from(s.to_string()))
+    });
 
     Ok(Source::Path(PathSource {
         path: Value::new_concrete(path, None),
         sha256: None,
         md5: None,
-        patches,
+        patches: patches.unwrap_or_default(),
         target_directory: target_directory.map(|p| Value::new_concrete(p, None)),
         file_name: None,
         use_gitignore,
@@ -767,7 +772,7 @@ fn convert_path_source(obj: &Arc<rpkl_runtime::VmObject>) -> PklResult<Source> {
 fn convert_string_list(
     obj: &Arc<rpkl_runtime::VmObject>,
     field: &str,
-) -> PklResult<ConditionalList<String>> {
+) -> PklResult<Option<ConditionalList<String>>> {
     match get_property(obj, field) {
         Some(rpkl_runtime::VmValue::List(list)) => {
             let mut items = Vec::new();
@@ -776,7 +781,7 @@ fn convert_string_list(
                     items.push(Item::Value(Value::new_concrete(s.to_string(), None)));
                 }
             }
-            Ok(ConditionalList::new(items))
+            Ok(Some(ConditionalList::new(items)))
         }
         Some(rpkl_runtime::VmValue::Object(obj)) if obj.is_listing() => {
             let mut items = Vec::new();
@@ -789,15 +794,15 @@ fn convert_string_list(
                     }
                 }
             }
-            Ok(ConditionalList::new(items))
+            Ok(Some(ConditionalList::new(items)))
         }
         // Null means empty list
-        Some(rpkl_runtime::VmValue::Null) => Ok(ConditionalList::default()),
+        Some(rpkl_runtime::VmValue::Null) => Ok(None),
         Some(_) => Err(PklError::conversion_field(
             format!("Expected {} to be a list", field),
             field,
         )),
-        None => Ok(ConditionalList::default()),
+        None => Ok(None),
     }
 }
 
@@ -809,11 +814,9 @@ fn convert_build(value: &rpkl_runtime::VmValue) -> PklResult<Build> {
 
     let number = get_property(obj, "number")
         .and_then(|v| v.as_int())
-        .map(|i| i as u64)
-        .unwrap_or(0);
+        .map(|i| i as u64);
 
-    let string = get_property(obj, "string")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let string = get_property(obj, "string").and_then(|v| v.as_string().map(|s| s.to_string()));
 
     let noarch = get_property(obj, "noarch")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
@@ -826,10 +829,8 @@ fn convert_build(value: &rpkl_runtime::VmValue) -> PklResult<Build> {
     // Convert script - can be a string or list of strings
     let script = match get_property(obj, "script") {
         Some(rpkl_runtime::VmValue::String(s)) => {
-            let content = ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                s.to_string(),
-                None,
-            ))]);
+            let content =
+                ConditionalList::new(vec![Item::Value(Value::new_concrete(s.to_string(), None))]);
             Script {
                 content: Some(content),
                 ..Default::default()
@@ -867,7 +868,7 @@ fn convert_build(value: &rpkl_runtime::VmValue) -> PklResult<Build> {
     };
 
     Ok(Build {
-        number: Value::new_concrete(number, None),
+        number: number.map(|n| Value::new_concrete(n, None)),
         string: string.map(|s| Value::new_concrete(s, None)),
         script,
         noarch: noarch.map(|n| Value::new_concrete(n, None)),
@@ -943,13 +944,17 @@ fn convert_about(value: &rpkl_runtime::VmValue) -> PklResult<About> {
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| s.parse::<url::Url>())
         .transpose()
-        .map_err(|e| PklError::conversion_field(format!("Invalid homepage URL: {}", e), "about.homepage"))?;
+        .map_err(|e| {
+            PklError::conversion_field(format!("Invalid homepage URL: {}", e), "about.homepage")
+        })?;
 
     let license = get_property(obj, "license")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| s.parse::<crate::stage0::License>())
         .transpose()
-        .map_err(|e| PklError::conversion_field(format!("Invalid license: {}", e), "about.license"))?;
+        .map_err(|e| {
+            PklError::conversion_field(format!("Invalid license: {}", e), "about.license")
+        })?;
 
     let license_file = convert_string_list(obj, "license_file")
         .or_else(|_| {
@@ -957,29 +962,37 @@ fn convert_about(value: &rpkl_runtime::VmValue) -> PklResult<About> {
             get_property(obj, "license_file")
                 .and_then(|v| v.as_string().map(|s| s.to_string()))
                 .map(|s| {
-                    ConditionalList::new(vec![Item::Value(Value::new_concrete(s, None))])
+                    Some(ConditionalList::new(vec![Item::Value(
+                        Value::new_concrete(s, None),
+                    )]))
                 })
                 .ok_or_else(|| PklError::conversion("Could not parse license_file"))
         })
         .unwrap_or_default();
 
-    let summary = get_property(obj, "summary")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let summary = get_property(obj, "summary").and_then(|v| v.as_string().map(|s| s.to_string()));
 
-    let description = get_property(obj, "description")
-        .and_then(|v| v.as_string().map(|s| s.to_string()));
+    let description =
+        get_property(obj, "description").and_then(|v| v.as_string().map(|s| s.to_string()));
 
     let documentation = get_property(obj, "documentation")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| s.parse::<url::Url>())
         .transpose()
-        .map_err(|e| PklError::conversion_field(format!("Invalid documentation URL: {}", e), "about.documentation"))?;
+        .map_err(|e| {
+            PklError::conversion_field(
+                format!("Invalid documentation URL: {}", e),
+                "about.documentation",
+            )
+        })?;
 
     let repository = get_property(obj, "repository")
         .and_then(|v| v.as_string().map(|s| s.to_string()))
         .map(|s| s.parse::<url::Url>())
         .transpose()
-        .map_err(|e| PklError::conversion_field(format!("Invalid repository URL: {}", e), "about.repository"))?;
+        .map_err(|e| {
+            PklError::conversion_field(format!("Invalid repository URL: {}", e), "about.repository")
+        })?;
 
     Ok(About {
         homepage: homepage.map(|u| Value::new_concrete(u, None)),
@@ -1104,7 +1117,10 @@ fn convert_single_test(value: &rpkl_runtime::VmValue) -> PklResult<Option<TestTy
             rpkl_runtime::VmValue::List(list) => {
                 let items: Vec<_> = list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| Item::Value(Value::new_concrete(s.to_string(), None))))
+                    .filter_map(|v| {
+                        v.as_string()
+                            .map(|s| Item::Value(Value::new_concrete(s.to_string(), None)))
+                    })
                     .collect();
                 ConditionalList::new(items)
             }
@@ -1146,7 +1162,10 @@ fn convert_single_test(value: &rpkl_runtime::VmValue) -> PklResult<Option<TestTy
             Some(rpkl_runtime::VmValue::List(list)) => {
                 let items: Vec<_> = list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| Item::Value(Value::new_concrete(s.to_string(), None))))
+                    .filter_map(|v| {
+                        v.as_string()
+                            .map(|s| Item::Value(Value::new_concrete(s.to_string(), None)))
+                    })
                     .collect();
                 ConditionalListOrItem::new(items)
             }
@@ -1166,8 +1185,7 @@ fn convert_single_test(value: &rpkl_runtime::VmValue) -> PklResult<Option<TestTy
             _ => ConditionalListOrItem::empty(),
         };
 
-        let pip_check = get_property(python_obj, "pip_check")
-            .and_then(|v| v.as_bool());
+        let pip_check = get_property(python_obj, "pip_check").and_then(|v| v.as_bool());
 
         return Ok(Some(TestType::Python {
             python: PythonTest {
@@ -1188,7 +1206,11 @@ fn convert_single_test(value: &rpkl_runtime::VmValue) -> PklResult<Option<TestTy
         })?;
 
         // Helper to convert string list to PackageContentsCheckFiles
-        fn to_check_files(list: ConditionalList<String>) -> Option<PackageContentsCheckFiles> {
+        fn to_check_files(
+            list: Option<ConditionalList<String>>,
+        ) -> Option<PackageContentsCheckFiles> {
+            // TODO remove!
+            let list = list.unwrap_or_default();
             if list.is_empty() {
                 None
             } else {
@@ -1232,7 +1254,10 @@ fn convert_single_test(value: &rpkl_runtime::VmValue) -> PklResult<Option<TestTy
             rpkl_runtime::VmValue::List(list) => {
                 let items: Vec<_> = list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| Item::Value(Value::new_concrete(s.to_string(), None))))
+                    .filter_map(|v| {
+                        v.as_string()
+                            .map(|s| Item::Value(Value::new_concrete(s.to_string(), None)))
+                    })
                     .collect();
                 ConditionalList::new(items)
             }
@@ -1296,18 +1321,16 @@ mod tests {
         if pkl_path.exists() {
             let result = parse_pkl_recipe(&pkl_path, "linux-64");
             match result {
-                Ok(recipe) => {
-                    match recipe {
-                        Recipe::SingleOutput(single) => {
-                            assert!(single.package.name.is_concrete());
-                            assert_eq!(
-                                single.package.name.as_concrete().unwrap().0.as_normalized(),
-                                "xtensor"
-                            );
-                        }
-                        Recipe::MultiOutput(_) => panic!("Expected single output recipe"),
+                Ok(recipe) => match recipe {
+                    Recipe::SingleOutput(single) => {
+                        assert!(single.package.name.is_concrete());
+                        assert_eq!(
+                            single.package.name.as_concrete().unwrap().0.as_normalized(),
+                            "xtensor"
+                        );
                     }
-                }
+                    Recipe::MultiOutput(_) => panic!("Expected single output recipe"),
+                },
                 Err(e) => {
                     // It's OK if we can't parse complex examples with external imports
                     // Just log the error for now
@@ -1368,7 +1391,10 @@ about {
             Recipe::SingleOutput(single) => {
                 // Check package name
                 assert!(single.package.name.is_concrete());
-                assert_eq!(single.package.name.as_concrete().unwrap().0.as_normalized(), "test-package");
+                assert_eq!(
+                    single.package.name.as_concrete().unwrap().0.as_normalized(),
+                    "test-package"
+                );
 
                 // Check version
                 assert!(single.package.version.is_concrete());

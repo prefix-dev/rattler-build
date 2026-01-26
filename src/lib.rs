@@ -269,10 +269,7 @@ fn find_variants_pkl(
     let used_variant_keys = pkl::extract_used_variants(recipe_path)
         .map_err(|e| miette::miette!("Failed to analyze PKL recipe: {}", e))?;
 
-    tracing::debug!(
-        "PKL recipe uses variant keys: {:?}",
-        used_variant_keys
-    );
+    tracing::debug!("PKL recipe uses variant keys: {:?}", used_variant_keys);
 
     // Step 2: Build variant combinations from the config, filtered by used keys
     let variant_combinations = build_variant_combinations(variant_config, &used_variant_keys);
@@ -321,10 +318,9 @@ fn find_variants_pkl(
         // Create a minimal variant config just for this specific variant
         let mut single_variant_config = VariantConfig::default();
         for (key, value) in &variant {
-            single_variant_config.variants.insert(
-                key.clone(),
-                vec![Variable::from_string(&value.to_string())],
-            );
+            single_variant_config
+                .variants
+                .insert(key.clone(), vec![Variable::from_string(&value.to_string())]);
         }
         // Add platform variants
         single_variant_config.variants.insert(
