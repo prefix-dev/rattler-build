@@ -97,7 +97,7 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
 
     // Handle license_file specially since it can be a single value or list
     if let Some(license_file_node) = yaml.as_mapping().and_then(|m| m.get("license_file")) {
-        about.license_file = parse_license_file(license_file_node)?;
+        about.license_file = Some(parse_license_file(license_file_node)?);
     }
 
     Ok(about)

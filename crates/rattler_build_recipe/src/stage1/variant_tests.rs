@@ -1161,7 +1161,10 @@ build:
 
         // Verify the variant contains the original value from the variant config
         assert_eq!(
-            used_variant.get(&NormalizedKey::from("is_abi3")).unwrap().to_string(),
+            used_variant
+                .get(&NormalizedKey::from("is_abi3"))
+                .unwrap()
+                .to_string(),
             "true",
             "Variant should contain the original 'true' value for is_abi3"
         );

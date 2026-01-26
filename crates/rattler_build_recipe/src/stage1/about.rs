@@ -25,8 +25,8 @@ pub struct About {
     pub license: Option<License>,
 
     /// License file paths
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub license_file: GlobVec,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license_file: Option<GlobVec>,
 
     /// License family (e.g., MIT, BSD, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -53,7 +53,7 @@ impl About {
             && self.repository.is_none()
             && self.documentation.is_none()
             && self.license.is_none()
-            && self.license_file.is_empty()
+            && self.license_file.is_none()
             && self.license_family.is_none()
             && self.summary.is_none()
             && self.description.is_none()

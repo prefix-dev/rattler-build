@@ -1580,7 +1580,11 @@ impl Evaluate for Stage0About {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
+            license_file: self
+                .license_file
+                .as_ref()
+                .map(|lf| evaluate_glob_vec_simple(lf, context))
+                .transpose()?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -2882,7 +2886,7 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
         } else {
             toplevel.license_family
         },
-        license_file: if !output.license_file.is_empty() {
+        license_file: if output.license_file.is_some() {
             output.license_file
         } else {
             toplevel.license_file
