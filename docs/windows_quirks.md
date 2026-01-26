@@ -57,7 +57,18 @@ build:
     script: ...
 ```
 
-Or save your build script as `build.ps1` (which will automatically use powershell based on the file ending).
+Or save your build script as `build.ps1` (which will automatically use powershell based on the file ending), rattler-build will choose it automatically on Windows if `build.bat` is absent.
+
+rattler-build relies on `$PSNativeCommandUseErrorActionPreference`, which is only available in PowerShell 7.4+. If your PowerShell is not new enough, it will skip over errors from native
+command and you have to check `$?` or `$LASTEXITCODE` manually like in `cmd.exe`.
+
+rattler-build also creates normal variable copies of environment variables, you can use them if you feel `Env:` prefix is tedious, so you can write
+
+```ps1 title="build.ps1"
+cmake -S . B build -DCMAKE_INSTALL_PREFIX=$LIBRARY_PREFIX # same as $Env:LIBRARY_PREFIX
+```
+
+All these variables are strings, because rattler-build just copies them, so variables with value `'True'` will not be `$true` in current implementation.
 
 ### Using `Bash` on Windows
 
