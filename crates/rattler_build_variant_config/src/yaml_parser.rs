@@ -24,10 +24,36 @@ pub struct Stage0VariantConfig {
     pub path: Option<PathBuf>,
 }
 
+/// Check if content contains legacy `# [selector]` syntax and warn about it
+fn warn_about_legacy_selectors(content: &str, path: &Path) {
+    // Look for patterns like `# [win]`, `# [unix]`, `# [osx]`, `# [linux]` etc.
+    let selector_pattern = regex::Regex::new(r"#\s*\[[\w\s]+\]").unwrap();
+    if selector_pattern.is_match(content) {
+        tracing::warn!(
+            "Variant file '{}' appears to contain legacy `# [selector]` syntax (e.g. `# [win]`). \
+             This syntax is only supported in files named 'conda_build_config.yaml'. \
+             For other variant files, use the `if/then/else` syntax instead:\n\
+             \n\
+             # Old style (only works in conda_build_config.yaml):\n\
+             python:\n\
+             \x20 - 3.10  # [unix]\n\
+             \n\
+             # New style (recommended):\n\
+             python:\n\
+             \x20 - if: unix\n\
+             \x20   then: \"3.10\"",
+            path.display()
+        );
+    }
+}
+
 /// Parse a variant configuration file using marked_yaml
 pub fn parse_variant_file(path: &Path) -> Result<Stage0VariantConfig, VariantConfigError> {
     let content = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
+
+    // Check for legacy selector syntax and warn
+    warn_about_legacy_selectors(&content, path);
 
     let mut config = parse_variant_str(&content, Some(path.to_path_buf()))?;
     config.path = Some(path.to_path_buf());

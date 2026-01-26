@@ -98,21 +98,79 @@ pub enum PackagingError {
 /// This function copies the license files to the info/licenses folder.
 /// License files are selected from the recipe directory and the source (work) folder.
 /// If the same file is found in both locations, the file from the recipe directory is used.
+/// Absolute paths are also supported when `allow_absolute_license_paths` is true.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
+    allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
-    if output.recipe.about().license_file.is_empty() {
-        Ok(None)
-    } else {
-        let licenses_folder = tmp_dir_path.join("info/licenses/");
-        fs::create_dir_all(&licenses_folder)?;
+    let Some(license_file) = output.recipe.about().license_file.as_ref() else {
+        return Ok(None);
+    };
+
+    if license_file.is_empty() {
+        return Ok(None);
+    }
+
+    let licenses_folder = tmp_dir_path.join("info/licenses/");
+    fs::create_dir_all(&licenses_folder)?;
+
+    // Separate absolute paths from relative glob patterns
+    let (absolute_paths, relative_globs): (Vec<_>, Vec<_>) = license_file
+        .include_globs()
+        .iter()
+        .partition(|glob| Path::new(glob.source()).is_absolute());
+
+    let mut copied_files = HashSet::new();
+    let mut missing_globs = Vec::new();
+
+    // Handle absolute paths directly
+    for glob_with_source in &absolute_paths {
+        let abs_path = Path::new(glob_with_source.source());
+
+        // Check if absolute paths are allowed
+        if !allow_absolute_license_paths {
+            return Err(PackagingError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Absolute paths in license_file are not allowed. \
+                        Use --allow-absolute-license-paths to enable. Path: {}",
+                    abs_path.display()
+                ),
+            )));
+        }
+
+        if abs_path.exists() {
+            // Get the file name to use as destination
+            let file_name = abs_path.file_name().ok_or_else(|| {
+                PackagingError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!(
+                        "Invalid absolute path for license file: {}",
+                        abs_path.display()
+                    ),
+                ))
+            })?;
+
+            let dest_path = licenses_folder.join(file_name);
+            fs::copy(abs_path, &dest_path)?;
+            copied_files.insert(dest_path);
+        } else {
+            missing_globs.push(glob_with_source.source().to_string());
+        }
+    }
+
+    // Only process relative globs if there are any
+    if !relative_globs.is_empty() {
+        // Create a new GlobVec with only relative patterns
+        let relative_globvec =
+            GlobVec::from_vec(relative_globs.iter().map(|g| g.source()).collect(), None);
 
         let copy_dir_work = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
-        .with_globvec(&output.recipe.about().license_file)
+        .with_globvec(&relative_globvec)
         .use_gitignore(false)
         .run()?;
 
@@ -121,7 +179,7 @@ fn copy_license_files(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
-        .with_globvec(&output.recipe.about().license_file)
+        .with_globvec(&relative_globvec)
         .use_gitignore(false)
         .overwrite(true)
         .run()?;
@@ -141,16 +199,15 @@ fn copy_license_files(
             }
         }
 
-        let copied_files = copied_files_recipe_dir
-            .iter()
-            .chain(copied_files_work_dir)
-            .map(PathBuf::from)
-            .collect::<HashSet<PathBuf>>();
+        // Merge copied files from work and recipe dirs
+        copied_files.extend(
+            copied_files_recipe_dir
+                .iter()
+                .chain(copied_files_work_dir)
+                .map(PathBuf::from),
+        );
 
         // Check which globs didn't match any files
-        let mut missing_globs = Vec::new();
-
-        // Check globs from both work and recipe dir results
         for (glob_str, match_obj) in copy_dir_work.include_globs() {
             if !match_obj.get_matched() {
                 // Check if it matched in the recipe dir
@@ -163,21 +220,21 @@ fn copy_license_files(
                 }
             }
         }
+    }
 
-        if !missing_globs.is_empty() {
-            let error_str = format!(
-                "The following license files were not found: {}",
-                missing_globs.join(", ")
-            );
-            tracing::error!(error_str);
-            return Err(PackagingError::LicensesNotFound);
-        }
+    if !missing_globs.is_empty() {
+        let error_str = format!(
+            "The following license files were not found: {}",
+            missing_globs.join(", ")
+        );
+        tracing::error!(error_str);
+        return Err(PackagingError::LicensesNotFound);
+    }
 
-        if copied_files.is_empty() {
-            Err(PackagingError::LicensesNotFound)
-        } else {
-            Ok(Some(copied_files))
-        }
+    if copied_files.is_empty() {
+        Err(PackagingError::LicensesNotFound)
+    } else {
+        Ok(Some(copied_files))
     }
 }
 
@@ -656,7 +713,11 @@ pub fn package_conda(
 
     // TODO move things below also to metadata.rs
     tracing::info!("Copying license files");
-    if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
+    if let Some(license_files) = copy_license_files(
+        output,
+        tmp.temp_dir.path(),
+        tool_configuration.allow_absolute_license_paths,
+    )? {
         tmp.add_files(license_files);
     }
 

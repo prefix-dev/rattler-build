@@ -6,7 +6,7 @@ package:
   name: ${{ name | lower }}
   version: ${{ version }}
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

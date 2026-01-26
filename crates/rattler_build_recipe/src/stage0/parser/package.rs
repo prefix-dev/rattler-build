@@ -2,7 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
-use rattler_build_yaml_parser::ParseMapping;
+use rattler_build_yaml_parser::{ParseMapping, helpers::contains_jinja_template};
 
 use std::str::FromStr;
 
@@ -44,7 +44,7 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
     let name_span = *name_scalar.span();
 
     // Parse the name - check if it's a template or concrete value
-    let name = if name_str.contains("${{") && name_str.contains("}}") {
+    let name = if contains_jinja_template(name_str) {
         // Template
         let template = JinjaTemplate::new(name_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, name_span))?;
@@ -73,7 +73,7 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
     let version_span = *version_scalar.span();
 
     // Parse the version - check if it's a template or concrete value
-    let version = if version_str.contains("${{") && version_str.contains("}}") {
+    let version = if contains_jinja_template(version_str) {
         // Template
         let template = JinjaTemplate::new(version_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, version_span))?;

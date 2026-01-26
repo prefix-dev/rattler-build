@@ -72,7 +72,8 @@ The following variables are available during rendering of the recipe:
 | `win`                | "true" if `target_platform` is Windows                                 |
 | `unix`               | "true" if `target_platform` is a Unix (macOS or Linux)                 |
 | `x86`, `x86_64`      | x86 32/64-bit Architecture                                             |
-| `aarch64`, `arm64`   | 64-bit Arm (these are the same but are both supported for legacy)      |
+| `aarch64`            | 64-bit Arm (if `target_platform` is `linux-aarch64`)                   |
+| `arm64`              | 64-bit Arm (if `target_platform` is `osx-arm64` or `win-arm64`)        |
 | `armV6l`, `armV7l`   | 32-bit Arm                                                             |
 | `ppc64`, `s390x`,    | Big endian                                                             |
 | `ppc64le`            | Little endian                                                          |

@@ -120,6 +120,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
+/// Returns a map of environment variables for all supported languages (Python, R).
 pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
@@ -269,7 +270,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(
         vars,
         "PKG_BUILDNUM",
-        output.recipe.build().number.to_string()
+        output.recipe.build().number.unwrap_or(0).to_string()
     );
 
     let hash = output.build_configuration.hash.clone();

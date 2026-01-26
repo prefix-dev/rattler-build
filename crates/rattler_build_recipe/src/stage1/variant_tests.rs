@@ -49,7 +49,7 @@ mod tests {
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Strict,
         };
 
-        let context = EvaluationContext::with_variables_and_config(variant, jinja_config);
+        let context = EvaluationContext::with_variables_and_config(variant.clone(), jinja_config);
 
         let mut recipe = single.as_ref().evaluate(&context).unwrap();
 
@@ -57,11 +57,28 @@ mod tests {
         let noarch = recipe.build.noarch.unwrap_or(NoArchType::none());
         let hash_info = HashInfo::from_variant(&recipe.used_variant, &noarch);
 
+        // Build a context for build string resolution that includes both:
+        // 1. Variant variables (base values)
+        // 2. Recipe context variables (which may transform/override variant values)
+        // Context takes precedence - this mirrors finalize_build_string_single in variant_render.rs
+        let mut resolve_vars = IndexMap::new();
+        for (k, v) in &recipe.used_variant {
+            resolve_vars.insert(k.normalize(), v.clone());
+        }
+        for (k, v) in &recipe.context {
+            resolve_vars.insert(k.clone(), v.clone());
+        }
+        let resolve_context = EvaluationContext::from_variables(resolve_vars);
+
         // Resolve the build string with the computed hash info
         recipe
             .build
             .string
-            .resolve(&hash_info, recipe.build.number, &context)
+            .resolve(
+                &hash_info,
+                recipe.build.number.unwrap_or(0),
+                &resolve_context,
+            )
             .unwrap();
 
         // Extract used variant from recipe
@@ -792,5 +809,364 @@ build:
         let build_str = recipe.build.string.as_resolved().unwrap();
         // Build string should be in format "py{python_version}_h{hash}"
         assert!(build_str.contains("py3") && build_str.contains("_h"));
+    }
+
+    #[test]
+    fn test_context_variable_shadowing_variant_variable() {
+        // Test case: when context defines a variable that references a variant variable
+        // with the same name, the variant variable should still be tracked as used.
+        //
+        // Example:
+        //   context:
+        //     foobar: ${{ foobar }}
+        //   package:
+        //     name: foobar-${{ foobar }}
+        //
+        // Here, `foobar` in context references the variant `foobar`, and even though
+        // the context variable shadows it, we should track `foobar` as a used variant.
+        let yaml = r#"
+context:
+  foobar: ${{ foobar }}
+
+package:
+  name: foobar-${{ foobar }}
+  version: "1.0.0"
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("foobar".to_string(), Variable::from("baz"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // The foobar variant should be tracked even though it's shadowed by context
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("foobar")),
+            "foobar should be in used_variant because it was accessed from the variant \
+             before being shadowed by the context variable. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // Verify the recipe was evaluated correctly
+        assert_eq!(recipe.package().name().as_source(), "foobar-baz");
+    }
+
+    #[test]
+    fn test_context_variable_not_from_variant() {
+        // Test case: when context defines a variable with a literal value,
+        // it should NOT be tracked as a used variant (since it's not from the variant).
+        let yaml = r#"
+context:
+  myvar: "literal_value"
+
+package:
+  name: test-${{ myvar }}
+  version: "1.0.0"
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("myvar".to_string(), Variable::from("variant_value"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // myvar should NOT be in used_variant because the context defined it as a literal,
+        // not as a reference to the variant
+        assert!(
+            !used_variant.contains_key(&NormalizedKey::from("myvar")),
+            "myvar should NOT be in used_variant because context defines it as a literal"
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // Verify the context value (literal) was used, not the variant value
+        assert_eq!(recipe.package().name().as_source(), "test-literal_value");
+    }
+
+    #[test]
+    fn test_context_variable_concatenation_with_variant() {
+        // Test case: when context defines variables using concatenation with a variant variable,
+        // the variant variable should be tracked as used.
+        //
+        // This tests the full scenario from examples/contextused/recipe.yaml:
+        //   context:
+        //     mpi: ${{ mpi ~ "foobar" }}
+        //     extra_mpi: ${{ "extra" ~ mpi }}  # Uses the already-transformed mpi from context
+        //   build:
+        //     string: ${{ mpi ~ extra_mpi }}
+        //
+        // Key behaviors:
+        // 1. `mpi` in context uses the variant `mpi` via concatenation
+        // 2. `extra_mpi` uses the already-transformed context `mpi` (sequential evaluation)
+        // 3. The variant should track the ORIGINAL `mpi` value ("bla"), not transformed
+        // 4. The build string should use the context-transformed values
+        let yaml = r#"
+context:
+  mpi: ${{ mpi ~ "foobar" }}
+  extra_mpi: ${{ "extra" ~ mpi }}
+
+package:
+  name: contextused
+  version: "1.0.0"
+
+build:
+  string: ${{ mpi ~ extra_mpi }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("mpi".to_string(), Variable::from("bla"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // The mpi variant should be tracked even though it's shadowed by context
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("mpi")),
+            "mpi should be in used_variant because it was accessed from the variant \
+             via concatenation before being shadowed by the context variable. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("target_platform")));
+
+        // The variant should contain the ORIGINAL value from the variant config, not the
+        // context-transformed value. This is important for variant tracking and hash computation.
+        assert_eq!(
+            used_variant
+                .get(&NormalizedKey::from("mpi"))
+                .unwrap()
+                .to_string(),
+            "bla",
+            "Variant should contain the original value 'bla', not the context-transformed 'blafoobar'"
+        );
+
+        // Verify the context variables were evaluated correctly:
+        // - mpi = "bla" ~ "foobar" = "blafoobar"
+        // - extra_mpi = "extra" ~ "blafoobar" = "extrablafoobar" (uses already-transformed mpi)
+        assert_eq!(
+            recipe.context.get("mpi").unwrap().to_string(),
+            "blafoobar",
+            "Context mpi should be 'blafoobar'"
+        );
+        assert_eq!(
+            recipe.context.get("extra_mpi").unwrap().to_string(),
+            "extrablafoobar",
+            "Context extra_mpi should use the transformed mpi value"
+        );
+
+        // Build string uses the context values: mpi ~ extra_mpi = "blafoobar" ~ "extrablafoobar"
+        assert_eq!(
+            recipe.build.string.as_resolved().unwrap(),
+            "blafoobarextrablafoobar",
+            "Build string should use the concatenated context values"
+        );
+    }
+
+    #[test]
+    fn test_cdt_function_tracks_cdt_name_from_variant() {
+        // This test verifies that when the cdt() function is used in a recipe,
+        // and cdt_name is provided in the variant, it gets tracked in used_variant.
+        // This is important for hash computation - different cdt_name values should
+        // produce different hashes.
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert(
+            "target_platform".to_string(),
+            Variable::from("linux-aarch64"),
+        );
+        variant.insert("cdt_name".to_string(), Variable::from("conda"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_name is in used_variant because cdt() function accessed it
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("cdt_name")),
+            "cdt_name should be in used_variant when cdt() function uses it from the variant. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the custom cdt_name
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names.iter().any(|n| n == "mesa-libgbm-conda-aarch64"),
+            "Expected mesa-libgbm-conda-aarch64 in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn test_cdt_function_with_default_cdt_name() {
+        // This test verifies that when the cdt() function is used but cdt_name
+        // is NOT provided in the variant, it uses the default and does NOT track
+        // cdt_name (since it wasn't read from the variant).
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert(
+            "target_platform".to_string(),
+            Variable::from("linux-aarch64"),
+        );
+        // Note: NOT providing cdt_name - should use default "cos7" for aarch64
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_name is NOT in used_variant because it used the default
+        assert!(
+            !used_variant.contains_key(&NormalizedKey::from("cdt_name")),
+            "cdt_name should NOT be in used_variant when using default value. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the default cdt_name
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names.iter().any(|n| n == "mesa-libgbm-cos7-aarch64"),
+            "Expected mesa-libgbm-cos7-aarch64 (default for aarch64) in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn test_cdt_function_tracks_cdt_arch_from_variant() {
+        // This test verifies that when cdt_arch is provided in the variant,
+        // it gets tracked in used_variant.
+        let yaml = r#"
+package:
+  name: test-cdt
+  version: "1.0.0"
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - ${{ cdt("mesa-libgbm") }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("cdt_arch".to_string(), Variable::from("custom_arch"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify cdt_arch is in used_variant
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("cdt_arch")),
+            "cdt_arch should be in used_variant when cdt() function uses it from the variant. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the requirement was rendered correctly with the custom cdt_arch
+        let host_deps = recipe.requirements.host;
+        let dep_names: Vec<String> = host_deps
+            .iter()
+            .filter_map(|d| d.name().map(|n| n.as_source().to_string()))
+            .collect();
+        assert!(
+            dep_names
+                .iter()
+                .any(|n| n == "mesa-libgbm-cos6-custom_arch"),
+            "Expected mesa-libgbm-cos6-custom_arch in host dependencies. Got: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn test_variant_variable_used_in_context_without_shadowing() {
+        // Test case: when a variant variable is used in context expressions but the
+        // context variable has a DIFFERENT name (not shadowing), the variant variable
+        // should still be tracked as used.
+        //
+        // This tests the pattern from the is_abi3 use case:
+        //   context:
+        //     use_abi3: ${{ is_abi3 }}
+        //     build_abi3: ${{ is_abi3 and match(python, "3.10.*") }}
+        //
+        // Here, `is_abi3` is a variant variable used to compute context variables
+        // `use_abi3` and `build_abi3`. Even though `is_abi3` is NOT shadowed by a
+        // context variable with the same name, it should still be tracked in used_variant.
+        let yaml = r#"
+context:
+  use_abi3: ${{ is_abi3 }}
+  build_abi3: ${{ is_abi3 and match(python, "3.10.*") }}
+
+package:
+  name: test-abi3
+  version: "1.0.0"
+
+build:
+  number: 0
+  python:
+    version_independent: ${{ build_abi3 }}
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("is_abi3".to_string(), Variable::from(true));
+        variant.insert("python".to_string(), Variable::from("3.10.* *_cpython"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Verify is_abi3 is in used_variant because it was accessed during context evaluation
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("is_abi3")),
+            "is_abi3 should be in used_variant when used in context expressions (even without shadowing). \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Verify the context variables were evaluated correctly
+        assert_eq!(
+            recipe.context.get("use_abi3").unwrap().to_string(),
+            "true",
+            "Context use_abi3 should be 'true'"
+        );
+        assert_eq!(
+            recipe.context.get("build_abi3").unwrap().to_string(),
+            "true",
+            "Context build_abi3 should be 'true' (is_abi3=true, python matches 3.10.*)"
+        );
+
+        // Verify the variant contains the original value from the variant config
+        assert_eq!(
+            used_variant
+                .get(&NormalizedKey::from("is_abi3"))
+                .unwrap()
+                .to_string(),
+            "true",
+            "Variant should contain the original 'true' value for is_abi3"
+        );
     }
 }

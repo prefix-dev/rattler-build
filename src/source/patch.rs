@@ -957,7 +957,7 @@ mod tests {
         #[exclude("mumps")]
         // Failed to download source
         #[exclude("petsc")]
-        // GNU patch fails and diffy succeeds, seemingly correctly from the diff output.
+        // GNU patch fails and flickzeug succeeds, seemingly correctly from the diff output.
         #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)")]
         // Parse fails, since createrepo-c/438.patch contains two mail
         // messages in one file. Fix postponed until parser
@@ -1053,7 +1053,7 @@ mod tests {
             match (custom_res, gnu_patch_res) {
                 (Ok(_), Ok(_)) => (),
                 (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
-                (Err(err), Ok(_)) => panic!("Diffy patch failed:\n{}", err),
+                (Err(err), Ok(_)) => panic!("flickzeug patch failed:\n{}", err),
                 (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
             }
 

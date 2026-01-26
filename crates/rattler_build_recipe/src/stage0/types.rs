@@ -85,6 +85,12 @@ pub struct Script {
     /// Working directory for the script
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<Value<String>>,
+
+    /// Whether content was explicitly specified via `content:` field
+    /// When true, serialization should preserve `{content: ...}` structure
+    /// When false, can serialize as plain string if no other options
+    #[serde(default, skip)]
+    pub content_explicit: bool,
 }
 
 impl Default for Script {
@@ -96,6 +102,7 @@ impl Default for Script {
             content: None,
             file: None,
             cwd: None,
+            content_explicit: false,
         }
     }
 }
@@ -132,6 +139,7 @@ impl Script {
             content,
             file,
             cwd,
+            content_explicit: _,
         } = self;
 
         let mut vars = Vec::new();

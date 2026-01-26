@@ -10,6 +10,7 @@ fn test_script_serialization_simple_command() {
         secrets: Vec::new(),
         content: ScriptContent::Command("echo 'Hello World'".to_string()),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"content: "echo 'Hello World'""###);
@@ -27,6 +28,7 @@ fn test_script_serialization_commands() {
             "echo 'Step 3'".to_string(),
         ]),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -44,6 +46,7 @@ fn test_script_serialization_with_interpreter() {
         secrets: Vec::new(),
         content: ScriptContent::Command("print('Hello from Python')".to_string()),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -64,6 +67,7 @@ fn test_script_serialization_with_env() {
         secrets: Vec::new(),
         content: ScriptContent::Commands(vec!["echo $MY_VAR".to_string()]),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -83,6 +87,7 @@ fn test_script_serialization_with_secrets() {
         secrets: vec!["SECRET_TOKEN".to_string(), "API_KEY".to_string()],
         content: ScriptContent::Command("deploy.sh".to_string()),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -101,6 +106,7 @@ fn test_script_serialization_with_path() {
         secrets: Vec::new(),
         content: ScriptContent::Path(PathBuf::from("build.sh")),
         cwd: None,
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -117,6 +123,7 @@ fn test_script_serialization_with_cwd() {
         secrets: Vec::new(),
         content: ScriptContent::Command("make install".to_string()),
         cwd: Some(PathBuf::from("src/subdir")),
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -141,6 +148,7 @@ fn test_script_serialization_full() {
             "make -j$(nproc)".to_string(),
         ]),
         cwd: Some(PathBuf::from("project")),
+        content_explicit: false,
     };
 
     insta::assert_yaml_snapshot!(script, @r###"
@@ -210,6 +218,7 @@ fn test_script_roundtrip() {
         secrets: vec!["SECRET".to_string()],
         content: ScriptContent::Commands(vec!["cmd1".to_string(), "cmd2".to_string()]),
         cwd: Some(PathBuf::from("dir")),
+        content_explicit: false,
     };
 
     let serialized = serde_yaml::to_string(&original).unwrap();

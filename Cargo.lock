@@ -2666,8 +2666,7 @@ dependencies = [
 [[package]]
 name = "http-range-client"
 version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d5f72a73344fc9576e74e42a0f1d7a05d7c6c50950a15f44faea133a91f622b"
+source = "git+https://github.com/pka/http-range-client.git#fccfa852dbe7e875a50802c55ee6c5f69c634827"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -4488,7 +4487,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.55.0"
+version = "0.56.0"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -4827,6 +4826,7 @@ dependencies = [
  "rattler_build_types",
  "rattler_build_yaml_parser",
  "rattler_conda_types",
+ "regex",
  "rstest",
  "serde",
  "serde_yaml",

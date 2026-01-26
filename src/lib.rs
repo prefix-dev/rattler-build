@@ -27,7 +27,7 @@ pub mod types;
 pub mod utils;
 
 mod consts;
-mod env_vars;
+pub mod env_vars;
 mod linux;
 mod macos;
 mod package_info;
@@ -40,7 +40,7 @@ mod windows;
 mod package_cache_reporter;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -56,10 +56,9 @@ use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
-use petgraph::{algo::toposort, graph::DiGraph, graph::NodeIndex, visit::DfsPostOrder};
 use rattler_build_recipe::{
     stage0,
-    stage1::{Dependency, Recipe, TestType},
+    stage1::{Recipe, TestType},
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
 use rattler_build_variant_config::VariantConfig;
@@ -502,6 +501,7 @@ pub fn get_tool_config(
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
         .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_allow_absolute_license_paths(build_data.allow_absolute_license_paths)
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
         .with_sharded_repodata_enabled(build_data.common.use_sharded)
@@ -579,23 +579,28 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config = VariantConfig::from_files(&variant_configs).map_err(|e| {
-        // Check if this is a ParseError with a file path
-        if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } = &e {
-            // Read the file to provide source code context
-            if let Ok(content) = fs_err::read_to_string(path) {
-                let source_code = rattler_build_recipe::source_code::Source::from_string(
-                    path.display().to_string(),
-                    content,
-                );
-                let error_with_source =
-                    rattler_build_recipe::ParseErrorWithSource::new(source_code, source.clone());
-                return miette::Report::new(error_with_source);
+    let mut variant_config =
+        VariantConfig::from_files(&variant_configs, build_data.target_platform).map_err(|e| {
+            // Check if this is a ParseError with a file path
+            if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } =
+                &e
+            {
+                // Read the file to provide source code context
+                if let Ok(content) = fs_err::read_to_string(path) {
+                    let source_code = rattler_build_recipe::source_code::Source::from_string(
+                        path.display().to_string(),
+                        content,
+                    );
+                    let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(
+                        source_code,
+                        source.clone(),
+                    );
+                    return miette::Report::new(error_with_source);
+                }
             }
-        }
-        // Fallback to original error if we can't provide source context
-        miette::Report::new(e)
-    })?;
+            // Fallback to original error if we can't provide source context
+            miette::Report::new(e)
+        })?;
 
     // Always insert target_platform and build_platform
     variant_config.variants.insert(
@@ -680,9 +685,14 @@ pub async fn get_build_output(
             },
         );
 
-        // Use the global build name for all outputs in a multi-output recipe
+        // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
-        let build_name = global_build_name.clone();
+        // Otherwise, use the output's own name for the build directory
+        let build_name = if recipe.inherits_from.is_some() {
+            global_build_name.clone()
+        } else {
+            recipe.package().name().as_normalized().to_string()
+        };
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -794,7 +804,7 @@ pub async fn get_build_output(
         );
         for output in &mut outputs {
             // Update the build number
-            output.recipe.build.number = build_num_override;
+            output.recipe.build.number = Some(build_num_override);
 
             // Extract the hash from the current build string and recompute with new build number
             // Build string format is: {hash}_{build_number}
@@ -1413,106 +1423,106 @@ pub async fn rebuild(
     Ok(())
 }
 
-/// Sort the build outputs (recipes) topologically based on their dependencies.
-pub fn sort_build_outputs_topologically(
-    outputs: &mut Vec<Output>,
-    up_to: Option<&str>,
-) -> miette::Result<()> {
-    let mut graph = DiGraph::<usize, ()>::new();
-    // Store all node indices for each package name (multiple variants produce same name)
-    let mut name_to_indices: HashMap<PackageName, Vec<NodeIndex>> = HashMap::new();
-    // Also store direct mapping from output index to node index
-    let mut output_to_node: Vec<NodeIndex> = Vec::with_capacity(outputs.len());
+// /// Sort the build outputs (recipes) topologically based on their dependencies.
+// pub fn sort_build_outputs_topologically(
+//     outputs: &mut Vec<Output>,
+//     up_to: Option<&str>,
+// ) -> miette::Result<()> {
+//     let mut graph = DiGraph::<usize, ()>::new();
+//     // Store all node indices for each package name (multiple variants produce same name)
+//     let mut name_to_indices: HashMap<PackageName, Vec<NodeIndex>> = HashMap::new();
+//     // Also store direct mapping from output index to node index
+//     let mut output_to_node: Vec<NodeIndex> = Vec::with_capacity(outputs.len());
 
-    // Index outputs by their produced names for quick lookup
-    for (idx, output) in outputs.iter().enumerate() {
-        let node_idx = graph.add_node(idx);
-        output_to_node.push(node_idx);
-        name_to_indices
-            .entry(output.name().clone())
-            .or_default()
-            .push(node_idx);
-    }
+//     // Index outputs by their produced names for quick lookup
+//     for (idx, output) in outputs.iter().enumerate() {
+//         let node_idx = graph.add_node(idx);
+//         output_to_node.push(node_idx);
+//         name_to_indices
+//             .entry(output.name().clone())
+//             .or_default()
+//             .push(node_idx);
+//     }
 
-    // Add edges based on dependencies
-    for (output_idx, output) in outputs.iter().enumerate() {
-        let output_node = output_to_node[output_idx];
-        for dep in output.recipe.requirements().run_build_host() {
-            let dep_name: Option<PackageName> = match dep {
-                Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| {
-                    use rattler_conda_types::PackageNameMatcher;
-                    match matcher {
-                        PackageNameMatcher::Exact(name) => Some(name),
-                        _ => None,
-                    }
-                }),
-                Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
-                Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
-            };
+//     // Add edges based on dependencies
+//     for (output_idx, output) in outputs.iter().enumerate() {
+//         let output_node = output_to_node[output_idx];
+//         for dep in output.recipe.requirements().build_host() {
+//             let dep_name: Option<PackageName> = match dep {
+//                 Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| {
+//                     use rattler_conda_types::PackageNameMatcher;
+//                     match matcher {
+//                         PackageNameMatcher::Exact(name) => Some(name),
+//                         _ => None,
+//                     }
+//                 }),
+//                 Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
+//                 Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
+//             };
 
-            if let Some(dep_name) = dep_name
-                && let Some(dep_nodes) = name_to_indices.get(&dep_name)
-            {
-                // Add edge to ALL variants of the dependency package
-                for &dep_node in dep_nodes {
-                    // do not point to self (circular dependency) - this can happen with
-                    // pin_subpackage in run_exports, for example.
-                    if output_node == dep_node {
-                        continue;
-                    }
-                    graph.add_edge(output_node, dep_node, ());
-                }
-            }
-        }
-    }
+//             if let Some(dep_name) = dep_name
+//                 && let Some(dep_nodes) = name_to_indices.get(&dep_name)
+//             {
+//                 // Add edge to ALL variants of the dependency package
+//                 for &dep_node in dep_nodes {
+//                     // do not point to self (circular dependency) - this can happen with
+//                     // pin_subpackage in run_exports, for example.
+//                     if output_node == dep_node {
+//                         continue;
+//                     }
+//                     graph.add_edge(output_node, dep_node, ());
+//                 }
+//             }
+//         }
+//     }
 
-    let sorted_indices = if let Some(up_to) = up_to {
-        // Find the node indices for the "up-to" package (may have multiple variants)
-        let up_to_name = PackageName::from_str(up_to)
-            .map_err(|_| miette::miette!("Invalid package name: '{}'", up_to))?;
-        let up_to_indices = name_to_indices.get(&up_to_name).ok_or_else(|| {
-            miette::miette!("The package '{}' was not found in the outputs", up_to)
-        })?;
+//     let sorted_indices = if let Some(up_to) = up_to {
+//         // Find the node indices for the "up-to" package (may have multiple variants)
+//         let up_to_name = PackageName::from_str(up_to)
+//             .map_err(|_| miette::miette!("Invalid package name: '{}'", up_to))?;
+//         let up_to_indices = name_to_indices.get(&up_to_name).ok_or_else(|| {
+//             miette::miette!("The package '{}' was not found in the outputs", up_to)
+//         })?;
 
-        // Perform DFS post-order traversal from ALL variants of the "up-to" package
-        let mut sorted_indices = Vec::new();
-        let mut visited = HashSet::new();
-        for &up_to_index in up_to_indices {
-            let mut dfs = DfsPostOrder::new(&graph, up_to_index);
-            while let Some(nx) = dfs.next(&graph) {
-                if visited.insert(nx) {
-                    sorted_indices.push(nx);
-                }
-            }
-        }
+//         // Perform DFS post-order traversal from ALL variants of the "up-to" package
+//         let mut sorted_indices = Vec::new();
+//         let mut visited = HashSet::new();
+//         for &up_to_index in up_to_indices {
+//             let mut dfs = DfsPostOrder::new(&graph, up_to_index);
+//             while let Some(nx) = dfs.next(&graph) {
+//                 if visited.insert(nx) {
+//                     sorted_indices.push(nx);
+//                 }
+//             }
+//         }
 
-        sorted_indices
-    } else {
-        // Perform topological sort
-        let mut sorted_indices = toposort(&graph, None).map_err(|cycle| {
-            let node = cycle.node_id();
-            let name = outputs[node.index()].name();
-            miette::miette!("Cycle detected in dependencies: {}", name.as_source())
-        })?;
-        sorted_indices.reverse();
-        sorted_indices
-    };
+//         sorted_indices
+//     } else {
+//         // Perform topological sort
+//         let mut sorted_indices = toposort(&graph, None).map_err(|cycle| {
+//             let node = cycle.node_id();
+//             let name = outputs[node.index()].name();
+//             miette::miette!("Cycle detected in dependencies: {}", name.as_source())
+//         })?;
+//         sorted_indices.reverse();
+//         sorted_indices
+//     };
 
-    sorted_indices
-        .iter()
-        .map(|idx| &outputs[idx.index()])
-        .for_each(|output| {
-            tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
-        });
+//     sorted_indices
+//         .iter()
+//         .map(|idx| &outputs[idx.index()])
+//         .for_each(|output| {
+//             tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
+//         });
 
-    // Reorder outputs based on the sorted indices
-    *outputs = sorted_indices
-        .iter()
-        .map(|node| outputs[node.index()].clone())
-        .collect();
+//     // Reorder outputs based on the sorted indices
+//     *outputs = sorted_indices
+//         .iter()
+//         .map(|node| outputs[node.index()].clone())
+//         .collect();
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 /// Get the version of rattler-build.
 pub fn get_rattler_build_version() -> &'static str {
@@ -1538,7 +1548,8 @@ pub async fn build_recipes(
 
     if build_data.render_only {
         // Sort outputs topologically even in render-only mode to show expected build order
-        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+        // TODO(refactor): figure out if this is still needed
+        // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
 
         let outputs = if build_data.with_solve {
             let mut updated_outputs = Vec::new();
@@ -1565,7 +1576,7 @@ pub async fn build_recipes(
     // Skip noarch builds before the topological sort
     outputs = skip_noarch(outputs, &tool_config).await?;
 
-    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
     run_build_from_args(outputs, tool_config).await?;
 
     Ok(())
@@ -1781,7 +1792,7 @@ pub async fn publish_packages(
         // Skip noarch builds before the topological sort
         outputs = skip_noarch(outputs, &tool_config).await?;
 
-        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+        // sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
 
         // Build all packages and collect the paths
         let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
@@ -1844,6 +1855,7 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
     };

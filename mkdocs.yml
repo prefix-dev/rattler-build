@@ -137,6 +137,7 @@ nav:
   - Publishing packages:
       - Authentication & upload: authentication_and_upload.md
       - Publishing packages: publish.md
+      - Sigstore attestations: sigstore.md
       - Publishing to conda-forge: conda_forge.md
       - Automatic recipe linting: automatic_linting.md
 

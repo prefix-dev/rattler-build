@@ -102,7 +102,7 @@ outputs:
     run:
     - zlib
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null
@@ -155,7 +155,7 @@ outputs:
     - python
     - libcomplex ${{ version }}.*
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null
@@ -210,7 +210,7 @@ outputs:
     run:
     - libcomplex ${{ version }}.*
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null

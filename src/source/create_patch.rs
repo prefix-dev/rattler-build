@@ -1,4 +1,4 @@
-//! Functions to create a new patch for a given directory using `diffy`.
+//! Functions to create a new patch for a given directory using `flickzeug`.
 //! We take all files found in this directory and compare them to the original files
 //! from the source cache. Any differences will be written to a patch file.
 

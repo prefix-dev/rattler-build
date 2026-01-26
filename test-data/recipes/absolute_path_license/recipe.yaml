@@ -1,0 +1,27 @@
+package:
+  name: absolute-path-license
+  version: "0.1.0"
+
+build:
+  script:
+    # Create license file in work directory (relative path)
+    - echo "test content" > LICENSE
+    # Create license file outside work directory (absolute path)
+    # Use a cross-platform approach with build-time environment variable
+    - if: unix
+      then:
+        - mkdir -p /tmp/rattler_test_licenses
+        - echo "absolute path test" > /tmp/rattler_test_licenses/external_license.txt
+    - if: win
+      then:
+        - if not exist "%TEMP%\rattler_test_licenses" mkdir "%TEMP%\rattler_test_licenses"
+        - echo "absolute path test" > %TEMP%\rattler_test_licenses\external_license.txt
+
+about:
+  license_file:
+    - LICENSE
+    # Use conditional to specify the absolute path per platform
+    - if: unix
+      then: /tmp/rattler_test_licenses/external_license.txt
+    - if: win
+      then: ${{ env.get("TEMP") }}\rattler_test_licenses\external_license.txt

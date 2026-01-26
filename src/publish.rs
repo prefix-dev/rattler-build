@@ -190,7 +190,7 @@ pub(crate) fn apply_build_number_override(
         };
 
         // Update the build number
-        output.recipe.build.number = new_build_number;
+        output.recipe.build.number = Some(new_build_number);
 
         // Extract the hash from the current build string and recompute with new build number
         let current_build_string = output

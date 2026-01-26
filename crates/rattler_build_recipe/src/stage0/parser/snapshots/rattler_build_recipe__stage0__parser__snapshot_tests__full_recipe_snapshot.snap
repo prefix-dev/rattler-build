@@ -6,7 +6,7 @@ package:
   name: full-package
   version: 2.5.1
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

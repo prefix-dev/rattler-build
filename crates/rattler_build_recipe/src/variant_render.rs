@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_yaml_parser::ParseError;
+use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
 
 use rattler_build_jinja::{JinjaConfig, Variable};
@@ -21,7 +22,7 @@ use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::stage0::evaluate::ALWAYS_INCLUDED_VARS;
-use crate::stage1::HashInfo;
+use crate::stage1::{Dependency, HashInfo, build::BuildString};
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
@@ -131,7 +132,14 @@ impl RenderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderedVariant {
     /// The variant combination used (variable name -> value)
+    /// This is the "used" variant - only variables actually referenced by this output
     pub variant: BTreeMap<NormalizedKey, Variable>,
+    /// The full combination that was used to evaluate this output.
+    /// This includes ALL variant keys from the combination, not just the ones
+    /// this specific output references. This is needed for matching pin_subpackage
+    /// dependencies to their correct variants.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub full_combination: BTreeMap<NormalizedKey, Variable>,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
     /// Pin subpackage dependencies that need to be tracked for exact pinning
@@ -142,17 +150,21 @@ pub struct RenderedVariant {
     pub hash_info: Option<HashInfo>,
 }
 
-/// Helper function to extract pin_subpackage information from a recipe
+/// Helper function to extract pin_subpackage information from a recipe.
+/// Note: version and build_string are initially placeholders (from the current recipe).
+/// They will be updated by `add_pins_to_variant` with the actual pinned package's values.
 fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, PinSubpackageInfo> {
     recipe
         .requirements
         .exact_pin_subpackages()
         .map(|pin| {
             let key = NormalizedKey::from(pin.pin_subpackage.name.as_normalized());
+            // Note: version and build_string are placeholders here.
+            // The actual values from the pinned package will be set in add_pins_to_variant.
             let info = PinSubpackageInfo {
                 name: pin.pin_subpackage.name.clone(),
-                version: recipe.package.version.clone(),
-                build_string: recipe.build.string.as_resolved().map(|s| s.to_string()),
+                version: recipe.package.version.clone(), // Placeholder, will be updated
+                build_string: None, // Will be populated with pinned package's build string
                 exact: pin.pin_subpackage.args.exact,
             };
             (key, info)
@@ -166,31 +178,69 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
 /// so that the hash includes this information. This ensures that packages with
 /// different pinned dependencies get different hashes.
 ///
+/// When there are multiple variants of the pinned package, we match by finding the one
+/// whose `full_combination` matches the current variant's `full_combination`. This ensures
+/// that e.g. pillow-tests (python=3.11) pins to pillow (python=3.11), not pillow (python=3.10).
+///
+/// This function also updates `pin_subpackages` with the actual version and build_string
+/// from the matched pinned variant.
+///
 /// Returns an error if a pinned package cannot be found in the rendered outputs.
 fn add_pins_to_variant(
     self_name: &rattler_conda_types::PackageName,
     variant: &mut BTreeMap<NormalizedKey, Variable>,
-    pin_subpackages: &BTreeMap<NormalizedKey, PinSubpackageInfo>,
+    full_combination: &BTreeMap<NormalizedKey, Variable>,
+    pin_subpackages: &mut BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
 ) -> Result<(), String> {
-    for (pin_name, pin_info) in pin_subpackages {
+    for (pin_name, pin_info) in pin_subpackages.iter_mut() {
         // Ignore ourselves
         if self_name == &pin_info.name {
             continue;
         }
 
-        // Find the rendered variant for this pinned package
-        if let Some(pinned_variant) = all_rendered
+        // Find the rendered variant for this pinned package.
+        // When there are multiple variants (e.g., pillow for python 3.10, 3.11, 3.12),
+        // we need to find the one whose full_combination matches ours.
+        let matching_variants: Vec<_> = all_rendered
             .iter()
-            .find(|v| v.recipe.package.name == pin_info.name)
-        {
+            .filter(|v| v.recipe.package.name == pin_info.name)
+            .collect();
+
+        let pinned_variant = if matching_variants.len() <= 1 {
+            // Only one variant (or none), use it directly
+            matching_variants.first().copied()
+        } else {
+            // Multiple variants - find the one whose full_combination matches ours
+            // We look for the variant with the most matching keys from our combination
+            matching_variants
+                .iter()
+                .max_by_key(|v| {
+                    // Count how many keys match between our combination and this variant's combination
+                    full_combination
+                        .iter()
+                        .filter(|(key, value)| v.full_combination.get(*key) == Some(*value))
+                        .count()
+                })
+                .copied()
+        };
+
+        if let Some(pinned_variant) = pinned_variant {
+            // Update pin_info with the actual version and build_string from the pinned package
+            pin_info.version = pinned_variant.recipe.package.version.clone();
+            pin_info.build_string = pinned_variant
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .map(|s| s.to_string());
+
             // Add the pinned package to the variant with format "version build_string"
-            let variant_value =
-                if let Some(build_string) = pinned_variant.recipe.build.string.as_resolved() {
-                    format!("{} {}", pinned_variant.recipe.package.version, build_string)
-                } else {
-                    unreachable!("Should not happen when topological ordering succeeded");
-                };
+            let variant_value = if let Some(build_string) = &pin_info.build_string {
+                format!("{} {}", pin_info.version, build_string)
+            } else {
+                unreachable!("Should not happen when topological ordering succeeded");
+            };
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
         } else {
@@ -271,7 +321,12 @@ fn build_dependency_graph(
     Ok((graph, idx_to_node))
 }
 
-/// Perform a stable topological sort that preserves original order when possible
+/// Perform a stable topological sort that preserves original order when possible.
+///
+/// This sort uses `full_combination` to match dependencies: when checking if a dependency
+/// is satisfied, we only require the variant with the **matching** combination to be added,
+/// not ALL variants of that dependency. This preserves the interleaved order:
+/// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11), ...`
 fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
     _graph: &DependencyGraph,
@@ -294,6 +349,7 @@ fn stable_topological_sort(
             // Check if all dependencies are already added
             let mut can_add = true;
             let current_name = &variants[idx].recipe.package.name;
+            let current_combination = &variants[idx].full_combination;
 
             // Check all dependencies in requirements
             for dep_name in extract_dependency_names(&variants[idx].recipe) {
@@ -303,14 +359,31 @@ fn stable_topological_sort(
                 }
 
                 if let Some(dep_indices) = name_to_indices.get(&dep_name) {
-                    for &dep_idx in dep_indices {
+                    // Find the matching dependency variant based on full_combination.
+                    // We only require the variant with the most matching keys to be added,
+                    // not ALL variants of this dependency.
+                    let matching_dep_idx = if dep_indices.len() <= 1 {
+                        dep_indices.first().copied()
+                    } else {
+                        dep_indices
+                            .iter()
+                            .max_by_key(|&&dep_idx| {
+                                // Count matching keys between current combination and dep's combination
+                                current_combination
+                                    .iter()
+                                    .filter(|(key, value)| {
+                                        variants[dep_idx].full_combination.get(*key) == Some(*value)
+                                    })
+                                    .count()
+                            })
+                            .copied()
+                    };
+
+                    if let Some(dep_idx) = matching_dep_idx {
                         if !added[dep_idx] {
                             can_add = false;
                             break;
                         }
-                    }
-                    if !can_add {
-                        break;
                     }
                 }
             }
@@ -379,11 +452,190 @@ fn collect_used_variables(
         .collect()
 }
 
+/// Evaluate requirements with a variant combination and extract free specs
+/// that are also variant keys (not yet in the combination)
+fn discover_new_variant_keys_from_evaluation(
+    stage0_recipe: &Stage0Recipe,
+    combination: &BTreeMap<NormalizedKey, Variable>,
+    variant_config: &VariantConfig,
+    config: &RenderConfig,
+) -> Result<HashSet<NormalizedKey>, ParseError> {
+    let context = build_evaluation_context(combination, config)?;
+
+    // Get requirements and evaluate them
+    // NOTE: We need to merge the recipe's context variables into the evaluation context
+    // before evaluating requirements, so that variables like `name` defined in the
+    // context section are available.
+    let free_specs: Vec<rattler_conda_types::PackageName> = match stage0_recipe {
+        Stage0Recipe::SingleOutput(recipe) => {
+            // Merge recipe context variables into evaluation context
+            let (context_with_vars, _) = if !recipe.context.is_empty() {
+                context.with_context(&recipe.context)?
+            } else {
+                (context.clone(), IndexMap::new())
+            };
+            let evaluated = recipe.requirements.evaluate(&context_with_vars)?;
+            evaluated.free_specs()
+        }
+        Stage0Recipe::MultiOutput(recipe) => {
+            // Merge recipe context variables into evaluation context
+            let (context_with_vars, _) = if !recipe.context.is_empty() {
+                context.with_context(&recipe.context)?
+            } else {
+                (context.clone(), IndexMap::new())
+            };
+            let mut all_free_specs = Vec::new();
+            for output in &recipe.outputs {
+                // For package outputs, check if the output should be skipped before
+                // evaluating requirements. This prevents errors from platform-specific
+                // functions like stdlib('c') when the output is skipped for that platform.
+                let (reqs, should_skip) = match output {
+                    stage0::Output::Staging(staging) => {
+                        // Staging outputs don't have skip conditions
+                        (&staging.requirements, false)
+                    }
+                    stage0::Output::Package(pkg) => {
+                        // Evaluate skip conditions to determine if output should be skipped
+                        let skip_conditions = crate::stage0::evaluate::evaluate_skip_list(
+                            &pkg.build.skip,
+                            &context_with_vars,
+                        )
+                        .unwrap_or_default();
+                        let is_skipped = crate::stage0::evaluate::is_skipped(
+                            &skip_conditions,
+                            &context_with_vars,
+                        );
+                        (&pkg.requirements, is_skipped)
+                    }
+                };
+
+                // Only evaluate requirements for non-skipped outputs
+                if !should_skip {
+                    if let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
+                        all_free_specs.extend(evaluated.free_specs());
+                    }
+                }
+            }
+            all_free_specs
+        }
+    };
+
+    // Find free specs that are variant keys but not in current combination
+    let mut new_keys = HashSet::new();
+    for spec in free_specs {
+        let key = NormalizedKey::from(spec.as_normalized());
+        if variant_config.get(&key).is_some() && !combination.contains_key(&key) {
+            new_keys.insert(key);
+        }
+    }
+
+    Ok(new_keys)
+}
+
+/// Expand a variant combination with new keys, creating all combinations
+fn expand_combination_with_keys(
+    base: &BTreeMap<NormalizedKey, Variable>,
+    new_keys: &HashSet<NormalizedKey>,
+    variant_config: &VariantConfig,
+) -> Vec<BTreeMap<NormalizedKey, Variable>> {
+    if new_keys.is_empty() {
+        return vec![base.clone()];
+    }
+
+    // Get values for each new key
+    let key_values: Vec<(NormalizedKey, Vec<Variable>)> = new_keys
+        .iter()
+        .filter_map(|key| {
+            variant_config
+                .get(key)
+                .map(|values| (key.clone(), values.clone()))
+        })
+        .collect();
+
+    if key_values.is_empty() {
+        return vec![base.clone()];
+    }
+
+    // Create cross-product of all new key values
+    let mut results = vec![base.clone()];
+    for (key, values) in key_values {
+        let mut new_results = Vec::new();
+        for combo in &results {
+            for value in &values {
+                let mut new_combo = combo.clone();
+                new_combo.insert(key.clone(), value.clone());
+                new_results.push(new_combo);
+            }
+        }
+        results = new_results;
+    }
+
+    results
+}
+
+/// Recursively expand variant combinations by discovering new variant keys from evaluation
+/// This implements a tree-based approach where each combination can spawn new combinations
+/// if its evaluated free specs reveal new variant keys
+fn expand_variants_tree(
+    stage0_recipe: &Stage0Recipe,
+    initial_combinations: Vec<BTreeMap<NormalizedKey, Variable>>,
+    variant_config: &VariantConfig,
+    config: &RenderConfig,
+) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, ParseError> {
+    let mut final_combinations = Vec::new();
+    let mut to_process = initial_combinations;
+
+    // Limit iterations to prevent infinite loops
+    const MAX_ITERATIONS: usize = 10;
+    let mut iteration = 0;
+
+    while !to_process.is_empty() && iteration < MAX_ITERATIONS {
+        iteration += 1;
+        let mut next_round = Vec::new();
+
+        for combination in to_process {
+            // Discover new variant keys from evaluation
+            let new_keys = discover_new_variant_keys_from_evaluation(
+                stage0_recipe,
+                &combination,
+                variant_config,
+                config,
+            )?;
+
+            if new_keys.is_empty() {
+                // No new keys - this combination is final
+                final_combinations.push(combination);
+            } else {
+                // Expand with new keys and process in next round
+                let expanded =
+                    expand_combination_with_keys(&combination, &new_keys, variant_config);
+                next_round.extend(expanded);
+            }
+        }
+
+        to_process = next_round;
+    }
+
+    // Add any remaining combinations (in case we hit iteration limit)
+    final_combinations.extend(to_process);
+
+    // Deduplicate combinations
+    let mut seen = HashSet::new();
+    final_combinations.retain(|combo| {
+        let key: Vec<_> = combo
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect();
+        seen.insert(key)
+    });
+
+    Ok(final_combinations)
+}
+
 /// Helper function to build an evaluation context from variant values and config
 fn build_evaluation_context(
     variant: &BTreeMap<NormalizedKey, Variable>,
     config: &RenderConfig,
-    stage0_recipe: &Stage0Recipe,
 ) -> Result<EvaluationContext, ParseError> {
     // Build context map from variant values and extra context
     // Merge variant into the variables map for template rendering
@@ -396,19 +648,14 @@ fn build_evaluation_context(
     let jinja_config = create_jinja_config(config, variant);
 
     // Create evaluation context with variables, config, and OS env var keys
-    let context = EvaluationContext::with_variables_config_and_os_env_keys(
+    // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
+    // Calling it here would cause double-evaluation of context templates, leading to bugs
+    // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
+    Ok(EvaluationContext::with_variables_config_and_os_env_keys(
         context_map,
         jinja_config,
         config.os_env_var_keys.clone(),
-    );
-
-    // Evaluate and merge recipe context variables
-    let (context, _evaluated_context) = match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
-        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
-    };
-
-    Ok(context)
+    ))
 }
 
 /// Helper function to evaluate a recipe (handles both single and multi-output)
@@ -428,16 +675,11 @@ fn render_with_empty_combinations(
     config: &RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
     // Create context with just extra_context (no variant for empty combinations)
+    // NOTE: Do NOT call with_context() here - Stage0Recipe::evaluate() handles context evaluation
     let empty_variant = BTreeMap::new();
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config);
-
-    // Evaluate and merge recipe context variables
-    let (context, _evaluated_context) = match stage0_recipe {
-        Stage0Recipe::SingleOutput(recipe) => context.with_context(&recipe.context)?,
-        Stage0Recipe::MultiOutput(recipe) => context.with_context(&recipe.context)?,
-    };
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -465,6 +707,7 @@ fn render_with_empty_combinations(
 
             RenderedVariant {
                 variant,
+                full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
                 recipe,
                 pin_subpackages: BTreeMap::new(),
                 hash_info: None,
@@ -479,13 +722,12 @@ fn render_with_empty_combinations(
     // Resolve build strings in topological order
     // For each variant, we:
     // 1. Extract its pin_subpackages (which may reference already-resolved variants)
-    // 2. Add those pins to its variant
+    // 2. Add those pins to its variant (and update pin_subpackages with actual version/build_string)
     // 3. Compute its hash and finalize its build string
     // This ensures that when variant B pins variant A, A's build string is already finalized
     for i in 0..results.len() {
         // Extract pin_subpackages for this variant
-        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
-        results[i].pin_subpackages = pin_subpackages.clone();
+        let mut pin_subpackages = extract_pin_subpackages(&results[i].recipe);
 
         // Add pin information to this variant's variant map
         if !pin_subpackages.is_empty() {
@@ -493,11 +735,15 @@ fn render_with_empty_combinations(
             add_pins_to_variant(
                 results_snapshot[i].recipe.package.name(),
                 &mut results[i].variant,
-                &pin_subpackages,
+                &results_snapshot[i].full_combination,
+                &mut pin_subpackages,
                 &results_snapshot,
             )
             .map_err(ParseError::from_message)?;
         }
+
+        // Store the updated pin_subpackages
+        results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
         finalize_build_string_single(&mut results[i])?;
@@ -511,9 +757,6 @@ fn render_with_empty_combinations(
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
 fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
-    use crate::stage1::{HashInfo, build::BuildString};
-    use rattler_conda_types::NoArchType;
-
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -527,49 +770,58 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Pars
         // Always resolve/re-resolve the build string with the current hash
         // This ensures we use the latest hash that includes all pin information
         // Create a temporary evaluation context for build string resolution
-        // Merge both recipe context variables and variant variables
+        // Merge both variant variables and recipe context variables
         let mut variables = IndexMap::new();
 
-        // First add recipe context variables (from context: section)
-        for (k, v) in &result.recipe.context {
-            variables.insert(k.clone(), v.clone());
-        }
-
-        // Then add variant variables (which may override context variables)
+        // First add variant variables (base values from variant config)
         for (k, v) in &result.variant {
             variables.insert(k.0.as_str().to_string(), v.clone());
+        }
+
+        // Then add recipe context variables (which may transform/override variant values)
+        // Context takes precedence because it's the user's way of transforming variant values
+        for (k, v) in &result.recipe.context {
+            variables.insert(k.clone(), v.clone());
         }
 
         let eval_ctx = EvaluationContext::from_variables(variables);
 
         // Resolve the build string template with the hash
-        result
-            .recipe
-            .build
-            .string
-            .resolve(&hash_info, result.recipe.build.number, &eval_ctx)?;
+        result.recipe.build.string.resolve(
+            &hash_info,
+            result.recipe.build.number.unwrap_or(0),
+            &eval_ctx,
+        )?;
         result.hash_info = Some(hash_info);
     }
     Ok(())
 }
 
-/// Helper function to extract all dependency package names from a recipe
+/// Helper function to extract all dependency package names from a recipe.
+///
+/// This collects:
+/// - All named dependencies from build/host/run requirements
+/// - All pin_subpackage references from run_exports (these reference other outputs
+///   and create build-order dependencies even though they're not direct build deps)
+///
+/// Note: May contain duplicates, which is acceptable for dependency graph construction.
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
-    use crate::stage1::requirements::Dependency;
-    use rattler_conda_types::PackageNameMatcher;
+    let requirements = recipe.requirements();
 
-    recipe
-        .requirements
-        .all_requirements()
+    // Collect names from build/host/run dependencies
+    let build_host_run = requirements
+        .build_host()
+        .filter_map(|dep| dep.name().cloned());
+
+    // Also collect pin_subpackage names from run_exports (these reference other outputs)
+    let run_export_pins = requirements
+        .run_exports_and_constraints()
         .filter_map(|dep| match dep {
-            Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| match matcher {
-                PackageNameMatcher::Exact(name) => Some(name),
-                _ => None,
-            }),
             Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
-            Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
-        })
-        .collect()
+            _ => None,
+        });
+
+    build_host_run.chain(run_export_pins).collect()
 }
 
 /// Helper function to build name-to-indices mapping for topological sort
@@ -590,12 +842,34 @@ fn create_jinja_config(
     config: &RenderConfig,
     variant: &BTreeMap<NormalizedKey, Variable>,
 ) -> JinjaConfig {
+    // Check if the variant specifies a target_platform - if so, use it
+    // This allows rendering recipes for platforms different from the current platform
+    // (e.g., rendering a Windows variant on Linux to check if outputs would be skipped)
+    let target_platform = variant
+        .get(&"target_platform".into())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .unwrap_or(config.target_platform);
+
+    // Similarly for host_platform (defaults to target_platform if not specified)
+    let host_platform = variant
+        .get(&"host_platform".into())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .unwrap_or_else(|| {
+            // If host_platform not in variant, use config.host_platform if it differs from default,
+            // otherwise use the (potentially variant-derived) target_platform
+            if config.host_platform != config.target_platform {
+                config.host_platform
+            } else {
+                target_platform
+            }
+        });
+
     JinjaConfig {
         experimental: config.experimental,
         recipe_path: config.recipe_path.clone(),
-        target_platform: config.target_platform,
+        target_platform,
         build_platform: config.build_platform,
-        host_platform: config.host_platform,
+        host_platform,
         variant: variant.clone(),
         ..Default::default()
     }
@@ -662,7 +936,7 @@ pub fn render_recipe_with_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
 
     // Load variant configuration
-    let variant_config = VariantConfig::from_files(variant_files)
+    let variant_config = VariantConfig::from_files(variant_files, config.target_platform)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     render_recipe_with_variant_config(&stage0_recipe, &variant_config, config)
@@ -732,24 +1006,29 @@ fn render_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    // Collect used variables
+    // Collect initially used variables (from templates and stage0 free specs)
     let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
 
-    // Compute all variant combinations
-    let combinations = variant_config
+    // Compute initial variant combinations
+    let initial_combinations = variant_config
         .combinations(&used_vars)
         .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     // If no combinations, render once with just the extra context
-    if combinations.is_empty() {
+    if initial_combinations.is_empty() {
         return render_with_empty_combinations(stage0_recipe, &config);
     }
 
-    // Render recipe for each variant combination
+    // Expand combinations tree-style: evaluate each combination, discover new variant keys
+    // from free specs, and expand combinations if new keys are found
+    let combinations =
+        expand_variants_tree(stage0_recipe, initial_combinations, variant_config, &config)?;
+
+    // Render recipe for each final variant combination
     let mut results = Vec::with_capacity(combinations.len());
 
     for combination in combinations {
-        let context = build_evaluation_context(&combination, &config, stage0_recipe)?;
+        let context = build_evaluation_context(&combination, &config)?;
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
         // Convert each output to a RenderedVariant
@@ -783,6 +1062,7 @@ fn render_with_variants(
 
             results.push(RenderedVariant {
                 variant,
+                full_combination: combination.clone(), // Track the full combination for pin matching
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
                 hash_info: None,
@@ -796,20 +1076,23 @@ fn render_with_variants(
     // Resolve build strings in topological order
     for i in 0..results.len() {
         // Extract pin_subpackages for this variant
-        let pin_subpackages = extract_pin_subpackages(&results[i].recipe);
-        results[i].pin_subpackages = pin_subpackages.clone();
+        let mut pin_subpackages = extract_pin_subpackages(&results[i].recipe);
 
-        // Add pin information to variant if needed
+        // Add pin information to variant if needed (also updates pin_subpackages with actual version/build_string)
         if !pin_subpackages.is_empty() {
             let results_snapshot = results.clone();
             add_pins_to_variant(
                 results_snapshot[i].recipe.package().name(),
                 &mut results[i].variant,
-                &pin_subpackages,
+                &results_snapshot[i].full_combination,
+                &mut pin_subpackages,
                 &results_snapshot,
             )
             .map_err(ParseError::from_message)?;
         }
+
+        // Store the updated pin_subpackages
+        results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
         finalize_build_string_single(&mut results[i])?;
@@ -1432,5 +1715,542 @@ outputs:
             "Staging outputs should work with experimental flag: {:?}",
             result.err()
         );
+    }
+
+    #[test]
+    fn test_variant_discovery_from_conditional_template() {
+        // Test that `host: ["${{ 'openssl' if unix }}"]` discovers 'openssl' as a variant key
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - ${{ 'openssl' if unix }}
+"#;
+
+        let variant_yaml = r#"
+openssl:
+  - "1.1"
+  - "3.0"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        // Use linux platform to ensure `unix` is true
+        let config =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        // Should create 2 variants for openssl (1.1 and 3.0)
+        assert_eq!(
+            rendered.len(),
+            2,
+            "Should have 2 variants from openssl in conditional template"
+        );
+
+        // Check that openssl is in the variants
+        let openssl_versions: Vec<String> = rendered
+            .iter()
+            .filter_map(|r| r.variant.get(&"openssl".into()).map(|v| v.to_string()))
+            .collect();
+
+        assert!(
+            openssl_versions.contains(&"1.1".to_string()),
+            "Should have openssl 1.1 variant"
+        );
+        assert!(
+            openssl_versions.contains(&"3.0".to_string()),
+            "Should have openssl 3.0 variant"
+        );
+    }
+
+    #[test]
+    fn test_variant_discovery_from_variable_template() {
+        // Test tree-based variant discovery:
+        // - `host: ["${{ mpi }}"]` with `mpi: [openmpi, mpich]`
+        // - After evaluating mpi=openmpi, free spec 'openmpi' is discovered as a variant key
+        // - After evaluating mpi=mpich, free spec 'mpich' is discovered as a variant key
+        // - This creates a tree of variants
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - ${{ mpi }}
+"#;
+
+        let variant_yaml = r#"
+mpi:
+  - openmpi
+  - mpich
+openmpi:
+  - "4.0"
+  - "4.1"
+mpich:
+  - "3.4"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Tree-based variant discovery should create:
+        // - {mpi: openmpi, openmpi: 4.0}
+        // - {mpi: openmpi, openmpi: 4.1}
+        // - {mpi: mpich, mpich: 3.4}
+        assert_eq!(
+            rendered.len(),
+            3,
+            "Should have 3 variants: 2 for openmpi × openmpi versions, 1 for mpich × mpich version"
+        );
+
+        // Check mpi=openmpi variants have openmpi key
+        let openmpi_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| {
+                r.variant.get(&"mpi".into()).map(|v| v.to_string()) == Some("openmpi".to_string())
+            })
+            .collect();
+        assert_eq!(openmpi_variants.len(), 2, "Should have 2 openmpi variants");
+
+        let openmpi_versions: Vec<String> = openmpi_variants
+            .iter()
+            .filter_map(|r| r.variant.get(&"openmpi".into()).map(|v| v.to_string()))
+            .collect();
+        assert!(
+            openmpi_versions.contains(&"4.0".to_string()),
+            "Should have openmpi 4.0"
+        );
+        assert!(
+            openmpi_versions.contains(&"4.1".to_string()),
+            "Should have openmpi 4.1"
+        );
+
+        // Check mpi=mpich variant has mpich key
+        let mpich_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| {
+                r.variant.get(&"mpi".into()).map(|v| v.to_string()) == Some("mpich".to_string())
+            })
+            .collect();
+        assert_eq!(mpich_variants.len(), 1, "Should have 1 mpich variant");
+        assert_eq!(
+            mpich_variants[0]
+                .variant
+                .get(&"mpich".into())
+                .map(|v| v.to_string()),
+            Some("3.4".to_string()),
+            "mpich variant should have mpich=3.4"
+        );
+    }
+
+    #[test]
+    fn test_skipped_output_with_platform_specific_requirements() {
+        // Test that when an output is skipped (e.g., skip: win), its requirements
+        // are not evaluated. This prevents errors from platform-specific functions
+        // like stdlib('c') which may not have defaults on certain platforms.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        // Variant for Windows - the output should be skipped
+        let variant_config = VariantConfig::default();
+
+        // RenderConfig with Windows as target platform
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+
+        // The rendering should NOT fail - even though stdlib('c') would fail on Windows,
+        // the output is skipped (skip: win) so requirements should not be evaluated
+        let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config);
+
+        // Check if result is OK - it should be because the output is skipped
+        assert!(
+            result.is_ok(),
+            "Rendering skipped output should not fail. Error: {:?}",
+            result.err()
+        );
+
+        let rendered = result.unwrap();
+        assert_eq!(rendered.len(), 1, "Should have 1 output");
+
+        // The output should be marked as skipped (skip contains "win")
+        let recipe = &rendered[0].recipe;
+        assert!(
+            recipe.build.skip.contains(&"win".to_string()),
+            "Output should have win in skip conditions"
+        );
+    }
+
+    #[test]
+    fn test_pin_subpackage_inherits_variants_from_pinned_output() {
+        // Test the case where:
+        // - Output A (pillow) has python as a host/run dependency -> creates 3 variants
+        // - Output B (pillow-tests) ONLY uses pin_subpackage("pillow", exact=True)
+        //   -> should ALSO create 3 variants, one for each pillow variant
+        //
+        // This is the user's exact scenario from the pillow-expansion recipe.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "12.1.0"
+
+recipe:
+  name: pillow-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: pillow
+    requirements:
+      host:
+        - python
+      run:
+        - python
+
+  - package:
+      name: pillow-tests
+    requirements:
+      run:
+        - ${{ pin_subpackage("pillow", exact=True) }}
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10"
+  - "3.11"
+  - "3.12"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Count outputs by name
+        let pillow_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "pillow")
+            .collect();
+
+        let pillow_tests_variants: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "pillow-tests")
+            .collect();
+
+        // pillow should have 3 variants (one for each Python version)
+        assert_eq!(
+            pillow_variants.len(),
+            3,
+            "pillow should have 3 variants (one per Python version)"
+        );
+
+        // pillow-tests should ALSO have 3 variants because pin_subpackage(exact=True)
+        // should cause it to inherit variants from pillow
+        assert_eq!(
+            pillow_tests_variants.len(),
+            3,
+            "pillow-tests should have 3 variants because pin_subpackage(exact=True) \
+             should cause variant inheritance from pillow. Currently has {} variants.",
+            pillow_tests_variants.len()
+        );
+
+        // Additionally, each pillow-tests should pin a DIFFERENT pillow variant
+        let pinned_build_strings: std::collections::HashSet<String> = pillow_tests_variants
+            .iter()
+            .filter_map(|v| {
+                v.pin_subpackages
+                    .get(&"pillow".into())
+                    .and_then(|p| p.build_string.clone())
+            })
+            .collect();
+
+        assert_eq!(
+            pinned_build_strings.len(),
+            3,
+            "Each pillow-tests variant should pin a different pillow variant. \
+             Pinned build strings: {:?}",
+            pinned_build_strings
+        );
+
+        // Verify the order is interleaved: pillow(3.10), pillow-tests(3.10), pillow(3.11), ...
+        // Each pillow should be immediately followed by its matching pillow-tests
+        let output_names: Vec<_> = rendered
+            .iter()
+            .map(|r| r.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        assert_eq!(
+            output_names,
+            vec![
+                "pillow",
+                "pillow-tests",
+                "pillow",
+                "pillow-tests",
+                "pillow",
+                "pillow-tests"
+            ],
+            "Order should be interleaved: each pillow immediately followed by its pillow-tests"
+        );
+
+        // Additionally verify that each pillow-tests pins the immediately preceding pillow
+        for i in (1..rendered.len()).step_by(2) {
+            let pillow_idx = i - 1;
+            let pillow_tests_idx = i;
+
+            let pillow_build_string = rendered[pillow_idx]
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .unwrap();
+            let pinned_build_string = rendered[pillow_tests_idx]
+                .pin_subpackages
+                .get(&"pillow".into())
+                .and_then(|p| p.build_string.as_ref())
+                .unwrap();
+
+            assert_eq!(
+                pillow_build_string, pinned_build_string,
+                "pillow-tests at index {} should pin pillow at index {}",
+                pillow_tests_idx, pillow_idx
+            );
+        }
+    }
+
+    #[test]
+    fn test_single_output_pin_subpackage_with_context_variable() {
+        // Test that single-output recipes can use context variables in pin_subpackage.
+        // This was a regression where `pin_subpackage(name)` would fail with
+        // "Undefined variable 'name'" even though `name` was defined in the context section.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: 0.1.0
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+requirements:
+  run_exports:
+    - ${{ pin_subpackage(name, upper_bound='x.x.x') }}
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // This should succeed - the `name` variable from context should be available
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new());
+
+        assert!(
+            rendered.is_ok(),
+            "pin_subpackage(name) should work with context variables. Error: {:?}",
+            rendered.err()
+        );
+
+        let rendered = rendered.unwrap();
+        assert_eq!(rendered.len(), 1);
+
+        // Verify the pin_subpackage was correctly evaluated
+        let recipe = &rendered[0].recipe;
+        assert_eq!(recipe.package.name.as_normalized(), "test-pkg");
+
+        // Check that run_exports contains the pin_subpackage
+        let weak_exports = &recipe.requirements.run_exports.weak;
+        assert_eq!(weak_exports.len(), 1, "Should have one run_export");
+
+        // The pin_subpackage should reference "test-pkg"
+        if let Dependency::PinSubpackage(pin) = &weak_exports[0] {
+            assert_eq!(
+                pin.pin_subpackage.name.as_normalized(),
+                "test-pkg",
+                "pin_subpackage should reference the context variable value"
+            );
+        } else {
+            panic!("Expected PinSubpackage dependency");
+        }
+    }
+
+    #[test]
+    fn test_context_variables_not_included_in_variant() {
+        // Test that context variables like build_drafts and build_prefix are NOT included
+        // in the variant, even when they are accessed during context evaluation.
+        // Only actual variant keys (like drafts) should be in the variant.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: zeromq
+  version: 4.3.5
+  build: 9
+  build_drafts: ${{ drafts == "ON" }}
+  build_prefix: "${{ 'drafts_' if build_drafts else '' }}"
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+build:
+  number: ${{ build }}
+  string: ${{ build_prefix }}h${{ hash }}_${{ build }}
+"#;
+
+        let variant_yaml = r#"
+drafts:
+  - "ON"
+  - "OFF"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(
+            rendered.len(),
+            2,
+            "Should have 2 variants (drafts ON and OFF)"
+        );
+
+        for variant in &rendered {
+            // The variant should contain 'drafts' (actual variant key) and 'target_platform'
+            // but NOT 'build_drafts' or 'build_prefix' (which are context variables)
+            assert!(
+                variant.variant.contains_key(&"drafts".into()),
+                "Variant should contain 'drafts'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build_drafts".into()),
+                "Variant should NOT contain context variable 'build_drafts'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build_prefix".into()),
+                "Variant should NOT contain context variable 'build_prefix'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"name".into()),
+                "Variant should NOT contain context variable 'name'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"version".into()),
+                "Variant should NOT contain context variable 'version'"
+            );
+            assert!(
+                !variant.variant.contains_key(&"build".into()),
+                "Variant should NOT contain context variable 'build'"
+            );
+        }
+
+        // Check that build strings are correct
+        let build_strings: Vec<_> = rendered
+            .iter()
+            .map(|r| r.recipe.build.string.as_resolved().unwrap().to_string())
+            .collect();
+
+        // One should have drafts_ prefix, one shouldn't
+        assert!(
+            build_strings.iter().any(|s| s.starts_with("drafts_")),
+            "One build string should have 'drafts_' prefix for drafts=ON"
+        );
+        assert!(
+            build_strings.iter().any(|s| !s.starts_with("drafts_")),
+            "One build string should NOT have 'drafts_' prefix for drafts=OFF"
+        );
+    }
+
+    #[test]
+    fn test_context_variable_same_name_as_variant_included() {
+        // Test that when a context variable has the same name as a variant variable
+        // and references it (like `context: { mpi: ${{ mpi }} }`), the variant
+        // variable IS included in the variant.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  mpi: ${{ mpi }}
+
+package:
+  name: test-pkg
+  version: 1.0.0
+
+build:
+  string: ${{ mpi }}_h${{ hash }}_0
+"#;
+
+        let variant_yaml = r#"
+mpi:
+  - openmpi
+  - mpich
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 2, "Should have 2 variants (mpi values)");
+
+        for variant in &rendered {
+            // The variant SHOULD contain 'mpi' because it references a variant variable
+            // of the same name
+            assert!(
+                variant.variant.contains_key(&"mpi".into()),
+                "Variant should contain 'mpi' since context.mpi references variant.mpi"
+            );
+        }
+
+        // Check mpi values are correct
+        let mpi_values: Vec<_> = rendered
+            .iter()
+            .map(|r| r.variant.get(&"mpi".into()).unwrap().to_string())
+            .collect();
+
+        assert!(mpi_values.contains(&"openmpi".to_string()));
+        assert!(mpi_values.contains(&"mpich".to_string()));
     }
 }

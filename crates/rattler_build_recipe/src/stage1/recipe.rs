@@ -122,7 +122,7 @@ pub struct Recipe {
     pub build: Build,
 
     /// Requirements/dependencies
-    #[serde(default, skip_serializing_if = "Requirements::is_empty")]
+    #[serde(default)]
     pub requirements: Requirements,
 
     /// Tests (can be multiple tests)

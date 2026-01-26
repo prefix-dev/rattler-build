@@ -13,7 +13,7 @@ recipe:
   name: ${{ name }}
   version: ${{ version }}
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null
@@ -82,7 +82,7 @@ outputs:
     - python ${{ python_version }}.*
     - ${{ pin_subpackage(name ~ "-lib", max_pin="x.x") }}
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null
@@ -130,7 +130,7 @@ outputs:
     run:
     - libgcc-ng
   build:
-    number: 0
+    number: null
     string: null
     script: {}
     noarch: null

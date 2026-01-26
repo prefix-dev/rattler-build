@@ -41,6 +41,7 @@ miette = { workspace = true, optional = true }
 # Utilities
 tracing = { workspace = true }
 fs-err = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }

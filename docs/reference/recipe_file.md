@@ -1124,7 +1124,7 @@ context:
   version: "5.1.2"
   # later keys can reference previous keys
   # and use jinja functions to compute new values
-  major_version: ${{ version.split('.')[0] }}
+  major_version: ${{ (version | split('.'))[0] }}
   tests_to_skip:
     # fails for one reason
     - test_foo
@@ -1207,7 +1207,7 @@ See the [Jinja Reference](./jinja.md) for more information.
 #### Pin subpackage
 
 Pin subpackage refers to another package from the same recipe file. It is
-commonly used in the `build/run_exports` section to export a run export from the
+commonly used in the `requirements/run_exports` section to export a run export from the
 package, or with multiple outputs to refer to a previous build.
 
 It looks something like:

@@ -6,7 +6,7 @@ package:
   name: conditional-package
   version: 1.5.0
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

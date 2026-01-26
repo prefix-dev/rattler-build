@@ -282,10 +282,19 @@ impl Requirements {
     }
 
     /// Get all requirements in one iterator.
-    pub fn run_build_host(&self) -> impl Iterator<Item = &Dependency> {
-        self.build
+    pub fn build_host(&self) -> impl Iterator<Item = &Dependency> {
+        self.build.iter().chain(self.host.iter())
+    }
+
+    pub fn run_exports_and_constraints(&self) -> impl Iterator<Item = &Dependency> {
+        self.run_exports
+            .noarch
             .iter()
-            .chain(self.host.iter())
+            .chain(self.run_exports.strong.iter())
+            .chain(self.run_exports.strong_constraints.iter())
+            .chain(self.run_exports.weak.iter())
+            .chain(self.run_exports.weak_constraints.iter())
+            .chain(self.run_constraints.iter())
             .chain(self.run.iter())
     }
 

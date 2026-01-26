@@ -2,13 +2,22 @@
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
 expression: error_with_source
 ---
-  × invalid value for 'license': InvalidLicense
+  × invalid value for 'license': failed to parse SPDX license:
+  │ 'InvalidLicense', because:
+  │ InvalidLicense
   │ ^^^^^^^^^^^^^^ unknown term
+  │ 
+  │ See <https://spdx.org/licenses> for the list of valid licenses.
+  │ Use 'LicenseRef-<MyLicense>' if you are using a custom license.
    ╭─[error_license.yaml:6:12]
  5 │ about:
  6 │   license: InvalidLicense
    ·            ───────┬──────
-   ·                   ╰─┤ invalid value for 'license': InvalidLicense
+   ·                   ╰─┤ invalid value for 'license': failed to parse SPDX license: 'InvalidLicense', because:
+   ·                     │ InvalidLicense
    ·                     │ ^^^^^^^^^^^^^^ unknown term
+   ·                     │ 
+   ·                     │ See <https://spdx.org/licenses> for the list of valid licenses.
+   ·                     │ Use 'LicenseRef-<MyLicense>' if you are using a custom license.
  7 │   summary: An example package with an invalid license
    ╰────

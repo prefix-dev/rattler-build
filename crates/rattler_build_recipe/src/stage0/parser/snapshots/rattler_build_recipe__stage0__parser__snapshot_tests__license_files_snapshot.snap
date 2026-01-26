@@ -6,7 +6,7 @@ package:
   name: test-license-files
   version: 1.0.0
 build:
-  number: 0
+  number: null
   string: null
   script: {}
   noarch: null

@@ -836,6 +836,35 @@ pub fn evaluate_skip_list(
     })
 }
 
+/// Check if any skip condition in the list evaluates to true
+///
+/// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
+/// Returns true if ANY condition evaluates to true (OR logic).
+pub fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
+    for condition in skip_conditions {
+        // Create a Jinja instance with the configuration from the evaluation context
+        let jinja_config = context.jinja_config().clone();
+        let mut jinja = Jinja::new(jinja_config);
+
+        // Use with_context to add all variables from the evaluation context
+        jinja = jinja.with_context(context.variables());
+
+        // Evaluate the skip condition as a boolean expression
+        match jinja.eval(condition) {
+            Ok(value) => {
+                if value.is_true() {
+                    return true;
+                }
+            }
+            Err(_) => {
+                // If evaluation fails, we can't determine if it's skipped
+                // Continue to check other conditions
+            }
+        }
+    }
+    false
+}
+
 /// Evaluate a string list, preserving templates with undefined variables
 /// This is used for script content where build-time environment variables might be referenced
 pub fn evaluate_string_list_lenient(
@@ -912,12 +941,20 @@ pub fn evaluate_package_name_list(
 }
 
 /// Helper function to validate and evaluate glob patterns from a ConditionalList
+///
+/// Empty strings are filtered out. This allows conditional list items like
+/// `- ${{ "loguru" if unix }}` to be removed when the condition is false
+/// (Jinja renders them as empty strings).
 fn evaluate_glob_patterns(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let pattern = evaluate_string_value(value, ctx)?;
+        // Filter out empty strings from templates like `${{ "value" if condition }}`
+        if pattern.is_empty() {
+            return Ok(None);
+        }
         // Validate the glob pattern immediately with proper error reporting
         match rattler_build_types::glob::validate_glob_pattern(&pattern) {
             Ok(_) => Ok(Some(pattern)),
@@ -1190,13 +1227,17 @@ pub fn evaluate_script(
 
         let content = if commands.is_empty() {
             ScriptContentOutput::Default
-        } else if commands.len() == 1 && !has_additional_options {
-            // Single command with no additional options - use CommandOrPath for backward compat
+        } else if commands.len() == 1 && !has_additional_options && !script.content_explicit {
+            // Single command with no additional options and NOT explicitly using content: field
             // This serializes as a simple string: `script: "cmd"`
             ScriptContentOutput::CommandOrPath(commands.into_iter().next().unwrap())
+        } else if commands.len() == 1 && script.content_explicit {
+            // Single command with explicit content: field
+            // This serializes as `script: { content: "..." }`
+            ScriptContentOutput::Command(commands.into_iter().next().unwrap())
         } else {
-            // Multiple commands OR has additional options - use Commands
-            // This serializes as a list inside the content field: `script: { content: [...] }`
+            // Multiple commands OR has additional options
+            // This serializes with content field: `script: { content: [...] }`
             ScriptContentOutput::Commands(commands)
         };
         (content, None)
@@ -1213,6 +1254,7 @@ pub fn evaluate_script(
         secrets,
         content,
         cwd,
+        content_explicit: script.content_explicit,
     })
 }
 
@@ -1538,7 +1580,11 @@ impl Evaluate for Stage0About {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            license_file: evaluate_glob_vec_simple(&self.license_file, context)?,
+            license_file: self
+                .license_file
+                .as_ref()
+                .map(|lf| evaluate_glob_vec_simple(lf, context))
+                .transpose()?,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -1588,14 +1634,62 @@ impl Evaluate for Stage0Requirements {
     }
 }
 
-// Pass through Extra as-is without evaluation
+// Evaluate Extra field with Jinja template support
 impl Evaluate for Stage0Extra {
     type Output = Stage1Extra;
 
-    fn evaluate(&self, _context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        Ok(Stage1Extra {
-            extra: self.extra.clone(),
-        })
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Recursively evaluate all values in the extra map, rendering any Jinja templates
+        let extra = self
+            .extra
+            .iter()
+            .map(|(key, value)| {
+                let evaluated_value = evaluate_serde_value(value, context)?;
+                Ok((key.clone(), evaluated_value))
+            })
+            .collect::<Result<indexmap::IndexMap<_, _>, ParseError>>()?;
+
+        Ok(Stage1Extra { extra })
+    }
+}
+
+/// Helper function to recursively evaluate serde_value::Value, rendering Jinja templates
+fn evaluate_serde_value(
+    value: &serde_value::Value,
+    context: &EvaluationContext,
+) -> Result<serde_value::Value, ParseError> {
+    match value {
+        serde_value::Value::String(s) => {
+            // Check if this string contains a Jinja template
+            if s.contains("${{") && s.contains("}}") {
+                // Render the Jinja template using the render_template helper
+                let rendered = render_template(s, context, None)?;
+                Ok(serde_value::Value::String(rendered))
+            } else {
+                Ok(value.clone())
+            }
+        }
+        serde_value::Value::Map(map) => {
+            // Recursively evaluate all values in the map
+            let evaluated_map = map
+                .iter()
+                .map(|(k, v)| {
+                    let evaluated_value = evaluate_serde_value(v, context)?;
+                    Ok((k.clone(), evaluated_value))
+                })
+                .collect::<Result<BTreeMap<_, _>, ParseError>>()?;
+            Ok(serde_value::Value::Map(evaluated_map))
+        }
+        serde_value::Value::Seq(seq) => {
+            // Recursively evaluate all items in the sequence
+            let evaluated_seq = seq
+                .iter()
+                .map(|v| evaluate_serde_value(v, context))
+                .collect::<Result<Vec<_>, ParseError>>()?;
+            Ok(serde_value::Value::Seq(evaluated_seq))
+        }
+        // For other types (numbers, booleans, etc.), pass through as-is
+        _ => Ok(value.clone()),
     }
 }
 
@@ -1921,34 +2015,41 @@ impl Evaluate for Stage0Build {
         // Evaluate prefix_detection
         let prefix_detection = self.prefix_detection.evaluate(context)?;
 
-        // Evaluate post_process
+        // Evaluate post_process (supports conditional items with if/then/else)
         let mut post_process = Vec::new();
-        for pp in &self.post_process {
-            post_process.push(pp.evaluate(context)?);
+        for item in &self.post_process {
+            post_process.extend(evaluate_post_process_item(item, context)?);
         }
 
         // Evaluate build number
-        let number = if let Some(n) = self.number.as_concrete() {
-            *n
-        } else if let Some(template) = self.number.as_template() {
-            let s = render_template(template.source(), context, self.number.span())?;
-            // If we render to an empty string, treat it as 0
-            if s.is_empty() {
-                0
-            } else {
-                s.parse::<u64>().map_err(|_| {
-                    ParseError::invalid_value(
-                        "build number",
-                        format!(
-                            "Invalid build number: '{}' is not a valid positive integer",
-                            s
-                        ),
-                        self.number.span().copied().unwrap_or_else(Span::new_blank),
-                    )
-                })?
+        // None means inherit from top-level, Some(n) means use n (even if n is 0)
+        let number = match &self.number {
+            None => None,
+            Some(value) => {
+                let n = if let Some(n) = value.as_concrete() {
+                    *n
+                } else if let Some(template) = value.as_template() {
+                    let s = render_template(template.source(), context, value.span())?;
+                    // If we render to an empty string, treat it as 0
+                    if s.is_empty() {
+                        0
+                    } else {
+                        s.parse::<u64>().map_err(|_| {
+                            ParseError::invalid_value(
+                                "build number",
+                                format!(
+                                    "Invalid build number: '{}' is not a valid positive integer",
+                                    s
+                                ),
+                                value.span().copied().unwrap_or_else(Span::new_blank),
+                            )
+                        })?
+                    }
+                } else {
+                    unreachable!("Value must be either concrete or template")
+                };
+                Some(n)
             }
-        } else {
-            unreachable!("Value must be either concrete or template")
         };
 
         // Evaluate merge_build_and_host_envs (supports Jinja templates)
@@ -2434,16 +2535,81 @@ impl Evaluate for Stage0TestType {
     }
 }
 
+/// Evaluate a single post_process item (which can be a Value or Conditional), returning a vector
+/// (conditionals expand to multiple post_process entries)
+/// Supports nested conditionals at any depth.
+fn evaluate_post_process_item(
+    item: &Item<Stage0PostProcess>,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1PostProcess>, ParseError> {
+    match item {
+        Item::Value(value) => {
+            // Get the concrete PostProcess from the Value
+            let pp = value.as_concrete().ok_or_else(|| {
+                ParseError::invalid_value(
+                    "post_process",
+                    "post_process cannot be a template",
+                    crate::Span::new_blank(),
+                )
+            })?;
+            pp.evaluate(context).map(|p| vec![p])
+        }
+        Item::Conditional(cond) => {
+            // Evaluate the condition
+            let condition_met =
+                evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
+
+            let items_to_evaluate = if condition_met {
+                &cond.then
+            } else {
+                match &cond.else_value {
+                    Some(else_value) => else_value,
+                    None => return Ok(Vec::new()), // No else branch and condition is false
+                }
+            };
+
+            // Recursively evaluate the selected items (supports nested conditionals)
+            let mut results = Vec::new();
+            for nested_item in items_to_evaluate.iter() {
+                results.extend(evaluate_post_process_item(nested_item, context)?);
+            }
+            Ok(results)
+        }
+    }
+}
+
 impl Evaluate for Stage0Recipe {
     type Output = Stage1Recipe;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // First, evaluate the context variables and merge them into a new context
+        // Track variables accessed before context evaluation so we can identify
+        // which variables were accessed during context evaluation (before shadowing)
+        let accessed_before_context = context.accessed_variables();
+
+        // Get the set of original variable names (variant variables) before context merge
+        let original_variable_keys: HashSet<String> = context.variables().keys().cloned().collect();
+
+        // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
             (context.clone(), IndexMap::new())
         };
+
+        // Variables accessed during context evaluation that were ALSO in the original context.
+        // This filters out context variables that were accessed by other context variables.
+        // For example, if we have:
+        //   context:
+        //     build_drafts: ${{ drafts == "ON" }}
+        //     build_prefix: "${{ 'drafts_' if build_drafts else '' }}"
+        // Then `drafts` is a variant variable (should be tracked), but `build_drafts` is a
+        // context variable accessed by `build_prefix` (should NOT be tracked as a variant variable).
+        let accessed_during_context: HashSet<String> = context_with_vars
+            .accessed_variables()
+            .difference(&accessed_before_context)
+            .filter(|var| original_variable_keys.contains(*var))
+            .cloned()
+            .collect();
         let package = self.package.evaluate(&context_with_vars)?;
         let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
@@ -2486,6 +2652,19 @@ impl Evaluate for Stage0Recipe {
         // Get OS environment variable keys that can be overridden by variant config
         let os_env_var_keys = context_with_vars.os_env_var_keys();
 
+        // Build the actual variant from accessed variables
+        // IMPORTANT: For variables that were accessed during context evaluation (i.e., variant
+        // variables that were used by context templates), we must use the ORIGINAL value from
+        // the variant, not the context-transformed value. This ensures the variant correctly
+        // captures the input that varied between builds.
+        //
+        // Example:
+        //   variant: mpi: ["bla", "ble"]
+        //   context: mpi: ${{ mpi ~ "foobar" }}
+        //
+        // The variant should record mpi: "bla", not mpi: "blafoobar"
+        let original_variables = context.variables();
+
         let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
             .variables()
             .iter()
@@ -2493,10 +2672,17 @@ impl Evaluate for Stage0Recipe {
                 let key_str = k.as_str();
 
                 // Context variables (defined in the context: section) should not be included
-                // in the variant for hash computation. We need to determine which variables
-                // are context variables vs variant variables.
-                // Exclude context variables (from context: section)
-                if self.context.contains_key(key_str) {
+                // in the variant, UNLESS they shadow a variant variable that was accessed
+                // during context evaluation. This happens with patterns like:
+                //   context:
+                //     foobar: ${{ foobar }}
+                // where foobar in context references and shadows the variant foobar.
+                //
+                // Since accessed_during_context is already filtered to only contain original
+                // variant variables (not context variables), we simply check if this context
+                // variable name is in that set.
+                if self.context.contains_key(key_str) && !accessed_during_context.contains(key_str)
+                {
                     return false;
                 }
                 // Exclude if it's a noarch-excluded key
@@ -2511,7 +2697,19 @@ impl Evaluate for Stage0Recipe {
                     || ALWAYS_INCLUDED_VARS.contains(&key_str)
                     || os_env_var_keys.contains(key_str)
             })
-            .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+            .map(|(k, _)| {
+                let key_str = k.as_str();
+                // For variables accessed during context evaluation, use the original value
+                // from the variant (before context transformation)
+                let value = if accessed_during_context.contains(key_str) {
+                    original_variables.get(key_str).cloned().unwrap_or_else(|| {
+                        context_with_vars.variables().get(key_str).unwrap().clone()
+                    })
+                } else {
+                    context_with_vars.variables().get(key_str).unwrap().clone()
+                };
+                (NormalizedKey::from(key_str), value)
+            })
             .collect();
 
         // Ensure that `target_platform` is set to "noarch" for noarch packages
@@ -2571,12 +2769,8 @@ fn merge_stage1_build(
         _ => output.string,
     };
 
-    // Build number: use output if non-zero, otherwise inherit from top-level
-    let number = if output.number == 0 {
-        toplevel.number
-    } else {
-        output.number
-    };
+    // Build number: use output if set, otherwise inherit from top-level
+    let number = output.number.or(toplevel.number);
 
     // Noarch: inherit from top-level if not set in output
     let noarch = output.noarch.or(toplevel.noarch);
@@ -2692,7 +2886,7 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
         } else {
             toplevel.license_family
         },
-        license_file: if !output.license_file.is_empty() {
+        license_file: if output.license_file.is_some() {
             output.license_file
         } else {
             toplevel.license_file
@@ -2717,7 +2911,8 @@ fn evaluate_package_output_to_recipe(
     recipe: &stage0::MultiOutputRecipe,
     context: &EvaluationContext,
     staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
-) -> Result<Stage1Recipe, ParseError> {
+    accessed_during_context: &HashSet<String>,
+) -> Result<Option<Stage1Recipe>, ParseError> {
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
     let name = PackageName::from_str(&name_str).map_err(|e| {
@@ -2807,6 +3002,14 @@ fn evaluate_package_output_to_recipe(
 
         output_build
     };
+
+    // Check if this output is skipped based on the merged skip conditions.
+    // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
+    // We skip evaluating requirements, tests, sources, etc. to avoid errors from
+    // platform-specific functions (like stdlib('c') on Windows) that would fail.
+    if is_skipped(&build.skip, context) {
+        return Ok(None);
+    }
 
     // Evaluate about section
     // Always merge top-level about with output about (output fields take precedence)
@@ -2903,8 +3106,11 @@ fn evaluate_package_output_to_recipe(
         .filter(|(k, _)| {
             let key_str = k.as_str();
 
-            // Exclude recipe context variables
-            if recipe.context.contains_key(key_str) {
+            // Context variables (defined in the context: section) should not be included
+            // in the variant, UNLESS they shadow a variant variable that was accessed
+            // during context evaluation. Since accessed_during_context is already filtered
+            // to only contain original variant variables, we simply check membership.
+            if recipe.context.contains_key(key_str) && !accessed_during_context.contains(key_str) {
                 return false;
             }
             // Exclude if it's a noarch-excluded key
@@ -2912,10 +3118,15 @@ fn evaluate_package_output_to_recipe(
                 return false;
             }
 
-            // Include if accessed, part of our (free) dependencies or if it's an always-include variable
+            // Include if accessed (either during this output evaluation or during context
+            // evaluation), part of our (free) dependencies, if it's an always-include variable,
+            // or if it's an OS env var key
+            let os_env_var_keys = context.os_env_var_keys();
             accessed_vars.contains(key_str)
+                || accessed_during_context.contains(key_str)
                 || free_specs.contains(&NormalizedKey::from(key_str))
                 || ALWAYS_INCLUDED_VARS.contains(&key_str)
+                || os_env_var_keys.contains(key_str)
         })
         .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
         .collect();
@@ -2944,7 +3155,7 @@ fn evaluate_package_output_to_recipe(
     // added to the variant (which happens in variant_render.rs after evaluation).
     // The build string will remain unresolved until finalize_build_strings() is called.
 
-    Ok(Stage1Recipe::new(
+    Ok(Some(Stage1Recipe::new(
         package,
         build,
         about,
@@ -2954,7 +3165,7 @@ fn evaluate_package_output_to_recipe(
         tests,
         resolved_context,
         actual_variant,
-    ))
+    )))
 }
 
 /// Implement Evaluate for MultiOutputRecipe
@@ -2965,12 +3176,28 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         use crate::stage1::StagingCache;
 
-        // First, evaluate the context variables and merge them into a new context
+        // Track variables accessed before context evaluation so we can identify
+        // which variables were accessed during context evaluation (before shadowing)
+        let accessed_before_context = context.accessed_variables();
+
+        // Get the set of original variable names (variant variables) before context merge
+        let original_variable_keys: HashSet<String> = context.variables().keys().cloned().collect();
+
+        // Evaluate the context variables and merge them into a new context
         let (context_with_vars, evaluated_context) = if !self.context.is_empty() {
             context.with_context(&self.context)?
         } else {
             (context.clone(), IndexMap::new())
         };
+
+        // Variables accessed during context evaluation that were ALSO in the original context.
+        // This filters out context variables that were accessed by other context variables.
+        let accessed_during_context: HashSet<String> = context_with_vars
+            .accessed_variables()
+            .difference(&accessed_before_context)
+            .filter(|var| original_variable_keys.contains(*var))
+            .cloned()
+            .collect();
 
         // First pass: Evaluate all staging outputs and collect them
         let mut staging_caches = IndexMap::new();
@@ -3011,17 +3238,24 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 const ALWAYS_INCLUDE: &[&str] =
                     &["target_platform", "channel_targets", "channel_sources"];
 
+                let os_env_var_keys = context_with_vars.os_env_var_keys();
                 let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
                     .variables()
                     .iter()
                     .filter(|(k, _)| {
                         let key_str = k.as_str();
-                        if self.context.contains_key(key_str) {
+                        // Exclude context variables UNLESS they were accessed from the variant
+                        // DURING context evaluation (before shadowing)
+                        if self.context.contains_key(key_str)
+                            && !accessed_during_context.contains(key_str)
+                        {
                             return false;
                         }
                         accessed_vars.contains(key_str)
+                            || accessed_during_context.contains(key_str)
                             || free_specs.contains(&NormalizedKey::from(key_str))
                             || ALWAYS_INCLUDE.contains(&key_str)
+                            || os_env_var_keys.contains(key_str)
                     })
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
@@ -3046,12 +3280,17 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             if let crate::stage0::Output::Package(pkg_output) = output {
                 context_with_vars.clear_accessed();
 
-                let mut recipe = evaluate_package_output_to_recipe(
+                let Some(mut recipe) = evaluate_package_output_to_recipe(
                     pkg_output.as_ref(),
                     self,
                     &context_with_vars,
                     &staging_caches,
-                )?;
+                    &accessed_during_context,
+                )?
+                else {
+                    continue;
+                };
+
                 recipe.context = evaluated_context.clone();
 
                 // Set staging_caches and inherits_from based on the inherit field
@@ -3739,7 +3978,7 @@ outputs:
                 // First output: inherits everything from top-level
                 let output1 = &recipes[0];
                 assert_eq!(output1.package.name.as_normalized(), "output-with-defaults");
-                assert_eq!(output1.build.number, 5); // Inherited
+                assert_eq!(output1.build.number, Some(5)); // Inherited
                 assert_eq!(
                     output1.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
@@ -3753,7 +3992,7 @@ outputs:
                     output2.package.name.as_normalized(),
                     "output-with-overrides"
                 );
-                assert_eq!(output2.build.number, 10); // Overridden
+                assert_eq!(output2.build.number, Some(10)); // Overridden
                 assert_eq!(
                     output2.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
@@ -3762,6 +4001,71 @@ outputs:
                 assert_eq!(output2.build.skip.len(), 2);
                 assert!(output2.build.skip.contains(&"win".to_string()));
                 assert!(output2.build.skip.contains(&"osx".to_string()));
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_build_number_zero_not_inherited() {
+        // Regression test: build number 0 should NOT be inherited from top-level
+        // when explicitly set in an output (0 is a valid build number)
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  build_number: 1
+  server_build_number: 0
+  server_version: "2.3.0"
+  version: "5.2.0"
+
+recipe:
+  name: jupyter-lsp-meta
+  version: ${{ version }}
+
+build:
+  number: 1234
+  noarch: python
+
+outputs:
+  - package:
+      name: jupyterlab-lsp
+      version: ${{ version }}
+    build:
+      number: ${{ build_number }}
+
+  - package:
+      name: jupyter-lsp
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                let mut ctx = EvaluationContext::new();
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output: jupyterlab-lsp with build_number = 1
+                let output1 = &recipes[0];
+                assert_eq!(output1.package.name.as_normalized(), "jupyterlab-lsp");
+                assert_eq!(output1.build.number, Some(1)); // From context variable
+
+                // Second output: jupyter-lsp with server_build_number = 0
+                // This is the key assertion - 0 should NOT be replaced with 1234
+                let output2 = &recipes[1];
+                assert_eq!(output2.package.name.as_normalized(), "jupyter-lsp");
+                assert_eq!(output2.build.number, Some(0)); // Explicitly set to 0, NOT inherited 1234
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -4326,5 +4630,426 @@ build:
             "is_abi3 should be tracked from skip expression (since match() succeeds, the 'and' evaluates the second operand). Accessed vars: {:?}",
             accessed
         );
+    }
+
+    #[test]
+    fn test_evaluate_extra_with_templates() {
+        use serde_value::Value as SerdeValue;
+
+        // Create a Stage0Extra with template values
+        let mut extra_map = indexmap::IndexMap::new();
+        extra_map.insert(
+            "feedstock-name".to_string(),
+            SerdeValue::String("${{ repo_name }}".to_string()),
+        );
+        extra_map.insert(
+            "custom-field".to_string(),
+            SerdeValue::String("custom-value".to_string()),
+        );
+        extra_map.insert(
+            "version-str".to_string(),
+            SerdeValue::String("Version: ${{ version }}".to_string()),
+        );
+
+        let extra = Stage0Extra { extra: extra_map };
+
+        // Create evaluation context with variables
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("repo_name".to_string(), Variable::from_string("my-repo"));
+        ctx.insert("version".to_string(), Variable::from_string("1.2.3"));
+
+        // Evaluate the extra
+        let result = extra.evaluate(&ctx).unwrap();
+
+        // Check that templates were rendered
+        assert_eq!(
+            result.extra.get("feedstock-name"),
+            Some(&SerdeValue::String("my-repo".to_string()))
+        );
+        assert_eq!(
+            result.extra.get("custom-field"),
+            Some(&SerdeValue::String("custom-value".to_string()))
+        );
+        assert_eq!(
+            result.extra.get("version-str"),
+            Some(&SerdeValue::String("Version: 1.2.3".to_string()))
+        );
+
+        // Check that variables were tracked
+        let accessed = ctx.accessed_variables();
+        assert!(
+            accessed.contains("repo_name"),
+            "repo_name should be tracked from extra template"
+        );
+        assert!(
+            accessed.contains("version"),
+            "version should be tracked from extra template"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_extra_with_nested_structures() {
+        use serde_value::Value as SerdeValue;
+        use std::collections::BTreeMap;
+
+        // Create a Stage0Extra with nested structures
+        let mut extra_map = indexmap::IndexMap::new();
+
+        // Add a nested map with templates
+        let mut nested_map = BTreeMap::new();
+        nested_map.insert(
+            SerdeValue::String("key1".to_string()),
+            SerdeValue::String("${{ var1 }}".to_string()),
+        );
+        nested_map.insert(
+            SerdeValue::String("key2".to_string()),
+            SerdeValue::String("static".to_string()),
+        );
+        extra_map.insert("nested".to_string(), SerdeValue::Map(nested_map));
+
+        // Add a list with templates
+        extra_map.insert(
+            "list".to_string(),
+            SerdeValue::Seq(vec![
+                SerdeValue::String("${{ var2 }}".to_string()),
+                SerdeValue::String("fixed".to_string()),
+            ]),
+        );
+
+        let extra = Stage0Extra { extra: extra_map };
+
+        // Create evaluation context
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("var1".to_string(), Variable::from_string("value1"));
+        ctx.insert("var2".to_string(), Variable::from_string("value2"));
+
+        // Evaluate
+        let result = extra.evaluate(&ctx).unwrap();
+
+        // Check nested map
+        if let Some(SerdeValue::Map(map)) = result.extra.get("nested") {
+            assert_eq!(
+                map.get(&SerdeValue::String("key1".to_string())),
+                Some(&SerdeValue::String("value1".to_string()))
+            );
+            assert_eq!(
+                map.get(&SerdeValue::String("key2".to_string())),
+                Some(&SerdeValue::String("static".to_string()))
+            );
+        } else {
+            panic!("nested should be a map");
+        }
+
+        // Check list
+        if let Some(SerdeValue::Seq(seq)) = result.extra.get("list") {
+            assert_eq!(seq[0], SerdeValue::String("value2".to_string()));
+            assert_eq!(seq[1], SerdeValue::String("fixed".to_string()));
+        } else {
+            panic!("list should be a sequence");
+        }
+
+        // Check variables were tracked
+        let accessed = ctx.accessed_variables();
+        assert!(accessed.contains("var1"));
+        assert!(accessed.contains("var2"));
+    }
+
+    #[test]
+    fn test_evaluate_glob_patterns_filters_empty_strings() {
+        // Test that glob patterns with conditional expressions that evaluate to empty strings
+        // are filtered out. This handles cases like `${{ "loguru" if unix }}` on non-unix platforms.
+
+        // Create list with some normal patterns and one that will evaluate to empty
+        let list = ConditionalList::new(vec![
+            Item::Value(Value::new_concrete("*.txt".to_string(), None)),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("${{ \"loguru\" if unix else \"\" }}".to_string()).unwrap(),
+                None,
+            )),
+            Item::Value(Value::new_concrete("*.md".to_string(), None)),
+        ]);
+
+        // Test with unix = false (should filter out empty string)
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("unix".to_string(), Variable::from(false));
+
+        let result = evaluate_glob_patterns(&list, &ctx).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "*.txt");
+        assert_eq!(result[1], "*.md");
+
+        // Test with unix = true (should include "loguru")
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(true));
+
+        let result2 = evaluate_glob_patterns(&list, &ctx2).unwrap();
+        assert_eq!(result2.len(), 3);
+        assert_eq!(result2[0], "*.txt");
+        assert_eq!(result2[1], "loguru");
+        assert_eq!(result2[2], "*.md");
+    }
+
+    #[test]
+    fn test_evaluate_glob_patterns_simple_conditional_template() {
+        // Test the simpler form: `${{ "value" if condition }}`
+        // which renders to empty string when condition is false
+
+        let list = ConditionalList::new(vec![
+            Item::Value(Value::new_concrete("pattern1".to_string(), None)),
+            Item::Value(Value::new_template(
+                JinjaTemplate::new("${{ \"Library/bin/logurud.dll\" if win }}".to_string())
+                    .unwrap(),
+                None,
+            )),
+        ]);
+
+        // When win is false, the template evaluates to empty and should be filtered
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let result = evaluate_glob_patterns(&list, &ctx).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "pattern1");
+
+        // When win is true, the pattern should be included
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("win".to_string(), Variable::from(true));
+
+        let result2 = evaluate_glob_patterns(&list, &ctx2).unwrap();
+        assert_eq!(result2.len(), 2);
+        assert_eq!(result2[0], "pattern1");
+        assert_eq!(result2[1], "Library/bin/logurud.dll");
+    }
+
+    #[test]
+    fn test_skipped_output_does_not_evaluate_requirements() {
+        // Test that when an output is skipped (e.g., skip: win), its requirements
+        // are not evaluated. This is important because platform-specific functions
+        // like stdlib('c') may fail on certain platforms where they have no default.
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                // Test on Windows - the output should be skipped and not fail
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Win64,
+                    build_platform: rattler_conda_types::Platform::Win64,
+                    host_platform: rattler_conda_types::Platform::Win64,
+                    // Note: no c_stdlib in variant - stdlib('c') would fail on Windows
+                    variant: std::collections::BTreeMap::new(),
+                    ..Default::default()
+                };
+                let mut ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("win-64"),
+                );
+                ctx.insert("win".to_string(), Variable::from(true));
+                ctx.insert("unix".to_string(), Variable::from(false));
+
+                // This should NOT fail even though stdlib('c') has no default on Windows
+                // because the output is skipped (skip: win)
+                let result = multi.evaluate(&ctx);
+                assert!(
+                    result.is_ok(),
+                    "Skipped output should not fail on requirement evaluation. Error: {:?}",
+                    result.err()
+                );
+
+                let recipes = result.unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                // The output should have skip conditions and empty requirements
+                let recipe = &recipes[0];
+                assert!(
+                    recipe.build.skip.contains(&"win".to_string()),
+                    "Skip conditions should be preserved"
+                );
+                assert!(
+                    recipe.requirements.build.is_empty(),
+                    "Requirements should be empty for skipped output"
+                );
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_non_skipped_output_evaluates_requirements() {
+        // Test that non-skipped outputs still have their requirements evaluated
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}-unix
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            crate::stage0::Recipe::MultiOutput(multi) => {
+                // Test on Linux - the output should NOT be skipped and requirements should be evaluated
+                let mut variant = std::collections::BTreeMap::new();
+                variant.insert("c_stdlib".into(), Variable::from_string("sysroot"));
+                variant.insert("c_stdlib_version".into(), Variable::from_string("2.17"));
+                variant.insert("cxx_compiler".into(), Variable::from_string("gxx"));
+                variant.insert("cxx_compiler_version".into(), Variable::from_string("12"));
+
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    variant,
+                    ..Default::default()
+                };
+                let mut ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                ctx.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+                ctx.insert("win".to_string(), Variable::from(false));
+                ctx.insert("unix".to_string(), Variable::from(true));
+
+                let result = multi.evaluate(&ctx);
+                assert!(
+                    result.is_ok(),
+                    "Non-skipped output should evaluate requirements"
+                );
+
+                let recipes = result.unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                // The output should NOT be skipped and should have requirements
+                let recipe = &recipes[0];
+                assert!(
+                    !recipe.requirements.build.is_empty(),
+                    "Requirements should NOT be empty for non-skipped output"
+                );
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_conditional_post_process_evaluation() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+package:
+  name: test-pkg
+  version: 1.0.0
+
+build:
+  post_process:
+    - if: unix
+      then:
+        - files:
+            - "*.txt"
+          regex: "unix_pattern"
+          replacement: "unix_replacement"
+    - if: win
+      then:
+        - files:
+            - "*.txt"
+          regex: "win_pattern"
+          replacement: "win_replacement"
+    - files:
+        - "*.md"
+      regex: "always"
+      replacement: "present"
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+
+        // Test with unix=true, win=false
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("unix".to_string(), Variable::from(true));
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert(
+            "target_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+
+        let result = parsed.evaluate(&ctx).unwrap();
+
+        // Should have 2 post_process entries: the unix one and the unconditional one
+        assert_eq!(result.build.post_process.len(), 2);
+
+        // First should be the unix post_process
+        assert_eq!(result.build.post_process[0].regex.as_str(), "unix_pattern");
+
+        // Second should be the unconditional one
+        assert_eq!(result.build.post_process[1].regex.as_str(), "always");
+
+        // Test with unix=false, win=true
+        let mut ctx2 = EvaluationContext::new();
+        ctx2.insert("unix".to_string(), Variable::from(false));
+        ctx2.insert("win".to_string(), Variable::from(true));
+        ctx2.insert(
+            "target_platform".to_string(),
+            Variable::from_string("win-64"),
+        );
+
+        let result2 = parsed.evaluate(&ctx2).unwrap();
+
+        // Should have 2 post_process entries: the win one and the unconditional one
+        assert_eq!(result2.build.post_process.len(), 2);
+
+        // First should be the win post_process
+        assert_eq!(result2.build.post_process[0].regex.as_str(), "win_pattern");
+
+        // Second should be the unconditional one
+        assert_eq!(result2.build.post_process[1].regex.as_str(), "always");
     }
 }

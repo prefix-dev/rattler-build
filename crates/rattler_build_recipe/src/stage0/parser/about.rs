@@ -1,12 +1,14 @@
 //! Parser for the About section
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::{ParseMapping, parse_conditional_list};
+use rattler_build_yaml_parser::{
+    ParseMapping, helpers::contains_jinja_template, parse_conditional_list, parse_value_with_name,
+};
 
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
-        about::About,
+        about::{About, License},
         parser::helpers::get_span,
         types::{ConditionalList, Item, JinjaTemplate, Value},
     },
@@ -25,7 +27,7 @@ fn parse_license_file(yaml: &MarkedNode) -> ParseResult<ConditionalList<String>>
         let span = *scalar.span();
 
         // Check if it's a template
-        if s.contains("${{") && s.contains("}}") {
+        if contains_jinja_template(s) {
             let template =
                 JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
             let items = vec![Item::Value(Value::new_template(template, Some(span)))];
@@ -79,7 +81,7 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
 
     let mut about = About {
         homepage: yaml.try_get_field("homepage")?,
-        license: yaml.try_get_field("license")?,
+        license: None,
         license_family: yaml.try_get_field("license_family")?,
         summary: yaml.try_get_field("summary")?,
         description: yaml.try_get_field("description")?,
@@ -88,9 +90,14 @@ pub fn parse_about(yaml: &MarkedNode) -> ParseResult<About> {
         license_file: Default::default(),
     };
 
+    // Parse license using the generic value parser - LicenseParseError provides helpful messages
+    if let Some(license_node) = yaml.as_mapping().and_then(|m| m.get("license")) {
+        about.license = Some(parse_value_with_name::<License>(license_node, "license")?);
+    }
+
     // Handle license_file specially since it can be a single value or list
     if let Some(license_file_node) = yaml.as_mapping().and_then(|m| m.get("license_file")) {
-        about.license_file = parse_license_file(license_file_node)?;
+        about.license_file = Some(parse_license_file(license_file_node)?);
     }
 
     Ok(about)
@@ -183,7 +190,7 @@ mod tests {
 
         assert!(about.homepage.is_some());
         assert!(about.license.is_some());
-        assert!(!about.license_file.is_empty());
+        assert!(!about.license_file.is_none());
         assert!(about.summary.is_some());
         assert!(about.description.is_some());
         assert!(about.documentation.is_some());

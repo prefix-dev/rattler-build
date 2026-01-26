@@ -9,6 +9,31 @@ use url::Url;
 #[derive(Clone, PartialEq, Debug)]
 pub struct License(pub spdx::Expression);
 
+/// Error type for parsing SPDX license expressions with helpful guidance
+#[derive(Debug)]
+pub struct LicenseParseError {
+    input: String,
+    inner: spdx::ParseError,
+}
+
+impl Display for LicenseParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to parse SPDX license: '{}', because:\n{}\n\n\
+             See <https://spdx.org/licenses> for the list of valid licenses.\n\
+             Use 'LicenseRef-<MyLicense>' if you are using a custom license.",
+            self.input, self.inner
+        )
+    }
+}
+
+impl std::error::Error for LicenseParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.inner)
+    }
+}
+
 impl Serialize for License {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -30,10 +55,15 @@ impl<'de> Deserialize<'de> for License {
 }
 
 impl FromStr for License {
-    type Err = spdx::ParseError;
+    type Err = LicenseParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<spdx::Expression>().map(License)
+        s.parse::<spdx::Expression>()
+            .map(License)
+            .map_err(|e| LicenseParseError {
+                input: s.to_string(),
+                inner: e,
+            })
     }
 }
 
@@ -47,8 +77,8 @@ impl Display for License {
 pub struct About {
     pub homepage: Option<Value<Url>>,
     pub license: Option<Value<License>>,
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub license_file: ConditionalList<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license_file: Option<ConditionalList<String>>,
     /// License family (deprecated, but still used in some recipes)
     pub license_family: Option<Value<String>>,
     pub summary: Option<Value<String>>,
@@ -64,7 +94,9 @@ impl Display for About {
             "About {{ homepage: {}, license: {}, license_file: [{}], summary: {}, description: {}, documentation: {}, repository: {} }}",
             self.homepage.as_ref().into_iter().format(", "),
             self.license.as_ref().into_iter().format(", "),
-            self.license_file.iter().format(", "),
+            self.license_file
+                .as_ref()
+                .map_or("None".to_string(), |lf| lf.iter().format(", ").to_string()),
             self.summary.as_ref().into_iter().format(", "),
             self.description.as_ref().into_iter().format(", "),
             self.documentation.as_ref().into_iter().format(", "),
@@ -93,7 +125,9 @@ impl About {
         if let Some(license) = license {
             vars.extend(license.used_variables());
         }
-        vars.extend(license_file.used_variables());
+        if let Some(license_file) = license_file {
+            vars.extend(license_file.used_variables());
+        }
         if let Some(license_family) = license_family {
             vars.extend(license_family.used_variables());
         }

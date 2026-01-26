@@ -2,7 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
-use rattler_build_yaml_parser::{ParseMapping, parse_value};
+use rattler_build_yaml_parser::{ParseMapping, helpers::contains_jinja_template, parse_value};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -171,7 +171,7 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
         let span = *scalar.span();
 
         // Check if it's a template
-        if name_str.contains("${{") && name_str.contains("}}") {
+        if contains_jinja_template(name_str) {
             let template = JinjaTemplate::new(name_str.to_string())
                 .map_err(|e| ParseError::jinja_error(e, span))?;
             Some(Value::new_template(template, Some(span)))
@@ -401,7 +401,7 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
     let span = *scalar.span();
 
     // Check if it's a template
-    let name = if name_str.contains("${{") && name_str.contains("}}") {
+    let name = if contains_jinja_template(name_str) {
         let template = JinjaTemplate::new(name_str.to_string())
             .map_err(|e| ParseError::jinja_error(e, span))?;
         Value::new_template(template, Some(span))
@@ -519,7 +519,7 @@ fn parse_inherit(yaml: &MarkedNode) -> ParseResult<Inherit> {
         }
 
         // Check if it's a template
-        if s.contains("${{") && s.contains("}}") {
+        if contains_jinja_template(s) {
             let template =
                 JinjaTemplate::new(s.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
             return Ok(Inherit::CacheName(Value::new_template(

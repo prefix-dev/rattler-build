@@ -51,7 +51,7 @@ pub fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, force, generate_attestation, attestation_file, store_github_attestation=false))]
 #[allow(clippy::too_many_arguments)]
 pub fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
@@ -63,6 +63,7 @@ pub fn upload_package_to_prefix_py(
     force: bool,
     generate_attestation: bool,
     attestation_file: Option<PathBuf>,
+    store_github_attestation: bool,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
@@ -82,6 +83,7 @@ pub fn upload_package_to_prefix_py(
         attestation,
         UploadSkipExisting(skip_existing),
         ForceOverwrite(force),
+        store_github_attestation,
     );
 
     run_async_task(async {

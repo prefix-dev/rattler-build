@@ -126,8 +126,9 @@ async fn resolve_rockspec_url_from_module(
         .into_diagnostic()?;
 
     // Extract the first module link from search results
+    // Note: HTML attribute order can vary, so we match href before class
     let module_link_pattern =
-        regex::Regex::new(r#"<a class="title" href="/modules/([^/]+)/([^"]+)">([^<]+)</a>"#)
+        regex::Regex::new(r#"<a href="/modules/([^/]+)/([^"]+)" class="title">([^<]+)</a>"#)
             .unwrap();
 
     let module_match = module_link_pattern
