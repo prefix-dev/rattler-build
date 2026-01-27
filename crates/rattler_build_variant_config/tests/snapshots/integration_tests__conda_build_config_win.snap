@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+compiler:
+  - vs2019
+python:
+  - "3.9"
+  - gcc
+  - clang
+target_platform:
+  - win-64

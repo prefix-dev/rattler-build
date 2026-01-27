@@ -16,6 +16,7 @@ ignore-hidden = false
 ratatui = "ratatui"
 ND = "ND"
 FreeTakServer = "FreeTakServer"
+BA = "BA"
 
 [default.extend-words]
 placehold = "placehold"

@@ -1,0 +1,6 @@
+package:
+  name: Invalid Package Name With Spaces!
+  version: 1.0.0
+
+about:
+  license: MIT

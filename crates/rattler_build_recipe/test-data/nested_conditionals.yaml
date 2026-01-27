@@ -1,0 +1,19 @@
+package:
+  name: nested-conditionals-test
+  version: "1.0.0"
+
+build:
+  script:
+    - if: unix
+      then:
+        - export EXTRA_FLAGS=""
+        - if: linux
+          then:
+            - export EXTRA_FLAGS="-DLINUX_SPECIFIC"
+        - if: osx
+          then:
+            - export EXTRA_FLAGS="-DOSX_SPECIFIC"
+        - make $EXTRA_FLAGS
+    - if: win
+      then:
+        - nmake

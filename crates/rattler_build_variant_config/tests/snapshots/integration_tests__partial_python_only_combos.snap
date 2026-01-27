@@ -1,0 +1,7 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: combinations
+---
+- python: "3.10"
+- python: "3.11"
+- python: "3.9"
