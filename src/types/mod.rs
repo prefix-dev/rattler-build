@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, VersionWithSource,
     compression_level::CompressionLevel,
-    package::{ArchiveType, PathsJson},
+    package::{CondaArchiveType, PathsJson},
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::{CacheClearMode, SubdirSelection};
@@ -29,7 +29,7 @@ pub use directories::Directories;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackagingSettings {
     /// The archive type, currently supported are `tar.bz2` and `conda`
-    pub archive_type: ArchiveType,
+    pub archive_type: CondaArchiveType,
     /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda`
     /// archives
     pub compression_level: i32,
@@ -38,10 +38,10 @@ pub struct PackagingSettings {
 impl PackagingSettings {
     /// Create a new `PackagingSettings` from the command line arguments
     /// and the selected archive type.
-    pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
+    pub fn from_args(archive_type: CondaArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
-            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap() as i32,
-            ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
+            CondaArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap() as i32,
+            CondaArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
         Self {

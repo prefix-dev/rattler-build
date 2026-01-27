@@ -1073,6 +1073,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         url,
         license,
         condition,
+        track_features,
     } = spec;
 
     name.is_some()
@@ -1089,6 +1090,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && url.is_none()
         && license.is_none()
         && condition.is_none()
+        && track_features.is_none()
 }
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///
