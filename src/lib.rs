@@ -300,20 +300,26 @@ fn find_variants_pkl(
         // For PKL, we need to go through the same rendering process as YAML
         let stage0_recipe = pkl_result.recipe;
 
+        // Get the PKL used variants for hash computation
+        // These are tracked at runtime during PKL evaluation via Variant.use/Variant.get
+        let pkl_used_variants: std::collections::HashSet<String> =
+            pkl_result.used_variants.into_iter().collect();
+
         // Get OS environment variable keys
         let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
             .keys()
             .cloned()
             .collect();
 
-        // Build render config
+        // Build render config with PKL used variants for proper hash computation
         let render_config = RenderConfig::new()
             .with_target_platform(target_platform)
             .with_build_platform(build_platform)
             .with_host_platform(host_platform)
             .with_experimental(_experimental)
             .with_recipe_path(recipe_path)
-            .with_os_env_var_keys(os_env_var_keys);
+            .with_os_env_var_keys(os_env_var_keys)
+            .with_pkl_used_variants(pkl_used_variants);
 
         // Create a minimal variant config just for this specific variant
         let mut single_variant_config = VariantConfig::default();

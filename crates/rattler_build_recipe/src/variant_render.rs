@@ -62,6 +62,11 @@ pub struct RenderConfig {
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
     /// customized via variant config.
     pub os_env_var_keys: HashSet<String>,
+    /// PKL-specific used variant keys. For PKL recipes, the used variants are tracked
+    /// at runtime during evaluation (via Variant.use/Variant.get calls), not via
+    /// Jinja template analysis. This field allows passing those tracked keys to the
+    /// variant rendering process so they're included in hash computation.
+    pub pkl_used_variants: HashSet<String>,
 }
 
 impl Default for RenderConfig {
@@ -74,6 +79,7 @@ impl Default for RenderConfig {
             build_platform: rattler_conda_types::Platform::current(),
             host_platform: rattler_conda_types::Platform::current(),
             os_env_var_keys: HashSet::new(),
+            pkl_used_variants: HashSet::new(),
         }
     }
 }
@@ -124,6 +130,14 @@ impl RenderConfig {
     /// These are typically derived from `env_vars::os_vars()` keys.
     pub fn with_os_env_var_keys(mut self, keys: HashSet<String>) -> Self {
         self.os_env_var_keys = keys;
+        self
+    }
+
+    /// Set the PKL used variant keys.
+    /// For PKL recipes, variant usage is tracked at runtime during evaluation.
+    /// This allows those tracked keys to be included in hash computation.
+    pub fn with_pkl_used_variants(mut self, keys: HashSet<String>) -> Self {
+        self.pkl_used_variants = keys;
         self
     }
 }
@@ -407,12 +421,14 @@ fn stable_topological_sort(
 /// - Always-included variables (target_platform, etc.)
 /// - OS environment variable keys (passed via RenderConfig)
 /// - use_keys from build.variant.use_keys (forces keys into the variant matrix)
+/// - PKL used variants (for PKL recipes, tracked at runtime via Variant.use/Variant.get)
 ///
 /// Returns only variables that exist in the variant config.
 fn collect_used_variables(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
     os_env_var_keys: &HashSet<String>,
+    pkl_used_variants: &HashSet<String>,
 ) -> HashSet<NormalizedKey> {
     let mut used_vars = HashSet::new();
 
@@ -442,6 +458,12 @@ fn collect_used_variables(
     // These force specific variant keys to be included in the matrix even if
     // not explicitly referenced in templates or dependencies
     for key in stage0_recipe.use_keys() {
+        used_vars.insert(NormalizedKey::from(key.as_str()));
+    }
+
+    // Add PKL used variants (for PKL recipes, these are tracked at runtime
+    // during evaluation via Variant.use() and Variant.get() calls)
+    for key in pkl_used_variants {
         used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
@@ -1006,8 +1028,13 @@ fn render_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, ParseError> {
-    // Collect initially used variables (from templates and stage0 free specs)
-    let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
+    // Collect initially used variables (from templates, stage0 free specs, and PKL tracked variants)
+    let used_vars = collect_used_variables(
+        stage0_recipe,
+        variant_config,
+        &config.os_env_var_keys,
+        &config.pkl_used_variants,
+    );
 
     // Compute initial variant combinations
     let initial_combinations = variant_config
@@ -1034,6 +1061,16 @@ fn render_with_variants(
         // Convert each output to a RenderedVariant
         for recipe in outputs {
             let mut variant = recipe.used_variant.clone();
+
+            // Add PKL used variants to the variant (for PKL recipes, these are tracked at
+            // runtime via Variant.use/Variant.get, not via Jinja template access)
+            // We need to get the values from the combination since they were used to compute it
+            for key in &config.pkl_used_variants {
+                let normalized_key = NormalizedKey::from(key.as_str());
+                if let Some(value) = combination.get(&normalized_key) {
+                    variant.insert(normalized_key, value.clone());
+                }
+            }
 
             // Add use_keys to the variant (forces them to be included even if not referenced)
             // We need to get them from the combination since they were used to compute it

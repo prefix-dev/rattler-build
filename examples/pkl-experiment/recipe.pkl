@@ -1,0 +1,120 @@
+// Example PKL recipe demonstrating variant tracking
+//
+// This recipe shows how to use Variant.use() and Variant.get() to access
+// variant values. The system tracks which variants are accessed, enabling
+// rattler-build to determine which variant dimensions affect the build matrix.
+//
+// Run with variants:
+//   rattler-build build --recipe examples/newcache/recipe.pkl
+//
+// The variants.yaml in this directory defines:
+//   - cuda: ["11.8", "12.0"]
+//   - python: ["3.10", "3.11", "3.12"]
+//   - c_compiler, cxx_compiler variants
+//
+// Import from pkl-rust (adjust path as needed for your setup)
+
+import "../../../pkl-rust/recipe-pkl/src/Recipe.pkl"
+import "../../../pkl-rust/recipe-pkl/src/Variant.pkl"
+import "../../../pkl-rust/recipe-pkl/src/Helpers.pkl"
+import "../../../pkl-rust/recipe-pkl/src/Platform.pkl"
+
+// Access variant values using the tracking API
+// These calls record which variant keys are used, enabling proper matrix expansion
+
+/// CUDA version from variants - uses Variant.use() which requires the variant to be set
+/// If CUDA is not in the variant config, this returns empty string
+local cudaVersion = Variant.use("cuda")
+
+/// Python version with a default fallback using Variant.get()
+local pythonVersion = Variant.get("python", "3.11")
+
+package {
+  name = "xtensor"
+  version = "0.27.1"
+}
+
+source = new Recipe.UrlSource {
+  url = "https://github.com/xtensor-stack/xtensor/archive/\(package.version).tar.gz"
+  sha256 = "117c192ae3b7c37c0156dedaa88038e0599a6b264666c3c6c2553154b500fe23"
+}
+
+// Build number defined outside so we can reference it in build.string
+local buildNumber = 0
+
+build {
+  number = buildNumber
+  // Build string includes variant values - only accessed variants affect the matrix
+  string = if (cudaVersion != "")
+    "\(buildNumber)_cuda\(cudaVersion)_py\(pythonVersion)"
+  else
+    "\(buildNumber)_py\(pythonVersion)"
+
+  script = new Listing {
+    "cmake ${CMAKE_ARGS} -GNinja -B build -S ."
+    "cmake --build build"
+    "cmake --install build --prefix $PREFIX"
+  }
+}
+
+requirements {
+  build {
+    // Use Helpers.compiler() which internally tracks c_compiler and cxx_compiler variants
+    Helpers.compiler("cxx")
+    "cmake"
+    "ninja"
+  }
+  host {
+    "xtl >=0.7,<0.8"
+    // Conditionally add python based on whether we're building with python support
+    when (pythonVersion != "") {
+      "python \(pythonVersion).*"
+    }
+  }
+  run {
+    "xtl >=0.7,<0.8"
+  }
+  run_constraints {
+    "xsimd >=8.0.3,<10"
+  }
+}
+
+tests = new Listing {
+  new Recipe.PackageContentsTest {
+    package_contents {
+      include {
+        "xtensor/xarray.hpp"
+      }
+      files {
+        "**/share/cmake/xtensor/xtensorConfig.cmake"
+        "**/share/cmake/xtensor/xtensorConfigVersion.cmake"
+      }
+    }
+  }
+}
+
+about {
+  homepage = "https://github.com/xtensor-stack/xtensor"
+  license = "BSD-3-Clause"
+  license_file = "LICENSE"
+  summary = "The C++ tensor algebra library"
+  description = """
+    Multi dimensional arrays with broadcasting and lazy computing.
+
+    This example demonstrates PKL variant tracking:
+    - cuda variant accessed via Variant.use("cuda")
+    - python variant accessed via Variant.get("python", "3.11")
+    - compiler variants accessed via Helpers.compiler("cxx")
+
+    Only variants that are actually accessed during evaluation will be
+    included in the build matrix.
+    """
+  documentation = "https://xtensor.readthedocs.io"
+  repository = "https://github.com/xtensor-stack/xtensor"
+}
+
+extra {
+  recipe_maintainers {
+    "some-maintainer"
+  }
+}

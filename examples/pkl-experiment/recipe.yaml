@@ -1,0 +1,26 @@
+recipe:
+  name: newcache
+  version: "1.0.0"
+
+outputs:
+  - staging:
+      name: foobar
+
+    requirements:
+      build:
+        - python
+
+    build:
+      script:
+        - echo "building foobar" > $PREFIX/foobar.txt
+
+  - package:
+      name: foobar
+
+    inherit:
+      from: foobar
+      run_exports: false
+
+    build:
+      script:
+        - echo "building foobar PACKAGE"
