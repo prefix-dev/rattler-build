@@ -14,7 +14,8 @@ pub use rattler_build_yaml_parser::{
 
 // Additional recipe-specific types below
 
-use serde::{Deserialize, Serialize};
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Debug, Display};
 
 /// Include or exclude patterns for file selection
@@ -60,7 +61,7 @@ impl<T: ToString + Debug> IncludeExclude<T> {
 }
 
 /// Build script configuration
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Script {
     /// Optional interpreter (e.g., "bash", "python")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,6 +92,87 @@ pub struct Script {
     /// When false, can serialize as plain string if no other options
     #[serde(default, skip)]
     pub content_explicit: bool,
+}
+
+/// Helper struct for deserializing Script as an object
+#[derive(Deserialize)]
+struct ScriptFields {
+    #[serde(default)]
+    interpreter: Option<Value<String>>,
+    #[serde(default)]
+    env: indexmap::IndexMap<String, Value<String>>,
+    #[serde(default)]
+    secrets: Vec<String>,
+    #[serde(default)]
+    content: Option<ConditionalList<String>>,
+    #[serde(default)]
+    file: Option<Value<String>>,
+    #[serde(default)]
+    cwd: Option<Value<String>>,
+}
+
+impl<'de> Deserialize<'de> for Script {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ScriptVisitor;
+
+        impl<'de> Visitor<'de> for ScriptVisitor {
+            type Value = Script;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string, array, or script object")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Script, E>
+            where
+                E: de::Error,
+            {
+                use rattler_build_yaml_parser::Item;
+                // Plain string becomes content - create a ConditionalList with one item
+                let item = Item::Value(Value::new_concrete(value.to_string(), None));
+                Ok(Script {
+                    content: Some(ConditionalList::new(vec![item])),
+                    ..Default::default()
+                })
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Script, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                // Array of strings becomes content
+                let content: ConditionalList<String> =
+                    Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(Script {
+                    content: Some(content),
+                    ..Default::default()
+                })
+            }
+
+            fn visit_map<M>(self, map: M) -> Result<Script, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                // Object with fields
+                let fields: ScriptFields =
+                    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                let content_explicit = fields.content.is_some();
+                Ok(Script {
+                    interpreter: fields.interpreter,
+                    env: fields.env,
+                    secrets: fields.secrets,
+                    content: fields.content,
+                    file: fields.file,
+                    cwd: fields.cwd,
+                    content_explicit,
+                })
+            }
+        }
+
+        deserializer.deserialize_any(ScriptVisitor)
+    }
 }
 
 impl Default for Script {

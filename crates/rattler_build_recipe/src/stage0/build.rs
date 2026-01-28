@@ -4,6 +4,7 @@ use itertools::Itertools as _;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
+use crate::stage0::pipeline::Pipeline;
 use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
 
 /// Variant key usage configuration
@@ -34,8 +35,14 @@ pub struct Build {
 
     /// Build script - contains script content, interpreter, environment variables, etc.
     /// Default is `build.sh` on Unix, `build.bat` on Windows
+    /// Mutually exclusive with `pipeline`.
     #[serde(default)]
     pub script: Script,
+
+    /// Build pipeline - alternative to script for multi-step builds.
+    /// Mutually exclusive with `script`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<Pipeline>,
 
     /// Noarch type - python or generic
     pub noarch: Option<Value<NoArchType>>,
@@ -87,6 +94,7 @@ impl Default for Build {
             number: None,
             string: None,
             script: Script::default(),
+            pipeline: None,
             noarch: None,
             python: PythonBuild::default(),
             skip: ConditionalList::default(),
@@ -266,6 +274,7 @@ impl Build {
             number,
             string,
             script,
+            pipeline,
             noarch,
             python,
             skip,
@@ -290,6 +299,17 @@ impl Build {
         }
 
         vars.extend(script.used_variables());
+
+        // Collect variables from pipeline steps
+        if let Some(pipeline) = pipeline {
+            vars.extend(pipeline.used_variables());
+            // Also collect from concrete pipeline step values
+            for item in pipeline.iter() {
+                if let Some(step) = item.as_value().and_then(|v| v.as_concrete()) {
+                    vars.extend(step.used_variables());
+                }
+            }
+        }
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());

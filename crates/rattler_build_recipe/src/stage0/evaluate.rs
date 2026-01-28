@@ -42,6 +42,7 @@ use crate::{
             PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
             PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
         },
+        pipeline::{Pipeline as Stage0Pipeline, PipelineStep as Stage0PipelineStep},
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
@@ -69,6 +70,11 @@ use crate::{
             ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
             VariantKeyUsage as Stage1VariantKeyUsage,
+        },
+        pipeline::{
+            PipelineStepContent as Stage1PipelineStepContent,
+            ResolvedPipeline as Stage1ResolvedPipeline,
+            ResolvedPipelineStep as Stage1ResolvedPipelineStep,
         },
         requirements::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
@@ -1260,6 +1266,115 @@ pub fn evaluate_script(
     })
 }
 
+/// Evaluate a single pipeline step into a resolved step
+///
+/// For inline scripts, the script is evaluated using `evaluate_script`.
+/// For `uses` references, the path is evaluated and the `with` arguments are kept
+/// for resolution at build time when file access is available.
+fn evaluate_pipeline_step(
+    step: &Stage0PipelineStep,
+    context: &EvaluationContext,
+) -> Result<Stage1ResolvedPipelineStep, ParseError> {
+    // Evaluate name if present
+    let name = if let Some(name_val) = &step.name {
+        Some(evaluate_string_value(name_val, context)?)
+    } else {
+        None
+    };
+
+    // Determine the content (inline script or external uses)
+    let content = if let Some(uses_val) = &step.uses {
+        // External pipeline reference - evaluate the path and keep with args
+        let uses_path = evaluate_string_value(uses_val, context)?;
+        Stage1PipelineStepContent::External {
+            uses: uses_path,
+            with: step.with.clone(),
+        }
+    } else if let Some(script) = &step.script {
+        // Inline script - evaluate it
+        let evaluated_script = evaluate_script(script, context)?;
+        Stage1PipelineStepContent::Inline {
+            script: evaluated_script,
+        }
+    } else {
+        // This shouldn't happen if parsing validated properly, but handle it
+        Stage1PipelineStepContent::Inline {
+            script: rattler_build_script::Script::default(),
+        }
+    };
+
+    Ok(Stage1ResolvedPipelineStep {
+        name,
+        content,
+        env: indexmap::IndexMap::new(),
+        cpu_cost: 1,
+        outputs: Vec::new(),
+    })
+}
+
+/// Evaluate a pipeline item (handles conditionals)
+fn evaluate_pipeline_item(
+    item: &Item<Stage0PipelineStep>,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1ResolvedPipelineStep>, ParseError> {
+    match item {
+        Item::Value(value) => {
+            if let Some(step) = value.as_concrete() {
+                Ok(vec![evaluate_pipeline_step(step, context)?])
+            } else if let Some(template) = value.as_template() {
+                // This is unusual - a pipeline step shouldn't be a template itself
+                Err(ParseError::invalid_value(
+                    "pipeline step",
+                    format!("Unexpected template in pipeline step: {}", template.source()),
+                    Span::new_blank(),
+                ))
+            } else {
+                Ok(vec![])
+            }
+        }
+        Item::Conditional(cond) => {
+            // Evaluate the condition
+            let condition_result = evaluate_condition(&cond.condition, context, cond.condition_span.as_ref())?;
+
+            if condition_result {
+                // Evaluate the 'then' branch
+                let mut results = Vec::new();
+                for then_item in cond.then.iter() {
+                    results.extend(evaluate_pipeline_item(then_item, context)?);
+                }
+                Ok(results)
+            } else if let Some(else_branch) = &cond.else_value {
+                // Evaluate the 'else' branch
+                let mut results = Vec::new();
+                for else_item in else_branch.iter() {
+                    results.extend(evaluate_pipeline_item(else_item, context)?);
+                }
+                Ok(results)
+            } else {
+                // No else branch, return empty
+                Ok(vec![])
+            }
+        }
+    }
+}
+
+/// Evaluate a complete pipeline
+///
+/// This evaluates all pipeline steps, handling conditionals and converting
+/// to Stage1 resolved pipeline steps.
+pub fn evaluate_pipeline(
+    pipeline: &Stage0Pipeline,
+    context: &EvaluationContext,
+) -> Result<Stage1ResolvedPipeline, ParseError> {
+    let mut steps = Vec::new();
+
+    for item in pipeline.iter() {
+        steps.extend(evaluate_pipeline_item(item, context)?);
+    }
+
+    Ok(Stage1ResolvedPipeline { steps })
+}
+
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(
     s: &str,
@@ -2063,10 +2178,18 @@ impl Evaluate for Stage0Build {
             false,
         )?;
 
+        // Evaluate pipeline if present
+        let pipeline = if let Some(p) = &self.pipeline {
+            Some(evaluate_pipeline(p, context)?)
+        } else {
+            None
+        };
+
         Ok(Stage1Build {
             number,
             string,
             script,
+            pipeline,
             noarch,
             python,
             skip,
@@ -2765,6 +2888,9 @@ fn merge_stage1_build(
         output.script
     };
 
+    // Pipeline: use output if present, otherwise inherit from top-level
+    let pipeline = output.pipeline.or(toplevel.pipeline);
+
     // Build string: use output unless it's Default, then inherit from top-level
     let string = match output.string {
         BuildString::Default => toplevel.string,
@@ -2843,6 +2969,7 @@ fn merge_stage1_build(
 
     stage1::Build {
         script,
+        pipeline,
         number,
         string,
         noarch,

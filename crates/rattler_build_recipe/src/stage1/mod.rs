@@ -19,6 +19,7 @@ pub mod build;
 pub mod extra;
 pub mod hash;
 pub mod package;
+pub mod pipeline;
 pub mod recipe;
 pub mod requirements;
 pub mod source;
@@ -29,6 +30,7 @@ mod variant_tests;
 
 pub use about::About;
 pub use build::{Build, Rpaths};
+pub use pipeline::{ResolvedPipeline, ResolvedPipelineStep};
 pub use extra::Extra;
 pub use hash::{HashInfo, HashInput, compute_hash};
 use indexmap::IndexMap;

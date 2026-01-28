@@ -10,6 +10,7 @@ mod extra;
 mod helpers;
 mod output_parser;
 mod package;
+mod pipeline;
 mod requirements;
 mod source;
 mod test_parser;

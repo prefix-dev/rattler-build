@@ -9,6 +9,7 @@ use crate::stage0::{
         PrefixIgnore, PythonBuild, VariantKeyUsage,
     },
     parser::helpers::get_span,
+    parser::pipeline::parse_pipeline,
     types::{IncludeExclude, Value},
 };
 use rattler_build_yaml_parser::{
@@ -418,6 +419,9 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "script" => {
                 build.script = parse_script(value_node)?;
             }
+            "pipeline" => {
+                build.pipeline = Some(parse_pipeline(value_node)?);
+            }
             "noarch" => {
                 build.noarch = Some(parse_noarch(value_node)?);
             }
@@ -456,10 +460,20 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, pipeline, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
                 );
             }
         }
+    }
+
+    // Validate mutual exclusivity of script and pipeline
+    if !build.script.is_default() && build.pipeline.is_some() {
+        return Err(ParseError::invalid_value(
+            "build",
+            "cannot have both 'script' and 'pipeline' in the build section",
+            *mapping.span(),
+        )
+        .with_suggestion("Use either 'script' for simple builds or 'pipeline' for multi-step builds"));
     }
 
     Ok(build)

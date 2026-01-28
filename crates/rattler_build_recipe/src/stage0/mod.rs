@@ -9,6 +9,7 @@ mod match_spec;
 mod output;
 mod package;
 mod parser;
+mod pipeline;
 mod requirements;
 mod source;
 mod tests;
@@ -16,6 +17,7 @@ mod types;
 
 pub use about::{About, License};
 pub use build::{BinaryRelocation, Build};
+pub use pipeline::{Pipeline, PipelineDefinition, PipelineDefinitionStep, PipelineInput, PipelineStep};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{

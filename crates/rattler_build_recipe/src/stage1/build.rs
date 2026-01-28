@@ -6,6 +6,7 @@ use rattler_conda_types::{NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use crate::stage1::HashInfo;
+use crate::stage1::pipeline::ResolvedPipeline;
 
 use super::{AllOrGlobVec, GlobVec};
 
@@ -311,8 +312,14 @@ pub struct Build {
     pub string: BuildString,
 
     /// Build script - contains script content, interpreter, environment variables, etc.
+    /// Mutually exclusive with `pipeline`.
     #[serde(default, skip_serializing_if = "Script::is_default")]
     pub script: Script,
+
+    /// Build pipeline - alternative to script for multi-step builds.
+    /// Mutually exclusive with `script`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<ResolvedPipeline>,
 
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -506,6 +513,7 @@ impl Build {
         self.number.is_none()
             && matches!(self.string, BuildString::Default)
             && self.script.is_default()
+            && self.pipeline.is_none()
             && self.noarch.is_none()
             && self.python.entry_points.is_empty()
             && self.python.skip_pyc_compilation.is_empty()
