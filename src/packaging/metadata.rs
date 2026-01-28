@@ -4,7 +4,7 @@
 use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
-    collections::HashSet,
+    collections::{BTreeMap, HashSet},
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -254,6 +254,18 @@ impl Output {
     pub fn about_json(&self) -> AboutJson {
         let recipe = &self.recipe;
 
+        // Start with recipe's extra section, converted from yaml to json values
+        let mut extra: BTreeMap<String, serde_json::Value> = recipe
+            .extra
+            .iter()
+            .filter_map(|(k, v)| serde_json::to_value(v).ok().map(|json_v| (k.clone(), json_v)))
+            .collect();
+
+        // CLI extra_meta overrides/extends recipe extra
+        if let Some(extra_meta) = &self.extra_meta {
+            extra.extend(extra_meta.clone());
+        }
+
         AboutJson {
             home: recipe
                 .about()
@@ -285,7 +297,7 @@ impl Output {
                 .iter()
                 .map(clean_url)
                 .collect(),
-            extra: self.extra_meta.clone().unwrap_or_default(),
+            extra,
         }
     }
 
