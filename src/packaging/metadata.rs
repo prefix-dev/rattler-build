@@ -258,7 +258,11 @@ impl Output {
         let mut extra: BTreeMap<String, serde_json::Value> = recipe
             .extra
             .iter()
-            .filter_map(|(k, v)| serde_json::to_value(v).ok().map(|json_v| (k.clone(), json_v)))
+            .filter_map(|(k, v)| {
+                serde_json::to_value(v)
+                    .ok()
+                    .map(|json_v| (k.clone(), json_v))
+            })
             .collect();
 
         // CLI extra_meta overrides/extends recipe extra
