@@ -27,3 +27,12 @@ about:
   license: MIT
   license_file: LICENSE
   summary: Python lib for TOML.
+
+extra:
+  recipe-maintainers:
+    - conda-forge/toml-feedstock
+  foobar: 123
+  tags:
+    - toml
+    - config
+    - parser
