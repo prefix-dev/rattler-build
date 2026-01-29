@@ -481,6 +481,11 @@ pub fn parse_pkl_recipe_with_variants(
     // Evaluate the PKL file
     let value = evaluator.eval_file(path).map_err(PklError::EvalError)?;
 
+    // Force evaluation of all lazy members before converting
+    evaluator
+        .force_value(&value)
+        .map_err(PklError::EvalError)?;
+
     // Get the used variants before converting (in case conversion clears them somehow)
     let used_variants = take_variant_accesses();
 
@@ -1404,8 +1409,8 @@ about {
                 );
 
                 // Check build number
-                assert!(single.build.number.is_concrete());
-                assert_eq!(*single.build.number.as_concrete().unwrap(), 0);
+                assert!(single.build.number.as_ref().unwrap().is_concrete());
+                assert_eq!(single.build.number.as_ref().unwrap().as_concrete().unwrap(), &0);
             }
             Recipe::MultiOutput(_) => panic!("Expected single output recipe"),
         }
