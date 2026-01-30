@@ -1,6 +1,6 @@
 package:
   name: mypkg
-  version: '0.1.0'
+  version: "0.1.0"
 
 build:
   number: 0
@@ -8,7 +8,7 @@ build:
 requirements:
   ignore_run_exports:
     from_package:
-    - ${{ compiler('cxx') }}
+      - ${{ compiler('cxx') }}
   build:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}

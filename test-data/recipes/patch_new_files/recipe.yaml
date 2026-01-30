@@ -1,0 +1,35 @@
+# Test recipe for patches that create new files
+
+package:
+  name: patch_new_files
+  version: "1.0"
+
+source:
+  path: ./source.tar
+  patches:
+    # Patch that creates multiple new files (tests the fix for empty path bug)
+    - create_new_files.patch
+
+build:
+  script:
+    - if: unix
+      then:
+        - test -f existing.txt
+        - test -f new_file1.txt
+        - test -f new_file2.txt
+        - test -f subdir/new_file3.txt
+        - cp existing.txt $PREFIX/existing.txt
+        - cp new_file1.txt $PREFIX/new_file1.txt
+        - cp new_file2.txt $PREFIX/new_file2.txt
+        - mkdir -p $PREFIX/subdir
+        - cp subdir/new_file3.txt $PREFIX/subdir/new_file3.txt
+      else:
+        - if not exist existing.txt exit 1
+        - if not exist new_file1.txt exit 1
+        - if not exist new_file2.txt exit 1
+        - if not exist subdir\new_file3.txt exit 1
+        - copy existing.txt %PREFIX%\existing.txt
+        - copy new_file1.txt %PREFIX%\new_file1.txt
+        - copy new_file2.txt %PREFIX%\new_file2.txt
+        - mkdir %PREFIX%\subdir
+        - copy subdir\new_file3.txt %PREFIX%\subdir\new_file3.txt

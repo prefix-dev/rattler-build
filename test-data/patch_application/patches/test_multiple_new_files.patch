@@ -1,0 +1,16 @@
+--- /dev/null
++++ b/first_new_file.txt
+@@ -0,0 +1,2 @@
++This is the first new file
++created by the patch
+--- /dev/null
++++ b/second_new_file.txt
+@@ -0,0 +1,2 @@
++This is the second new file
++also created by the patch
+--- /dev/null
++++ b/subdir/third_new_file.txt
+@@ -0,0 +1,3 @@
++This is the third new file
++in a subdirectory
++created by the patch

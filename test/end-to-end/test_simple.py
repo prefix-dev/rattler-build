@@ -874,6 +874,42 @@ def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
+def test_patch_creates_new_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that patches creating multiple new files work correctly.
+
+    This tests the fix for an issue where patches creating new files from /dev/null
+    could fail with 'Is a directory' error if the strip level was calculated incorrectly.
+    """
+    path_to_recipe = recipes / "patch_new_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "patch_new_files")
+
+    assert (pkg / "info/paths.json").exists()
+
+    # Check that all files created by the patch exist in the package
+    assert (pkg / "existing.txt").exists()
+    assert (pkg / "new_file1.txt").exists()
+    assert (pkg / "new_file2.txt").exists()
+    assert (pkg / "subdir/new_file3.txt").exists()
+
+    # Verify content of the new files
+    new_file1_content = (pkg / "new_file1.txt").read_text()
+    assert "This is the first new file" in new_file1_content
+
+    new_file3_content = (pkg / "subdir/new_file3.txt").read_text()
+    assert "This is the third new file" in new_file3_content
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
 def test_symlink_recipe(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
