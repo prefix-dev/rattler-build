@@ -167,6 +167,7 @@ pub fn get_tool_config(
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
         .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
         .with_allow_absolute_license_paths(build_data.allow_absolute_license_paths)
+        .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
         .with_sharded_repodata_enabled(build_data.common.use_sharded)
@@ -1535,3 +1536,4 @@ pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
     package_info::extract_package(args).await
 }
+
