@@ -936,9 +936,6 @@ tests:
 
 ### Downstream tests
 
-!!! warning
-    Downstream tests are not yet implemented in `rattler-build`.
-
 A downstream test can mention a single package that has a dependency on the package being built.
 The test will install the package and run the tests of the downstream package with our current
 package as a dependency.
