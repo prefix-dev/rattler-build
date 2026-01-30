@@ -1,0 +1,18 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: config
+---
+c_compiler:
+  - vs2019
+  - vs2022
+filter:
+  - appears
+foobar:
+  - known
+mixed:
+  - static_value
+  - jinja_value
+python:
+  - "3.14"
+target:
+  - win-64

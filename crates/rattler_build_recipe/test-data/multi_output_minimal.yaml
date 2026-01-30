@@ -1,0 +1,38 @@
+# Minimal multi-output recipe with staging and package output
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+source:
+  - url: https://example.com/source.tar.gz
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+outputs:
+  - staging:
+      name: build-cache
+    source:
+      - url: https://example.com/build-source.tar.gz
+        sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    requirements:
+      build:
+        - gcc
+        - cmake
+      host:
+        - zlib
+    build:
+      script:
+        - cmake -S . -B build
+        - cmake --build build
+
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: build-cache
+    requirements:
+      run:
+        - libgcc
+    about:
+      summary: My awesome library
+      license: MIT

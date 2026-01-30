@@ -9,14 +9,12 @@ use rattler_conda_types::{ChannelConfig, Platform};
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;
 use rattler_networking::{
-    AuthenticationMiddleware, AuthenticationStorage,
+    AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
     mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
-use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 #[cfg(feature = "s3")]
 use thiserror::Error;
 use url::Url;
@@ -73,120 +71,17 @@ impl From<bool> for ContinueOnFailure {
     }
 }
 
-/// A client that can handle both secure and insecure connections
-#[derive(Clone, Default)]
-pub struct BaseClient {
-    /// The standard client with SSL verification enabled
-    client: ClientWithMiddleware,
-    /// The dangerous client with SSL verification disabled
-    dangerous_client: ClientWithMiddleware,
-    /// List of hosts for which SSL verification should be skipped
-    allow_insecure_host: Option<Vec<String>>,
-}
-
-impl BaseClient {
-    /// Create a new BaseClient with both secure and insecure clients
-    pub fn new(
-        auth_file: Option<PathBuf>,
-        allow_insecure_host: Option<Vec<String>>,
-        #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
-        mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
-    ) -> Result<Self, AuthenticationStorageError> {
-        let auth_storage = get_auth_store(auth_file)?;
-        let timeout = 5 * 60;
-
-        #[cfg(feature = "s3")]
-        let s3_middleware =
-            s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
-        let mirror_middleware =
-            mirror_middleware::MirrorMiddleware::from_map(mirror_middleware_config);
-
-        let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
-            builder
-                .no_gzip()
-                .pool_max_idle_per_host(20)
-                .user_agent(APP_USER_AGENT)
-                .referer(false)
-                .read_timeout(std::time::Duration::from_secs(timeout))
-        };
-
-        // Retry middleware must come before mirror middleware so that when a mirror
-        // returns a server error (e.g. 500), the retry will go through the mirror
-        // middleware again, which will then select a different mirror due to the
-        // recorded failure.
-        let client_builder = reqwest_middleware::ClientBuilder::new(
-            common_settings(reqwest::Client::builder())
-                .build()
-                .expect("failed to create client"),
-        )
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ))
-        .with(mirror_middleware);
-
-        #[cfg(feature = "s3")]
-        let client_builder = client_builder.with(s3_middleware);
-
-        let client = client_builder
-            .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-                auth_storage.clone(),
-            )))
-            .build();
-
-        let dangerous_client = reqwest_middleware::ClientBuilder::new(
-            common_settings(reqwest::Client::builder())
-                .danger_accept_invalid_certs(true)
-                .build()
-                .expect("failed to create dangerous client"),
-        )
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        ))
-        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-            auth_storage,
-        )))
-        .build();
-
-        Ok(Self {
-            client,
-            dangerous_client,
-            allow_insecure_host,
-        })
-    }
-
-    /// Get the default client (with SSL verification enabled)
-    pub fn get_client(&self) -> &ClientWithMiddleware {
-        &self.client
-    }
-
-    /// Selects the appropriate client based on the host's trustworthiness
-    pub fn for_host(&self, url: &Url) -> &ClientWithMiddleware {
-        if self.disable_ssl(url) {
-            &self.dangerous_client
-        } else {
-            &self.client
-        }
-    }
-
-    /// Returns true if SSL verification should be disabled for the given URL
-    fn disable_ssl(&self, url: &Url) -> bool {
-        if let Some(hosts) = &self.allow_insecure_host
-            && let Some(host) = url.host_str()
-        {
-            return hosts.iter().any(|h| h == host);
-        }
-        false
-    }
-}
-
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
     /// If set to a value, a progress bar will be shown
     pub fancy_log_handler: LoggingOutputHandler,
 
-    /// The authenticated reqwest download client to use
-    pub client: BaseClient,
+    /// The HTTP client with S3, mirrors, and auth middleware
+    pub client: rattler_build_networking::BaseClient,
+
+    /// The source cache for downloading and caching source code
+    pub source_cache: Option<Arc<rattler_build_source_cache::SourceCache>>,
 
     /// Set this to true if you want to keep the build directory after the build
     /// is done
@@ -279,21 +174,24 @@ pub fn reqwest_client_from_auth_storage(
     #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
-) -> Result<BaseClient, AuthenticationStorageError> {
-    BaseClient::new(
-        auth_file,
-        allow_insecure_host,
-        #[cfg(feature = "s3")]
-        s3_middleware_config,
-        mirror_middleware_config,
-    )
+) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
+    let auth_storage = get_auth_store(auth_file)?;
+
+    Ok(rattler_build_networking::BaseClient::builder()
+        .user_agent(APP_USER_AGENT)
+        .timeout(5 * 60)
+        .insecure_hosts(allow_insecure_host.unwrap_or_default())
+        .with_authentication(auth_storage)
+        .with_s3(s3_middleware_config)
+        .with_mirrors(mirror_middleware_config)
+        .build())
 }
 
 /// A builder for a [`Configuration`].
 pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
-    client: Option<BaseClient>,
+    client: Option<rattler_build_networking::BaseClient>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
@@ -450,7 +348,7 @@ impl ConfigurationBuilder {
     }
 
     /// Sets the request client to use for network requests.
-    pub fn with_reqwest_client(self, client: BaseClient) -> Self {
+    pub fn with_reqwest_client(self, client: rattler_build_networking::BaseClient) -> Self {
         Self {
             client: Some(client),
             ..self
@@ -557,7 +455,7 @@ impl ConfigurationBuilder {
         let repodata_gateway = Gateway::builder()
             .with_cache_dir(cache_dir.join(rattler_cache::REPODATA_CACHE_DIR))
             .with_package_cache(package_cache.clone())
-            .with_client(client.client.clone())
+            .with_client(client.get_client().clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
                     jlap_enabled: self.use_jlap,
@@ -578,6 +476,7 @@ impl ConfigurationBuilder {
         Configuration {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
+            source_cache: None, // Built lazily on first use
             no_clean: self.no_clean,
             test_strategy,
             use_zstd: self.use_zstd,
