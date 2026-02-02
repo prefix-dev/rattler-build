@@ -1,0 +1,10 @@
+context:
+  mpi: ${{ mpi ~ "foobar" }}
+  extra_mpi: ${{ "extra" ~ mpi }}
+
+package:
+  name: contextused
+  version: "1.0.0"
+
+build:
+  string: ${{ mpi ~ extra_mpi }}

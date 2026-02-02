@@ -1,0 +1,65 @@
+c_compiler:
+  - gcc
+c_compiler_version:
+  - "14"
+c_stdlib:
+  - sysroot
+c_stdlib_version:
+  - "2.17"
+channel_sources:
+  - conda-forge
+channel_targets:
+  - conda-forge main
+cxx_compiler:
+  - gxx
+cxx_compiler_version:
+  - "14"
+docker_image:
+  - quay.io/condaforge/linux-anvil-x86_64:alma9
+fmt:
+  - "11.2"
+hdf5:
+  - 1.14.6
+is_abi3:
+  - true
+libboost_devel:
+  - "1.88"
+libptscotch:
+  - 7.0.10
+libscotch:
+  - 7.0.10
+mpi:
+  - mpich
+mpich:
+  - "4"
+nanobind:
+  - "2.9"
+nanobind_abi:
+  - "16"
+openmpi:
+  - "5"
+petsc:
+  - "3.24"
+petsc4py:
+  - "3.24"
+pin_run_as_build:
+  python:
+    min_pin: x.x
+    max_pin: x.x
+pugixml:
+  - "1.15"
+python:
+  - 3.10.* *_cpython
+scalar:
+  - complex
+slepc:
+  - "3.24"
+slepc4py:
+  - "3.24"
+spdlog:
+  - "1.15"
+target_platform:
+  - linux-64
+zip_keys:
+  - - c_compiler_version
+    - cxx_compiler_version

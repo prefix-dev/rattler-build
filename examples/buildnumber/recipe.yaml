@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+schema_version: 1
+
+context:
+  # this is the version the bot will _hopefully_ pick up and PR.
+  version: "5.2.0"
+  # generally leave the build number the same if only the server version changes.
+  build_number: 1
+  # this will likely have to be hand-updated.
+  server_version: "2.3.0"
+  # the required version of the server component: often updated together, but...
+  lab_server_version: "2.0.0" # ${{ server_version }}
+  # Leave the build number the same if only the labextension changes.
+  server_build_number: 0
+  # a non-minumum version of python against which to `pip check`
+  python_check_max: "3.13"
+  python_min: "3.8"
+
+recipe:
+  name: jupyter-lsp-meta
+  version: ${{ version }}
+
+build:
+  number: 1234
+  noarch: python
+
+outputs:
+  - package:
+      name: jupyterlab-lsp
+      version: ${{ version }}
+    build:
+      number: ${{ build_number }}
+      noarch: generic
+
+  - package:
+      name: jupyter-lsp
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+      # noarch: python
+
+  - package:
+      name: jupyter-lsp-latex
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("jupyter-lsp", exact=True) }}
+        - chktex
+        - texlab
+
+  - package:
+      name: jupyter-lsp-python
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("jupyter-lsp", exact=True) }}
+        - python-lsp-server >=1
+
+  - package:
+      name: jupyter-lsp-python-plugins
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("jupyter-lsp-python", exact=True) }}
+        - pyls-isort >=0.2.2
+        - pylsp-mypy >=0.5.1,!=0.6.6
+      run_constraints:
+        - ipython >=7.20
+
+  - package:
+      name: jupyter-lsp-r
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("jupyter-lsp", exact=True) }}
+        # Snippets support https://github.com/jupyter-lsp/jupyterlab-lsp/issues/208
+        - r-languageserver >=0.3.5

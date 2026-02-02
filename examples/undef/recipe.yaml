@@ -1,0 +1,26 @@
+context:
+  # bla: ${{ iamundefined or "foobar" }}
+  # this should work
+  bla: ${{ iamundefined | default("foobar") }}
+  # this should fail
+  baz: ${{ iamundefined }}
+  # this I don't care about, OK with failing
+  biz: ${{ iamundefined or "foobar" }}
+  # this shoudl fail
+  split: ${{ iamundefined | split(' ') }}
+
+package:
+  name: foobar
+  version: 1.0.0
+
+requirements:
+  build:
+    # this should fail
+    - if: iamundefined
+      then:
+        - numpy
+
+    # this should work
+    - if: iamundefined is undefined
+      then:
+        - numpy

@@ -1,0 +1,172 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+package:
+  name: foobar
+  version: 1.0.0
+build:
+  number: 0
+  string: null
+  script:
+    content:
+    - |
+      mkdir -p $PREFIX/lib
+      mkdir -p $PREFIX/include
+      mkdir -p $PREFIX/bin
+      mkdir -p $PREFIX/share/doc
+      echo "library" > $PREFIX/lib/libfoobar.so
+      echo "header" > $PREFIX/include/foobar.h
+      echo "tool" > $PREFIX/bin/foobar-cli
+      echo "docs" > $PREFIX/share/doc/README.md
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+requirements:
+  host:
+  - python
+  run:
+  - python
+about:
+  homepage: null
+  license: null
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra: {}
+sub_packages:
+- package:
+    name: libfoobar
+  build:
+    files:
+    - lib/**
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  requirements:
+    run:
+    - python
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: null
+    description: null
+    documentation: null
+    repository: null
+- package:
+    name: foobar-headers
+  build:
+    files:
+    - include/**
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  requirements:
+    run:
+    - ${{ pin_subpackage('libfoobar', exact=true) }}
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: null
+    description: null
+    documentation: null
+    repository: null
+- package:
+    name: foobar-docs
+  build:
+    files:
+    - share/doc/**
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  requirements: {}
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: Documentation for foobar
+    description: null
+    documentation: null
+    repository: null

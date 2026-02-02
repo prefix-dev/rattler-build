@@ -1,0 +1,626 @@
+[
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyterlab-lsp",
+        "version": "5.2.0"
+      },
+      "build": {
+        "number": 123,
+        "string": "pyh4616a5c_123",
+        "script": [
+          "cd jupyterlab-lsp",
+          "${{ PYTHON }} -m pip install . --no-deps -vv --no-build-isolation --disable-pip-version-check"
+        ],
+        "noarch": "python"
+      },
+      "requirements": {
+        "host": [
+          "pip",
+          "python 3.8.*",
+          "setuptools"
+        ],
+        "run": [
+          "jupyter-lsp >=2.0.0",
+          "jupyterlab >=4.1.0,<5.0.0a0",
+          "python >=3.8"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "4616a5c",
+        "prefix": "py"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyterlab-lsp_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyterlab-lsp_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyterlab-lsp_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyterlab-lsp_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.009310Z",
+      "subpackages": {
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyter-lsp",
+        "version": "2.3.0"
+      },
+      "build": {
+        "number": 666,
+        "string": "pyh4616a5c_666",
+        "script": [
+          "cd jupyter-lsp",
+          "${{ PYTHON }} -m pip install . --no-deps -vv --no-build-isolation --disable-pip-version-check"
+        ],
+        "noarch": "python"
+      },
+      "requirements": {
+        "host": [
+          "pip",
+          "python 3.8.*",
+          "setuptools"
+        ],
+        "run": [
+          "importlib-metadata >=4.8.3",
+          "jupyter_server >=1.1.2",
+          "python >=3.8"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "4616a5c",
+        "prefix": "py"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pl",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.013286Z",
+      "subpackages": {
+        "jupyter-lsp": {
+          "name": "jupyter-lsp",
+          "version": "2.3.0",
+          "build_string": "pyh4616a5c_666"
+        },
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyter-lsp-latex",
+        "version": "2.3.0"
+      },
+      "build": {
+        "number": 123,
+        "string": "hd31c447_123",
+        "noarch": "generic"
+      },
+      "requirements": {
+        "run": [
+          {
+            "pin_subpackage": {
+              "name": "jupyter-lsp",
+              "exact": true
+            }
+          },
+          "chktex",
+          "texlab"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "jupyter_lsp": "2.3.0 pyh4616a5c_666",
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "d31c447"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-latex_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-latex_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-latex_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-latex_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.013465Z",
+      "subpackages": {
+        "jupyter-lsp": {
+          "name": "jupyter-lsp",
+          "version": "2.3.0",
+          "build_string": "pyh4616a5c_666"
+        },
+        "jupyter-lsp-latex": {
+          "name": "jupyter-lsp-latex",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyter-lsp-python",
+        "version": "2.3.0"
+      },
+      "build": {
+        "number": 123,
+        "string": "hd31c447_123",
+        "noarch": "generic"
+      },
+      "requirements": {
+        "run": [
+          {
+            "pin_subpackage": {
+              "name": "jupyter-lsp",
+              "exact": true
+            }
+          },
+          "python-lsp-server >=1"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "jupyter_lsp": "2.3.0 pyh4616a5c_666",
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "d31c447"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_place",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.013633Z",
+      "subpackages": {
+        "jupyter-lsp": {
+          "name": "jupyter-lsp",
+          "version": "2.3.0",
+          "build_string": "pyh4616a5c_666"
+        },
+        "jupyter-lsp-latex": {
+          "name": "jupyter-lsp-latex",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyter-lsp-python": {
+          "name": "jupyter-lsp-python",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyter-lsp-python-plugins",
+        "version": "2.3.0"
+      },
+      "build": {
+        "number": 123,
+        "string": "h22c74d5_123",
+        "noarch": "generic"
+      },
+      "requirements": {
+        "run": [
+          {
+            "pin_subpackage": {
+              "name": "jupyter-lsp-python",
+              "exact": true
+            }
+          },
+          "pyls-isort >=0.2.2",
+          "pylsp-mypy >=0.5.1,!=0.6.6"
+        ],
+        "run_constraints": [
+          "ipython >=7.20"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "jupyter_lsp_python": "2.3.0 hd31c447_123",
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "22c74d5"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python-plugins_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python-plugins_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python-plugins_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-python-plugins_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.013804Z",
+      "subpackages": {
+        "jupyter-lsp": {
+          "name": "jupyter-lsp",
+          "version": "2.3.0",
+          "build_string": "pyh4616a5c_666"
+        },
+        "jupyter-lsp-latex": {
+          "name": "jupyter-lsp-latex",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyter-lsp-python": {
+          "name": "jupyter-lsp-python",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyter-lsp-python-plugins": {
+          "name": "jupyter-lsp-python-plugins",
+          "version": "2.3.0",
+          "build_string": "h22c74d5_123"
+        },
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "version": "5.2.0",
+        "xbuild_number": 123,
+        "server_version": "2.3.0",
+        "lab_server_version": "2.0.0",
+        "server_build_number": 0,
+        "python_check_max": "3.13",
+        "python_min": "3.8"
+      },
+      "package": {
+        "name": "jupyter-lsp-r",
+        "version": "2.3.0"
+      },
+      "build": {
+        "number": 123,
+        "string": "hd31c447_123",
+        "noarch": "generic"
+      },
+      "requirements": {
+        "run": [
+          {
+            "pin_subpackage": {
+              "name": "jupyter-lsp",
+              "exact": true
+            }
+          },
+          "r-languageserver >=0.3.5"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "noarch",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=15.6=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "jupyter_lsp": "2.3.0 pyh4616a5c_666",
+        "target_platform": "noarch"
+      },
+      "hash": {
+        "hash": "d31c447"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-r_1769189130/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-r_1769189130/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-r_1769189130/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_jupyter-lsp-r_1769189130"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-23T17:25:30.013973Z",
+      "subpackages": {
+        "jupyter-lsp": {
+          "name": "jupyter-lsp",
+          "version": "2.3.0",
+          "build_string": "pyh4616a5c_666"
+        },
+        "jupyter-lsp-latex": {
+          "name": "jupyter-lsp-latex",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyter-lsp-python": {
+          "name": "jupyter-lsp-python",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyter-lsp-python-plugins": {
+          "name": "jupyter-lsp-python-plugins",
+          "version": "2.3.0",
+          "build_string": "h22c74d5_123"
+        },
+        "jupyter-lsp-r": {
+          "name": "jupyter-lsp-r",
+          "version": "2.3.0",
+          "build_string": "hd31c447_123"
+        },
+        "jupyterlab-lsp": {
+          "name": "jupyterlab-lsp",
+          "version": "5.2.0",
+          "build_string": "pyh4616a5c_123"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  }
+]

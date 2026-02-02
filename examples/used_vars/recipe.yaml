@@ -1,0 +1,252 @@
+context:
+  name: fenics-dolfinx
+  version: "0.10.0"
+  build: 1
+  major_minor: ${{ (version | split('.'))[:2] | join('.') }}.*
+  ufl_version: "2025.2.*"
+  # Python Stable ABI (SABI with nanobind requires 3.12)
+  abi3_tag: cp312
+  abi3_python: "3.10"
+  build_abi3: ${{ is_abi3 and match(python, abi3_python + ".*") }}
+  use_abi3: ${{ is_abi3 }}
+  skip_abi3: ${{ is_abi3 and match(python, ">=3.13") }}
+
+  # nanobind abi:
+  abi_version: 2.${{ nanobind_abi }}
+
+recipe:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+source:
+  url: https://github.com/fenics/dolfinx/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: 24cbad2f604b38248e7655280e5f894eed19b409de4618cd6148a362a70105fd
+
+build:
+  number: ${{ (build | int + 100) if scalar == 'real' else build }}
+  skip: win or ppc64le
+
+outputs:
+  - package:
+      name: fenics-libdolfinx
+    build:
+      script: build-libdolfinx
+      variant:
+        use_keys:
+          - python
+    requirements:
+      build:
+        - ${{ compiler("c") }}
+        - ${{ stdlib("c") }}
+        - ${{ compiler("cxx") }}
+        - cmake
+        - ninja
+        - if: not win
+          then:
+            - pkg-config
+        - if: "mpi == 'openmpi' and build_platform != target_platform"
+          then: ${{ mpi }}
+      host:
+        - ${{ mpi | replace("impi", "impi-devel") }}
+        - if: not win
+          then:
+            - libadios2
+            - libadios2 * mpi_${{ mpi }}_*
+            - kahip
+            - parmetis
+            - petsc
+            - petsc * ${{ scalar }}_*
+            - slepc
+        - libboost-devel
+        - hdf5 ${{ hdf5 }}.* mpi_${{ mpi }}_*
+        - libscotch
+        - libptscotch
+        - pugixml
+        - fmt
+        - spdlog
+        - fenics-libbasix ${{ major_minor }}
+        - fenics-ufcx ${{ major_minor }}
+        - if: win
+          # these shouldn't be required,
+          # but are in INTERFACE_LINK_LIBRARIES for libscotch
+          then:
+            - zlib
+            - liblzma-devel
+      run:
+        # these don't have run_exports
+        # but are needed at runtime for code generation
+        - fenics-ufcx ${{ major_minor }}
+        - if: not win
+          then:
+            - ${{ pin_compatible("parmetis", upper_bound="x.x") }}
+        # needs boost metadata just to CMake-load fenix-libdolfinx
+        - libboost-devel
+        # need these to resolve cmake dependencies of libscotch
+        # (only on windows)
+        - if: win
+          then:
+            - zlib
+            - liblzma-devel
+      run_exports:
+        weak:
+          - ${{ pin_subpackage("fenics-libdolfinx", upper_bound="x.x.x") }}
+          - if: not win
+            then:
+              - petsc * ${{ scalar }}_*
+          - ${{ mpi | replace("impi", "impi_rt") }}
+    tests:
+      - script:
+          file: test-libdolfinx
+          env:
+            target_platform: ${{ target_platform }}
+            CONDA_BUILD: "1"
+        files:
+          recipe:
+            - if: win
+              then: impi-toolchain.cmake
+          source:
+            - cpp/test/
+        requirements:
+          run:
+            - ${{ compiler("c") }}
+            - ${{ compiler("cxx") }}
+            - if: linux and target_platform != build_platform
+              then:
+                # __glibc virtual package seems to resolve wrong on emulated linux
+                - ${{ stdlib("c") }}
+            - if: win
+              then: impi-devel
+            - pkg-config
+            - cmake
+            - catch2 3.*
+            - ninja
+            - fenics-ffcx ${{ major_minor }}
+
+  - package:
+      name: fenics-dolfinx
+    build:
+      script:
+        file: build-dolfinx
+        env:
+          SKBUILD_WHEEL_PY_API: ${{ "cp312" if build_abi3 else "" }}
+      python:
+        version_independent: ${{ build_abi3 }}
+    requirements:
+      build:
+        - ${{ compiler("c") }}
+        - ${{ stdlib("c") }}
+        - ${{ compiler("cxx") }}
+        - cmake
+        - ninja
+        - pkg-config
+        - fenics-basix-nanobind-abi ${{ abi_version }}.*
+        - if: build_platform != target_platform
+          then:
+            - python
+            - cross-python_${{ target_platform }}
+            - nanobind
+            - nanobind-abi
+            - if: mpi == 'openmpi'
+              then: ${{ mpi }}
+      host:
+        - ${{ mpi | replace("impi", "impi-devel") }}
+        # hdf5 shouldn't be needed here, but solver fails without it
+        - hdf5 ${{ hdf5 }}.* mpi_${{ mpi }}_*
+        - ${{ pin_subpackage("fenics-libdolfinx", exact=True) }}
+        - fenics-libdolfinx ${{ major_minor }}
+        - python
+        - if: build_abi3
+          then:
+            - python-abi3
+        - pip
+        - scikit-build-core
+        - wheel
+        - nanobind
+        - nanobind-abi
+        - fenics-basix ${{ major_minor }}
+        - fenics-basix-nanobind-abi ${{ abi_version }}.*
+        - mpi4py
+        - if: not win
+          then:
+            - petsc * ${{ scalar }}_*
+            - petsc4py
+            - slepc
+            - slepc4py
+        # not actually a dependency of the Python part, but having it here
+        # seems to fix a solver error on libxml2's noicu build
+        - libboost-devel
+      run:
+        # code generation only needs c, not cxx
+        - ${{ compiler("c") }}
+        - pkg-config
+        - ${{ pin_subpackage("fenics-libdolfinx", exact=True) }}
+        - cffi
+        - mpi4py
+        - numpy >=1.21
+        - if: not win
+          then:
+            - petsc4py
+            - slepc4py
+        - fenics-basix ${{ major_minor }}
+        - fenics-ffcx ${{ major_minor }}
+        - fenics-ufl ${{ ufl_version }}
+    tests:
+      - script:
+          file: test-dolfinx
+          env:
+            scalar: ${{ scalar }}
+            target_platform: ${{ target_platform }}
+            CONDA_BUILD: "1"
+        files:
+          recipe:
+            - test_dolfinx.py
+          source:
+            - python/demo/
+            - python/test/
+        requirements:
+          run:
+            - python ${{ "3.13.*" if build_abi3 else "" }}
+            - pip
+            - pytest >=6
+            - python-gmsh
+            - if: linux and aarch64
+              then:
+                - libgl-devel
+                # seem to be getting nvpl on py310 for some reason
+                # which doesn't have sparse symbols
+                #
+                - blas[build=openblas]
+            - if: linux and target_platform != build_platform
+              then:
+                # __glibc virtual package seems to resolve wrong on emulated linux
+                - ${{ stdlib("c") }}
+            - sympy
+            - scipy
+            - matplotlib-base
+      - if: build_abi3
+        then:
+          - if: unix
+            then:
+              - script:
+                  - abi3audit $PREFIX/lib/python3.13/site-packages/dolfinx/*.so --assume-minimum-abi3 3.12
+                  - python3 -c 'import dolfinx'
+                requirements:
+                  run:
+                    - abi3audit
+                    - python 3.13.*
+
+about:
+  summary: The computational environment of FEniCSx
+  description: |
+    DOLFINx is the computational environment of FEniCSx
+    and implements the FEniCS Problem Solving Environment in Python and C++.
+  license: LGPL-3.0-or-later
+  license_file: COPYING.LESSER
+  homepage: https://fenicsproject.org
+  repository: https://github.com/fenics/dolfinx
+  documentation: https://docs.fenicsproject.org/dolfinx/v${{ version }}/
+
+extra:
+  feedstock-name: fenics-dolfinx
+  recipe-maintainers:
+    - minrk

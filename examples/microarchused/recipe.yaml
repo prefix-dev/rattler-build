@@ -1,0 +1,10 @@
+context:
+  # microarch_level: ${{ microarch_level | default(1) }}
+  microarch_level: ${{ 1 if microarch_level is undefined else microarch_level|int }}
+
+package:
+  name: foobar
+  version: 1.0.0
+
+build:
+  script: echo "Building foobar with microarch level ${{ microarch_level }}"

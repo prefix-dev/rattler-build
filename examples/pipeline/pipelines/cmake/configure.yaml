@@ -1,0 +1,25 @@
+name: Configure a CMake project
+
+needs:
+  packages:
+    - cmake
+    - ninja
+
+inputs:
+  output_dir:
+    description: |
+      The output directory for the CMake build.
+    default: output
+
+  cmake_args:
+    description: |
+      Compile options for the CMake build.
+
+pipeline:
+  - script: |
+      cmake -B ${{ inputs.output_dir }} -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=${{ PREFIX }} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_VERBOSE_MAKEFILE=ON \
+        ${{ inputs.cmake_args }}

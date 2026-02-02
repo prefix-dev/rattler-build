@@ -1,0 +1,454 @@
+[
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "name": "fenics-dolfinx",
+        "version": "0.10.0",
+        "build": 1,
+        "major_minor": "0.10.*",
+        "ufl_version": "2025.2.*",
+        "abi3_tag": "cp312",
+        "abi3_python": "3.10",
+        "build_abi3": true,
+        "use_abi3": true,
+        "skip_abi3": false,
+        "abi_version": "2.16"
+      },
+      "package": {
+        "name": "fenics-libdolfinx",
+        "version": "0.10.0"
+      },
+      "source": [
+        {
+          "url": "https://github.com/fenics/dolfinx/archive/refs/tags/v0.10.0.tar.gz",
+          "sha256": "24cbad2f604b38248e7655280e5f894eed19b409de4618cd6148a362a70105fd"
+        }
+      ],
+      "build": {
+        "number": 1,
+        "string": "py310hc0c274e_1",
+        "script": "build-libdolfinx",
+        "variant": {
+          "use_keys": [
+            "python"
+          ]
+        }
+      },
+      "requirements": {
+        "build": [
+          "gcc_osx-arm64 14.*",
+          "sysroot_osx-arm64 2.17.*",
+          "gxx_osx-arm64 14.*",
+          "cmake",
+          "ninja",
+          "pkg-config"
+        ],
+        "host": [
+          "mpich",
+          "libadios2",
+          "libadios2 * mpi_mpich_*",
+          "kahip",
+          "parmetis",
+          "petsc",
+          "petsc * complex_*",
+          "slepc",
+          "libboost-devel",
+          "hdf5 1.14.6.* mpi_mpich_*",
+          "libscotch",
+          "libptscotch",
+          "pugixml",
+          "fmt",
+          "spdlog",
+          "fenics-libbasix 0.10.*",
+          "fenics-ufcx 0.10.*"
+        ],
+        "run": [
+          "fenics-ufcx 0.10.*",
+          {
+            "pin_compatible": {
+              "name": "parmetis",
+              "lower_bound": "x.x.x.x.x.x",
+              "upper_bound": "x.x"
+            }
+          },
+          "libboost-devel"
+        ],
+        "run_exports": {
+          "weak": [
+            {
+              "pin_subpackage": {
+                "name": "fenics-libdolfinx",
+                "lower_bound": "x.x.x.x.x.x",
+                "upper_bound": "x.x.x"
+              }
+            },
+            "petsc * complex_*",
+            "mpich"
+          ]
+        }
+      },
+      "tests": [
+        {
+          "script": {
+            "env": {
+              "target_platform": "osx-arm64",
+              "CONDA_BUILD": "1"
+            },
+            "file": "test-libdolfinx"
+          },
+          "requirements": {
+            "run": [
+              "gcc_osx-arm64 14.*",
+              "gxx_osx-arm64 14.*",
+              "pkg-config",
+              "cmake",
+              "catch2 3.*",
+              "ninja",
+              "fenics-ffcx 0.10.*"
+            ]
+          },
+          "files": {
+            "source": [
+              "cpp/test/"
+            ]
+          }
+        }
+      ],
+      "about": {
+        "homepage": "https://fenicsproject.org/",
+        "repository": "https://github.com/fenics/dolfinx",
+        "documentation": "https://docs.fenicsproject.org/dolfinx/v0.10.0/",
+        "license": "LGPL-3.0-or-later",
+        "license_file": [
+          "COPYING.LESSER"
+        ],
+        "summary": "The computational environment of FEniCSx",
+        "description": "DOLFINx is the computational environment of FEniCSx\nand implements the FEniCS Problem Solving Environment in Python and C++."
+      },
+      "extra": {
+        "feedstock-name": "fenics-dolfinx",
+        "recipe-maintainers": [
+          "minrk"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "osx-arm64",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=26.2=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=26.2=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "c_compiler": "gcc",
+        "c_compiler_version": "14",
+        "c_stdlib": "sysroot",
+        "c_stdlib_version": "2.17",
+        "channel_sources": "conda-forge",
+        "channel_targets": "conda-forge main",
+        "cxx_compiler": "gxx",
+        "cxx_compiler_version": "14",
+        "fmt": "11.2",
+        "hdf5": "1.14.6",
+        "is_abi3": true,
+        "libboost_devel": "1.88",
+        "libptscotch": "7.0.10",
+        "libscotch": "7.0.10",
+        "mpi": "mpich",
+        "mpich": "4",
+        "nanobind_abi": "16",
+        "petsc": "3.24",
+        "pugixml": "1.15",
+        "python": "3.10.* *_cpython",
+        "scalar": "complex",
+        "slepc": "3.24",
+        "spdlog": "1.15",
+        "target_platform": "osx-arm64"
+      },
+      "hash": {
+        "hash": "c0c274e",
+        "prefix": "py310"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-libdolfinx_1769351384/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-libdolfinx_1769351384/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-libdolfinx_1769351384/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-libdolfinx_1769351384"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-25T14:29:44.925920Z",
+      "subpackages": {
+        "fenics-libdolfinx": {
+          "name": "fenics-libdolfinx",
+          "version": "0.10.0",
+          "build_string": "py310hc0c274e_1"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  },
+  {
+    "recipe": {
+      "schema_version": 1,
+      "context": {
+        "name": "fenics-dolfinx",
+        "version": "0.10.0",
+        "build": 1,
+        "major_minor": "0.10.*",
+        "ufl_version": "2025.2.*",
+        "abi3_tag": "cp312",
+        "abi3_python": "3.10",
+        "build_abi3": true,
+        "use_abi3": true,
+        "skip_abi3": false,
+        "abi_version": "2.16"
+      },
+      "package": {
+        "name": "fenics-dolfinx",
+        "version": "0.10.0"
+      },
+      "source": [
+        {
+          "url": "https://github.com/fenics/dolfinx/archive/refs/tags/v0.10.0.tar.gz",
+          "sha256": "24cbad2f604b38248e7655280e5f894eed19b409de4618cd6148a362a70105fd"
+        }
+      ],
+      "build": {
+        "number": 1,
+        "string": "py310h83c3864_1",
+        "script": {
+          "env": {
+            "SKBUILD_WHEEL_PY_API": "cp312"
+          },
+          "file": "build-dolfinx"
+        },
+        "python": {
+          "version_independent": true
+        }
+      },
+      "requirements": {
+        "build": [
+          "gcc_osx-arm64 14.*",
+          "sysroot_osx-arm64 2.17.*",
+          "gxx_osx-arm64 14.*",
+          "cmake",
+          "ninja",
+          "pkg-config",
+          "fenics-basix-nanobind-abi 2.16.*"
+        ],
+        "host": [
+          "mpich",
+          "hdf5 1.14.6.* mpi_mpich_*",
+          {
+            "pin_subpackage": {
+              "name": "fenics-libdolfinx",
+              "exact": true
+            }
+          },
+          "fenics-libdolfinx 0.10.*",
+          "python",
+          "python-abi3",
+          "pip",
+          "scikit-build-core",
+          "wheel",
+          "nanobind",
+          "nanobind-abi",
+          "fenics-basix 0.10.*",
+          "fenics-basix-nanobind-abi 2.16.*",
+          "mpi4py",
+          "petsc * complex_*",
+          "petsc4py",
+          "slepc",
+          "slepc4py",
+          "libboost-devel"
+        ],
+        "run": [
+          "gcc_osx-arm64 14.*",
+          "pkg-config",
+          {
+            "pin_subpackage": {
+              "name": "fenics-libdolfinx",
+              "exact": true
+            }
+          },
+          "cffi",
+          "mpi4py",
+          "numpy >=1.21",
+          "petsc4py",
+          "slepc4py",
+          "fenics-basix 0.10.*",
+          "fenics-ffcx 0.10.*",
+          "fenics-ufl 2025.2.*"
+        ]
+      },
+      "tests": [
+        {
+          "script": {
+            "env": {
+              "scalar": "complex",
+              "target_platform": "osx-arm64",
+              "CONDA_BUILD": "1"
+            },
+            "file": "test-dolfinx"
+          },
+          "requirements": {
+            "run": [
+              "python 3.13.*",
+              "pip",
+              "pytest >=6",
+              "python-gmsh",
+              "sympy",
+              "scipy",
+              "matplotlib-base"
+            ]
+          },
+          "files": {
+            "source": [
+              "python/demo/",
+              "python/test/"
+            ],
+            "recipe": [
+              "test_dolfinx.py"
+            ]
+          }
+        },
+        {
+          "script": [
+            "abi3audit $PREFIX/lib/python3.13/site-packages/dolfinx/*.so --assume-minimum-abi3 3.12",
+            "python3 -c 'import dolfinx'"
+          ],
+          "requirements": {
+            "run": [
+              "abi3audit",
+              "python 3.13.*"
+            ]
+          }
+        }
+      ],
+      "about": {
+        "homepage": "https://fenicsproject.org/",
+        "repository": "https://github.com/fenics/dolfinx",
+        "documentation": "https://docs.fenicsproject.org/dolfinx/v0.10.0/",
+        "license": "LGPL-3.0-or-later",
+        "license_file": [
+          "COPYING.LESSER"
+        ],
+        "summary": "The computational environment of FEniCSx",
+        "description": "DOLFINx is the computational environment of FEniCSx\nand implements the FEniCS Problem Solving Environment in Python and C++."
+      },
+      "extra": {
+        "feedstock-name": "fenics-dolfinx",
+        "recipe-maintainers": [
+          "minrk"
+        ]
+      }
+    },
+    "build_configuration": {
+      "target_platform": "osx-arm64",
+      "host_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=26.2=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "build_platform": {
+        "platform": "osx-arm64",
+        "virtual_packages": [
+          "__unix=0=0",
+          "__osx=26.2=0",
+          "__archspec=1=m2"
+        ]
+      },
+      "variant": {
+        "build_platform": "osx-arm64",
+        "c_compiler": "gcc",
+        "c_compiler_version": "14",
+        "c_stdlib": "sysroot",
+        "c_stdlib_version": "2.17",
+        "channel_sources": "conda-forge",
+        "channel_targets": "conda-forge main",
+        "cxx_compiler": "gxx",
+        "cxx_compiler_version": "14",
+        "fenics_libdolfinx": "0.10.0 py310hc0c274e_1",
+        "hdf5": "1.14.6",
+        "is_abi3": true,
+        "libboost_devel": "1.88",
+        "mpi": "mpich",
+        "mpich": "4",
+        "nanobind": "2.9",
+        "nanobind_abi": "16",
+        "petsc4py": "3.24",
+        "python": "3.10.* *_cpython",
+        "scalar": "complex",
+        "slepc": "3.24",
+        "slepc4py": "3.24",
+        "target_platform": "osx-arm64"
+      },
+      "hash": {
+        "hash": "83c3864",
+        "prefix": "py310"
+      },
+      "directories": {
+        "host_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-dolfinx_1769351384/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold",
+        "build_prefix": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-dolfinx_1769351384/build_env",
+        "work_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-dolfinx_1769351384/work",
+        "build_dir": "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_fenics-dolfinx_1769351384"
+      },
+      "channels": [
+        "https://conda.anaconda.org/conda-forge"
+      ],
+      "channel_priority": "strict",
+      "solve_strategy": "highest",
+      "timestamp": "2026-01-25T14:29:44.932452Z",
+      "subpackages": {
+        "fenics-dolfinx": {
+          "name": "fenics-dolfinx",
+          "version": "0.10.0",
+          "build_string": "py310h83c3864_1"
+        },
+        "fenics-libdolfinx": {
+          "name": "fenics-libdolfinx",
+          "version": "0.10.0",
+          "build_string": "py310hc0c274e_1"
+        }
+      },
+      "packaging_settings": {
+        "archive_type": "conda",
+        "compression_level": 15
+      }
+    },
+    "finalized_dependencies": null,
+    "finalized_sources": null,
+    "system_tools": {
+      "rattler-build": "0.56.0"
+    },
+    "extra_meta": {}
+  }
+]

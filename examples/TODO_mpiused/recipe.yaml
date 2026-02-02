@@ -1,0 +1,10 @@
+context:
+  mpi: ${{ mpi or "nompi" }} # is this still needed?
+
+package:
+  name: mpiused
+  version: 1.0.0
+
+requirements:
+  build:
+    - ${{ "mpi4py" if mpi != "nompi" else "numpy" }}

@@ -1,0 +1,17 @@
+recipe:
+  name: foobar-split
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: foobar
+
+    requirements:
+      run_constraints:
+        - ${{ pin_subpackage("baz") }}
+
+  - package:
+      name: baz
+    requirements:
+      run:
+        - foobar

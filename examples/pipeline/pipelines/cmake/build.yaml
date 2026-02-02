@@ -1,0 +1,16 @@
+name: Build a CMake project
+
+needs:
+  packages:
+    - cmake
+    - ninja
+
+inputs:
+  output_dir:
+    description: |
+      The output directory for the CMake build.
+    default: output
+
+pipeline:
+  - script: |
+      VERBOSE=1 cmake --build ${{ inputs.output_dir }}

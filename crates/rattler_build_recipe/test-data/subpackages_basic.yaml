@@ -1,0 +1,52 @@
+schema_version: 1
+
+package:
+  name: foobar
+  version: 1.0.0
+
+build:
+  number: 0
+  script: |
+    mkdir -p $PREFIX/lib
+    mkdir -p $PREFIX/include
+    mkdir -p $PREFIX/bin
+    mkdir -p $PREFIX/share/doc
+    echo "library" > $PREFIX/lib/libfoobar.so
+    echo "header" > $PREFIX/include/foobar.h
+    echo "tool" > $PREFIX/bin/foobar-cli
+    echo "docs" > $PREFIX/share/doc/README.md
+
+requirements:
+  host:
+    - python
+  run:
+    - python
+
+sub_packages:
+  - package:
+      name: libfoobar
+    build:
+      files:
+        - lib/**
+    requirements:
+      run:
+        - python
+
+  - package:
+      name: foobar-headers
+    build:
+      files:
+        - include/**
+    requirements:
+      run:
+        - ${{ pin_subpackage('libfoobar', exact=true) }}
+
+  - package:
+      name: foobar-docs
+    build:
+      files:
+        - share/doc/**
+    about:
+      summary: Documentation for foobar
+
+# Parent 'foobar' gets: bin/** and anything not claimed by subpackages

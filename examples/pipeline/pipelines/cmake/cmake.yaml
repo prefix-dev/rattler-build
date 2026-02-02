@@ -1,0 +1,38 @@
+name: Configure a CMake project
+
+needs:
+  packages:
+    - cmake
+    - ninja
+
+inputs:
+  output_dir:
+    description: |
+      The output directory for the CMake build.
+    default: output
+
+  cmake_args:
+    description: |
+      Compile options for the CMake build.
+
+pipeline:
+  - uses: ./configure.yaml
+    with:
+      output_dir: ${{ inputs.output_dir }}
+      cmake_args: ${{ inputs.cmake_args }}
+  - if: unix
+    then:
+      - script: echo "unix"
+    else:
+      - script: echo "not unix"
+  - if: unix
+    then:
+      - uses: jlkajsdlkasjd
+        with:
+          output_dir: ${{ inputs.output_dir }}
+  - uses: ./build.yaml
+    with:
+      output_dir: ${{ inputs.output_dir }}
+  - uses: ./install.yaml
+    with:
+      output_dir: ${{ inputs.output_dir }}

@@ -1,0 +1,18 @@
+package:
+  name: libfoobar
+  version: 1.2.3
+
+build:
+  script:
+    - echo "foo" > $PREFIX/foo.txt
+    - echo "bar" > $PREFIX/bar.txt
+
+sub_packages:
+  - package:
+      name: foo
+    build:
+      files:
+        - foo.txt
+    requirements:
+      run:
+        - ${{ pin_subpackage('libfoobar', exact=true) }}

@@ -1,0 +1,38 @@
+schema_version: 1
+
+context:
+  name: ninja
+  version: 1.2.0
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 9
+
+outputs:
+  - package:
+      name: ${{ name }}-hep-ph
+    build:
+      skip: win
+    requirements:
+      build:
+        - ${{ compiler("c") }}
+        - ${{ stdlib("c") }}
+        - ${{ compiler("cxx") }}
+
+  - package:
+      name: ${{ name }}-hep-ph-static
+    build:
+      skip: win
+
+about:
+  summary: "Ninja: Automated Integrand Reduction via Laurent Expansion for One-Loop Amplitudes"
+  description: |
+    Ninja implements the Laurent series expansion method for the computation of
+    one-loop integrals.
+  license: GPL-3.0-only
+  license_file: COPYING
+  homepage: https://github.com/peraro/ninja
+  repository: https://github.com/peraro/ninja

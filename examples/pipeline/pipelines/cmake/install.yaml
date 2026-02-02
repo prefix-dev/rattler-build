@@ -1,0 +1,16 @@
+name: Install a CMake project
+
+needs:
+  packages:
+    - cmake
+    - ninja
+
+inputs:
+  output_dir:
+    description: |
+      The output directory for the CMake build.
+    default: output
+
+pipeline:
+  - script: |
+      cmake --install ${{ inputs.output_dir }}

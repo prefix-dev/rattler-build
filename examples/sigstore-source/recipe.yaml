@@ -1,0 +1,11 @@
+package:
+  name: flask
+  version: 3.0.0
+
+source:
+  - url: https://files.pythonhosted.org/packages/dc/6d/cfe3c0fcc5e477df242b98bfe186a4c34357b4847e87ecaef04507332dab/flask-3.1.2.tar.gz
+    sha256: bf656c15c80190ed628ad08cdfd3aaa35beb087855e2f494910aa3774cc4fd87
+    sigstore:
+      bundle_url: https://pypi.org/integrity/flask/3.1.2/flask-3.1.2.tar.gz/provenance
+      identity: https://github.com/pallets/flask/.github/workflows/publish.yaml@refs/tags/3.1.2
+      issuer: https://token.actions.githubusercontent.com

@@ -1,0 +1,25 @@
+context:
+  build_number: 1
+  server_build_number: 0
+  server_version: "2.3.0"
+  version: "5.2.0"
+recipe:
+  name: jupyter-lsp-meta
+  version: ${{ version }}
+
+build:
+  number: 1234
+  noarch: python
+
+outputs:
+  - package:
+      name: jupyterlab-lsp
+      version: ${{ version }}
+    build:
+      number: ${{ build_number }}
+
+  - package:
+      name: jupyter-lsp
+      version: ${{ server_version }}
+    build:
+      number: ${{ server_build_number }}

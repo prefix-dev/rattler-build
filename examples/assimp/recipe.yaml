@@ -1,0 +1,7 @@
+package:
+  name: assimp-runexport
+  version: 0.1.0
+
+requirements:
+  host:
+    - assimp =6.0.3
