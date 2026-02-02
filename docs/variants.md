@@ -31,7 +31,7 @@ numpy:
 - "1.20"
 ```
 
-If we have a recipe, that has a `build`, `host` or `run` dependency on `python`
+If we have a recipe that has a `build` or `host` dependency on `python`,
 we will build multiple variants of this package, one for each configured
 `python` version ("3.8", "3.9" and "3.10").
 
