@@ -69,3 +69,6 @@ pre-push:
     - name: cargo-clippy
       glob: "*.rs"
       run: pixi {run} cargo-clippy
+    - name: check-native-tls
+      glob: "Cargo.{toml,lock}"
+      run: ./scripts/check-native-tls.sh

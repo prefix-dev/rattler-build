@@ -67,6 +67,8 @@ native-tls = [
   'rattler_networking/native-tls',
   'rattler_package_streaming/native-tls',
   'rattler_index/native-tls',
+  'rattler_redaction/native-tls',
+  'http-range-client/default-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -77,6 +79,8 @@ rustls-tls = [
   'rattler_networking/rustls-tls',
   'rattler_package_streaming/rustls-tls',
   'rattler_index/rustls-tls',
+  'rattler_redaction/rustls-tls',
+  'http-range-client/rustls-tls',
 ]
 tui = [
   'ratatui',
@@ -85,7 +89,12 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'dep:rattler_s3', 'rattler_index/s3']
+s3 = [
+  'rattler_networking/s3',
+  'rattler_upload/s3',
+  'dep:rattler_s3',
+  'rattler_index/s3',
+]
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -203,7 +212,7 @@ rattler_networking = { version = "0.25.29", default-features = false, features =
 ] }
 rattler_upload = { version = "0.4.6", default-features = false }
 rattler_s3 = { version = "0.1.17", optional = true }
-rattler_redaction = { version = "0.1.13" }
+rattler_redaction = { version = "0.1.13", default-features = false }
 rattler_repodata_gateway = { version = "0.25.9", default-features = false, features = [
   "gateway",
 ] }
@@ -226,7 +235,6 @@ line-ending = "1.5.1"
 flickzeug = "0.4.4"
 http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
-  "rustls-tls",
 ] }
 sevenz-rust2 = "0.20.0"
 dialoguer = "0.12.0"
