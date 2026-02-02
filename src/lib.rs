@@ -54,7 +54,6 @@ use std::{
 
 use build::{WorkingDirectoryBehavior, run_build, skip_existing};
 use console_utils::LoggingOutputHandler;
-use dialoguer::Confirm;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
@@ -968,12 +967,17 @@ pub async fn rebuild(
         let diffoscope_available = Command::new("diffoscope").arg("--version").output().is_ok();
 
         if diffoscope_available {
-            let confirmation = Confirm::new()
-                .with_prompt("Do you want to run diffoscope?")
-                .interact()
-                .unwrap();
+            // In interactive mode, ask the user; in CI/non-TTY, run automatically
+            let should_run = if std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+                dialoguer::Confirm::new()
+                    .with_prompt("Do you want to run diffoscope?")
+                    .interact()
+                    .unwrap_or(true)
+            } else {
+                true
+            };
 
-            if confirmation {
+            if should_run {
                 let mut command = Command::new("diffoscope");
                 command
                     .arg(&package_path)
