@@ -5054,4 +5054,74 @@ build:
         // Second should be the unconditional one
         assert_eq!(result2.build.post_process[1].regex.as_str(), "always");
     }
+
+    #[test]
+    fn test_skip_true_unconditionally_skips() {
+        // Test that `skip: true` (boolean literal) causes the build to be skipped
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+package:
+  name: test-skip
+  version: "1.0.0"
+build:
+  number: 0
+  skip: true
+  script:
+    - exit 1
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+
+        // Create a minimal evaluation context
+        let mut ctx = EvaluationContext::new();
+        ctx.insert(
+            "target_platform".to_string(),
+            Variable::from_string("linux-64"),
+        );
+
+        // Evaluate the recipe - it should be skipped
+        let result = parsed.evaluate(&ctx);
+        assert!(
+            result.is_ok(),
+            "Recipe evaluation should succeed, got error: {:?}",
+            result.err()
+        );
+
+        let recipe = result.unwrap();
+
+        // The recipe should have skip conditions that include "true"
+        assert!(
+            !recipe.build.skip.is_empty(),
+            "Skip conditions should not be empty"
+        );
+
+        // Verify that is_skipped returns true for this recipe
+        assert!(
+            is_skipped(&recipe.build.skip, &ctx),
+            "Recipe with skip: true should be skipped. Skip conditions: {:?}",
+            recipe.build.skip
+        );
+    }
+
+    #[test]
+    fn test_is_skipped_with_literal_true() {
+        // Direct test of is_skipped function with the string "true"
+        let ctx = EvaluationContext::new();
+
+        // The string "true" should evaluate to boolean true in Jinja
+        let skip_conditions = vec!["true".to_string()];
+        assert!(
+            is_skipped(&skip_conditions, &ctx),
+            "is_skipped should return true for skip condition 'true'"
+        );
+
+        // Also test "false" - should NOT skip
+        let skip_conditions_false = vec!["false".to_string()];
+        assert!(
+            !is_skipped(&skip_conditions_false, &ctx),
+            "is_skipped should return false for skip condition 'false'"
+        );
+    }
 }

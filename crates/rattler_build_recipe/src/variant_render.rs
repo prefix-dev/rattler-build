@@ -2253,4 +2253,40 @@ mpi:
         assert!(mpi_values.contains(&"openmpi".to_string()));
         assert!(mpi_values.contains(&"mpich".to_string()));
     }
+
+    #[test]
+    fn test_single_output_skip_true_filters_output() {
+        // Test that a single-output recipe with `skip: true` returns an empty result
+        // Currently this test FAILS because the skip check is not implemented for single-output recipes
+        use crate::stage0::parse_recipe_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+package:
+  name: test-skip
+  version: "1.0.0"
+build:
+  number: 0
+  skip: true
+  script:
+    - exit 1
+"#;
+
+        let stage0_recipe = parse_recipe_from_source(recipe_yaml).unwrap();
+        let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe));
+
+        let variant_config = VariantConfig::default();
+        let rendered =
+            render_recipe_with_variant_config(&stage0, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // This should be empty because the recipe has skip: true
+        // BUG: Currently returns 1 because skip is not checked for single-output recipes
+        assert_eq!(
+            rendered.len(),
+            0,
+            "Recipe with skip: true should be filtered out, got {} outputs",
+            rendered.len()
+        );
+    }
 }
