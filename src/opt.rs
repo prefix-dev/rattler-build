@@ -8,7 +8,7 @@ use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{
-    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::ArchiveType,
+    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::ConfigBase;
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -752,7 +752,7 @@ impl BuildData {
             keep_build,
             no_build_id,
             package_format: package_format.unwrap_or(PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
+                archive_type: CondaArchiveType::Conda,
                 compression_level: CompressionLevel::Default,
             }),
             compression_threads,
