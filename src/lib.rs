@@ -1540,4 +1540,3 @@ pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
     package_info::extract_package(args).await
 }
-
