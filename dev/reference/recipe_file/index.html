@@ -3860,8 +3860,8 @@ variant file (if the pinning from the variant file needs customization).</p>
 </span><span id="__span-65-7"><a id="__codelineno-65-7" name="__codelineno-65-7" href="#__codelineno-65-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, min_pin=&#39;x.x&#39;, upper_bound=&#39;x&#39;) }}</span>
 </span></code></pre></div>
 <h4 id="the-env-jinja-functions">The env Jinja functions<a class="headerlink" href="#the-env-jinja-functions" title="Permanent link">#</a></h4>
-<p>You can access the current environment variables using the <code>env</code> object in
-Jinja.</p>
+<p>You can access the environment variables set outside the build script using the
+<code>env</code> object in Jinja.</p>
 <p>There are three functions:</p>
 <ul>
 <li><code>env.get("ENV_VAR")</code> will insert the value of "ENV_VAR" into the recipe.</li>
