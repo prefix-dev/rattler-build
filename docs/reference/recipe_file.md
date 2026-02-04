@@ -1240,8 +1240,8 @@ requirements:
 
 #### The env Jinja functions
 
-You can access the current environment variables using the `env` object in
-Jinja.
+You can access the environment variables set outside the build script using the
+`env` object in Jinja.
 
 There are three functions:
 
