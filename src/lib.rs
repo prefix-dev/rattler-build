@@ -56,9 +56,10 @@ use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
+use rattler_build_jinja::JinjaConfig;
 use rattler_build_recipe::{
     stage0,
-    stage1::{Recipe, TestType},
+    stage1::{EvaluationContext, Recipe, TestType},
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
 use rattler_build_variant_config::VariantConfig;
@@ -466,10 +467,35 @@ pub async fn get_build_output(
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
-        // TODO: handle skipped builds
-        // if recipe.build().skip() {
-        //     continue;
-        // }
+        // Check if this build should be skipped based on skip conditions
+        if !recipe.build().skip.is_empty() {
+            // Create JinjaConfig with the target platform and variant
+            let jinja_config = JinjaConfig {
+                target_platform: discovered_output.target_platform,
+                build_platform: build_data.build_platform,
+                host_platform: build_data.host_platform,
+                variant: discovered_output.used_vars.clone(),
+                ..Default::default()
+            };
+
+            // Convert variant to IndexMap<String, Variable> for EvaluationContext
+            let variables = discovered_output
+                .used_vars
+                .iter()
+                .map(|(k, v)| (k.0.clone(), v.clone()))
+                .collect();
+
+            let context = EvaluationContext::with_variables_and_config(variables, jinja_config);
+
+            if stage0::evaluate::is_skipped(&recipe.build().skip, &context) {
+                tracing::info!(
+                    "Skipping {} {} - skip conditions evaluated to true",
+                    recipe.package().name().as_normalized(),
+                    recipe.package().version()
+                );
+                continue;
+            }
+        }
 
         subpackages.insert(
             recipe.package().name().clone(),

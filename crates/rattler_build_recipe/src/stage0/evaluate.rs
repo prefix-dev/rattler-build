@@ -4886,18 +4886,12 @@ outputs:
                     result.err()
                 );
 
+                // Skipped outputs are completely filtered out
                 let recipes = result.unwrap();
-                assert_eq!(recipes.len(), 1);
-
-                // The output should have skip conditions and empty requirements
-                let recipe = &recipes[0];
-                assert!(
-                    recipe.build.skip.contains(&"win".to_string()),
-                    "Skip conditions should be preserved"
-                );
-                assert!(
-                    recipe.requirements.build.is_empty(),
-                    "Requirements should be empty for skipped output"
+                assert_eq!(
+                    recipes.len(),
+                    0,
+                    "Skipped output should be filtered out, not returned"
                 );
             }
             _ => panic!("Expected MultiOutputRecipe"),
