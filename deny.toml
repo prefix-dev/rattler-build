@@ -14,7 +14,7 @@ allow = [
   "MPL-2.0",
   "Unicode-3.0",
   "Zlib",
-  "ISC AND (Apache-2.0 OR ISC) AND OpenSSL"
+  "OpenSSL",
 ]
 confidence-threshold = 0.8
 private = { ignore = true }
