@@ -10,7 +10,7 @@ use super::SourceError;
 /// Handle Compression formats internally
 enum TarCompression<'a> {
     PlainTar(Box<dyn BufRead + 'a>),
-    Gzip(flate2::read::GzDecoder<Box<dyn BufRead + 'a>>),
+    Gzip(Box<flate2::read::GzDecoder<Box<dyn BufRead + 'a>>>),
     Bzip2(bzip2::read::BzDecoder<Box<dyn BufRead + 'a>>),
     Xz(Box<lzma_rust2::XzReader<Box<dyn BufRead + 'a>>>),
     Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<Box<dyn BufRead + 'a>>>),
@@ -64,7 +64,9 @@ fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> T
         .and_then(|s| s.rsplit_once('.'))
         .map(|(_, s)| s)
     {
-        Some("gz" | "tgz" | "taz") => TarCompression::Gzip(flate2::read::GzDecoder::new(file)),
+        Some("gz" | "tgz" | "taz") => {
+            TarCompression::Gzip(Box::new(flate2::read::GzDecoder::new(file)))
+        }
         Some("bz2" | "tbz" | "tbz2" | "tz2") => {
             TarCompression::Bzip2(bzip2::read::BzDecoder::new(file))
         }

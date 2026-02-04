@@ -35,7 +35,7 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 openssl = "3.*"
 rust = ">=1.89.0,<1.90"
 rust-src = ">=1.89.0,<1.90"
-compilers = "1.6.0.*"
+compilers = ">=1.11.0,<2"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
 cmake = "3.27.6.*"
