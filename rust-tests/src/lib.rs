@@ -717,6 +717,59 @@ requirements:
     }
 
     #[test]
+    fn test_absolute_path_license_without_flag() {
+        let tmp = tmp("test_absolute_path_license_without_flag");
+        let recipe_path = recipes().join("absolute_path_license");
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipe_path.display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+        ]);
+
+        // This should fail without --allow-absolute-license-paths
+        assert!(!rattler_build.status.success());
+
+        let output = String::from_utf8_lossy(&rattler_build.stdout);
+        assert!(output.contains("Absolute paths in license_file are not allowed"));
+        // Check for parts of the flag name (may be wrapped across lines in output)
+        assert!(output.contains("allow-absolute"));
+    }
+
+    #[test]
+    fn test_absolute_path_license_with_flag() {
+        let tmp = tmp("test_absolute_path_license_with_flag");
+        let recipe_path = recipes().join("absolute_path_license");
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipe_path.display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+            "--allow-absolute-license-paths",
+        ]);
+
+        // This should succeed with --allow-absolute-license-paths
+        assert!(rattler_build.status.success());
+
+        // Verify both the relative and absolute path license files were copied
+        let pkg = get_extracted_package(tmp.as_dir(), "absolute-path-license");
+        assert!(pkg.join("info/licenses/LICENSE").exists());
+        assert!(pkg.join("info/licenses/external_license.txt").exists());
+    }
+
+    #[test]
     fn test_sourceforge_redirects() {
         let tmp = tmp("test_sourceforge_redirects");
         let rattler_build = rattler().build(

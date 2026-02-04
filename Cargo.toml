@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.55.1"
+version = "0.56.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -67,6 +67,8 @@ native-tls = [
   'rattler_networking/native-tls',
   'rattler_package_streaming/native-tls',
   'rattler_index/native-tls',
+  'rattler_redaction/native-tls',
+  'http-range-client/default-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -77,6 +79,8 @@ rustls-tls = [
   'rattler_networking/rustls-tls',
   'rattler_package_streaming/rustls-tls',
   'rattler_index/rustls-tls',
+  'rattler_redaction/rustls-tls',
+  'http-range-client/rustls-tls',
 ]
 tui = [
   'ratatui',
@@ -226,7 +230,6 @@ line-ending = "1.5.1"
 flickzeug = "0.4.5"
 http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
   "reqwest-sync",
-  "rustls-tls",
 ] }
 sevenz-rust2 = "0.20.1"
 dialoguer = "0.12.0"

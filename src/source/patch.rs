@@ -135,7 +135,8 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         // the first match in the affected files.
         let any_paths_exist = patched_files.iter().any(|p| {
             let path: PathBuf = p.components().skip(strip_level).collect();
-            work_dir.join(path).exists()
+            // Skip empty paths - they can falsely match the work_dir itself
+            !path.as_os_str().is_empty() && work_dir.join(path).exists()
         });
         if any_paths_exist {
             return Ok(strip_level);
@@ -602,6 +603,29 @@ mod tests {
     }
 
     #[test]
+    fn test_strip_level_with_all_new_files() {
+        // Test that when all files are new (from /dev/null), the strip level
+        // doesn't incorrectly match the workdir itself when paths become empty
+        // after stripping.
+        let patch_content = b"--- /dev/null
++++ b/new_file.txt
+@@ -0,0 +1 @@
++new content
+";
+        let patch = patch_from_bytes(patch_content).unwrap();
+
+        let tempdir = TempDir::new().unwrap();
+        // Work dir exists but contains no files matching the patch
+        let strip_level = guess_strip_level(&patch, tempdir.path()).unwrap();
+
+        // Should return 1 (strip the 'b' prefix), not 2 (which would make path empty)
+        assert_eq!(
+            strip_level, 1,
+            "Strip level should be 1, not 2 (empty paths should not match workdir)"
+        );
+    }
+
+    #[test]
     fn test_backup_file_logic_edge_cases() {
         // Test edge cases in the backup file handling logic
         let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
@@ -732,6 +756,39 @@ mod tests {
         let content = fs_err::read_to_string(&created_file).unwrap();
         assert!(content.contains("This is a newly created file"));
         assert!(content.contains("via patch application"));
+    }
+
+    #[test]
+    fn test_apply_multiple_new_files_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch that creates multiple new files in one patch
+        apply_patches(
+            &[PathBuf::from("test_multiple_new_files.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Multiple new files patch should apply successfully");
+
+        // Check that all new files were created with correct content
+        let first_file = tempdir.path().join("workdir/first_new_file.txt");
+        assert!(first_file.exists(), "first_new_file.txt should exist");
+        let content = fs_err::read_to_string(&first_file).unwrap();
+        assert!(content.contains("This is the first new file"));
+
+        let second_file = tempdir.path().join("workdir/second_new_file.txt");
+        assert!(second_file.exists(), "second_new_file.txt should exist");
+        let content = fs_err::read_to_string(&second_file).unwrap();
+        assert!(content.contains("This is the second new file"));
+
+        let third_file = tempdir.path().join("workdir/subdir/third_new_file.txt");
+        assert!(
+            third_file.exists(),
+            "subdir/third_new_file.txt should exist"
+        );
+        let content = fs_err::read_to_string(&third_file).unwrap();
+        assert!(content.contains("This is the third new file"));
     }
 
     #[test]

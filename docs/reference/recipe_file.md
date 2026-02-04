@@ -936,9 +936,6 @@ tests:
 
 ### Downstream tests
 
-!!! warning
-    Downstream tests are not yet implemented in `rattler-build`.
-
 A downstream test can mention a single package that has a dependency on the package being built.
 The test will install the package and run the tests of the downstream package with our current
 package as a dependency.
@@ -1207,7 +1204,7 @@ See the [Jinja Reference](./jinja.md) for more information.
 #### Pin subpackage
 
 Pin subpackage refers to another package from the same recipe file. It is
-commonly used in the `build/run_exports` section to export a run export from the
+commonly used in the `requirements/run_exports` section to export a run export from the
 package, or with multiple outputs to refer to a previous build.
 
 It looks something like:

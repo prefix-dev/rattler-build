@@ -389,7 +389,7 @@ fn parse_recipe_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -420,6 +420,7 @@ fn build_recipes_py(
     debug: bool,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
+    allow_absolute_license_paths: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     use_bz2: bool,
     use_zstd: bool,
@@ -508,6 +509,7 @@ fn build_recipes_py(
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
+        allow_absolute_license_paths,
         exclude_newer,
         // TODO: implement build number override!
         None,

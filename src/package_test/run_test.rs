@@ -19,7 +19,7 @@ use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
-    package::{CondaArchiveIdentifier as ArchiveIdentifier, IndexJson, PackageFile},
+    package::{CondaArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_shell::{
@@ -350,7 +350,7 @@ pub async fn run_test(
 
     let cache_dir = rattler::default_cache_dir()?;
 
-    let pkg = ArchiveIdentifier::try_from_path(package_file)
+    let pkg = CondaArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
     // if the package is already in the cache, remove it.
@@ -539,15 +539,16 @@ impl PythonTest {
     /// Execute the Python test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!(
-            "Running python test(s)",
-            span_color = pkg.identifier.to_string()
+        let pkg_id = format!(
+            "{}-{}-{}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
         );
+        let span = tracing::info_span!("Running python test(s)", span_color = pkg_id);
         let _guard = span.enter();
 
         // The version spec of the package being built
@@ -705,13 +706,16 @@ impl PerlTest {
     /// Execute the Perl test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span =
-            tracing::info_span!("Running perl test", span_color = pkg.identifier.to_string());
+        let pkg_id = format!(
+            "{}-{}-{}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        );
+        let span = tracing::info_span!("Running perl test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -782,7 +786,7 @@ impl CommandsTest {
     /// Execute the command test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         test_directory: &Path,
         config: &TestConfiguration,
@@ -900,7 +904,7 @@ impl DownstreamTest {
     /// Execute the command test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
@@ -966,7 +970,7 @@ impl DownstreamTest {
                 let temp_dir = tempfile::tempdir()?;
                 let package_file = temp_dir
                     .path()
-                    .join(&downstream_package.identifier.to_file_name());
+                    .join(downstream_package.identifier.to_file_name());
 
                 if downstream_package.url.scheme() == "file" {
                     fs::copy(
@@ -1006,12 +1010,16 @@ impl RTest {
     /// Execute the R test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running R test", span_color = pkg.identifier.to_string());
+        let pkg_id = format!(
+            "{}-{}-{}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        );
+        let span = tracing::info_span!("Running R test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
@@ -1081,13 +1089,16 @@ impl RubyTest {
     /// Execute the Ruby test
     pub async fn run_test(
         &self,
-        pkg: &ArchiveIdentifier,
+        pkg: &CondaArchiveIdentifier,
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span =
-            tracing::info_span!("Running Ruby test", span_color = pkg.identifier.to_string());
+        let pkg_id = format!(
+            "{}-{}-{}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        );
+        let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(
