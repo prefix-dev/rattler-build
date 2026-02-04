@@ -68,6 +68,7 @@ native-tls = [
   'rattler_package_streaming/native-tls',
   'rattler_index/native-tls',
   'rattler_redaction/native-tls',
+  'rattler_upload/native-tls',
   'http-range-client/default-tls',
 ]
 rustls-tls = [
@@ -80,6 +81,7 @@ rustls-tls = [
   'rattler_package_streaming/rustls-tls',
   'rattler_index/rustls-tls',
   'rattler_redaction/rustls-tls',
+  'rattler_upload/rustls-tls',
   'http-range-client/rustls-tls',
 ]
 tui = [
