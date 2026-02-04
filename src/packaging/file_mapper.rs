@@ -49,7 +49,9 @@ pub fn filter_pyc(path: &Path, old_files: &HashSet<PathBuf>) -> bool {
 /// - .pyo files are considered "harmful" (optimized python files)
 /// - .la files are not needed at runtime and are unnecessary bloat
 /// - .DS_Store files are not needed and macOS specific
-/// - .git* files are not needed in a package and are version control specific (incl. .git folder and .gitignore)
+/// - share/info/dir is skipped to avoid multiple packages writing to the same index file
+/// - conda-meta directories are skipped
+/// - CACHEDIR.TAG files are skipped
 pub fn filter_file(relative_path: &Path) -> bool {
     let ext = relative_path.extension().unwrap_or_default();
 
@@ -69,10 +71,10 @@ pub fn filter_file(relative_path: &Path) -> bool {
         return true;
     }
 
-    // filter any paths with .DS_Store, .git*, or conda-meta in them
+    // filter any paths with .DS_Store, CACHEDIR.TAG or conda-meta in them
     if relative_path.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();
-        s == ".DS_Store" || s == "conda-meta"
+        s == ".DS_Store" || s == "conda-meta" || s == "CACHEDIR.TAG"
     }) {
         return true;
     }
