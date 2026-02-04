@@ -209,7 +209,7 @@ rattler_networking = { version = "0.25.33", default-features = false, features =
 ] }
 rattler_upload = { version = "0.4.11", default-features = false, features = ["sigstore-sign"] }
 rattler_s3 = { version = "0.1.22", optional = true }
-rattler_redaction = { version = "0.1.13" }
+rattler_redaction = { version = "0.1.13", default-features = false }
 rattler_repodata_gateway = { version = "0.25.11", default-features = false, features = [
   "gateway",
 ] }
