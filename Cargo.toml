@@ -55,7 +55,7 @@ url = "2.5.8"
 zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 
 [features]
-default = ['rustls-tls', 'recipe-generation', 's3']
+default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']
 # Enable optimized memory allocators for release builds.
 # This provides significant performance improvements, especially on Linux musl.
 # Disabled by default due to increased compile time.
@@ -92,6 +92,7 @@ tui = [
   'tui-input',
 ]
 s3 = ['rattler_networking/s3', 'rattler_upload/s3', 'rattler_index/s3', 'dep:rattler_s3']
+sigstore = ['rattler_upload/sigstore-sign']
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
@@ -207,7 +208,7 @@ rattler_index = { version = "0.27.12", default-features = false }
 rattler_networking = { version = "0.25.33", default-features = false, features = [
   "rattler_config",
 ] }
-rattler_upload = { version = "0.4.11", default-features = false, features = ["sigstore-sign"] }
+rattler_upload = { version = "0.4.11", default-features = false }
 rattler_s3 = { version = "0.1.22", optional = true }
 rattler_redaction = { version = "0.1.13", default-features = false }
 rattler_repodata_gateway = { version = "0.25.11", default-features = false, features = [

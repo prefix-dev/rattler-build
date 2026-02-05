@@ -396,12 +396,13 @@ pub struct BuildOpts {
         short,
         long = "recipe",
         default_value = ".",
-        default_value_if("recipe_dir", ArgPredicate::IsPresent, None)
+        default_value_if("recipe_dir", ArgPredicate::IsPresent, None),
+        conflicts_with = "recipe_dir"
     )]
     pub recipes: Vec<PathBuf>,
 
     /// The directory that contains recipes.
-    #[arg(long, value_parser = is_dir)]
+    #[arg(long, value_parser = is_dir, conflicts_with = "recipes")]
     pub recipe_dir: Option<PathBuf>,
 
     /// Build recipes up to the specified package.
@@ -617,13 +618,33 @@ impl PublishData {
         let mut package_files = Vec::new();
         let mut recipe_paths = Vec::new();
 
-        // If recipe_dir is specified (from BuildOpts), use it; otherwise use positional arguments
+        // Determine recipe paths from options, in order of priority:
+        // 1. --recipe-dir flag
+        // 2. --recipe flag (if not at default value)
+        // 3. positional arguments
         if let Some(ref recipe_dir) = opts.build.recipe_dir {
             // Use recipe_dir - will be expanded later to find all recipes in the directory
             recipe_paths.push(recipe_dir.clone());
         } else {
-            // Process positional arguments
-            for path in opts.package_or_recipe {
+            // Check if --recipe was explicitly specified (not just the default ".")
+            let default_recipe = PathBuf::from(".");
+            let recipe_flag_specified = opts.build.recipes.len() != 1
+                || opts.build.recipes.first() != Some(&default_recipe);
+
+            // Check if positional argument is at default value
+            let default_positional = PathBuf::from("recipe.yaml");
+            let positional_is_default = opts.package_or_recipe.len() == 1
+                && opts.package_or_recipe.first() == Some(&default_positional);
+
+            // If --recipe was specified and positional is at default, prefer --recipe
+            let paths_to_process = if recipe_flag_specified && positional_is_default {
+                opts.build.recipes.clone()
+            } else {
+                opts.package_or_recipe
+            };
+
+            // Process the selected paths
+            for path in paths_to_process {
                 if path.is_dir() && path.join("recipe.yaml").is_file() {
                     // If it's a directory containing recipe.yaml, treat it as a recipe path
                     recipe_paths.push(path);
@@ -639,6 +660,11 @@ impl PublishData {
                         recipe_paths.push(path);
                         continue;
                     }
+                }
+
+                // If no extension or unrecognized, treat directories as potential recipe dirs
+                if path.is_dir() {
+                    recipe_paths.push(path);
                 }
             }
         }
