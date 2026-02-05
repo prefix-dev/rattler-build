@@ -3919,7 +3919,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.56.0"
+version = "0.57.0"
 dependencies = [
  "chrono",
  "clap",
@@ -4230,7 +4230,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.56.0"
+version = "0.57.0"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -5026,9 +5026,11 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-rustls",
+ "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
+ "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -5040,6 +5042,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls",
  "tower",
  "tower-http",
