@@ -8,13 +8,11 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/publish/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/rattler_index/">
       
       
-        <link rel="prev" href="../authentication_and_upload/">
+        <link rel="prev" href="../reference/python_bindings/">
       
-      
-        <link rel="next" href="../sigstore/">
       
       
         
@@ -25,7 +23,7 @@
     
     
       
-        <title>Publishing packages - Rattler-Build</title>
+        <title>Rattler Index - Rattler-Build</title>
       
     
     
@@ -63,15 +61,15 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Publishing packages - Rattler-Build" />
-<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/publish.png" />
+<meta property="og:title" content="Rattler Index - Rattler-Build" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/rattler_index.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://rattler-build.prefix.dev/dev/publish/" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/dev/rattler_index/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="Publishing packages - Rattler-Build" />
-<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/publish.png" />
+<meta property="twitter:title" content="Rattler Index - Rattler-Build" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/rattler_index.png" />
 </head>
   
   
@@ -91,7 +89,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#publishing-packages-to-your-own-channel" class="md-skip">
+        <a href="#installation" class="md-skip">
           Skip to content
         </a>
       
@@ -130,7 +128,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Publishing packages
+              Rattler Index
             
           </span>
         </div>
@@ -1351,10 +1349,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1372,11 +1368,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -1397,7 +1393,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1440,37 +1436,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Publishing packages
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../publish/" class="md-nav__link">
         
   
   
@@ -1486,120 +1455,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Options
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bumping-the-build-number" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bumping the build number
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Authentication
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#channel-initialization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Channel Initialization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Channel Initialization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#new-channels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New channels
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#existing-channels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Existing channels
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Indexing S3 and Filesystem channels
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sigstore-attestations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sigstore attestations
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1876,8 +1731,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1895,11 +1752,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -1920,7 +1777,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2047,10 +1904,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../rattler_index/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rattler Index
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2066,6 +1948,113 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#indexing-a-local-filesystem-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing a local filesystem channel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexing-an-s3-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing an S3 channel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#s3-specific-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3-specific Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2095,8 +2084,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -2105,10 +2092,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
+  <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Options
+        Installation
       
     </span>
   </a>
@@ -2116,44 +2103,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bumping-the-build-number" class="md-nav__link">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bumping the build number
+        Usage
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Authentication
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#channel-initialization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Channel Initialization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Channel Initialization">
+    <nav class="md-nav" aria-label="Usage">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#new-channels" class="md-nav__link">
+  <a href="#indexing-a-local-filesystem-channel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New channels
+        Indexing a local filesystem channel
       
     </span>
   </a>
@@ -2161,10 +2126,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#existing-channels" class="md-nav__link">
+  <a href="#indexing-an-s3-channel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Existing channels
+        Indexing an S3 channel
       
     </span>
   </a>
@@ -2177,21 +2142,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#indexing-s3-and-filesystem-channels" class="md-nav__link">
+  <a href="#global-options" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Indexing S3 and Filesystem channels
+        Global Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#s3-specific-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3-specific Options
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#sigstore-attestations" class="md-nav__link">
+  <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sigstore attestations
+        Examples
       
     </span>
   </a>
@@ -2215,7 +2197,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/publish.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/rattler_index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -2223,82 +2205,119 @@
   
 
 
-<h1 id="publishing-packages-to-your-own-channel">Publishing packages to your own channel<a class="headerlink" href="#publishing-packages-to-your-own-channel" title="Permanent link">#</a></h1>
-<p>Rattler-build comes with an intuitive <code>publish</code> subcommand, that will publish a package to a channel.</p>
-<p>You can either point to an already built package, or to a recipe and <code>publish</code> them into your channel.
-The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.</p>
-<p>Publishing a package is a convenience short hand for:</p>
-<ol>
-<li>Building the package from a recipe.yaml</li>
-<li>Optionally, automatically increment the build number by passing in <code>--build-number=+1</code> to set a <em>relative</em> value, or <code>--build-number=12</code> to set an absolute value for all packages being built.</li>
-<li>Uploading the package to a channel</li>
-<li>Running <code>rattler-index</code> for a S3 bucket or a filesystem channel to produce <code>repodata.json</code>.</li>
-</ol>
-<p>To publish a package you can use:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./output/linux-64/my-package-0.1.2-h123_0.conda<span class="w"> </span>--to<span class="w"> </span>s3://my-bucket
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./some/recipe.yaml<span class="w"> </span>--to<span class="w"> </span>artifactory://my-secret.company.com/package-channel
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># on prefix.dev you can also automatically add a sigstore attestation</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+  <h1>Rattler Index</h1>
+
+<p><code>rattler-index</code> is a rattler-based tool which allows you to index your channels.
+It can create <code>repodata.json</code>, <code>repodata.json.zst</code> as well as sharded repodata (<a href="https://github.com/conda/ceps/blob/main/cep-0016.md">CEP 16</a>).
+It can index both conda channels on a local file system as well as conda channels on S3.</p>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
+<p>You can install <code>rattler-index</code> using pixi:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pixi<span class="w"> </span>global<span class="w"> </span>install<span class="w"> </span>rattler-index
 </span></code></pre></div>
-<p>The following schema is used:</p>
-<ul>
-<li>prefix.dev: <code>https://prefix.dev/&lt;channel-name&gt;</code></li>
-<li>anaconda.org: <code>https://anaconda.org/&lt;owner&gt;/&lt;label (optional)&gt;</code> (e.g. <code>https://anaconda.org/foobar</code>)</li>
-<li>S3: <code>s3://bucket-name</code> (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)</li>
-<li>Filesystem: <code>file:///path/to/channel</code></li>
-<li>Quetz: <code>quetz://server.my-company.com/&lt;channel&gt;</code></li>
-<li>Articatory: <code>artifactory://server.my-company.com/&lt;channel&gt;</code></li>
-</ul>
-<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">#</a></h2>
-<p>The <code>--to</code> option selects the channel to publish the package into. This channel will also be used as the <em>highest priority</em> channel in the list of channels. Other channels can be added using the usual <code>-c conda-forge -c bioconda ...</code> syntax or configured using a <code>config.toml</code> file.</p>
-<p>When using <code>publish</code> with a recipe, you can use the same options as when normally building packages.</p>
-<h2 id="bumping-the-build-number">Bumping the build number<a class="headerlink" href="#bumping-the-build-number" title="Permanent link">#</a></h2>
-<p>Sometimes you want to package the same package again, but rebuild it with the latest dependencies. There are two ways to achieve this:</p>
-<ul>
-<li>By using a variant file, and updating it at certain times</li>
-<li>By bumping the build number and re-publishing the package again</li>
-</ul>
-<p>The publish command makes it easy to "bump the buildnumber" either by setting an absolute build number for all packages the recipe builds (e.g. <code>--build-number=12</code>) or a <em>relative</em> bump for all packages (e.g. <code>--build-number=+1</code> to add 1 to the <em>highest</em> build number found in the publish channel).
-When bumping by a relative amount, we download the repodata and determine for each subdir/package combination that you are building the highest build number.</p>
-<p>When the recipe does not specify a build number, the build number is automatically bumped on <code>publish</code> to the <em>next available build number</em>.</p>
-<p>If the recipe does specify a build number, you have to manually trigger an override using the <code>--build-number</code> CLI flag. Alternatively, you can use the <code>--force</code> upload option on S3, your local filesystem, Anaconda and prefix channels to forcibly replace the previous build. Please note that this is heavily discouraged as lockfiles will get out of date and the old build is irrevocably deleted.</p>
-<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">#</a></h2>
-<p>Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the <code>auth</code> subcommand: <code>rattler-build auth login</code>. Note: if you are already logged in with <code>pixi</code>, you are also logged in with <code>rattler-build</code> - they share credentials.</p>
-<p>Otherwise you can also use the same options as with <code>upload</code>, and supply tokens as environment variables or CLI arguments.</p>
-<h2 id="channel-initialization">Channel Initialization<a class="headerlink" href="#channel-initialization" title="Permanent link">#</a></h2>
-<p>When publishing to local filesystem or S3 channels, rattler-build automatically handles channel initialization:</p>
-<h3 id="new-channels">New channels<a class="headerlink" href="#new-channels" title="Permanent link">#</a></h3>
-<p>If the target channel doesn't exist yet, rattler-build will:</p>
-<ol>
-<li>Create the channel directory (for filesystem channels)</li>
-<li>Initialize it with an empty <code>noarch/repodata.json</code></li>
-<li>Upload your package</li>
-<li>Run indexing to update the repodata</li>
-</ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># This will create /path/to/my-channel if it doesn&#39;t exist</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-package.conda<span class="w"> </span>--to<span class="w"> </span>file:///path/to/my-channel
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Same for S3 buckets</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-package.conda<span class="w"> </span>--to<span class="w"> </span>s3://my-bucket/channel
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h2>
+<p><code>rattler-index</code> has two subcommands for indexing channels on different storage backends:</p>
+<h3 id="indexing-a-local-filesystem-channel">Indexing a local filesystem channel<a class="headerlink" href="#indexing-a-local-filesystem-channel" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>/path/to/channel
 </span></code></pre></div>
-<h3 id="existing-channels">Existing channels<a class="headerlink" href="#existing-channels" title="Permanent link">#</a></h3>
-<p>If the channel directory exists but is not properly initialized (missing <code>noarch/repodata.json</code>), rattler-build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.</p>
-<p>To initialize an existing directory as a channel, you can either:</p>
-<ul>
-<li>Let rattler-build create it fresh (remove the directory first)</li>
-<li>Manually create <code>noarch/repodata.json</code> with content <code>{"packages": {}, "packages.conda": {}}</code></li>
-</ul>
-<h2 id="indexing-s3-and-filesystem-channels">Indexing S3 and Filesystem channels<a class="headerlink" href="#indexing-s3-and-filesystem-channels" title="Permanent link">#</a></h2>
-<p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
-<h2 id="sigstore-attestations">Sigstore attestations<a class="headerlink" href="#sigstore-attestations" title="Permanent link">#</a></h2>
-<p>When publishing to prefix.dev, you can automatically generate Sigstore attestations to cryptographically sign your packages and provide verifiable build provenance. Use the <code>--generate-attestation</code> flag:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+<h3 id="indexing-an-s3-channel">Indexing an S3 channel<a class="headerlink" href="#indexing-an-s3-channel" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-index<span class="w"> </span>s3<span class="w"> </span>s3://my-bucket/my-channel
 </span></code></pre></div>
-<p>For more information about Sigstore attestations, verification, and manual attestation creation, see the <a href="../sigstore/">Sigstore attestations</a> documentation.</p>
+<p>For S3 channels, you can provide credentials via command-line options or they will be resolved from the AWS SDK (environment variables, AWS config files, etc.).</p>
+<h2 id="global-options">Global Options<a class="headerlink" href="#global-options" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--write-zst</code></td>
+<td><code>true</code></td>
+<td>Write compressed <code>repodata.json.zst</code> files</td>
+</tr>
+<tr>
+<td><code>--write-shards</code></td>
+<td><code>true</code></td>
+<td>Write sharded repodata (<a href="https://github.com/conda/ceps/blob/main/cep-0016.md">CEP 16</a>)</td>
+</tr>
+<tr>
+<td><code>-f, --force</code></td>
+<td><code>false</code></td>
+<td>Force re-indexing of all packages, creating a new <code>repodata.json</code> instead of updating the existing one</td>
+</tr>
+<tr>
+<td><code>--max-parallel &lt;N&gt;</code></td>
+<td>10</td>
+<td>Maximum number of packages to process in-memory simultaneously. Useful for limiting memory usage when indexing large channels</td>
+</tr>
+<tr>
+<td><code>--target-platform &lt;PLATFORM&gt;</code></td>
+<td>all</td>
+<td>Index only a specific platform (e.g., <code>linux-64</code>, <code>osx-arm64</code>). By default, all platforms in the channel are indexed</td>
+</tr>
+<tr>
+<td><code>--repodata-patch &lt;PACKAGE&gt;</code></td>
+<td>none</td>
+<td>Name of a conda package (in the <code>noarch</code> subdir) to use for repodata patching. See <a href="https://prefix.dev/blog/repodata_patching">repodata patching</a> for more information</td>
+</tr>
+<tr>
+<td><code>--config &lt;PATH&gt;</code></td>
+<td>none</td>
+<td>Path to a config file (uses the same format as <a href="https://pixi.sh/latest/reference/pixi_configuration">pixi configuration</a>)</td>
+</tr>
+<tr>
+<td><code>-v, -vv, -vvv</code></td>
+<td>none</td>
+<td>Increase verbosity level</td>
+</tr>
+</tbody>
+</table>
+<h3 id="s3-specific-options">S3-specific Options<a class="headerlink" href="#s3-specific-options" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--disable-precondition-checks</code></td>
+<td>Disable ETag and timestamp checks during file operations. Use if your S3 backend doesn't fully support conditional requests, or if you're certain no concurrent indexing processes are running. <strong>Warning:</strong> Disabling this removes protection against concurrent modifications</td>
+</tr>
+<tr>
+<td><code>--region &lt;REGION&gt;</code></td>
+<td>AWS region for the S3 bucket</td>
+</tr>
+<tr>
+<td><code>--endpoint-url &lt;URL&gt;</code></td>
+<td>Custom S3 endpoint URL (for S3-compatible storage like MinIO)</td>
+</tr>
+</tbody>
+</table>
+<p>S3 credentials can also be configured in the config file under the <code>s3_options</code> section.</p>
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
+<p>Index a local channel with default settings:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>./my-channel
+</span></code></pre></div></p>
+<p>Index only the <code>linux-64</code> platform:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>./my-channel<span class="w"> </span>--target-platform<span class="w"> </span>linux-64
+</span></code></pre></div></p>
+<p>Force a full re-index (ignoring existing repodata):
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>./my-channel<span class="w"> </span>--force
+</span></code></pre></div></p>
+<p>Index without sharded repodata:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>./my-channel<span class="w"> </span>--write-shards<span class="w"> </span><span class="nb">false</span>
+</span></code></pre></div></p>
+<p>Index an S3 channel with a custom endpoint (e.g., MinIO):
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>rattler-index<span class="w"> </span>s3<span class="w"> </span>s3://my-bucket/channel<span class="w"> </span>--endpoint-url<span class="w"> </span>http://localhost:9000<span class="w"> </span>--region<span class="w"> </span>us-east-1
+</span></code></pre></div></p>
+<p>Apply repodata patches from a package:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>rattler-index<span class="w"> </span>fs<span class="w"> </span>./my-channel<span class="w"> </span>--repodata-patch<span class="w"> </span>my-repodata-patches
+</span></code></pre></div></p>
 
 
 
@@ -2367,9 +2386,9 @@ When bumping by a relative amount, we download the repodata and determine for ea
           
             
             <a
-              href="../authentication_and_upload/"
+              href="../reference/python_bindings/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Authentication &amp; upload"
+              aria-label="Previous: Python Bindings"
             >
               <div class="md-footer__button md-icon">
                 
@@ -2380,33 +2399,13 @@ When bumping by a relative amount, we download the repodata and determine for ea
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Authentication & upload
+                  Python Bindings
                 </div>
               </div>
             </a>
           
 
           <!-- Link to next page -->
-          
-            
-            <a
-              href="../sigstore/"
-              class="md-footer__link md-footer__link--next"
-              aria-label="Next: Sigstore attestations"
-            >
-              <div class="md-footer__title">
-                <span class="md-footer__direction">
-                  Next
-                </span>
-                <div class="md-ellipsis">
-                  Sigstore attestations
-                </div>
-              </div>
-              <div class="md-footer__button md-icon">
-                
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-              </div>
-            </a>
           
         </nav>
       
