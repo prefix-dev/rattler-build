@@ -211,3 +211,87 @@ def test_publish_with_path_syntax(
     assert channel_dir.exists()
     noarch_repodata = channel_dir / "noarch" / "repodata.json"
     assert noarch_repodata.exists()
+
+
+def test_publish_with_recipe_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test publishing using the --recipe flag instead of positional argument."""
+    channel_dir = tmp_path / "channel"
+
+    # Publish using --recipe flag
+    rattler_build(
+        "publish",
+        "--recipe",
+        str(recipes / "globtest"),
+        "--to",
+        f"file://{channel_dir}",
+    )
+
+    # Check that channel was created and has packages
+    assert channel_dir.exists()
+    packages = list(channel_dir.glob("**/*.tar.bz2")) + list(
+        channel_dir.glob("**/*.conda")
+    )
+    assert len(packages) > 0
+
+
+def test_publish_with_recipe_dir_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test publishing using the --recipe-dir flag to scan a directory for recipes."""
+    channel_dir = tmp_path / "channel"
+    recipe_dir = tmp_path / "recipes"
+
+    # Create a directory with multiple recipe subdirs
+    recipe_dir.mkdir()
+    globtest_dir = recipe_dir / "globtest"
+    globtest_dir.mkdir()
+
+    # Copy the globtest recipe
+    import shutil
+
+    for item in (recipes / "globtest").iterdir():
+        if item.is_file():
+            shutil.copy(item, globtest_dir / item.name)
+
+    # Publish using --recipe-dir flag
+    rattler_build(
+        "publish",
+        "--recipe-dir",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+    )
+
+    # Check that channel was created and has packages
+    assert channel_dir.exists()
+    packages = list(channel_dir.glob("**/*.tar.bz2")) + list(
+        channel_dir.glob("**/*.conda")
+    )
+    assert len(packages) > 0
+
+
+def test_publish_recipe_and_recipe_dir_conflict(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --recipe and --recipe-dir flags conflict with each other."""
+    from subprocess import STDOUT
+
+    channel_dir = tmp_path / "channel"
+
+    # Using both --recipe and --recipe-dir should fail
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build(
+            "publish",
+            "--recipe",
+            str(recipes / "globtest"),
+            "--recipe-dir",
+            str(recipes),
+            "--to",
+            f"file://{channel_dir}",
+            stderr=STDOUT,
+        )
+
+    # The error message should mention the conflict
+    assert "cannot be used with" in str(exc_info.value.output)

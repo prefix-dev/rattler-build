@@ -462,16 +462,17 @@ async fn upload_to_quetz(
         .ok_or_else(|| miette::miette!("Invalid Quetz URL: missing channel name"))?
         .to_string();
 
-    // Convert quetz:// to https:// if needed, otherwise use as-is
-    let server_url = if url.scheme() == "quetz" {
-        let mut converted = url.clone();
-        converted
+    // Convert quetz:// to https:// if needed, and strip the channel path from the URL
+    // The server_url should only contain the base URL (e.g., https://quetz.example.com/)
+    // without the channel path, since the channel is passed separately to QuetzData
+    let mut server_url = url.clone();
+    if server_url.scheme() == "quetz" {
+        server_url
             .set_scheme("https")
             .map_err(|_| miette::miette!("Failed to convert quetz:// URL to https://"))?;
-        converted
-    } else {
-        url.clone()
-    };
+    }
+    // Remove the channel path from the URL to get just the base server URL
+    server_url.set_path("");
 
     // Create QuetzData with server URL, channel, and optional API key
     let quetz_data = QuetzData::new(server_url, channel, None);
@@ -509,16 +510,17 @@ async fn upload_to_artifactory(
         .ok_or_else(|| miette::miette!("Invalid Artifactory URL: missing repository name"))?
         .to_string();
 
-    // Convert artifactory:// to https:// if needed, otherwise use as-is
-    let server_url = if url.scheme() == "artifactory" {
-        let mut converted = url.clone();
-        converted
+    // Convert artifactory:// to https:// if needed, and strip the channel path from the URL
+    // The server_url should only contain the base URL (e.g., https://artifactory.example.com/)
+    // without the channel path, since the channel is passed separately to ArtifactoryData
+    let mut server_url = url.clone();
+    if server_url.scheme() == "artifactory" {
+        server_url
             .set_scheme("https")
             .map_err(|_| miette::miette!("Failed to convert artifactory:// URL to https://"))?;
-        converted
-    } else {
-        url.clone()
-    };
+    }
+    // Remove the channel path from the URL to get just the base server URL
+    server_url.set_path("");
 
     // Create ArtifactoryData with server URL, channel, and optional token
     let artifactory_data = ArtifactoryData::new(server_url, channel, None);
@@ -558,16 +560,17 @@ async fn upload_to_prefix(
         .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?
         .to_string();
 
-    // Convert prefix:// to https:// if needed, otherwise use as-is
-    let server_url = if url.scheme() == "prefix" {
-        let mut converted = url.clone();
-        converted
+    // Convert prefix:// to https:// if needed, and strip the channel path from the URL
+    // The server_url should only contain the base URL (e.g., https://prefix.dev/)
+    // without the channel path, since the channel is passed separately to PrefixData
+    let mut server_url = url.clone();
+    if server_url.scheme() == "prefix" {
+        server_url
             .set_scheme("https")
             .map_err(|_| miette::miette!("Failed to convert prefix:// URL to https://"))?;
-        converted
-    } else {
-        url.clone()
-    };
+    }
+    // Remove the channel path from the URL to get just the base server URL
+    server_url.set_path("");
 
     // Determine attestation source
     let attestation = if publish_data.generate_attestation {
