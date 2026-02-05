@@ -160,6 +160,7 @@ nav:
       - CLI: reference/cli.md
       - Jinja: reference/jinja.md
       - Python Bindings: reference/python_bindings.md
+      - Rattler Index: rattler_index.md
 
 plugins:
   - search
