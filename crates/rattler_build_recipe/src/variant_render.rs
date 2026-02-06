@@ -2292,4 +2292,62 @@ build:
             "Recipe should have skip condition 'true'"
         );
     }
+
+    #[test]
+    fn test_noarch_should_not_override_target_platform_for_skip() {
+        // When building a noarch package on a native platform (e.g., linux-64),
+        // the skip condition `target_platform == "noarch"` should evaluate to false
+        // because the target_platform should remain the build platform, not "noarch".
+        use crate::stage0::{evaluate::is_skipped, parse_recipe_from_source};
+
+        let recipe_yaml = r#"
+schema_version: 1
+package:
+  name: skip
+  version: "1.0.0"
+build:
+  number: 0
+  skip: target_platform == "noarch"
+  noarch: generic
+"#;
+
+        let stage0_recipe = parse_recipe_from_source(recipe_yaml).unwrap();
+        let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe));
+
+        let variant_config = VariantConfig::default();
+        let config =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0, &variant_config, config.clone()).unwrap();
+
+        assert_eq!(rendered.len(), 1, "Recipe should be returned from rendering");
+
+        let recipe = &rendered[0].recipe;
+
+        // Build an evaluation context matching what src/lib.rs does at build time
+        let jinja_config = JinjaConfig {
+            target_platform: config.target_platform,
+            build_platform: config.build_platform,
+            host_platform: config.host_platform,
+            ..Default::default()
+        };
+        let context = crate::stage1::EvaluationContext::with_variables_and_config(
+            rendered[0]
+                .variant
+                .iter()
+                .map(|(k, v)| (k.normalize(), v.clone()))
+                .collect(),
+            jinja_config,
+        );
+
+        // The skip condition `target_platform == "noarch"` should be false
+        // because target_platform should be "linux-64", not "noarch"
+        assert!(
+            !is_skipped(&recipe.build.skip, &context),
+            "Recipe with `skip: target_platform == \"noarch\"` should NOT be skipped \
+             when building on linux-64. The target_platform for skip evaluation \
+             should be the build platform, not \"noarch\"."
+        );
+    }
 }
