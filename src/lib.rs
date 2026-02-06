@@ -428,9 +428,26 @@ pub async fn get_build_output(
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
         let skipped = if !discovered_output.recipe.build().skip.is_empty() {
-            console::style(" (skipped)").red().to_string()
+            let jinja_config = JinjaConfig {
+                target_platform: discovered_output.target_platform,
+                build_platform: build_data.build_platform,
+                host_platform: build_data.host_platform,
+                variant: discovered_output.used_vars.clone(),
+                ..Default::default()
+            };
+            let variables = discovered_output
+                .used_vars
+                .iter()
+                .map(|(k, v)| (k.0.clone(), v.clone()))
+                .collect();
+            let context = EvaluationContext::with_variables_and_config(variables, jinja_config);
+            if stage0::evaluate::is_skipped(&discovered_output.recipe.build().skip, &context) {
+                console::style(" (skipped)").red().to_string()
+            } else {
+                String::new()
+            }
         } else {
-            "".to_string()
+            String::new()
         };
 
         tracing::info!(
