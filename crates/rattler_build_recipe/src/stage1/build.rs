@@ -322,11 +322,11 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "PythonBuild::is_default")]
     pub python: PythonBuild,
 
-    /// Skip conditions - can be boolean expressions or platform names
-    /// For example: ["win", "platform == 'osx-64'"]
-    /// Note: This field is not serialized to JSON output (like main branch)
+    /// Whether the build should be skipped (pre-evaluated from skip conditions).
+    /// Skip conditions are evaluated eagerly during recipe evaluation, before
+    /// the variant gets noarch overrides
     #[serde(default, skip)]
-    pub skip: Vec<String>,
+    pub skip: bool,
 
     /// Always copy these files (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -512,7 +512,7 @@ impl Build {
             && !self.python.use_python_app_entrypoint
             && !self.python.version_independent
             && self.python.site_packages_path.is_none()
-            && self.skip.is_empty()
+            && !self.skip
             && self.always_copy_files.is_empty()
             && self.always_include_files.is_empty()
             && !self.merge_build_and_host_envs

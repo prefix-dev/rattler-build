@@ -799,41 +799,44 @@ pub fn evaluate_string_list(
 /// Evaluate skip expressions as Jinja boolean expressions
 ///
 /// Skip values are Jinja expressions like `is_abi3`, `not unix`, etc.
-/// They need to be rendered through Jinja to track accessed variables
-/// (important for variant hash computation).
+/// They are rendered through Jinja to track accessed variables
+/// (important for variant hash computation), and then evaluated eagerly
+/// to produce a boolean result. This matches the behavior of main where
+/// skip conditions are resolved during parsing, before the variant gets
+/// noarch overrides that would change `target_platform`.
 ///
-/// Returns all skip expressions as strings, preserving them for later evaluation
-/// during the actual build decision. The expressions are evaluated here only
-/// for variable tracking purposes.
+/// Returns true if ANY skip condition evaluates to true (OR logic).
 pub fn evaluate_skip_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
-) -> Result<Vec<String>, ParseError> {
-    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
-        // Skip expressions are Jinja boolean expressions, not templates
-        // We need to render them through Jinja to track accessed variables,
-        // but we preserve the original expression string for later evaluation
-        if let Some(expr_str) = value.as_concrete() {
-            // Wrap in ${{ }} to render as Jinja expression (for variable tracking)
-            let template = format!("${{{{ {} }}}}", expr_str);
-            // Ignore the result - we just want to trigger variable tracking
-            let _ = render_template(&template, ctx, value.span());
+) -> Result<bool, ParseError> {
+    let conditions: Vec<String> =
+        evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+            // Skip expressions are Jinja boolean expressions, not templates
+            // We need to render them through Jinja to track accessed variables,
+            // but we preserve the original expression string for later evaluation
+            if let Some(expr_str) = value.as_concrete() {
+                // Wrap in ${{ }} to render as Jinja expression (for variable tracking)
+                let template = format!("${{{{ {} }}}}", expr_str);
+                // Ignore the result - we just want to trigger variable tracking
+                let _ = render_template(&template, ctx, value.span());
 
-            // Always return the original expression string
-            Ok(Some(expr_str.clone()))
-        } else if let Some(template) = value.as_template() {
-            // Already a template, render it
-            let rendered = render_template(template.source(), ctx, value.span())?;
-            // Return the rendered value (should evaluate to a skip condition)
-            if rendered.is_empty() {
-                Ok(None)
+                // Always return the original expression string
+                Ok(Some(expr_str.clone()))
+            } else if let Some(template) = value.as_template() {
+                // Already a template, render it
+                let rendered = render_template(template.source(), ctx, value.span())?;
+                // Return the rendered value (should evaluate to a skip condition)
+                if rendered.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(rendered))
+                }
             } else {
-                Ok(Some(rendered))
+                unreachable!("Value must be either concrete or template")
             }
-        } else {
-            unreachable!("Value must be either concrete or template")
-        }
-    })
+        })?;
+    Ok(is_skipped(&conditions, context))
 }
 
 /// Check if any skip condition in the list evaluates to true
@@ -2784,9 +2787,8 @@ fn merge_stage1_build(
         output.python
     };
 
-    // Skip: combine top-level and output skip conditions with OR logic
-    let mut skip = toplevel.skip;
-    skip.extend(output.skip);
+    // Skip: combine top-level and output skip with OR logic
+    let skip = toplevel.skip || output.skip;
 
     // Always copy files: use output if not empty, otherwise inherit from top-level
     let always_copy_files = if output.always_copy_files.is_empty() {
@@ -2999,17 +3001,17 @@ fn evaluate_package_output_to_recipe(
         if output_build.post_process.is_empty() {
             output_build.post_process = toplevel_build.post_process;
         }
-        // Combine skip conditions
-        output_build.skip.extend(toplevel_build.skip);
+        // Combine skip with OR logic
+        output_build.skip = output_build.skip || toplevel_build.skip;
 
         output_build
     };
 
-    // Check if this output is skipped based on the merged skip conditions.
+    // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
     // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
     // We skip evaluating requirements, tests, sources, etc. to avoid errors from
     // platform-specific functions (like stdlib('c') on Windows) that would fail.
-    if is_skipped(&build.skip, context) {
+    if build.skip {
         return Ok(None);
     }
 
@@ -3985,7 +3987,8 @@ outputs:
                     output1.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
                 ); // Inherited
-                assert_eq!(output1.build.skip, vec!["win"]); // Inherited
+                // Skip "win" evaluates to false on linux-64
+                assert!(!output1.build.skip); // Inherited, but not skipped
                 assert!(!output1.build.always_copy_files.is_empty()); // Inherited
 
                 // Second output: overrides some fields
@@ -3999,10 +4002,8 @@ outputs:
                     output2.build.noarch,
                     Some(rattler_conda_types::NoArchType::python())
                 ); // Inherited
-                // Skip should combine with OR: ["win", "osx"]
-                assert_eq!(output2.build.skip.len(), 2);
-                assert!(output2.build.skip.contains(&"win".to_string()));
-                assert!(output2.build.skip.contains(&"osx".to_string()));
+                // Skip combines "win" and "osx" with OR, both false on linux-64
+                assert!(!output2.build.skip);
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -5085,17 +5086,10 @@ build:
 
         let recipe = result.unwrap();
 
-        // The recipe should have skip conditions that include "true"
+        // Skip is eagerly evaluated to true during recipe evaluation
         assert!(
-            !recipe.build.skip.is_empty(),
-            "Skip conditions should not be empty"
-        );
-
-        // Verify that is_skipped returns true for this recipe
-        assert!(
-            is_skipped(&recipe.build.skip, &ctx),
-            "Recipe with skip: true should be skipped. Skip conditions: {:?}",
-            recipe.build.skip
+            recipe.build.skip,
+            "Recipe with skip: true should be skipped"
         );
     }
 
