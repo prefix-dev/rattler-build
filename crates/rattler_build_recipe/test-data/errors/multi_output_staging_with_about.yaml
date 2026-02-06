@@ -1,0 +1,19 @@
+# Error: Staging output with about section (not allowed)
+schema_version: 1
+
+recipe:
+  name: staging-with-about
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    requirements:
+      build:
+        - gcc
+    build:
+      script:
+        - make
+    about:
+      summary: This should not be allowed
+      license: MIT

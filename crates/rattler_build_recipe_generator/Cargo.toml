@@ -37,5 +37,5 @@ url = { workspace = true }
 zip = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 tokio = { workspace = true }

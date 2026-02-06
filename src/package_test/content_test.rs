@@ -1,11 +1,11 @@
-use std::collections::HashSet;
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
-use crate::metadata::Output;
-use crate::package_test::TestError;
-use crate::recipe::parser::PackageContentsTest;
 use globset::{Glob, GlobBuilder, GlobSet};
+use rattler_build_recipe::stage1::tests::PackageContentsTest;
+use rattler_build_types::GlobWithSource;
 use rattler_conda_types::{Platform, package::PathsJson};
+
+use crate::{package_test::TestError, types::Output};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);
@@ -36,10 +36,87 @@ pub enum Section {
     Files,
 }
 
-impl PackageContentsTest {
+/// Extension trait for PackageContentsTest to add testing functionality
+pub trait PackageContentsTestExt {
     /// Build globs from raw sources
     fn match_files(
-        globs: &[crate::recipe::parser::GlobWithSource],
+        globs: &[GlobWithSource],
+        glob_builder: impl Fn(&str) -> Result<Vec<(String, GlobSet)>, globset::Error>,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Check a list of (glob, GlobSet) against paths, collecting any missing or forbidden matches
+    fn check_globs<'a>(
+        globs: &[(String, GlobSet)],
+        paths: &[&'a PathBuf],
+        section: &str,
+        expect_exists: bool,
+        collected_issues: &mut Vec<String>,
+        matched_paths: &mut HashSet<&'a PathBuf>,
+    );
+
+    /// Build or not-exists globs for any section in one place
+    fn build_section_globs(
+        &self,
+        section: Section,
+        exists: bool,
+        target_platform: &Platform,
+        version_independent: bool,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Retrieve globs for a section
+    fn get_globs_for_section(
+        &self,
+        section: Section,
+        exists: bool,
+        target_platform: &Platform,
+        version_independent: bool,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get include globs that should exist
+    fn include_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get bin globs that should exist
+    fn bin_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get lib globs that should exist
+    fn lib_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get site packages globs that should exist
+    fn site_packages_as_globs(
+        &self,
+        target_platform: &Platform,
+        version_independent: bool,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get files globs that should exist
+    fn files_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Get files globs that should not exist
+    fn files_not_exists_as_globs(
+        &self,
+        target_platform: &Platform,
+    ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
+
+    /// Run the package content test
+    fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError>;
+}
+
+impl PackageContentsTestExt for PackageContentsTest {
+    /// Build globs from raw sources
+    fn match_files(
+        globs: &[GlobWithSource],
         glob_builder: impl Fn(&str) -> Result<Vec<(String, GlobSet)>, globset::Error>,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
@@ -106,9 +183,9 @@ impl PackageContentsTest {
         match section {
             Section::Include => {
                 let raws = if exists {
-                    self.include.exists_globs()
+                    self.include.exists.include_globs()
                 } else {
-                    self.include.not_exists_globs()
+                    self.include.not_exists.include_globs()
                 };
                 Self::match_files(raws, |source| {
                     let pattern = if target_platform.is_windows() {
@@ -122,9 +199,9 @@ impl PackageContentsTest {
             }
             Section::Bin => {
                 let raws = if exists {
-                    self.bin.exists_globs()
+                    self.bin.exists.include_globs()
                 } else {
-                    self.bin.not_exists_globs()
+                    self.bin.not_exists.include_globs()
                 };
                 Self::match_files(raws, |bin_raw| {
                     let globset = if target_platform.is_windows() {
@@ -152,9 +229,9 @@ impl PackageContentsTest {
             }
             Section::Lib => {
                 let raws = if exists {
-                    self.lib.exists_globs()
+                    self.lib.exists.include_globs()
                 } else {
-                    self.lib.not_exists_globs()
+                    self.lib.not_exists.include_globs()
                 };
                 if target_platform.is_windows() {
                     Self::match_files(raws, |raw| {
@@ -220,9 +297,9 @@ impl PackageContentsTest {
             }
             Section::SitePackages => {
                 let raws = if exists {
-                    self.site_packages.exists_globs()
+                    self.site_packages.exists.include_globs()
                 } else {
-                    self.site_packages.not_exists_globs()
+                    self.site_packages.not_exists.include_globs()
                 };
                 Self::match_files(raws, |source| {
                     let base = if version_independent {
@@ -251,9 +328,9 @@ impl PackageContentsTest {
             }
             Section::Files => {
                 let raws = if exists {
-                    self.files.exists_globs()
+                    self.files.exists.include_globs()
                 } else {
-                    self.files.not_exists_globs()
+                    self.files.not_exists.include_globs()
                 };
                 Self::match_files(raws, |source| {
                     let g = Glob::new(source)?;
@@ -265,7 +342,7 @@ impl PackageContentsTest {
     }
 
     /// Retrieve globs for a section
-    pub fn get_globs_for_section(
+    fn get_globs_for_section(
         &self,
         section: Section,
         exists: bool,
@@ -276,7 +353,7 @@ impl PackageContentsTest {
     }
 
     /// Get include globs that should exist
-    pub fn include_as_globs(
+    fn include_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
@@ -284,7 +361,7 @@ impl PackageContentsTest {
     }
 
     /// Get bin globs that should exist
-    pub fn bin_as_globs(
+    fn bin_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
@@ -292,7 +369,7 @@ impl PackageContentsTest {
     }
 
     /// Get lib globs that should exist
-    pub fn lib_as_globs(
+    fn lib_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
@@ -300,7 +377,7 @@ impl PackageContentsTest {
     }
 
     /// Get site packages globs that should exist
-    pub fn site_packages_as_globs(
+    fn site_packages_as_globs(
         &self,
         target_platform: &Platform,
         version_independent: bool,
@@ -314,7 +391,7 @@ impl PackageContentsTest {
     }
 
     /// Get files globs that should exist
-    pub fn files_as_globs(
+    fn files_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
@@ -322,7 +399,7 @@ impl PackageContentsTest {
     }
 
     /// Get files globs that should not exist
-    pub fn files_not_exists_as_globs(
+    fn files_not_exists_as_globs(
         &self,
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
@@ -330,7 +407,7 @@ impl PackageContentsTest {
     }
 
     /// Run the package content test
-    pub fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
+    fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
         let target_platform = output.target_platform();
@@ -338,7 +415,7 @@ impl PackageContentsTest {
 
         let mut collected_issues = Vec::new();
         let mut matched_paths = HashSet::<&PathBuf>::new();
-        let version_independent = output.recipe.build().is_python_version_independent();
+        let version_independent = output.is_python_version_independent();
 
         // Check all sections for both exists and not_exists
         let sections = [
@@ -441,15 +518,27 @@ impl PackageContentsTest {
 mod tests {
     use std::path::Path;
 
-    use super::{PackageContentsTest, Section};
-    use crate::recipe::parser::GlobCheckerVec;
+    use super::{PackageContentsTestExt, Section};
     use globset::GlobSet;
+    use rattler_build_recipe::stage1::tests::{PackageContentsCheckFiles, PackageContentsTest};
+    use rattler_build_types::GlobVec;
     use rattler_conda_types::Platform;
     use serde::Deserialize;
 
     #[derive(Debug)]
     enum MatchError {
         NoMatch,
+    }
+
+    // Helper function to create PackageContentsCheckFiles from string slices
+    fn make_check_files(
+        exists: Vec<&str>,
+        not_exists: Option<Vec<&str>>,
+    ) -> PackageContentsCheckFiles {
+        PackageContentsCheckFiles {
+            exists: GlobVec::from_vec(exists, None),
+            not_exists: GlobVec::from_vec(not_exists.unwrap_or_default(), None),
+        }
     }
 
     fn test_glob_matches(globs: &[(String, GlobSet)], paths: &[String]) -> Result<(), MatchError> {
@@ -475,7 +564,7 @@ mod tests {
     #[test]
     fn test_include_globs() {
         let package_contents = PackageContentsTest {
-            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
+            include: make_check_files(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -487,7 +576,7 @@ mod tests {
         test_glob_matches(&globs, paths).unwrap();
 
         let package_contents = PackageContentsTest {
-            include: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
+            include: make_check_files(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -502,7 +591,7 @@ mod tests {
     #[test]
     fn test_wasm_bin_globs() {
         let package_contents = PackageContentsTest {
-            bin: GlobCheckerVec::from_vec(vec!["foo", "bar"], None),
+            bin: make_check_files(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -654,14 +743,14 @@ mod tests {
     #[test]
     fn test_strict_mode() {
         let strict_contents = PackageContentsTest {
-            files: GlobCheckerVec::from_vec(vec!["matched.txt"], None),
+            files: make_check_files(vec!["matched.txt"], None),
             strict: true,
             ..Default::default()
         };
         assert!(strict_contents.strict);
 
         let non_strict_contents = PackageContentsTest {
-            files: GlobCheckerVec::from_vec(vec!["*.txt"], None),
+            files: make_check_files(vec!["*.txt"], None),
             ..Default::default()
         };
         assert!(!non_strict_contents.strict);

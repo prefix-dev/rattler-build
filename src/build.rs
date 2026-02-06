@@ -3,12 +3,16 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
+use rattler_build_recipe::stage1::TestType;
+use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    apply_patch_custom, metadata::Output, metadata::build_reindexed_channels,
-    recipe::parser::TestType, render::resolved_dependencies::RunExportsDownload,
-    render::solver::load_repodatas, script::InterpreterError, tool_configuration,
+    apply_patch_custom,
+    metadata::{Output, build_reindexed_channels},
+    package_test::PackageContentsTestExt as _,
+    render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
+    tool_configuration,
 };
 
 /// Behavior for handling the working directory during the build process
@@ -104,7 +108,7 @@ pub async fn skip_existing(
 /// dependencies, and execute the build script. Returns the path to the
 /// resulting package.
 pub async fn run_build(
-    output: Output,
+    mut output: Output,
     tool_configuration: &tool_configuration::Configuration,
     working_directory_behavior: WorkingDirectoryBehavior,
 ) -> miette::Result<(Output, PathBuf)> {
@@ -128,15 +132,25 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
-    } else {
-        output
-            .fetch_sources(tool_configuration, apply_patch_custom)
-            .await
-            .into_diagnostic()?
-    };
+    // Process staging caches if this output depends on any
+    // This will build or restore staging caches and return their dependencies/sources if inherited
+    let staging_result = output.process_staging_caches(tool_configuration).await?;
 
+    // If we inherit from a staging cache, store its dependencies and sources
+    if let Some((deps, sources)) = staging_result {
+        output.finalized_cache_dependencies = Some(deps);
+        output.finalized_cache_sources = Some(sources);
+    }
+
+    // Fetch sources for this output
+    let output = output
+        .fetch_sources(tool_configuration, apply_patch_custom)
+        .await
+        .into_diagnostic()?;
+
+    // Resolve dependencies for this output
+    // If we inherited from a staging cache, finalized_cache_dependencies will be merged
+    // into the final dependencies during the resolve_dependencies call
     let output = output
         .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
         .await

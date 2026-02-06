@@ -1,0 +1,14 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+expression: error_with_source
+---
+  × invalid value for 'about': unknown field 'maintainer'
+   ╭─[unknown_about_field.yaml:8:3]
+ 7 │   license: MIT
+ 8 │   maintainer: John Doe
+   ·   ─────┬────
+   ·        ╰── invalid value for 'about': unknown field 'maintainer'
+ 9 │   contact_email: john@example.com
+   ╰────
+  help: valid fields are: homepage, license, license_file, license_family,
+        summary, description, documentation, repository

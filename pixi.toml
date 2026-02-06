@@ -11,10 +11,13 @@ install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
   "build-release",
 ] }
-test = "cargo test"
-test-slow = "cargo test --release"
+test = "cargo test --workspace --all-targets"
+test-slow = "cargo test --release --workspace --all-targets"
 test-patch-extra = "cargo test --features patch-test-extra"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
+install-as = { cmd = "python scripts/install.py", depends-on = [
+  "build-release",
+], description = "Install release build to a custom location" }
 test-ci = "cargo test --release -p rust-tests"
 generate-cli-docs = "mkdir -p src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"
 generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
@@ -22,13 +25,30 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]
 download-font = "bash docs/layouts/download-font-to-cache.sh"
-build-docs = { cmd = "mkdocs build --strict", depends-on = ["download-font"] }
-docs = { cmd = "mkdocs serve", depends-on = ["download-font"] }
+convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
+  "py-rattler-build/notebooks/*.ipynb",
+  "py-rattler-build/rust/src/**/*.rs",
+  "py-rattler-build/src/**/*.py",
+  "src/**/*.rs",
+  "crates/**/*.rs",
+], outputs = [
+  "docs/py-rattler-build/tutorials/*.md",
+] }
+build-docs = { cmd = "mkdocs build --strict", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
+docs = { cmd = "mkdocs serve", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
 deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
   "download-font",
+  "convert-notebooks",
 ] }
 deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
   "download-font",
+  "convert-notebooks",
 ] }
 
 [dependencies]
@@ -49,23 +69,35 @@ requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 boto3 = "*"
 
+
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
 cargo-deny = ">=0.18.3,<0.19"
-dprint = ">=0.50.0,<0.51"
-lefthook = ">=2.0.11,<3"
-ruff = ">=0.4.8,<0.5"
+prettier = ">=3.7.0,<4"
+ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
 typos = ">=1.23.1,<2"
+nbstripout = ">=0.8.2,<0.9"
 
 [feature.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
 cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
 cargo-deny = "cargo deny --workspace check license --deny warnings"
 cargo-fmt = "cargo fmt"
-dprint-check = { cmd = "dprint check --log-level=silent", description = "Check formatting with dprint" }
-dprint-fmt = { cmd = "dprint fmt --incremental=false", description = "Format with dprint" }
+prettier-check = { cmd = "prettier --check", description = "Check YAML formatting with prettier" }
+prettier-fmt = { cmd = "prettier --write", description = "Format YAML with prettier" }
+nbstripout = "nbstripout"
+ruff-format = "ruff format --force-exclude"
+ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
+toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
+toml-lint = "taplo lint --verbose **/pixi.toml"
+typos = "typos --force-exclude"
+
+[feature.pre-commit.dependencies]
+lefthook = ">=2.0.11,<3"
+
+[feature.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
 lint = { depends-on = [
   "lint-fast",
@@ -75,11 +107,6 @@ lint-fast = { cmd = "lefthook run pre-commit --all-files --force", description =
 lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "Run all slow linters and formatters on all code" }
 pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
-ruff-format = "ruff format --force-exclude"
-ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
-toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
-toml-lint = "taplo lint --verbose **/pixi.toml"
-typos = "typos --force-exclude"
 
 [feature.dev.dependencies]
 tbump = "*"
@@ -115,7 +142,10 @@ mkdocs-material = ">=9.7.0,<10"
 mkdocstrings = ">=0.30.1,<0.31"
 mkdocstrings-python = ">=1.18.2,<2"
 pillow = ">=11.3.0,<12"
-ruff = ">=0.13.1,<0.14"
+ruff = ">=0.14.7,<0.15"
+py-rattler-build = { path = "./py-rattler-build" }
+nbconvert = ">=7.16,<8"
+ipykernel = ">=6.29,<7"
 
 
 [environments]
@@ -124,12 +154,13 @@ default = { features = [
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
+pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 
 # pixi build
 [package.build.backend]
 name = "pixi-build-rust"
-version = "0.3.*"
+version = "*"
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",

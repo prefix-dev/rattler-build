@@ -18,8 +18,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use thiserror::Error;
 
-use crate::recipe::jinja::Jinja;
-use crate::selectors::SelectorConfig;
+use rattler_build_jinja::{Jinja, JinjaConfig};
 
 /// Errors that can occur during recipe bumping
 #[derive(Debug, Error)]
@@ -571,20 +570,19 @@ pub fn build_url_with_version(
     version: &str,
     raw_context: &IndexMap<String, String>,
 ) -> Result<String, BumpRecipeError> {
-    // Create a SelectorConfig with default platform settings
-    let selector_config = SelectorConfig {
+    // Create a JinjaConfig with default platform settings
+    let jinja_config = JinjaConfig {
         target_platform: Platform::current(),
         host_platform: Platform::current(),
         build_platform: Platform::current(),
-        hash: None,
         variant: BTreeMap::new(),
         experimental: false,
-        allow_undefined: true,
         recipe_path: None,
+        ..Default::default()
     };
 
     // Create Jinja instance
-    let mut jinja = Jinja::new(selector_config);
+    let mut jinja = Jinja::new(jinja_config);
 
     // First, set the version (so other context vars can reference it)
     jinja

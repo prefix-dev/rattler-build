@@ -75,9 +75,9 @@ def test_eigen_abi_profile_ignore_keys(
         f"Expected 1 eigen output (since ignore_keys makes all abi_profile variants identical), "
         f"got {len(eigen_outputs)}"
     )
-    assert (
-        len(eigen_abi_outputs) == 2
-    ), f"Expected 2 eigen-abi outputs (one per abi_profile), got {len(eigen_abi_outputs)}"
+    assert len(eigen_abi_outputs) == 2, (
+        f"Expected 2 eigen-abi outputs (one per abi_profile), got {len(eigen_abi_outputs)}"
+    )
     assert len(eigen_abi_other_outputs) == 2, (
         f"Expected 2 eigen-abi-other outputs (one per some_key via use_keys), "
         f"got {len(eigen_abi_other_outputs)}"
@@ -110,26 +110,26 @@ def test_eigen_abi_profile_ignore_keys(
         )
         # Should only have target_platform
         assert "target_platform" in variant, "eigen variant should have target_platform"
-        assert (
-            output["version"] == "3.4.0"
-        ), f"eigen version should be 3.4.0, got {output['version']}"
+        assert output["version"] == "3.4.0", (
+            f"eigen version should be 3.4.0, got {output['version']}"
+        )
 
     # Test 4: eigen-abi SHOULD show eigen_abi_profile in its variant (not ignored)
     abi_profiles_found = set()
     for output in eigen_abi_outputs:
         variant = output["variant"]
         # The variant dict SHOULD contain eigen_abi_profile for eigen-abi
-        assert (
-            "eigen_abi_profile" in variant
-        ), f"eigen-abi variant should include eigen_abi_profile, but variant is: {variant}"
+        assert "eigen_abi_profile" in variant, (
+            f"eigen-abi variant should include eigen_abi_profile, but variant is: {variant}"
+        )
         abi_profile = variant["eigen_abi_profile"]
         abi_profiles_found.add(str(abi_profile))
 
         # Version should include the abi profile (e.g., 3.4.0.100)
         expected_version = f"3.4.0.{abi_profile}"
-        assert (
-            output["version"] == expected_version
-        ), f"eigen-abi version should be {expected_version}, got {output['version']}"
+        assert output["version"] == expected_version, (
+            f"eigen-abi version should be {expected_version}, got {output['version']}"
+        )
 
     # Verify we saw both abi profiles
     assert abi_profiles_found == {
@@ -145,12 +145,12 @@ def test_eigen_abi_profile_ignore_keys(
         (o for o in eigen_abi_outputs if o["abi_profile"] == "80"), None
     )
 
-    assert (
-        eigen_abi_100 is not None
-    ), "Could not find eigen-abi output for abi_profile 100"
-    assert (
-        eigen_abi_80 is not None
-    ), "Could not find eigen-abi output for abi_profile 80"
+    assert eigen_abi_100 is not None, (
+        "Could not find eigen-abi output for abi_profile 100"
+    )
+    assert eigen_abi_80 is not None, (
+        "Could not find eigen-abi output for abi_profile 80"
+    )
 
     hash_100 = eigen_abi_100["build_string"].split("_")[0]
     hash_80 = eigen_abi_80["build_string"].split("_")[0]
@@ -171,9 +171,9 @@ def test_eigen_abi_profile_ignore_keys(
         variant = output["variant"]
 
         # Should have some_key (via use_keys)
-        assert (
-            "some_key" in variant
-        ), f"eigen-abi-other variant should include some_key (via use_keys), but variant is: {variant}"
+        assert "some_key" in variant, (
+            f"eigen-abi-other variant should include some_key (via use_keys), but variant is: {variant}"
+        )
 
         # Should NOT have eigen_abi_profile (via ignore_keys)
         assert (

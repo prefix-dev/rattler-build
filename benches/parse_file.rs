@@ -1,114 +1,59 @@
-use anyhow::Result;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use fs_err as fs;
 use memmap2::Mmap;
 use minijinja::Value as MiniJinjaValue;
-use serde_json::Value as JsonValue;
-use serde_yaml::Value as YamlValue;
+use serde::de::DeserializeOwned;
 use std::hint::black_box;
 use std::io::BufReader;
 use std::path::Path;
 
-// Parse YAML from reader
-fn parse_yaml_from_reader(file_path: &Path) -> Result<YamlValue> {
-    let file = fs::File::open(file_path)?;
+// Generic parse from reader
+fn parse_from_reader<T: DeserializeOwned>(
+    file_path: &Path,
+    parser: impl FnOnce(BufReader<fs::File>) -> T,
+) -> T {
+    let file = fs::File::open(file_path).unwrap();
     let reader = BufReader::new(file);
-    Ok(serde_yaml::from_reader(reader)?)
+    parser(reader)
 }
 
-// Parse YAML from string
-fn parse_yaml_from_string(file_path: &Path) -> Result<YamlValue> {
-    let content = fs::read_to_string(file_path)?;
-    Ok(serde_yaml::from_str(&content)?)
+// Generic parse from string
+fn parse_from_string<T: DeserializeOwned>(file_path: &Path, parser: impl FnOnce(&str) -> T) -> T {
+    let content = fs::read_to_string(file_path).unwrap();
+    parser(&content)
 }
 
-// Parse JSON from reader
-fn parse_json_from_reader(file_path: &Path) -> Result<JsonValue> {
-    let file = fs::File::open(file_path)?;
-    let reader = BufReader::new(file);
-    Ok(serde_json::from_reader(reader)?)
+// Generic parse from memory map
+fn parse_from_mmap<T: DeserializeOwned>(file_path: &Path, parser: impl FnOnce(&[u8]) -> T) -> T {
+    let file = fs::File::open(file_path).unwrap();
+    let mmap = unsafe { Mmap::map(&file).unwrap() };
+    parser(&mmap)
 }
 
-// Parse JSON from string
-fn parse_json_from_string(file_path: &Path) -> Result<JsonValue> {
-    let content = fs::read_to_string(file_path)?;
-    Ok(serde_json::from_str(&content)?)
+// YAML parsers
+fn parse_yaml_from_reader(file_path: &Path) -> MiniJinjaValue {
+    parse_from_reader(file_path, |r| serde_yaml::from_reader(r).unwrap())
 }
 
-// Helper function to determine the file format based on the file extension
-fn get_file_format(file_path: &Path) -> &'static str {
-    file_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| match ext.to_lowercase().as_str() {
-            "yaml" | "yml" => "yaml",
-            "json" => "json",
-            _ => "unknown",
-        })
-        .unwrap_or("unknown")
+fn parse_yaml_from_string(file_path: &Path) -> MiniJinjaValue {
+    parse_from_string(file_path, |s| serde_yaml::from_str(s).unwrap())
 }
 
-// Read and parse the file based on its format
-fn read_and_parse_file(file_path: &Path) -> Result<MiniJinjaValue> {
-    let file = fs::File::open(file_path)?;
-    let reader = BufReader::new(file);
-
-    match get_file_format(file_path) {
-        "yaml" => Ok(serde_yaml::from_reader(reader)?),
-        "json" => Ok(serde_json::from_reader(reader)?),
-        _ => {
-            let content = fs::read_to_string(file_path)?;
-            Ok(MiniJinjaValue::from(content))
-        }
-    }
+fn parse_yaml_from_mmap(file_path: &Path) -> MiniJinjaValue {
+    parse_from_mmap(file_path, |b| serde_yaml::from_slice(b).unwrap())
 }
 
-// Parse YAML to MiniJinja Value from reader
-fn parse_yaml_to_minijinja_from_reader(file_path: &Path) -> Result<MiniJinjaValue> {
-    read_and_parse_file(file_path)
+// JSON parsers
+fn parse_json_from_reader(file_path: &Path) -> MiniJinjaValue {
+    parse_from_reader(file_path, |r| serde_json::from_reader(r).unwrap())
 }
 
-// Parse YAML to MiniJinja Value from string
-fn parse_yaml_to_minijinja_from_string(file_path: &Path) -> Result<MiniJinjaValue> {
-    read_and_parse_file(file_path)
+fn parse_json_from_string(file_path: &Path) -> MiniJinjaValue {
+    parse_from_string(file_path, |s| serde_json::from_str(s).unwrap())
 }
 
-// Parse JSON to MiniJinja Value from reader
-fn parse_json_to_minijinja_from_reader(file_path: &Path) -> Result<MiniJinjaValue> {
-    read_and_parse_file(file_path)
-}
-
-// Parse JSON to MiniJinja Value from string
-fn parse_json_to_minijinja_from_string(file_path: &Path) -> Result<MiniJinjaValue> {
-    read_and_parse_file(file_path)
-}
-
-// Parse YAML using memory mapping
-fn parse_yaml_from_mmap(file_path: &Path) -> Result<YamlValue> {
-    let file = fs::File::open(file_path)?;
-    let mmap = unsafe { Mmap::map(&file)? };
-    Ok(serde_yaml::from_slice(&mmap)?)
-}
-
-// Parse JSON using memory mapping
-fn parse_json_from_mmap(file_path: &Path) -> Result<JsonValue> {
-    let file = fs::File::open(file_path)?;
-    let mmap = unsafe { Mmap::map(&file)? };
-    Ok(serde_json::from_slice(&mmap)?)
-}
-
-// Parse YAML to MiniJinja Value using memory mapping
-fn parse_yaml_to_minijinja_from_mmap(file_path: &Path) -> Result<MiniJinjaValue> {
-    let file = fs::File::open(file_path)?;
-    let mmap = unsafe { Mmap::map(&file)? };
-    Ok(serde_yaml::from_slice(&mmap)?)
-}
-
-// Parse JSON to MiniJinja Value using memory mapping
-fn parse_json_to_minijinja_from_mmap(file_path: &Path) -> Result<MiniJinjaValue> {
-    let file = fs::File::open(file_path)?;
-    let mmap = unsafe { Mmap::map(&file)? };
-    Ok(serde_json::from_slice(&mmap)?)
+fn parse_json_from_mmap(file_path: &Path) -> MiniJinjaValue {
+    parse_from_mmap(file_path, |b| serde_json::from_slice(b).unwrap())
 }
 
 fn create_test_files() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
@@ -175,131 +120,56 @@ about:
     (temp_dir, yaml_path, json_path)
 }
 
-fn benchmark_yaml_parsing(c: &mut Criterion) {
-    let (temp_dir, yaml_path, _) = create_test_files();
-    let mut group = c.benchmark_group("yaml_parsing");
+type Parsers = [(&'static str, fn(&Path) -> MiniJinjaValue); 3];
+
+// Generic benchmark helper
+fn run_benchmark_group(c: &mut Criterion, group_name: &str, file_path: &Path, parsers: Parsers) {
+    let mut group = c.benchmark_group(group_name);
     group.sample_size(5000);
 
-    let file_size = fs::metadata(&yaml_path).unwrap().len();
+    let file_size = fs::metadata(file_path).unwrap().len();
     group.throughput(Throughput::Bytes(file_size));
 
-    group.bench_function("from_reader", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_from_reader(&yaml_path).unwrap());
+    for (name, parser) in parsers {
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                black_box(parser(file_path));
+            });
         });
-    });
-
-    group.bench_function("from_string", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_from_string(&yaml_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_mmap", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_from_mmap(&yaml_path).unwrap());
-        });
-    });
+    }
 
     group.finish();
+}
+
+fn benchmark_yaml_parsing(c: &mut Criterion) {
+    let (temp_dir, yaml_path, _) = create_test_files();
+    run_benchmark_group(
+        c,
+        "yaml_parsing",
+        &yaml_path,
+        [
+            ("from_reader", parse_yaml_from_reader),
+            ("from_string", parse_yaml_from_string),
+            ("from_mmap", parse_yaml_from_mmap),
+        ],
+    );
     drop(temp_dir);
 }
 
 fn benchmark_json_parsing(c: &mut Criterion) {
     let (temp_dir, _, json_path) = create_test_files();
-    let mut group = c.benchmark_group("json_parsing");
-    group.sample_size(5000);
-
-    let file_size = fs::metadata(&json_path).unwrap().len();
-    group.throughput(Throughput::Bytes(file_size));
-
-    group.bench_function("from_reader", |b| {
-        b.iter(|| {
-            black_box(parse_json_from_reader(&json_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_string", |b| {
-        b.iter(|| {
-            black_box(parse_json_from_string(&json_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_mmap", |b| {
-        b.iter(|| {
-            black_box(parse_json_from_mmap(&json_path).unwrap());
-        });
-    });
-
-    group.finish();
+    run_benchmark_group(
+        c,
+        "json_parsing",
+        &json_path,
+        [
+            ("from_reader", parse_json_from_reader),
+            ("from_string", parse_json_from_string),
+            ("from_mmap", parse_json_from_mmap),
+        ],
+    );
     drop(temp_dir);
 }
 
-fn benchmark_yaml_to_minijinja_parsing(c: &mut Criterion) {
-    let (temp_dir, yaml_path, _) = create_test_files();
-    let mut group = c.benchmark_group("yaml_to_minijinja_parsing");
-    group.sample_size(5000);
-
-    let file_size = fs::metadata(&yaml_path).unwrap().len();
-    group.throughput(Throughput::Bytes(file_size));
-
-    group.bench_function("from_reader", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_to_minijinja_from_reader(&yaml_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_string", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_to_minijinja_from_string(&yaml_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_mmap", |b| {
-        b.iter(|| {
-            black_box(parse_yaml_to_minijinja_from_mmap(&yaml_path).unwrap());
-        });
-    });
-
-    group.finish();
-    drop(temp_dir);
-}
-
-fn benchmark_json_to_minijinja_parsing(c: &mut Criterion) {
-    let (temp_dir, _, json_path) = create_test_files();
-    let mut group = c.benchmark_group("json_to_minijinja_parsing");
-    group.sample_size(5000);
-
-    let file_size = fs::metadata(&json_path).unwrap().len();
-    group.throughput(Throughput::Bytes(file_size));
-
-    group.bench_function("from_reader", |b| {
-        b.iter(|| {
-            black_box(parse_json_to_minijinja_from_reader(&json_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_string", |b| {
-        b.iter(|| {
-            black_box(parse_json_to_minijinja_from_string(&json_path).unwrap());
-        });
-    });
-
-    group.bench_function("from_mmap", |b| {
-        b.iter(|| {
-            black_box(parse_json_to_minijinja_from_mmap(&json_path).unwrap());
-        });
-    });
-
-    group.finish();
-    drop(temp_dir);
-}
-
-criterion_group!(
-    benches,
-    benchmark_yaml_parsing,
-    benchmark_json_parsing,
-    benchmark_yaml_to_minijinja_parsing,
-    benchmark_json_to_minijinja_parsing
-);
+criterion_group!(benches, benchmark_yaml_parsing, benchmark_json_parsing);
 criterion_main!(benches);

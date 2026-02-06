@@ -1,0 +1,40 @@
+package:
+  name: test-rendering
+  version: 1.0.0
+
+tests:
+  - python:
+      imports:
+        - numpy.testing
+  - python:
+      python_version: ["3.8.*"]
+      imports:
+        - numpy.matrix
+  - python:
+      python_version: "3.8.*"
+      imports:
+        - numpy.matrix
+  - script:
+      - echo "FOO"
+  - script:
+      interpreter: python
+      content: |
+        import numpy as np
+  - script:
+      file: test.py
+      env:
+        FOO: BAR
+        BAZ: QUX
+      secrets:
+        - ABC
+        - DEF
+  - downstream: foo
+  - perl:
+      uses:
+        - Test::More
+  - r:
+      libraries:
+        - testthat
+  - ruby:
+      requires:
+        - minitest

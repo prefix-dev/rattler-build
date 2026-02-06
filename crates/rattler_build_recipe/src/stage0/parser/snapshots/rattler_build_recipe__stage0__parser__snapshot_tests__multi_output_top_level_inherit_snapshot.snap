@@ -1,0 +1,211 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+schema_version: 1
+recipe:
+  version: 5.0.0
+source:
+- url:
+  - https://example.com/top-level-source.tar.gz
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+build:
+  number: 0
+  string: null
+  script:
+    content:
+    - echo "Top-level build script"
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+about:
+  homepage: https://top-level-example.com/
+  license: GPL-3.0-or-later
+  license_family: null
+  summary: null
+  description: null
+  documentation: null
+  repository: null
+extra: {}
+outputs:
+- package:
+    name: main-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+  build:
+    number: null
+    string: null
+    script: {}
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: Main package inheriting from top-level
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - python:
+      imports:
+      - main_package
+- package:
+    name: sub-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+    - main-package ==5.0.0
+  build:
+    number: null
+    string: null
+    script: {}
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: null
+    license_family: null
+    summary: Sub package also inheriting from top-level
+    description: null
+    documentation: null
+    repository: null
+  tests:
+  - script:
+      content:
+      - python -c "import sub_package"
+- package:
+    name: custom-package
+    version: 5.0.0
+  inherit: null
+  requirements:
+    run:
+    - python
+  build:
+    number: 1
+    string: null
+    script:
+      content:
+      - echo "Custom build overriding top-level"
+    noarch: null
+    python:
+      entry_points: []
+      skip_pyc_compilation: []
+      use_python_app_entrypoint: false
+      site_packages_path: null
+    skip: []
+    always_copy_files: []
+    always_include_files: []
+    merge_build_and_host_envs: false
+    files: []
+    dynamic_linking:
+      rpaths: []
+      binary_relocation: true
+      missing_dso_allowlist: []
+      rpath_allowlist: []
+      overdepending_behavior: null
+      overlinking_behavior: null
+    variant:
+      use_keys: []
+      ignore_keys: []
+      down_prioritize_variant: null
+    prefix_detection:
+      force_file_type:
+        text: []
+        binary: []
+      ignore: false
+      ignore_binary_files: false
+    post_process: []
+  about:
+    homepage: null
+    license: MIT
+    license_family: null
+    summary: Custom package with overridden build
+    description: null
+    documentation: null
+    repository: null

@@ -5,34 +5,33 @@ size: {width: 1200, height: 630}
 definitions:
   # Site name
   - &site_name >-
-      {{ config.site_name }}
+    {{ config.site_name }}
 
   # Page title
   - &page_title >-
-      {%- if layout.title -%}
-        {{ layout.title }}
-      {%- else -%}
-        {{ page.meta.get("title", page.title) }}
-      {%- endif -%}
+    {%- if layout.title -%}
+      {{ layout.title }}
+    {%- else -%}
+      {{ page.meta.get("title", page.title) }}
+    {%- endif -%}
 
   # Page title with site name
   - &page_title_with_site_name >-
-      {%- if not page.is_homepage -%}
-        {{ page.meta.get("title", page.title) }} - {{ config.site_name }}
-      {%- else -%}
-        {{ config.site_name }}
-      {%- endif -%}
+    {%- if not page.is_homepage -%}
+      {{ page.meta.get("title", page.title) }} - {{ config.site_name }}
+    {%- else -%}
+      {{ config.site_name }}
+    {%- endif -%}
 
   # Page description
   - &page_description >-
-      {%- if layout.description -%}
-        {{ layout.description }}
-      {%- else -%}
-        {{ page.meta.get("description", config.site_description) | x }}
-      {%- endif -%}
+    {%- if layout.description -%}
+      {{ layout.description }}
+    {%- else -%}
+      {{ page.meta.get("description", config.site_description) | x }}
+    {%- endif -%}
 
 tags:
-
   # Open Graph
   og:type: website
   og:title: *page_title_with_site_name
