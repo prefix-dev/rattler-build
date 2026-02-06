@@ -5,6 +5,9 @@ channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 preview = ['pixi-build']
 
+[workspace.target.osx.build-variants]
+c_compiler_version = ["19"]
+
 [tasks]
 build-release = "cargo build --release"
 install = "cargo install --path . --locked"
