@@ -1,0 +1,38 @@
+package:
+  name: conditional-test
+  version: "1.0.0"
+
+tests:
+  - if: unix
+    then:
+      script:
+        - cd source
+        - ${CXX} xmltest.cpp -o xmltest $(pkg-config tinyxml2 --cflags --libs)
+        # Fix up the runpath on macOS
+        - if: osx
+          then:
+            - install_name_tool -change @rpath/libtinyxml2.11.dylib $CONDA_PREFIX/lib/libtinyxml2.11.dylib xmltest
+        - ./xmltest
+        - test -f ${PREFIX}/lib/libtinyxml2${SHLIB_EXT}
+
+      files:
+        source:
+          - source/xmltest.cpp
+          - source/resources/
+
+      requirements:
+        run:
+          - ${{ compiler('c') }}
+          - ${{ compiler('cxx') }}
+          - pkg-config
+  - package_contents:
+      lib:
+        - tinyxml2
+      files:
+        - "**/cmake/tinyxml2/tinyxml2-config.cmake"
+        - "**/cmake/tinyxml2/tinyxml2-shared-targets.cmake"
+  - python:
+      python_version:
+        - "3.9.*"
+        - if: unix
+          then: "3.10.*"

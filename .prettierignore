@@ -1,0 +1,6 @@
+# Test data directories - may contain intentionally malformed or specific formatting
+test-data/
+**/test-data/
+
+# conda_build_config files have duplicate keys with selectors, which prettier doesn't support
+**/conda_build_config/

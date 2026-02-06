@@ -1,0 +1,7 @@
+package:
+  name: foobar
+  version: 1.2.3
+
+build:
+  script:
+    - echo "Building foobar version 1.2.3"

@@ -1,0 +1,52 @@
+# Multi-output recipe with conditional outputs and requirements
+schema_version: 1
+
+recipe:
+  name: conditional-pkg
+  version: 3.0.0
+
+outputs:
+  - staging:
+      name: build-stage
+    requirements:
+      build:
+        - if: unix
+          then:
+            - gcc
+            - make
+          else: msvc
+        - cmake
+      host:
+        - if: linux
+          then: glibc
+        - if: osx
+          then: libcxx
+    build:
+      script:
+        - if: unix
+          then: make all
+          else: nmake all
+
+  - package:
+      name: conditional-pkg
+      version: 3.0.0
+    inherit: build-stage
+    requirements:
+      run:
+        - if: linux
+          then:
+            - libgcc-ng
+            - libstdcxx-ng
+        - if: osx
+          then: libcxx
+        - if: win
+          then: vs2019-runtime
+    about:
+      summary: Package with platform-specific dependencies
+      license: BSD-3-Clause
+    tests:
+      - script:
+          - if: unix
+            then: test -f $PREFIX/bin/conditional-pkg
+          - if: win
+            then: if not exist %PREFIX%\\Library\\bin\\conditional-pkg.exe exit 1

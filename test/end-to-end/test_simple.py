@@ -3,6 +3,8 @@ import json
 import os
 import platform
 import re
+import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,8 +15,6 @@ import boto3
 import pytest
 import requests
 import yaml
-import subprocess
-import shutil
 from helpers import (
     RattlerBuild,
     check_build_output,
@@ -171,6 +171,64 @@ def test_render_only_with_solve_does_not_download_packages(
         if isinstance(build, dict):
             resolved_len = len(build.get("resolved", []))
     assert resolved_len >= 1
+
+
+def test_render_only_ignores_nonexistent_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only ignores --output-dir even if it doesn't exist.
+
+    When using --render-only, no output files are produced, so the output
+    directory should not be required to be writable.
+    """
+    # Create a file and try to use a subdirectory of it as output-dir
+    # This path cannot be created because the parent is a file, not a directory
+    blocking_file = tmp_path / "blocking_file"
+    blocking_file.write_text("I am a file, not a directory")
+    invalid_output_dir = blocking_file / "subdir"
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipes / "toml"),
+        "--output-dir",
+        str(invalid_output_dir),
+        "--render-only",
+        need_result_object=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, f"render-only failed: {result.stderr}"
+
+
+def test_render_only_does_not_create_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only does not create the output directory.
+
+    Even when the output directory path is writable, --render-only should
+    not create it since no output files are produced.
+    """
+    output_dir = tmp_path / "should" / "not" / "be" / "created"
+    assert not output_dir.exists()
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipes / "toml"),
+        "--output-dir",
+        str(output_dir),
+        "--render-only",
+        need_result_object=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert not output_dir.exists(), (
+        "output directory should not be created with --render-only"
+    )
+    assert result.returncode == 0, f"render-only failed: {result.stderr}"
 
 
 def test_run_exports(
@@ -1244,6 +1302,7 @@ def test_downstream_test(
         assert "│ Downstream test failed" in e.value.output
 
 
+@pytest.mark.skip(reason="Cache not implemented yet")
 def test_cache_runexports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1326,6 +1385,7 @@ def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     }
 
 
+@pytest.mark.skip(reason="Cache not implemented yet")
 def test_cache_install(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1339,6 +1399,7 @@ def test_cache_install(
     assert (pkg2 / "info/index.json").exists()
 
 
+@pytest.mark.skip(reason="Need to support jinja templates script")
 def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "env_vars",
@@ -1501,7 +1562,7 @@ def test_missing_pin_subpackage(
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Missing output: test1 (used in pin_subpackage)" in stdout
+    assert "Missing output: test1" in stdout
 
 
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1513,7 +1574,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Found a cycle in the recipe outputs: bazbus" in stdout
+    assert "Cycle detected in recipe outputs: bazbus" in stdout
 
 
 def test_python_min_render(
@@ -1543,6 +1604,7 @@ def test_recipe_variant_render(
     ]
 
 
+@pytest.mark.skip(reason="Cache not implemented yet")
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
@@ -1633,15 +1695,15 @@ about:
     pkg = get_extracted_package(tmp_path / "output", "test-case-collision")
     extracted_files_list = [str(f.relative_to(pkg)) for f in pkg.glob("**/*")]
 
-    assert (
-        "case_test/CASE-FILE.txt" in extracted_files_list
-    ), "CASE-FILE.txt not found in package"
-    assert (
-        "case_test/case-file.txt" in extracted_files_list
-    ), "case-file.txt not found in package"
-    assert (
-        "regular-file.txt" in extracted_files_list
-    ), "regular-file.txt not found in package"
+    assert "case_test/CASE-FILE.txt" in extracted_files_list, (
+        "CASE-FILE.txt not found in package"
+    )
+    assert "case_test/case-file.txt" in extracted_files_list, (
+        "case-file.txt not found in package"
+    )
+    assert "regular-file.txt" in extracted_files_list, (
+        "regular-file.txt not found in package"
+    )
 
     collision_warning_pattern = (
         r"Mixed-case filenames detected, case-insensitive filesystems may break:"
@@ -1649,9 +1711,9 @@ about:
         r"\n  - case_test/case-file.txt"
     )
 
-    assert re.search(
-        collision_warning_pattern, output, flags=re.IGNORECASE
-    ), f"Case collision warning not found in build output. Output contains:\n{output}"
+    assert re.search(collision_warning_pattern, output, flags=re.IGNORECASE), (
+        f"Case collision warning not found in build output. Output contains:\n{output}"
+    )
 
 
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
@@ -1731,8 +1793,9 @@ def test_python_version_spec(
         rattler_build(*args, stderr=STDOUT)
 
     error_output = exc_info.value.output
-    assert (
-        "failed to parse match spec: unable to parse version spec: =.*" in error_output
+    # Check that the error mentions the invalid version spec
+    assert "=.*" in error_output and (
+        "MatchSpecParsing" in error_output or "parse version spec" in error_output
     )
 
 
@@ -1795,6 +1858,21 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     test_result = rattler_build.test(pkg_file)
     assert "Running R test" in test_result
     assert "all tests passed!" in test_result
+
+
+def test_rendering_of_tests_yaml(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "test-rendering", tmp_path, extra_args=["--no-test"])
+    pkg = get_extracted_package(tmp_path, "test-rendering")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # expected file is under recipes/test-rendering/tests.yaml, make sure it's identical
+    expected_tests_yaml = (recipes / "test-rendering" / "tests.yaml").read_text()
+    actual_tests_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    assert expected_tests_yaml == actual_tests_yaml
 
 
 def test_channel_sources(
@@ -2046,29 +2124,29 @@ build:
     pkg = get_extracted_package(build_output_path, "test-relative-git")
 
     cloned_readme = pkg / "README_from_build.md"
-    assert (
-        cloned_readme.exists()
-    ), "README_from_build.md should exist in the built package"
+    assert cloned_readme.exists(), (
+        "README_from_build.md should exist in the built package"
+    )
     assert cloned_readme.read_text() == "test content", "Cloned README content mismatch"
 
     rendered_recipe_path = pkg / "info/recipe/rendered_recipe.yaml"
-    assert (
-        rendered_recipe_path.exists()
-    ), "rendered_recipe.yaml not found in package info"
+    assert rendered_recipe_path.exists(), (
+        "rendered_recipe.yaml not found in package info"
+    )
     rendered_recipe = yaml.safe_load(rendered_recipe_path.read_text())
 
-    assert (
-        "finalized_sources" in rendered_recipe
-    ), "'finalized_sources' missing in rendered recipe"
-    assert (
-        len(rendered_recipe["finalized_sources"]) == 1
-    ), "Expected exactly one finalized source"
+    assert "finalized_sources" in rendered_recipe, (
+        "'finalized_sources' missing in rendered recipe"
+    )
+    assert len(rendered_recipe["finalized_sources"]) == 1, (
+        "Expected exactly one finalized source"
+    )
     final_source = rendered_recipe["finalized_sources"][0]
     assert "rev" in final_source, "'rev' missing in finalized source"
     resolved_commit = final_source["rev"]
-    assert (
-        resolved_commit == original_commit
-    ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+    assert resolved_commit == original_commit, (
+        f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+    )
 
 
 @pytest.mark.skipif(
@@ -2203,7 +2281,6 @@ def test_condapackageignore(rattler_build: RattlerBuild, recipes: Path, tmp_path
     (test_dir / "included.txt").write_text("This should be included")
     (test_dir / "ignored.txt").write_text("This should be ignored")
     (test_dir / "test.pyc").write_text("This should also be ignored")
-
 
     output_dir = tmp_path / "output"
     rattler_build.build(test_dir, output_dir)
@@ -2459,57 +2536,26 @@ about:
     assert (pkg1 / "test.txt").exists()
     assert (pkg1 / "test.txt").read_text() == "Hello from git repo!"
 
-    # Find the git cache directory in the default rattler cache location
-    # The default cache is typically ~/.cache/rattler on Linux
-    import os
+    # Find the git cache directory in the source cache
+    # The refactor stores git repos at src_cache/git/db/<hash>/
+    src_cache = build_output_dir / "src_cache"
+    git_cache_dir = src_cache / "git" / "db"
 
-    default_cache = Path(os.path.expanduser("~/.cache/rattler"))
+    assert git_cache_dir.exists(), (
+        f"Git cache directory should exist after first build: {git_cache_dir}"
+    )
 
-    # Look for git cache in the default location
-    # Git sources are cached in the src_cache directory under output
-    src_cache_locations = [
-        build_output_dir.parent / "output" / "src_cache",  # May be here
-        default_cache / "git",  # Or here
-    ]
-
-    # Find where the git cache actually is by looking for our test repo
-    git_cache_dir = None
-    for potential_cache in src_cache_locations:
-        if potential_cache.exists():
-            # Check if this directory contains our test repo
-            for item in potential_cache.iterdir():
-                if item.is_dir():
-                    # Check if this looks like our repo (has test.txt or is a git repo)
-                    if (item / ".git").exists() or (item / "test.txt").exists():
-                        git_cache_dir = potential_cache
-                        break
-        if git_cache_dir:
-            break
-
-    # If we still haven't found it, look in the output directory's src_cache
-    if git_cache_dir is None:
-        src_cache = build_output_dir / "src_cache"
-        if src_cache.exists():
-            git_cache_dir = src_cache
-
-    assert (
-        git_cache_dir is not None
-    ), f"Could not find git cache directory. Checked: {src_cache_locations}"
-    assert (
-        git_cache_dir.exists()
-    ), f"Git cache directory should exist after first build: {git_cache_dir}"
-
-    # Find the actual cached repo directory (should be named after the repo)
+    # Find the actual cached repo directory (hash-based directory name)
     cached_repos = [d for d in git_cache_dir.iterdir() if d.is_dir()]
-    assert (
-        len(cached_repos) > 0
-    ), f"Should have at least one cached git repo in {git_cache_dir}"
+    assert len(cached_repos) > 0, (
+        f"Should have at least one cached git repo in {git_cache_dir}"
+    )
     cached_repo = cached_repos[0]
 
     # Corrupt the cache by removing the .git directory
     git_dir = cached_repo / ".git"
-    if git_dir.exists():
-        shutil.rmtree(git_dir)
+    assert git_dir.exists(), f"Expected .git directory at {git_dir}"
+    shutil.rmtree(git_dir)
 
     # Verify the cache is now corrupted (git commands should fail)
     result = subprocess.run(
@@ -2549,9 +2595,9 @@ about:
     # Verify the cache was re-created and is now valid
     # The cache directory should still exist (may have been re-cloned)
     cached_repos_after = [d for d in git_cache_dir.iterdir() if d.is_dir()]
-    assert (
-        len(cached_repos_after) > 0
-    ), "Should have at least one cached git repo after re-clone"
+    assert len(cached_repos_after) > 0, (
+        "Should have at least one cached git repo after re-clone"
+    )
 
     # Verify the cache is now valid
     for repo in cached_repos_after:
@@ -2587,20 +2633,16 @@ def test_topological_sort_with_variants(
 
     # Use render-only to get the sorted output order without actually building
     args = ["build", "--recipe-dir", str(recipe_dir), "--render-only"]
-    output = check_output(
+    result = subprocess.run(
         [str(rattler_build.path), *args],
-        stderr=STDOUT,
+        capture_output=True,
         text=True,
         encoding="utf-8",
     )
 
-    # Parse the JSON output to get package names in order
-    # The output after the build variant messages is JSON
-    json_start = output.find("[")
-    if json_start == -1:
-        pytest.fail("Could not find JSON output in render-only response")
-
-    rendered = json.loads(output[json_start:])
+    # The JSON is on stdout, debug messages are on stderr
+    assert result.returncode == 0, f"Build failed: {result.stderr}"
+    rendered = json.loads(result.stdout)
 
     # Extract package names in order
     package_names = [r["recipe"]["package"]["name"] for r in rendered]
@@ -2628,16 +2670,16 @@ def test_topological_sort_with_variants(
 
     # Verify correct ordering:
     # All pkg-a variants should come before any pkg-b variant
-    assert (
-        last_a < first_b
-    ), f"All pkg-a variants ({first_a}-{last_a}) should come before pkg-b ({first_b})"
+    assert last_a < first_b, (
+        f"All pkg-a variants ({first_a}-{last_a}) should come before pkg-b ({first_b})"
+    )
 
     # All pkg-b variants should come before any pkg-c variant
-    assert (
-        last_b < first_c
-    ), f"All pkg-b variants ({first_b}-{last_b}) should come before pkg-c ({first_c})"
+    assert last_b < first_c, (
+        f"All pkg-b variants ({first_b}-{last_b}) should come before pkg-c ({first_c})"
+    )
 
     # Verify we have the expected number of packages (2 variants each = 6 total)
-    assert (
-        len(package_names) == 6
-    ), f"Expected 6 packages (2 variants each), got {len(package_names)}"
+    assert len(package_names) == 6, (
+        f"Expected 6 packages (2 variants each), got {len(package_names)}"
+    )

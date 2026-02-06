@@ -72,7 +72,6 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.details
-  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
   - toc:
@@ -103,8 +102,6 @@ nav:
   - Getting started: getting_started.md
   - High-level overview: highlevel.md
   - Understanding the logs: understanding_terminal_output.md
-  # - Tutorials:
-  #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
       - tutorials/index.md
       - "Python": tutorials/python.md
@@ -116,17 +113,13 @@ nav:
       - "R": tutorials/r.md
       - "Repackaging": tutorials/repackaging.md
       - "Converting from conda-build": converting_from_conda_build.md
-
   - Build options:
       - Advanced options: build_options.md
-
       - Selector syntax (if/then): selectors.md
       - Build script: build_script.md
       - Variants: variants.md
       - Configuration: config.md
-
       - Compilers and cross compilation: compilers.md
-
       - Experimental features: experimental_features.md
       - Multiple output cache: multiple_output_cache.md
       - Sandbox: sandbox.md
@@ -142,7 +135,6 @@ nav:
       - Reproducible builds: rebuild.md
 
   - Publishing packages:
-      # - Terminal User Interface (TUI): tui.md
       - Authentication & upload: authentication_and_upload.md
       - Publishing packages: publish.md
       - Sigstore attestations: sigstore.md
@@ -154,12 +146,29 @@ nav:
       - Package scripts: special_files.md
       - Package Internals: internals.md
       - System integration: system_integration.md
+  - Python Bindings:
+      - Reference:
+          - py-rattler-build/reference/index.md
+          - py-rattler-build/reference/recipe.md
+          - py-rattler-build/reference/rendering.md
+          - py-rattler-build/reference/configuration.md
+          - py-rattler-build/reference/package.md
+          - py-rattler-build/reference/build_result.md
+          - py-rattler-build/reference/upload.md
+          - py-rattler-build/reference/exceptions.md
+          - py-rattler-build/reference/recipe_generation.md
+          - py-rattler-build/reference/progress.md
+          - py-rattler-build/reference/package_assembler.md
+      - Tutorials:
+          - py-rattler-build/tutorials/recipe_rendering_basics.md
+          - py-rattler-build/tutorials/multi_output_and_staging.md
+          - py-rattler-build/tutorials/inspecting_built_packages.md
+          - py-rattler-build/tutorials/package_assembly.md
 
   - References:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
       - Jinja: reference/jinja.md
-      - Python Bindings: reference/python_bindings.md
       - Rattler Index: rattler_index.md
 
 plugins:

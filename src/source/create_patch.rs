@@ -14,9 +14,9 @@ use tempfile::TempDir;
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::recipe::parser::Source;
 use crate::source::patch::{apply_patch_custom, summarize_single_patch};
 use crate::source::{SourceError, SourceInformation};
+use rattler_build_recipe::stage1::Source;
 
 // ============================================================================
 // Section 1: Error types and type definitions
@@ -147,7 +147,7 @@ fn get_patch_output_paths<'a>(
 
 /// Handle URL source patch generation.
 fn handle_url_source(
-    url_src: &crate::recipe::parser::UrlSource,
+    url_src: &rattler_build_recipe::stage1::source::UrlSource,
     source_idx: usize,
     source_info: &SourceInformation,
     work_dir: &Path,
@@ -158,24 +158,21 @@ fn handle_url_source(
     let mut patch_content = String::new();
 
     // Skip single files that weren't extracted
-    if url_src.file_name().is_some() {
+    if url_src.file_name.is_some() {
         return Ok(patch_content);
     }
 
-    tracing::info!("Generating patch for URL source: {}", url_src.urls()[0]);
+    tracing::info!("Generating patch for URL source: {}", url_src.url[0]);
 
     // Determine the original (extracted) directory
-    let original_dir = if let Some(extracted_folders) = &source_info.extracted_folders {
-        if let Some(Some(extracted)) = extracted_folders.get(source_idx) {
-            extracted.clone()
-        } else {
-            find_url_cache_dir(cache_dir, url_src)?
-        }
+    let original_dir = if let Some(extracted) = source_info.extracted_paths.get(&source_idx) {
+        // extracted_paths stores relative paths from the cache dir
+        cache_dir.join(extracted)
     } else {
         find_url_cache_dir(cache_dir, url_src)?
     };
 
-    let target_dir = if let Some(target) = url_src.target_directory() {
+    let target_dir = if let Some(target) = &url_src.target_directory {
         work_dir.join(target)
     } else {
         work_dir.to_path_buf()
@@ -188,7 +185,7 @@ fn handle_url_source(
     // Filter out the patch we're currently creating/overwriting from the baseline
     let current_patch_name = PathBuf::from(format!("{}.patch", config.name));
     let existing_patches: Vec<PathBuf> = url_src
-        .patches()
+        .patches
         .iter()
         .filter(|p| *p != &current_patch_name)
         .cloned()
@@ -198,7 +195,7 @@ fn handle_url_source(
     let diff = create_directory_diff(
         &original_dir,
         &target_dir,
-        url_src.target_directory(),
+        url_src.target_directory.as_ref(),
         filter_config,
         &existing_patches,
         patch_output_dir,
@@ -207,7 +204,7 @@ fn handle_url_source(
     if !diff.is_empty() {
         patch_content.push_str(&diff);
         if existing_patches.is_empty() {
-            tracing::info!("Created patch for URL source: {}", url_src.urls()[0]);
+            tracing::info!("Created patch for URL source: {}", url_src.url[0]);
         } else {
             tracing::info!("Created incremental patch ({} bytes)", diff.len());
         }
@@ -218,7 +215,7 @@ fn handle_url_source(
 
 /// Handle Git source patch generation (not yet implemented).
 fn handle_git_source(
-    _git_src: &crate::recipe::parser::GitSource,
+    _git_src: &rattler_build_recipe::stage1::source::GitSource,
 ) -> Result<String, GeneratePatchError> {
     tracing::warn!("Generating patch for git source is not implemented yet.");
     Ok(String::new())
@@ -226,7 +223,7 @@ fn handle_git_source(
 
 /// Handle Path source patch generation (not yet implemented).
 fn handle_path_source(
-    _path_src: &crate::recipe::parser::PathSource,
+    _path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Result<String, GeneratePatchError> {
     tracing::warn!("Generating patch for path source is not implemented yet.");
     Ok(String::new())
@@ -694,33 +691,33 @@ fn create_directory_diff(
 /// Find the URL cache directory for a given URL source
 fn find_url_cache_dir(
     cache_dir: &Path,
-    url_src: &crate::recipe::parser::UrlSource,
+    url_src: &rattler_build_recipe::stage1::source::UrlSource,
 ) -> Result<PathBuf, SourceError> {
-    // This should match the logic in url_source::extracted_folder
-    // You might need to recreate the cache name logic here
-    use crate::source::checksum::Checksum;
+    use rattler_build_source_cache::{CacheIndex, Checksum};
 
-    let checksum = Checksum::from_url_source(url_src)
+    // Convert checksum from stage1 to cache format (prefer sha256, fallback to md5)
+    let checksum = url_src
+        .sha256
+        .as_ref()
+        .map(|hash| Checksum::Sha256(hash.to_vec()))
+        .or_else(|| {
+            url_src
+                .md5
+                .as_ref()
+                .map(|hash| Checksum::Md5(hash.to_vec()))
+        })
         .ok_or_else(|| SourceError::NoChecksum("No checksum for URL source".to_string()))?;
 
     let first_url = url_src
-        .urls()
+        .url
         .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
-    // Recreate the cache name logic from url_source.rs
-    let filename = first_url
-        .path_segments()
-        .and_then(|segments| segments.filter(|x| !x.is_empty()).next_back())
-        .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
+    // Generate cache key using the same logic as the source cache
+    let key = CacheIndex::generate_cache_key(first_url, Some(&checksum));
 
-    let (stem, _) = super::url_source::split_path(Path::new(filename))
-        .map_err(|e| SourceError::UnknownError(format!("Failed to split path: {}", e)))?;
-
-    let checksum_hex = checksum.to_hex();
-    let cache_name = format!("{}_{}", stem, &checksum_hex[..8]);
-
-    let extracted_dir = cache_dir.join(cache_name);
+    // The source cache stores extracted archives as "{key}_extracted"
+    let extracted_dir = cache_dir.join(format!("{}_extracted", key));
     if extracted_dir.exists() {
         Ok(extracted_dir)
     } else {
