@@ -1,0 +1,113 @@
+# Custom social card layout for rattler-build
+# Uses Moranga font and Paxton mascot
+size: {width: 1200, height: 630}
+
+definitions:
+  # Site name
+  - &site_name >-
+      {{ config.site_name }}
+
+  # Page title
+  - &page_title >-
+      {%- if layout.title -%}
+        {{ layout.title }}
+      {%- else -%}
+        {{ page.meta.get("title", page.title) }}
+      {%- endif -%}
+
+  # Page title with site name
+  - &page_title_with_site_name >-
+      {%- if not page.is_homepage -%}
+        {{ page.meta.get("title", page.title) }} - {{ config.site_name }}
+      {%- else -%}
+        {{ config.site_name }}
+      {%- endif -%}
+
+  # Page description
+  - &page_description >-
+      {%- if layout.description -%}
+        {{ layout.description }}
+      {%- else -%}
+        {{ page.meta.get("description", config.site_description) | x }}
+      {%- endif -%}
+
+tags:
+
+  # Open Graph
+  og:type: website
+  og:title: *page_title_with_site_name
+  og:description: *page_description
+  og:image: "{{ image.url }}"
+  og:image:type: "{{ image.type }}"
+  og:image:width: "{{ image.width }}"
+  og:image:height: "{{ image.height }}"
+  og:url: "{{ page.canonical_url }}"
+
+  # Twitter
+  twitter:card: summary_large_image
+  twitter:title: *page_title_with_site_name
+  twitter:description: *page_description
+  twitter:image: "{{ image.url }}"
+
+layers:
+  # Background - brand navy
+  - background:
+      color: "#001838"
+
+  # Prefix.dev logo in top right
+  - size: {width: 380, height: 100}
+    offset: {x: 780, y: 56}
+    background:
+      image: docs/assets/prefix-logo-white.png
+
+  # Mascot in bottom right
+  - size: {width: 360, height: 360}
+    offset: {x: 800, y: 240}
+    background:
+      image: docs/assets/paxton-mascot-socialcard.png
+
+  # Site name in top left
+  - size: {width: 400, height: 56}
+    offset: {x: 60, y: 56}
+    typography:
+      content: "{{ config.site_name }}"
+      color: "#FFFFFF"
+      font:
+        family: Moranga
+        style: Bold
+
+  # Page title - large and prominent
+  - size: {width: 700, height: 220}
+    offset: {x: 60, y: 250}
+    typography:
+      content: "{{ page.meta.title or page.title }}"
+      color: "#FFD432"
+      font:
+        family: Moranga
+        style: Medium
+      line:
+        amount: 3
+        height: 1.2
+
+  # Page description
+  - size: {width: 650, height: 80}
+    offset: {x: 60, y: 110}
+    typography:
+      content: "{{ page.meta.description or config.site_description or 'Fast Conda Package Builder' }}"
+      color: "#FFFFFF80"
+      font:
+        family: Roboto
+        style: Medium
+      line:
+        amount: 2
+        height: 1.4
+
+  # URL at bottom
+  - size: {width: 500, height: 36}
+    offset: {x: 60, y: 560}
+    typography:
+      content: "rattler-build.prefix.dev"
+      color: "#FFFFFF80"
+      font:
+        family: Roboto
+        style: Regular
