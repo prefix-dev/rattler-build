@@ -150,7 +150,6 @@ py-rattler-build = { path = "./py-rattler-build" }
 nbconvert = ">=7.16,<8"
 ipykernel = ">=6.29,<7"
 
-
 [environments]
 default = { features = [
   "dev",
@@ -158,7 +157,6 @@ default = { features = [
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
-
 
 # pixi build
 [package.build.backend]
@@ -168,6 +166,10 @@ channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
 ]
+
+[package.build.config]
+compilers = ["rust", "c"]
+
 [package]
 name = "rattler-build"
 version = "0.0.0dev"   # NOTE: how to set this automatically?
