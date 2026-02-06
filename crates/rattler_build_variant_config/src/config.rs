@@ -151,8 +151,10 @@ impl VariantConfig {
         paths: &[impl AsRef<Path>],
         target_platform: rattler_conda_types::Platform,
     ) -> Result<Self, VariantConfigError> {
-        let mut jinja_config = rattler_build_jinja::JinjaConfig::default();
-        jinja_config.target_platform = target_platform;
+        let jinja_config = rattler_build_jinja::JinjaConfig {
+            target_platform: target_platform,
+            ..Default::default()
+        };
         Self::from_files_with_context(paths, &jinja_config)
     }
 

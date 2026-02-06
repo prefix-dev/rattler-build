@@ -443,7 +443,8 @@ pub async fn run_test(
     // extract package in place
     if package_folder.join("info/test").exists() {
         let prefix =
-            TempDir::with_prefix_in(format!("test_{}", pkg.identifier.name), &config.output_dir)?.keep();
+            TempDir::with_prefix_in(format!("test_{}", pkg.identifier.name), &config.output_dir)?
+                .keep();
 
         tracing::info!("Creating test environment in '{}'", prefix.display());
 
@@ -461,7 +462,11 @@ pub async fn run_test(
 
         tracing::info!("Creating test environment in {:?}", prefix);
         let match_spec = MatchSpec::from_str(
-            format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+            format!(
+                "{}={}={}",
+                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+            )
+            .as_str(),
             ParseStrictness::Lenient,
         )
         .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
@@ -519,8 +524,11 @@ pub async fn run_test(
         };
 
         for test in tests {
-            let test_prefix =
-                TempDir::with_prefix_in(format!("test_{}", pkg.identifier.name), &config.test_prefix)?.keep();
+            let test_prefix = TempDir::with_prefix_in(
+                format!("test_{}", pkg.identifier.name),
+                &config.test_prefix,
+            )?
+            .keep();
             match test {
                 TestType::Commands(c) => {
                     run_commands_test(&c, &pkg, &package_folder, &test_prefix, &config, &env)
@@ -573,13 +581,20 @@ async fn run_python_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let pkg_id = format!("{}-{}-{}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string);
+    let pkg_id = format!(
+        "{}-{}-{}",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    );
     let span = tracing::info_span!("Running python test(s)", span_color = pkg_id);
     let _guard = span.enter();
 
     // The version spec of the package being built
     let match_spec = MatchSpec::from_str(
-        format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+        format!(
+            "{}={}={}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        )
+        .as_str(),
         ParseStrictness::Lenient,
     )?;
 
@@ -738,12 +753,19 @@ async fn run_perl_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let pkg_id = format!("{}-{}-{}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string);
+    let pkg_id = format!(
+        "{}-{}-{}",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    );
     let span = tracing::info_span!("Running perl test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(
-        format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+        format!(
+            "{}={}={}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        )
+        .as_str(),
         ParseStrictness::Lenient,
     )?;
 
@@ -849,7 +871,11 @@ async fn run_commands_test(
 
     // create environment with the test dependencies
     dependencies.push(MatchSpec::from_str(
-        format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+        format!(
+            "{}={}={}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        )
+        .as_str(),
         ParseStrictness::Lenient,
     )?);
 
@@ -920,7 +946,10 @@ async fn run_downstream_test(
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
     let downstream_spec = downstream_test.downstream.clone();
-    let pkg_id = format!("{}-{}-{}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string);
+    let pkg_id = format!(
+        "{}-{}-{}",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    );
 
     let span = tracing::info_span!(
         "Running downstream test for",
@@ -934,7 +963,11 @@ async fn run_downstream_test(
     let match_specs = [
         MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
         MatchSpec::from_str(
-            format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+            format!(
+                "{}={}={}",
+                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+            )
+            .as_str(),
             ParseStrictness::Lenient,
         )?,
     ];
@@ -975,7 +1008,9 @@ async fn run_downstream_test(
                 })?;
 
             let temp_dir = tempfile::tempdir()?;
-            let package_file = temp_dir.path().join(downstream_package.identifier.to_file_name());
+            let package_file = temp_dir
+                .path()
+                .join(downstream_package.identifier.to_file_name());
 
             if downstream_package.url.scheme() == "file" {
                 fs::copy(
@@ -1018,12 +1053,19 @@ async fn run_r_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let pkg_id = format!("{}-{}-{}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string);
+    let pkg_id = format!(
+        "{}-{}-{}",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    );
     let span = tracing::info_span!("Running R test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(
-        format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+        format!(
+            "{}={}={}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        )
+        .as_str(),
         ParseStrictness::Lenient,
     )?;
 
@@ -1088,12 +1130,19 @@ async fn run_ruby_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    let pkg_id = format!("{}-{}-{}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string);
+    let pkg_id = format!(
+        "{}-{}-{}",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    );
     let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
     let _guard = span.enter();
 
     let match_spec = MatchSpec::from_str(
-        format!("{}={}={}", pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string).as_str(),
+        format!(
+            "{}={}={}",
+            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+        )
+        .as_str(),
         ParseStrictness::Lenient,
     )?;
 

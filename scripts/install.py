@@ -12,7 +12,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Install rattler-build binary to a custom location"
     )
-    parser.add_argument("name", help="Name of the executable (e.g., 'rattler-build-dev')")
+    parser.add_argument(
+        "name", help="Name of the executable (e.g., 'rattler-build-dev')"
+    )
     parser.add_argument(
         "--dest",
         type=Path,
