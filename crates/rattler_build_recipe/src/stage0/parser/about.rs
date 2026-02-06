@@ -190,7 +190,7 @@ mod tests {
 
         assert!(about.homepage.is_some());
         assert!(about.license.is_some());
-        assert!(!about.license_file.is_none());
+        assert!(about.license_file.is_some());
         assert!(about.summary.is_some());
         assert!(about.description.is_some());
         assert!(about.documentation.is_some());

@@ -379,11 +379,11 @@ fn stable_topological_sort(
                             .copied()
                     };
 
-                    if let Some(dep_idx) = matching_dep_idx {
-                        if !added[dep_idx] {
-                            can_add = false;
-                            break;
-                        }
+                    if let Some(dep_idx) = matching_dep_idx
+                        && !added[dep_idx]
+                    {
+                        can_add = false;
+                        break;
                     }
                 }
             }
@@ -510,10 +510,8 @@ fn discover_new_variant_keys_from_evaluation(
                 };
 
                 // Only evaluate requirements for non-skipped outputs
-                if !should_skip {
-                    if let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
-                        all_free_specs.extend(evaluated.free_specs());
-                    }
+                if !should_skip && let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
+                    all_free_specs.extend(evaluated.free_specs());
                 }
             }
             all_free_specs

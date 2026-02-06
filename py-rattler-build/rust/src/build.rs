@@ -209,7 +209,7 @@ pub fn build_rendered_variant_py(
                 package_format
                     .as_ref()
                     .map(|p| p.archive_type)
-                    .unwrap_or(rattler_conda_types::package::ArchiveType::Conda),
+                    .unwrap_or(rattler_conda_types::package::CondaArchiveType::Conda),
                 package_format
                     .as_ref()
                     .map(|p| p.compression_level)
@@ -276,8 +276,8 @@ pub fn build_rendered_variant_py(
     // Construct package filename
     let archive_type = build_config.packaging_settings.archive_type;
     let extension = match archive_type {
-        rattler_conda_types::package::ArchiveType::Conda => "conda",
-        rattler_conda_types::package::ArchiveType::TarBz2 => "tar.bz2",
+        rattler_conda_types::package::CondaArchiveType::Conda => "conda",
+        rattler_conda_types::package::CondaArchiveType::TarBz2 => "tar.bz2",
     };
 
     let package_filename = format!(

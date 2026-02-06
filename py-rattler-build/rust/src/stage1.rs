@@ -160,7 +160,7 @@ pub struct PyStage1Build {
 #[pymethods]
 impl PyStage1Build {
     #[getter]
-    fn number(&self) -> u64 {
+    fn number(&self) -> Option<u64> {
         self.inner.number
     }
 
@@ -204,7 +204,7 @@ impl PyStage1Build {
     }
 
     fn __repr__(&self) -> String {
-        format!("Stage1Build(number={})", self.inner.number)
+        format!("Stage1Build(number={:?})", self.inner.number)
     }
 }
 

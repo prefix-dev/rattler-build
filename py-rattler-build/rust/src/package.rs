@@ -16,7 +16,9 @@ use rattler_build_recipe::stage1::tests::{
 };
 use rattler_conda_types::{
     NamedChannelOrUrl,
-    package::{ArchiveIdentifier, IndexJson, PackageFile, PathsEntry, PathsJson},
+    package::{
+        CondaArchiveIdentifier, CondaArchiveType, IndexJson, PackageFile, PathsEntry, PathsJson,
+    },
 };
 use rattler_package_streaming::seek::read_package_file;
 
@@ -40,7 +42,7 @@ pub struct PyPackage {
     /// Parsed index.json metadata
     index: IndexJson,
     /// Parsed package identifier from filename
-    archive_id: ArchiveIdentifier,
+    archive_id: CondaArchiveIdentifier,
     /// Parsed tests from info/tests/tests.yaml (lazily loaded)
     tests_cache: Arc<Mutex<Option<Vec<TestType>>>>,
     /// Parsed paths.json (lazily loaded)
@@ -57,7 +59,7 @@ impl PyPackage {
             .map_err(|e| RattlerBuildError::Other(format!("Failed to read package: {}", e)))?;
 
         // Parse archive identifier from filename
-        let archive_id = ArchiveIdentifier::try_from_path(&path).ok_or_else(|| {
+        let archive_id = CondaArchiveIdentifier::try_from_path(&path).ok_or_else(|| {
             RattlerBuildError::Other(format!(
                 "Failed to parse package filename: {}",
                 path.display()
@@ -173,8 +175,8 @@ impl PyPackage {
     #[getter]
     fn archive_type(&self) -> String {
         match self.archive_id.archive_type {
-            rattler_conda_types::package::ArchiveType::TarBz2 => "tar.bz2".to_string(),
-            rattler_conda_types::package::ArchiveType::Conda => "conda".to_string(),
+            CondaArchiveType::TarBz2 => "tar.bz2".to_string(),
+            CondaArchiveType::Conda => "conda".to_string(),
         }
     }
 
