@@ -178,11 +178,6 @@ impl PackageContentsTest {
                                 raw.to_string(),
                                 GlobSet::builder()
                                     .add(Glob::new(&format!("Library/bin/{raw}.dll"))?)
-                                    .build()?,
-                            ));
-                            res.push((
-                                raw.to_string(),
-                                GlobSet::builder()
                                     .add(Glob::new(&format!("Library/lib/{raw}.lib"))?)
                                     .build()?,
                             ));
