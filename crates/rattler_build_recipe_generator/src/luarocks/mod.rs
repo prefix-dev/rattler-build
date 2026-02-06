@@ -372,6 +372,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
     let mut context = IndexMap::new();
     context.insert("version".to_string(), version.to_string());
     context.insert("name".to_string(), package_name.as_normalized().to_string());
+    context.insert("build_number".to_string(), "0".to_string());
 
     // Determine source type and create appropriate SourceElement
     let source_element: SourceElement = if is_git_url(&rockspec.source.url) {
@@ -404,6 +405,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         },
         source: vec![source_element],
         build: Build {
+            number: "${{ build_number }}".to_string(),
             script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
             python: Python::default(),
             noarch: None,
