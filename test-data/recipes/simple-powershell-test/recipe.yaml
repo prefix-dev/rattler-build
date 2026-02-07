@@ -1,0 +1,18 @@
+package:
+  name: simple-powershell-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: powershell
+    content: |
+      Write-Output "PowerShell interpreter working!"
+
+requirements:
+  build:
+    - powershell
+
+about:
+  summary: Simple test for PowerShell interpreter
+  license: MIT

@@ -24,3 +24,7 @@ outputs:
         requirements:
           build:
             - nushell
+      - script: powershell/build.ps1
+        requirements:
+          build:
+            - powershell

@@ -9,7 +9,8 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NodeJsInterpreter,
-    NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter, RubyInterpreter,
+    NuShellInterpreter, PerlInterpreter, PowerShellInterpreter, PythonInterpreter, RInterpreter,
+    RubyInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -260,8 +261,13 @@ impl Script {
     ) -> Result<(), InterpreterError> {
         // Determine the valid script extensions based on the available interpreters.
         let mut valid_script_extensions = Vec::new();
+        let mut inferred_interpreter: Option<&str> = None;
         if cfg!(windows) {
             valid_script_extensions.push("bat");
+            if !recipe_dir.join("build.bat").exists() && recipe_dir.join("build.ps1").exists() {
+                valid_script_extensions.push("ps1");
+                inferred_interpreter = Some("powershell");
+            }
         } else {
             valid_script_extensions.push("sh");
         }
@@ -318,7 +324,12 @@ impl Script {
             debug,
         };
 
-        match self.interpreter() {
+        let interpreter = self
+            .interpreter
+            .as_deref()
+            .or(inferred_interpreter)
+            .unwrap_or(self.interpreter());
+        match interpreter {
             "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
             "bash" => BashInterpreter.run(exec_args).await?,
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
@@ -327,6 +338,7 @@ impl Script {
             "rscript" => RInterpreter.run(exec_args).await?,
             "ruby" => RubyInterpreter.run(exec_args).await?,
             "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
+            "powershell" => PowerShellInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::other(format!(
                     "Unsupported interpreter: {}",
