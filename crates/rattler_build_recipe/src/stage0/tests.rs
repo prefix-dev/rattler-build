@@ -9,8 +9,7 @@ use crate::stage0::{
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PythonVersion {
-    /// A single python version
-    /// TODO: possibly change to use `VersionSpec` for proper parsing?
+    /// A single python version (kept as String since Value<T> may hold Jinja templates)
     Single(Value<String>),
     /// Multiple python versions (with if/then/else support)
     Multiple(ConditionalList<String>),
