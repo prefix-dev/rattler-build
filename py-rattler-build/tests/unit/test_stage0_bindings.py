@@ -150,7 +150,6 @@ def test_single_output_recipe_package() -> None:
     assert recipe.requirements is not None
     assert recipe.about is not None
 
-    # TODO: decide if we want to keep context a dictionary
     context = recipe.context
     assert isinstance(context, dict)
 
