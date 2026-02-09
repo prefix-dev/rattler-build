@@ -3921,7 +3921,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.56.0"
+version = "0.57.2"
 dependencies = [
  "chrono",
  "clap",
@@ -4281,7 +4281,6 @@ dependencies = [
  "minijinja",
  "num_cpus",
  "pathdiff",
- "petgraph",
  "rattler",
  "rattler_build_jinja",
  "rattler_build_networking",
