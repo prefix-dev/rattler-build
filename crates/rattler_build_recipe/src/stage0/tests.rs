@@ -213,7 +213,6 @@ impl TestType {
             TestType::Commands(commands) => {
                 vars.extend(commands.script.used_variables());
                 if let Some(reqs) = &commands.requirements {
-                    // TODO(refactor): should this parse into matchspec?
                     vars.extend(reqs.run.used_variables());
                     vars.extend(reqs.build.used_variables());
                 }
