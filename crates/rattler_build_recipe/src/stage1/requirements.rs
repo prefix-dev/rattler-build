@@ -201,7 +201,6 @@ impl RunExports {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct IgnoreRunExports {
     /// Packages to ignore run exports from by name
-    /// TODO: move to PackageName perhaps (or spec!?)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub by_name: Vec<PackageName>,
 
