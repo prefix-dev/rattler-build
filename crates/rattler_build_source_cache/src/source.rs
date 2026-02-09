@@ -36,20 +36,18 @@ impl Checksum {
             return false;
         }
 
-        // TODO: the `.as_slice()` is deprecated in generic-array.
-        #[allow(deprecated)]
         match self {
             Checksum::Sha256(expected) => {
                 let mut hasher = Sha256::new();
                 hasher.update(&buffer);
                 let result = hasher.finalize();
-                result.as_slice() == expected.as_slice()
+                result[..] == expected[..]
             }
             Checksum::Md5(expected) => {
                 let mut hasher = Md5::new();
                 hasher.update(&buffer);
                 let result = hasher.finalize();
-                result.as_slice() == expected.as_slice()
+                result[..] == expected[..]
             }
         }
     }
