@@ -4,7 +4,6 @@ version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-readme = "README.md"
 repository.workspace = true
 description = "Variant configuration system for rattler-build"
 
