@@ -599,13 +599,9 @@ fn default_tests(env: &mut Environment) {
 
 fn default_filters(env: &mut Environment) {
     env.add_filter("version_to_buildstring", |s: String| {
-        // we first split the string by whitespace and take the first part
+        // strip build string suffixes (e.g. "3.11.* *_cpython" -> "3.11.*")
         let s = s.split_whitespace().next().unwrap_or(&s);
-        // we then split the string by . and take the first two parts
-        let mut parts = s.split('.');
-        let major = parts.next().unwrap_or("");
-        let minor = parts.next().unwrap_or("");
-        format!("{}{}", major, minor)
+        rattler_build_types::short_version(s, 2)
     });
 
     env.add_filter("replace", minijinja::filters::replace);

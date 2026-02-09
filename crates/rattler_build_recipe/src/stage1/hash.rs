@@ -68,17 +68,7 @@ impl Formatter for PythonFormatter {
     }
 }
 
-// TODO merge with the jinja function that we have for this
-fn short_version_from_spec(input: &str, length: u32) -> String {
-    let mut parts = input.split('.');
-    let mut result = String::new();
-    for _ in 0..length {
-        if let Some(part) = parts.next() {
-            result.push_str(part);
-        }
-    }
-    result
-}
+use rattler_build_types::short_version;
 
 /// The hash info for a given variant
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
@@ -151,7 +141,7 @@ impl HashInfo {
 
             map.insert(
                 prefix.to_string(),
-                short_version_from_spec(&version_spec.to_string(), version_length),
+                short_version(&version_spec.to_string(), version_length),
             );
         }
 
