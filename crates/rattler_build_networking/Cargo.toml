@@ -11,7 +11,12 @@ description = "Networking utilities for rattler-build"
 default = []
 middleware = ["rattler_networking"]
 native-tls = ["reqwest/native-tls", "rattler_networking?/native-tls"]
-rustls-tls = ["reqwest/rustls-tls", "reqwest/rustls-tls-native-roots", "reqwest-middleware/rustls-tls", "rattler_networking?/rustls-tls"]
+rustls-tls = [
+  "reqwest/rustls-tls",
+  "reqwest/rustls-tls-native-roots",
+  "reqwest-middleware/rustls-tls",
+  "rattler_networking?/rustls-tls",
+]
 
 [dependencies]
 reqwest = { workspace = true, features = ["multipart"] }

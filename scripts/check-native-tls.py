@@ -40,10 +40,13 @@ def get_features(package: dict) -> str:
 def check_package(name: str, features: str) -> tuple[bool, str]:
     """Run cargo tree to check if the forbidden crate is in the dependency tree."""
     cmd = [
-        "cargo", "tree",
-        "-i", FORBIDDEN_CRATE,
+        "cargo",
+        "tree",
+        "-i",
+        FORBIDDEN_CRATE,
         "--no-default-features",
-        "--package", name,
+        "--package",
+        name,
         "--locked",
         "--edges=normal",
     ]
