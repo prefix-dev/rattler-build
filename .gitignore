@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .DS_STORE
 checkouts
+.mypy_cache
 
 # mkdocs
 .cache
