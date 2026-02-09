@@ -98,9 +98,12 @@ fn test_parse_all_test_recipes() {
         }
     }
 
-    // For now, we'll just print the results and not fail the test
-    // This allows us to see which recipes need attention
-    // TODO: Once all recipes parse correctly, make this test fail on errors
+    assert!(
+        failed.is_empty(),
+        "{} out of {} recipes failed to parse",
+        failed.len(),
+        recipes.len()
+    );
 }
 
 #[test]
