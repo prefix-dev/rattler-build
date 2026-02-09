@@ -63,7 +63,6 @@ pub fn build_recipes_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
-    // todo: allow custom config here
     let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         output_dir,
@@ -173,7 +172,6 @@ pub fn test_package_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
-    // todo: allow custom config here
     let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         None,
