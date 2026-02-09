@@ -7,7 +7,6 @@ use std::path::Component;
 
 /// Convert a path to a string with forward slashes (only on windows). Otherwise,
 /// just return the path as a string.
-/// TODO move to rattler-build-fs crate?
 #[allow(dead_code)]
 pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
