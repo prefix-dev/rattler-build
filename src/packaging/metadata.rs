@@ -349,7 +349,6 @@ impl Output {
         let noarch = if self.is_python_version_independent() {
             NoArchType::python()
         } else {
-            // TODO(refactor): perhaps normalize in the recipe parsing step?
             self.recipe.build().noarch.unwrap_or(NoArchType::none())
         };
 
