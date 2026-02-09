@@ -1,5 +1,5 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
-use rattler_build_jinja::{Jinja, Variable};
+use rattler_build_jinja::Variable;
 use rattler_build_script::Script;
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{NoArchType, package::EntryPoint};
@@ -104,11 +104,7 @@ impl BuildString {
                 *self = BuildString::Resolved(rendered);
             }
             BuildString::Unresolved(template, span) => {
-                // Create a Jinja instance
-                let mut jinja = Jinja::new(context.jinja_config().clone());
-
-                // Add all context variables
-                jinja = jinja.with_context(context.variables());
+                let mut jinja = context.to_jinja();
 
                 // Add the hash variable to the context
                 jinja.context_mut().insert(

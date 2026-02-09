@@ -1,0 +1,24 @@
+package:
+  name: used-vars-scripts
+  version: "0.1.0"
+
+build:
+  script:
+    - "echo 'ok'"
+    - "echo ${{ simple_var }}"
+    - if: unix
+      then:
+        - "echo ${{ unix_var }}"
+    - if: win
+      then:
+        - "echo ${{ win_var }}" 
+      
+tests:
+  - script:
+      - "echo ${{ test_var }}"
+      - if: unix
+        then:
+          - "echo ${{ test_unix_var }}"
+      - if: win
+        then:
+          - "echo ${{ test_win_var }}"

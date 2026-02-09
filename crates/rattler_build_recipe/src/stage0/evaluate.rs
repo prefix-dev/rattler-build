@@ -88,7 +88,7 @@ use crate::{
         },
     },
 };
-use rattler_build_jinja::{Jinja, Variable};
+use rattler_build_jinja::Variable;
 
 /// Variables that are always included in variant combinations
 pub const ALWAYS_INCLUDED_VARS: &[&str] =
@@ -100,13 +100,8 @@ fn render_template_to_variable(
     context: &EvaluationContext,
     span: Option<&Span>,
 ) -> Result<Variable, ParseError> {
-    // Create a Jinja instance with the configuration from the evaluation context
-    let jinja_config = context.jinja_config().clone();
-    let undefined_behavior = jinja_config.undefined_behavior;
-    let mut jinja = Jinja::new(jinja_config);
-
-    // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(context.variables());
+    let undefined_behavior = context.jinja_config().undefined_behavior;
+    let jinja = context.to_jinja();
 
     let trimmed = template.trim();
 
@@ -398,13 +393,8 @@ fn render_template(
     context: &EvaluationContext,
     span: Option<&Span>,
 ) -> Result<String, ParseError> {
-    // Create a Jinja instance with the configuration from the evaluation context
-    let jinja_config = context.jinja_config().clone();
-    let undefined_behavior = jinja_config.undefined_behavior;
-    let mut jinja = Jinja::new(jinja_config);
-
-    // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(context.variables());
+    let undefined_behavior = context.jinja_config().undefined_behavior;
+    let jinja = context.to_jinja();
 
     // The Jinja environment is already configured to use ${{ }} syntax
     // so we can pass the template as-is
@@ -511,13 +501,7 @@ fn evaluate_condition(
     context: &EvaluationContext,
     span: Option<&Span>,
 ) -> Result<bool, ParseError> {
-    // Create a Jinja instance with the configuration from the evaluation context
-    let jinja_config = context.jinja_config().clone();
-
-    let mut jinja = Jinja::new(jinja_config);
-
-    // Use with_context to add all variables from the evaluation context
-    jinja = jinja.with_context(context.variables());
+    let jinja = context.to_jinja();
 
     // Evaluate the expression to get its value
     let value = jinja.eval(expr.source()).map_err(|e| {
@@ -845,12 +829,7 @@ pub fn evaluate_skip_list(
 /// Returns true if ANY condition evaluates to true (OR logic).
 pub fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
     for condition in skip_conditions {
-        // Create a Jinja instance with the configuration from the evaluation context
-        let jinja_config = context.jinja_config().clone();
-        let mut jinja = Jinja::new(jinja_config);
-
-        // Use with_context to add all variables from the evaluation context
-        jinja = jinja.with_context(context.variables());
+        let jinja = context.to_jinja();
 
         // Evaluate the skip condition as a boolean expression
         match jinja.eval(condition) {
@@ -889,10 +868,18 @@ pub fn evaluate_string_list_lenient(
 ///
 /// This allows templates like `${{ "$CMAKE_ARGS" if unix else "%CMAKE_ARGS%" }}` to remain
 /// unevaluated until build time when the actual environment variables are available.
+///
+/// IMPORTANT: Variable tracking is done for ALL branches (both taken and not-taken) because
+/// script variables affect variant computation. For example, `if: win then: echo ${{ win_var }}`
+/// should track `win_var` even on unix, since it's part of the recipe's variant dependencies.
 pub fn preserve_string_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<Vec<String>, ParseError> {
+    // First, track variables in ALL branches (including non-taken ones)
+    // This ensures variant computation includes all script variables regardless of platform
+    track_all_template_variables(list.as_slice(), context);
+
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         // Track variables in templates for used_variant calculation
         // This ensures that variables like ${{ python }} in scripts are tracked
@@ -904,6 +891,31 @@ pub fn preserve_string_list(
         // Filter out empty strings
         Ok(if s.is_empty() { None } else { Some(s) })
     })
+}
+
+/// Recursively track template variables in ALL items, including both branches of conditionals.
+///
+/// This is used by `preserve_string_list` to ensure that variables in non-taken conditional
+/// branches are still tracked for variant computation purposes.
+fn track_all_template_variables(items: &[Item<String>], context: &EvaluationContext) {
+    for item in items {
+        match item {
+            Item::Value(value) => {
+                track_template_variables(value, context);
+            }
+            Item::Conditional(cond) => {
+                // Track variables used in the condition expression itself
+                for var in cond.condition.used_variables() {
+                    context.track_access(var);
+                }
+                // Track variables in BOTH branches
+                track_all_template_variables(cond.then.as_slice(), context);
+                if let Some(else_items) = &cond.else_value {
+                    track_all_template_variables(else_items.as_slice(), context);
+                }
+            }
+        }
+    }
 }
 
 /// Evaluate a ConditionalList<PackageName> into Vec<PackageName>
@@ -3845,11 +3857,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -3912,11 +3920,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -3968,13 +3972,10 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
+                println!("{:#?}", recipes);
                 assert_eq!(recipes.len(), 2);
 
                 // First output: inherits everything from top-level
@@ -4048,11 +4049,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4114,11 +4111,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs
@@ -4202,11 +4195,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4301,11 +4290,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4362,11 +4347,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4465,11 +4446,7 @@ outputs:
 
         match parsed {
             crate::stage0::Recipe::MultiOutput(multi) => {
-                let mut ctx = EvaluationContext::new();
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs, not staging
@@ -4552,15 +4529,7 @@ requirements:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create context with both build_platform and target_platform
-        let mut ctx = EvaluationContext::new();
-        ctx.insert(
-            "target_platform".to_string(),
-            Variable::from_string("linux-64"),
-        );
-        ctx.insert(
-            "build_platform".to_string(),
-            Variable::from_string("linux-64"),
-        );
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
         // Evaluate the recipe
         let result = parsed.evaluate(&ctx);
@@ -4599,11 +4568,7 @@ build:
 
         // Create context with all required variables
         // Using python=3.8 and python_min=3.8 so that match() succeeds and is_abi3 is evaluated
-        let mut ctx = EvaluationContext::new();
-        ctx.insert(
-            "target_platform".to_string(),
-            Variable::from_string("linux-64"),
-        );
+        let mut ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
         ctx.insert("python".to_string(), Variable::from_string("3.8"));
         ctx.insert("python_min".to_string(), Variable::from_string("3.8"));
         ctx.insert("is_abi3".to_string(), Variable::from(true));
@@ -4867,14 +4832,8 @@ outputs:
                     variant: std::collections::BTreeMap::new(),
                     ..Default::default()
                 };
-                let mut ctx =
+                let ctx =
                     EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("win-64"),
-                );
-                ctx.insert("win".to_string(), Variable::from(true));
-                ctx.insert("unix".to_string(), Variable::from(false));
 
                 // This should NOT fail even though stdlib('c') has no default on Windows
                 // because the output is skipped (skip: win)
@@ -4945,14 +4904,8 @@ outputs:
                     variant,
                     ..Default::default()
                 };
-                let mut ctx =
+                let ctx =
                     EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
-                ctx.insert(
-                    "target_platform".to_string(),
-                    Variable::from_string("linux-64"),
-                );
-                ctx.insert("win".to_string(), Variable::from(false));
-                ctx.insert("unix".to_string(), Variable::from(true));
 
                 let result = multi.evaluate(&ctx);
                 assert!(
@@ -5008,13 +4961,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Test with unix=true, win=false
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), Variable::from(true));
-        ctx.insert("win".to_string(), Variable::from(false));
-        ctx.insert(
-            "target_platform".to_string(),
-            Variable::from_string("linux-64"),
-        );
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
         let result = parsed.evaluate(&ctx).unwrap();
 
@@ -5028,13 +4975,7 @@ build:
         assert_eq!(result.build.post_process[1].regex.as_str(), "always");
 
         // Test with unix=false, win=true
-        let mut ctx2 = EvaluationContext::new();
-        ctx2.insert("unix".to_string(), Variable::from(false));
-        ctx2.insert("win".to_string(), Variable::from(true));
-        ctx2.insert(
-            "target_platform".to_string(),
-            Variable::from_string("win-64"),
-        );
+        let ctx2 = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
 
         let result2 = parsed.evaluate(&ctx2).unwrap();
 
@@ -5068,11 +5009,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create a minimal evaluation context
-        let mut ctx = EvaluationContext::new();
-        ctx.insert(
-            "target_platform".to_string(),
-            Variable::from_string("linux-64"),
-        );
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
         // Evaluate the recipe - it should be skipped
         let result = parsed.evaluate(&ctx);

@@ -1169,4 +1169,108 @@ build:
             "Variant should contain the original 'true' value for is_abi3"
         );
     }
+
+    #[test]
+    fn test_used_vars_in_test_scripts() {
+        // Test that variables used in test script sections are tracked in used_variant
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+build:
+  script:
+    - "echo ${{ build_var }}"
+
+tests:
+  - script:
+      - "echo ${{ test_var }}"
+      - if: unix
+        then:
+          - "echo ${{ test_unix_var }}"
+      - if: win
+        then:
+          - "echo ${{ test_win_var }}"
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("build_var".to_string(), Variable::from("build_value"));
+        variant.insert("test_var".to_string(), Variable::from("test_value"));
+        variant.insert("test_unix_var".to_string(), Variable::from("unix_value"));
+        variant.insert("test_win_var".to_string(), Variable::from("win_value"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("win".to_string(), Variable::from(false));
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        // Build script variable should be tracked
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("build_var")),
+            "build_var should be in used_variant. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+
+        // Test script variables should also be tracked (including from non-taken branches)
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("test_var")),
+            "test_var should be in used_variant. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("test_unix_var")),
+            "test_unix_var should be in used_variant (from taken unix branch). Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("test_win_var")),
+            "test_win_var should be in used_variant (from non-taken win branch). Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_used_vars_in_build_scripts_all_branches() {
+        // Test that variables in non-taken conditional branches of BUILD scripts
+        // are also tracked in used_variant
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+build:
+  script:
+    - "echo ${{ common_var }}"
+    - if: unix
+      then:
+        - "echo ${{ unix_only_var }}"
+    - if: win
+      then:
+        - "echo ${{ win_only_var }}"
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("common_var".to_string(), Variable::from("common"));
+        variant.insert("unix_only_var".to_string(), Variable::from("unix_val"));
+        variant.insert("win_only_var".to_string(), Variable::from("win_val"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("win".to_string(), Variable::from(false));
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("common_var")),
+            "common_var should be in used_variant. Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("unix_only_var")),
+            "unix_only_var should be in used_variant (from taken branch). Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("win_only_var")),
+            "win_only_var should be in used_variant (from non-taken branch). Got: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+    }
 }

@@ -12,7 +12,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rattler_build_jinja::{JinjaConfig, Variable};
+use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
+use rattler_conda_types::Platform;
 
 pub mod about;
 pub mod build;
@@ -74,6 +75,23 @@ impl EvaluationContext {
     /// Create a new empty evaluation context
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create an evaluation context configured for a specific target platform.
+    ///
+    /// This sets the JinjaConfig's target/build/host platforms, ensuring
+    /// all derived platform variables (`linux`, `win`, `unix`, etc.) are correct.
+    pub fn for_platform(platform: Platform) -> Self {
+        let jinja_config = JinjaConfig {
+            target_platform: platform,
+            build_platform: platform,
+            host_platform: platform,
+            ..Default::default()
+        };
+        Self {
+            jinja_config,
+            ..Default::default()
+        }
     }
 
     /// Create an evaluation context from a map of string variables
@@ -174,6 +192,15 @@ impl EvaluationContext {
     /// Get the Jinja configuration
     pub fn jinja_config(&self) -> &JinjaConfig {
         &self.jinja_config
+    }
+
+    /// Create a Jinja instance from this evaluation context.
+    ///
+    /// This ensures the Jinja environment and context variables are properly
+    /// synchronized — platform booleans and variables all derive from the
+    /// same `JinjaConfig`.
+    pub fn to_jinja(&self) -> Jinja {
+        Jinja::new(self.jinja_config.clone()).with_context(&self.variables)
     }
 
     /// Track that a variable was accessed

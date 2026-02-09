@@ -216,6 +216,55 @@ build:
     }
 
     #[test]
+    fn test_used_vars_in_scripts() {
+        let yaml = include_str!("../../test-data/used_vars_in_scripts.yaml");
+        let parsed = parse_recipe_from_source(yaml).unwrap();
+        let used_vars = parsed.used_variables();
+
+        // Build script variables
+        assert!(
+            used_vars.contains(&"simple_var".to_string()),
+            "simple_var should be extracted from build script. Got: {:?}",
+            used_vars
+        );
+        assert!(
+            used_vars.contains(&"unix_var".to_string()),
+            "unix_var should be extracted from build script conditional"
+        );
+        assert!(
+            used_vars.contains(&"win_var".to_string()),
+            "win_var should be extracted from build script conditional"
+        );
+
+        // Condition variables
+        assert!(
+            used_vars.contains(&"unix".to_string()),
+            "unix should be extracted from if conditions"
+        );
+        assert!(
+            used_vars.contains(&"win".to_string()),
+            "win should be extracted from if conditions"
+        );
+
+        // Test script variables
+        assert!(
+            used_vars.contains(&"test_var".to_string()),
+            "test_var should be extracted from test script. Got: {:?}",
+            used_vars
+        );
+        assert!(
+            used_vars.contains(&"test_unix_var".to_string()),
+            "test_unix_var should be extracted from test script conditional. Got: {:?}",
+            used_vars
+        );
+        assert!(
+            used_vars.contains(&"test_win_var".to_string()),
+            "test_win_var should be extracted from test script conditional. Got: {:?}",
+            used_vars
+        );
+    }
+
+    #[test]
     fn test_source_patch_conditional_variable_extraction() {
         // Test that variables from conditional if expressions in source patches are extracted
         let recipe = r#"
