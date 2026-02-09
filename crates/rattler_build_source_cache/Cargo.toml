@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 description = "Source cache management for rattler-build"
 
+[features]
+native-tls = ["rattler_build_networking/native-tls"]
+rustls-tls = ["rattler_build_networking/rustls-tls"]
+
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }

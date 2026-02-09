@@ -2316,10 +2316,13 @@ build:
         let config =
             RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
 
-        let rendered =
-            render_recipe_with_variant_config(&stage0, &variant_config, config).unwrap();
+        let rendered = render_recipe_with_variant_config(&stage0, &variant_config, config).unwrap();
 
-        assert_eq!(rendered.len(), 1, "Recipe should be returned from rendering");
+        assert_eq!(
+            rendered.len(),
+            1,
+            "Recipe should be returned from rendering"
+        );
 
         // Skip should be false: target_platform is "linux-64" (the build platform),
         // not "noarch", when the skip condition is evaluated
