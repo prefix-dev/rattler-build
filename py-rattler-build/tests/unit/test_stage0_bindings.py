@@ -306,7 +306,7 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                     "inherit": None,
                     "requirements": {"run": ["libtest"]},
                     "build": {
-                        "number": 0,
+                        "number": None,
                         "string": None,
                         "script": {},
                         "noarch": None,
@@ -356,7 +356,7 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                     "inherit": None,
                     "requirements": {"run": ["test-multi-lib"]},
                     "build": {
-                        "number": 0,
+                        "number": None,
                         "string": None,
                         "script": {},
                         "noarch": None,
@@ -566,7 +566,7 @@ def test_multi_output_outputs_snapshot() -> None:
                 "inherit": None,
                 "requirements": {"run": ["libtest"]},
                 "build": {
-                    "number": 0,
+                    "number": None,
                     "string": None,
                     "script": {},
                     "noarch": None,
@@ -616,7 +616,7 @@ def test_multi_output_outputs_snapshot() -> None:
                 "inherit": None,
                 "requirements": {"run": ["test-multi-lib"]},
                 "build": {
-                    "number": 0,
+                    "number": None,
                     "string": None,
                     "script": {},
                     "noarch": None,
