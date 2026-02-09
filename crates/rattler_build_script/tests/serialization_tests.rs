@@ -218,7 +218,7 @@ fn test_script_roundtrip() {
         secrets: vec!["SECRET".to_string()],
         content: ScriptContent::Commands(vec!["cmd1".to_string(), "cmd2".to_string()]),
         cwd: Some(PathBuf::from("dir")),
-        content_explicit: false,
+        content_explicit: true,
     };
 
     let serialized = serde_yaml::to_string(&original).unwrap();
