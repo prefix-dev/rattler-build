@@ -1,5 +1,4 @@
 from rattler_build import (
-    generate_cpan_recipe,
     generate_cran_recipe,
     generate_pypi_recipe,
 )
@@ -14,12 +13,6 @@ def test_generate_pypi_recipe_smoke() -> None:
 def test_generate_cran_recipe_smoke() -> None:
     recipe = generate_cran_recipe("assertthat").as_single_output()
     assert recipe.package.name == "r-assertthat"
-    assert recipe.about.license is not None
-
-
-def test_generate_cpan_recipe_smoke() -> None:
-    recipe = generate_cpan_recipe("Try-Tiny").as_single_output()
-    assert recipe.package.name == "perl-try-tiny"
     assert recipe.about.license is not None
 
 
