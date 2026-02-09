@@ -131,6 +131,13 @@ impl std::hash::Hash for DiscoveredOutput {
     }
 }
 
+/// Result of finding variants, including the top-level recipe name if available
+struct FoundVariants {
+    outputs: IndexSet<DiscoveredOutput>,
+    /// Top-level recipe name from multi-output recipes (if set and concrete)
+    recipe_name: Option<String>,
+}
+
 /// Find all variants from the recipe and variant config
 fn find_variants(
     variant_config: &VariantConfig,
@@ -140,7 +147,7 @@ fn find_variants(
     build_platform: Platform,
     host_platform: Platform,
     experimental: bool,
-) -> Result<IndexSet<DiscoveredOutput>, miette::Error> {
+) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
@@ -153,6 +160,17 @@ fn find_variants(
             miette::Report::new(error_with_source)
         })
         .wrap_err("Failed to parse recipe")?;
+
+    // Extract the top-level recipe name from multi-output recipes (if concrete)
+    let recipe_name = match &stage0_recipe {
+        stage0::Recipe::MultiOutput(multi) => multi
+            .recipe
+            .name
+            .as_ref()
+            .and_then(|v| v.as_concrete())
+            .map(|name| name.0.as_normalized().to_string()),
+        stage0::Recipe::SingleOutput(_) => None,
+    };
 
     // Get OS environment variable keys that can be overridden by variant config
     // We use an empty prefix path since we just need the keys, not the values
@@ -220,7 +238,10 @@ fn find_variants(
         });
     }
 
-    Ok(recipes)
+    Ok(FoundVariants {
+        outputs: recipes,
+        recipe_name,
+    })
 }
 
 /// Returns the recipe path.
@@ -412,7 +433,10 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
-    let outputs_and_variants = find_variants(
+    let FoundVariants {
+        outputs: outputs_and_variants,
+        recipe_name,
+    } = find_variants(
         &variant_config,
         recipe_path,
         &recipe_content,
@@ -455,10 +479,9 @@ pub async fn get_build_output(
 
     // For multi-output recipes, all outputs (including staging caches) need to use the same
     // build directory so that paths are consistent across outputs.
-    // TODO(refactor): use the top-level `recipe` name if available
-    let global_build_name = outputs_and_variants
-        .first()
-        .map(|o| o.name.clone())
+    // Use the top-level recipe name if available, otherwise fall back to the first output name.
+    let global_build_name = recipe_name
+        .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
     for discovered_output in outputs_and_variants {
