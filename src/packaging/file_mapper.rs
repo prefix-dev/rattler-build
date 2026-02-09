@@ -99,7 +99,7 @@ impl Output {
         dest_folder: &Path,
     ) -> Result<Option<PathBuf>, PackagingError> {
         let target_platform = &self.build_configuration.target_platform;
-        let entry_points = &self.recipe.build().python().entry_points;
+        let entry_points = &self.recipe.build().python.entry_points;
 
         let path_rel = path.strip_prefix(prefix)?;
 
@@ -119,7 +119,7 @@ impl Output {
             }
         }
 
-        if self.recipe.build().is_python_version_independent() {
+        if self.is_python_version_independent() {
             // we need to remove files in bin/ that are registered as entry points
             if path_rel.starts_with("bin") {
                 if let Some(name) = path_rel.file_name()

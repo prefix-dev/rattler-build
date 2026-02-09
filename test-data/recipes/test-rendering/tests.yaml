@@ -1,0 +1,36 @@
+- python:
+    imports:
+    - numpy.testing
+- python:
+    imports:
+    - numpy.matrix
+    python_version:
+    - 3.8.*
+- python:
+    imports:
+    - numpy.matrix
+    python_version: 3.8.*
+- script:
+    content: echo "FOO"
+- script:
+    interpreter: python
+    content: import numpy as np
+- script:
+    interpreter: python
+    env:
+      FOO: BAR
+      BAZ: QUX
+    secrets:
+    - ABC
+    - DEF
+    content: print("i am the test")
+- downstream: foo
+- perl:
+    uses:
+    - Test::More
+- r:
+    libraries:
+    - testthat
+- ruby:
+    requires:
+    - minitest

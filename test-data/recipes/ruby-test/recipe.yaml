@@ -33,13 +33,13 @@ tests:
       - if: unix
         then:
           - test -f $PREFIX/ruby_test_output.txt
-          - grep "package1: 1.0" $PREFIX/ruby_test_output.txt
-          - grep "package2: 2.0" $PREFIX/ruby_test_output.txt
+          - 'grep "package1: 1.0" $PREFIX/ruby_test_output.txt'
+          - 'grep "package2: 2.0" $PREFIX/ruby_test_output.txt'
       - if: win
         then:
           - if not exist %PREFIX%\ruby_test_output.txt exit 1
-          - findstr "package1: 1.0" %PREFIX%\ruby_test_output.txt
-          - findstr "package2: 2.0" %PREFIX%\ruby_test_output.txt
+          - 'findstr "package1: 1.0" %PREFIX%\ruby_test_output.txt'
+          - 'findstr "package2: 2.0" %PREFIX%\ruby_test_output.txt'
 
 about:
   summary: Test package for Ruby interpreter support

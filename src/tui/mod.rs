@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 use crate::build::{WorkingDirectoryBehavior, run_build};
 use crate::console_utils::LoggingOutputHandler;
-use crate::{BuildData, get_build_output, sort_build_outputs_topologically};
+use crate::{BuildData, get_build_output};
 
 use self::utils::run_editor;
 
@@ -178,8 +178,7 @@ pub async fn run<B: Backend>(
                         .unwrap();
                 });
             }
-            Event::ProcessBuildOutputs(mut outputs) => {
-                sort_build_outputs_topologically(&mut outputs, state.build_data.up_to.as_deref())?;
+            Event::ProcessBuildOutputs(outputs) => {
                 let packages: Vec<Package> = outputs
                     .into_iter()
                     .map(|output| Package::from_output(output, &state.tool_config))

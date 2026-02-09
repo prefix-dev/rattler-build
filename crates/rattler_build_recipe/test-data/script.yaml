@@ -1,0 +1,35 @@
+package:
+  name: test-script-parsing
+  version: 0.1.0
+
+tests:
+  - script: test.sh
+  - script:
+      - echo "hello list"
+      - echo "of commands"
+      - echo "in a script"
+  - script:
+      - if: unix
+        then:
+          - echo "This is a unix-like system"
+        else:
+          - echo "This is not a unix-like system"
+  - script:
+      content: |
+        #!/usr/bin/env bash
+        echo "This is a script provided as content"
+  - script:
+      interpreter: bash
+      content: |
+        echo "This is a script provided as content"
+  - script:
+      file: test.sh
+  - script:
+      interpreter: bash
+      file: test.sh
+  - script:
+      env:
+        TEST_ENV: "Hello, world!"
+        FOOBAR: "42"
+      content: |
+        echo "This is a script with environment variables"

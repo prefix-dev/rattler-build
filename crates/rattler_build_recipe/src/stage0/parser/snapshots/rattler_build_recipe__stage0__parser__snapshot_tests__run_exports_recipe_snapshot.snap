@@ -1,0 +1,76 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+package:
+  name: library-with-exports
+  version: 3.2.1
+build:
+  number: null
+  string: null
+  script: {}
+  noarch: null
+  python:
+    entry_points: []
+    skip_pyc_compilation: []
+    use_python_app_entrypoint: false
+    site_packages_path: null
+  skip: []
+  always_copy_files: []
+  always_include_files: []
+  merge_build_and_host_envs: false
+  files: []
+  dynamic_linking:
+    rpaths: []
+    binary_relocation: true
+    missing_dso_allowlist: []
+    rpath_allowlist: []
+    overdepending_behavior: null
+    overlinking_behavior: null
+  variant:
+    use_keys: []
+    ignore_keys: []
+    down_prioritize_variant: null
+  prefix_detection:
+    force_file_type:
+      text: []
+      binary: []
+    ignore: false
+    ignore_binary_files: false
+  post_process: []
+requirements:
+  build:
+  - gcc
+  host:
+  - python
+  run:
+  - python
+  run_exports:
+    noarch:
+    - library-with-exports-noarch
+    strong:
+    - library-with-exports
+    - libfoo >=1.0
+    strong_constraints:
+    - libbar <2.0
+    weak:
+    - optional-dep
+    weak_constraints:
+    - another-optional <3.0
+  ignore_run_exports:
+    by_name:
+    - ignored-lib
+    - another-ignored
+    from_package:
+    - problematic-package
+about:
+  homepage: https://example.com/
+  license: BSD-3-Clause
+  license_family: null
+  summary: Library that exports dependencies
+  description: null
+  documentation: null
+  repository: null
+extra:
+  recipe-maintainers:
+  - maintainer

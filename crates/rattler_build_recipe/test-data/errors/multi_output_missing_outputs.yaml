@@ -1,0 +1,6 @@
+# Error: Multi-output recipe missing the outputs field
+schema_version: 1
+
+recipe:
+  name: test-package
+  version: 1.0.0

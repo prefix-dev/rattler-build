@@ -10,6 +10,7 @@ use fs_err as fs;
 use fs_err::File;
 use indicatif::HumanBytes;
 use metadata::clean_url;
+use rattler_build_types::GlobVec;
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
@@ -29,7 +30,6 @@ use crate::{
     metadata::Output,
     package_test::write_test_files,
     post_process,
-    recipe::parser::GlobVec,
     source::{self, copy_dir},
     tool_configuration,
 };
@@ -104,139 +104,137 @@ fn copy_license_files(
     tmp_dir_path: &Path,
     allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
-    if output.recipe.about().license_file.is_empty() {
-        Ok(None)
-    } else {
-        let licenses_folder = tmp_dir_path.join("info/licenses/");
-        fs::create_dir_all(&licenses_folder)?;
+    let Some(license_file) = output.recipe.about().license_file.as_ref() else {
+        return Ok(None);
+    };
 
-        // Separate absolute paths from relative glob patterns
-        let (absolute_paths, relative_globs): (Vec<_>, Vec<_>) = output
-            .recipe
-            .about()
-            .license_file
-            .include_globs()
-            .iter()
-            .partition(|glob| Path::new(glob.source()).is_absolute());
+    if license_file.is_empty() {
+        return Ok(None);
+    }
 
-        let mut copied_files = HashSet::new();
-        let mut missing_globs = Vec::new();
+    let licenses_folder = tmp_dir_path.join("info/licenses/");
+    fs::create_dir_all(&licenses_folder)?;
 
-        // Handle absolute paths directly
-        for glob_with_source in &absolute_paths {
-            let abs_path = Path::new(glob_with_source.source());
+    // Separate absolute paths from relative glob patterns
+    let (absolute_paths, relative_globs): (Vec<_>, Vec<_>) = license_file
+        .include_globs()
+        .iter()
+        .partition(|glob| Path::new(glob.source()).is_absolute());
 
-            // Check if absolute paths are allowed
-            if !allow_absolute_license_paths {
-                return Err(PackagingError::IoError(std::io::Error::new(
+    let mut copied_files = HashSet::new();
+    let mut missing_globs = Vec::new();
+
+    // Handle absolute paths directly
+    for glob_with_source in &absolute_paths {
+        let abs_path = Path::new(glob_with_source.source());
+
+        // Check if absolute paths are allowed
+        if !allow_absolute_license_paths {
+            return Err(PackagingError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Absolute paths in license_file are not allowed. \
+                        Use --allow-absolute-license-paths to enable. Path: {}",
+                    abs_path.display()
+                ),
+            )));
+        }
+
+        if abs_path.exists() {
+            // Get the file name to use as destination
+            let file_name = abs_path.file_name().ok_or_else(|| {
+                PackagingError::IoError(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     format!(
-                        "Absolute paths in license_file are not allowed. \
-                        Use --allow-absolute-license-paths to enable. Path: {}",
+                        "Invalid absolute path for license file: {}",
                         abs_path.display()
                     ),
-                )));
-            }
+                ))
+            })?;
 
-            if abs_path.exists() {
-                // Get the file name to use as destination
-                let file_name = abs_path.file_name().ok_or_else(|| {
-                    PackagingError::IoError(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        format!(
-                            "Invalid absolute path for license file: {}",
-                            abs_path.display()
-                        ),
-                    ))
-                })?;
+            let dest_path = licenses_folder.join(file_name);
+            fs::copy(abs_path, &dest_path)?;
+            copied_files.insert(dest_path);
+        } else {
+            missing_globs.push(glob_with_source.source().to_string());
+        }
+    }
 
-                let dest_path = licenses_folder.join(file_name);
-                fs::copy(abs_path, &dest_path)?;
-                copied_files.insert(dest_path);
-            } else {
-                missing_globs.push(glob_with_source.source().to_string());
+    // Only process relative globs if there are any
+    if !relative_globs.is_empty() {
+        // Create a new GlobVec with only relative patterns
+        let relative_globvec =
+            GlobVec::from_vec(relative_globs.iter().map(|g| g.source()).collect(), None);
+
+        let copy_dir_work = copy_dir::CopyDir::new(
+            &output.build_configuration.directories.work_dir,
+            &licenses_folder,
+        )
+        .with_globvec(&relative_globvec)
+        .use_gitignore(false)
+        .run()?;
+
+        let copied_files_work_dir = copy_dir_work.copied_paths();
+        let copy_dir_recipe = copy_dir::CopyDir::new(
+            &output.build_configuration.directories.recipe_dir,
+            &licenses_folder,
+        )
+        .with_globvec(&relative_globvec)
+        .use_gitignore(false)
+        .overwrite(true)
+        .run()?;
+
+        let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
+
+        // if a file was copied from the recipe dir, and the work dir, we should
+        // issue a warning
+        for file in copied_files_recipe_dir {
+            if copied_files_work_dir.contains(file) {
+                let warn_str = format!(
+                    "License file from source directory was overwritten by license file from recipe folder ({})",
+                    file.display()
+                );
+                tracing::warn!(warn_str);
+                output.record_warning(&warn_str);
             }
         }
 
-        // Only process relative globs if there are any
-        if !relative_globs.is_empty() {
-            // Create a new GlobVec with only relative patterns
-            let relative_globvec = crate::recipe::parser::GlobVec::from_vec(
-                relative_globs.iter().map(|g| g.source()).collect(),
-                None,
-            );
+        // Merge copied files from work and recipe dirs
+        copied_files.extend(
+            copied_files_recipe_dir
+                .iter()
+                .chain(copied_files_work_dir)
+                .map(PathBuf::from),
+        );
 
-            let copy_dir_work = copy_dir::CopyDir::new(
-                &output.build_configuration.directories.work_dir,
-                &licenses_folder,
-            )
-            .with_globvec(&relative_globvec)
-            .use_gitignore(false)
-            .run()?;
-
-            let copied_files_work_dir = copy_dir_work.copied_paths();
-
-            let copy_dir_recipe = copy_dir::CopyDir::new(
-                &output.build_configuration.directories.recipe_dir,
-                &licenses_folder,
-            )
-            .with_globvec(&relative_globvec)
-            .use_gitignore(false)
-            .overwrite(true)
-            .run()?;
-
-            let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
-
-            // if a file was copied from the recipe dir, and the work dir, we should
-            // issue a warning
-            for file in copied_files_recipe_dir {
-                if copied_files_work_dir.contains(file) {
-                    let warn_str = format!(
-                        "License file from source directory was overwritten by license file from recipe folder ({})",
-                        file.display()
-                    );
-                    tracing::warn!(warn_str);
-                    output.record_warning(&warn_str);
-                }
-            }
-
-            // Merge copied files from work and recipe dirs
-            copied_files.extend(
-                copied_files_recipe_dir
-                    .iter()
-                    .chain(copied_files_work_dir)
-                    .map(PathBuf::from),
-            );
-
-            // Check which globs didn't match any files
-            for (glob_str, match_obj) in copy_dir_work.include_globs() {
-                if !match_obj.get_matched() {
-                    // Check if it matched in the recipe dir
-                    if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
-                        if !recipe_match.get_matched() {
-                            missing_globs.push(glob_str.clone());
-                        }
-                    } else {
+        // Check which globs didn't match any files
+        for (glob_str, match_obj) in copy_dir_work.include_globs() {
+            if !match_obj.get_matched() {
+                // Check if it matched in the recipe dir
+                if let Some(recipe_match) = copy_dir_recipe.include_globs().get(glob_str) {
+                    if !recipe_match.get_matched() {
                         missing_globs.push(glob_str.clone());
                     }
+                } else {
+                    missing_globs.push(glob_str.clone());
                 }
             }
         }
+    }
 
-        if !missing_globs.is_empty() {
-            let error_str = format!(
-                "The following license files were not found: {}",
-                missing_globs.join(", ")
-            );
-            tracing::error!(error_str);
-            return Err(PackagingError::LicensesNotFound);
-        }
+    if !missing_globs.is_empty() {
+        let error_str = format!(
+            "The following license files were not found: {}",
+            missing_globs.join(", ")
+        );
+        tracing::error!(error_str);
+        return Err(PackagingError::LicensesNotFound);
+    }
 
-        if copied_files.is_empty() {
-            Err(PackagingError::LicensesNotFound)
-        } else {
-            Ok(Some(copied_files))
-        }
+    if copied_files.is_empty() {
+        Err(PackagingError::LicensesNotFound)
+    } else {
+        Ok(Some(copied_files))
     }
 }
 
@@ -731,7 +729,7 @@ pub fn package_conda(
 
     tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
-    if output.recipe.build().is_python_version_independent() {
+    if output.is_python_version_independent() {
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);
@@ -865,8 +863,8 @@ impl Output {
         let _enter = span.enter();
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
-            self.recipe.build().always_include_files(),
-            self.recipe.build().files(),
+            &self.recipe.build().always_include_files,
+            &self.recipe.build().files,
         )?;
 
         package_conda(self, tool_configuration, &files_after)

@@ -1,0 +1,10 @@
+package:
+  name: test-package
+  version: 1.0.0
+
+build:
+  script: build.sh
+
+unknown_section:
+  some_field: some_value
+  another_field: another_value
