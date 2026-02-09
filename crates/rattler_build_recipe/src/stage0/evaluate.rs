@@ -126,7 +126,7 @@ fn render_template_to_variable(
             Ok(val) => val,
             Err(e) => {
                 // Transfer the tracked variables from Jinja to EvaluationContext
-                for var in jinja.accessed_variables() {
+                for var in jinja.accessed_variables_excluding_functions() {
                     context.track_access(&var);
                 }
                 for var in jinja.undefined_variables() {
@@ -167,7 +167,7 @@ fn render_template_to_variable(
             Ok(s) => s,
             Err(e) => {
                 // Transfer the tracked variables from Jinja to EvaluationContext
-                for var in jinja.accessed_variables() {
+                for var in jinja.accessed_variables_excluding_functions() {
                     context.track_access(&var);
                 }
                 for var in jinja.undefined_variables() {
@@ -204,7 +204,7 @@ fn render_template_to_variable(
         };
 
         // Transfer tracked variables and check for undefined ones
-        for var in jinja.accessed_variables() {
+        for var in jinja.accessed_variables_excluding_functions() {
             context.track_access(&var);
         }
         for var in jinja.undefined_variables() {
@@ -255,7 +255,7 @@ fn render_template_to_variable(
     };
 
     // Transfer the tracked variables from Jinja to EvaluationContext
-    for var in jinja.accessed_variables() {
+    for var in jinja.accessed_variables_excluding_functions() {
         context.track_access(&var);
     }
     for var in jinja.undefined_variables() {
@@ -412,7 +412,7 @@ fn render_template(
     match jinja.render_str(template) {
         Ok(result) => {
             // Transfer the tracked variables from Jinja to EvaluationContext
-            for var in jinja.accessed_variables() {
+            for var in jinja.accessed_variables_excluding_functions() {
                 context.track_access(&var);
             }
             for var in jinja.undefined_variables() {
@@ -462,7 +462,7 @@ fn render_template(
         }
         Err(e) => {
             // Transfer the tracked variables from Jinja to EvaluationContext
-            for var in jinja.accessed_variables() {
+            for var in jinja.accessed_variables_excluding_functions() {
                 context.track_access(&var);
             }
             for var in jinja.undefined_variables() {
@@ -528,7 +528,7 @@ fn evaluate_condition(
     })?;
 
     // Transfer the tracked variables from Jinja to EvaluationContext
-    for var in jinja.accessed_variables() {
+    for var in jinja.accessed_variables_excluding_functions() {
         context.track_access(&var);
     }
 
@@ -3589,11 +3589,9 @@ mod tests {
 
         let result = evaluate_string_list(&list, &ctx).unwrap();
 
-        // Both "compiler" and "version" should be accessed during template rendering
+        // Variables used during template rendering (functions like `compiler` are excluded)
         let accessed = ctx.accessed_variables();
-        // TODO: `compiler` should _NOT_ be accessed (it's a function!!)
-        assert_eq!(accessed.len(), 4);
-        assert!(accessed.contains("compiler"));
+        assert_eq!(accessed.len(), 3);
         assert!(accessed.contains("c_compiler"));
         assert!(accessed.contains("c_compiler_version"));
         assert!(accessed.contains("version"));
