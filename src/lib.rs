@@ -144,8 +144,6 @@ fn find_variants(
     // Parse the recipe
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
         .map_err(|e| {
-            // Use Source type which implements AsRef<str> for better span expansion
-            // TODO: possibly move this to stage0::parse_recipe_or_multi_from_source
             let source = rattler_build_recipe::source_code::Source::from_string(
                 recipe_path.display().to_string(),
                 recipe_content.to_string(),
