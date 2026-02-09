@@ -4571,7 +4571,6 @@ dependencies = [
  "minijinja",
  "num_cpus",
  "pathdiff",
- "petgraph",
  "pretty_assertions",
  "ratatui",
  "rattler",

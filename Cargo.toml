@@ -244,8 +244,6 @@ reflink-copy = "0.1.28"
 rayon = "1.11.0"
 regex = { workspace = true }
 async-recursion = { workspace = true }
-# TODO: remove
-petgraph = { workspace = true }
 
 # Rattler crates
 rattler_config = { version = "0.2.26" }
