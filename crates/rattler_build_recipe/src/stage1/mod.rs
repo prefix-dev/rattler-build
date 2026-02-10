@@ -521,4 +521,52 @@ mod unit_tests {
             Some(&Variable::from("mypackage-linux"))
         );
     }
+
+    #[test]
+    fn test_quoted_jinja_expressions_evaluate_to_strings() {
+        // Regression test: quoted jinja expressions like "${{ 123 }}" should evaluate
+        // to strings, not integers. The YAML quoting signals string intent.
+        // See: https://github.com/prefix-dev/rattler-build/issues/XXXX
+
+        let recipe_yaml = r#"
+schema_version: 1
+context:
+  foobar: "${{ 123 }}"
+  bizbar: |
+    ${{ 123 }}
+  bla: "${{ foobar ~ bizbar }}"
+package:
+  name: test
+  version: "1.0.0"
+"#;
+
+        let recipe = crate::stage0::parse_recipe_from_source(recipe_yaml).unwrap();
+        let ctx = EvaluationContext::new();
+        let (evaluated_ctx, _) = ctx.with_context(&recipe.context).unwrap();
+
+        // "${{ 123 }}" is quoted in YAML, so it should be a string "123", not integer 123
+        let foobar = evaluated_ctx.get("foobar").expect("foobar should exist");
+        assert_eq!(
+            foobar.as_ref().as_str(),
+            Some("123"),
+            "quoted expression '${{{{ 123 }}}}' should evaluate to string \"123\", got: {:?}",
+            foobar
+        );
+
+        // Multiline block scalar `|` always produces strings
+        let bizbar = evaluated_ctx.get("bizbar").expect("bizbar should exist");
+        assert!(
+            bizbar.as_ref().as_str().is_some(),
+            "block scalar expression should evaluate to a string, got: {:?}",
+            bizbar
+        );
+
+        // String concatenation of foobar and bizbar should work since both are strings
+        let bla = evaluated_ctx.get("bla").expect("bla should exist");
+        assert!(
+            bla.as_ref().as_str().is_some(),
+            "concatenation of quoted expressions should produce a string, got: {:?}",
+            bla
+        );
+    }
 }
