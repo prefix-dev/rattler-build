@@ -14,6 +14,12 @@ pub struct Value<T> {
     /// Optional span for error reporting (not serialized)
     #[serde(skip)]
     span: Option<Span>,
+    /// When true, the evaluated result of a template must be coerced to a string.
+    /// This is set when the original YAML scalar was quoted or a block scalar,
+    /// signaling that the user intended a string value even if the expression
+    /// evaluates to a number or boolean.
+    #[serde(skip)]
+    force_string: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -29,6 +35,7 @@ impl<T> Value<T> {
         Self {
             inner: ValueInner::Concrete(value),
             span,
+            force_string: false,
         }
     }
 
@@ -37,7 +44,20 @@ impl<T> Value<T> {
         Self {
             inner: ValueInner::Template(template),
             span,
+            force_string: false,
         }
+    }
+
+    /// Mark this value as requiring string coercion after template evaluation.
+    /// Used when the original YAML scalar was quoted or a block scalar.
+    pub fn with_force_string(mut self) -> Self {
+        self.force_string = true;
+        self
+    }
+
+    /// Returns true if the evaluated result should be coerced to a string.
+    pub fn force_string(&self) -> bool {
+        self.force_string
     }
 
     /// Check if this is a template

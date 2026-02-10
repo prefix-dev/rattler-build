@@ -347,10 +347,11 @@ fn parse_context_scalar(
     if contains_jinja_template(s) {
         let template = crate::stage0::types::JinjaTemplate::new(s.to_string())
             .map_err(|e| ParseError::jinja_error(e, span))?;
-        Ok(crate::stage0::types::Value::new_template(
-            template,
-            Some(span),
-        ))
+        let mut value = crate::stage0::types::Value::new_template(template, Some(span));
+        if !scalar.may_coerce() {
+            value = value.with_force_string();
+        }
+        Ok(value)
     } else {
         let variable = parse_scalar_to_variable(scalar);
         Ok(crate::stage0::types::Value::new_concrete(

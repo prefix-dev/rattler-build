@@ -581,7 +581,15 @@ pub fn evaluate_value_to_variable(
     if let Some(var) = value.as_concrete() {
         Ok(var.clone())
     } else if let Some(template) = value.as_template() {
-        render_template_to_variable(template.source(), context, value.span())
+        let result = render_template_to_variable(template.source(), context, value.span())?;
+        if value.force_string() {
+            // The original YAML scalar was quoted or a block scalar, so the user
+            // intended a string even if the jinja expression evaluates to a number
+            // or boolean (e.g. `"${{ 123 }}"` should produce "123", not 123).
+            Ok(Variable::from(result.as_ref().to_string()))
+        } else {
+            Ok(result)
+        }
     } else {
         unreachable!("Value must be either concrete or template")
     }
