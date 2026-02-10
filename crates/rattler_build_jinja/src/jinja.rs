@@ -1705,6 +1705,38 @@ mod tests {
     }
 
     #[test]
+    fn test_standard_jinja2_comment_syntax() {
+        let jinja = Jinja::new(Default::default());
+
+        // Standard Jinja2 comments {# ... #} should be stripped from output
+        let result = jinja.render_str("hello {# this is a comment #}world");
+        assert!(result.is_ok(), "failed to render: {:?}", result.err());
+        assert_eq!(result.unwrap(), "hello world");
+    }
+
+    #[test]
+    fn test_standard_jinja2_comment_multiline() {
+        let jinja = Jinja::new(Default::default());
+
+        let result = jinja.render_str("before\n{# multi\nline\ncomment #}\nafter");
+        assert!(result.is_ok(), "failed to render: {:?}", result.err());
+        assert_eq!(result.unwrap(), "before\n\nafter");
+    }
+
+    #[test]
+    fn test_standard_jinja2_comment_with_jinja_expressions() {
+        let mut jinja = Jinja::new(Default::default());
+        jinja
+            .context_mut()
+            .insert("name".to_string(), Value::from("foo"));
+
+        // Comments should be stripped and expressions still evaluated
+        let result = jinja.render_str("${{ name }}{# comment #}-bar");
+        assert!(result.is_ok(), "failed to render: {:?}", result.err());
+        assert_eq!(result.unwrap(), "foo-bar");
+    }
+
+    #[test]
     fn test_default_compiler() {
         let platform = Platform::Linux64;
         assert_eq!(
