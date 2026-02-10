@@ -384,6 +384,33 @@ build:
   number: ${{ 100 if cuda == "yes" else 0 }}
 ```
 
+#### Comments
+
+Jinja comments use the standard `{# ... #}` syntax. Anything between `{#` and
+`#}` is stripped from the output and can span multiple lines.
+
+```yaml
+context:
+  name: mypackage
+  version: "1.0"
+
+package:
+  name: ${{ name }}  {# this comment will not appear in the output #}
+  version: ${{ version }}
+```
+
+Multiline comments are also supported:
+
+```yaml
+package:
+  name: mypackage
+  {#
+    This is a multiline comment.
+    It will be completely removed from the output.
+  #}
+  version: "1.0"
+```
+
 #### Slicing lists
 
 Lists can be spliced using the regular Python `[i:j]` syntax.  Note that when
