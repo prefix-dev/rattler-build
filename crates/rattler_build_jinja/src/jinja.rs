@@ -639,7 +639,7 @@ lazy_static::lazy_static! {
     pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
         .block_delimiters("{%", "%}")
         .variable_delimiters("${{", "}}")
-        .comment_delimiters("#{{", "}}")
+        .comment_delimiters("{#", "#}")
         .build()
         .unwrap();
 }
