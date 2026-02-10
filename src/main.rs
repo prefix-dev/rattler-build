@@ -480,6 +480,8 @@ fn recipe_paths(
                     recipe_paths.push(recipe_path);
                 }
             }
+            // Sort to ensure deterministic ordering across platforms/filesystems
+            recipe_paths.sort();
         }
     }
 

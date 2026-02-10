@@ -1558,6 +1558,8 @@ pub async fn publish_packages(
                 expanded_recipe_paths.push(resolved_path);
             }
         }
+        // Sort to ensure deterministic ordering across platforms/filesystems
+        expanded_recipe_paths.sort();
 
         for recipe_path in &expanded_recipe_paths {
             let output = get_build_output(&publish_data.build, recipe_path, &tool_config).await?;
