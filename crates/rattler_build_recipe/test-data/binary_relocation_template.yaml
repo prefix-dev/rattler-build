@@ -1,0 +1,7 @@
+package:
+  name: binary-relocation-test
+  version: "1.0.0"
+
+build:
+  dynamic_linking:
+    binary_relocation: ${{ false if osx else true }}

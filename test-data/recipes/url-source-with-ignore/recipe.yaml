@@ -9,12 +9,12 @@ source:
 build:
   script:
     - if: unix
-      then:
-        - test -f tooling/workspace-hack/Cargo.toml || (echo "FAIL: Cargo.toml was ignored!" && exit 1)
-        - echo "SUCCESS: Cargo.toml was not ignored"
-      else:
-        - if not exist tooling\workspace-hack\Cargo.toml (echo FAIL: Cargo.toml was ignored! && exit 1)
-        - echo SUCCESS: Cargo.toml was not ignored
+      then: |
+        test -f tooling/workspace-hack/Cargo.toml || (echo "FAIL: Cargo.toml was ignored!" && exit 1)
+        echo "SUCCESS: Cargo.toml was not ignored"
+      else: |
+        if not exist tooling\workspace-hack\Cargo.toml (echo FAIL: Cargo.toml was ignored! && exit 1)
+        echo SUCCESS: Cargo.toml was not ignored
 
 about:
   summary: Test that .ignore files don't affect URL sources

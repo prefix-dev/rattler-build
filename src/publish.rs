@@ -9,8 +9,8 @@ use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::BuildString;
 use crate::opt::PublishData;
-use crate::recipe::parser::BuildString;
 use crate::render::reporters::GatewayReporter;
 use crate::tool_configuration::{self, Configuration};
 use crate::types::Output;
@@ -190,7 +190,7 @@ pub(crate) fn apply_build_number_override(
         };
 
         // Update the build number
-        output.recipe.build.number = new_build_number;
+        output.recipe.build.number = Some(new_build_number);
 
         // Extract the hash from the current build string and recompute with new build number
         let current_build_string = output

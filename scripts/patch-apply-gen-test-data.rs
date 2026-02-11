@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Context;
 use http_range_client::HttpReader;
+use miette::{Context as _, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
 use rattler_networking::LazyClient;
 use rattler_package_streaming::seek::stream_conda_info;
@@ -88,7 +88,7 @@ async fn main() {
     let latest_records = latest_records.values().cloned().collect::<Vec<_>>();
     let total = latest_records.len();
 
-    let mut record_tasks: JoinSet<anyhow::Result<String>> = JoinSet::new();
+    let mut record_tasks: JoinSet<miette::Result<String>> = JoinSet::new();
     for record in latest_records.into_iter() {
         let recipe_expected_path = PathBuf::from("recipe.yaml");
 
@@ -112,16 +112,18 @@ async fn main() {
 async fn handle_record(
     record: RepoDataRecord,
     recipe_expected_path: PathBuf,
-) -> anyhow::Result<String> {
+) -> miette::Result<String> {
     let pkg_name = record.package_record.name.as_source();
 
     // TODO: Replace with async versions. Currently there is not asyn stream_conda_info.
     let reader = HttpReader::new(record.url.as_str());
     let mut sci = stream_conda_info(reader)
+        .into_diagnostic()
         .with_context(|| format!("{}: can't stream conda info", pkg_name))?;
 
     let entries = sci
         .entries()
+        .into_diagnostic()
         .with_context(|| format!("{}: could not obtain entries", pkg_name))?;
 
     let entries = entries.filter_map(|entry| entry.ok());
@@ -142,6 +144,7 @@ async fn handle_record(
             let mut content = String::new();
             reader
                 .read_to_string(&mut content)
+                .into_diagnostic()
                 .with_context(|| format!("{}: problem reading recipe.yaml", pkg_name))?;
             recipe_entry = Some((path, content));
         } else if path.extension().and_then(|s| s.to_str()) == Some("patch") {
@@ -150,6 +153,7 @@ async fn handle_record(
             let mut content = String::new();
             reader
                 .read_to_string(&mut content)
+                .into_diagnostic()
                 .with_context(|| format!("{}: problem reading patch file.", pkg_name))?;
             patch_entries.push((path, content));
         }
@@ -160,6 +164,7 @@ async fn handle_record(
             tokio::io::ErrorKind::NotFound,
             "Could not find recipe.yaml and patch files",
         ))
+        .into_diagnostic()
         .with_context(|| pkg_name.to_string());
     }
 
@@ -172,13 +177,20 @@ async fn handle_record(
         let file_new_path = package_path.join(path);
 
         if let Err(e) = tokio::fs::create_dir_all(file_new_path.parent().unwrap()).await {
-            any_failed = Some(Err(e).with_context(|| format!("{}: error creating dir", pkg_name)));
+            any_failed = Some(
+                Err(e)
+                    .into_diagnostic()
+                    .with_context(|| format!("{}: error creating dir", pkg_name)),
+            );
             break;
         };
 
         if let Err(e) = tokio::fs::write(file_new_path, content).await {
-            any_failed =
-                Some(Err(e).with_context(|| format!("{}: error writing file to dir", pkg_name)));
+            any_failed = Some(
+                Err(e)
+                    .into_diagnostic()
+                    .with_context(|| format!("{}: error writing file to dir", pkg_name)),
+            );
             break;
         };
     }
@@ -186,6 +198,7 @@ async fn handle_record(
     if let Some(e) = any_failed {
         tokio::fs::remove_dir_all(package_path)
             .await
+            .into_diagnostic()
             .with_context(|| {
                 format!(
                     "{}: issue occurred when tried to remove package directory after getting {:#?}",

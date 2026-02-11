@@ -3,7 +3,7 @@
     "https://conda.anaconda.org/conda-forge/"
   ],
   "extra": {
-    "foobar": "123",
+    "foobar": 123,
     "recipe-maintainers": [
       "conda-forge/toml-feedstock"
     ],

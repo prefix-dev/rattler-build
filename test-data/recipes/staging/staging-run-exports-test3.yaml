@@ -1,0 +1,32 @@
+# Tests ignore_run_exports.by_name for staging outputs
+# Verifies that run_exports from packages can be ignored by name pattern
+schema_version: 1
+
+recipe:
+  name: staging-ignore-run-exports-by-name
+  version: "1.0.0"
+
+outputs:
+  # Helper package that provides run_exports
+  - package:
+      name: normal-run-exports
+      version: "1.0.0"
+    requirements:
+      run_exports:
+        - normal-run-exports
+
+  # Staging output with run_exports dependency that gets ignored by name
+  - staging:
+      name: build-with-run-exports
+    requirements:
+      host:
+        - normal-run-exports
+      ignore_run_exports:
+        by_name:
+          - normal-run-exports
+
+  # Package output inheriting from staging
+  - package:
+      name: staging-ignore-run-exports-by-name
+      version: "1.0.0"
+    inherit: build-with-run-exports

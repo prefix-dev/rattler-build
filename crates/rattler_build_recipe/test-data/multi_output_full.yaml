@@ -1,0 +1,113 @@
+# Comprehensive multi-output recipe demonstrating all features
+schema_version: 1
+
+context:
+  version: "2.5.0"
+  build_number: "0"
+
+recipe:
+  name: complex-project
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/example/project/archive/v${{ version }}.tar.gz
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+build:
+  number: ${{ build_number }}
+
+about:
+  summary: A complex multi-output project
+  license: Apache-2.0
+  homepage: https://example.com
+
+extra:
+  recipe-maintainers:
+    - alice
+    - bob
+
+outputs:
+  # First staging output - compiles the core library
+  - staging:
+      name: core-build
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+        - ${{ compiler('cxx') }}
+        - cmake
+        - ninja
+      host:
+        - zlib
+        - openssl
+      ignore_run_exports:
+        by_name:
+          - openssl
+    build:
+      script:
+        - cmake -GNinja -DCMAKE_BUILD_TYPE=Release .
+        - ninja
+
+  # Second staging output - builds Python bindings
+  - staging:
+      name: python-build
+    requirements:
+      build:
+        - python
+        - setuptools
+        - wheel
+      host:
+        - python
+        - pybind11
+    build:
+      script:
+        - python setup.py build_ext
+
+  # Package output 1: Core library
+  - package:
+      name: libcomplex
+      version: ${{ version }}
+    inherit:
+      from: core-build
+      run_exports: true
+    requirements:
+      run:
+        - zlib
+    about:
+      summary: Complex project core library
+      license: Apache-2.0
+    tests:
+      - script:
+          - test -f $PREFIX/lib/libcomplex.so
+
+  # Package output 2: Python bindings
+  - package:
+      name: py-complex
+      version: ${{ version }}
+    inherit: python-build
+    requirements:
+      run:
+        - python
+        - libcomplex ${{ version }}.*
+    about:
+      summary: Python bindings for complex project
+      license: Apache-2.0
+      description: |
+        This package provides Python bindings for the complex project.
+        It allows you to use complex project functionality from Python.
+    tests:
+      - python:
+          imports:
+            - complex
+            - complex.core
+
+  # Package output 3: Development headers (no staging, inherits from top-level)
+  - package:
+      name: libcomplex-dev
+      version: ${{ version }}
+    inherit: null
+    requirements:
+      run:
+        - libcomplex ${{ version }}.*
+    about:
+      summary: Development headers for complex project
+      license: Apache-2.0

@@ -4,7 +4,7 @@
   ],
   "extra": {
     "flow_run_id": "some_id",
-    "foobar": "123",
+    "foobar": 123,
     "recipe-maintainers": [
       "conda-forge/toml-feedstock"
     ],

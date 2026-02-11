@@ -13,6 +13,7 @@ use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
+use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
     ChannelUrl, NoArchType, Platform,
     package::{
@@ -25,7 +26,8 @@ use rayon::prelude::*;
 use url::Url;
 
 use super::{PackagingError, TempFiles};
-use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
+use crate::metadata::Output;
+use rattler_build_recipe::stage1::HashInput;
 
 /// Safely check if a symlink resolves to a regular file, with basic loop protection
 fn is_symlink_to_file(path: &Path) -> bool {
@@ -257,6 +259,7 @@ impl Output {
         // Start with recipe's extra section, converted from yaml to json values
         let mut extra: BTreeMap<String, serde_json::Value> = recipe
             .extra
+            .extra
             .iter()
             .filter_map(|(k, v)| {
                 serde_json::to_value(v)
@@ -324,7 +327,7 @@ impl Output {
         let track_features = self
             .recipe
             .build()
-            .variant()
+            .variant
             .down_prioritize_variant
             .map(|down_prioritize| {
                 let mut track_features = Vec::new();
@@ -335,7 +338,7 @@ impl Output {
             })
             .unwrap_or_default();
 
-        if recipe.build().python().site_packages_path.is_some() {
+        if recipe.build().python.site_packages_path.is_some() {
             // check that the package name is Python, otherwise fail
             if self.name().as_normalized() != "python" {
                 return Err(PackagingError::InvalidMetadata("Cannot set python_site_packages_path for a package that is not called `python`".to_string()));
@@ -343,10 +346,10 @@ impl Output {
         }
 
         // Support CEP-20 / ABI3 packages
-        let noarch = if self.recipe.build().is_python_version_independent() {
+        let noarch = if self.is_python_version_independent() {
             NoArchType::python()
         } else {
-            *self.recipe.build().noarch()
+            self.recipe.build().noarch.unwrap_or(NoArchType::none())
         };
 
         if self.name().as_normalized() != self.name().as_source() {
@@ -366,7 +369,7 @@ impl Output {
                 .expect("Should always be valid"),
             version: self.version().clone(),
             build: self.build_string().into_owned(),
-            build_number: recipe.build().number(),
+            build_number: recipe.build().number.unwrap_or(0),
             arch,
             platform,
             subdir: Some(self.build_configuration.target_platform.to_string()),
@@ -390,7 +393,7 @@ impl Output {
             noarch,
             track_features,
             features: None,
-            python_site_packages_path: recipe.build().python().site_packages_path.clone(),
+            python_site_packages_path: recipe.build().python.site_packages_path.clone(),
             purls: None,
             experimental_extra_depends: Default::default(),
         })
@@ -398,7 +401,7 @@ impl Output {
 
     /// This function creates a link.json file for the given output.
     pub fn link_json(&self) -> Result<LinkJson, PackagingError> {
-        let entry_points = &self.recipe.build().python().entry_points;
+        let entry_points = &self.recipe.build().python.entry_points;
         let noarch_links = PythonEntryPoints {
             entry_points: entry_points.clone(),
         };
@@ -416,7 +419,7 @@ impl Output {
     /// directory. This function will also determine if the file is binary
     /// or text, and if it contains the prefix.
     pub fn paths_json(&self, temp_files: &TempFiles) -> Result<PathsJson, PackagingError> {
-        let always_copy_files = self.recipe.build().always_copy_files();
+        let always_copy_files = &self.recipe.build().always_copy_files;
 
         let mut paths_json = PathsJson {
             paths: Vec::new(),
@@ -490,7 +493,7 @@ impl Output {
                         temp_files.temp_dir.path(),
                         &temp_files.encoded_prefix,
                         &content_type,
-                        self.recipe.build().prefix_detection(),
+                        &self.recipe.build().prefix_detection,
                     )?;
                     let file_size = meta.len();
                     // Compute SHA256 for files - empty files get empty hash
@@ -591,7 +594,7 @@ mod test {
     use super::contains_prefix_binary;
     use super::fs;
     use super::{contains_prefix_text, create_prefix_placeholder};
-    use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
+    use crate::packaging::metadata::clean_url;
 
     #[test]
     fn detect_prefix() {
@@ -605,7 +608,7 @@ mod test {
             prefix,
             prefix,
             &ContentType::BINARY,
-            &PrefixDetection::default(),
+            &Default::default(),
         )
         .unwrap();
     }

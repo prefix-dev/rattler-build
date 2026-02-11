@@ -24,6 +24,7 @@ use rattler_build::{
     },
     publish_packages, rebuild, run_test, show_package_info,
     source::create_patch,
+    tool_configuration::APP_USER_AGENT,
 };
 use rattler_config::config::ConfigBase;
 use rattler_upload::upload_from_args;
@@ -174,7 +175,8 @@ async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
 
     // Create a simple HTTP client
     let client = reqwest::Client::builder()
-        .user_agent("rattler-build")
+        .user_agent(APP_USER_AGENT)
+        .referer(false)
         .build()
         .into_diagnostic()?;
 
@@ -306,7 +308,6 @@ async fn async_main() -> miette::Result<()> {
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
-
             if recipe_paths.is_empty() {
                 if recipe_dir.is_some() {
                     tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
@@ -479,6 +480,8 @@ fn recipe_paths(
                     recipe_paths.push(recipe_path);
                 }
             }
+            // Sort to ensure deterministic ordering across platforms/filesystems
+            recipe_paths.sort();
         }
     }
 

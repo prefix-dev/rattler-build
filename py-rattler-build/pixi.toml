@@ -7,13 +7,15 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
 preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
-build-variants = { python = ["3.8"] }
+build-variants = { python = ["3.10"] }
 
-[package.build]
-backend = { name = "pixi-build-python", version = "*" }
+[package.build.backend]
+name = "pixi-build-python"
+version = "*"
 
 [package.build.config]
 compilers = ["rust"]
+extra-input-globs = ["../src", "../crates"]
 
 [package.host-dependencies]
 python = "*"
@@ -28,59 +30,50 @@ rust = ">=1.89.0,<1.90"
 ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]
-fmt = { depends-on = ["fmt-python", "fmt-rust"] }
-fmt-python = "ruff format rattler_build examples tests"
-fmt-rust = "cargo fmt --all"
-# checks for the CI
-fmt-rust-check = "cargo fmt --all --check"
-fmt-python-check = "ruff format rattler_build examples tests --diff"
-fmt-check = { depends-on = ["fmt-python-check", "fmt-rust-check"] }
 
-lint = { depends-on = ["lint-python", "lint-rust"] }
+fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
+# checks for the CI
+fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
+
 lint-python = "ruff check ."
-lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
+lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
+
+lint = { depends-on = ["lint-python", "lint-rust", "fmt-rust"] }
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
-
 lua = "*"
-# Python 3.8 is the minimum supported version, so we use that for testing
-python = "3.8.*"
+
+# Python 3.10 is the minimum supported version, so we use that for testing
+python = "3.10.*"
 
 mypy = "~=1.5.1"
 
-pytest = "~=7.4.0"
-pytest-asyncio = "0.21.1.*"
-pytest-xprocess = ">=0.23.0,<0.24"
-
+pytest = ">=8.3"
+pytest-asyncio = "1.2.*"
+pytest-xprocess = "1.0.*"
+inline-snapshot = ">=0.31.0"
 # used in examples
 typer = "*"
+rich = ">=14.2.0,<15"
+zstandard = ">=0.25.0,<0.26"
 
 [feature.test.pypi-dependencies]
 types-networkx = "*"
 
 [feature.test.tasks]
-check-cargo-lock = "cargo check --locked"
-test = { cmd = "pytest --doctest-modules", depends-on = ["type-check"] }
+check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
+test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
 type-check = { cmd = "mypy" }
 
-[feature.docs.dependencies]
-mkdocs = ">=1.5.3,<2"
-mkdocstrings-python = ">=1.9.0,<2"
-mkdocstrings = ">=0.24.1,<1"
-mkdocs-material = ">=9.5.20"
-mdx_truly_sane_lists = ">=1.3,<2"
-cairosvg = "2.7.1.*"
-pillow = ">=9.4.0"
+[feature.notebooks.dependencies]
+jupyter = ">=1.1.1,<2"
 
-[feature.docs.tasks]
-docs = { cmd = "mkdocs serve" }
-build-docs = { cmd = "mkdocs build" }
 
 [environments]
-lint = { features = ["lint"] }
+default = { features = ["test", "notebooks"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
-docs = ["docs"]
+lint = { features = ["lint"] }
 
 [dependencies]
 requests = ">=2.32.3,<2.33"

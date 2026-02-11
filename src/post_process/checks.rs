@@ -1,3 +1,4 @@
+use rattler_build_recipe::stage1::build::LinkingCheckBehavior;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -293,7 +294,7 @@ pub fn perform_linking_checks(
     new_files: &HashSet<PathBuf>,
     tmp_prefix: &Path,
 ) -> Result<(), LinkingCheckError> {
-    let dynamic_linking = output.recipe.build().dynamic_linking();
+    let dynamic_linking = &output.recipe.build().dynamic_linking;
     let system_libs = find_system_libs(output)?;
 
     let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
@@ -403,14 +404,14 @@ pub fn perform_linking_checks(
             }
 
             // Check if we allow overlinking.
-            if dynamic_linking.missing_dso_allowlist().is_match(lib) {
+            if dynamic_linking.missing_dso_allowlist.is_match(lib) {
                 tracing::info!(
                     "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",
                     package.file
                 );
             // Error on overlinking.
-            } else if dynamic_linking.error_on_overlinking() {
+            } else if dynamic_linking.overlinking_behavior == LinkingCheckBehavior::Error {
                 link_info.linked_packages.push(LinkedPackage {
                     name: lib.to_path_buf(),
                     link_origin: LinkOrigin::NotFound,
@@ -455,7 +456,7 @@ pub fn perform_linking_checks(
             })
             .any(|libraries| libraries.contains(run_dependency))
         {
-            if dynamic_linking.error_on_overdepending() {
+            if dynamic_linking.overdepending_behavior == LinkingCheckBehavior::Error {
                 return Err(LinkingCheckError::Overdepending {
                     package: PathBuf::from(run_dependency),
                 });

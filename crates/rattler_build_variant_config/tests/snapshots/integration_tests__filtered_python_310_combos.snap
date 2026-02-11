@@ -1,0 +1,8 @@
+---
+source: crates/rattler_build_variant_config/tests/integration_tests.rs
+expression: combinations
+---
+- compiler: clang
+  python: "3.10"
+- compiler: gcc
+  python: "3.10"

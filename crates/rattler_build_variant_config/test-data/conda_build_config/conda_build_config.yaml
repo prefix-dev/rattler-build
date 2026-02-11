@@ -1,0 +1,25 @@
+python:
+  - 3.9
+  - 3.10 # [unix]
+  - 3.11 # [linux]
+
+compiler: # [unix]
+  - gcc
+  - clang
+
+compiler: # [win]
+  - vs2019 # [win]
+
+c_compiler_version: # [linux]
+  - 9 # [linux]
+  - 10 # [linux]
+  - 11 # [linux]
+
+c_compiler_version: # [osx]
+  - 14 # [osx]
+  - 15 # [osx]
+
+target_platform:
+  - linux-64 # [linux]
+  - osx-64 # [osx]
+  - win-64 # [win]

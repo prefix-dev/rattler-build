@@ -1,0 +1,5 @@
+package:
+  name: test-package
+
+about:
+  license: MIT
