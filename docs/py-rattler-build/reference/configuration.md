@@ -22,7 +22,6 @@ from rattler_build import ToolConfiguration, PlatformConfig, JinjaConfig, Render
             - use_zstd
             - use_bz2
             - use_sharded
-            - use_jlap
             - compression_threads
             - io_concurrency_limit
             - allow_insecure_host

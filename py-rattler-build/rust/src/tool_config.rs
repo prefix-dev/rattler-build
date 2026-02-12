@@ -34,7 +34,6 @@ impl PyToolConfiguration {
         use_zstd=true,
         use_bz2=true,
         use_sharded=true,
-        use_jlap=false
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -52,7 +51,6 @@ impl PyToolConfiguration {
         use_zstd: bool,
         use_bz2: bool,
         use_sharded: bool,
-        use_jlap: bool,
     ) -> PyResult<Self> {
         let channel_priority = channel_priority
             .map(|c| match c.to_lowercase().as_str() {
@@ -102,7 +100,6 @@ impl PyToolConfiguration {
             .with_zstd_repodata_enabled(use_zstd)
             .with_bz2_repodata_enabled(use_bz2)
             .with_sharded_repodata_enabled(use_sharded)
-            .with_jlap_enabled(use_jlap)
             .with_channel_config(config.channel_config);
 
         if let Some(threads) = compression_threads {
@@ -172,12 +169,6 @@ impl PyToolConfiguration {
     #[getter]
     fn use_sharded(&self) -> bool {
         self.inner.use_sharded
-    }
-
-    /// Whether to use JLAP
-    #[getter]
-    fn use_jlap(&self) -> bool {
-        self.inner.use_jlap
     }
 
     /// Compression threads
