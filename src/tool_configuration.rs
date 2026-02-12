@@ -173,6 +173,10 @@ pub fn reqwest_client_from_auth_storage(
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
+    #[cfg(feature = "s3")]
+    let s3_middleware_config = s3_middleware_config;
+    #[cfg(not(feature = "s3"))]
+    let s3_middleware_config = Default::default();
 
     Ok(rattler_build_networking::BaseClient::builder()
         .user_agent(APP_USER_AGENT)
