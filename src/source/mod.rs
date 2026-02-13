@@ -179,8 +179,12 @@ pub(crate) fn convert_url_source(
 ) -> Result<CacheUrlSource, SourceError> {
     use rattler_build_source_cache::Checksum;
 
-    // Convert checksum if present
-    let checksum = url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()));
+    // Convert checksum if present (prefer SHA256 over MD5)
+    let checksum = if let Some(sha256) = &url_src.sha256 {
+        Some(Checksum::Sha256(sha256.to_vec()))
+    } else {
+        url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
+    };
 
     Ok(CacheUrlSource {
         urls: url_src.url.clone(),
@@ -193,7 +197,11 @@ pub(crate) fn convert_url_source(
 fn convert_path_checksum(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Option<Checksum> {
-    path_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
+    if let Some(sha256) = &path_src.sha256 {
+        Some(Checksum::Sha256(sha256.to_vec()))
+    } else {
+        path_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
+    }
 }
 
 /// Result of fetching a single source

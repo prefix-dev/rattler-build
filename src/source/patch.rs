@@ -159,7 +159,15 @@ fn custom_patch_stripped_paths(
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
         std::str::from_utf8(path_bytes).ok().and_then(|p| {
-            (!is_dev_null(p)).then(|| PathBuf::from(p).components().skip(strip_level).collect())
+            if is_dev_null(p) {
+                return None;
+            }
+            let path: PathBuf = PathBuf::from(p).components().skip(strip_level).collect();
+            // Skip empty paths - they would resolve to work_dir itself
+            if path.as_os_str().is_empty() {
+                return None;
+            }
+            Some(path)
         })
     };
 
@@ -852,6 +860,34 @@ mod tests {
             matches!(err, SourceError::PatchNotFound(_)),
             "Expected PatchNotFound error, got: {:?}",
             err
+        );
+    }
+
+    #[test]
+    fn test_patch_with_nonexistent_file_no_panic() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2137
+        // When a patch references a file that doesn't exist in the work directory
+        // (e.g., because file_name renamed it), and the strip level falls back to 1,
+        // a single-component path like "original_name.md" would be stripped to an
+        // empty path, causing work_dir.join("") to resolve to work_dir itself.
+        // Reading a directory as a file produces "Is a directory" error.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply a patch that references "original_name.md" which doesn't exist
+        // in the workdir (simulates file_name renaming the downloaded file).
+        // This should NOT panic or produce "Is a directory" error.
+        let result = apply_patches(
+            &[PathBuf::from("test_renamed_file.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // The patch should succeed by creating a new file (since the original doesn't exist)
+        assert!(
+            result.is_ok(),
+            "Patch referencing non-existent file should not fail with 'Is a directory': {:?}",
+            result.err()
         );
     }
 
