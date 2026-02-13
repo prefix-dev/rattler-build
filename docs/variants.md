@@ -232,6 +232,44 @@ build:
     down_prioritize_variant: ${{ 1 if cuda else 0 }}
 ```
 
+???+ example "Example: CUDA / CPU variant with automatic fallback"
+
+    A common pattern is to build both GPU and CPU variants, where the solver
+    picks the GPU variant when CUDA is available and falls back to CPU otherwise.
+    The `__cuda` virtual package in `run` requirements is the key — it makes
+    the GPU package uninstallable on non-CUDA systems.
+
+    ```yaml title="recipe.yaml"
+    context:
+      # ...
+      cuda_version: ${{ env.get("CONDA_OVERRIDE_CUDA", default="None") }}
+      cuda: ${{ "enabled" if cuda_version != "None" else "disabled" }}
+
+    build:
+      # ...
+      variant:
+        use_keys:
+          - ${{ "cuda" if cuda == "enabled" }}
+        # deprioritize the CPU variant so the solver prefers GPU when available
+        down_prioritize_variant: ${{ 0 if cuda == "enabled" else 1 }}
+
+    requirements:
+      build:
+        # ...
+        - if: cuda == "enabled"
+          then: ${{ compiler('cuda') }}
+      host:
+        # ...
+        - if: cuda == "enabled"
+          then:
+            - cuda-version ==${{ cuda_version }}
+            # ... other CUDA host dependencies
+      run:
+        - if: cuda == "enabled"
+          then:
+            - __cuda  # ensures this variant is only installed in CUDA environments
+    ```
+
 ### Mutex packages
 
 Another way to make sure the right variants are selected are "mutex" packages. A mutex package is a package that is
