@@ -91,7 +91,7 @@ impl SourceCacheBuilder {
 
         // Create cache directory if it doesn't exist
         if !cache_dir.exists() {
-            tokio::fs::create_dir_all(&cache_dir).await?;
+            fs_err::tokio::create_dir_all(&cache_dir).await?;
         }
 
         // Use default client if not specified
