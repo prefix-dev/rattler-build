@@ -910,7 +910,7 @@ pub struct TestOpts {
     #[arg(short = 'c', long = "channel")]
     pub channels: Option<Vec<NamedChannelOrUrl>>,
 
-    /// The package file to test
+    /// The package file or extracted package directory to test
     #[arg(short, long)]
     pub package_file: PathBuf,
 
