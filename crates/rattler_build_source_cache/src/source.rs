@@ -123,7 +123,7 @@ impl GitSource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UrlSource {
     pub urls: Vec<url::Url>,
-    pub checksum: Option<Checksum>,
+    pub checksums: Vec<Checksum>,
     pub file_name: Option<String>,
 }
 

@@ -179,21 +179,34 @@ pub(crate) fn convert_url_source(
 ) -> Result<CacheUrlSource, SourceError> {
     use rattler_build_source_cache::Checksum;
 
-    // Convert checksum if present
-    let checksum = url_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()));
+    // Collect all checksums so both SHA256 and MD5 are validated
+    let mut checksums = Vec::new();
+    if let Some(sha256) = &url_src.sha256 {
+        checksums.push(Checksum::Sha256(sha256.to_vec()));
+    }
+    if let Some(md5) = &url_src.md5 {
+        checksums.push(Checksum::Md5(md5.to_vec()));
+    }
 
     Ok(CacheUrlSource {
         urls: url_src.url.clone(),
-        checksum,
+        checksums,
         file_name: url_src.file_name.clone(),
     })
 }
 
-/// Convert a stage1 PathSource checksum to a cache Checksum
-fn convert_path_checksum(
+/// Convert a stage1 PathSource checksums to cache Checksums
+fn convert_path_checksums(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
-) -> Option<Checksum> {
-    path_src.md5.as_ref().map(|md5| Checksum::Md5(md5.to_vec()))
+) -> Vec<Checksum> {
+    let mut checksums = Vec::new();
+    if let Some(sha256) = &path_src.sha256 {
+        checksums.push(Checksum::Sha256(sha256.to_vec()));
+    }
+    if let Some(md5) = &path_src.md5 {
+        checksums.push(Checksum::Md5(md5.to_vec()));
+    }
+    checksums
 }
 
 /// Result of fetching a single source
@@ -377,10 +390,10 @@ async fn fetch_source(
                         dest.display()
                     );
 
-                    if let Some(checksum) = convert_path_checksum(path_src)
-                        && !checksum.validate(&src_path)
-                    {
-                        return Err(SourceError::ValidationFailed);
+                    for checksum in convert_path_checksums(path_src) {
+                        if !checksum.validate(&src_path) {
+                            return Err(SourceError::ValidationFailed);
+                        }
                     }
 
                     fs::copy(&src_path, dest)?;
