@@ -24,7 +24,7 @@ mod source_cache_tests {
         let url = url::Url::parse("https://example.com/file.tar.gz").unwrap();
         let checksum = Checksum::Sha256(vec![1, 2, 3, 4]);
 
-        let key1 = CacheIndex::generate_cache_key(&url, &[checksum.clone()]);
+        let key1 = CacheIndex::generate_cache_key(&url, std::slice::from_ref(&checksum));
         let key2 = CacheIndex::generate_cache_key(&url, &[checksum]);
 
         assert_eq!(key1, key2);
