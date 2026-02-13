@@ -122,10 +122,7 @@ impl CacheIndex {
     }
 
     /// Generate a cache key from URL and checksums
-    pub fn generate_cache_key(
-        url: &url::Url,
-        checksums: &[crate::source::Checksum],
-    ) -> String {
+    pub fn generate_cache_key(url: &url::Url, checksums: &[crate::source::Checksum]) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 

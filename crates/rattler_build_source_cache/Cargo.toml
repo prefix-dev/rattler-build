@@ -8,6 +8,7 @@ repository.workspace = true
 description = "Source cache management for rattler-build"
 
 [features]
+default = ["rustls-tls"]
 native-tls = ["rattler_build_networking/native-tls"]
 rustls-tls = ["rattler_build_networking/rustls-tls"]
 

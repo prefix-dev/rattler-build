@@ -22,14 +22,14 @@ mod source_cache_tests {
     #[tokio::test]
     async fn test_cache_key_generation() {
         let url = url::Url::parse("https://example.com/file.tar.gz").unwrap();
-        let checksum = Some(Checksum::Sha256(vec![1, 2, 3, 4]));
+        let checksum = Checksum::Sha256(vec![1, 2, 3, 4]);
 
-        let key1 = CacheIndex::generate_cache_key(&url, checksum.as_ref());
-        let key2 = CacheIndex::generate_cache_key(&url, checksum.as_ref());
+        let key1 = CacheIndex::generate_cache_key(&url, &[checksum.clone()]);
+        let key2 = CacheIndex::generate_cache_key(&url, &[checksum]);
 
         assert_eq!(key1, key2);
 
-        let key3 = CacheIndex::generate_cache_key(&url, None);
+        let key3 = CacheIndex::generate_cache_key(&url, &[]);
         assert_ne!(key1, key3);
     }
 
