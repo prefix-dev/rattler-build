@@ -15,11 +15,9 @@ use rattler_build_recipe::stage1::{
 use rattler_build_script::{Debug as ScriptDebug, Script, ScriptContent};
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
-    compression_level::CompressionLevel,
     package::{CondaArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::{IndexFsConfig, index_fs};
-use rattler_package_streaming::write::write_conda_package;
 use rattler_shell::{
     activation::ActivationError,
     shell::{Shell, ShellEnum},
@@ -35,7 +33,6 @@ use std::{
     str::FromStr,
 };
 use tempfile::TempDir;
-use walkdir::WalkDir;
 
 use crate::{
     env_vars,
@@ -131,54 +128,6 @@ pub enum TestError {
 
     #[error("could not determine target platform from package file (no index.json?)")]
     CouldNotDetermineTargetPlatform,
-
-    #[error(
-        "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
-    )]
-    NoTestsFound,
-}
-
-/// Create a `.conda` archive from an extracted package directory.
-///
-/// This allows `rattler-build test` to work with already-extracted package
-/// folders by repackaging them into a temporary archive that can be indexed
-/// and installed into a test environment.
-fn create_conda_from_directory(
-    package_dir: &Path,
-    output_dir: &Path,
-) -> Result<PathBuf, TestError> {
-    let index_json = IndexJson::from_package_directory(package_dir)?;
-    let identifier = format!(
-        "{}-{}-{}",
-        index_json.name.as_normalized(),
-        index_json.version,
-        index_json.build
-    );
-    let archive_name = format!("{}.conda", identifier);
-    let archive_path = output_dir.join(&archive_name);
-
-    // Collect all files in the directory
-    let files: Vec<PathBuf> = WalkDir::new(package_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .map(|e| e.into_path())
-        .collect();
-
-    let mut file = fs::File::create(&archive_path)?;
-    write_conda_package(
-        &mut file,
-        package_dir,
-        &files,
-        CompressionLevel::default(),
-        None,
-        &identifier,
-        None,
-        None,
-    )
-    .map_err(|e| TestError::TestFailed(format!("failed to create .conda from directory: {}", e)))?;
-
-    Ok(archive_path)
 }
 
 #[derive(Debug)]
@@ -383,23 +332,6 @@ pub async fn run_test(
     // create the test prefix
     fs::create_dir_all(&config.test_prefix)?;
 
-    // If the input is a directory (already-extracted package), create a
-    // temporary .conda archive so it can be indexed and installed into the
-    // test environment.
-    let _temp_archive_dir;
-    let package_file = if package_file.is_dir() {
-        tracing::info!(
-            "Input is a directory, creating temporary .conda archive from '{}'",
-            package_file.display()
-        );
-        _temp_archive_dir = tempfile::tempdir()?;
-        let archive_path = create_conda_from_directory(package_file, _temp_archive_dir.path())?;
-        archive_path
-    } else {
-        package_file.to_path_buf()
-    };
-    let package_file = package_file.as_path();
-
     let target_platform = if let Some(tp) = config.target_platform {
         tp
     } else {
@@ -508,43 +440,10 @@ pub async fn run_test(
 
     let index_json = IndexJson::from_package_directory(&package_folder)?;
     let env = env_vars_from_package(&index_json);
-
-    let has_legacy_tests = package_folder.join("info/test").exists();
-    let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
-
-    if !has_legacy_tests && !has_modern_tests {
-        // List what we found in the info/ directory for diagnostics
-        let info_dir = package_folder.join("info");
-        if info_dir.exists() {
-            let entries: Vec<String> = std::fs::read_dir(&info_dir)?
-                .filter_map(|e| e.ok())
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .collect();
-            tracing::warn!(
-                "No tests found in package. Contents of info/: [{}]",
-                entries.join(", ")
-            );
-            tracing::warn!(
-                "Expected either `info/test/` (conda-build format with run_test.sh/run_test.py) \
-                 or `info/tests/tests.yaml` (rattler-build format)"
-            );
-
-            // Check if there's a conda-build recipe without embedded tests
-            if info_dir.join("recipe").join("meta.yaml").exists() {
-                tracing::warn!(
-                    "Found `info/recipe/meta.yaml` (conda-build recipe), but no embedded test \
-                     files in `info/test/`. The recipe may define tests that were not included \
-                     in the package."
-                );
-            }
-        }
-        return Err(TestError::NoTestsFound);
-    }
-
-    // Run legacy tests (conda-build v0 format: info/test/)
-    if has_legacy_tests {
+    // extract package in place
+    if package_folder.join("info/test").exists() {
         let prefix =
-            TempDir::with_prefix_in(format!("test_{}", pkg.identifier.name), &config.test_prefix)?
+            TempDir::with_prefix_in(format!("test_{}", pkg.identifier.name), &config.output_dir)?
                 .keep();
 
         tracing::info!("Creating test environment in '{}'", prefix.display());
@@ -561,6 +460,7 @@ pub async fn run_test(
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
+        tracing::info!("Creating test environment in {:?}", prefix);
         let match_spec = MatchSpec::from_str(
             format!(
                 "{}={}={}",
@@ -603,7 +503,7 @@ pub async fn run_test(
         }
     }
 
-    if has_modern_tests {
+    if package_folder.join("info/tests/tests.yaml").exists() {
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
