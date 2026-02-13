@@ -132,7 +132,9 @@ pub enum TestError {
     #[error("could not determine target platform from package file (no index.json?)")]
     CouldNotDetermineTargetPlatform,
 
-    #[error("no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)")]
+    #[error(
+        "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
+    )]
     NoTestsFound,
 }
 
@@ -391,8 +393,7 @@ pub async fn run_test(
             package_file.display()
         );
         _temp_archive_dir = tempfile::tempdir()?;
-        let archive_path =
-            create_conda_from_directory(package_file, _temp_archive_dir.path())?;
+        let archive_path = create_conda_from_directory(package_file, _temp_archive_dir.path())?;
         archive_path
     } else {
         package_file.to_path_buf()
