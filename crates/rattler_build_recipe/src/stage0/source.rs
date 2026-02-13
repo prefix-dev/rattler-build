@@ -76,6 +76,39 @@ pub struct GitSource {
     pub expected_commit: Option<Value<String>>,
 }
 
+/// Attestation verification configuration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AttestationConfig {
+    /// URL to download the attestation bundle from (e.g., .sigstore.json file)
+    /// Auto-derived for PyPI sources if not specified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle_url: Option<Value<String>>,
+
+    /// Publisher identities to verify (e.g., "github:owner/repo" or "github:owner/repo@refs/tags/v1.0")
+    /// All specified publishers must match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publishers: Vec<Value<String>>,
+}
+
+impl AttestationConfig {
+    /// Check if the attestation config is empty (no verification configured)
+    pub fn is_empty(&self) -> bool {
+        self.bundle_url.is_none() && self.publishers.is_empty()
+    }
+
+    /// Collect all variables used in this attestation config
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        if let Some(bundle_url) = &self.bundle_url {
+            vars.extend(bundle_url.used_variables());
+        }
+        for publisher in &self.publishers {
+            vars.extend(publisher.used_variables());
+        }
+        vars
+    }
+}
+
 /// A url source (usually a tar.gz or tar.bz2 archive)
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,6 +146,10 @@ pub struct UrlSource {
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<Value<PathBuf>>,
+
+    /// Optional attestation verification configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attestation: Option<AttestationConfig>,
 }
 
 /// A local path source
@@ -277,6 +314,7 @@ impl UrlSource {
             file_name,
             patches,
             target_directory,
+            attestation,
         } = self;
 
         let mut vars = Vec::new();
@@ -298,6 +336,9 @@ impl UrlSource {
         }
         if let Some(td) = target_directory {
             vars.extend(td.used_variables());
+        }
+        if let Some(attestation) = attestation {
+            vars.extend(attestation.used_variables());
         }
         vars.sort();
         vars.dedup();

@@ -4,7 +4,7 @@ use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 
 use crate::stage0::{
     parser::helpers::get_span,
-    source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
+    source::{AttestationConfig, GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, NestedItemList, Value},
 };
 
@@ -349,6 +349,47 @@ fn parse_git_source(
     })
 }
 
+/// Parse an attestation configuration section
+fn parse_attestation_config(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<AttestationConfig, ParseError> {
+    let mut bundle_url = None;
+    let mut publishers = Vec::new();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "bundle_url" => {
+                bundle_url = Some(parse_value(value_node)?);
+            }
+            "publishers" => {
+                if let Some(seq) = value_node.as_sequence() {
+                    for item in seq.iter() {
+                        publishers.push(parse_value(item)?);
+                    }
+                } else {
+                    // Single publisher as a string
+                    publishers.push(parse_value(value_node)?);
+                }
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "attestation",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: bundle_url, publishers"));
+            }
+        }
+    }
+
+    Ok(AttestationConfig {
+        bundle_url,
+        publishers,
+    })
+}
+
 fn parse_url_source(
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<UrlSource, ParseError> {
@@ -360,6 +401,7 @@ fn parse_url_source(
     let mut file_name = None;
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
+    let mut attestation = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -390,6 +432,17 @@ fn parse_url_source(
             "target_directory" => {
                 target_directory = Some(parse_value(value_node)?);
             }
+            "attestation" => {
+                if let Some(att_mapping) = value_node.as_mapping() {
+                    attestation = Some(parse_attestation_config(att_mapping)?);
+                } else {
+                    return Err(ParseError::invalid_value(
+                        "attestation",
+                        "expected a mapping with bundle_url and/or publishers",
+                        get_span(value_node),
+                    ));
+                }
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
@@ -397,7 +450,7 @@ fn parse_url_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory",
+                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation",
                 ));
             }
         }
@@ -417,6 +470,7 @@ fn parse_url_source(
         file_name,
         patches,
         target_directory,
+        attestation,
     })
 }
 

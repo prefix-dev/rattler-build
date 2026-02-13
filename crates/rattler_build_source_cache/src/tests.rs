@@ -68,6 +68,7 @@ mod source_cache_tests {
             last_accessed: chrono::Utc::now(),
             created: chrono::Utc::now(),
             lock_file: None,
+            attestation_verified: false,
         };
 
         let key = "test_key";
@@ -97,13 +98,14 @@ mod source_cache_tests {
         fs_err::write(&file_path, data).unwrap();
 
         // Validate should succeed
-        assert!(checksum.validate(&file_path));
+        assert!(checksum.validate(&file_path).is_ok());
 
         // Write different data
         fs_err::write(&file_path, b"different data").unwrap();
 
         // Validate should fail
-        assert!(!checksum.validate(&file_path));
+        let err = checksum.validate(&file_path).unwrap_err();
+        assert_ne!(err.expected, err.actual);
     }
 
     #[tokio::test]

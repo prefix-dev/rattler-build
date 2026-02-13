@@ -41,8 +41,12 @@ pub enum SourceError {
     #[error("StripPrefixError Error: {0}")]
     StripPrefixError(#[from] StripPrefixError),
 
-    #[error("Download could not be validated with checksum!")]
-    ValidationFailed,
+    #[error("{kind} checksum validation failed\n  expected: {expected}\n  actual:   {actual}")]
+    ValidationFailed {
+        expected: String,
+        actual: String,
+        kind: String,
+    },
 
     #[error("File not found: {0}")]
     FileNotFound(PathBuf),
@@ -177,7 +181,7 @@ pub(crate) fn convert_git_source(
 pub(crate) fn convert_url_source(
     url_src: &rattler_build_recipe::stage1::source::UrlSource,
 ) -> Result<CacheUrlSource, SourceError> {
-    use rattler_build_source_cache::Checksum;
+    use rattler_build_source_cache::{AttestationVerification, Checksum, IdentityCheck};
 
     // Collect all checksums so both SHA256 and MD5 are validated
     let mut checksums = Vec::new();
@@ -188,10 +192,27 @@ pub(crate) fn convert_url_source(
         checksums.push(Checksum::Md5(md5.to_vec()));
     }
 
+    // Convert attestation config if present
+    let attestation = url_src.attestation.as_ref().map(|config| {
+        let identity_checks = config
+            .publishers
+            .iter()
+            .map(|pub_info| {
+                let (identity, issuer) = pub_info.to_identity_and_issuer();
+                IdentityCheck { identity, issuer }
+            })
+            .collect();
+        AttestationVerification {
+            bundle_url: config.bundle_url.clone(),
+            identity_checks,
+        }
+    });
+
     Ok(CacheUrlSource {
         urls: url_src.url.clone(),
         checksums,
         file_name: url_src.file_name.clone(),
+        attestation,
     })
 }
 
@@ -368,6 +389,7 @@ async fn fetch_source(
                         patches: path_src.patches.clone(),
                         file_name: None,
                         target_directory: path_src.target_directory.clone(),
+                        attestation: None,
                     };
 
                     let cache_url_source = convert_url_source(&temp_url_source)?;
@@ -391,8 +413,12 @@ async fn fetch_source(
                     );
 
                     for checksum in convert_path_checksums(path_src) {
-                        if !checksum.validate(&src_path) {
-                            return Err(SourceError::ValidationFailed);
+                        if let Err(mismatch) = checksum.validate(&src_path) {
+                            return Err(SourceError::ValidationFailed {
+                                expected: mismatch.expected,
+                                actual: mismatch.actual,
+                                kind: mismatch.kind.to_string(),
+                            });
                         }
                     }
 
