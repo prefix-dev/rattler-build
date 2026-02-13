@@ -212,7 +212,7 @@ impl SourceCache {
 
         for url in &source.urls {
             match self
-                .try_url(url, source.checksum.as_ref(), source.file_name.as_deref())
+                .try_url(url, &source.checksums, source.file_name.as_deref())
                 .await
             {
                 Ok(path) => {
@@ -235,10 +235,10 @@ impl SourceCache {
     async fn try_url(
         &self,
         url: &url::Url,
-        checksum: Option<&Checksum>,
+        checksums: &[Checksum],
         file_name: Option<&str>,
     ) -> Result<PathBuf, CacheError> {
-        let key = CacheIndex::generate_cache_key(url, checksum);
+        let key = CacheIndex::generate_cache_key(url, checksums);
 
         // Acquire lock for this cache entry
         let _lock = self.lock_manager.acquire(&key).await?;
@@ -261,9 +261,10 @@ impl SourceCache {
 
             // Otherwise return the archive file
             if cache_path.exists() {
-                // Validate checksum if provided
-                if let Some(cs) = checksum {
-                    if !cs.validate(&cache_path) {
+                // Validate all checksums if provided
+                if !checksums.is_empty() {
+                    let all_valid = checksums.iter().all(|cs| cs.validate(&cache_path));
+                    if !all_valid {
                         tracing::warn!("Checksum validation failed, re-downloading");
                         tokio::fs::remove_file(&cache_path).await?;
                     } else {
@@ -283,12 +284,12 @@ impl SourceCache {
         tracing::info!("Downloading from: {}", url);
         let (cache_path, actual_filename) = self.download_url(url, &key).await?;
 
-        // Validate checksum
-        if let Some(cs) = checksum
-            && !cs.validate(&cache_path)
-        {
-            tokio::fs::remove_file(&cache_path).await?;
-            return Err(CacheError::ValidationFailed { path: cache_path });
+        // Validate all checksums
+        for cs in checksums {
+            if !cs.validate(&cache_path) {
+                tokio::fs::remove_file(&cache_path).await?;
+                return Err(CacheError::ValidationFailed { path: cache_path });
+            }
         }
 
         // Extract if needed and no explicit filename was provided
@@ -300,12 +301,15 @@ impl SourceCache {
             None
         };
 
+        // Use the first checksum for the cache entry metadata
+        let primary_checksum = checksums.first();
+
         // Create cache entry
         let entry = CacheEntry {
             source_type: SourceType::Url,
             url: url.to_string(),
-            checksum: checksum.map(|c| c.to_hex()),
-            checksum_type: checksum
+            checksum: primary_checksum.map(|c| c.to_hex()),
+            checksum_type: primary_checksum
                 .map(|c| match c {
                     Checksum::Sha256(_) => "sha256",
                     Checksum::Md5(_) => "md5",

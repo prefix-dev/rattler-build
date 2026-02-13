@@ -121,10 +121,10 @@ impl CacheIndex {
         Ok(())
     }
 
-    /// Generate a cache key from URL and optional checksum
+    /// Generate a cache key from URL and checksums
     pub fn generate_cache_key(
         url: &url::Url,
-        checksum: Option<&crate::source::Checksum>,
+        checksums: &[crate::source::Checksum],
     ) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -132,7 +132,7 @@ impl CacheIndex {
         let mut hasher = DefaultHasher::new();
         url.as_str().hash(&mut hasher);
 
-        if let Some(cs) = checksum {
+        for cs in checksums {
             cs.to_hex().hash(&mut hasher);
         }
 
