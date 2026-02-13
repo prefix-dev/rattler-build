@@ -36,31 +36,31 @@ fn discover_python_version(prefix: &Path, platform: Platform) -> Option<String> 
     if platform.is_windows() {
         // On Windows, look for include/pythonX.Y/ directory
         let include_dir = prefix.join("include");
-        if let Ok(entries) = std::fs::read_dir(&include_dir) {
+        if let Ok(entries) = fs_err::read_dir(&include_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
-                if let Some(py_ver) = name_str.strip_prefix("python") {
-                    if py_ver.contains('.') && entry.path().is_dir() {
-                        return Some(py_ver.to_string());
-                    }
+                if let Some(py_ver) = name_str.strip_prefix("python")
+                    && py_ver.contains('.')
+                    && entry.path().is_dir()
+                {
+                    return Some(py_ver.to_string());
                 }
             }
         }
     } else {
         // On Unix, look for lib/pythonX.Y/ directories with site-packages
         let lib_dir = prefix.join("lib");
-        if let Ok(entries) = std::fs::read_dir(&lib_dir) {
+        if let Ok(entries) = fs_err::read_dir(&lib_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
-                if let Some(py_ver) = name_str.strip_prefix("python") {
-                    if py_ver.contains('.')
-                        && entry.path().is_dir()
-                        && entry.path().join("site-packages").is_dir()
-                    {
-                        return Some(py_ver.to_string());
-                    }
+                if let Some(py_ver) = name_str.strip_prefix("python")
+                    && py_ver.contains('.')
+                    && entry.path().is_dir()
+                    && entry.path().join("site-packages").is_dir()
+                {
+                    return Some(py_ver.to_string());
                 }
             }
         }
@@ -127,12 +127,12 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         .variant()
         .get(&"python".into())
         .map(|s| s.to_string());
-    if python_version.is_none() {
-        if let Some((record, _)) = output.find_resolved_package("python") {
-            // Use the resolved python version even if it's a transitive dependency
-            // (e.g. pulled in by pip in noarch python packages)
-            python_version = Some(record.package_record.version.to_string());
-        }
+    if python_version.is_none()
+        && let Some((record, _)) = output.find_resolved_package("python")
+    {
+        // Use the resolved python version even if it's a transitive dependency
+        // (e.g. pulled in by pip in noarch python packages)
+        python_version = Some(record.package_record.version.to_string());
     }
 
     // If still not found, try to discover Python from the host prefix filesystem.
