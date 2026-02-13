@@ -132,7 +132,9 @@ pub enum TestError {
     #[error("could not determine target platform from package file (no index.json?)")]
     CouldNotDetermineTargetPlatform,
 
-    #[error("no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)")]
+    #[error(
+        "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
+    )]
     NoTestsFound,
 }
 
@@ -391,9 +393,7 @@ pub async fn run_test(
             package_file.display()
         );
         _temp_archive_dir = tempfile::tempdir()?;
-        let archive_path =
-            create_conda_from_directory(package_file, _temp_archive_dir.path())?;
-        archive_path
+        create_conda_from_directory(package_file, _temp_archive_dir.path())?
     } else {
         package_file.to_path_buf()
     };
@@ -515,7 +515,7 @@ pub async fn run_test(
         // List what we found in the info/ directory for diagnostics
         let info_dir = package_folder.join("info");
         if info_dir.exists() {
-            let entries: Vec<String> = std::fs::read_dir(&info_dir)?
+            let entries: Vec<String> = fs_err::read_dir(&info_dir)?
                 .filter_map(|e| e.ok())
                 .map(|e| e.file_name().to_string_lossy().to_string())
                 .collect();
