@@ -492,7 +492,9 @@ pub async fn create_cpan_recipe(
     recipe
         .context
         .insert("version".to_string(), metadata.release.version.clone());
-    recipe.context.insert("build_number".to_string(), "0".to_string());
+    recipe
+        .context
+        .insert("build_number".to_string(), "0".to_string());
 
     // Set source
     let source = UrlSourceElement {
