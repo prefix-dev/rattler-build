@@ -498,7 +498,10 @@ build:
                 .attestation
                 .as_ref()
                 .expect("attestation should be set");
-            assert!(att.bundle_url.is_none(), "bundle_url should be None for PyPI");
+            assert!(
+                att.bundle_url.is_none(),
+                "bundle_url should be None for PyPI"
+            );
             assert_eq!(att.publishers.len(), 1);
             assert_eq!(
                 att.publishers[0].as_concrete().unwrap(),
@@ -620,7 +623,10 @@ fn test_parse_zstd_attestation_example() {
                 .attestation
                 .as_ref()
                 .expect("attestation should be set");
-            assert!(att.bundle_url.is_some(), "zstd example has explicit bundle_url");
+            assert!(
+                att.bundle_url.is_some(),
+                "zstd example has explicit bundle_url"
+            );
             assert_eq!(att.publishers.len(), 1);
         }
         _ => panic!("Expected URL source"),

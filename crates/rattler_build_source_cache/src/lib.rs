@@ -17,9 +17,7 @@ pub use index::{CacheEntry, CacheIndex, SourceType};
 pub use rattler_build_networking::{BaseClient, BaseClientBuilder};
 pub use rattler_git::GitUrl;
 pub use rattler_git::git::GitReference;
-pub use source::{
-    AttestationVerification, Checksum, GitSource, IdentityCheck, Source, UrlSource,
-};
+pub use source::{AttestationVerification, Checksum, GitSource, IdentityCheck, Source, UrlSource};
 
 #[cfg(test)]
 mod tests;

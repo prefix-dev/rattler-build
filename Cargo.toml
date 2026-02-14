@@ -105,9 +105,9 @@ rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.10.6" }
 lzma-rust2 = { version = "0.15", features = ["xz"] }
-sigstore-verify = { path = "../sigstore-rust/crates/sigstore-verify", default-features = false }
-sigstore-trust-root = { path = "../sigstore-rust/crates/sigstore-trust-root", default-features = false }
-sigstore-types = { path = "../sigstore-rust/crates/sigstore-types" }
+sigstore-verify = { version = "0.6.3", default-features = false }
+sigstore-trust-root = { version = "0.6.3", default-features = false }
+sigstore-types = { version = "0.6.3" }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']

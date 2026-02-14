@@ -189,16 +189,14 @@ impl Publisher {
     pub fn to_identity_and_issuer(&self) -> (String, String) {
         match self.provider {
             PublisherProvider::GitHub => {
-                let identity =
-                    format!("https://github.com/{}/{}", self.owner, self.repo);
+                let identity = format!("https://github.com/{}/{}", self.owner, self.repo);
                 (
                     identity,
                     "https://token.actions.githubusercontent.com".to_string(),
                 )
             }
             PublisherProvider::GitLab => {
-                let identity =
-                    format!("https://gitlab.com/{}/{}", self.owner, self.repo);
+                let identity = format!("https://gitlab.com/{}/{}", self.owner, self.repo);
                 (identity, "https://gitlab.com".to_string())
             }
         }
@@ -217,9 +215,12 @@ impl fmt::Display for Publisher {
 
 /// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0"
 pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
-    let (provider_str, rest) = s
-        .split_once(':')
-        .ok_or_else(|| format!("Invalid publisher format '{}': expected 'provider:owner/repo'", s))?;
+    let (provider_str, rest) = s.split_once(':').ok_or_else(|| {
+        format!(
+            "Invalid publisher format '{}': expected 'provider:owner/repo'",
+            s
+        )
+    })?;
 
     let provider = match provider_str {
         "github" => PublisherProvider::GitHub,
@@ -228,7 +229,7 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
             return Err(format!(
                 "Unknown publisher provider '{}': expected 'github' or 'gitlab'",
                 provider_str
-            ))
+            ));
         }
     };
 

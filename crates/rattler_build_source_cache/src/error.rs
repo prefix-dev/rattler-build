@@ -17,7 +17,9 @@ pub enum CacheError {
     #[error("URL does not point to a file: {0}")]
     UrlNotFile(url::Url),
 
-    #[error("{kind} checksum validation failed for {path:?}\n  expected: {expected}\n  actual:   {actual}")]
+    #[error(
+        "{kind} checksum validation failed for {path:?}\n  expected: {expected}\n  actual:   {actual}"
+    )]
     ValidationFailed {
         path: PathBuf,
         expected: String,

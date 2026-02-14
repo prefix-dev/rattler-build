@@ -69,21 +69,14 @@ struct ParsedAttestations {
 ///    parsed directly via `Bundle::from_json`.
 /// 2. **PyPI PEP 740 provenance response**: has an `attestation_bundles` array,
 ///    each containing `attestations` that are converted to sigstore bundles.
-fn parse_attestation_response(
-    json_str: &str,
-) -> Result<ParsedAttestations, CacheError> {
-    let value: serde_json::Value =
-        serde_json::from_str(json_str).map_err(|e| {
-            CacheError::InvalidAttestationBundle(format!("Invalid JSON: {}", e))
-        })?;
+fn parse_attestation_response(json_str: &str) -> Result<ParsedAttestations, CacheError> {
+    let value: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|e| CacheError::InvalidAttestationBundle(format!("Invalid JSON: {}", e)))?;
 
     // If it has a "mediaType" field, it's a standard sigstore bundle
     if value.get("mediaType").is_some() {
         let bundle = sigstore_types::Bundle::from_json(json_str).map_err(|e| {
-            CacheError::InvalidAttestationBundle(format!(
-                "Failed to parse sigstore bundle: {}",
-                e
-            ))
+            CacheError::InvalidAttestationBundle(format!("Failed to parse sigstore bundle: {}", e))
         })?;
         return Ok(ParsedAttestations {
             bundles: vec![bundle],
@@ -140,7 +133,9 @@ fn convert_pypi_attestation_to_bundle(
 ) -> Result<sigstore_types::Bundle, CacheError> {
     let err = |msg: &str| CacheError::InvalidAttestationBundle(msg.to_string());
 
-    let envelope = attestation.get("envelope").ok_or_else(|| err("missing 'envelope'"))?;
+    let envelope = attestation
+        .get("envelope")
+        .ok_or_else(|| err("missing 'envelope'"))?;
     let verification_material = attestation
         .get("verification_material")
         .ok_or_else(|| err("missing 'verification_material'"))?;
@@ -167,10 +162,7 @@ fn convert_pypi_attestation_to_bundle(
             .iter()
             .map(|entry| {
                 // Convert PyPI tlog entry format to sigstore bundle v0.3 format
-                let log_index = entry
-                    .get("log_index")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
+                let log_index = entry.get("log_index").and_then(|v| v.as_u64()).unwrap_or(0);
                 let log_id = entry.get("log_id").and_then(|v| v.as_str()).unwrap_or("");
                 let kind = entry
                     .get("entry_kind")
@@ -197,10 +189,11 @@ fn convert_pypi_attestation_to_bundle(
                 if let Some(proof) = entry.get("inclusion_proof") {
                     let proof_log_index =
                         proof.get("log_index").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let root_hash =
-                        proof.get("root_hash").and_then(|v| v.as_str()).unwrap_or("");
-                    let tree_size =
-                        proof.get("tree_size").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let root_hash = proof
+                        .get("root_hash")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let tree_size = proof.get("tree_size").and_then(|v| v.as_u64()).unwrap_or(0);
                     let hashes = proof
                         .get("hashes")
                         .and_then(|v| v.as_array())
@@ -514,8 +507,9 @@ impl SourceCache {
             if cache_path.exists() {
                 // Validate all checksums if provided
                 if !checksums.is_empty() {
-                    let mismatch =
-                        checksums.iter().find_map(|cs| cs.validate(&cache_path).err());
+                    let mismatch = checksums
+                        .iter()
+                        .find_map(|cs| cs.validate(&cache_path).err());
                     if mismatch.is_some() {
                         tracing::warn!("Checksum validation failed, re-downloading");
                         fs_err::tokio::remove_file(&cache_path).await?;
@@ -820,8 +814,7 @@ impl SourceCache {
                 // Verify with just the issuer in the policy — we do prefix matching on identity ourselves.
                 // For PyPI-converted bundles, skip tlog verification since we can't reconstruct
                 // the canonicalized rekor body from the PEP 740 format.
-                let mut policy =
-                    VerificationPolicy::default().require_issuer(check.issuer.clone());
+                let mut policy = VerificationPolicy::default().require_issuer(check.issuer.clone());
                 if parsed.from_pypi {
                     policy = policy.skip_tlog();
                 }
@@ -852,7 +845,10 @@ impl SourceCache {
             if !matched {
                 let mut msg = format!(
                     "attestation identity mismatch for publisher '{}'\n  expected identity prefix: {}\n  expected issuer: {}",
-                    check.identity.trim_start_matches("https://github.com/").trim_start_matches("https://gitlab.com/"),
+                    check
+                        .identity
+                        .trim_start_matches("https://github.com/")
+                        .trim_start_matches("https://gitlab.com/"),
                     check.identity,
                     check.issuer,
                 );
@@ -871,10 +867,7 @@ impl SourceCache {
             }
         }
 
-        tracing::info!(
-            "All attestation checks passed for: {}",
-            file_path.display()
-        );
+        tracing::info!("All attestation checks passed for: {}", file_path.display());
         Ok(())
     }
 
@@ -1154,10 +1147,9 @@ mod tests {
 
     #[test]
     fn test_derive_pypi_provenance_url_normalizes_name() {
-        let url = url::Url::parse(
-            "https://pypi.io/packages/source/F/Flask-CORS/Flask-CORS-4.0.0.tar.gz",
-        )
-        .unwrap();
+        let url =
+            url::Url::parse("https://pypi.io/packages/source/F/Flask-CORS/Flask-CORS-4.0.0.tar.gz")
+                .unwrap();
         let result = derive_pypi_provenance_url(&url).unwrap();
         assert_eq!(
             result.as_str(),
