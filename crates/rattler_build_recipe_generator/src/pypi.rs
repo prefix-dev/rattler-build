@@ -56,6 +56,8 @@ struct PyPiInfo {
     description: Option<String>,
     home_page: Option<String>,
     license: Option<String>,
+    license_expression: Option<String>,
+    classifiers: Option<Vec<String>>,
     requires_dist: Option<Vec<String>>,
     project_urls: Option<HashMap<String, String>>,
     requires_python: Option<String>,
@@ -323,6 +325,46 @@ async fn map_requirement(
     req.to_string()
 }
 
+/// Extract the license string from PyPI metadata.
+///
+/// Checks the following fields in order of preference:
+/// 1. `license_expression` — the PEP 639 field, already in SPDX format
+/// 2. `license` — the legacy free-text license field (skipped if it looks like
+///    a full license text rather than a short identifier)
+/// 3. License classifiers — e.g. `"License :: OSI Approved :: MIT License"`
+fn extract_license(info: &PyPiInfo) -> Option<String> {
+    // Prefer license_expression (PEP 639) — already SPDX
+    if let Some(expr) = &info.license_expression {
+        let expr = expr.trim();
+        if !expr.is_empty() {
+            return Some(expr.to_string());
+        }
+    }
+
+    // Fall back to legacy license field, but only if it looks like a short
+    // identifier rather than a full license text.
+    if let Some(license) = &info.license {
+        let license = license.trim();
+        if !license.is_empty() && license.len() < 100 && !license.contains('\n') {
+            return Some(license.to_string());
+        }
+    }
+
+    // Fall back to classifiers
+    if let Some(classifiers) = &info.classifiers {
+        let license_classifiers: Vec<&str> = classifiers
+            .iter()
+            .filter_map(|c| c.strip_prefix("License :: OSI Approved :: "))
+            .collect();
+
+        if !license_classifiers.is_empty() {
+            return Some(license_classifiers.join(" OR "));
+        }
+    }
+
+    None
+}
+
 /// Create a `serialize::Recipe` from the provided options and PyPI metadata.
 pub async fn create_recipe(
     opts: &PyPIOpts,
@@ -444,7 +486,7 @@ pub async fn create_recipe(
     recipe.about.summary = metadata.info.summary.clone();
     recipe.about.description = metadata.info.description.clone();
     recipe.about.homepage = metadata.info.home_page.clone();
-    recipe.about.license = metadata.info.license.clone();
+    recipe.about.license = extract_license(&metadata.info);
 
     if let Some(urls) = &metadata.info.project_urls {
         recipe.about.repository = urls.get("Source Code").cloned();
@@ -536,6 +578,58 @@ mod tests {
         let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
 
         assert_yaml_snapshot!(recipe);
+    }
+
+    #[test]
+    fn test_extract_license_prefers_license_expression() {
+        let info = PyPiInfo {
+            license_expression: Some("GPL-2.0-or-later".into()),
+            license: Some("GPL".into()),
+            classifiers: Some(vec![
+                "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)".into(),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("GPL-2.0-or-later".into()));
+    }
+
+    #[test]
+    fn test_extract_license_falls_back_to_license() {
+        let info = PyPiInfo {
+            license: Some("MIT".into()),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("MIT".into()));
+    }
+
+    #[test]
+    fn test_extract_license_skips_long_license_text() {
+        let info = PyPiInfo {
+            license: Some("A very long license text that is clearly not a short SPDX identifier but rather the full contents of a license file which we should not use".into()),
+            classifiers: Some(vec![
+                "License :: OSI Approved :: MIT License".into(),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("MIT License".into()));
+    }
+
+    #[test]
+    fn test_extract_license_falls_back_to_classifiers() {
+        let info = PyPiInfo {
+            classifiers: Some(vec![
+                "License :: OSI Approved :: BSD License".into(),
+                "Programming Language :: Python :: 3".into(),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("BSD License".into()));
+    }
+
+    #[test]
+    fn test_extract_license_none_when_empty() {
+        let info = PyPiInfo::default();
+        assert_eq!(extract_license(&info), None);
     }
 
     #[tokio::test]
