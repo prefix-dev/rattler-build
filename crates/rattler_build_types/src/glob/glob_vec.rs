@@ -520,9 +520,18 @@ mod tests {
         // "./" and "." should match all files, just like "**" (issue #2085)
         for pattern in &["./", "."] {
             let globvec = GlobVec::from_vec(vec![pattern], None);
-            assert!(globvec.is_match(Path::new("data.txt")), "{pattern} should match data.txt");
-            assert!(globvec.is_match(Path::new("sub/file.txt")), "{pattern} should match sub/file.txt");
-            assert!(globvec.is_match(Path::new("a/b/c")), "{pattern} should match a/b/c");
+            assert!(
+                globvec.is_match(Path::new("data.txt")),
+                "{pattern} should match data.txt"
+            );
+            assert!(
+                globvec.is_match(Path::new("sub/file.txt")),
+                "{pattern} should match sub/file.txt"
+            );
+            assert!(
+                globvec.is_match(Path::new("a/b/c")),
+                "{pattern} should match a/b/c"
+            );
         }
 
         // "./subdir/" should match files inside subdir
