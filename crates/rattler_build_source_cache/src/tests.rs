@@ -142,4 +142,38 @@ mod source_cache_tests {
         assert_eq!(git_url.repository(), &url);
         assert_eq!(git_url.reference(), &reference);
     }
+
+    #[test]
+    fn test_should_extract_with_actual_filename() {
+        use std::path::Path;
+
+        // Test the is_archive function directly
+        use super::super::cache::is_archive;
+
+        // Test that archive detection works with actual filename (from Content-Disposition)
+        assert!(is_archive("file.tar.gz"), "Should detect .tar.gz as archive");
+        assert!(is_archive("YODA-2.0.1.tar.gz"), "Should detect .tar.gz with version as archive");
+        assert!(is_archive("file.zip"), "Should detect .zip as archive");
+        assert!(is_archive("file.tar.bz2"), "Should detect .tar.bz2 as archive");
+        
+        // Test that non-archives are correctly identified
+        assert!(!is_archive("file.txt"), "Should not detect .txt as archive");
+        assert!(!is_archive("file.pdf"), "Should not detect .pdf as archive");
+        assert!(!is_archive("no_extension"), "Should not detect files without extension as archive");
+        
+        // Test the specific case from the issue: URL with query parameters
+        // When the cache_path is hash-based but actual_filename from Content-Disposition is an archive
+        let hash_path = Path::new("abcd1234efgh5678");
+        assert!(
+            !is_archive(hash_path.to_str().unwrap()),
+            "Hash-based filename should not be detected as archive"
+        );
+        
+        // But the actual filename from Content-Disposition should be detected
+        let actual_filename = "YODA-2.0.1.tar.gz";
+        assert!(
+            is_archive(actual_filename),
+            "Content-Disposition filename should be detected as archive"
+        );
+    }
 }
