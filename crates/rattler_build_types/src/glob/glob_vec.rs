@@ -80,16 +80,27 @@ fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
     // First, try to parse as a normal glob so that we get a descriptive error
     let _ = Glob::new(glob)?;
 
-    if glob.ends_with('/') {
+    // Strip leading "./" since paths are matched as relative (e.g. "data.txt" not "./data.txt")
+    let glob_stripped = glob.strip_prefix("./").unwrap_or(glob);
+
+    // "./" or "." means "everything" — treat as "**"
+    if glob_stripped.is_empty() || glob_stripped == "." {
+        return Ok(GlobWithSource {
+            glob: Glob::new("**")?,
+            source: glob.to_string(),
+        });
+    }
+
+    if glob_stripped.ends_with('/') {
         // We treat folders as globs that match everything in the folder
         Ok(GlobWithSource {
-            glob: Glob::new(&format!("{glob}**"))?,
+            glob: Glob::new(&format!("{glob_stripped}**"))?,
             source: glob.to_string(),
         })
     } else {
         // Match either file, or folder
         Ok(GlobWithSource {
-            glob: GlobBuilder::new(&format!("{glob}{{,/**}}"))
+            glob: GlobBuilder::new(&format!("{glob_stripped}{{,/**}}"))
                 .empty_alternates(true)
                 .build()?,
             source: glob.to_string(),
@@ -502,6 +513,22 @@ mod tests {
         assert!(globvec.is_match(Path::new("foo/bla/bar")));
         assert!(!globvec.is_match(Path::new("bar")));
         assert!(!globvec.is_match(Path::new("bla")));
+    }
+
+    #[test]
+    fn test_glob_dot_slash_matches_everything() {
+        // "./" and "." should match all files, just like "**" (issue #2085)
+        for pattern in &["./", "."] {
+            let globvec = GlobVec::from_vec(vec![pattern], None);
+            assert!(globvec.is_match(Path::new("data.txt")), "{pattern} should match data.txt");
+            assert!(globvec.is_match(Path::new("sub/file.txt")), "{pattern} should match sub/file.txt");
+            assert!(globvec.is_match(Path::new("a/b/c")), "{pattern} should match a/b/c");
+        }
+
+        // "./subdir/" should match files inside subdir
+        let globvec = GlobVec::from_vec(vec!["./subdir/"], None);
+        assert!(globvec.is_match(Path::new("subdir/file.txt")));
+        assert!(!globvec.is_match(Path::new("other/file.txt")));
     }
 
     #[test]
