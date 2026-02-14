@@ -496,7 +496,7 @@ impl SourceCache {
     /// Check if a file should be extracted
     /// If `actual_filename` is provided (e.g., from Content-Disposition header),
     /// it will be used to determine if the file is an archive instead of the path's filename
-    fn should_extract(&self, path: &Path, actual_filename: Option<&str>) -> bool {
+    pub(crate) fn should_extract(&self, path: &Path, actual_filename: Option<&str>) -> bool {
         let name = actual_filename
             .or_else(|| path.file_name().and_then(|n| n.to_str()))
             .unwrap_or("");

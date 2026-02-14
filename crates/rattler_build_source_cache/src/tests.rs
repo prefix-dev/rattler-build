@@ -146,11 +146,9 @@ mod source_cache_tests {
     #[test]
     fn test_should_extract_with_actual_filename() {
         use std::path::Path;
+        use crate::cache::is_archive;
 
         // Test the is_archive function directly
-        use super::super::cache::is_archive;
-
-        // Test that archive detection works with actual filename (from Content-Disposition)
         assert!(is_archive("file.tar.gz"), "Should detect .tar.gz as archive");
         assert!(is_archive("YODA-2.0.1.tar.gz"), "Should detect .tar.gz with version as archive");
         assert!(is_archive("file.zip"), "Should detect .zip as archive");
@@ -174,6 +172,58 @@ mod source_cache_tests {
         assert!(
             is_archive(actual_filename),
             "Content-Disposition filename should be detected as archive"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_should_extract_method_with_content_disposition() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let cache = SourceCacheBuilder::new()
+            .cache_dir(temp_dir.path())
+            .build()
+            .await
+            .unwrap();
+
+        // Test case 1: Hash-based path without actual_filename should not extract
+        let hash_path = temp_dir.path().join("abcd1234efgh5678");
+        assert!(
+            !cache.should_extract(&hash_path, None),
+            "Hash-based path without actual_filename should not be extracted"
+        );
+
+        // Test case 2: Hash-based path WITH actual_filename (archive) should extract
+        assert!(
+            cache.should_extract(&hash_path, Some("YODA-2.0.1.tar.gz")),
+            "Hash-based path with archive actual_filename should be extracted"
+        );
+
+        // Test case 3: Hash-based path WITH actual_filename (non-archive) should not extract
+        assert!(
+            !cache.should_extract(&hash_path, Some("file.txt")),
+            "Hash-based path with non-archive actual_filename should not be extracted"
+        );
+
+        // Test case 4: Archive path without actual_filename should extract
+        let archive_path = temp_dir.path().join("file.tar.gz");
+        assert!(
+            cache.should_extract(&archive_path, None),
+            "Archive path should be extracted even without actual_filename"
+        );
+
+        // Test case 5: Archive path with different actual_filename (non-archive) should not extract
+        // The actual_filename takes precedence
+        assert!(
+            !cache.should_extract(&archive_path, Some("not_an_archive.txt")),
+            "actual_filename should take precedence over path filename"
+        );
+
+        // Test case 6: Non-archive path with archive actual_filename should extract
+        let non_archive_path = temp_dir.path().join("file.txt");
+        assert!(
+            cache.should_extract(&non_archive_path, Some("archive.tar.gz")),
+            "actual_filename should take precedence over path filename"
         );
     }
 }
