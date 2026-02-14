@@ -73,34 +73,16 @@ where
         let level = metadata.level();
 
         let level_str = match *level {
-            tracing_core::metadata::Level::ERROR => {
-                style("ERROR").red().bold().to_string()
-            }
-            tracing_core::metadata::Level::WARN => {
-                style("WARN").yellow().bold().to_string()
-            }
-            tracing_core::metadata::Level::INFO => {
-                style("INFO").green().to_string()
-            }
-            tracing_core::metadata::Level::DEBUG => {
-                style("DEBUG").blue().to_string()
-            }
-            tracing_core::metadata::Level::TRACE => {
-                style("TRACE").magenta().to_string()
-            }
+            tracing_core::metadata::Level::ERROR => style("ERROR").red().bold().to_string(),
+            tracing_core::metadata::Level::WARN => style("WARN").yellow().bold().to_string(),
+            tracing_core::metadata::Level::INFO => style("INFO").green().to_string(),
+            tracing_core::metadata::Level::DEBUG => style("DEBUG").blue().to_string(),
+            tracing_core::metadata::Level::TRACE => style("TRACE").magenta().to_string(),
         };
 
-        if *level == tracing_core::metadata::Level::INFO
-            && metadata.target().starts_with("rattler_build")
-        {
-            write!(writer, "[{}] ", level_str)?;
-            ctx.format_fields(writer.by_ref(), event)?;
-            writeln!(writer)
-        } else {
-            write!(writer, "[{}] ", level_str)?;
-            ctx.format_fields(writer.by_ref(), event)?;
-            writeln!(writer)
-        }
+        write!(writer, "[{}] ", level_str)?;
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
     }
 }
 

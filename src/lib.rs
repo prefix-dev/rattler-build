@@ -1412,12 +1412,7 @@ pub async fn build_recipes(
     outputs = skip_noarch(outputs, &tool_config).await?;
 
     // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-    run_build_from_args(
-        outputs,
-        tool_config,
-        build_data.markdown_summary.as_deref(),
-    )
-    .await?;
+    run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
 }
