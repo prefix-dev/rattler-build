@@ -38,7 +38,9 @@ def test_source_files_copied_to_test(
     pkg = get_extracted_package(tmp_path, "test-source-files")
 
     # Verify the test files were packaged
-    assert (pkg / "etc" / "conda" / "test-files" / "test-source-files" / "0" / "data.txt").exists()
+    assert (
+        pkg / "etc" / "conda" / "test-files" / "test-source-files" / "0" / "data.txt"
+    ).exists()
 
 
 @pytest.mark.skipif(
