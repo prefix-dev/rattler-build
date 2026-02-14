@@ -143,6 +143,7 @@ pub fn build_recipes_py(
         allow_absolute_license_paths,
         exclude_newer,
         build_num,
+        None, // markdown_summary
     );
 
     run_async_task(async {

@@ -54,6 +54,56 @@ fn get_span_color(identifier: &str) -> Style {
     Style::new().fg(SPAN_COLOR_PALETTE[color_index])
 }
 
+/// A simple formatter that outputs `[LEVEL] message` with ANSI colors
+/// but without box-drawing characters or span trees.
+pub struct SimpleFormatter;
+
+impl<S, N> FormatEvent<S, N> for SimpleFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: format::Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
+        let metadata = event.metadata();
+        let level = metadata.level();
+
+        let level_str = match *level {
+            tracing_core::metadata::Level::ERROR => {
+                style("ERROR").red().bold().to_string()
+            }
+            tracing_core::metadata::Level::WARN => {
+                style("WARN").yellow().bold().to_string()
+            }
+            tracing_core::metadata::Level::INFO => {
+                style("INFO").green().to_string()
+            }
+            tracing_core::metadata::Level::DEBUG => {
+                style("DEBUG").blue().to_string()
+            }
+            tracing_core::metadata::Level::TRACE => {
+                style("TRACE").magenta().to_string()
+            }
+        };
+
+        if *level == tracing_core::metadata::Level::INFO
+            && metadata.target().starts_with("rattler_build")
+        {
+            write!(writer, "[{}] ", level_str)?;
+            ctx.format_fields(writer.by_ref(), event)?;
+            writeln!(writer)
+        } else {
+            write!(writer, "[{}] ", level_str)?;
+            ctx.format_fields(writer.by_ref(), event)?;
+            writeln!(writer)
+        }
+    }
+}
+
 /// A custom formatter for tracing events.
 pub struct TracingFormatter;
 
@@ -568,6 +618,8 @@ pub enum LogStyle {
     Json,
     /// Use plain logging output.
     Plain,
+    /// Use simple logging output (colored, no box-drawing frames).
+    Simple,
 }
 
 /// Constructs a default [`EnvFilter`] that is used when the user did not
@@ -595,6 +647,62 @@ pub fn get_default_env_filter(
     Ok(result)
 }
 
+/// Strip ANSI escape codes from a string.
+fn strip_ansi_codes(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1B' {
+            // Skip the escape sequence
+            while let Some(&next_char) = chars.peek() {
+                chars.next();
+                if next_char.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// A visitor that formats messages without debug-style quoting for GitHub Actions output.
+struct GitHubActionsVisitor<'a> {
+    writer: &'a mut dyn io::Write,
+    result: io::Result<()>,
+}
+
+impl<'a> GitHubActionsVisitor<'a> {
+    fn new(writer: &'a mut dyn io::Write) -> Self {
+        Self {
+            writer,
+            result: Ok(()),
+        }
+    }
+}
+
+impl field::Visit for GitHubActionsVisitor<'_> {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            self.result = write!(self.writer, "{}", value);
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            // Use Display-style formatting to avoid extra quotes around strings
+            self.result = write!(self.writer, "{:?}", value);
+        }
+    }
+}
+
 struct GitHubActionsLayer(bool);
 
 impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
@@ -605,8 +713,9 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
         let metadata = event.metadata();
 
         let mut message = Vec::new();
-        event.record(&mut CustomVisitor::new(&mut message));
+        event.record(&mut GitHubActionsVisitor::new(&mut message));
         let message = String::from_utf8_lossy(&message);
+        let message = strip_ansi_codes(&message);
 
         match *metadata.level() {
             Level::ERROR => println!("::error ::{}", message),
@@ -709,6 +818,15 @@ pub fn init_logging(
             log_handler.set_progress_bars_hidden(true);
             registry
                 .with(fmt::layer().json().with_writer(io::stderr))
+                .init();
+        }
+        LogStyle::Simple => {
+            registry
+                .with(
+                    fmt::layer()
+                        .with_writer(log_handler.clone())
+                        .event_format(SimpleFormatter),
+                )
                 .init();
         }
     }
