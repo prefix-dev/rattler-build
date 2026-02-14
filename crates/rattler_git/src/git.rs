@@ -459,16 +459,6 @@ impl GitCheckout {
             .current_dir(&self.repo.path)
             .output()?;
 
-        // Update submodules (`git submodule update --recursive`).
-        Command::new(GIT.as_ref().map_err(|e| e.clone())?)
-            .arg("submodule")
-            .arg("update")
-            .arg("--recursive")
-            .arg("--init")
-            .current_dir(&self.repo.path)
-            .output()
-            .map(drop)?;
-
         fs_err::File::create(ok_file)?;
         Ok(())
     }

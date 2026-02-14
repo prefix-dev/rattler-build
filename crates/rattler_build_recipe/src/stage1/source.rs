@@ -142,6 +142,10 @@ pub struct GitSource {
     #[serde(default, skip_serializing_if = "is_false")]
     pub lfs: bool,
 
+    /// Whether to recursively initialize and update submodules (defaults to true)
+    #[serde(default = "default_submodules", skip_serializing_if = "is_true")]
+    pub submodules: bool,
+
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<String>,
@@ -149,6 +153,10 @@ pub struct GitSource {
 
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+fn default_submodules() -> bool {
+    true
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated
