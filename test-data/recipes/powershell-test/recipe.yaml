@@ -33,15 +33,15 @@ requirements:
 tests:
   - script:
       - if: unix
-        then:
-          - test -f $PREFIX/powershell_test_output.txt
-          - grep "package1: 1.0" $PREFIX/powershell_test_output.txt
-          - grep "package2: 2.0" $PREFIX/powershell_test_output.txt
+        then: |
+          test -f $PREFIX/powershell_test_output.txt
+          grep "package1: 1.0" $PREFIX/powershell_test_output.txt
+          grep "package2: 2.0" $PREFIX/powershell_test_output.txt
       - if: win
-        then:
-          - if not exist %PREFIX%\powershell_test_output.txt exit 1
-          - findstr "package1: 1.0" %PREFIX%\powershell_test_output.txt
-          - findstr "package2: 2.0" %PREFIX%\powershell_test_output.txt
+        then: |
+          if not exist %PREFIX%\powershell_test_output.txt exit 1
+          findstr "package1: 1.0" %PREFIX%\powershell_test_output.txt
+          findstr "package2: 2.0" %PREFIX%\powershell_test_output.txt
 
 about:
   summary: Test package for PowerShell interpreter support
