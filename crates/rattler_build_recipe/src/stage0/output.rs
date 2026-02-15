@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::stage0::{
     about::About,
+    app::App,
     build::Build,
     package::{Package, PackageMetadata},
     requirements::Requirements,
@@ -41,6 +42,7 @@ pub struct SingleOutputRecipe {
     pub build: Build,
     pub requirements: Requirements,
     pub about: About,
+    pub app: App,
     pub extra: crate::stage0::extra::Extra,
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub source: ConditionalList<Source>,
@@ -73,6 +75,10 @@ pub struct MultiOutputRecipe {
     /// Top-level about information (inheritable by outputs)
     #[serde(default)]
     pub about: About,
+
+    /// Top-level app information (inheritable by outputs)
+    #[serde(default)]
+    pub app: App,
 
     /// Extra metadata
     #[serde(default)]
@@ -180,6 +186,10 @@ pub struct PackageOutput {
     #[serde(default)]
     pub about: About,
 
+    /// App information for this output
+    #[serde(default)]
+    pub app: App,
+
     /// Tests for this output
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub tests: ConditionalList<TestType>,
@@ -258,6 +268,7 @@ impl SingleOutputRecipe {
             build,
             requirements,
             about,
+            app,
             extra,
             source,
             tests,
@@ -267,6 +278,7 @@ impl SingleOutputRecipe {
         vars.extend(build.used_variables());
         vars.extend(requirements.used_variables());
         vars.extend(about.used_variables());
+        vars.extend(app.used_variables());
         vars.extend(extra.used_variables());
         for src_item in source {
             vars.extend(collect_source_item_variables(src_item));
@@ -310,6 +322,7 @@ impl MultiOutputRecipe {
             source,
             build,
             about,
+            app,
             extra,
             tests,
             outputs,
@@ -328,6 +341,7 @@ impl MultiOutputRecipe {
         }
         vars.extend(build.used_variables());
         vars.extend(about.used_variables());
+        vars.extend(app.used_variables());
         vars.extend(extra.used_variables());
         for src_item in source {
             vars.extend(collect_source_item_variables(src_item));
@@ -457,6 +471,7 @@ impl PackageOutput {
             requirements,
             build,
             about,
+            app,
             tests,
         } = self;
 
@@ -468,6 +483,7 @@ impl PackageOutput {
         vars.extend(requirements.used_variables());
         vars.extend(build.used_variables());
         vars.extend(about.used_variables());
+        vars.extend(app.used_variables());
         for test_item in tests {
             vars.extend(collect_test_item_variables(test_item));
         }

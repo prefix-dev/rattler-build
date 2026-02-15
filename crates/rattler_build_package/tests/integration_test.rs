@@ -243,6 +243,7 @@ fn test_from_recipe_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
         package,
         Build::default(),
         about,
+        Default::default(),
         Requirements::default(),
         Extra::default(),
         Vec::new(),

@@ -52,6 +52,7 @@ about:
   description: null
   documentation: null
   repository: null
+app: {}
 extra: {}
 outputs:
 - package:
@@ -102,6 +103,7 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}
   tests:
   - python:
       imports:
@@ -155,6 +157,7 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}
   tests:
   - script:
       content:
@@ -209,3 +212,4 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
 use serde::{Deserialize, Serialize};
 
-use super::{About, Build, Extra, Package, Requirements, Source, TestType};
+use super::{About, App, Build, Extra, Package, Requirements, Source, TestType};
 
 /// Staging cache - a build artifact that doesn't produce a package
 ///
@@ -133,6 +133,10 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "About::is_empty")]
     pub about: About,
 
+    /// App section for Anaconda Navigator app discovery
+    #[serde(default, skip_serializing_if = "App::is_empty")]
+    pub app: App,
+
     /// Extra metadata
     #[serde(default, skip_serializing_if = "Extra::is_empty")]
     pub extra: Extra,
@@ -159,10 +163,12 @@ pub struct Recipe {
 impl Recipe {
     /// Create a new Recipe
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         package: Package,
         build: Build,
         about: About,
+        app: App,
         requirements: Requirements,
         extra: Extra,
         source: Vec<Source>,
@@ -175,6 +181,7 @@ impl Recipe {
             package,
             build,
             about,
+            app,
             requirements,
             extra,
             source,
@@ -192,6 +199,7 @@ impl Recipe {
         package: Package,
         build: Build,
         about: About,
+        app: App,
         requirements: Requirements,
         extra: Extra,
         source: Vec<Source>,
@@ -206,6 +214,7 @@ impl Recipe {
             package,
             build,
             about,
+            app,
             requirements,
             extra,
             source,
@@ -230,6 +239,11 @@ impl Recipe {
     /// Get the about section
     pub fn about(&self) -> &About {
         &self.about
+    }
+
+    /// Get the app section
+    pub fn app(&self) -> &App {
+        &self.app
     }
 
     /// Get the requirements section
@@ -279,6 +293,7 @@ mod tests {
             pkg.clone(),
             build.clone(),
             about.clone(),
+            App::default(),
             reqs.clone(),
             extra.clone(),
             Vec::new(),
@@ -324,6 +339,7 @@ mod tests {
             pkg.clone(),
             build.clone(),
             about.clone(),
+            App::default(),
             reqs.clone(),
             extra.clone(),
             Vec::new(),
