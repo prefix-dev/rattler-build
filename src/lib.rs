@@ -597,6 +597,7 @@ pub async fn get_build_output(
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
                 exclude_newer: build_data.exclude_newer,
+                no_log_path_replacement: build_data.common.no_log_path_replacement,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -835,6 +836,9 @@ pub async fn run_build_from_args(
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
                         exclude_newer: output.build_configuration.exclude_newer,
+                        no_log_path_replacement: output
+                            .build_configuration
+                            .no_log_path_replacement,
                     },
                     None,
                 )
@@ -989,6 +993,7 @@ pub async fn run_test(
         output_dir: test_data.common.output_dir,
         debug: test_data.debug,
         exclude_newer: None,
+        no_log_path_replacement: test_data.common.no_log_path_replacement,
     };
 
     let package_name = package_file
@@ -1111,6 +1116,8 @@ pub async fn rebuild_package_core(
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
+    output.build_configuration.no_log_path_replacement =
+        rebuild_data.common.no_log_path_replacement;
 
     // Use a temporary directory for the build output to avoid overwriting the original
     let temp_output_dir = tempfile::tempdir().into_diagnostic()?;

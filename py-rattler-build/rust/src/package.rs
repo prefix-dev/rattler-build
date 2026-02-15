@@ -368,6 +368,7 @@ impl PyPackage {
             use_zstd,
             use_jlap,
             use_sharded,
+            false,
         );
 
         // Create rebuild data using the package path
@@ -525,6 +526,7 @@ impl PyPackage {
             use_zstd,
             use_jlap,
             use_sharded,
+            false,
         );
 
         let channel = match channel {

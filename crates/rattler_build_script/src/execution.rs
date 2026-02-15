@@ -15,6 +15,25 @@ use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
+/// Controls which filesystem paths are replaced with variable names in script output.
+///
+/// When running build or test scripts, rattler-build can replace concrete filesystem paths
+/// (like `/tmp/rattler-build_my-pkg_12345/work`) with symbolic names (like `$SRC_DIR`) in
+/// the log output. This enum controls that behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogPathReplacements {
+    /// Replace all paths: `PREFIX`, `BUILD_PREFIX`, and `SRC_DIR`.
+    /// This is the default for build scripts.
+    All,
+    /// Replace `PREFIX` and `BUILD_PREFIX` but not `SRC_DIR`.
+    /// This is the default for test scripts, where the working directory is a
+    /// temporary directory (not the actual source directory).
+    ExceptSrcDir,
+    /// Do not replace any paths in the output.
+    /// Use this when concrete filesystem paths are needed for debugging.
+    None,
+}
+
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
 pub struct ExecutionArgs {
@@ -42,10 +61,8 @@ pub struct ExecutionArgs {
     /// Whether to enable debug output
     pub debug: Debug,
 
-    /// Whether to replace the work directory path with `$SRC_DIR` in the script output.
-    /// This should be `true` during builds (where `work_dir` is the source directory)
-    /// and `false` during tests (where `work_dir` is a temporary directory).
-    pub replace_work_dir_in_output: bool,
+    /// Controls which filesystem paths are replaced with variable names in script output.
+    pub log_path_replacements: LogPathReplacements,
 }
 
 impl ExecutionArgs {
@@ -54,28 +71,31 @@ impl ExecutionArgs {
     /// will be replaced with the actual variable name.
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-        if let Some(build_prefix) = &self.build_prefix {
-            replacements.insert(
-                build_prefix.display().to_string(),
-                template.replace("((var))", "BUILD_PREFIX"),
-            );
-        };
-        replacements.insert(
-            self.run_prefix.display().to_string(),
-            template.replace("((var))", "PREFIX"),
-        );
 
-        if self.replace_work_dir_in_output {
+        if self.log_path_replacements != LogPathReplacements::None {
+            if let Some(build_prefix) = &self.build_prefix {
+                replacements.insert(
+                    build_prefix.display().to_string(),
+                    template.replace("((var))", "BUILD_PREFIX"),
+                );
+            };
             replacements.insert(
-                self.work_dir.display().to_string(),
-                template.replace("((var))", "SRC_DIR"),
+                self.run_prefix.display().to_string(),
+                template.replace("((var))", "PREFIX"),
             );
-        }
 
-        // if the paths contain `\` then also replace the forward slash variants
-        for (k, v) in replacements.clone() {
-            if k.contains('\\') {
-                replacements.insert(k.replace('\\', "/"), v.clone());
+            if self.log_path_replacements == LogPathReplacements::All {
+                replacements.insert(
+                    self.work_dir.display().to_string(),
+                    template.replace("((var))", "SRC_DIR"),
+                );
+            }
+
+            // if the paths contain `\` then also replace the forward slash variants
+            for (k, v) in replacements.clone() {
+                if k.contains('\\') {
+                    replacements.insert(k.replace('\\', "/"), v.clone());
+                }
             }
         }
 
@@ -165,7 +185,7 @@ impl Script {
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
         debug: Debug,
-        replace_work_dir_in_output: bool,
+        log_path_replacements: LogPathReplacements,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
@@ -234,7 +254,7 @@ impl Script {
             work_dir,
             sandbox_config: sandbox_config.cloned(),
             debug,
-            replace_work_dir_in_output,
+            log_path_replacements,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;

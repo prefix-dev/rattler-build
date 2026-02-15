@@ -12,7 +12,7 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Debug as ScriptDebug, Script, ScriptContent};
+use rattler_build_script::{Debug as ScriptDebug, LogPathReplacements, Script, ScriptContent};
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     package::{CondaArchiveIdentifier, IndexJson, PackageFile},
@@ -142,6 +142,7 @@ impl Tests {
         environment: &Path,
         cwd: &Path,
         pkg_vars: &HashMap<String, String>,
+        log_path_replacements: LogPathReplacements,
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
@@ -181,7 +182,7 @@ impl Tests {
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         ScriptDebug::new(false),
-                        false,
+                        log_path_replacements,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -203,7 +204,7 @@ impl Tests {
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         ScriptDebug::new(false),
-                        false,
+                        log_path_replacements,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -276,6 +277,22 @@ pub struct TestConfiguration {
     pub debug: Debug,
     /// Exclude packages newer than this date from the solver
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// Whether to disable path replacement in log output
+    pub no_log_path_replacement: bool,
+}
+
+impl TestConfiguration {
+    /// Returns the appropriate `LogPathReplacements` for test execution.
+    /// During tests, `SRC_DIR` replacement is skipped because the working directory
+    /// is a temporary directory, not the actual source directory. If
+    /// `no_log_path_replacement` is set, all path replacements are disabled.
+    pub fn log_path_replacements(&self) -> LogPathReplacements {
+        if self.no_log_path_replacement {
+            LogPathReplacements::None
+        } else {
+            LogPathReplacements::ExceptSrcDir
+        }
+    }
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -492,7 +509,8 @@ pub async fn run_test(
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder, &env).await?;
+            test.run(&prefix, &test_folder, &env, config.log_path_replacements())
+                .await?;
         }
 
         tracing::info!(
@@ -711,7 +729,7 @@ async fn run_python_test_inner(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
-            false,
+            config.log_path_replacements(),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -736,7 +754,7 @@ async fn run_python_test_inner(
                 None::<fn(&str) -> Result<String, String>>,
                 None,
                 ScriptDebug::new(config.debug.is_enabled()),
-                false,
+                config.log_path_replacements(),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -820,7 +838,7 @@ async fn run_perl_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
-            false,
+            config.log_path_replacements(),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -935,7 +953,7 @@ async fn run_commands_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
-            false,
+            config.log_path_replacements(),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1121,7 +1139,7 @@ async fn run_r_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
-            false,
+            config.log_path_replacements(),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1200,7 +1218,7 @@ async fn run_ruby_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
-            false,
+            config.log_path_replacements(),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

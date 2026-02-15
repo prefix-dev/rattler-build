@@ -265,6 +265,11 @@ pub struct CommonOpts {
     /// Channel priority to use when solving
     #[arg(long)]
     pub channel_priority: Option<ChannelPriorityWrapper>,
+
+    /// Do not replace paths with variable names (like `$PREFIX`, `$SRC_DIR`) in
+    /// log output. Use this to see concrete filesystem paths for debugging.
+    #[arg(long)]
+    pub no_log_path_replacement: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -282,6 +287,7 @@ pub struct CommonData {
     pub use_bz2: bool,
     pub use_sharded: bool,
     pub use_jlap: bool,
+    pub no_log_path_replacement: bool,
 }
 
 impl CommonData {
@@ -298,6 +304,7 @@ impl CommonData {
         use_bz2: bool,
         use_sharded: bool,
         use_jlap: bool,
+        no_log_path_replacement: bool,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
@@ -345,6 +352,7 @@ impl CommonData {
             use_bz2,
             use_sharded,
             use_jlap,
+            no_log_path_replacement,
         }
     }
 
@@ -360,6 +368,7 @@ impl CommonData {
             value.use_bz2,
             value.use_sharded,
             value.use_jlap,
+            value.no_log_path_replacement,
         )
     }
 }
