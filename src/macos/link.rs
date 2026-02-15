@@ -5,6 +5,7 @@ use goblin::mach::header::{
     Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE, SIZEOF_HEADER_32, SIZEOF_HEADER_64,
 };
 use indexmap::IndexSet;
+use itertools::Itertools;
 use memmap2::MmapMut;
 use rattler_build_recipe::stage1::GlobVec;
 use scroll::Pread;
@@ -246,6 +247,10 @@ impl Relinker for Dylib {
                 );
             }
         }
+
+        // Deduplicate rpaths (keep first occurrence only).
+        // On macOS >= 15.4, duplicate LC_RPATH entries cause dlopen() to fail.
+        let final_rpaths: Vec<_> = final_rpaths.into_iter().unique().collect();
 
         if final_rpaths != self.rpaths {
             for (old, new) in self.rpaths.iter().zip(final_rpaths.iter()) {
@@ -861,5 +866,90 @@ mod tests {
             &encoded_prefix,
         );
         assert_eq!(resolved, PathBuf::from("/foo/very_long_encoded_prefix/lib"));
+    }
+
+    /// Regression test: duplicate rpaths must be removed so that macOS >= 15.4
+    /// does not reject the binary with "duplicate LC_RPATH" errors at load time.
+    #[test]
+    fn test_relink_deduplicates_rpaths() -> Result<(), RelinkError> {
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let tmp_prefix = tmp_dir.path();
+
+        // Set up bin/ and lib/ directories so the rpath resolution finds them
+        let bin_dir = tmp_prefix.join("bin");
+        let lib_dir = tmp_prefix.join("lib");
+        fs::create_dir(&bin_dir)?;
+        fs::create_dir(&lib_dir)?;
+
+        let binary_path = bin_dir.join("zlink-dedup");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        // First, remove all existing rpaths
+        let object = Dylib::new(&binary_path)?;
+        let delete_all = DylibChanges {
+            change_rpath: object.rpaths.iter().map(|p| (Some(p.clone()), None)).collect(),
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        install_name_tool(&binary_path, &delete_all, &SystemTools::default())?;
+
+        // Add the same rpath twice to simulate the duplicate condition
+        let dup_rpath = PathBuf::from("@loader_path/../lib");
+        let add_dup = DylibChanges {
+            change_rpath: vec![
+                (None, Some(dup_rpath.clone())),
+            ],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        install_name_tool(&binary_path, &add_dup, &SystemTools::default())?;
+        // Add the same rpath a second time via a raw install_name_tool call
+        let mut cmd = std::process::Command::new("install_name_tool");
+        cmd.arg("-add_rpath")
+            .arg("@loader_path/../lib")
+            .arg(&binary_path);
+        let output = cmd.output()?;
+        assert!(output.status.success(), "Failed to add duplicate rpath");
+
+        // Verify we now have duplicate rpaths
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(
+            object.rpaths,
+            vec![dup_rpath.clone(), dup_rpath.clone()],
+            "Expected duplicate rpaths before relink"
+        );
+
+        // Now run the relink which should deduplicate
+        object
+            .relink(
+                tmp_prefix,
+                tmp_prefix,
+                &["lib/".to_string()],
+                &GlobVec::default(),
+                &SystemTools::default(),
+            )
+            .unwrap();
+
+        // After relinking, rpaths must be deduplicated
+        let object = Dylib::new(&binary_path)?;
+        let unique_rpaths: Vec<_> = object.rpaths.clone().into_iter().collect();
+        assert_eq!(
+            object.rpaths, unique_rpaths,
+            "RPATHs should be deduplicated after relink (macOS >= 15.4 rejects duplicates)"
+        );
+        // Should contain exactly one @loader_path/../lib
+        assert!(
+            object.rpaths.iter().filter(|r| *r == &dup_rpath).count() == 1,
+            "Expected exactly one @loader_path/../lib rpath, got: {:?}",
+            object.rpaths
+        );
+
+        Ok(())
     }
 }
