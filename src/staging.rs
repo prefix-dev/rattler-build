@@ -299,6 +299,7 @@ impl Output {
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
                 ScriptDebug::new(self.build_configuration.debug.is_enabled()),
+                true,
             )
             .await
             .into_diagnostic()?;

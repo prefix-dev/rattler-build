@@ -79,6 +79,7 @@ impl Output {
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
             debug: ScriptDebug::new(self.build_configuration.debug.is_enabled()),
+            replace_work_dir_in_output: true,
         })
     }
 
@@ -136,6 +137,7 @@ impl Output {
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
                 ScriptDebug::new(self.build_configuration.debug.is_enabled()),
+                true,
             )
             .await?;
 

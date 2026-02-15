@@ -41,6 +41,11 @@ pub struct ExecutionArgs {
 
     /// Whether to enable debug output
     pub debug: Debug,
+
+    /// Whether to replace the work directory path with `$SRC_DIR` in the script output.
+    /// This should be `true` during builds (where `work_dir` is the source directory)
+    /// and `false` during tests (where `work_dir` is a temporary directory).
+    pub replace_work_dir_in_output: bool,
 }
 
 impl ExecutionArgs {
@@ -60,10 +65,12 @@ impl ExecutionArgs {
             template.replace("((var))", "PREFIX"),
         );
 
-        replacements.insert(
-            self.work_dir.display().to_string(),
-            template.replace("((var))", "SRC_DIR"),
-        );
+        if self.replace_work_dir_in_output {
+            replacements.insert(
+                self.work_dir.display().to_string(),
+                template.replace("((var))", "SRC_DIR"),
+            );
+        }
 
         // if the paths contain `\` then also replace the forward slash variants
         for (k, v) in replacements.clone() {
@@ -158,6 +165,7 @@ impl Script {
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
         debug: Debug,
+        replace_work_dir_in_output: bool,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
@@ -226,6 +234,7 @@ impl Script {
             work_dir,
             sandbox_config: sandbox_config.cloned(),
             debug,
+            replace_work_dir_in_output,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;

@@ -181,6 +181,7 @@ impl Tests {
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         ScriptDebug::new(false),
+                        false,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -202,6 +203,7 @@ impl Tests {
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         ScriptDebug::new(false),
+                        false,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -709,6 +711,7 @@ async fn run_python_test_inner(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
+            false,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -733,6 +736,7 @@ async fn run_python_test_inner(
                 None::<fn(&str) -> Result<String, String>>,
                 None,
                 ScriptDebug::new(config.debug.is_enabled()),
+                false,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -816,6 +820,7 @@ async fn run_perl_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
+            false,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -930,6 +935,7 @@ async fn run_commands_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
+            false,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1115,6 +1121,7 @@ async fn run_r_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
+            false,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1193,6 +1200,7 @@ async fn run_ruby_test(
             None::<fn(&str) -> Result<String, String>>,
             None,
             ScriptDebug::new(config.debug.is_enabled()),
+            false,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
