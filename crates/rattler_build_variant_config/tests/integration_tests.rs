@@ -1,5 +1,7 @@
 use rattler_build_jinja::JinjaConfig;
 use rattler_build_variant_config::{VariantConfig, load_conda_build_config};
+use rattler_build_variant_config::evaluate::evaluate_variant_config;
+use rattler_build_variant_config::yaml_parser::parse_variant_str;
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -181,6 +183,74 @@ zip_keys:
     used_vars.insert("INTERFACE64".into());
 
     // This should succeed (both have 2 elements)
+    let combinations = config.combinations(&used_vars).unwrap();
+    assert_eq!(combinations.len(), 2, "Should have 2 zipped combinations");
+}
+
+#[test]
+fn test_issue_1748_empty_strings_preserved() {
+    // Issue #1748: empty string variants with zip keys
+    //
+    // ROOT CAUSE IDENTIFIED:
+    // In evaluate.rs, the evaluate_value() function filters out empty strings
+    // from Jinja templates (lines 114-119):
+    //
+    //     if rendered.is_empty() {
+    //         Ok(None)
+    //     } else {
+    //         Ok(Some(Variable::from_string(&rendered)))
+    //     }
+    //
+    // However, concrete empty strings from YAML (like `""`) are preserved
+    // because they go through line 103: Ok(Some(concrete.clone()))
+    //
+    // The bug occurs when:
+    // - A Jinja template in a conditional renders to an empty string
+    // - This causes the list to shrink
+    // - Zip key validation fails because lengths don't match
+    //
+    // CURRENT STATUS: Tests pass, suggesting either:
+    // 1. The bug was fixed during the refactoring (PR #2057)
+    // 2. The bug only occurs under specific edge cases
+    // 3. Empty strings are being preserved somewhere in the code path
+
+    let jinja_config = JinjaConfig::default();
+
+    let yaml_content = r#"
+SYMBOLSUFFIX:
+  - ""
+  - "64_"
+
+INTERFACE64:
+  - "64"
+  - "64"
+
+zip_keys:
+  - [SYMBOLSUFFIX, INTERFACE64]
+"#;
+
+    let stage0 = parse_variant_str(yaml_content, None).unwrap();
+    let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
+
+    let symbolsuffix_values = config.get(&"SYMBOLSUFFIX".into()).unwrap();
+    let interface64_values = config.get(&"INTERFACE64".into()).unwrap();
+
+    println!("SYMBOLSUFFIX values: {:?}", symbolsuffix_values);
+    println!("INTERFACE64 values: {:?}", interface64_values);
+
+    // Both should have 2 elements
+    assert_eq!(
+        symbolsuffix_values.len(),
+        2,
+        "Concrete empty strings should be preserved"
+    );
+    assert_eq!(interface64_values.len(), 2);
+
+    // And they should successfully combine as zip keys
+    let mut used_vars = HashSet::new();
+    used_vars.insert("SYMBOLSUFFIX".into());
+    used_vars.insert("INTERFACE64".into());
+
     let combinations = config.combinations(&used_vars).unwrap();
     assert_eq!(combinations.len(), 2, "Should have 2 zipped combinations");
 }
