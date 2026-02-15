@@ -4,7 +4,6 @@ use goblin::mach::Mach;
 use goblin::mach::header::{
     Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE, SIZEOF_HEADER_32, SIZEOF_HEADER_64,
 };
-use indexmap::IndexSet;
 use itertools::Itertools;
 use memmap2::MmapMut;
 use rattler_build_recipe::stage1::GlobVec;
@@ -572,31 +571,47 @@ fn install_name_tool(
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    let mut add_set = IndexSet::new();
-    let mut remove_set = IndexSet::new();
+    // Collect all rpaths to add and remove, preserving multiplicity.
+    // We cancel matching add/remove *pairs* one-for-one (multiset subtraction)
+    // rather than using set difference, so that duplicate rpaths are properly
+    // removed. On macOS >= 15.4, duplicate LC_RPATH entries cause dlopen() to
+    // fail.
+    let mut to_add: Vec<&PathBuf> = Vec::new();
+    let mut to_delete: Vec<&PathBuf> = Vec::new();
 
     for change in &changes.change_rpath {
         match change {
             (Some(old), Some(new)) => {
-                remove_set.insert(old);
-                add_set.insert(new);
+                to_delete.push(old);
+                to_add.push(new);
             }
             (Some(old), None) => {
-                remove_set.insert(old);
+                to_delete.push(old);
             }
             (None, Some(new)) => {
-                add_set.insert(new);
+                to_add.push(new);
             }
             (None, None) => {}
         }
     }
 
-    // ignore any that are added and removed
-    for rpath in add_set.difference(&remove_set) {
-        cmd.arg("-add_rpath").arg(rpath);
+    // Cancel out matching pairs: for each rpath in to_add, if there is a
+    // matching entry in to_delete, remove both (they are a no-op together).
+    let mut remaining_add = Vec::new();
+    let mut remaining_delete = to_delete;
+    for rpath in to_add {
+        if let Some(pos) = remaining_delete.iter().position(|d| *d == rpath) {
+            remaining_delete.remove(pos);
+        } else {
+            remaining_add.push(rpath);
+        }
     }
-    for rpath in remove_set.difference(&add_set) {
+
+    for rpath in &remaining_delete {
         cmd.arg("-delete_rpath").arg(rpath);
+    }
+    for rpath in &remaining_add {
+        cmd.arg("-add_rpath").arg(rpath);
     }
 
     cmd.arg(dylib_path);
