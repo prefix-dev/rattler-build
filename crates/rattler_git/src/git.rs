@@ -403,6 +403,10 @@ impl GitCheckout {
         // Perform a local clone of the repository, which will attempt to use
         // hardlinks to set up the repository. This should speed up the clone operation
         // quite a bit if it works.
+        //
+        // Skip LFS smudge filter during clone because the database doesn't have
+        // LFS objects. LFS files are handled separately after checkout when the
+        // recipe explicitly requests it.
         let output = Command::new(GIT.as_ref().map_err(|e| e.clone())?)
             .arg("clone")
             .arg("--local")
@@ -411,6 +415,7 @@ impl GitCheckout {
             // have a HEAD checked out.
             .arg(dunce::simplified(&database.repo.path).display().to_string())
             .arg(dunce::simplified(into).display().to_string())
+            .env("GIT_LFS_SKIP_SMUDGE", "1")
             .output()?;
 
         tracing::debug!("output after cloning {:?}", output);
@@ -452,20 +457,26 @@ impl GitCheckout {
         tracing::debug!("reset {} to {}", self.repo.path.display(), self.revision);
 
         // Perform the hard reset.
+        // Skip LFS smudge filter during reset because the checkout's origin
+        // points to the local database which doesn't have LFS objects.
+        // LFS files are handled separately after checkout.
         Command::new(GIT.as_ref().map_err(|e| e.clone())?)
             .arg("reset")
             .arg("--hard")
             .arg(self.revision.as_str())
             .current_dir(&self.repo.path)
+            .env("GIT_LFS_SKIP_SMUDGE", "1")
             .output()?;
 
         // Update submodules (`git submodule update --recursive`).
+        // Also skip LFS smudge here — submodules may contain LFS files.
         Command::new(GIT.as_ref().map_err(|e| e.clone())?)
             .arg("submodule")
             .arg("update")
             .arg("--recursive")
             .arg("--init")
             .current_dir(&self.repo.path)
+            .env("GIT_LFS_SKIP_SMUDGE", "1")
             .output()
             .map(drop)?;
 
