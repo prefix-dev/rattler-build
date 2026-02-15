@@ -550,6 +550,52 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     Ok(())
 }
 
+/// Compute which rpaths to delete and which to add from a list of rpath
+/// changes. Matching add/remove pairs are cancelled one-for-one (multiset
+/// subtraction) so that duplicate rpaths are properly removed. Using plain
+/// set difference would collapse duplicates into a single entry and silently
+/// skip the deletion — leaving the binary with duplicate `LC_RPATH` entries
+/// that cause `dlopen()` to fail on macOS >= 15.4.
+fn compute_rpath_changes(
+    changes: &[(Option<PathBuf>, Option<PathBuf>)],
+) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let mut to_add: Vec<&PathBuf> = Vec::new();
+    let mut to_delete: Vec<&PathBuf> = Vec::new();
+
+    for change in changes {
+        match change {
+            (Some(old), Some(new)) => {
+                to_delete.push(old);
+                to_add.push(new);
+            }
+            (Some(old), None) => {
+                to_delete.push(old);
+            }
+            (None, Some(new)) => {
+                to_add.push(new);
+            }
+            (None, None) => {}
+        }
+    }
+
+    // Cancel out matching pairs: for each rpath in to_add, if there is a
+    // matching entry in to_delete, remove both (they are a no-op together).
+    let mut remaining_add: Vec<PathBuf> = Vec::new();
+    let mut remaining_delete: Vec<&PathBuf> = to_delete;
+    for rpath in to_add {
+        if let Some(pos) = remaining_delete.iter().position(|d| *d == rpath) {
+            remaining_delete.remove(pos);
+        } else {
+            remaining_add.push(rpath.clone());
+        }
+    }
+
+    (
+        remaining_delete.into_iter().cloned().collect(),
+        remaining_add,
+    )
+}
+
 fn install_name_tool(
     dylib_path: &Path,
     changes: &DylibChanges,
@@ -571,41 +617,7 @@ fn install_name_tool(
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    // Collect all rpaths to add and remove, preserving multiplicity.
-    // We cancel matching add/remove *pairs* one-for-one (multiset subtraction)
-    // rather than using set difference, so that duplicate rpaths are properly
-    // removed. On macOS >= 15.4, duplicate LC_RPATH entries cause dlopen() to
-    // fail.
-    let mut to_add: Vec<&PathBuf> = Vec::new();
-    let mut to_delete: Vec<&PathBuf> = Vec::new();
-
-    for change in &changes.change_rpath {
-        match change {
-            (Some(old), Some(new)) => {
-                to_delete.push(old);
-                to_add.push(new);
-            }
-            (Some(old), None) => {
-                to_delete.push(old);
-            }
-            (None, Some(new)) => {
-                to_add.push(new);
-            }
-            (None, None) => {}
-        }
-    }
-
-    // Cancel out matching pairs: for each rpath in to_add, if there is a
-    // matching entry in to_delete, remove both (they are a no-op together).
-    let mut remaining_add = Vec::new();
-    let mut remaining_delete = to_delete;
-    for rpath in to_add {
-        if let Some(pos) = remaining_delete.iter().position(|d| *d == rpath) {
-            remaining_delete.remove(pos);
-        } else {
-            remaining_add.push(rpath);
-        }
-    }
+    let (remaining_delete, remaining_add) = compute_rpath_changes(&changes.change_rpath);
 
     for rpath in &remaining_delete {
         cmd.arg("-delete_rpath").arg(rpath);
@@ -966,5 +978,113 @@ mod tests {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod rpath_change_tests {
+    use super::compute_rpath_changes;
+    use std::path::PathBuf;
+
+    fn p(s: &str) -> PathBuf {
+        PathBuf::from(s)
+    }
+
+    /// [A, A] -> [A]: one duplicate must be deleted.
+    #[test]
+    fn duplicate_rpath_yields_one_delete() {
+        let a = p("@loader_path/../lib");
+        // Change computation for [A, A] -> [A]:
+        //   zip produces (Some(A), Some(A))  — slot stays
+        //   extra old produces (Some(A), None) — duplicate removed
+        let changes = vec![
+            (Some(a.clone()), Some(a.clone())),
+            (Some(a.clone()), None),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a], "should delete exactly one duplicate");
+        assert!(add.is_empty(), "should not add anything");
+    }
+
+    /// [A, A, A] -> [A]: two duplicates must be deleted.
+    #[test]
+    fn triple_rpath_yields_two_deletes() {
+        let a = p("@loader_path/../lib");
+        let changes = vec![
+            (Some(a.clone()), Some(a.clone())),
+            (Some(a.clone()), None),
+            (Some(a.clone()), None),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a.clone(), a], "should delete two duplicates");
+        assert!(add.is_empty());
+    }
+
+    /// [A] -> [B]: straightforward replacement.
+    #[test]
+    fn simple_replacement() {
+        let a = p("/old/lib");
+        let b = p("@loader_path/../lib");
+        let changes = vec![(Some(a.clone()), Some(b.clone()))];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a]);
+        assert_eq!(add, vec![b]);
+    }
+
+    /// [A] -> [A, B]: existing rpath kept, new one added.
+    #[test]
+    fn add_extra_rpath() {
+        let a = p("@loader_path/../lib");
+        let b = p("@loader_path/");
+        let changes = vec![
+            (Some(a.clone()), Some(a.clone())),
+            (None, Some(b.clone())),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert!(del.is_empty(), "nothing should be deleted");
+        assert_eq!(add, vec![b]);
+    }
+
+    /// [A, B] -> [A]: one rpath removed.
+    #[test]
+    fn remove_one_rpath() {
+        let a = p("@loader_path/../lib");
+        let b = p("@loader_path/");
+        let changes = vec![
+            (Some(a.clone()), Some(a.clone())),
+            (Some(b.clone()), None),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![b]);
+        assert!(add.is_empty());
+    }
+
+    /// No changes → nothing emitted.
+    #[test]
+    fn empty_changes() {
+        let (del, add) = compute_rpath_changes(&[]);
+        assert!(del.is_empty());
+        assert!(add.is_empty());
+    }
+
+    /// Existing test scenario: [@loader_path/] -> [@loader_path/../../../, @loader_path/]
+    /// Should only add the new rpath; the existing one cancels out.
+    #[test]
+    fn existing_test_change_and_add() {
+        let lp = p("@loader_path/");
+        let lp_up = p("@loader_path/../../../");
+        let changes = vec![
+            (Some(lp.clone()), Some(lp_up.clone())),
+            (None, Some(lp.clone())),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert!(del.is_empty(), "lp/ delete should cancel with lp/ add");
+        assert_eq!(add, vec![lp_up], "only the new rpath should be added");
     }
 }
