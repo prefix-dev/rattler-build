@@ -1,8 +1,10 @@
 //! Integration tests for parsing real recipe files from test-data/recipes
 
 use std::path::Path;
+use std::collections::HashSet;
 
 use rattler_build_recipe::stage0::{Recipe, parse_recipe_or_multi_from_source};
+use rattler_build_recipe::variant_render::{render_recipe_with_variants, RenderConfig};
 
 /// Helper to find all recipe.yaml files in test-data/recipes
 fn find_recipe_files() -> Vec<std::path::PathBuf> {
@@ -159,6 +161,72 @@ fn test_parse_specific_known_recipes() {
             }
         } else {
             println!("Skipping {} (file not found)", recipe_name);
+        }
+    }
+}
+
+#[test]
+fn test_render_recipe_with_empty_string_variants() {
+    // Test for issue #1748: empty string variants should work with zip keys
+    let test_data_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("test-data")
+        .join("recipes");
+
+    let recipe_path = test_data_dir.join("empty-string-variant-test/recipe.yaml");
+    let variant_path = test_data_dir.join("empty-string-variant-test/variants.yaml");
+
+    if !recipe_path.exists() || !variant_path.exists() {
+        println!("Skipping test - recipe or variant file not found");
+        return;
+    }
+
+    let config = RenderConfig::new();
+    let result = render_recipe_with_variants(&recipe_path, &[&variant_path], Some(config));
+
+    match result {
+        Ok(rendered) => {
+            println!("✓ Successfully rendered {} variants", rendered.len());
+
+            // Print all variant details
+            for (i, v) in rendered.iter().enumerate() {
+                println!("Variant {}: {:?}", i, v.variant);
+            }
+
+            // Should have 2 variants (zipped)
+            assert_eq!(rendered.len(), 2, "Expected 2 variants from zipped empty string and '64_'");
+
+            // Check that we have one with empty string and one with "64_"
+            let symbolsuffixes: Vec<String> = rendered
+                .iter()
+                .map(|v| {
+                    v.variant
+                        .get(&"SYMBOLSUFFIX".into())
+                        .map(|val| val.to_string())
+                        .unwrap_or_else(|| "(missing)".to_string())
+                })
+                .collect();
+
+            println!("SYMBOLSUFFIX values: {:?}", symbolsuffixes);
+            assert!(
+                symbolsuffixes.contains(&"".to_string()),
+                "Expected empty string variant. Got: {:?}",
+                symbolsuffixes
+            );
+            assert!(
+                symbolsuffixes.contains(&"64_".to_string()),
+                "Expected '64_' variant. Got: {:?}",
+                symbolsuffixes
+            );
+        }
+        Err(e) => {
+            panic!(
+                "Failed to render recipe with empty string variants: {}",
+                e
+            );
         }
     }
 }

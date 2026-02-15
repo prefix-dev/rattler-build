@@ -93,6 +93,99 @@ fn test_zip_keys_all_combinations() {
 }
 
 #[test]
+fn test_empty_string_variants_with_zip_keys() {
+    // Test for issue #1748: empty string variants should work with zip keys
+    let path = test_data_dir().join("with_empty_strings/variants.yaml");
+    let config = VariantConfig::from_file(&path).unwrap();
+
+    // Debug: print the parsed variant values
+    println!("SYMBOLSUFFIX variants: {:?}", config.get(&"SYMBOLSUFFIX".into()));
+    println!("INTERFACE64 variants: {:?}", config.get(&"INTERFACE64".into()));
+
+    // Test with both SYMBOLSUFFIX and INTERFACE64 (should be zipped)
+    let mut used_vars = HashSet::new();
+    used_vars.insert("SYMBOLSUFFIX".into());
+    used_vars.insert("INTERFACE64".into());
+
+    // This should NOT fail with "Zip key elements do not all have same length"
+    // because empty strings should be preserved
+    let combinations = config.combinations(&used_vars).unwrap();
+
+    // Should have 2 combinations (zipped)
+    assert_eq!(combinations.len(), 2);
+}
+
+#[test]
+fn test_mismatched_zip_key_lengths() {
+    // Test that zip key validation detects mismatched lengths
+    let yaml_content = r#"
+python:
+  - "3.9"
+  - "3.10"
+
+numpy:
+  - "1.20"
+
+zip_keys:
+  - [python, numpy]
+"#;
+
+    let config = VariantConfig::from_yaml_str(yaml_content).unwrap();
+
+    let mut used_vars = HashSet::new();
+    used_vars.insert("python".into());
+    used_vars.insert("numpy".into());
+
+    // This SHOULD fail with InvalidZipKeyLength error
+    let result = config.combinations(&used_vars);
+
+    println!("Result: {:?}", result);
+    assert!(result.is_err(), "Expected error for mismatched zip key lengths");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("Zip key") || err_msg.contains("same length"),
+        "Expected zip key length error, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_issue_1748_empty_string_zip_keys() {
+    // Test for issue #1748: empty string variants with zip keys
+    // If empty strings are being filtered out, this would have 1 item instead of 2
+    // and would fail zip key validation
+    let yaml_content = r#"
+SYMBOLSUFFIX:
+  - ""
+  - "64_"
+
+INTERFACE64:
+  - "64"
+  - "64"
+
+zip_keys:
+  - [SYMBOLSUFFIX, INTERFACE64]
+"#;
+
+    let config = VariantConfig::from_yaml_str(yaml_content).unwrap();
+
+    // Check that empty strings are preserved
+    let symbolsuffix_values = config.get(&"SYMBOLSUFFIX".into()).unwrap();
+    println!("SYMBOLSUFFIX values: {:?}", symbolsuffix_values);
+    assert_eq!(symbolsuffix_values.len(), 2, "Empty strings should be preserved");
+    assert_eq!(symbolsuffix_values[0].to_string(), "");
+    assert_eq!(symbolsuffix_values[1].to_string(), "64_");
+
+    let mut used_vars = HashSet::new();
+    used_vars.insert("SYMBOLSUFFIX".into());
+    used_vars.insert("INTERFACE64".into());
+
+    // This should succeed (both have 2 elements)
+    let combinations = config.combinations(&used_vars).unwrap();
+    assert_eq!(combinations.len(), 2, "Should have 2 zipped combinations");
+}
+
+#[test]
 fn test_conda_build_config_linux() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {

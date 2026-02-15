@@ -1,0 +1,16 @@
+package:
+  name: test-empty-string
+  version: "1.0.0"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+  host:
+    - python
+
+build:
+  number: 0
+  string: ${{ SYMBOLSUFFIX }}h${{ hash }}_${{ build_number }}
+
+source:
+  path: .

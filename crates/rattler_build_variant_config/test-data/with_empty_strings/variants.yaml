@@ -1,0 +1,12 @@
+SYMBOLSUFFIX:
+  - ""
+  - "64_"
+
+INTERFACE64:
+  - if: not (win or aarch64)
+    then: "64"
+  - if: not (win or aarch64)
+    then: "64"
+
+zip_keys:
+  - [SYMBOLSUFFIX, INTERFACE64]
