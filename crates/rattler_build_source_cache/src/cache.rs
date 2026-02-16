@@ -171,9 +171,7 @@ impl SourceCache {
             .arg("--recursive")
             .output()
             .await
-            .map_err(|e| {
-                CacheError::Git(format!("Failed to update git submodules: {}", e))
-            })?;
+            .map_err(|e| CacheError::Git(format!("Failed to update git submodules: {}", e)))?;
 
         if !output.status.success() {
             return Err(CacheError::Git(format!(
