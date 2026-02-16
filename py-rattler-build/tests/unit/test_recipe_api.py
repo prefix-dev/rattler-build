@@ -457,3 +457,17 @@ package:
     rendered = recipe.render(VariantConfig())
 
     assert rendered[0].recipe_path == recipe.recipe_path
+
+
+def test_default_output_dir_is_recipe_dir_output() -> None:
+    """Test that run_build defaults output_dir to recipe_path.parent / 'output'."""
+    yaml_content = """
+package:
+  name: default-output-test
+  version: 1.0.0
+"""
+    recipe = Stage0Recipe.from_yaml(yaml_content)
+    rendered = recipe.render(VariantConfig())
+
+    expected_output_dir = recipe.recipe_path.parent / "output"
+    assert expected_output_dir == rendered[0].recipe_path.parent / "output"

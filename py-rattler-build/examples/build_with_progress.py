@@ -58,24 +58,21 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
             print("=" * 60 + "\n")
 
             # Build with real progress callbacks!
-            import tempfile
+            result = variant.run_build(progress_callback=callback)
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                result = variant.run_build(progress_callback=callback, output_dir=Path(tmpdir))
-
-                # Display build result information
-                print("\n" + "=" * 60)
-                print("Build Result:")
-                print("=" * 60)
-                print(f"   Package: {result.name} {result.version}")
-                print(f"   Build string: {result.build_string}")
-                print(f"   Platform: {result.platform}")
-                print(f"   Build time: {result.build_time:.2f}s")
-                print("   Package files:")
-                for pkg in result.packages:
-                    print(f"     - {pkg}")
-                if result.variant:
-                    print(f"   Variant: {result.variant}")
+            # Display build result information
+            print("\n" + "=" * 60)
+            print("Build Result:")
+            print("=" * 60)
+            print(f"   Package: {result.name} {result.version}")
+            print(f"   Build string: {result.build_string}")
+            print(f"   Platform: {result.platform}")
+            print(f"   Build time: {result.build_time:.2f}s")
+            print("   Package files:")
+            for pkg in result.packages:
+                print(f"     - {pkg}")
+            if result.variant:
+                print(f"   Variant: {result.variant}")
 
     print("\n✅ Build complete!")
 

@@ -322,7 +322,7 @@ class RenderedVariant:
     def run_build(
         self,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path = ".",
+        output_dir: str | Path | None = None,
         channels: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
         no_build_id: bool = False,
@@ -339,7 +339,8 @@ class RenderedVariant:
 
         Args:
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-            output_dir: Directory to store the built package. Defaults to current directory.
+            output_dir: Directory to store the built package.
+                Defaults to ``<recipe_dir>/output``.
             channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
             progress_callback: Optional progress callback for build events.
             no_build_id: Don't include build ID in output directory.
@@ -357,8 +358,8 @@ class RenderedVariant:
 
             recipe = Stage0Recipe.from_yaml(yaml_string)
             rendered = recipe.render(VariantConfig())
-            # Build just the first variant
-            result = rendered[0].run_build(output_dir="./output")
+            # Build just the first variant (output goes to <recipe_dir>/output)
+            result = rendered[0].run_build()
             print(f"Built package: {result.packages[0]}")
             ```
         """
@@ -366,11 +367,17 @@ class RenderedVariant:
         if tool_config is None:
             tool_config = ToolConfiguration()
 
+        # Resolve output_dir default
+        if output_dir is None:
+            output_dir = self._recipe_path.parent / "output"
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         # Build this single variant
         rust_result = build_rendered_variant_py(
             rendered_variant=self._inner,
             tool_config=tool_config._inner,
-            output_dir=Path(output_dir),
+            output_dir=output_dir,
             channels=channels if channels is not None else ["conda-forge"],
             progress_callback=progress_callback,
             recipe_path=self._recipe_path,
@@ -382,7 +389,7 @@ class RenderedVariant:
         )
 
         # Convert Rust BuildResult to Python BuildResult
-        return BuildResult._from_inner(rust_result)
+        return BuildResult._from_inner(rust_result, output_dir=output_dir)
 
     def __repr__(self) -> str:
         return repr(self._inner)
@@ -392,7 +399,7 @@ def build_rendered_variants(
     rendered_variants: list[RenderedVariant],
     *,
     tool_config: ToolConfiguration | None = None,
-    output_dir: str | Path = ".",
+    output_dir: str | Path | None = None,
     channels: list[str] | None = None,
     progress_callback: ProgressCallback | None = None,
     no_build_id: bool = False,
@@ -411,7 +418,8 @@ def build_rendered_variants(
     Args:
         rendered_variants: List of RenderedVariant objects to build
         tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-        output_dir: Directory to store the built packages. Defaults to current directory.
+        output_dir: Directory to store the built packages.
+            Defaults to ``<recipe_dir>/output`` (resolved per variant).
         channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
         progress_callback: Optional progress callback for build events.
         no_build_id: Don't include build ID in output directory.
@@ -438,12 +446,12 @@ def build_rendered_variants(
         ''')
         rendered = recipe.render(variant_config)
 
-        # Build all variants at once
-        results = build_rendered_variants(rendered, output_dir="./output")
+        # Build all variants at once (output goes to <recipe_dir>/output)
+        results = build_rendered_variants(rendered)
         for result in results:
             print(f"Built {result.name} {result.version} for {result.platform}")
 
-        # Or build a subset
+        # Or build a subset with explicit output dir
         results = build_rendered_variants(rendered[:2], output_dir="./output")
         ```
     """

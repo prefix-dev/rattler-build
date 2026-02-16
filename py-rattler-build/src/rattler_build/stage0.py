@@ -244,9 +244,7 @@ class Stage0Recipe(ABC):
             variant_config = VariantConfig()
 
         # Build a RenderConfig with the recipe_path injected
-        render_config_inner = RenderConfig._with_recipe_path(
-            render_config, self._recipe_path
-        )
+        render_config_inner = RenderConfig._with_recipe_path(render_config, self._recipe_path)
 
         # Unwrap variant_config to get inner Rust object
         variant_config_inner = variant_config._inner
@@ -260,7 +258,7 @@ class Stage0Recipe(ABC):
         self,
         variant_config: VariantConfig | None = None,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path = ".",
+        output_dir: str | Path | None = None,
         channels: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
         no_build_id: bool = False,
@@ -278,7 +276,8 @@ class Stage0Recipe(ABC):
         Args:
             variant_config: Optional VariantConfig to use for building variants.
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-            output_dir: Directory to store the built packages. Defaults to current directory.
+            output_dir: Directory to store the built packages.
+                Defaults to ``<recipe_dir>/output``.
             channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
             progress_callback: Optional progress callback for build events.
             no_build_id: Don't include build ID in output directory.
@@ -293,7 +292,8 @@ class Stage0Recipe(ABC):
         Example:
             ```python
             recipe = Stage0Recipe.from_yaml(yaml_string)
-            results = recipe.run_build(output_dir="./output")
+            # Build with default output dir (<recipe_dir>/output)
+            results = recipe.run_build()
             for result in results:
                 print(f"Built {result.name} {result.version}")
                 print(f"Package at: {result.packages[0]}")
