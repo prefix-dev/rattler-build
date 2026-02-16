@@ -246,35 +246,20 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
     Ok(())
 }
 
-/// Check if the output has a `__unix` virtual package in its run dependencies,
-/// indicating this package is only intended for Unix systems.
+/// Check if the output has a Unix-specific virtual package (`__unix`, `__osx`,
+/// `__linux`, or `__glibc`) in its finalized run dependencies, indicating this
+/// package is only intended for Unix systems.
 fn has_unix_virtual_package(output: &Output) -> bool {
-    // Check the recipe's run dependencies
-    let has_unix_in_recipe = output
-        .recipe
-        .requirements()
-        .run
-        .iter()
-        .any(|dep| dep.name().is_some_and(|n| n.as_normalized() == "__unix"));
-
-    if has_unix_in_recipe {
-        return true;
-    }
-
-    // Also check finalized dependencies (in case __unix was added via run exports)
-    if let Some(finalized_deps) = &output.finalized_dependencies {
-        return finalized_deps.run.depends.iter().any(|dep| {
-            if let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) =
-                &dep.spec().name
-            {
-                name.as_normalized() == "__unix"
-            } else {
-                false
-            }
-        });
-    }
-
-    false
+    output.finalized_dependencies.as_ref().is_some_and(|deps| {
+        deps.run.depends.iter().any(|dep| {
+            matches!(
+                &dep.spec().name,
+                Some(rattler_conda_types::PackageNameMatcher::Exact(name))
+                    if ["__unix", "__osx", "__linux", "__glibc"]
+                        .contains(&name.as_normalized())
+            )
+        })
+    })
 }
 
 /// Check if any files are symlinks on Windows
