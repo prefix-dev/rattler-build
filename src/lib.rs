@@ -836,9 +836,7 @@ pub async fn run_build_from_args(
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         debug: output.build_configuration.debug,
                         exclude_newer: output.build_configuration.exclude_newer,
-                        no_log_path_replacement: output
-                            .build_configuration
-                            .no_log_path_replacement,
+                        no_log_path_replacement: output.build_configuration.no_log_path_replacement,
                     },
                     None,
                 )
