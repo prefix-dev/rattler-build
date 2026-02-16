@@ -363,9 +363,7 @@ impl SourceCache {
 
         // Extract if needed and no explicit filename was provided
         // Use actual_filename from Content-Disposition if available to determine if extraction is needed
-        let final_path = if file_name.is_none()
-            && self.should_extract(&cache_path, actual_filename.as_deref())
-        {
+        let final_path = if file_name.is_none() && self.should_extract(&cache_path) {
             let extracted_dir = self.cache_dir.join(format!("{}_extracted", key));
             self.extract_archive(&cache_path, &extracted_dir).await?;
             Some(extracted_dir)
@@ -487,20 +485,27 @@ impl SourceCache {
             handler.on_download_complete(url.as_str());
         }
 
-        Ok((
-            cache_path,
-            actual_filename.or_else(|| Some(filename.to_string())),
-        ))
+        // If Content-Disposition gave us a better filename, rename the cache file
+        // so that downstream code can determine the archive format from the path alone
+        let actual_filename = actual_filename.or_else(|| Some(filename.to_string()));
+        let final_path = if let Some(ref actual) = actual_filename {
+            let new_path = self.cache_dir.join(format!("{}_{}", key, actual));
+            if new_path != cache_path {
+                fs_err::tokio::rename(&cache_path, &new_path).await?;
+                new_path
+            } else {
+                cache_path
+            }
+        } else {
+            cache_path
+        };
+
+        Ok((final_path, actual_filename))
     }
 
-    /// Check if a file should be extracted
-    /// If `actual_filename` is provided (e.g., from Content-Disposition header),
-    /// it will be used to determine if the file is an archive instead of the path's filename
-    pub(crate) fn should_extract(&self, path: &Path, actual_filename: Option<&str>) -> bool {
-        let name = actual_filename
-            .or_else(|| path.file_name().and_then(|n| n.to_str()))
-            .unwrap_or("");
-
+    /// Check if a file should be extracted based on its filename extension
+    pub(crate) fn should_extract(&self, path: &Path) -> bool {
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         is_archive(name)
     }
 
