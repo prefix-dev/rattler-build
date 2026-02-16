@@ -2685,9 +2685,7 @@ def test_topological_sort_with_variants(
     )
 
 
-def test_git_lfs_local_source(
-    rattler_build: RattlerBuild, tmp_path: Path
-):
+def test_git_lfs_local_source(rattler_build: RattlerBuild, tmp_path: Path):
     """
     Tests that git sources with LFS-tracked files work correctly for local repos.
 
