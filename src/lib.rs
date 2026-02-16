@@ -420,7 +420,7 @@ pub async fn get_build_output(
     let target_platform_variants = variant_config
         .variants
         .get(&NormalizedKey("target_platform".into()));
-    if target_platform_variants != None
+    if target_platform_variants.is_some()
         && target_platform_variants
             .map(|v| v != &vec![Variable::from(build_data.target_platform.to_string())])
             .unwrap_or(false)
