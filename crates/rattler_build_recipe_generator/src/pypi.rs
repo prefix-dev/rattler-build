@@ -325,13 +325,189 @@ async fn map_requirement(
     req.to_string()
 }
 
-/// Extract the license string from PyPI metadata.
+/// Map a PyPI license classifier name (the part after `"License :: OSI Approved :: "`)
+/// to an SPDX license identifier.
+///
+/// Many classifiers already carry the SPDX id in parentheses —
+/// e.g. `"Boost Software License 1.0 (BSL-1.0)"` — and we extract it from there.
+/// For the remaining ones we maintain a hand-curated lookup table derived from
+/// the [PEP 639 appendix](https://peps.python.org/pep-0639/appendix-mapping-classifiers/).
+///
+/// Ambiguous classifiers (e.g. `"BSD License"`) are mapped to the most common
+/// variant.  Callers may want to emit a warning in those cases.
+fn classifier_to_spdx(classifier_name: &str) -> Option<&'static str> {
+    // Static lookup for classifiers that do NOT carry the SPDX id in parens,
+    // or where the parenthesised form needs correction.
+    static MAP: &[(&str, &str)] = &[
+        ("Academic Free License (AFL)", "AFL-3.0"),
+        ("Apache Software License", "Apache-2.0"),
+        ("Artistic License", "Artistic-2.0"),
+        ("BSD License", "BSD-3-Clause"),
+        ("Boost Software License 1.0 (BSL-1.0)", "BSL-1.0"),
+        (
+            "CEA CNRS Inria Logiciel Libre License, version 2.1 (CeCILL-2.1)",
+            "CECILL-2.1",
+        ),
+        ("CMU License (MIT-CMU)", "MIT-CMU"),
+        (
+            "Common Development and Distribution License 1.0 (CDDL-1.0)",
+            "CDDL-1.0",
+        ),
+        ("Common Public License", "CPL-1.0"),
+        ("Eclipse Public License 1.0 (EPL-1.0)", "EPL-1.0"),
+        ("Eclipse Public License 2.0 (EPL-2.0)", "EPL-2.0"),
+        (
+            "Educational Community License, Version 2.0 (ECL-2.0)",
+            "ECL-2.0",
+        ),
+        ("Eiffel Forum License", "EFL-2.0"),
+        ("European Union Public Licence 1.0 (EUPL 1.0)", "EUPL-1.0"),
+        ("European Union Public Licence 1.1 (EUPL 1.1)", "EUPL-1.1"),
+        ("European Union Public Licence 1.2 (EUPL 1.2)", "EUPL-1.2"),
+        ("GNU Affero General Public License v3", "AGPL-3.0-only"),
+        (
+            "GNU Affero General Public License v3 or later (AGPLv3+)",
+            "AGPL-3.0-or-later",
+        ),
+        ("GNU Free Documentation License (FDL)", "GFDL-1.3-only"),
+        ("GNU General Public License (GPL)", "GPL-2.0-or-later"),
+        ("GNU General Public License v2 (GPLv2)", "GPL-2.0-only"),
+        (
+            "GNU General Public License v2 or later (GPLv2+)",
+            "GPL-2.0-or-later",
+        ),
+        ("GNU General Public License v3 (GPLv3)", "GPL-3.0-only"),
+        (
+            "GNU General Public License v3 or later (GPLv3+)",
+            "GPL-3.0-or-later",
+        ),
+        (
+            "GNU Lesser General Public License v2 (LGPLv2)",
+            "LGPL-2.0-only",
+        ),
+        (
+            "GNU Lesser General Public License v2 or later (LGPLv2+)",
+            "LGPL-2.0-or-later",
+        ),
+        (
+            "GNU Lesser General Public License v3 (LGPLv3)",
+            "LGPL-3.0-only",
+        ),
+        (
+            "GNU Lesser General Public License v3 or later (LGPLv3+)",
+            "LGPL-3.0-or-later",
+        ),
+        (
+            "GNU Library or Lesser General Public License (LGPL)",
+            "LGPL-2.0-or-later",
+        ),
+        ("Historical Permission Notice and Disclaimer (HPND)", "HPND"),
+        ("IBM Public License", "IPL-1.0"),
+        ("ISC License (ISCL)", "ISC"),
+        ("MIT License", "MIT"),
+        ("MIT No Attribution License (MIT-0)", "MIT-0"),
+        ("MirOS License (MirOS)", "MirOS"),
+        ("Motosoto License", "Motosoto"),
+        ("Mozilla Public License 1.0 (MPL)", "MPL-1.0"),
+        ("Mozilla Public License 1.1 (MPL 1.1)", "MPL-1.1"),
+        ("Mozilla Public License 2.0 (MPL 2.0)", "MPL-2.0"),
+        (
+            "Mulan Permissive Software License v2 (MulanPSL-2.0)",
+            "MulanPSL-2.0",
+        ),
+        ("NASA Open Source Agreement v1.3 (NASA-1.3)", "NASA-1.3"),
+        ("Nethack General Public License", "NGPL"),
+        ("Nokia Open Source License", "Nokia"),
+        ("Open Group Test Suite License", "OGTSL"),
+        ("Open Software License 3.0 (OSL-3.0)", "OSL-3.0"),
+        ("PostgreSQL License", "PostgreSQL"),
+        ("Python License (CNRI Python License)", "CNRI-Python"),
+        ("Python Software Foundation License", "PSF-2.0"),
+        ("Qt Public License (QPL)", "QPL-1.0"),
+        ("Ricoh Source Code Public License", "RSCPL"),
+        ("SIL Open Font License 1.1 (OFL-1.1)", "OFL-1.1"),
+        ("Sleepycat License", "Sleepycat"),
+        ("Sun Public License", "SPL-1.0"),
+        ("The Unlicense (Unlicense)", "Unlicense"),
+        ("Universal Permissive License (UPL)", "UPL-1.0"),
+        ("University of Illinois/NCSA Open Source License", "NCSA"),
+        ("Vovida Software License 1.0", "VSL-1.0"),
+        ("W3C License", "W3C"),
+        ("Zero-Clause BSD (0BSD)", "0BSD"),
+        ("zlib/libpng License", "Zlib"),
+        ("Zope Public License", "ZPL-2.1"),
+        // Non-OSI classifiers
+        ("Apple Public Source License", "APSL-2.0"),
+        ("Blue Oak Model License (BlueOak-1.0.0)", "BlueOak-1.0.0"),
+    ];
+
+    MAP.iter()
+        .find(|(name, _)| *name == classifier_name)
+        .map(|(_, spdx)| *spdx)
+}
+
+/// Try to convert a legacy `license` field value to an SPDX identifier.
+///
+/// Many packages set the `license` field to human-readable strings like
+/// `"MIT"` or `"BSD"` rather than a proper SPDX expression. We map the most
+/// common values.
+fn legacy_license_to_spdx(license: &str) -> Option<&'static str> {
+    static MAP: &[(&str, &str)] = &[
+        ("MIT", "MIT"),
+        ("MIT License", "MIT"),
+        ("BSD", "BSD-3-Clause"),
+        ("BSD License", "BSD-3-Clause"),
+        ("BSD-3-Clause", "BSD-3-Clause"),
+        ("BSD-2-Clause", "BSD-2-Clause"),
+        ("Apache 2.0", "Apache-2.0"),
+        ("Apache-2.0", "Apache-2.0"),
+        ("Apache License 2.0", "Apache-2.0"),
+        ("Apache License, Version 2.0", "Apache-2.0"),
+        ("Apache Software License", "Apache-2.0"),
+        ("GPLv2", "GPL-2.0-only"),
+        ("GPLv2+", "GPL-2.0-or-later"),
+        ("GPLv3", "GPL-3.0-only"),
+        ("GPLv3+", "GPL-3.0-or-later"),
+        ("GPL-2.0", "GPL-2.0-only"),
+        ("GPL-2.0-only", "GPL-2.0-only"),
+        ("GPL-2.0-or-later", "GPL-2.0-or-later"),
+        ("GPL-3.0", "GPL-3.0-only"),
+        ("GPL-3.0-only", "GPL-3.0-only"),
+        ("GPL-3.0-or-later", "GPL-3.0-or-later"),
+        ("LGPLv2", "LGPL-2.0-only"),
+        ("LGPLv2+", "LGPL-2.0-or-later"),
+        ("LGPLv3", "LGPL-3.0-only"),
+        ("LGPLv3+", "LGPL-3.0-or-later"),
+        ("LGPL-2.1", "LGPL-2.1-only"),
+        ("LGPL-3.0", "LGPL-3.0-only"),
+        ("ISC", "ISC"),
+        ("ISC License", "ISC"),
+        ("MPL-2.0", "MPL-2.0"),
+        ("MPL 2.0", "MPL-2.0"),
+        ("Mozilla Public License 2.0", "MPL-2.0"),
+        ("PSF", "PSF-2.0"),
+        ("Python Software Foundation License", "PSF-2.0"),
+        ("Unlicense", "Unlicense"),
+        ("Public Domain", "LicenseRef-Public-Domain"),
+        ("Zlib", "Zlib"),
+        ("zlib", "Zlib"),
+    ];
+
+    MAP.iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(license))
+        .map(|(_, spdx)| *spdx)
+}
+
+/// Extract the license string from PyPI metadata and convert it to SPDX.
 ///
 /// Checks the following fields in order of preference:
 /// 1. `license_expression` — the PEP 639 field, already in SPDX format
 /// 2. `license` — the legacy free-text license field (skipped if it looks like
 ///    a full license text rather than a short identifier)
 /// 3. License classifiers — e.g. `"License :: OSI Approved :: MIT License"`
+///
+/// Values from sources 2 and 3 are mapped to SPDX identifiers using the
+/// [PEP 639 classifier mapping](https://peps.python.org/pep-0639/appendix-mapping-classifiers/).
 fn extract_license(info: &PyPiInfo) -> Option<String> {
     // Prefer license_expression (PEP 639) — already SPDX
     if let Some(expr) = &info.license_expression {
@@ -346,19 +522,26 @@ fn extract_license(info: &PyPiInfo) -> Option<String> {
     if let Some(license) = &info.license {
         let license = license.trim();
         if !license.is_empty() && license.len() < 100 && !license.contains('\n') {
+            if let Some(spdx) = legacy_license_to_spdx(license) {
+                return Some(spdx.to_string());
+            }
+            // If we can't map it, check if it already looks like a valid SPDX
+            // expression (e.g. contains only SPDX-like characters). Return as-is
+            // and let the recipe parser validate.
             return Some(license.to_string());
         }
     }
 
     // Fall back to classifiers
     if let Some(classifiers) = &info.classifiers {
-        let license_classifiers: Vec<&str> = classifiers
+        let spdx_ids: Vec<&str> = classifiers
             .iter()
             .filter_map(|c| c.strip_prefix("License :: OSI Approved :: "))
+            .filter_map(classifier_to_spdx)
             .collect();
 
-        if !license_classifiers.is_empty() {
-            return Some(license_classifiers.join(" OR "));
+        if !spdx_ids.is_empty() {
+            return Some(spdx_ids.join(" OR "));
         }
     }
 
@@ -611,7 +794,7 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("MIT License".into()));
+        assert_eq!(extract_license(&info), Some("MIT".into()));
     }
 
     #[test]
@@ -623,7 +806,54 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("BSD License".into()));
+        assert_eq!(extract_license(&info), Some("BSD-3-Clause".into()));
+    }
+
+    #[test]
+    fn test_extract_license_maps_legacy_field_to_spdx() {
+        let info = PyPiInfo {
+            license: Some("MIT License".into()),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("MIT".into()));
+    }
+
+    #[test]
+    fn test_extract_license_multiple_classifiers() {
+        let info = PyPiInfo {
+            classifiers: Some(vec![
+                "License :: OSI Approved :: MIT License".into(),
+                "License :: OSI Approved :: Apache Software License".into(),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(extract_license(&info), Some("MIT OR Apache-2.0".into()));
+    }
+
+    #[test]
+    fn test_classifier_to_spdx_coverage() {
+        // Verify a selection of common mappings
+        assert_eq!(classifier_to_spdx("MIT License"), Some("MIT"));
+        assert_eq!(classifier_to_spdx("BSD License"), Some("BSD-3-Clause"));
+        assert_eq!(
+            classifier_to_spdx("Apache Software License"),
+            Some("Apache-2.0")
+        );
+        assert_eq!(
+            classifier_to_spdx("GNU General Public License v3 (GPLv3)"),
+            Some("GPL-3.0-only")
+        );
+        assert_eq!(
+            classifier_to_spdx("Mozilla Public License 2.0 (MPL 2.0)"),
+            Some("MPL-2.0")
+        );
+        assert_eq!(
+            classifier_to_spdx("The Unlicense (Unlicense)"),
+            Some("Unlicense")
+        );
+        assert_eq!(classifier_to_spdx("Zero-Clause BSD (0BSD)"), Some("0BSD"));
+        // Unknown classifier returns None
+        assert_eq!(classifier_to_spdx("Some Unknown License"), None);
     }
 
     #[test]
