@@ -16,11 +16,9 @@ import sys
 from pathlib import Path
 
 from rattler_build.progress import RichProgressCallback
-from rattler_build.render import RenderConfig
 
 # Import rattler_build components
 from rattler_build.stage0 import Stage0Recipe
-from rattler_build.tool_config import PlatformConfig
 from rattler_build.variant_config import VariantConfig
 
 
@@ -32,18 +30,14 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
     """
     print(f"🔍 Loading recipe from {recipe_path}")
 
-    # Load the recipe
+    # Load the recipe — recipe_path is inferred automatically from the file
     recipe = Stage0Recipe.from_file(recipe_path)
 
     # Configure variant rendering
     variant_config = VariantConfig()
-    # Set recipe_path so the build can find license files, etc.
-    # target_platform defaults to current platform if not specified
-    platform_config = PlatformConfig(recipe_path=str(recipe_path))
-    render_config = RenderConfig(platform=platform_config)
 
     print("\n📋 Rendering recipe variants...")
-    rendered_variants = recipe.render(variant_config, render_config)
+    rendered_variants = recipe.render(variant_config)
     print(f"✅ Rendered {len(rendered_variants)} variant(s)")
 
     # Build each variant with progress reporting
@@ -67,7 +61,7 @@ def build_recipe_with_rich_progress(recipe_path: Path) -> None:
             import tempfile
 
             with tempfile.TemporaryDirectory() as tmpdir:
-                result = variant.run_build(progress_callback=callback, output_dir=Path(tmpdir), recipe_path=recipe_path)
+                result = variant.run_build(progress_callback=callback, output_dir=Path(tmpdir))
 
                 # Display build result information
                 print("\n" + "=" * 60)
