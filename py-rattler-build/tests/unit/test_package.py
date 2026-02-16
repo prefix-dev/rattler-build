@@ -286,8 +286,8 @@ class TestRunTests:
 
 
 @pytest.mark.skipif(
-    not (platform.system() == "Darwin" and platform.machine() == "arm64"),
-    reason="Only runs on macOS arm64",
+    not (platform.system() == "Linux" and platform.machine() == "x86_64"),
+    reason="Only runs on Linux x86_64 due to the specific package being tested",
 )
 class TestLegacyV0Tests:
     """Tests for running legacy (conda-build v0) test scripts from packages."""
@@ -295,8 +295,8 @@ class TestLegacyV0Tests:
     @pytest.fixture
     def v0_package(self, tmp_path: Path) -> Path:
         """Download a v0 package with legacy test scripts."""
-        url = "https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py39he7485ab_3.conda"
-        dest = tmp_path / "zstandard-0.23.0-py39he7485ab_3.conda"
+        url = "https://prefix.dev/conda-forge/linux-64/zstandard-0.23.0-py39h08a7858_1.conda"
+        dest = tmp_path / "zstandard-0.23.0-py39h08a7858_1.conda"
         urllib.request.urlretrieve(url, dest)
         return dest
 

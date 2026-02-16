@@ -206,21 +206,21 @@ impl Tests {
         );
         let tmp_dir = tempfile::tempdir()?;
 
+        // copy all test files to a temporary directory and set it as the working
+        // directory
+        CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
+            TestError::IoError(std::io::Error::other(format!(
+                "Failed to copy test files: {}",
+                e
+            )))
+        })?;
+
         match self {
             Tests::Commands(path) => {
                 let script = Script {
                     content: ScriptContent::Path(path.clone()),
                     ..Script::default()
                 };
-
-                // copy all test files to a temporary directory and set it as the working
-                // directory
-                CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
-                    TestError::IoError(std::io::Error::other(format!(
-                        "Failed to copy test files: {}",
-                        e
-                    )))
-                })?;
 
                 script
                     .run_script(
@@ -242,15 +242,6 @@ impl Tests {
                     interpreter: Some("python".into()),
                     ..Script::default()
                 };
-
-                // copy all test files to a temporary directory and set it as the working
-                // directory
-                CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
-                    TestError::IoError(std::io::Error::other(format!(
-                        "Failed to copy test files: {}",
-                        e
-                    )))
-                })?;
 
                 script
                     .run_script(
@@ -519,35 +510,6 @@ pub async fn run_test(
 
     let has_legacy_tests = package_folder.join("info/test").exists();
     let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
-
-    if !has_legacy_tests && !has_modern_tests {
-        // List what we found in the info/ directory for diagnostics
-        let info_dir = package_folder.join("info");
-        if info_dir.exists() {
-            let entries: Vec<String> = fs_err::read_dir(&info_dir)?
-                .filter_map(|e| e.ok())
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .collect();
-            tracing::warn!(
-                "No tests found in package. Contents of info/: [{}]",
-                entries.join(", ")
-            );
-            tracing::warn!(
-                "Expected either `info/test/` (conda-build format with run_test.sh/run_test.py) \
-                 or `info/tests/tests.yaml` (rattler-build format)"
-            );
-
-            // Check if there's a conda-build recipe without embedded tests
-            if info_dir.join("recipe").join("meta.yaml").exists() {
-                tracing::warn!(
-                    "Found `info/recipe/meta.yaml` (conda-build recipe), but no embedded test \
-                     files in `info/test/`. The recipe may define tests that were not included \
-                     in the package."
-                );
-            }
-        }
-        return Err(TestError::NoTestsFound);
-    }
 
     // Run legacy tests (conda-build v0 format: info/test/)
     if has_legacy_tests {
