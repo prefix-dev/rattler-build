@@ -187,8 +187,11 @@ pub async fn run_build(
     }
 
     // Check for symlinks on Windows if not allowed
+    // Skip the check for noarch packages that have __unix in run dependencies,
+    // since they will never be installed on Windows.
     if (output.build_configuration.target_platform.is_windows()
-        || output.build_configuration.target_platform == Platform::NoArch)
+        || (output.build_configuration.target_platform == Platform::NoArch
+            && !has_unix_virtual_package(&output)))
         && !tool_configuration.allow_symlinks_on_windows
     {
         tracing::info!("Checking for symlinks ...");
@@ -241,6 +244,37 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
     }
 
     Ok(())
+}
+
+/// Check if the output has a `__unix` virtual package in its run dependencies,
+/// indicating this package is only intended for Unix systems.
+fn has_unix_virtual_package(output: &Output) -> bool {
+    // Check the recipe's run dependencies
+    let has_unix_in_recipe = output
+        .recipe
+        .requirements()
+        .run
+        .iter()
+        .any(|dep| dep.name().is_some_and(|n| n.as_normalized() == "__unix"));
+
+    if has_unix_in_recipe {
+        return true;
+    }
+
+    // Also check finalized dependencies (in case __unix was added via run exports)
+    if let Some(finalized_deps) = &output.finalized_dependencies {
+        return finalized_deps.run.depends.iter().any(|dep| {
+            if let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) =
+                &dep.spec().name
+            {
+                name.as_normalized() == "__unix"
+            } else {
+                false
+            }
+        });
+    }
+
+    false
 }
 
 /// Check if any files are symlinks on Windows
