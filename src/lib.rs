@@ -416,6 +416,21 @@ pub async fn get_build_output(
             miette::Report::new(e)
         })?;
 
+    // Warn if target_platform is set in variant config - it's not supported and will be ignored
+    let target_platform_variants = variant_config
+        .variants
+        .get(&NormalizedKey("target_platform".into()));
+    if target_platform_variants.is_some()
+        && target_platform_variants
+            .map(|v| v != &vec![Variable::from(build_data.target_platform.to_string())])
+            .unwrap_or(false)
+    {
+        tracing::warn!(
+            "Setting 'target_platform' in a variant config file is not supported and will be ignored. \
+            Please use the '--target-platform' command-line flag to specify the target platform."
+        );
+    }
+
     // Always insert target_platform and build_platform
     variant_config.variants.insert(
         "target_platform".into(),

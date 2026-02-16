@@ -781,4 +781,42 @@ requirements:
 
         assert!(rattler_build.status.success());
     }
+
+    #[test]
+    fn test_target_platform_in_variant_config_warning() {
+        let tmp = tmp("test_target_platform_warning");
+        let variant_config_path = test_data_dir()
+            .join("variant_files/variant_with_target_platform.yaml")
+            .display()
+            .to_string();
+
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipes().join("binary_prefix_test").display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+            "--variant-config",
+            &variant_config_path,
+            "--render-only",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        // Check that the warning message appears
+        assert!(
+            output.contains("Setting 'target_platform' in a variant config file is not supported"),
+            "Expected warning about target_platform not being supported in variant config"
+        );
+        assert!(
+            output.contains("Please use the '--target-platform' command-line flag"),
+            "Expected suggestion to use --target-platform flag"
+        );
+    }
 }
