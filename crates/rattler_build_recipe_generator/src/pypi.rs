@@ -333,9 +333,30 @@ async fn map_requirement(
 /// For the remaining ones we maintain a hand-curated lookup table derived from
 /// the [PEP 639 appendix](https://peps.python.org/pep-0639/appendix-mapping-classifiers/).
 ///
-/// Ambiguous classifiers (e.g. `"BSD License"`) are mapped to the most common
-/// variant.  Callers may want to emit a warning in those cases.
-fn classifier_to_spdx(classifier_name: &str) -> Option<&'static str> {
+/// Returns `(spdx_id, ambiguous)` where `ambiguous` is `true` for classifiers
+/// that PEP 639 flags as not specifying a particular version/variant.
+fn classifier_to_spdx(classifier_name: &str) -> Option<(&'static str, bool)> {
+    // Classifiers that PEP 639 considers ambiguous — they don't specify the
+    // particular version or variant.  We still map them to the most common
+    // SPDX id, but flag them so callers can warn.
+    // See: https://peps.python.org/pep-0639/appendix-mapping-classifiers/
+    static AMBIGUOUS: &[&str] = &[
+        "Academic Free License (AFL)",
+        "Apache Software License",
+        "Apple Public Source License",
+        "Artistic License",
+        "BSD License",
+        "GNU Affero General Public License v3",
+        "GNU Free Documentation License (FDL)",
+        "GNU General Public License (GPL)",
+        "GNU General Public License v2 (GPLv2)",
+        "GNU General Public License v3 (GPLv3)",
+        "GNU Lesser General Public License v2 (LGPLv2)",
+        "GNU Lesser General Public License v2 or later (LGPLv2+)",
+        "GNU Lesser General Public License v3 (LGPLv3)",
+        "GNU Library or Lesser General Public License (LGPL)",
+    ];
+
     // Static lookup for classifiers that do NOT carry the SPDX id in parens,
     // or where the parenthesised form needs correction.
     static MAP: &[(&str, &str)] = &[
@@ -443,7 +464,10 @@ fn classifier_to_spdx(classifier_name: &str) -> Option<&'static str> {
 
     MAP.iter()
         .find(|(name, _)| *name == classifier_name)
-        .map(|(_, spdx)| *spdx)
+        .map(|(_, spdx)| {
+            let ambiguous = AMBIGUOUS.contains(&classifier_name);
+            (*spdx, ambiguous)
+        })
 }
 
 /// Try to convert a legacy `license` field value to an SPDX identifier.
@@ -498,6 +522,14 @@ fn legacy_license_to_spdx(license: &str) -> Option<&'static str> {
         .map(|(_, spdx)| *spdx)
 }
 
+/// Result of license extraction: the SPDX expression and an optional warning.
+struct ExtractedLicense {
+    /// The SPDX license expression.
+    spdx: String,
+    /// If set, a warning that the license mapping was ambiguous.
+    warning: Option<String>,
+}
+
 /// Extract the license string from PyPI metadata and convert it to SPDX.
 ///
 /// Checks the following fields in order of preference:
@@ -508,12 +540,15 @@ fn legacy_license_to_spdx(license: &str) -> Option<&'static str> {
 ///
 /// Values from sources 2 and 3 are mapped to SPDX identifiers using the
 /// [PEP 639 classifier mapping](https://peps.python.org/pep-0639/appendix-mapping-classifiers/).
-fn extract_license(info: &PyPiInfo) -> Option<String> {
+fn extract_license(info: &PyPiInfo) -> Option<ExtractedLicense> {
     // Prefer license_expression (PEP 639) — already SPDX
     if let Some(expr) = &info.license_expression {
         let expr = expr.trim();
         if !expr.is_empty() {
-            return Some(expr.to_string());
+            return Some(ExtractedLicense {
+                spdx: expr.to_string(),
+                warning: None,
+            });
         }
     }
 
@@ -523,25 +558,54 @@ fn extract_license(info: &PyPiInfo) -> Option<String> {
         let license = license.trim();
         if !license.is_empty() && license.len() < 100 && !license.contains('\n') {
             if let Some(spdx) = legacy_license_to_spdx(license) {
-                return Some(spdx.to_string());
+                return Some(ExtractedLicense {
+                    spdx: spdx.to_string(),
+                    warning: None,
+                });
             }
-            // If we can't map it, check if it already looks like a valid SPDX
-            // expression (e.g. contains only SPDX-like characters). Return as-is
-            // and let the recipe parser validate.
-            return Some(license.to_string());
+            // If we can't map it, return as-is and let the recipe parser validate.
+            return Some(ExtractedLicense {
+                spdx: license.to_string(),
+                warning: None,
+            });
         }
     }
 
     // Fall back to classifiers
     if let Some(classifiers) = &info.classifiers {
-        let spdx_ids: Vec<&str> = classifiers
+        let mapped: Vec<(&str, &str, bool)> = classifiers
             .iter()
             .filter_map(|c| c.strip_prefix("License :: OSI Approved :: "))
-            .filter_map(classifier_to_spdx)
+            .filter_map(|name| classifier_to_spdx(name).map(|(spdx, amb)| (name, spdx, amb)))
             .collect();
 
-        if !spdx_ids.is_empty() {
-            return Some(spdx_ids.join(" OR "));
+        if !mapped.is_empty() {
+            let spdx_ids: Vec<&str> = mapped.iter().map(|(_, spdx, _)| *spdx).collect();
+            let ambiguous: Vec<&str> = mapped
+                .iter()
+                .filter(|(_, _, amb)| *amb)
+                .map(|(name, _, _)| *name)
+                .collect();
+
+            let warning = if !ambiguous.is_empty() {
+                let classifiers_str = ambiguous
+                    .iter()
+                    .map(|c| format!("  - {c}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Some(format!(
+                    "WARNING: The following PyPI classifier(s) are ambiguous (per PEP 639)\n\
+                     and may not map to the correct SPDX license. Please verify:\n\
+                     {classifiers_str}"
+                ))
+            } else {
+                None
+            };
+
+            return Some(ExtractedLicense {
+                spdx: spdx_ids.join(" OR "),
+                warning,
+            });
         }
     }
 
@@ -669,7 +733,18 @@ pub async fn create_recipe(
     recipe.about.summary = metadata.info.summary.clone();
     recipe.about.description = metadata.info.description.clone();
     recipe.about.homepage = metadata.info.home_page.clone();
-    recipe.about.license = extract_license(&metadata.info);
+    if let Some(extracted) = extract_license(&metadata.info) {
+        if let Some(warning) = &extracted.warning {
+            tracing::warn!(
+                "Ambiguous PyPI license classifier for '{}': mapped to '{}' — please verify.\n{}",
+                metadata.info.name,
+                extracted.spdx,
+                warning
+            );
+        }
+        recipe.about.license_warning = extracted.warning;
+        recipe.about.license = Some(extracted.spdx);
+    }
 
     if let Some(urls) = &metadata.info.project_urls {
         recipe.about.repository = urls.get("Source Code").cloned();
@@ -763,6 +838,16 @@ mod tests {
         assert_yaml_snapshot!(recipe);
     }
 
+    /// Helper: extract just the SPDX string from `extract_license`.
+    fn extract_spdx(info: &PyPiInfo) -> Option<String> {
+        extract_license(info).map(|e| e.spdx)
+    }
+
+    /// Helper: extract the warning from `extract_license`.
+    fn extract_warning(info: &PyPiInfo) -> Option<String> {
+        extract_license(info).and_then(|e| e.warning)
+    }
+
     #[test]
     fn test_extract_license_prefers_license_expression() {
         let info = PyPiInfo {
@@ -773,7 +858,8 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("GPL-2.0-or-later".into()));
+        assert_eq!(extract_spdx(&info), Some("GPL-2.0-or-later".into()));
+        assert_eq!(extract_warning(&info), None);
     }
 
     #[test]
@@ -782,7 +868,7 @@ mod tests {
             license: Some("MIT".into()),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("MIT".into()));
+        assert_eq!(extract_spdx(&info), Some("MIT".into()));
     }
 
     #[test]
@@ -794,7 +880,9 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("MIT".into()));
+        assert_eq!(extract_spdx(&info), Some("MIT".into()));
+        // MIT License is not ambiguous
+        assert_eq!(extract_warning(&info), None);
     }
 
     #[test]
@@ -806,7 +894,9 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("BSD-3-Clause".into()));
+        assert_eq!(extract_spdx(&info), Some("BSD-3-Clause".into()));
+        // BSD License is ambiguous per PEP 639
+        assert!(extract_warning(&info).is_some());
     }
 
     #[test]
@@ -815,7 +905,7 @@ mod tests {
             license: Some("MIT License".into()),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("MIT".into()));
+        assert_eq!(extract_spdx(&info), Some("MIT".into()));
     }
 
     #[test]
@@ -827,31 +917,42 @@ mod tests {
             ]),
             ..Default::default()
         };
-        assert_eq!(extract_license(&info), Some("MIT OR Apache-2.0".into()));
+        assert_eq!(extract_spdx(&info), Some("MIT OR Apache-2.0".into()));
+        // Apache Software License is ambiguous
+        let warning = extract_warning(&info).unwrap();
+        assert!(warning.contains("Apache Software License"));
+        // MIT License is not ambiguous, so it shouldn't be in the warning
+        assert!(!warning.contains("MIT License"));
     }
 
     #[test]
     fn test_classifier_to_spdx_coverage() {
         // Verify a selection of common mappings
-        assert_eq!(classifier_to_spdx("MIT License"), Some("MIT"));
-        assert_eq!(classifier_to_spdx("BSD License"), Some("BSD-3-Clause"));
+        assert_eq!(classifier_to_spdx("MIT License"), Some(("MIT", false)));
+        assert_eq!(
+            classifier_to_spdx("BSD License"),
+            Some(("BSD-3-Clause", true))
+        );
         assert_eq!(
             classifier_to_spdx("Apache Software License"),
-            Some("Apache-2.0")
+            Some(("Apache-2.0", true))
         );
         assert_eq!(
             classifier_to_spdx("GNU General Public License v3 (GPLv3)"),
-            Some("GPL-3.0-only")
+            Some(("GPL-3.0-only", true))
         );
         assert_eq!(
             classifier_to_spdx("Mozilla Public License 2.0 (MPL 2.0)"),
-            Some("MPL-2.0")
+            Some(("MPL-2.0", false))
         );
         assert_eq!(
             classifier_to_spdx("The Unlicense (Unlicense)"),
-            Some("Unlicense")
+            Some(("Unlicense", false))
         );
-        assert_eq!(classifier_to_spdx("Zero-Clause BSD (0BSD)"), Some("0BSD"));
+        assert_eq!(
+            classifier_to_spdx("Zero-Clause BSD (0BSD)"),
+            Some(("0BSD", false))
+        );
         // Unknown classifier returns None
         assert_eq!(classifier_to_spdx("Some Unknown License"), None);
     }
@@ -859,7 +960,7 @@ mod tests {
     #[test]
     fn test_extract_license_none_when_empty() {
         let info = PyPiInfo::default();
-        assert_eq!(extract_license(&info), None);
+        assert!(extract_license(&info).is_none());
     }
 
     #[tokio::test]
