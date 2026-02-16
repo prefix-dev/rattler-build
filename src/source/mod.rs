@@ -174,6 +174,7 @@ pub(crate) fn convert_git_source(
         reference,
         git_src.depth,
         git_src.lfs,
+        git_src.submodules,
     ))
 }
 

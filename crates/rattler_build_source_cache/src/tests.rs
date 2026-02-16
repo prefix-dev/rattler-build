@@ -130,12 +130,13 @@ mod source_cache_tests {
         let url = url::Url::parse("https://github.com/example/repo.git").unwrap();
         let reference = GitReference::Branch("main".to_string());
 
-        let git_source = GitSource::new(url.clone(), reference.clone(), Some(1), false);
+        let git_source = GitSource::new(url.clone(), reference.clone(), Some(1), false, true);
 
         assert_eq!(git_source.url, url);
         assert_eq!(git_source.reference, reference);
         assert_eq!(git_source.depth, Some(1));
         assert!(!git_source.lfs);
+        assert!(git_source.submodules);
 
         let git_url = git_source.to_git_url();
         assert_eq!(git_url.repository(), &url);
