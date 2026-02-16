@@ -2428,7 +2428,9 @@ def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert (pkg / "info/index.json").exists()
 
 
-def test_simple_powershell_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_simple_powershell_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
     rattler_build.build(
         recipes / "simple-powershell-test/recipe.yaml",
         tmp_path,
@@ -2449,7 +2451,8 @@ def test_powershell(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
 
 
 @pytest.mark.skipif(
-    platform.system() != "Windows", reason="powershell default test only relevant on Windows"
+    platform.system() != "Windows",
+    reason="powershell default test only relevant on Windows",
 )
 def test_powershell_default(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
