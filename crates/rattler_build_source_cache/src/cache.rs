@@ -126,7 +126,7 @@ impl SourceCache {
 
         // Handle LFS if needed
         if source.lfs {
-            self.git_lfs_pull(&repo_path).await?;
+            self.git_lfs_pull(&repo_path, &source.url).await?;
         }
 
         // Create cache entry
@@ -157,7 +157,11 @@ impl SourceCache {
     }
 
     /// Pull LFS files for a git repository
-    async fn git_lfs_pull(&self, repo_path: &Path) -> Result<(), CacheError> {
+    async fn git_lfs_pull(
+        &self,
+        repo_path: &Path,
+        source_url: &url::Url,
+    ) -> Result<(), CacheError> {
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
@@ -170,7 +174,38 @@ impl SourceCache {
             return Err(CacheError::Git("git-lfs not installed".to_string()));
         }
 
-        // Fetch LFS files
+        // Point git-lfs at the original source via `lfs.url` config.
+        // The checkout's origin remote points to the local bare database
+        // (set by `git clone --local`), which doesn't have LFS objects.
+        // We use lfs.url rather than modifying origin so only LFS is affected.
+        // For file:// URLs, convert to a plain local path because git-lfs does
+        // not handle the file:// protocol correctly (especially on Windows).
+        let lfs_url = if source_url.scheme() == "file" {
+            source_url
+                .to_file_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| source_url.as_str().to_string())
+        } else {
+            source_url.as_str().to_string()
+        };
+
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .arg("config")
+            .arg("lfs.url")
+            .arg(&lfs_url)
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("Failed to configure lfs.url: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(CacheError::Git(format!(
+                "Failed to configure lfs.url: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        // Fetch LFS files from the configured lfs.url.
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
