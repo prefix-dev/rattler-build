@@ -333,8 +333,12 @@ pub async fn create_recipe(
     recipe
         .context
         .insert("version".to_string(), metadata.info.version.clone());
+    recipe
+        .context
+        .insert("build_number".to_string(), "0".to_string());
     recipe.package.name = metadata.info.name.to_lowercase();
     recipe.package.version = "${{ version }}".to_string();
+    recipe.build.number = "${{ build_number }}".to_string();
 
     // replace URL with the shorter version that does not contain the hash
     let release_url = if metadata
