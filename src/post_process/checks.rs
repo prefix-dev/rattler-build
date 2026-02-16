@@ -317,7 +317,10 @@ fn add_windows_system_libs(
     let subdir = output.build_configuration.target_platform.to_string();
 
     // Load dsolists from both build and host prefixes
-    let (build_allow, build_deny) = load_dsolists(&output.build_configuration.directories.build_prefix, &subdir);
+    let (build_allow, build_deny) = load_dsolists(
+        &output.build_configuration.directories.build_prefix,
+        &subdir,
+    );
     let (host_allow, host_deny) = load_dsolists(output.prefix(), &subdir);
 
     let mut all_allow: Vec<String> = build_allow.into_iter().chain(host_allow).collect();
@@ -326,11 +329,7 @@ fn add_windows_system_libs(
     if all_allow.is_empty() && all_deny.is_empty() {
         // No dsolists found: fall back to hardcoded WIN_ALLOWLIST
         for pattern in WIN_ALLOWLIST {
-            allow_builder.add(
-                GlobBuilder::new(pattern)
-                    .case_insensitive(true)
-                    .build()?,
-            );
+            allow_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
         }
         return Ok(());
     }
@@ -344,19 +343,11 @@ fn add_windows_system_libs(
     let expanded_deny = expand_dsolist(&all_deny);
 
     for pattern in &expanded_allow {
-        allow_builder.add(
-            GlobBuilder::new(pattern)
-                .case_insensitive(true)
-                .build()?,
-        );
+        allow_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
     }
 
     for pattern in &expanded_deny {
-        deny_builder.add(
-            GlobBuilder::new(pattern)
-                .case_insensitive(true)
-                .build()?,
-        );
+        deny_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
     }
 
     Ok(())
