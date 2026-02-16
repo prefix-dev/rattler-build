@@ -38,7 +38,7 @@ impl LockManager {
 
         // Create locks directory if it doesn't exist
         if !locks_dir.exists() {
-            tokio::fs::create_dir_all(&locks_dir).await?;
+            fs_err::tokio::create_dir_all(&locks_dir).await?;
         }
 
         Ok(Self { locks_dir })
@@ -136,7 +136,7 @@ impl LockManager {
 
     /// Clean up stale lock files
     pub async fn cleanup_stale_locks(&self) -> Result<(), CacheError> {
-        let mut dir = tokio::fs::read_dir(&self.locks_dir).await?;
+        let mut dir = fs_err::tokio::read_dir(&self.locks_dir).await?;
 
         while let Some(entry) = dir.next_entry().await? {
             if let Some(filename) = entry.file_name().to_str()

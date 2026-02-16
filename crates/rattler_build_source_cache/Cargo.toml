@@ -15,7 +15,7 @@ rustls-tls = ["rattler_build_networking/rustls-tls"]
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-fs-err = { workspace = true }
+fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
 rattler_prefix_guard = { path = "../rattler_prefix_guard" }
 reqwest = { workspace = true, features = ["stream"] }

@@ -97,13 +97,13 @@ mod source_cache_tests {
         fs_err::write(&file_path, data).unwrap();
 
         // Validate should succeed
-        assert!(checksum.validate(&file_path));
+        assert!(checksum.validate(&file_path).is_ok());
 
         // Write different data
         fs_err::write(&file_path, b"different data").unwrap();
 
         // Validate should fail
-        assert!(!checksum.validate(&file_path));
+        assert!(checksum.validate(&file_path).is_err());
     }
 
     #[tokio::test]

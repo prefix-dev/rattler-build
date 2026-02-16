@@ -484,6 +484,12 @@ fn discover_new_variant_keys_from_evaluation(
             } else {
                 (context.clone(), IndexMap::new())
             };
+
+            // Evaluate top-level skip conditions once (inherited by all outputs)
+            let toplevel_skipped =
+                crate::stage0::evaluate::evaluate_skip_list(&recipe.build.skip, &context_with_vars)
+                    .unwrap_or_default();
+
             let mut all_free_specs = Vec::new();
             for output in &recipe.outputs {
                 // For package outputs, check if the output should be skipped before
@@ -492,15 +498,16 @@ fn discover_new_variant_keys_from_evaluation(
                 let (reqs, should_skip) = match output {
                     stage0::Output::Staging(staging) => {
                         // Staging outputs don't have skip conditions
-                        (&staging.requirements, false)
+                        (&staging.requirements, toplevel_skipped)
                     }
                     stage0::Output::Package(pkg) => {
-                        // Evaluate skip conditions to determine if output should be skipped
-                        let is_skipped = crate::stage0::evaluate::evaluate_skip_list(
-                            &pkg.build.skip,
-                            &context_with_vars,
-                        )
-                        .unwrap_or_default();
+                        // Evaluate skip conditions: combine top-level and output skip (OR logic)
+                        let is_skipped = toplevel_skipped
+                            || crate::stage0::evaluate::evaluate_skip_list(
+                                &pkg.build.skip,
+                                &context_with_vars,
+                            )
+                            .unwrap_or_default();
                         (&pkg.requirements, is_skipped)
                     }
                 };
@@ -2330,6 +2337,148 @@ build:
             !rendered[0].recipe.build.skip,
             "Recipe with `skip: target_platform == \"noarch\"` should NOT be skipped \
              when building on linux-64"
+        );
+    }
+
+    #[test]
+    fn test_toplevel_skip_inherited_by_outputs_during_variant_discovery() {
+        // Regression test for GitHub issue #2110
+        // When a multi-output recipe has a top-level skip condition that references
+        // a variant key (e.g., match(python, "<3.11")), ALL outputs should be skipped
+        // for matching variants — even outputs that define their own output-level skip.
+        //
+        // Additionally, variant keys used in top-level skip conditions should be
+        // discovered and included in the variant matrix.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+  skip:
+    - match(python, "<3.11")
+
+outputs:
+  - package:
+      name: ${{ name }}
+    requirements:
+      host:
+        - python
+      run:
+        - python
+
+  - package:
+      name: ${{ name }}-tests
+    build:
+      skip:
+        - win
+    requirements:
+      run:
+        - python
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        let variant_yaml = r#"
+python:
+  - "3.10"
+  - "3.11"
+  - "3.12"
+"#;
+        let variant_config =
+            VariantConfig::from_yaml_str(variant_yaml).expect("Failed to parse variant config");
+
+        // On Linux: python 3.10 should be skipped entirely (top-level skip),
+        // python 3.11 and 3.12 should each produce 2 outputs
+        let config_linux =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+        let rendered_linux =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_linux)
+                .unwrap();
+        // 2 python versions * 2 outputs = 4
+        assert_eq!(
+            rendered_linux.len(),
+            4,
+            "Expected 4 outputs on Linux (py3.10 skipped, py3.11+3.12 x 2 outputs). Got {}",
+            rendered_linux.len()
+        );
+
+        // On Windows: python 3.10 skipped by top-level match(python, "<3.11"),
+        // tests output skipped by output-level "win", so only the main package
+        // for python 3.11 and 3.12
+        let config_win =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let rendered_win =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win).unwrap();
+        // 2 python versions * 1 output (tests skipped on win) = 2
+        assert_eq!(
+            rendered_win.len(),
+            2,
+            "Expected 2 outputs on Windows (py3.10 skipped, tests skipped on win). Got {}",
+            rendered_win.len()
+        );
+        for rv in &rendered_win {
+            assert_eq!(rv.recipe.package.name.as_normalized(), "test-pkg");
+        }
+    }
+
+    #[test]
+    fn test_toplevel_skip_prevents_requirement_evaluation_in_multi_output() {
+        // When a top-level skip fires (e.g., skip: win), outputs should NOT have
+        // their requirements evaluated — even if the output has no skip of its own.
+        // This prevents errors from platform-specific functions like stdlib('c').
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: test-pkg-split
+  version: "1.0.0"
+
+build:
+  number: 0
+  skip:
+    - win
+
+outputs:
+  - package:
+      name: test-pkg
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+
+  - package:
+      name: test-pkg-extra
+    build:
+      skip:
+        - osx
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // On Windows: top-level skip: win should prevent requirement evaluation
+        // for all outputs, avoiding stdlib('c') errors
+        let config_win =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win);
+        assert!(
+            result.is_ok(),
+            "Top-level skip should prevent requirement evaluation on Windows. Error: {:?}",
+            result.err()
+        );
+        assert_eq!(
+            result.unwrap().len(),
+            0,
+            "All outputs should be skipped on Windows"
         );
     }
 }
