@@ -96,7 +96,7 @@ impl SourceCache {
         // Use rattler_git to fetch the repository
         tracing::info!("Fetching git repository: {}", git_url);
         let git_cache = self.cache_dir.join("git");
-        tokio::fs::create_dir_all(&git_cache).await?;
+        fs_err::tokio::create_dir_all(&git_cache).await?;
 
         let fetch_result = self
             .git_resolver
@@ -263,10 +263,12 @@ impl SourceCache {
             if cache_path.exists() {
                 // Validate all checksums if provided
                 if !checksums.is_empty() {
-                    let all_valid = checksums.iter().all(|cs| cs.validate(&cache_path));
-                    if !all_valid {
+                    let mismatch = checksums
+                        .iter()
+                        .find_map(|cs| cs.validate(&cache_path).err());
+                    if mismatch.is_some() {
                         tracing::warn!("Checksum validation failed, re-downloading");
-                        tokio::fs::remove_file(&cache_path).await?;
+                        fs_err::tokio::remove_file(&cache_path).await?;
                     } else {
                         self.index.touch(&key).await?;
                         tracing::info!("Found source in cache: {}", cache_path.display());
@@ -286,9 +288,14 @@ impl SourceCache {
 
         // Validate all checksums
         for cs in checksums {
-            if !cs.validate(&cache_path) {
-                tokio::fs::remove_file(&cache_path).await?;
-                return Err(CacheError::ValidationFailed { path: cache_path });
+            if let Err(mismatch) = cs.validate(&cache_path) {
+                fs_err::tokio::remove_file(&cache_path).await?;
+                return Err(CacheError::ValidationFailed {
+                    path: cache_path,
+                    expected: mismatch.expected,
+                    actual: mismatch.actual,
+                    kind: mismatch.kind.to_string(),
+                });
             }
         }
 
@@ -359,7 +366,7 @@ impl SourceCache {
                 return Err(CacheError::FileNotFound(source_path));
             }
 
-            tokio::fs::copy(&source_path, &cache_path).await?;
+            fs_err::tokio::copy(&source_path, &cache_path).await?;
             return Ok((cache_path, Some(filename.to_string())));
         }
 
@@ -392,7 +399,7 @@ impl SourceCache {
         }
 
         // Stream download to file
-        let mut file = tokio::fs::File::create(&cache_path).await?;
+        let mut file = fs_err::tokio::File::create(&cache_path).await?;
         let mut stream = response.bytes_stream();
         let mut downloaded = 0u64;
 
@@ -494,7 +501,7 @@ impl SourceCache {
             }
 
             let path = self.index.get_cache_path(&entry);
-            if let Ok(metadata) = tokio::fs::metadata(&path).await {
+            if let Ok(metadata) = fs_err::tokio::metadata(&path).await {
                 if metadata.is_file() {
                     total_size += metadata.len();
                 } else if metadata.is_dir() {
@@ -638,7 +645,7 @@ fn extract_7z(archive: &Path, target: &Path) -> Result<(), CacheError> {
 
 async fn calculate_dir_size(dir: &Path) -> Result<u64, CacheError> {
     let mut total = 0u64;
-    let mut entries = tokio::fs::read_dir(dir).await?;
+    let mut entries = fs_err::tokio::read_dir(dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let metadata = entry.metadata().await?;

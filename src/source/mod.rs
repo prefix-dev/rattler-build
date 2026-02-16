@@ -41,8 +41,12 @@ pub enum SourceError {
     #[error("StripPrefixError Error: {0}")]
     StripPrefixError(#[from] StripPrefixError),
 
-    #[error("Download could not be validated with checksum!")]
-    ValidationFailed,
+    #[error("{kind} checksum validation failed\n  expected: {expected}\n  actual:   {actual}")]
+    ValidationFailed {
+        expected: String,
+        actual: String,
+        kind: String,
+    },
 
     #[error("File not found: {0}")]
     FileNotFound(PathBuf),
@@ -391,8 +395,12 @@ async fn fetch_source(
                     );
 
                     for checksum in convert_path_checksums(path_src) {
-                        if !checksum.validate(&src_path) {
-                            return Err(SourceError::ValidationFailed);
+                        if let Err(mismatch) = checksum.validate(&src_path) {
+                            return Err(SourceError::ValidationFailed {
+                                expected: mismatch.expected,
+                                actual: mismatch.actual,
+                                kind: mismatch.kind.to_string(),
+                            });
                         }
                     }
 
