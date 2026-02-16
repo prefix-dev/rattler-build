@@ -37,6 +37,9 @@ pub enum LinkingCheckError {
 
     #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
+
+    #[error("DSO list validation error: {0}")]
+    DsoListValidation(String),
 }
 
 #[derive(Debug)]
@@ -161,15 +164,43 @@ struct DsoList {
     subdir: String,
 }
 
-/// Load dsolist JSON files from the given prefix directory.
-/// Returns collected (allow, deny) pattern lists from all matching files.
-fn load_dsolists(prefix: &Path, subdir: &str) -> (Vec<String>, Vec<String>) {
-    let dsolists_dir = prefix.join("etc/conda-build/dsolists.d");
-    let mut allow_patterns = Vec::new();
-    let mut deny_patterns = Vec::new();
+/// Validate that a dsolist glob pattern uses forward slashes and is either
+/// an absolute path or starts with `**` (which the CEP considers absolute).
+fn validate_dsolist_pattern(pattern: &str, file: &Path) -> Result<(), LinkingCheckError> {
+    if pattern.contains('\\') {
+        return Err(LinkingCheckError::DsoListValidation(format!(
+            "Pattern '{}' in {} contains backslashes; use forward slashes for path separation",
+            pattern,
+            file.display()
+        )));
+    }
 
-    let Ok(entries) = std::fs::read_dir(&dsolists_dir) else {
-        return (allow_patterns, deny_patterns);
+    // Patterns starting with ** are considered absolute per the CEP.
+    // Otherwise, the path must be an absolute Windows path (drive letter followed by :/).
+    let is_drive_letter_path = pattern.len() >= 3
+        && pattern.as_bytes()[0].is_ascii_alphabetic()
+        && pattern.as_bytes()[1] == b':'
+        && pattern.as_bytes()[2] == b'/';
+
+    if !pattern.starts_with("**") && !is_drive_letter_path {
+        return Err(LinkingCheckError::DsoListValidation(format!(
+            "Pattern '{}' in {} is not an absolute path; only Windows drive letter paths (e.g. C:/...) or patterns starting with ** are allowed",
+            pattern,
+            file.display()
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate all dsolist JSON files that are about to be packaged.
+/// This ensures that any `etc/conda-build/dsolists.d/*.json` files in the
+/// package contents conform to the CEP-28 schema before they ship.
+pub fn validate_dsolist_files(package_dir: &Path) -> Result<(), LinkingCheckError> {
+    let dsolists_dir = package_dir.join("etc/conda-build/dsolists.d");
+
+    let Ok(entries) = fs_err::read_dir(&dsolists_dir) else {
+        return Ok(());
     };
 
     for entry in entries.filter_map(|e| e.ok()) {
@@ -178,7 +209,62 @@ fn load_dsolists(prefix: &Path, subdir: &str) -> (Vec<String>, Vec<String>) {
             continue;
         }
 
-        let content = match std::fs::read_to_string(&path) {
+        let content = fs_err::read_to_string(&path).map_err(|e| {
+            LinkingCheckError::DsoListValidation(format!(
+                "Failed to read dsolist file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+
+        let dsolist: DsoList = serde_json::from_str(&content).map_err(|e| {
+            LinkingCheckError::DsoListValidation(format!(
+                "Failed to parse dsolist file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+
+        if dsolist.version != 1 {
+            return Err(LinkingCheckError::DsoListValidation(format!(
+                "Unsupported dsolist version {} in {} (only version 1 is supported)",
+                dsolist.version,
+                path.display()
+            )));
+        }
+
+        for pattern in &dsolist.allow {
+            validate_dsolist_pattern(pattern, &path)?;
+        }
+        for pattern in &dsolist.deny {
+            validate_dsolist_pattern(pattern, &path)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Load dsolist JSON files from the given prefix directory.
+/// Returns collected (allow, deny) pattern lists from all matching files.
+fn load_dsolists(
+    prefix: &Path,
+    subdir: &str,
+) -> Result<(Vec<String>, Vec<String>), LinkingCheckError> {
+    let dsolists_dir = prefix.join("etc/conda-build/dsolists.d");
+    let mut allow_patterns = Vec::new();
+    let mut deny_patterns = Vec::new();
+
+    let Ok(entries) = fs_err::read_dir(&dsolists_dir) else {
+        return Ok((allow_patterns, deny_patterns));
+    };
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+
+        let content = match fs_err::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!("Failed to read dsolist file {}: {}", path.display(), e);
@@ -195,23 +281,30 @@ fn load_dsolists(prefix: &Path, subdir: &str) -> (Vec<String>, Vec<String>) {
         };
 
         if dsolist.version != 1 {
-            tracing::warn!(
-                "Skipping dsolist file {} with unsupported version {}",
-                path.display(),
-                dsolist.version
-            );
-            continue;
+            return Err(LinkingCheckError::DsoListValidation(format!(
+                "Unsupported dsolist version {} in {} (only version 1 is supported)",
+                dsolist.version,
+                path.display()
+            )));
         }
 
         if dsolist.subdir != subdir {
             continue;
         }
 
+        // Validate all patterns before accepting them
+        for pattern in &dsolist.allow {
+            validate_dsolist_pattern(pattern, &path)?;
+        }
+        for pattern in &dsolist.deny {
+            validate_dsolist_pattern(pattern, &path)?;
+        }
+
         allow_patterns.extend(dsolist.allow);
         deny_patterns.extend(dsolist.deny);
     }
 
-    (allow_patterns, deny_patterns)
+    Ok((allow_patterns, deny_patterns))
 }
 
 /// Expand dsolist patterns following conda-build's `_expand_dsolist` behavior.
@@ -313,15 +406,15 @@ fn add_windows_system_libs(
     output: &Output,
     allow_builder: &mut GlobSetBuilder,
     deny_builder: &mut GlobSetBuilder,
-) -> Result<(), globset::Error> {
+) -> Result<(), LinkingCheckError> {
     let subdir = output.build_configuration.target_platform.to_string();
 
     // Load dsolists from both build and host prefixes
     let (build_allow, build_deny) = load_dsolists(
         &output.build_configuration.directories.build_prefix,
         &subdir,
-    );
-    let (host_allow, host_deny) = load_dsolists(output.prefix(), &subdir);
+    )?;
+    let (host_allow, host_deny) = load_dsolists(output.prefix(), &subdir)?;
 
     let mut all_allow: Vec<String> = build_allow.into_iter().chain(host_allow).collect();
     let all_deny: Vec<String> = build_deny.into_iter().chain(host_deny).collect();
@@ -403,7 +496,7 @@ struct SystemLibs {
 }
 
 /// Returns the system libraries found in sysroot.
-fn find_system_libs(output: &Output) -> Result<SystemLibs, globset::Error> {
+fn find_system_libs(output: &Output) -> Result<SystemLibs, LinkingCheckError> {
     let mut allow_builder = GlobSetBuilder::new();
     let mut deny_builder = GlobSetBuilder::new();
     let platform = &output.build_configuration.target_platform;
@@ -604,7 +697,7 @@ pub fn perform_linking_checks(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use fs_err;
 
     #[test]
     fn test_extract_tbd_install_names() {
@@ -629,61 +722,68 @@ mod tests {
     fn test_load_dsolists_valid() {
         let tmp = tempfile::tempdir().unwrap();
         let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
-        fs::create_dir_all(&dsolists_dir).unwrap();
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
 
         let json = serde_json::json!({
             "version": 1,
             "subdir": "win-64",
-            "allow": ["KERNEL32.dll", "USER32.dll"],
-            "deny": ["ucrtbased.dll"]
+            "allow": ["C:/Windows/System32/KERNEL32.dll", "C:/Windows/System32/USER32.dll"],
+            "deny": ["C:/Windows/System32/ucrtbased.dll"]
         });
-        fs::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64");
-        assert_eq!(allow, vec!["KERNEL32.dll", "USER32.dll"]);
-        assert_eq!(deny, vec!["ucrtbased.dll"]);
+        let (allow, deny) = load_dsolists(tmp.path(), "win-64").unwrap();
+        assert_eq!(
+            allow,
+            vec![
+                "C:/Windows/System32/KERNEL32.dll",
+                "C:/Windows/System32/USER32.dll"
+            ]
+        );
+        assert_eq!(deny, vec!["C:/Windows/System32/ucrtbased.dll"]);
     }
 
     #[test]
     fn test_load_dsolists_wrong_subdir() {
         let tmp = tempfile::tempdir().unwrap();
         let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
-        fs::create_dir_all(&dsolists_dir).unwrap();
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
 
         let json = serde_json::json!({
             "version": 1,
             "subdir": "linux-64",
-            "allow": ["libc.so.6"]
+            "allow": ["**/libc.so.6"]
         });
-        fs::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64");
+        let (allow, deny) = load_dsolists(tmp.path(), "win-64").unwrap();
         assert!(allow.is_empty());
         assert!(deny.is_empty());
     }
 
     #[test]
-    fn test_load_dsolists_invalid_version() {
+    fn test_load_dsolists_invalid_version_errors() {
         let tmp = tempfile::tempdir().unwrap();
         let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
-        fs::create_dir_all(&dsolists_dir).unwrap();
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
 
         let json = serde_json::json!({
             "version": 99,
             "subdir": "win-64",
-            "allow": ["KERNEL32.dll"]
+            "allow": ["C:/Windows/System32/KERNEL32.dll"]
         });
-        fs::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64");
-        assert!(allow.is_empty());
-        assert!(deny.is_empty());
+        let result = load_dsolists(tmp.path(), "win-64");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Unsupported dsolist version 99"), "got: {err}");
     }
 
     #[test]
     fn test_load_dsolists_no_directory() {
         let tmp = tempfile::tempdir().unwrap();
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64");
+        let (allow, deny) = load_dsolists(tmp.path(), "win-64").unwrap();
         assert!(allow.is_empty());
         assert!(deny.is_empty());
     }
@@ -692,26 +792,106 @@ mod tests {
     fn test_load_dsolists_multiple_files() {
         let tmp = tempfile::tempdir().unwrap();
         let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
-        fs::create_dir_all(&dsolists_dir).unwrap();
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
 
         let json1 = serde_json::json!({
             "version": 1,
             "subdir": "win-64",
-            "allow": ["KERNEL32.dll"]
+            "allow": ["C:/Windows/System32/KERNEL32.dll"]
         });
         let json2 = serde_json::json!({
             "version": 1,
             "subdir": "win-64",
-            "allow": ["USER32.dll"],
-            "deny": ["ucrtbased.dll"]
+            "allow": ["C:/Windows/System32/USER32.dll"],
+            "deny": ["**/ucrtbased.dll"]
         });
-        fs::write(dsolists_dir.join("a.json"), json1.to_string()).unwrap();
-        fs::write(dsolists_dir.join("b.json"), json2.to_string()).unwrap();
+        fs_err::write(dsolists_dir.join("a.json"), json1.to_string()).unwrap();
+        fs_err::write(dsolists_dir.join("b.json"), json2.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64");
-        assert!(allow.contains(&"KERNEL32.dll".to_string()));
-        assert!(allow.contains(&"USER32.dll".to_string()));
-        assert_eq!(deny, vec!["ucrtbased.dll"]);
+        let (allow, deny) = load_dsolists(tmp.path(), "win-64").unwrap();
+        assert!(allow.contains(&"C:/Windows/System32/KERNEL32.dll".to_string()));
+        assert!(allow.contains(&"C:/Windows/System32/USER32.dll".to_string()));
+        assert_eq!(deny, vec!["**/ucrtbased.dll"]);
+    }
+
+    #[test]
+    fn test_load_dsolists_rejects_backslashes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["C:\\Windows\\System32\\KERNEL32.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let result = load_dsolists(tmp.path(), "win-64");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("backslashes"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_dsolists_rejects_relative_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["relative/path/KERNEL32.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let result = load_dsolists(tmp.path(), "win-64");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not an absolute path"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_dsolists_accepts_glob_star_patterns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["**/R.dll", "C:/Windows/System32/*.dll"],
+            "deny": ["**/ucrtbased.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let (allow, deny) = load_dsolists(tmp.path(), "win-64").unwrap();
+        assert_eq!(allow, vec!["**/R.dll", "C:/Windows/System32/*.dll"]);
+        assert_eq!(deny, vec!["**/ucrtbased.dll"]);
+    }
+
+    #[test]
+    fn test_validate_dsolist_pattern() {
+        let file = Path::new("test.json");
+
+        // Valid patterns
+        assert!(validate_dsolist_pattern("C:/Windows/System32/*.dll", file).is_ok());
+        assert!(validate_dsolist_pattern("D:/some/path/lib.dll", file).is_ok());
+        assert!(validate_dsolist_pattern("**/R.dll", file).is_ok());
+
+        // Invalid: backslashes
+        assert!(validate_dsolist_pattern("C:\\Windows\\System32\\foo.dll", file).is_err());
+
+        // Invalid: Unix absolute paths
+        assert!(validate_dsolist_pattern("/usr/lib/libc.so.6", file).is_err());
+
+        // Invalid: relative path
+        assert!(validate_dsolist_pattern("relative/foo.dll", file).is_err());
+        assert!(validate_dsolist_pattern("foo.dll", file).is_err());
+
+        // Invalid: bare glob without **
+        assert!(validate_dsolist_pattern("*.dll", file).is_err());
     }
 
     #[test]
@@ -739,5 +919,105 @@ mod tests {
         ];
         let expanded = expand_dsolist(&patterns);
         assert_eq!(expanded, vec!["*.dll", "**/ucrtbased.dll"]);
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_valid() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["C:/Windows/System32/*.dll", "**/R.dll"],
+            "deny": ["**/ucrtbased.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        assert!(validate_dsolist_files(tmp.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_no_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(validate_dsolist_files(tmp.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_rejects_invalid_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 2,
+            "subdir": "win-64",
+            "allow": ["C:/Windows/System32/*.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let result = validate_dsolist_files(tmp.path());
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported dsolist version 2")
+        );
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_rejects_backslashes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["C:\\Windows\\System32\\foo.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let result = validate_dsolist_files(tmp.path());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("backslashes"));
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_rejects_relative_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        let json = serde_json::json!({
+            "version": 1,
+            "subdir": "win-64",
+            "allow": ["relative/KERNEL32.dll"]
+        });
+        fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
+
+        let result = validate_dsolist_files(tmp.path());
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("not an absolute path")
+        );
+    }
+
+    #[test]
+    fn test_validate_dsolist_files_rejects_invalid_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dsolists_dir = tmp.path().join("etc/conda-build/dsolists.d");
+        fs_err::create_dir_all(&dsolists_dir).unwrap();
+
+        fs_err::write(dsolists_dir.join("bad.json"), "not valid json").unwrap();
+
+        let result = validate_dsolist_files(tmp.path());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to parse"));
     }
 }
