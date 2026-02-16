@@ -150,11 +150,11 @@ impl fmt::Display for Recipe {
             }
             first_line = false;
             // Inject a warning comment above the license field if present
-            if line.starts_with("  license:") {
-                if let Some(warning) = &self.about.license_warning {
-                    for comment_line in warning.lines() {
-                        writeln!(f, "  # {comment_line}")?;
-                    }
+            if line.starts_with("  license:")
+                && let Some(warning) = &self.about.license_warning
+            {
+                for comment_line in warning.lines() {
+                    writeln!(f, "  # {comment_line}")?;
                 }
             }
             writeln!(f, "{}", line)?;
