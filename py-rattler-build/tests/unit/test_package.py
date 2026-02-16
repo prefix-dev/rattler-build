@@ -1,6 +1,8 @@
 """Tests for the Package inspection and testing API."""
 
+import platform
 import shutil
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -281,3 +283,31 @@ class TestRunTests:
             assert "TestResult" in repr_str
             assert "index=" in repr_str
             assert "status=" in repr_str
+
+
+@pytest.mark.skipif(
+    not (platform.system() == "Darwin" and platform.machine() == "arm64"),
+    reason="Only runs on macOS arm64",
+)
+class TestLegacyV0Tests:
+    """Tests for running legacy (conda-build v0) test scripts from packages."""
+
+    @pytest.fixture
+    def v0_package(self, tmp_path: Path) -> Path:
+        """Download a v0 package with legacy test scripts."""
+        url = "https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py39he7485ab_3.conda"
+        dest = tmp_path / "zstandard-0.23.0-py39he7485ab_3.conda"
+        urllib.request.urlretrieve(url, dest)
+        return dest
+
+    def test_v0_legacy_tests_pass(self, v0_package: Path) -> None:
+        """Test that legacy v0 packages with run_test.sh and run_test.py execute correctly.
+
+        This is a regression test for a bug where CopyDir was called with a file
+        path instead of a directory path, causing 'File already exists' errors.
+        """
+        pkg = Package.from_file(v0_package)
+        results = pkg.run_tests(channel=["conda-forge"])
+        assert len(results) > 0
+        for result in results:
+            assert result.success, f"Test {result.test_index} failed: {result.output}"

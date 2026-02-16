@@ -215,7 +215,7 @@ impl Tests {
 
                 // copy all test files to a temporary directory and set it as the working
                 // directory
-                CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
+                CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
                     TestError::IoError(std::io::Error::other(format!(
                         "Failed to copy test files: {}",
                         e
@@ -242,6 +242,15 @@ impl Tests {
                     interpreter: Some("python".into()),
                     ..Script::default()
                 };
+
+                // copy all test files to a temporary directory and set it as the working
+                // directory
+                CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
+                    TestError::IoError(std::io::Error::other(format!(
+                        "Failed to copy test files: {}",
+                        e
+                    )))
+                })?;
 
                 script
                     .run_script(
