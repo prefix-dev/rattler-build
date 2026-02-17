@@ -54,8 +54,8 @@ impl Interpreter for PowerShellInterpreter {
         let (shell_cmd, new_enough) = detect_powershell();
 
         if !new_enough {
-            eprintln!(
-                "Warning: rattler-build requires PowerShell 7.4+, \
+            tracing::warn!(
+                "rattler-build requires PowerShell 7.4+, \
                  otherwise it will skip native command errors!"
             );
         }
