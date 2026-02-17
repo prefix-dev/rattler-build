@@ -895,8 +895,38 @@ mod tests {
         assert_eq!(resolved, PathBuf::from("/foo/very_long_encoded_prefix/lib"));
     }
 
+    /// Create a binary with duplicate rpaths by starting from
+    /// `duplicate-rpath-macos` (which has `@loader_path/../lib` and
+    /// `@loader_path/../xxx`) and using the builtin relink to overwrite the
+    /// second rpath to match the first. We can't use `install_name_tool` for
+    /// this because modern macOS rejects duplicate rpaths.
+    fn make_binary_with_duplicate_rpaths(src: &Path, dst: &Path) -> Result<(), RelinkError> {
+        fs::copy(src, dst)?;
+        let make_dup = DylibChanges {
+            change_rpath: vec![(
+                Some(PathBuf::from("@loader_path/../xxx")),
+                Some(PathBuf::from("@loader_path/../lib")),
+            )],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        super::relink(dst, &make_dup)?;
+
+        // Sanity-check: we should now have duplicate rpaths
+        let object = Dylib::new(dst)?;
+        let dup = PathBuf::from("@loader_path/../lib");
+        assert_eq!(
+            object.rpaths,
+            vec![dup.clone(), dup],
+            "Expected duplicate rpaths after binary manipulation"
+        );
+        Ok(())
+    }
+
     /// Regression test: duplicate rpaths must be removed so that macOS >= 15.4
     /// does not reject the binary with "duplicate LC_RPATH" errors at load time.
+    /// This exercises the full `Dylib::relink()` path (builtin relink tries
+    /// first, falls back to `install_name_tool` for rpath deletions).
     #[test]
     fn test_relink_deduplicates_rpaths() -> Result<(), RelinkError> {
         if which::which("install_name_tool").is_err() {
@@ -915,44 +945,13 @@ mod tests {
         fs::create_dir(&lib_dir)?;
 
         let binary_path = bin_dir.join("zlink-dedup");
-        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+        make_binary_with_duplicate_rpaths(&prefix.join("duplicate-rpath-macos"), &binary_path)?;
 
-        // First, remove all existing rpaths
-        let object = Dylib::new(&binary_path)?;
-        let delete_all = DylibChanges {
-            change_rpath: object.rpaths.iter().map(|p| (Some(p.clone()), None)).collect(),
-            change_id: None,
-            change_dylib: HashMap::default(),
-        };
-        install_name_tool(&binary_path, &delete_all, &SystemTools::default())?;
-
-        // Add the same rpath twice to simulate the duplicate condition
         let dup_rpath = PathBuf::from("@loader_path/../lib");
-        let add_dup = DylibChanges {
-            change_rpath: vec![
-                (None, Some(dup_rpath.clone())),
-            ],
-            change_id: None,
-            change_dylib: HashMap::default(),
-        };
-        install_name_tool(&binary_path, &add_dup, &SystemTools::default())?;
-        // Add the same rpath a second time via a raw install_name_tool call
-        let mut cmd = std::process::Command::new("install_name_tool");
-        cmd.arg("-add_rpath")
-            .arg("@loader_path/../lib")
-            .arg(&binary_path);
-        let output = cmd.output()?;
-        assert!(output.status.success(), "Failed to add duplicate rpath");
-
-        // Verify we now have duplicate rpaths
         let object = Dylib::new(&binary_path)?;
-        assert_eq!(
-            object.rpaths,
-            vec![dup_rpath.clone(), dup_rpath.clone()],
-            "Expected duplicate rpaths before relink"
-        );
 
-        // Now run the relink which should deduplicate
+        // Full relink: builtin relink can't handle deletions, so this falls
+        // back to install_name_tool which performs the deduplication.
         object
             .relink(
                 tmp_prefix,
@@ -965,16 +964,49 @@ mod tests {
 
         // After relinking, rpaths must be deduplicated
         let object = Dylib::new(&binary_path)?;
-        let unique_rpaths: Vec<_> = object.rpaths.clone().into_iter().collect();
-        assert_eq!(
-            object.rpaths, unique_rpaths,
-            "RPATHs should be deduplicated after relink (macOS >= 15.4 rejects duplicates)"
-        );
-        // Should contain exactly one @loader_path/../lib
         assert!(
             object.rpaths.iter().filter(|r| *r == &dup_rpath).count() == 1,
             "Expected exactly one @loader_path/../lib rpath, got: {:?}",
             object.rpaths
+        );
+
+        Ok(())
+    }
+
+    /// Test that `install_name_tool` correctly removes the duplicate rpath
+    /// via `compute_rpath_changes` producing the right delete/add lists.
+    #[test]
+    fn test_install_name_tool_deduplicates_rpaths() -> Result<(), RelinkError> {
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink-dedup-int");
+        make_binary_with_duplicate_rpaths(&prefix.join("duplicate-rpath-macos"), &binary_path)?;
+
+        let dup_rpath = PathBuf::from("@loader_path/../lib");
+
+        // Directly call install_name_tool with changes that remove the duplicate:
+        // [dup, dup] -> [dup] means: keep one (old=dup, new=dup) and delete one (old=dup, new=None)
+        let changes = DylibChanges {
+            change_rpath: vec![
+                (Some(dup_rpath.clone()), Some(dup_rpath.clone())),
+                (Some(dup_rpath.clone()), None),
+            ],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(
+            object.rpaths,
+            vec![dup_rpath],
+            "install_name_tool should have removed the duplicate rpath"
         );
 
         Ok(())
@@ -997,10 +1029,7 @@ mod rpath_change_tests {
         // Change computation for [A, A] -> [A]:
         //   zip produces (Some(A), Some(A))  — slot stays
         //   extra old produces (Some(A), None) — duplicate removed
-        let changes = vec![
-            (Some(a.clone()), Some(a.clone())),
-            (Some(a.clone()), None),
-        ];
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (Some(a.clone()), None)];
 
         let (del, add) = compute_rpath_changes(&changes);
         assert_eq!(del, vec![a], "should delete exactly one duplicate");
@@ -1039,10 +1068,7 @@ mod rpath_change_tests {
     fn add_extra_rpath() {
         let a = p("@loader_path/../lib");
         let b = p("@loader_path/");
-        let changes = vec![
-            (Some(a.clone()), Some(a.clone())),
-            (None, Some(b.clone())),
-        ];
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (None, Some(b.clone()))];
 
         let (del, add) = compute_rpath_changes(&changes);
         assert!(del.is_empty(), "nothing should be deleted");
@@ -1054,10 +1080,7 @@ mod rpath_change_tests {
     fn remove_one_rpath() {
         let a = p("@loader_path/../lib");
         let b = p("@loader_path/");
-        let changes = vec![
-            (Some(a.clone()), Some(a.clone())),
-            (Some(b.clone()), None),
-        ];
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (Some(b.clone()), None)];
 
         let (del, add) = compute_rpath_changes(&changes);
         assert_eq!(del, vec![b]);
