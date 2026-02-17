@@ -340,7 +340,9 @@ async fn build_cran_recipe_and_deps(
 
     recipe.about.summary = Some(package_info.Title.clone());
     recipe.about.description = Some(package_info.Description.clone());
-    (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
+    let (license, license_file) = map_license(&package_info.License);
+    recipe.about.license = license;
+    recipe.about.license_file = license_file.into_iter().collect();
     recipe.about.repository = Some(package_info._upstream.clone());
     if let Some(pkgdocs) = &package_info._pkgdocs
         && url::Url::parse(pkgdocs).is_ok()

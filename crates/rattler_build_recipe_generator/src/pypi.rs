@@ -63,10 +63,16 @@ struct PyPiInfo {
     requires_python: Option<String>,
 }
 
-async fn extract_entry_points_from_wheel(
-    url: &str,
-    client: &reqwest::Client,
-) -> miette::Result<Option<Vec<String>>> {
+/// Information extracted from a wheel archive.
+#[derive(Default, Debug)]
+struct WheelInfo {
+    /// Console script entry points (e.g. `"cmd = package.module:func"`).
+    entry_points: Vec<String>,
+    /// License file paths from `License-File` METADATA headers.
+    license_files: Vec<String>,
+}
+
+async fn extract_wheel_info(url: &str, client: &reqwest::Client) -> miette::Result<WheelInfo> {
     // Download the wheel
     let wheel_data = client
         .get(url)
@@ -81,7 +87,30 @@ async fn extract_entry_points_from_wheel(
     let reader = Cursor::new(wheel_data);
     let mut archive = ZipArchive::new(reader).into_diagnostic()?;
 
-    // Find entry_points.txt in any .dist-info directory
+    let mut info = WheelInfo::default();
+
+    // Extract License-File entries from METADATA
+    let metadata_file = (0..archive.len()).find(|&i| {
+        archive
+            .by_index(i)
+            .map(|file| file.name().ends_with(".dist-info/METADATA"))
+            .unwrap_or(false)
+    });
+
+    if let Some(index) = metadata_file {
+        let mut file = archive.by_index(index).into_diagnostic()?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).into_diagnostic()?;
+
+        info.license_files = contents
+            .lines()
+            .filter_map(|l| l.strip_prefix("License-File: "))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    // Extract entry_points.txt
     let entry_points_file = (0..archive.len()).find(|&i| {
         archive
             .by_index(i)
@@ -95,7 +124,7 @@ async fn extract_entry_points_from_wheel(
         file.read_to_string(&mut contents).into_diagnostic()?;
 
         // Parse console_scripts section
-        let console_scripts: Vec<String> = contents
+        info.entry_points = contents
             .lines()
             .skip_while(|l| !l.contains("[console_scripts]"))
             .skip(1) // Skip the [console_scripts] line
@@ -108,13 +137,9 @@ async fn extract_entry_points_from_wheel(
                 format!("{} = {}", name.trim(), script.trim())
             })
             .collect();
-
-        if !console_scripts.is_empty() {
-            return Ok(Some(console_scripts));
-        }
     }
 
-    Ok(None)
+    Ok(info)
 }
 
 #[derive(Deserialize)]
@@ -475,19 +500,45 @@ fn classifier_to_spdx(classifier_name: &str) -> Option<(&'static str, bool)> {
 /// Many packages set the `license` field to human-readable strings like
 /// `"MIT"` or `"BSD"` rather than a proper SPDX expression. We map the most
 /// common values.
-fn legacy_license_to_spdx(license: &str) -> Option<&'static str> {
+/// Returns `(spdx_id, ambiguous)` where `ambiguous` is `true` for values that
+/// don't clearly specify a particular version/variant.
+fn legacy_license_to_spdx(license: &str) -> Option<(&'static str, bool)> {
+    // Values that are ambiguous — they don't specify the particular version or
+    // variant, so our mapping is a best-effort guess.
+    static AMBIGUOUS: &[&str] = &[
+        "BSD",
+        "BSD License",
+        "GPL",
+        "LGPL",
+        "Apache",
+        "Apache Software License",
+        "Artistic",
+        "Artistic License",
+    ];
+
     static MAP: &[(&str, &str)] = &[
         ("MIT", "MIT"),
         ("MIT License", "MIT"),
+        ("MIT license", "MIT"),
         ("BSD", "BSD-3-Clause"),
         ("BSD License", "BSD-3-Clause"),
+        ("BSD license", "BSD-3-Clause"),
         ("BSD-3-Clause", "BSD-3-Clause"),
+        ("BSD 3-Clause", "BSD-3-Clause"),
+        ("BSD 3-Clause License", "BSD-3-Clause"),
+        ("BSD-3-Clause License", "BSD-3-Clause"),
+        ("BSD 3-clause", "BSD-3-Clause"),
         ("BSD-2-Clause", "BSD-2-Clause"),
+        ("BSD 2-Clause License", "BSD-2-Clause"),
+        ("BSD-2-Clause License", "BSD-2-Clause"),
+        ("0BSD", "0BSD"),
         ("Apache 2.0", "Apache-2.0"),
         ("Apache-2.0", "Apache-2.0"),
         ("Apache License 2.0", "Apache-2.0"),
         ("Apache License, Version 2.0", "Apache-2.0"),
         ("Apache Software License", "Apache-2.0"),
+        ("Apache", "Apache-2.0"),
+        ("GPL", "GPL-2.0-or-later"),
         ("GPLv2", "GPL-2.0-only"),
         ("GPLv2+", "GPL-2.0-or-later"),
         ("GPLv3", "GPL-3.0-only"),
@@ -498,28 +549,47 @@ fn legacy_license_to_spdx(license: &str) -> Option<&'static str> {
         ("GPL-3.0", "GPL-3.0-only"),
         ("GPL-3.0-only", "GPL-3.0-only"),
         ("GPL-3.0-or-later", "GPL-3.0-or-later"),
+        ("LGPL", "LGPL-2.0-or-later"),
         ("LGPLv2", "LGPL-2.0-only"),
         ("LGPLv2+", "LGPL-2.0-or-later"),
         ("LGPLv3", "LGPL-3.0-only"),
         ("LGPLv3+", "LGPL-3.0-or-later"),
         ("LGPL-2.1", "LGPL-2.1-only"),
+        ("LGPL-2.1-only", "LGPL-2.1-only"),
+        ("LGPL-2.1-or-later", "LGPL-2.1-or-later"),
         ("LGPL-3.0", "LGPL-3.0-only"),
+        ("LGPL-3.0-only", "LGPL-3.0-only"),
+        ("LGPL-3.0-or-later", "LGPL-3.0-or-later"),
         ("ISC", "ISC"),
         ("ISC License", "ISC"),
+        ("ISC license (ISCL)", "ISC"),
         ("MPL-2.0", "MPL-2.0"),
         ("MPL 2.0", "MPL-2.0"),
         ("Mozilla Public License 2.0", "MPL-2.0"),
         ("PSF", "PSF-2.0"),
+        ("PSF-2.0", "PSF-2.0"),
         ("Python Software Foundation License", "PSF-2.0"),
         ("Unlicense", "Unlicense"),
+        ("The Unlicense", "Unlicense"),
         ("Public Domain", "LicenseRef-Public-Domain"),
+        ("Artistic", "Artistic-2.0"),
+        ("Artistic License", "Artistic-2.0"),
+        ("Artistic-2.0", "Artistic-2.0"),
         ("Zlib", "Zlib"),
         ("zlib", "Zlib"),
+        ("WTFPL", "WTFPL"),
+        ("CC0", "CC0-1.0"),
+        ("CC0-1.0", "CC0-1.0"),
+        ("EUPL-1.2", "EUPL-1.2"),
+        ("ECL-2.0", "ECL-2.0"),
     ];
 
     MAP.iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(license))
-        .map(|(_, spdx)| *spdx)
+        .map(|(_, spdx)| {
+            let ambiguous = AMBIGUOUS.iter().any(|a| a.eq_ignore_ascii_case(license));
+            (*spdx, ambiguous)
+        })
 }
 
 /// Result of license extraction: the SPDX expression and an optional warning.
@@ -557,16 +627,27 @@ fn extract_license(info: &PyPiInfo) -> Option<ExtractedLicense> {
     if let Some(license) = &info.license {
         let license = license.trim();
         if !license.is_empty() && license.len() < 100 && !license.contains('\n') {
-            if let Some(spdx) = legacy_license_to_spdx(license) {
+            if let Some((spdx, ambiguous)) = legacy_license_to_spdx(license) {
+                let warning = if ambiguous {
+                    Some(format!(
+                        "WARNING: The PyPI license field value \"{license}\" is ambiguous\n\
+                         and may not map to the correct SPDX license (mapped to \"{spdx}\"). Please verify."
+                    ))
+                } else {
+                    None
+                };
                 return Some(ExtractedLicense {
                     spdx: spdx.to_string(),
-                    warning: None,
+                    warning,
                 });
             }
             // If we can't map it, return as-is and let the recipe parser validate.
             return Some(ExtractedLicense {
                 spdx: license.to_string(),
-                warning: None,
+                warning: Some(format!(
+                    "WARNING: The PyPI license field value \"{license}\" could not be mapped\n\
+                     to a known SPDX license expression. Please verify and correct."
+                )),
             });
         }
     }
@@ -663,8 +744,12 @@ pub async fn create_recipe(
     );
 
     if let Some(wheel_url) = &metadata.wheel_url {
-        if let Some(entry_points) = extract_entry_points_from_wheel(wheel_url, client).await? {
-            recipe.build.python.entry_points = entry_points;
+        let wheel_info = extract_wheel_info(wheel_url, client).await?;
+        if !wheel_info.entry_points.is_empty() {
+            recipe.build.python.entry_points = wheel_info.entry_points;
+        }
+        if !wheel_info.license_files.is_empty() {
+            recipe.about.license_file = wheel_info.license_files;
         }
     } else {
         tracing::warn!(
@@ -955,6 +1040,44 @@ mod tests {
         );
         // Unknown classifier returns None
         assert_eq!(classifier_to_spdx("Some Unknown License"), None);
+    }
+
+    #[test]
+    fn test_extract_license_maps_bsd_3clause_license() {
+        // This is the format used by ipywidgets and many Jupyter packages.
+        let info = PyPiInfo {
+            license: Some("BSD 3-Clause License".into()),
+            classifiers: Some(vec!["License :: OSI Approved :: BSD License".into()]),
+            ..Default::default()
+        };
+        // Should map via legacy field (higher priority than classifiers)
+        assert_eq!(extract_spdx(&info), Some("BSD-3-Clause".into()));
+        // "BSD 3-Clause License" is NOT ambiguous — it's specific
+        assert_eq!(extract_warning(&info), None);
+    }
+
+    #[test]
+    fn test_extract_license_legacy_ambiguous_bsd() {
+        let info = PyPiInfo {
+            license: Some("BSD".into()),
+            ..Default::default()
+        };
+        assert_eq!(extract_spdx(&info), Some("BSD-3-Clause".into()));
+        let warning = extract_warning(&info).unwrap();
+        assert!(warning.contains("BSD"));
+        assert!(warning.contains("ambiguous"));
+    }
+
+    #[test]
+    fn test_extract_license_legacy_unmapped_warns() {
+        let info = PyPiInfo {
+            license: Some("Custom License v42".into()),
+            ..Default::default()
+        };
+        assert_eq!(extract_spdx(&info), Some("Custom License v42".into()));
+        let warning = extract_warning(&info).unwrap();
+        assert!(warning.contains("Custom License v42"));
+        assert!(warning.contains("could not be mapped"));
     }
 
     #[test]

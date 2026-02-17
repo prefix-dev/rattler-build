@@ -76,8 +76,8 @@ pub struct About {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub license_file: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub license_file: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
