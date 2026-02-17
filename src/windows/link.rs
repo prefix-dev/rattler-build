@@ -72,13 +72,14 @@ impl Dll {
                         Ok(None)
                     }
                     goblin::error::Error::Malformed(_) => {
-                        // File looks like PE but is structurally malformed
-                        tracing::warn!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
+                        // File looks like PE but is structurally malformed (e.g. .pyc, .npz files
+                        // that happen to have bytes partially matching the PE signature)
+                        tracing::debug!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
                         Ok(None)
                     }
                     goblin::error::Error::Scroll(_) => {
-                        // A valid PE file but goblin can not reading and interpreting bytes
-                        tracing::warn!(
+                        // A valid PE file but goblin cannot read and interpret the bytes
+                        tracing::debug!(
                             "[relink/windows] Skipping uninterpretable PE file {path:?}: {e}"
                         );
                         Ok(None)
