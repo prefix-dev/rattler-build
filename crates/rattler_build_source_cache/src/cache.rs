@@ -362,7 +362,6 @@ impl SourceCache {
         }
 
         // Extract if needed and no explicit filename was provided
-        // Use actual_filename from Content-Disposition if available to determine if extraction is needed
         let final_path = if file_name.is_none() && self.should_extract(&cache_path) {
             let extracted_dir = self.cache_dir.join(format!("{}_extracted", key));
             self.extract_archive(&cache_path, &extracted_dir).await?;
@@ -485,9 +484,9 @@ impl SourceCache {
             handler.on_download_complete(url.as_str());
         }
 
-        // If Content-Disposition gave us a better filename, rename the cache file
-        // so that downstream code can determine the archive format from the path alone
-        let actual_filename = actual_filename.or_else(|| Some(filename.to_string()));
+        // If Content-Disposition provided a filename that differs from the URL's,
+        // rename the cached file so downstream code can detect the archive format
+        // from the file extension alone.
         let final_path = if let Some(ref actual) = actual_filename {
             let new_path = self.cache_dir.join(format!("{}_{}", key, actual));
             if new_path != cache_path {
