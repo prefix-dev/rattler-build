@@ -11,15 +11,15 @@ The `debug` command sets up a build environment and downloads sources without ru
 ## Basic workflow
 
 ```bash
-# Set up debug environment (downloads sources, no build)
+# Set up debug environment and enter the debug shell
 rattler-build debug --recipe recipe.yaml
 
-# Edit files in the work directory
-cd output/bld/rattler-build_<package>_*/work
+# You're now in the work directory with the build environment sourced.
+# Edit files directly:
 vim some_file.c
 
-# Generate patch
-rattler-build create-patch --directory . --name fix-typo
+# Generate patch (from inside the debug shell, the directories are auto-detected)
+rattler-build create-patch --name fix-typo
 
 # Add to recipe
 ```
