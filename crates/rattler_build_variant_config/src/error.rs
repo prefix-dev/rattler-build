@@ -6,8 +6,7 @@ use thiserror::Error;
 use miette::Diagnostic;
 
 /// Errors that can occur while parsing variant configuration files
-#[derive(Debug, Error)]
-#[derive(Diagnostic)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum VariantConfigError {
     /// Failed to parse YAML file with detailed span information
     #[error("Could not parse variant config file {}: {source}", path.display())]
@@ -27,8 +26,7 @@ pub enum VariantConfigError {
 }
 
 /// Errors that can occur while expanding variants
-#[derive(Debug, Error)]
-#[derive(Diagnostic)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum VariantExpandError {
     /// Zip key elements have mismatched lengths
     #[error("Zip key elements do not all have same length: {0}")]
@@ -52,8 +50,7 @@ pub enum VariantExpandError {
 }
 
 /// Combined error type for variant operations
-#[derive(Debug, Error)]
-#[derive(Diagnostic)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum VariantError {
     /// Configuration error
     #[error(transparent)]

@@ -52,7 +52,7 @@ pub use conditional::{
     parse_item_with_converter,
 };
 pub use converter::{FromStrConverter, NodeConverter};
-pub use error::{FileParseError, ParseError, ParseErrorWithSource, ParseResult};
+pub use error::{FileParseError, ParseError, ParseErrorWithSource, ParseResult, WithSourceCode};
 pub use helpers::{contains_jinja_template, get_span, validate_mapping_fields};
 pub use list::{
     parse_list_or_item, parse_list_or_item_with_converter, parse_nested_item_list,

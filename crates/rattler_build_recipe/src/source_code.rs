@@ -2,8 +2,7 @@
 
 use miette::{MietteError, MietteSpanContents, SourceSpan, SpanContents};
 use std::fmt::Debug;
-use std::path::PathBuf;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// A helper trait that provides source code for rattler-build-recipe.

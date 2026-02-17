@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
+use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,42 @@ use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
+
+/// Errors that can occur during recipe rendering with variant configurations.
+///
+/// This is the primary error type for the rendering layer, covering parse errors,
+/// topological sort failures, variant expansion issues, and more.
+#[derive(Debug, Error, Diagnostic)]
+pub enum RenderError {
+    /// A parse error occurred during recipe evaluation
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Parse(#[from] ParseError),
+
+    /// A topological sort error occurred (e.g., dependency cycle)
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    TopologicalSort(#[from] TopologicalSortError),
+
+    /// A variant expansion error occurred
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    VariantExpand(#[from] VariantExpandError),
+
+    /// A pinned subpackage output was not found among the rendered variants
+    #[error("missing output: {package}")]
+    MissingOutput {
+        /// The name of the missing package
+        package: String,
+    },
+
+    /// An experimental feature was used without the experimental flag
+    #[error("{message}")]
+    ExperimentalRequired {
+        /// The message describing the experimental feature
+        message: String,
+    },
+}
 
 /// Information about a pin_subpackage dependency for variant tracking
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,7 +231,7 @@ fn add_pins_to_variant(
     full_combination: &BTreeMap<NormalizedKey, Variable>,
     pin_subpackages: &mut BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
-) -> Result<(), String> {
+) -> Result<(), RenderError> {
     for (pin_name, pin_info) in pin_subpackages.iter_mut() {
         // Ignore ourselves
         if self_name == &pin_info.name {
@@ -246,7 +283,9 @@ fn add_pins_to_variant(
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
         } else {
-            return Err(format!("Missing output: {}", pin_info.name.as_normalized()));
+            return Err(RenderError::MissingOutput {
+                package: pin_info.name.as_normalized().to_string(),
+            });
         }
     }
     Ok(())
@@ -256,7 +295,7 @@ fn add_pins_to_variant(
 #[derive(Debug, Clone, Error, Diagnostic)]
 pub enum TopologicalSortError {
     /// A dependency cycle was detected among recipe outputs.
-    #[error("cycle detected in recipe outputs: {package}")]
+    #[error("Cycle detected in recipe outputs: {package}")]
     CycleDetected {
         /// The package name where the cycle was detected.
         package: String,
@@ -686,7 +725,7 @@ fn evaluate_recipe(
 fn render_with_empty_combinations(
     stage0_recipe: &Stage0Recipe,
     config: &RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Create context with just extra_context (no variant for empty combinations)
     // NOTE: Do NOT call with_context() here - Stage0Recipe::evaluate() handles context evaluation
     let empty_variant = BTreeMap::new();
@@ -730,8 +769,7 @@ fn render_with_empty_combinations(
 
     // Sort variants topologically by pin_subpackage dependencies
     // This ensures we resolve build strings in the correct order
-    let mut results = topological_sort_variants(results)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
     // For each variant, we:
@@ -752,8 +790,7 @@ fn render_with_empty_combinations(
                 &results_snapshot[i].full_combination,
                 &mut pin_subpackages,
                 &results_snapshot,
-            )
-            .map_err(ParseError::from_message)?;
+            )?;
         }
 
         // Store the updated pin_subpackages
@@ -770,7 +807,7 @@ fn render_with_empty_combinations(
 ///
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
-fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
+fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), RenderError> {
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -935,7 +972,7 @@ pub fn render_recipe_with_variants(
     recipe_path: &Path,
     variant_files: &[impl AsRef<Path>],
     config: Option<RenderConfig>,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     let mut config = config.unwrap_or_default();
 
     // Set the recipe path if not already set
@@ -950,8 +987,19 @@ pub fn render_recipe_with_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
 
     // Load variant configuration
-    let variant_config = VariantConfig::from_files(variant_files, config.target_platform)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let variant_config =
+        VariantConfig::from_files(variant_files, config.target_platform).map_err(|e| match e {
+            rattler_build_variant_config::VariantConfigError::ParseError { source, .. } => {
+                RenderError::Parse(source)
+            }
+            rattler_build_variant_config::VariantConfigError::IoError(path, source) => {
+                RenderError::Parse(ParseError::io_error(path, source))
+            }
+            other => RenderError::Parse(ParseError::generic(
+                other.to_string(),
+                marked_yaml::Span::new_blank(),
+            )),
+        })?;
 
     render_recipe_with_variant_config(&stage0_recipe, &variant_config, config)
 }
@@ -973,13 +1021,27 @@ pub fn render_recipe_with_variant_config(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
+    // Ensure target_platform and build_platform are in the variant config so they
+    // are included in hash computation. Without this, all platforms would produce
+    // identical hashes because `collect_used_variables` filters out variables that
+    // aren't present in the variant config.
+    let mut variant_config = variant_config.clone();
+    variant_config
+        .variants
+        .entry("target_platform".into())
+        .or_insert_with(|| vec![Variable::from(config.target_platform.to_string())]);
+    variant_config
+        .variants
+        .entry("build_platform".into())
+        .or_insert_with(|| vec![Variable::from(config.build_platform.to_string())]);
+
     match stage0_recipe {
         Stage0Recipe::SingleOutput(recipe) => {
-            render_single_output_with_variants(recipe.as_ref(), variant_config, config)
+            render_single_output_with_variants(recipe.as_ref(), &variant_config, config)
         }
         Stage0Recipe::MultiOutput(recipe) => {
-            render_multi_output_with_variants(recipe.as_ref(), variant_config, config)
+            render_multi_output_with_variants(recipe.as_ref(), &variant_config, config)
         }
     }
 }
@@ -988,7 +1050,7 @@ fn render_single_output_with_variants(
     stage0_recipe: &SingleOutputRecipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe.clone()));
     render_with_variants(&stage0, variant_config, config)
 }
@@ -997,7 +1059,7 @@ fn render_multi_output_with_variants(
     stage0_recipe: &MultiOutputRecipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Check if recipe contains staging outputs - these require experimental flag
     let has_staging = stage0_recipe
         .outputs
@@ -1005,9 +1067,9 @@ fn render_multi_output_with_variants(
         .any(|o| matches!(o, stage0::Output::Staging(_)));
 
     if has_staging && !config.experimental {
-        return Err(ParseError::from_message(
-            "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature",
-        ));
+        return Err(RenderError::ExperimentalRequired {
+            message: "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature".to_string(),
+        });
     }
 
     let stage0 = Stage0Recipe::MultiOutput(Box::new(stage0_recipe.clone()));
@@ -1019,14 +1081,12 @@ fn render_with_variants(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Collect initially used variables (from templates and stage0 free specs)
     let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
 
     // Compute initial variant combinations
-    let initial_combinations = variant_config
-        .combinations(&used_vars)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let initial_combinations = variant_config.combinations(&used_vars)?;
 
     // If no combinations, render once with just the extra context
     if initial_combinations.is_empty() {
@@ -1085,8 +1145,7 @@ fn render_with_variants(
     }
 
     // Sort variants topologically by pin_subpackage dependencies
-    let mut results = topological_sort_variants(results)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
     for i in 0..results.len() {
@@ -1102,8 +1161,7 @@ fn render_with_variants(
                 &results_snapshot[i].full_combination,
                 &mut pin_subpackages,
                 &results_snapshot,
-            )
-            .map_err(ParseError::from_message)?;
+            )?;
         }
 
         // Store the updated pin_subpackages

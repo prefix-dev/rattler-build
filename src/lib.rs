@@ -58,7 +58,7 @@ use package_test::TestConfiguration;
 use rattler_build_recipe::{
     stage0,
     stage1::{Recipe, TestType},
-    variant_render::{RenderConfig, render_recipe_with_variant_config},
+    variant_render::RenderConfig,
 };
 use rattler_build_variant_config::VariantConfig;
 
@@ -149,17 +149,12 @@ fn find_variants(
     experimental: bool,
 ) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
-    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
-        .map_err(|e| {
-            let source = rattler_build_recipe::source_code::Source::from_string(
-                recipe_path.display().to_string(),
-                recipe_content.to_string(),
-            );
-            // Use ParseErrorWithSource for better span highlighting
-            let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(source, e);
-            miette::Report::new(error_with_source)
-        })
-        .wrap_err("Failed to parse recipe")?;
+    let source = rattler_build_recipe::source_code::Source::from_string(
+        recipe_path.display().to_string(),
+        recipe_content.to_string(),
+    );
+    let stage0_recipe =
+        rattler_build_recipe::parse_recipe(&source).wrap_err("Failed to parse recipe")?;
 
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
@@ -190,19 +185,8 @@ fn find_variants(
 
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
-        render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)
-            .map_err(|e| {
-                let source = miette::NamedSource::new(
-                    recipe_path.display().to_string(),
-                    recipe_content.to_string(),
-                );
-                miette::Report::new(e).with_source_code(source)
-            })
+        rattler_build_recipe::render_recipe(&source, &stage0_recipe, variant_config, render_config)
             .wrap_err("Failed to render recipe with variants")?;
-
-    // Apply topological sorting to ensure correct build order for multi-output recipes
-    let rendered_variants =
-        rattler_build_recipe::variant_render::topological_sort_variants(rendered_variants)?;
 
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();

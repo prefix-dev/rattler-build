@@ -145,15 +145,6 @@ impl ParseError {
         }
     }
 
-    /// Create a simple error from a message (for compatibility)
-    pub fn from_message(message: impl Into<String>) -> Self {
-        Self::Generic {
-            message: message.into().into_boxed_str(),
-            span: Box::new(marked_yaml::Span::new_blank()),
-            suggestion: None,
-        }
-    }
-
     pub fn with_message(mut self, message: impl Into<String>) -> Self {
         if let Self::Generic { message: m, .. } = &mut self {
             *m = message.into().into_boxed_str();
@@ -274,12 +265,17 @@ fn find_token_length(src: &str, start: usize) -> usize {
     }
 }
 
-/// Wrapper that combines a ParseError with source code for better miette diagnostics
+/// Generic wrapper that combines an error with source code for better miette diagnostics.
 ///
 /// This wrapper provides enhanced error reporting by:
 /// - Including source code context in error messages
 /// - Expanding single-character spans to cover full YAML tokens
-/// - Preserving all diagnostic information from the inner ParseError
+/// - Delegating all diagnostic information to the inner error
+///
+/// # Type Parameters
+///
+/// * `E` - The inner error type (must implement `Diagnostic`)
+/// * `S` - The source code type (must implement `AsRef<str>` + `SourceCode`)
 ///
 /// # Example
 /// ```ignore
@@ -287,44 +283,46 @@ fn find_token_length(src: &str, start: usize) -> usize {
 /// let result = parse_recipe(&source);
 /// match result {
 ///     Err(err) => {
-///         let report = ParseErrorWithSource::new(source, err);
+///         let report = WithSourceCode::new(source, err);
 ///         eprintln!("{:?}", miette::Report::new(report));
 ///     }
 ///     Ok(recipe) => { /* ... */ }
 /// }
 /// ```
 #[derive(Debug)]
-pub struct ParseErrorWithSource<S> {
+pub struct WithSourceCode<E, S> {
+    error: E,
     source: S,
-    error: ParseError,
 }
 
-impl<S> ParseErrorWithSource<S> {
-    pub fn new(source: S, error: ParseError) -> Self {
-        Self { source, error }
+impl<E, S> WithSourceCode<E, S> {
+    pub fn new(source: S, error: E) -> Self {
+        Self { error, source }
     }
 
-    pub fn error(&self) -> &ParseError {
+    pub fn error(&self) -> &E {
         &self.error
     }
 
-    pub fn into_error(self) -> ParseError {
+    pub fn into_error(self) -> E {
         self.error
     }
 }
 
-impl<S> std::fmt::Display for ParseErrorWithSource<S> {
+impl<E: std::fmt::Display, S> std::fmt::Display for WithSourceCode<E, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.error)
     }
 }
 
-impl<S> std::error::Error for ParseErrorWithSource<S> where S: std::fmt::Debug {}
+impl<E: std::fmt::Debug + std::fmt::Display, S: std::fmt::Debug> std::error::Error
+    for WithSourceCode<E, S>
+{
+}
 
-// Implementation for types that implement AsRef<str> (like Source)
-// This allows us to expand single-character spans to full tokens
-impl<S> Diagnostic for ParseErrorWithSource<S>
+impl<E, S> Diagnostic for WithSourceCode<E, S>
 where
+    E: Diagnostic + std::fmt::Debug + std::fmt::Display,
     S: AsRef<str> + miette::SourceCode + std::fmt::Debug,
 {
     fn source_code(&self) -> Option<&dyn miette::SourceCode> {
@@ -352,6 +350,9 @@ where
         self.error.help()
     }
 }
+
+/// Convenience type alias for a `ParseError` wrapped with source code.
+pub type ParseErrorWithSource<S> = WithSourceCode<ParseError, S>;
 
 /// Error type for file-based parsing operations
 #[derive(Debug, Error)]
