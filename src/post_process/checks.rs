@@ -420,12 +420,18 @@ fn add_windows_system_libs(
     let all_deny: Vec<String> = build_deny.into_iter().chain(host_deny).collect();
 
     if all_allow.is_empty() && all_deny.is_empty() {
-        // No dsolists found: fall back to hardcoded WIN_ALLOWLIST.
-        // Use **/ prefix so patterns match both bare names ("KERNEL32.dll")
-        // and fully resolved paths ("C:\Windows\system32\KERNEL32.dll").
+        // No dsolists found: fall back to hardcoded allowlist.
+        // 1. Allow any DLL under well-known Windows system directories.
+        //    Globset normalises backslashes on Windows, so forward-slash
+        //    patterns match paths like "C:\Windows\system32\SHLWAPI.dll".
+        for dir in &["C:/Windows/system32/**", "C:/Windows/SysWOW64/**"] {
+            allow_builder.add(GlobBuilder::new(dir).case_insensitive(true).build()?);
+        }
+        // 2. Also allow the bare DLL names from WIN_ALLOWLIST so that
+        //    cross-compiled builds (where resolve_libraries cannot stat
+        //    the Windows filesystem) still pass.
         for pattern in WIN_ALLOWLIST {
-            let full_pattern = format!("**/{pattern}");
-            allow_builder.add(GlobBuilder::new(&full_pattern).case_insensitive(true).build()?);
+            allow_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
         }
         return Ok(());
     }
