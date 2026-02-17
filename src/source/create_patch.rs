@@ -695,18 +695,19 @@ fn find_url_cache_dir(
 ) -> Result<PathBuf, SourceError> {
     use rattler_build_source_cache::{CacheIndex, Checksum};
 
-    // Convert checksum from stage1 to cache format (prefer sha256, fallback to md5)
-    let checksum = url_src
-        .sha256
-        .as_ref()
-        .map(|hash| Checksum::Sha256(hash.to_vec()))
-        .or_else(|| {
-            url_src
-                .md5
-                .as_ref()
-                .map(|hash| Checksum::Md5(hash.to_vec()))
-        })
-        .ok_or_else(|| SourceError::NoChecksum("No checksum for URL source".to_string()))?;
+    // Collect all checksums for cache key generation
+    let mut checksums = Vec::new();
+    if let Some(sha256) = &url_src.sha256 {
+        checksums.push(Checksum::Sha256(sha256.to_vec()));
+    }
+    if let Some(md5) = &url_src.md5 {
+        checksums.push(Checksum::Md5(md5.to_vec()));
+    }
+    if checksums.is_empty() {
+        return Err(SourceError::NoChecksum(
+            "No checksum for URL source".to_string(),
+        ));
+    }
 
     let first_url = url_src
         .url
@@ -714,7 +715,7 @@ fn find_url_cache_dir(
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
     // Generate cache key using the same logic as the source cache
-    let key = CacheIndex::generate_cache_key(first_url, Some(&checksum));
+    let key = CacheIndex::generate_cache_key(first_url, &checksums);
 
     // The source cache stores extracted archives as "{key}_extracted"
     let extracted_dir = cache_dir.join(format!("{}_extracted", key));

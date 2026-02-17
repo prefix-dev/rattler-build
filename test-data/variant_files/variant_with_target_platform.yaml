@@ -1,0 +1,5 @@
+target_platform:
+  - linux-aarch64
+
+python:
+  - "3.11"

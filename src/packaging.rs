@@ -702,6 +702,9 @@ pub fn package_conda(
 
     tracing::info!("Post-processing done!");
 
+    // Validate any dsolist JSON files being packaged (CEP-28)
+    post_process::checks::validate_dsolist_files(tmp.temp_dir.path())?;
+
     let info_folder = tmp.temp_dir.path().join("info");
 
     tracing::info!("Writing test files");
@@ -727,9 +730,9 @@ pub fn package_conda(
         tmp.add_files(recipe_files);
     }
 
-    tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
     if output.is_python_version_independent() {
+        tracing::info!("Creating entry points");
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);

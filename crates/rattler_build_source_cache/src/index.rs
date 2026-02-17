@@ -74,7 +74,7 @@ impl CacheIndex {
 
         // Create metadata directory if it doesn't exist
         if !metadata_dir.exists() {
-            tokio::fs::create_dir_all(&metadata_dir).await?;
+            fs_err::tokio::create_dir_all(&metadata_dir).await?;
         }
 
         let mut index = Self {
@@ -93,7 +93,7 @@ impl CacheIndex {
     async fn load_all(&mut self) -> Result<(), CacheError> {
         let mut entries = HashMap::new();
 
-        let mut dir = tokio::fs::read_dir(&self.metadata_dir).await?;
+        let mut dir = fs_err::tokio::read_dir(&self.metadata_dir).await?;
         while let Some(entry) = dir.next_entry().await? {
             if let Some(filename) = entry.file_name().to_str()
                 && filename.ends_with(".json")
@@ -101,7 +101,7 @@ impl CacheIndex {
                 let key = filename.trim_end_matches(".json");
                 let metadata_path = self.metadata_dir.join(filename);
 
-                match tokio::fs::read_to_string(&metadata_path).await {
+                match fs_err::tokio::read_to_string(&metadata_path).await {
                     Ok(content) => match serde_json::from_str::<CacheEntry>(&content) {
                         Ok(cache_entry) => {
                             entries.insert(key.to_string(), cache_entry);
@@ -121,18 +121,15 @@ impl CacheIndex {
         Ok(())
     }
 
-    /// Generate a cache key from URL and optional checksum
-    pub fn generate_cache_key(
-        url: &url::Url,
-        checksum: Option<&crate::source::Checksum>,
-    ) -> String {
+    /// Generate a cache key from URL and checksums
+    pub fn generate_cache_key(url: &url::Url, checksums: &[crate::source::Checksum]) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         url.as_str().hash(&mut hasher);
 
-        if let Some(cs) = checksum {
+        for cs in checksums {
             cs.to_hex().hash(&mut hasher);
         }
 
@@ -167,7 +164,7 @@ impl CacheIndex {
         // Persist to disk
         let metadata_path = self.metadata_dir.join(format!("{}.json", key));
         let content = serde_json::to_string_pretty(&entry)?;
-        tokio::fs::write(&metadata_path, content).await?;
+        fs_err::tokio::write(&metadata_path, content).await?;
 
         Ok(())
     }
@@ -183,7 +180,7 @@ impl CacheIndex {
             // Persist the update
             let metadata_path = self.metadata_dir.join(format!("{}.json", key));
             let content = serde_json::to_string_pretty(&updated_entry)?;
-            tokio::fs::write(&metadata_path, content).await?;
+            fs_err::tokio::write(&metadata_path, content).await?;
         }
         Ok(())
     }
@@ -228,27 +225,27 @@ impl CacheIndex {
                     SourceType::Url => {
                         // Remove archive file
                         if cache_path.exists() && cache_path.is_file() {
-                            let _ = tokio::fs::remove_file(&cache_path).await;
+                            let _ = fs_err::tokio::remove_file(&cache_path).await;
                         }
 
                         // Remove extracted directory
                         if let Some(extracted_path) = self.get_extracted_path(&entry)
                             && extracted_path.exists()
                         {
-                            let _ = tokio::fs::remove_dir_all(&extracted_path).await;
+                            let _ = fs_err::tokio::remove_dir_all(&extracted_path).await;
                         }
                     }
                     SourceType::Git => {
                         // Remove git repository directory
                         if cache_path.exists() && cache_path.is_dir() {
-                            let _ = tokio::fs::remove_dir_all(&cache_path).await;
+                            let _ = fs_err::tokio::remove_dir_all(&cache_path).await;
                         }
                     }
                 }
 
                 // Remove the metadata file
                 let metadata_path = self.metadata_dir.join(format!("{}.json", key));
-                let _ = tokio::fs::remove_file(&metadata_path).await;
+                let _ = fs_err::tokio::remove_file(&metadata_path).await;
             }
         }
 

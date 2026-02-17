@@ -22,14 +22,14 @@ mod source_cache_tests {
     #[tokio::test]
     async fn test_cache_key_generation() {
         let url = url::Url::parse("https://example.com/file.tar.gz").unwrap();
-        let checksum = Some(Checksum::Sha256(vec![1, 2, 3, 4]));
+        let checksum = Checksum::Sha256(vec![1, 2, 3, 4]);
 
-        let key1 = CacheIndex::generate_cache_key(&url, checksum.as_ref());
-        let key2 = CacheIndex::generate_cache_key(&url, checksum.as_ref());
+        let key1 = CacheIndex::generate_cache_key(&url, std::slice::from_ref(&checksum));
+        let key2 = CacheIndex::generate_cache_key(&url, &[checksum]);
 
         assert_eq!(key1, key2);
 
-        let key3 = CacheIndex::generate_cache_key(&url, None);
+        let key3 = CacheIndex::generate_cache_key(&url, &[]);
         assert_ne!(key1, key3);
     }
 
@@ -97,13 +97,13 @@ mod source_cache_tests {
         fs_err::write(&file_path, data).unwrap();
 
         // Validate should succeed
-        assert!(checksum.validate(&file_path));
+        assert!(checksum.validate(&file_path).is_ok());
 
         // Write different data
         fs_err::write(&file_path, b"different data").unwrap();
 
         // Validate should fail
-        assert!(!checksum.validate(&file_path));
+        assert!(checksum.validate(&file_path).is_err());
     }
 
     #[tokio::test]
@@ -130,12 +130,13 @@ mod source_cache_tests {
         let url = url::Url::parse("https://github.com/example/repo.git").unwrap();
         let reference = GitReference::Branch("main".to_string());
 
-        let git_source = GitSource::new(url.clone(), reference.clone(), Some(1), false);
+        let git_source = GitSource::new(url.clone(), reference.clone(), Some(1), false, true);
 
         assert_eq!(git_source.url, url);
         assert_eq!(git_source.reference, reference);
         assert_eq!(git_source.depth, Some(1));
         assert!(!git_source.lfs);
+        assert!(git_source.submodules);
 
         let git_url = git_source.to_git_url();
         assert_eq!(git_url.repository(), &url);

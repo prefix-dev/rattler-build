@@ -1,0 +1,48 @@
+package:
+  name: powershell-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    interpreter: powershell
+    content: |
+      Write-Output 'Testing PowerShell Interpreter'
+
+      $ErrorActionPreference = 'Stop'
+
+      # Create test data and output file
+      $testData = @(
+        @{ name = 'package1'; version = '1.0' },
+        @{ name = 'package2'; version = '2.0' }
+      )
+
+      # Write output to a file
+      $outputPath = Join-Path -Path $Env:PREFIX -ChildPath powershell_test_output.txt
+
+      foreach ($pkg in $testData) {
+        Add-Content -Path $outputPath -Value "$($pkg.name): $($pkg.version)"
+      }
+
+      Write-Output 'PowerShell test completed successfully'
+
+requirements:
+  host:
+    - powershell
+
+tests:
+  - script:
+      - if: unix
+        then: |
+          test -f $PREFIX/powershell_test_output.txt
+          grep "package1: 1.0" $PREFIX/powershell_test_output.txt
+          grep "package2: 2.0" $PREFIX/powershell_test_output.txt
+      - if: win
+        then: |
+          if not exist %PREFIX%\powershell_test_output.txt exit 1
+          findstr "package1: 1.0" %PREFIX%\powershell_test_output.txt
+          findstr "package2: 2.0" %PREFIX%\powershell_test_output.txt
+
+about:
+  summary: Test package for PowerShell interpreter support
+  license: MIT
