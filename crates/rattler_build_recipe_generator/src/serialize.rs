@@ -76,12 +76,16 @@ pub struct About {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub license_file: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub license_file: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub documentation: Option<String>,
+    /// Optional YAML comment to emit above the `license:` field.
+    /// Not serialized by serde — injected by the `Display` impl.
+    #[serde(skip)]
+    pub license_warning: Option<String>,
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -145,6 +149,14 @@ impl fmt::Display for Recipe {
                 writeln!(f)?;
             }
             first_line = false;
+            // Inject a warning comment above the license field if present
+            if line.starts_with("  license:")
+                && let Some(warning) = &self.about.license_warning
+            {
+                for comment_line in warning.lines() {
+                    writeln!(f, "  # {comment_line}")?;
+                }
+            }
             writeln!(f, "{}", line)?;
         }
         Ok(())
