@@ -285,25 +285,25 @@ async fn fetch_pypi_metadata(
 ) -> miette::Result<PyPiMetadata> {
     let (info, urls) = if let Some(version) = &opts.version {
         let url = format!("https://pypi.org/pypi/{}/{}/json", opts.package, version);
-        let release: PyPrReleaseResponse = client
-            .get(&url)
-            .send()
-            .await
-            .into_diagnostic()?
-            .json()
-            .await
-            .into_diagnostic()?;
+        let response = client.get(&url).send().await.into_diagnostic()?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            miette::bail!(
+                "Package '{}' version '{}' not found on PyPI",
+                opts.package,
+                version
+            );
+        }
+        let response = response.error_for_status().into_diagnostic()?;
+        let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
         (release.info, release.urls)
     } else {
         let url = format!("https://pypi.org/pypi/{}/json", opts.package);
-        let response: PyPiResponse = client
-            .get(&url)
-            .send()
-            .await
-            .into_diagnostic()?
-            .json()
-            .await
-            .into_diagnostic()?;
+        let response = client.get(&url).send().await.into_diagnostic()?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            miette::bail!("Package '{}' not found on PyPI", opts.package);
+        }
+        let response = response.error_for_status().into_diagnostic()?;
+        let response: PyPiResponse = response.json().await.into_diagnostic()?;
 
         // Get the latest release
         let urls = response
