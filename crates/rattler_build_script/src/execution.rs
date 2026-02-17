@@ -166,6 +166,7 @@ impl Script {
         let mut valid_script_extensions = Vec::new();
         if cfg!(windows) {
             valid_script_extensions.push("bat");
+            valid_script_extensions.push("ps1");
         } else {
             valid_script_extensions.push("sh");
         }
@@ -403,8 +404,8 @@ impl Decoder for CrLfNormalizer {
 
 use crate::interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, Interpreter,
-    NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter,
-    RubyInterpreter,
+    NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PowerShellInterpreter,
+    PythonInterpreter, RInterpreter, RubyInterpreter,
 };
 use rattler_shell::shell;
 
@@ -422,6 +423,7 @@ pub async fn run_script(
         "rscript" => RInterpreter.run(exec_args).await?,
         "ruby" => RubyInterpreter.run(exec_args).await?,
         "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
+        "powershell" => PowerShellInterpreter.run(exec_args).await?,
         _ => {
             return Err(
                 std::io::Error::other(format!("Unsupported interpreter: {}", interpreter)).into(),

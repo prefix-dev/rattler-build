@@ -1,0 +1,7 @@
+package:
+  name: powershell-default
+  version: 0.1.0
+
+build:
+  skip:
+    - unix
