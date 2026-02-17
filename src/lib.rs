@@ -740,6 +740,7 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
     tool_configuration: Configuration,
+    markdown_summary: Option<&Path>,
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
@@ -902,6 +903,14 @@ pub async fn run_build_from_args(
             tracing::error!("Error writing build summary: {}", e);
             e
         });
+
+        // Write to markdown summary file if requested
+        if let Some(md_path) = markdown_summary {
+            let _ = output.write_markdown_summary(md_path).map_err(|e| {
+                tracing::error!("Error writing markdown summary: {}", e);
+                e
+            });
+        }
     }
 
     Ok(())
@@ -1418,7 +1427,7 @@ pub async fn build_recipes(
     outputs = skip_noarch(outputs, &tool_config).await?;
 
     // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-    run_build_from_args(outputs, tool_config).await?;
+    run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
 }
@@ -1701,6 +1710,7 @@ pub async fn debug_recipe(
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
+        markdown_summary: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
