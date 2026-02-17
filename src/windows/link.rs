@@ -20,6 +20,16 @@ pub struct Dll {
     libraries: HashSet<PathBuf>,
 }
 
+/// File extensions that are known to be PE (Portable Executable) files on Windows.
+const PE_EXTENSIONS: &[&str] = &["dll", "exe", "pyd", "sys", "ocx", "drv", "cpl", "scr", "efi"];
+
+/// Returns true if the file extension indicates a potential PE file.
+fn has_pe_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| PE_EXTENSIONS.iter().any(|pe_ext| ext.eq_ignore_ascii_case(pe_ext)))
+}
+
 /// List of System DLLs that are allowed to be linked against.
 pub const WIN_ALLOWLIST: &[&str] = &[
     "ADVAPI32.dll",
@@ -37,6 +47,7 @@ pub const WIN_ALLOWLIST: &[&str] = &[
     "PSAPI.DLL",
     "RPCRT4.dll",
     "SHELL32.dll",
+    "SHLWAPI.dll",
     "USER32.dll",
     "USERENV.dll",
     "WINHTTP.dll",
@@ -57,6 +68,10 @@ pub enum DllParseError {
 impl Dll {
     /// Try to parse a PE file and create a Dll analyzer, returning None for non-PE or invalid PE files
     pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
+        if !has_pe_extension(path) {
+            return Ok(None);
+        }
+
         let file = File::open(path)?;
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
 

@@ -420,9 +420,12 @@ fn add_windows_system_libs(
     let all_deny: Vec<String> = build_deny.into_iter().chain(host_deny).collect();
 
     if all_allow.is_empty() && all_deny.is_empty() {
-        // No dsolists found: fall back to hardcoded WIN_ALLOWLIST
+        // No dsolists found: fall back to hardcoded WIN_ALLOWLIST.
+        // Use **/ prefix so patterns match both bare names ("KERNEL32.dll")
+        // and fully resolved paths ("C:\Windows\system32\KERNEL32.dll").
         for pattern in WIN_ALLOWLIST {
-            allow_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
+            let full_pattern = format!("**/{pattern}");
+            allow_builder.add(GlobBuilder::new(&full_pattern).case_insensitive(true).build()?);
         }
         return Ok(());
     }
@@ -556,8 +559,9 @@ pub fn perform_linking_checks(
                                 .get(&libpath.to_path_buf().into())
                             && let Some(nature) = prefix_info.package_to_nature.get(package)
                         {
-                            // Only take shared libraries into account.
-                            if nature == &PackageNature::DSOLibrary {
+                            // Accept any package that provides shared objects (DSO libraries,
+                            // interpreters like python providing python3XX.dll, plugin libraries, etc.)
+                            if nature.provides_shared_objects() {
                                 file_dsos.push((libpath.to_path_buf(), package.clone()));
                             }
                         }
