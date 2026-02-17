@@ -9,7 +9,7 @@ description = "Variant configuration system for rattler-build"
 
 [features]
 default = ["parser"]
-parser = ["minijinja", "miette"]
+parser = ["minijinja"]
 
 [dependencies]
 # Core serde
@@ -35,7 +35,7 @@ minijinja = { version = "2.11.0", features = [
 
 # Error handling
 thiserror = "2.0.17"
-miette = { workspace = true, optional = true }
+miette = { workspace = true }
 
 # Utilities
 tracing = { workspace = true }
@@ -46,7 +46,5 @@ regex = { workspace = true }
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
 serial_test = "3.2.0"
-rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser", version = "0.1.0", features = [
-  "miette",
-] }
+rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser", version = "0.1.0" }
 miette = { workspace = true, features = ["fancy"] }

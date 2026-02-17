@@ -4,7 +4,6 @@ use marked_yaml::Span;
 use std::{path::PathBuf, sync::Arc};
 use thiserror::Error;
 
-#[cfg(feature = "miette")]
 use miette::{Diagnostic, SourceSpan};
 
 /// Result type for parsing operations
@@ -163,7 +162,6 @@ impl ParseError {
     }
 }
 
-#[cfg(feature = "miette")]
 impl Diagnostic for ParseError {
     fn labels(&self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
         if let Self::IoError { .. } = self {
@@ -231,13 +229,11 @@ pub fn format_span(span: &Span) -> String {
 }
 
 /// Convert marked_yaml Span to miette SourceSpan
-#[cfg(feature = "miette")]
 fn span_to_source_span(span: &Span) -> SourceSpan {
     span_to_source_span_with_source(span, None)
 }
 
 /// Convert marked_yaml Span to miette SourceSpan, optionally using source code to expand single-character spans
-#[cfg(feature = "miette")]
 pub fn span_to_source_span_with_source(span: &Span, source: Option<&str>) -> SourceSpan {
     if let Some(start) = span.start() {
         let offset = start.character();
@@ -258,7 +254,6 @@ pub fn span_to_source_span_with_source(span: &Span, source: Option<&str>) -> Sou
 }
 
 /// Find the length of a YAML token starting at the given byte offset
-#[cfg(feature = "miette")]
 fn find_token_length(src: &str, start: usize) -> usize {
     let remaining = &src[start..];
     let mut len = 0;
@@ -298,14 +293,12 @@ fn find_token_length(src: &str, start: usize) -> usize {
 ///     Ok(recipe) => { /* ... */ }
 /// }
 /// ```
-#[cfg(feature = "miette")]
 #[derive(Debug)]
 pub struct ParseErrorWithSource<S> {
     source: S,
     error: ParseError,
 }
 
-#[cfg(feature = "miette")]
 impl<S> ParseErrorWithSource<S> {
     pub fn new(source: S, error: ParseError) -> Self {
         Self { source, error }
@@ -320,19 +313,16 @@ impl<S> ParseErrorWithSource<S> {
     }
 }
 
-#[cfg(feature = "miette")]
 impl<S> std::fmt::Display for ParseErrorWithSource<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.error)
     }
 }
 
-#[cfg(feature = "miette")]
 impl<S> std::error::Error for ParseErrorWithSource<S> where S: std::fmt::Debug {}
 
 // Implementation for types that implement AsRef<str> (like Source)
 // This allows us to expand single-character spans to full tokens
-#[cfg(feature = "miette")]
 impl<S> Diagnostic for ParseErrorWithSource<S>
 where
     S: AsRef<str> + miette::SourceCode + std::fmt::Debug,

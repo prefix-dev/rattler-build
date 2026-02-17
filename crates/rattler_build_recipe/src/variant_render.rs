@@ -12,10 +12,12 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
+use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
@@ -250,6 +252,17 @@ fn add_pins_to_variant(
     Ok(())
 }
 
+/// Errors that can occur during topological sorting of recipe variants.
+#[derive(Debug, Clone, Error, Diagnostic)]
+pub enum TopologicalSortError {
+    /// A dependency cycle was detected among recipe outputs.
+    #[error("cycle detected in recipe outputs: {package}")]
+    CycleDetected {
+        /// The package name where the cycle was detected.
+        package: String,
+    },
+}
+
 /// Sort rendered variants topologically based on pin_subpackage dependencies
 ///
 /// This ensures that when building multi-output packages, outputs are built in the
@@ -258,7 +271,7 @@ fn add_pins_to_variant(
 /// Returns the variants in topological order, or an error if there's a cycle.
 pub fn topological_sort_variants(
     variants: Vec<RenderedVariant>,
-) -> Result<Vec<RenderedVariant>, String> {
+) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     if variants.is_empty() {
         return Ok(variants);
     }
@@ -276,7 +289,7 @@ type DependencyGraph = (DiGraph<usize, ()>, BTreeMap<usize, NodeIndex>);
 fn build_dependency_graph(
     variants: &[RenderedVariant],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<DependencyGraph, String> {
+) -> Result<DependencyGraph, TopologicalSortError> {
     // Create a directed graph
     let mut graph = DiGraph::<usize, ()>::new();
     let mut idx_to_node: BTreeMap<usize, NodeIndex> = BTreeMap::new();
@@ -312,10 +325,9 @@ fn build_dependency_graph(
     if let Err(cycle) = petgraph::algo::toposort(&graph, None) {
         let cycle_idx = graph[cycle.node_id()];
         let cycle_pkg = &variants[cycle_idx].recipe.package.name;
-        return Err(format!(
-            "Cycle detected in recipe outputs: {}",
-            cycle_pkg.as_normalized()
-        ));
+        return Err(TopologicalSortError::CycleDetected {
+            package: cycle_pkg.as_normalized().to_string(),
+        });
     }
 
     Ok((graph, idx_to_node))
@@ -331,7 +343,7 @@ fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
     _graph: &DependencyGraph,
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<Vec<RenderedVariant>, String> {
+) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     // Use a stable topological sort that preserves original order when possible
     // We iterate through variants in their original order and only skip those
     // that have unsatisfied dependencies
@@ -718,7 +730,8 @@ fn render_with_empty_combinations(
 
     // Sort variants topologically by pin_subpackage dependencies
     // This ensures we resolve build strings in the correct order
-    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+    let mut results = topological_sort_variants(results)
+        .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     // Resolve build strings in topological order
     // For each variant, we:
@@ -1072,7 +1085,8 @@ fn render_with_variants(
     }
 
     // Sort variants topologically by pin_subpackage dependencies
-    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+    let mut results = topological_sort_variants(results)
+        .map_err(|e| ParseError::from_message(e.to_string()))?;
 
     // Resolve build strings in topological order
     for i in 0..results.len() {
