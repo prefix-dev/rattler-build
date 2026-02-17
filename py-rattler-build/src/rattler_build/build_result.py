@@ -21,6 +21,7 @@ class BuildResult:
         variant: Dictionary of variant values used for this build
         build_time: Build duration in seconds
         log: Captured build log messages (info level and above)
+        output_dir: Directory where the built packages are stored
     """
 
     def __init__(
@@ -33,6 +34,7 @@ class BuildResult:
         variant: dict[str, str],
         build_time: float,
         log: list[str],
+        output_dir: Path,
     ):
         self.packages = packages
         self.name = name
@@ -42,9 +44,10 @@ class BuildResult:
         self.variant = variant
         self.build_time = build_time
         self.log = log
+        self.output_dir = output_dir
 
     @classmethod
-    def _from_inner(cls, inner: BuildResultPy) -> BuildResult:
+    def _from_inner(cls, inner: BuildResultPy, output_dir: Path) -> BuildResult:
         """Create a BuildResult from the Rust object (internal use only)."""
         return cls(
             packages=inner.packages,
@@ -55,6 +58,7 @@ class BuildResult:
             variant=inner.variant,
             build_time=inner.build_time,
             log=inner.log,
+            output_dir=output_dir,
         )
 
     def __repr__(self) -> str:
@@ -64,5 +68,5 @@ class BuildResult:
         return (
             f"BuildResult({self.name}={self.version}={self.build_string}, "
             f"{pkg_count} {pkg_str}, platform={self.platform}, "
-            f"time={self.build_time:.2f}s)"
+            f"output_dir={self.output_dir}, time={self.build_time:.2f}s)"
         )

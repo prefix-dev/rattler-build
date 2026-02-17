@@ -9,15 +9,16 @@ class JinjaConfig:
     """Python wrapper for PyJinjaConfig to provide a cleaner interface.
 
     Args:
-        platform: Platform configuration (target, build, host platforms, experimental flag, and recipe_path)
+        platform: Platform configuration (target, build, host platforms, experimental flag)
         allow_undefined: Whether to allow undefined variables in Jinja templates
         variant: Variant configuration dictionary
+        recipe_path: Path to the recipe file (for relative path resolution in Jinja functions)
 
     Example:
         ```python
         from rattler_build.tool_config import PlatformConfig
 
-        platform = PlatformConfig("linux-64")
+        platform = PlatformConfig(target_platform="linux-64")
         config = JinjaConfig(platform=platform)
         ```
     """
@@ -30,6 +31,7 @@ class JinjaConfig:
         platform: PlatformConfig | None = None,
         allow_undefined: bool | None = None,
         variant: dict[str, Any] | None = None,
+        recipe_path: str | Path | None = None,
     ):
         self.platform = platform
         self._config = PyJinjaConfig(
@@ -39,7 +41,7 @@ class JinjaConfig:
             experimental=platform.experimental if platform else None,
             allow_undefined=allow_undefined,
             variant=variant,
-            recipe_path=Path(platform.recipe_path) if (platform and platform.recipe_path) else None,
+            recipe_path=Path(recipe_path) if recipe_path else None,
         )
 
     @property
