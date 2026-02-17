@@ -2738,6 +2738,34 @@ def test_topological_sort_with_variants(
     )
 
 
+@pytest.mark.skipif(
+    not (
+        (platform.system() == "Darwin" and platform.machine() == "arm64")
+        or (platform.system() == "Linux" and platform.machine() == "x86_64")
+    ),
+    reason="Only runs on macOS arm64 or Linux x86_64",
+)
+def test_v0_legacy_tests(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that legacy v0 packages with run_test.sh and run_test.py execute correctly.
+
+    This is a regression test for a bug where CopyDir was called with a file
+    path instead of the test directory, causing 'File already exists' errors.
+    """
+    import urllib.request
+
+    if platform.system() == "Darwin":
+        url = "https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py39he7485ab_3.conda"
+        filename = "zstandard-0.23.0-py39he7485ab_3.conda"
+    else:
+        url = "https://conda.anaconda.org/conda-forge/linux-64/zstandard-0.23.0-py311hbc35293_1.conda"
+        filename = "zstandard-0.23.0-py311hbc35293_1.conda"
+
+    package_path = tmp_path / filename
+    urllib.request.urlretrieve(url, package_path)
+
+    rattler_build.test(str(package_path))
+
+
 def test_git_lfs_local_source(rattler_build: RattlerBuild, tmp_path: Path):
     """
     Tests that git sources with LFS-tracked files work correctly for local repos.
