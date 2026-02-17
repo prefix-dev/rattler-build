@@ -605,13 +605,18 @@ pub struct CacheStats {
 
 // Helper functions
 
-fn extract_filename_from_header(header_value: &str) -> Option<String> {
+pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String> {
     for part in header_value.split(';') {
         let part = part.trim();
         if part.starts_with("filename=") {
             let filename = part.strip_prefix("filename=")?;
             let filename = filename.trim_matches('"').trim_matches('\'');
             if !filename.is_empty() {
+                // Strip any path components — only keep the base filename
+                let filename = Path::new(filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(filename);
                 return Some(filename.to_string());
             }
         }

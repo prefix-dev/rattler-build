@@ -220,4 +220,35 @@ mod source_cache_tests {
             "Non-archive path should not be extracted"
         );
     }
+
+    #[test]
+    fn test_extract_filename_from_header_strips_path_components() {
+        use crate::cache::extract_filename_from_header;
+
+        // Simple filename
+        assert_eq!(
+            extract_filename_from_header("attachment; filename=\"file.tar.gz\""),
+            Some("file.tar.gz".to_string())
+        );
+
+        // Filename with path components (e.g. from GitHub raw downloads)
+        assert_eq!(
+            extract_filename_from_header(
+                "attachment; filename=\"testdata/highgui/video/VID00003-20100701-2204.avi\""
+            ),
+            Some("VID00003-20100701-2204.avi".to_string())
+        );
+
+        // Filename with single path component
+        assert_eq!(
+            extract_filename_from_header("attachment; filename=\"subdir/archive.tar.gz\""),
+            Some("archive.tar.gz".to_string())
+        );
+
+        // Empty filename
+        assert_eq!(
+            extract_filename_from_header("attachment; filename=\"\""),
+            None
+        );
+    }
 }
