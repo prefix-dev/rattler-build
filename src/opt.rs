@@ -73,14 +73,20 @@ pub enum SubCommands {
     /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
 
-    /// Debug a recipe by setting up the environment without running the build script
-    Debug(DebugOpts),
+    /// Debug a recipe: set up the build environment and open a debug shell.
+    ///
+    /// When called with a recipe, this sets up the build/host environments,
+    /// creates the build script, and drops you into an interactive shell
+    /// in the work directory.
+    ///
+    /// Subcommands:
+    ///   shell     - Open a debug shell in an existing build environment
+    ///   host-add  - Install additional packages into the host prefix
+    ///   build-add - Install additional packages into the build prefix
+    Debug(DebugArgs),
 
     /// Create a patch for a directory
     CreatePatch(CreatePatchOpts),
-
-    /// Open a debug shell in the build environment
-    DebugShell(DebugShellOpts),
 
     /// Package-related subcommands
     #[command(subcommand)]
@@ -94,7 +100,90 @@ pub enum SubCommands {
     BumpRecipe(BumpRecipeOpts),
 }
 
-/// Options for the debug-shell command
+/// Arguments for the `debug` command.
+///
+/// When no subcommand is given, `debug` behaves like the old `debug` + `debug-shell` combined:
+/// it sets up the environment from a recipe and then opens a debug shell.
+///
+/// Subcommands allow more granular operations.
+#[derive(Parser)]
+#[command(args_conflicts_with_subcommands = true)]
+pub struct DebugArgs {
+    /// The debug subcommand to run. If not specified, sets up the environment
+    /// from a recipe and drops into a debug shell.
+    #[command(subcommand)]
+    pub subcommand: Option<DebugSubCommands>,
+
+    /// Arguments for setting up a debug environment (used when no subcommand is given)
+    #[command(flatten)]
+    pub setup: Option<DebugSetupArgs>,
+}
+
+/// Arguments for the default debug setup mode (no subcommand)
+#[derive(Parser, Debug, Clone)]
+pub struct DebugSetupArgs {
+    /// Recipe file to debug
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// Output directory for build artifacts
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
+
+    /// The target platform to build for
+    #[arg(long)]
+    pub target_platform: Option<Platform>,
+
+    /// The host platform to build for (defaults to target_platform)
+    #[arg(long)]
+    pub host_platform: Option<Platform>,
+
+    /// The build platform to build for (defaults to current platform)
+    #[arg(long)]
+    pub build_platform: Option<Platform>,
+
+    /// Channels to use when building
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+
+    /// Common options
+    #[clap(flatten)]
+    pub common: CommonOpts,
+
+    /// Name of the specific output to debug (only required when a recipe has multiple outputs)
+    #[arg(long, help = "Name of the specific output to debug")]
+    pub output_name: Option<String>,
+
+    /// Only set up the environment without opening a shell
+    #[arg(long)]
+    pub no_shell: bool,
+}
+
+/// Debug subcommands
+#[derive(Parser)]
+pub enum DebugSubCommands {
+    /// Open a debug shell in an existing build environment
+    ///
+    /// By default, reads the work directory from the last build in
+    /// rattler-build-log.txt. You can also specify --work-dir explicitly.
+    Shell(DebugShellOpts),
+
+    /// Install additional packages into the host prefix
+    ///
+    /// This command resolves and installs the specified packages into the host
+    /// environment of an existing debug build. Useful for iterating on
+    /// dependencies without re-running the full debug setup.
+    HostAdd(DebugEnvAddOpts),
+
+    /// Install additional packages into the build prefix
+    ///
+    /// This command resolves and installs the specified packages into the build
+    /// environment of an existing debug build. Useful for adding build tools
+    /// without re-running the full debug setup.
+    BuildAdd(DebugEnvAddOpts),
+}
+
+/// Options for the `debug shell` command
 #[derive(Parser, Debug, Clone)]
 pub struct DebugShellOpts {
     /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
@@ -104,6 +193,30 @@ pub struct DebugShellOpts {
     /// Output directory containing rattler-build-log.txt
     #[arg(short, long, default_value = "./output")]
     pub output_dir: PathBuf,
+}
+
+/// Options for `debug host-add` and `debug build-add`
+#[derive(Parser, Debug, Clone)]
+pub struct DebugEnvAddOpts {
+    /// Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
+    #[arg(required = true)]
+    pub specs: Vec<String>,
+
+    /// Channels to search for packages in
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+
+    /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Output directory containing rattler-build-log.txt
+    #[arg(short, long, default_value = "./output")]
+    pub output_dir: PathBuf,
+
+    /// Path to an auth-file to read authentication information from
+    #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
+    pub auth_file: Option<PathBuf>,
 }
 
 /// Package-related subcommands.
@@ -340,7 +453,8 @@ impl CommonData {
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
+    /// Create from CLI options and config file
+    pub fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -1071,7 +1185,7 @@ impl RebuildData {
     }
 }
 
-/// Debug options
+/// Debug options (extracted from DebugArgs for internal use)
 #[derive(Parser)]
 pub struct DebugOpts {
     /// Recipe file to debug
@@ -1129,8 +1243,7 @@ pub struct DebugData {
 }
 
 impl DebugData {
-    /// Generate a new TestData struct from TestOpts and an optional pixi config.
-    /// TestOpts have higher priority than the pixi config.
+    /// Generate a new DebugData struct from DebugOpts and an optional pixi config.
     pub fn from_opts_and_config(opts: DebugOpts, config: Option<ConfigBase<()>>) -> Self {
         Self {
             recipe_path: opts.recipe,
@@ -1143,6 +1256,25 @@ impl DebugData {
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
+        }
+    }
+
+    /// Generate a new DebugData struct from DebugSetupArgs (the new CLI structure).
+    pub fn from_setup_args_and_config(
+        args: DebugSetupArgs,
+        config: Option<ConfigBase<()>>,
+    ) -> Self {
+        Self {
+            recipe_path: args.recipe,
+            output_dir: args.output.unwrap_or_else(|| PathBuf::from("./output")),
+            build_platform: args.build_platform.unwrap_or(Platform::current()),
+            target_platform: args.target_platform.unwrap_or(Platform::current()),
+            host_platform: args
+                .host_platform
+                .unwrap_or_else(|| args.target_platform.unwrap_or(Platform::current())),
+            channels: args.channels,
+            common: CommonData::from_opts_and_config(args.common, config.unwrap_or_default()),
+            output_name: args.output_name,
         }
     }
 }
