@@ -352,9 +352,14 @@ impl SourceCache {
             tracing::info!("Verified expected commit: {}", expected);
         }
 
+        // Handle submodules if needed (defaults to true)
+        if source.submodules {
+            self.git_submodule_update(&repo_path).await?;
+        }
+
         // Handle LFS if needed
         if source.lfs {
-            self.git_lfs_pull(&repo_path).await?;
+            self.git_lfs_pull(&repo_path, &source.url).await?;
         }
 
         // Create cache entry
@@ -385,8 +390,34 @@ impl SourceCache {
         })
     }
 
+    /// Initialize and recursively update git submodules
+    async fn git_submodule_update(&self, repo_path: &Path) -> Result<(), CacheError> {
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .arg("submodule")
+            .arg("update")
+            .arg("--init")
+            .arg("--recursive")
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("Failed to update git submodules: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(CacheError::Git(format!(
+                "Git submodule update failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Pull LFS files for a git repository
-    async fn git_lfs_pull(&self, repo_path: &Path) -> Result<(), CacheError> {
+    async fn git_lfs_pull(
+        &self,
+        repo_path: &Path,
+        source_url: &url::Url,
+    ) -> Result<(), CacheError> {
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
@@ -399,7 +430,38 @@ impl SourceCache {
             return Err(CacheError::Git("git-lfs not installed".to_string()));
         }
 
-        // Fetch LFS files
+        // Point git-lfs at the original source via `lfs.url` config.
+        // The checkout's origin remote points to the local bare database
+        // (set by `git clone --local`), which doesn't have LFS objects.
+        // We use lfs.url rather than modifying origin so only LFS is affected.
+        // For file:// URLs, convert to a plain local path because git-lfs does
+        // not handle the file:// protocol correctly (especially on Windows).
+        let lfs_url = if source_url.scheme() == "file" {
+            source_url
+                .to_file_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| source_url.as_str().to_string())
+        } else {
+            source_url.as_str().to_string()
+        };
+
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .arg("config")
+            .arg("lfs.url")
+            .arg(&lfs_url)
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("Failed to configure lfs.url: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(CacheError::Git(format!(
+                "Failed to configure lfs.url: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        // Fetch LFS files from the configured lfs.url.
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
@@ -689,16 +751,27 @@ impl SourceCache {
             handler.on_download_complete(url.as_str());
         }
 
-        Ok((
-            cache_path,
-            actual_filename.or_else(|| Some(filename.to_string())),
-        ))
+        // If Content-Disposition provided a filename that differs from the URL's,
+        // rename the cached file so downstream code can detect the archive format
+        // from the file extension alone.
+        let final_path = if let Some(ref actual) = actual_filename {
+            let new_path = self.cache_dir.join(format!("{}_{}", key, actual));
+            if new_path != cache_path {
+                fs_err::tokio::rename(&cache_path, &new_path).await?;
+                new_path
+            } else {
+                cache_path
+            }
+        } else {
+            cache_path
+        };
+
+        Ok((final_path, actual_filename))
     }
 
-    /// Check if a file should be extracted
-    fn should_extract(&self, path: &Path) -> bool {
+    /// Check if a file should be extracted based on its filename extension
+    pub(crate) fn should_extract(&self, path: &Path) -> bool {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
         is_archive(name)
     }
 
@@ -954,13 +1027,18 @@ pub struct CacheStats {
 
 // Helper functions
 
-fn extract_filename_from_header(header_value: &str) -> Option<String> {
+pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String> {
     for part in header_value.split(';') {
         let part = part.trim();
         if part.starts_with("filename=") {
             let filename = part.strip_prefix("filename=")?;
             let filename = filename.trim_matches('"').trim_matches('\'');
             if !filename.is_empty() {
+                // Strip any path components — only keep the base filename
+                let filename = Path::new(filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(filename);
                 return Some(filename.to_string());
             }
         }
@@ -968,7 +1046,7 @@ fn extract_filename_from_header(header_value: &str) -> Option<String> {
     None
 }
 
-fn is_archive(name: &str) -> bool {
+pub(crate) fn is_archive(name: &str) -> bool {
     is_tarball(name) || name.ends_with(".zip") || name.ends_with(".7z")
 }
 

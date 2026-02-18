@@ -126,6 +126,7 @@ native-tls = [
   'rattler_upload/native-tls',
   'rattler_build_networking/native-tls',
   'rattler_build_source_cache/native-tls',
+  'rattler_build_recipe_generator?/native-tls',
   'http-range-client/default-tls',
 ]
 rustls-tls = [
@@ -141,6 +142,7 @@ rustls-tls = [
   'rattler_upload/rustls-tls',
   'rattler_build_networking/rustls-tls',
   'rattler_build_source_cache/rustls-tls',
+  'rattler_build_recipe_generator?/rustls-tls',
   'http-range-client/rustls-tls',
 ]
 tui = [
@@ -291,7 +293,7 @@ sevenz-rust2 = "0.20.1"
 dialoguer = "0.12.0"
 
 # Local rattler-build crates
-rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, features = [
+rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, default-features = false, features = [
   "cli",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }

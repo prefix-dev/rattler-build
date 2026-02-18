@@ -187,8 +187,11 @@ pub async fn run_build(
     }
 
     // Check for symlinks on Windows if not allowed
+    // Skip the check for noarch packages that have __unix in run dependencies,
+    // since they will never be installed on Windows.
     if (output.build_configuration.target_platform.is_windows()
-        || output.build_configuration.target_platform == Platform::NoArch)
+        || (output.build_configuration.target_platform == Platform::NoArch
+            && !has_unix_virtual_package(&output)))
         && !tool_configuration.allow_symlinks_on_windows
     {
         tracing::info!("Checking for symlinks ...");
@@ -241,6 +244,22 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
     }
 
     Ok(())
+}
+
+/// Check if the output has a Unix-specific virtual package (`__unix`, `__osx`,
+/// `__linux`, or `__glibc`) in its finalized run dependencies, indicating this
+/// package is only intended for Unix systems.
+fn has_unix_virtual_package(output: &Output) -> bool {
+    output.finalized_dependencies.as_ref().is_some_and(|deps| {
+        deps.run.depends.iter().any(|dep| {
+            matches!(
+                &dep.spec().name,
+                Some(rattler_conda_types::PackageNameMatcher::Exact(name))
+                    if ["__unix", "__osx", "__linux", "__glibc"]
+                        .contains(&name.as_normalized())
+            )
+        })
+    })
 }
 
 /// Check if any files are symlinks on Windows

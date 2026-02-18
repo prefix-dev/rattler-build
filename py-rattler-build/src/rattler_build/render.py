@@ -125,15 +125,18 @@ class RenderConfig:
     This class configures how recipes are rendered, including platform settings,
     experimental features, and additional Jinja context variables.
 
+    The ``recipe_path`` is **not** set here — it is automatically injected from
+    the :class:`~rattler_build.stage0.Stage0Recipe` during :meth:`render`.
+
     Args:
-        platform: Platform configuration (target, build, host platforms, experimental flag, and recipe_path)
+        platform: Platform configuration (target, build, host platforms, experimental flag)
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
         ```python
         from rattler_build.tool_config import PlatformConfig
 
-        platform = PlatformConfig("linux-64")
+        platform = PlatformConfig(target_platform="linux-64")
         config = RenderConfig(
             platform=platform,
             extra_context={"custom_var": "value", "build_num": 42}
@@ -150,12 +153,40 @@ class RenderConfig:
     ):
         """Create a new render configuration."""
         self.platform = platform
+        self._extra_context = extra_context
         self._config = _render.RenderConfig(
             target_platform=platform.target_platform if platform else None,
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
-            recipe_path=platform.recipe_path if platform else None,
+            recipe_path=None,
+            extra_context=extra_context,
+        )
+
+    @staticmethod
+    def _with_recipe_path(
+        render_config: RenderConfig | None,
+        recipe_path: Path,
+    ) -> _render.RenderConfig:
+        """Return a Rust RenderConfig with *recipe_path* injected.
+
+        This is an internal helper used by :meth:`Stage0Recipe.render` to
+        ensure the recipe path is always set without requiring the user to
+        pass it explicitly.
+        """
+        if render_config is not None:
+            platform = render_config.platform
+            extra_context = render_config._extra_context
+        else:
+            platform = None
+            extra_context = None
+
+        return _render.RenderConfig(
+            target_platform=platform.target_platform if platform else None,
+            build_platform=platform.build_platform if platform else None,
+            host_platform=platform.host_platform if platform else None,
+            experimental=platform.experimental if platform else False,
+            recipe_path=recipe_path,
             extra_context=extra_context,
         )
 
@@ -194,11 +225,6 @@ class RenderConfig:
         """Get whether experimental features are enabled."""
         return self._config.experimental()
 
-    @property
-    def recipe_path(self) -> str | None:
-        """Get the recipe path."""
-        return self._config.recipe_path()
-
     def __repr__(self) -> str:
         return repr(self._config)
 
@@ -209,11 +235,16 @@ class RenderedVariant:
     Each RenderedVariant represents one specific variant of a recipe after
     all Jinja templates have been evaluated and variant values applied.
 
+    The :attr:`recipe_path` is carried over from the
+    :class:`~rattler_build.stage0.Stage0Recipe` that produced this variant
+    and is used automatically by :meth:`run_build`.
+
     Attributes:
         variant: The variant combination used (variable name -> value)
         recipe: The rendered Stage1 recipe
         hash_info: Build string hash information
         pin_subpackages: Pin subpackage dependencies
+        recipe_path: Path to the recipe file on disk
 
     Example:
         ```python
@@ -224,9 +255,15 @@ class RenderedVariant:
         ```
     """
 
-    def __init__(self, inner: _render.RenderedVariant):
+    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
+        self._recipe_path = recipe_path
+
+    @property
+    def recipe_path(self) -> Path:
+        """Get the path to the recipe file on disk."""
+        return self._recipe_path
 
     @property
     def variant(self) -> dict[str, str]:
@@ -285,10 +322,9 @@ class RenderedVariant:
     def run_build(
         self,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path = ".",
+        output_dir: str | Path | None = None,
         channels: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
-        recipe_path: str | Path | None = None,
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
@@ -298,14 +334,15 @@ class RenderedVariant:
         """Build this rendered variant.
 
         This method builds a single rendered variant directly without needing
-        to go back through the Stage0 recipe.
+        to go back through the Stage0 recipe.  The recipe path is taken from
+        this variant automatically (set during :meth:`Stage0Recipe.render`).
 
         Args:
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-            output_dir: Directory to store the built package. Defaults to current directory.
+            output_dir: Directory to store the built package.
+                Defaults to ``<recipe_dir>/output``.
             channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
             progress_callback: Optional progress callback for build events.
-            recipe_path: Path to the recipe file (for copying license files, etc.).
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
@@ -321,8 +358,8 @@ class RenderedVariant:
 
             recipe = Stage0Recipe.from_yaml(yaml_string)
             rendered = recipe.render(VariantConfig())
-            # Build just the first variant
-            result = rendered[0].run_build(output_dir="./output")
+            # Build just the first variant (output goes to <recipe_dir>/output)
+            result = rendered[0].run_build()
             print(f"Built package: {result.packages[0]}")
             ```
         """
@@ -330,14 +367,20 @@ class RenderedVariant:
         if tool_config is None:
             tool_config = ToolConfiguration()
 
+        # Resolve output_dir default
+        if output_dir is None:
+            output_dir = self._recipe_path.parent / "output"
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         # Build this single variant
         rust_result = build_rendered_variant_py(
             rendered_variant=self._inner,
             tool_config=tool_config._inner,
-            output_dir=Path(output_dir),
+            output_dir=output_dir,
             channels=channels if channels is not None else ["conda-forge"],
             progress_callback=progress_callback,
-            recipe_path=Path(recipe_path) if recipe_path else None,
+            recipe_path=self._recipe_path,
             no_build_id=no_build_id,
             package_format=package_format,
             no_include_recipe=no_include_recipe,
@@ -346,7 +389,7 @@ class RenderedVariant:
         )
 
         # Convert Rust BuildResult to Python BuildResult
-        return BuildResult._from_inner(rust_result)
+        return BuildResult._from_inner(rust_result, output_dir=output_dir)
 
     def __repr__(self) -> str:
         return repr(self._inner)
@@ -356,10 +399,9 @@ def build_rendered_variants(
     rendered_variants: list[RenderedVariant],
     *,
     tool_config: ToolConfiguration | None = None,
-    output_dir: str | Path = ".",
+    output_dir: str | Path | None = None,
     channels: list[str] | None = None,
     progress_callback: ProgressCallback | None = None,
-    recipe_path: str | Path | None = None,
     no_build_id: bool = False,
     package_format: str | None = None,
     no_include_recipe: bool = False,
@@ -371,13 +413,15 @@ def build_rendered_variants(
     This is a convenience function for building multiple rendered variants
     in one call, useful when you want to build all variants from a recipe.
 
+    Each variant's :attr:`~RenderedVariant.recipe_path` is used automatically.
+
     Args:
         rendered_variants: List of RenderedVariant objects to build
         tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-        output_dir: Directory to store the built packages. Defaults to current directory.
+        output_dir: Directory to store the built packages.
+            Defaults to ``<recipe_dir>/output`` (resolved per variant).
         channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
         progress_callback: Optional progress callback for build events.
-        recipe_path: Path to the recipe file (for copying license files, etc.).
         no_build_id: Don't include build ID in output directory.
         package_format: Package format ("conda" or "tar.bz2").
         no_include_recipe: Don't include recipe in the output package.
@@ -402,12 +446,12 @@ def build_rendered_variants(
         ''')
         rendered = recipe.render(variant_config)
 
-        # Build all variants at once
-        results = build_rendered_variants(rendered, output_dir="./output")
+        # Build all variants at once (output goes to <recipe_dir>/output)
+        results = build_rendered_variants(rendered)
         for result in results:
             print(f"Built {result.name} {result.version} for {result.platform}")
 
-        # Or build a subset
+        # Or build a subset with explicit output dir
         results = build_rendered_variants(rendered[:2], output_dir="./output")
         ```
     """
@@ -418,7 +462,6 @@ def build_rendered_variants(
             output_dir=output_dir,
             channels=channels,
             progress_callback=progress_callback,
-            recipe_path=recipe_path,
             no_build_id=no_build_id,
             package_format=package_format,
             no_include_recipe=no_include_recipe,

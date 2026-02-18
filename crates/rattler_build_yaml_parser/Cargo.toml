@@ -6,16 +6,12 @@ license.workspace = true
 repository.workspace = true
 description = "Shared YAML parsing infrastructure for rattler-build with Jinja2 template support"
 
-[features]
-default = []
-miette = ["dep:miette"]
-
 [dependencies]
 marked-yaml = { workspace = true }
 rattler_build_jinja = { path = "../rattler_build_jinja", version = "0.1.0" }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-miette = { workspace = true, optional = true }
+miette = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

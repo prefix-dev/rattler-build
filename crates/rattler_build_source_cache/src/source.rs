@@ -113,8 +113,15 @@ pub struct GitSource {
     pub reference: RattlerGitReference,
     pub depth: Option<i32>,
     pub lfs: bool,
+    /// Whether to recursively initialize and update submodules (defaults to true)
+    #[serde(default = "default_submodules")]
+    pub submodules: bool,
     /// Optionally an expected commit hash to verify after checkout
     pub expected_commit: Option<String>,
+}
+
+fn default_submodules() -> bool {
+    true
 }
 
 impl GitSource {
@@ -129,12 +136,14 @@ impl GitSource {
         reference: RattlerGitReference,
         depth: Option<i32>,
         lfs: bool,
+        submodules: bool,
     ) -> Self {
         Self {
             url,
             reference,
             depth,
             lfs,
+            submodules,
             expected_commit: None,
         }
     }
@@ -145,6 +154,7 @@ impl GitSource {
         reference: RattlerGitReference,
         depth: Option<i32>,
         lfs: bool,
+        submodules: bool,
         expected_commit: Option<String>,
     ) -> Self {
         Self {
@@ -152,6 +162,7 @@ impl GitSource {
             reference,
             depth,
             lfs,
+            submodules,
             expected_commit,
         }
     }

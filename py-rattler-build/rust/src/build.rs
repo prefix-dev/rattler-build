@@ -236,7 +236,9 @@ pub fn build_rendered_variant_py(
     // Run the build with log capture and optional tracing subscriber
     let (build_result, log_buffer) =
         tracing_subscriber::with_log_capture(progress_callback, || {
-            run_async_task(async { run_build_from_args(vec![output.clone()], tool_config).await })
+            run_async_task(async {
+                run_build_from_args(vec![output.clone()], tool_config, None).await
+            })
         });
 
     // Extract captured logs

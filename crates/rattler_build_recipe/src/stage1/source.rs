@@ -142,6 +142,10 @@ pub struct GitSource {
     #[serde(default, skip_serializing_if = "is_false")]
     pub lfs: bool,
 
+    /// Whether to recursively initialize and update submodules (defaults to true)
+    #[serde(default = "default_submodules", skip_serializing_if = "is_true")]
+    pub submodules: bool,
+
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<String>,
@@ -283,6 +287,10 @@ impl AttestationConfig {
 
 fn attestation_is_none_or_empty(s: &Option<AttestationConfig>) -> bool {
     s.as_ref().map(|c| c.is_empty()).unwrap_or(true)
+}
+
+fn default_submodules() -> bool {
+    true
 }
 
 /// A url source (usually a tar.gz or tar.bz2 archive) - evaluated

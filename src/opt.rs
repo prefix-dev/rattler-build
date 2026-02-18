@@ -524,6 +524,11 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result")]
     pub debug: bool,
 
+    /// Write a markdown summary to the specified file (appends to the file).
+    /// Useful for generating PR comments or custom reports.
+    #[arg(long, help_heading = "Modifying result")]
+    pub markdown_summary: Option<PathBuf>,
+
     /// Continue building even if (one) of the packages fails to build.
     /// This is useful when building many packages with `--recipe-dir`.`
     #[clap(long)]
@@ -729,6 +734,7 @@ pub struct BuildData {
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
+    pub markdown_summary: Option<PathBuf>,
 }
 
 impl BuildData {
@@ -765,6 +771,7 @@ impl BuildData {
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
+        markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
             up_to,
@@ -805,6 +812,7 @@ impl BuildData {
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
+            markdown_summary,
         }
     }
 }
@@ -856,6 +864,7 @@ impl BuildData {
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
             opts.build_num,
+            opts.markdown_summary,
         )
     }
 }
@@ -910,7 +919,7 @@ pub struct TestOpts {
     #[arg(short = 'c', long = "channel")]
     pub channels: Option<Vec<NamedChannelOrUrl>>,
 
-    /// The package file to test
+    /// The package file or extracted package directory to test
     #[arg(short, long)]
     pub package_file: PathBuf,
 

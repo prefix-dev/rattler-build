@@ -12,10 +12,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
+use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
+use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_types::NormalizedKey;
@@ -27,6 +30,42 @@ use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
+
+/// Errors that can occur during recipe rendering with variant configurations.
+///
+/// This is the primary error type for the rendering layer, covering parse errors,
+/// topological sort failures, variant expansion issues, and more.
+#[derive(Debug, Error, Diagnostic)]
+pub enum RenderError {
+    /// A parse error occurred during recipe evaluation
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Parse(#[from] ParseError),
+
+    /// A topological sort error occurred (e.g., dependency cycle)
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    TopologicalSort(#[from] TopologicalSortError),
+
+    /// A variant expansion error occurred
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    VariantExpand(#[from] VariantExpandError),
+
+    /// A pinned subpackage output was not found among the rendered variants
+    #[error("missing output: {package}")]
+    MissingOutput {
+        /// The name of the missing package
+        package: String,
+    },
+
+    /// An experimental feature was used without the experimental flag
+    #[error("{message}")]
+    ExperimentalRequired {
+        /// The message describing the experimental feature
+        message: String,
+    },
+}
 
 /// Information about a pin_subpackage dependency for variant tracking
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -192,7 +231,7 @@ fn add_pins_to_variant(
     full_combination: &BTreeMap<NormalizedKey, Variable>,
     pin_subpackages: &mut BTreeMap<NormalizedKey, PinSubpackageInfo>,
     all_rendered: &[RenderedVariant],
-) -> Result<(), String> {
+) -> Result<(), RenderError> {
     for (pin_name, pin_info) in pin_subpackages.iter_mut() {
         // Ignore ourselves
         if self_name == &pin_info.name {
@@ -244,10 +283,23 @@ fn add_pins_to_variant(
 
             variant.insert(pin_name.clone(), Variable::from(variant_value));
         } else {
-            return Err(format!("Missing output: {}", pin_info.name.as_normalized()));
+            return Err(RenderError::MissingOutput {
+                package: pin_info.name.as_normalized().to_string(),
+            });
         }
     }
     Ok(())
+}
+
+/// Errors that can occur during topological sorting of recipe variants.
+#[derive(Debug, Clone, Error, Diagnostic)]
+pub enum TopologicalSortError {
+    /// A dependency cycle was detected among recipe outputs.
+    #[error("Cycle detected in recipe outputs: {package}")]
+    CycleDetected {
+        /// The package name where the cycle was detected.
+        package: String,
+    },
 }
 
 /// Sort rendered variants topologically based on pin_subpackage dependencies
@@ -258,7 +310,7 @@ fn add_pins_to_variant(
 /// Returns the variants in topological order, or an error if there's a cycle.
 pub fn topological_sort_variants(
     variants: Vec<RenderedVariant>,
-) -> Result<Vec<RenderedVariant>, String> {
+) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     if variants.is_empty() {
         return Ok(variants);
     }
@@ -276,7 +328,7 @@ type DependencyGraph = (DiGraph<usize, ()>, BTreeMap<usize, NodeIndex>);
 fn build_dependency_graph(
     variants: &[RenderedVariant],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<DependencyGraph, String> {
+) -> Result<DependencyGraph, TopologicalSortError> {
     // Create a directed graph
     let mut graph = DiGraph::<usize, ()>::new();
     let mut idx_to_node: BTreeMap<usize, NodeIndex> = BTreeMap::new();
@@ -312,10 +364,9 @@ fn build_dependency_graph(
     if let Err(cycle) = petgraph::algo::toposort(&graph, None) {
         let cycle_idx = graph[cycle.node_id()];
         let cycle_pkg = &variants[cycle_idx].recipe.package.name;
-        return Err(format!(
-            "Cycle detected in recipe outputs: {}",
-            cycle_pkg.as_normalized()
-        ));
+        return Err(TopologicalSortError::CycleDetected {
+            package: cycle_pkg.as_normalized().to_string(),
+        });
     }
 
     Ok((graph, idx_to_node))
@@ -331,7 +382,7 @@ fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
     _graph: &DependencyGraph,
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<Vec<RenderedVariant>, String> {
+) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     // Use a stable topological sort that preserves original order when possible
     // We iterate through variants in their original order and only skip those
     // that have unsatisfied dependencies
@@ -484,6 +535,12 @@ fn discover_new_variant_keys_from_evaluation(
             } else {
                 (context.clone(), IndexMap::new())
             };
+
+            // Evaluate top-level skip conditions once (inherited by all outputs)
+            let toplevel_skipped =
+                crate::stage0::evaluate::evaluate_skip_list(&recipe.build.skip, &context_with_vars)
+                    .unwrap_or_default();
+
             let mut all_free_specs = Vec::new();
             for output in &recipe.outputs {
                 // For package outputs, check if the output should be skipped before
@@ -492,15 +549,16 @@ fn discover_new_variant_keys_from_evaluation(
                 let (reqs, should_skip) = match output {
                     stage0::Output::Staging(staging) => {
                         // Staging outputs don't have skip conditions
-                        (&staging.requirements, false)
+                        (&staging.requirements, toplevel_skipped)
                     }
                     stage0::Output::Package(pkg) => {
-                        // Evaluate skip conditions to determine if output should be skipped
-                        let is_skipped = crate::stage0::evaluate::evaluate_skip_list(
-                            &pkg.build.skip,
-                            &context_with_vars,
-                        )
-                        .unwrap_or_default();
+                        // Evaluate skip conditions: combine top-level and output skip (OR logic)
+                        let is_skipped = toplevel_skipped
+                            || crate::stage0::evaluate::evaluate_skip_list(
+                                &pkg.build.skip,
+                                &context_with_vars,
+                            )
+                            .unwrap_or_default();
                         (&pkg.requirements, is_skipped)
                     }
                 };
@@ -667,7 +725,7 @@ fn evaluate_recipe(
 fn render_with_empty_combinations(
     stage0_recipe: &Stage0Recipe,
     config: &RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Create context with just extra_context (no variant for empty combinations)
     // NOTE: Do NOT call with_context() here - Stage0Recipe::evaluate() handles context evaluation
     let empty_variant = BTreeMap::new();
@@ -711,7 +769,7 @@ fn render_with_empty_combinations(
 
     // Sort variants topologically by pin_subpackage dependencies
     // This ensures we resolve build strings in the correct order
-    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+    let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
     // For each variant, we:
@@ -732,8 +790,7 @@ fn render_with_empty_combinations(
                 &results_snapshot[i].full_combination,
                 &mut pin_subpackages,
                 &results_snapshot,
-            )
-            .map_err(ParseError::from_message)?;
+            )?;
         }
 
         // Store the updated pin_subpackages
@@ -750,7 +807,7 @@ fn render_with_empty_combinations(
 ///
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
-fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), ParseError> {
+fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), RenderError> {
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -915,7 +972,7 @@ pub fn render_recipe_with_variants(
     recipe_path: &Path,
     variant_files: &[impl AsRef<Path>],
     config: Option<RenderConfig>,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     let mut config = config.unwrap_or_default();
 
     // Set the recipe path if not already set
@@ -930,8 +987,19 @@ pub fn render_recipe_with_variants(
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
 
     // Load variant configuration
-    let variant_config = VariantConfig::from_files(variant_files, config.target_platform)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let variant_config =
+        VariantConfig::from_files(variant_files, config.target_platform).map_err(|e| match e {
+            rattler_build_variant_config::VariantConfigError::ParseError { source, .. } => {
+                RenderError::Parse(source)
+            }
+            rattler_build_variant_config::VariantConfigError::IoError(path, source) => {
+                RenderError::Parse(ParseError::io_error(path, source))
+            }
+            other => RenderError::Parse(ParseError::generic(
+                other.to_string(),
+                marked_yaml::Span::new_blank(),
+            )),
+        })?;
 
     render_recipe_with_variant_config(&stage0_recipe, &variant_config, config)
 }
@@ -953,13 +1021,27 @@ pub fn render_recipe_with_variant_config(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
+    // Ensure target_platform and build_platform are in the variant config so they
+    // are included in hash computation. Without this, all platforms would produce
+    // identical hashes because `collect_used_variables` filters out variables that
+    // aren't present in the variant config.
+    let mut variant_config = variant_config.clone();
+    variant_config
+        .variants
+        .entry("target_platform".into())
+        .or_insert_with(|| vec![Variable::from(config.target_platform.to_string())]);
+    variant_config
+        .variants
+        .entry("build_platform".into())
+        .or_insert_with(|| vec![Variable::from(config.build_platform.to_string())]);
+
     match stage0_recipe {
         Stage0Recipe::SingleOutput(recipe) => {
-            render_single_output_with_variants(recipe.as_ref(), variant_config, config)
+            render_single_output_with_variants(recipe.as_ref(), &variant_config, config)
         }
         Stage0Recipe::MultiOutput(recipe) => {
-            render_multi_output_with_variants(recipe.as_ref(), variant_config, config)
+            render_multi_output_with_variants(recipe.as_ref(), &variant_config, config)
         }
     }
 }
@@ -968,7 +1050,7 @@ fn render_single_output_with_variants(
     stage0_recipe: &SingleOutputRecipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe.clone()));
     render_with_variants(&stage0, variant_config, config)
 }
@@ -977,7 +1059,7 @@ fn render_multi_output_with_variants(
     stage0_recipe: &MultiOutputRecipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Check if recipe contains staging outputs - these require experimental flag
     let has_staging = stage0_recipe
         .outputs
@@ -985,9 +1067,9 @@ fn render_multi_output_with_variants(
         .any(|o| matches!(o, stage0::Output::Staging(_)));
 
     if has_staging && !config.experimental {
-        return Err(ParseError::from_message(
-            "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature",
-        ));
+        return Err(RenderError::ExperimentalRequired {
+            message: "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature".to_string(),
+        });
     }
 
     let stage0 = Stage0Recipe::MultiOutput(Box::new(stage0_recipe.clone()));
@@ -999,14 +1081,12 @@ fn render_with_variants(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
     config: RenderConfig,
-) -> Result<Vec<RenderedVariant>, ParseError> {
+) -> Result<Vec<RenderedVariant>, RenderError> {
     // Collect initially used variables (from templates and stage0 free specs)
     let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
 
     // Compute initial variant combinations
-    let initial_combinations = variant_config
-        .combinations(&used_vars)
-        .map_err(|e| ParseError::from_message(e.to_string()))?;
+    let initial_combinations = variant_config.combinations(&used_vars)?;
 
     // If no combinations, render once with just the extra context
     if initial_combinations.is_empty() {
@@ -1065,7 +1145,7 @@ fn render_with_variants(
     }
 
     // Sort variants topologically by pin_subpackage dependencies
-    let mut results = topological_sort_variants(results).map_err(ParseError::from_message)?;
+    let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
     for i in 0..results.len() {
@@ -1081,8 +1161,7 @@ fn render_with_variants(
                 &results_snapshot[i].full_combination,
                 &mut pin_subpackages,
                 &results_snapshot,
-            )
-            .map_err(ParseError::from_message)?;
+            )?;
         }
 
         // Store the updated pin_subpackages
@@ -2330,6 +2409,148 @@ build:
             !rendered[0].recipe.build.skip,
             "Recipe with `skip: target_platform == \"noarch\"` should NOT be skipped \
              when building on linux-64"
+        );
+    }
+
+    #[test]
+    fn test_toplevel_skip_inherited_by_outputs_during_variant_discovery() {
+        // Regression test for GitHub issue #2110
+        // When a multi-output recipe has a top-level skip condition that references
+        // a variant key (e.g., match(python, "<3.11")), ALL outputs should be skipped
+        // for matching variants — even outputs that define their own output-level skip.
+        //
+        // Additionally, variant keys used in top-level skip conditions should be
+        // discovered and included in the variant matrix.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: test-pkg
+  version: "1.0.0"
+
+recipe:
+  name: ${{ name }}-split
+  version: ${{ version }}
+
+build:
+  number: 0
+  skip:
+    - match(python, "<3.11")
+
+outputs:
+  - package:
+      name: ${{ name }}
+    requirements:
+      host:
+        - python
+      run:
+        - python
+
+  - package:
+      name: ${{ name }}-tests
+    build:
+      skip:
+        - win
+    requirements:
+      run:
+        - python
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        let variant_yaml = r#"
+python:
+  - "3.10"
+  - "3.11"
+  - "3.12"
+"#;
+        let variant_config =
+            VariantConfig::from_yaml_str(variant_yaml).expect("Failed to parse variant config");
+
+        // On Linux: python 3.10 should be skipped entirely (top-level skip),
+        // python 3.11 and 3.12 should each produce 2 outputs
+        let config_linux =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+        let rendered_linux =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_linux)
+                .unwrap();
+        // 2 python versions * 2 outputs = 4
+        assert_eq!(
+            rendered_linux.len(),
+            4,
+            "Expected 4 outputs on Linux (py3.10 skipped, py3.11+3.12 x 2 outputs). Got {}",
+            rendered_linux.len()
+        );
+
+        // On Windows: python 3.10 skipped by top-level match(python, "<3.11"),
+        // tests output skipped by output-level "win", so only the main package
+        // for python 3.11 and 3.12
+        let config_win =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let rendered_win =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win).unwrap();
+        // 2 python versions * 1 output (tests skipped on win) = 2
+        assert_eq!(
+            rendered_win.len(),
+            2,
+            "Expected 2 outputs on Windows (py3.10 skipped, tests skipped on win). Got {}",
+            rendered_win.len()
+        );
+        for rv in &rendered_win {
+            assert_eq!(rv.recipe.package.name.as_normalized(), "test-pkg");
+        }
+    }
+
+    #[test]
+    fn test_toplevel_skip_prevents_requirement_evaluation_in_multi_output() {
+        // When a top-level skip fires (e.g., skip: win), outputs should NOT have
+        // their requirements evaluated — even if the output has no skip of its own.
+        // This prevents errors from platform-specific functions like stdlib('c').
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: test-pkg-split
+  version: "1.0.0"
+
+build:
+  number: 0
+  skip:
+    - win
+
+outputs:
+  - package:
+      name: test-pkg
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+        - ${{ compiler('cxx') }}
+
+  - package:
+      name: test-pkg-extra
+    build:
+      skip:
+        - osx
+    requirements:
+      build:
+        - ${{ stdlib('c') }}
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // On Windows: top-level skip: win should prevent requirement evaluation
+        // for all outputs, avoiding stdlib('c') errors
+        let config_win =
+            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win);
+        assert!(
+            result.is_ok(),
+            "Top-level skip should prevent requirement evaluation on Windows. Error: {:?}",
+            result.err()
+        );
+        assert_eq!(
+            result.unwrap().len(),
+            0,
+            "All outputs should be skipped on Windows"
         );
     }
 }

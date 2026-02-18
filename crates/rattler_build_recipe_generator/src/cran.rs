@@ -244,6 +244,10 @@ async fn build_cran_recipe_and_deps(
 
     let mut recipe = serialize::Recipe::default();
 
+    recipe
+        .context
+        .insert("build_number".to_string(), "0".to_string());
+
     recipe.package.name = format_r_package(&package_info.Package.to_lowercase(), None);
     // some versions have a `-` in them (i think that's like a build number in debian)
     // we just replace it with a `.`
@@ -272,6 +276,7 @@ async fn build_cran_recipe_and_deps(
     };
     recipe.source.push(source.into());
 
+    recipe.build.number = "${{ build_number }}".to_string();
     recipe.build.script = "R CMD INSTALL --build .".to_string();
 
     let build_requirements = vec![
@@ -335,7 +340,9 @@ async fn build_cran_recipe_and_deps(
 
     recipe.about.summary = Some(package_info.Title.clone());
     recipe.about.description = Some(package_info.Description.clone());
-    (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
+    let (license, license_file) = map_license(&package_info.License);
+    recipe.about.license = license;
+    recipe.about.license_file = license_file.into_iter().collect();
     recipe.about.repository = Some(package_info._upstream.clone());
     if let Some(pkgdocs) = &package_info._pkgdocs
         && url::Url::parse(pkgdocs).is_ok()

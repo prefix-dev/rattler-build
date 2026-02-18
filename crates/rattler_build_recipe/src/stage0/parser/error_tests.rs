@@ -3,16 +3,12 @@
 //! These tests demonstrate the error messages produced by the parser
 //! when encountering various error conditions.
 
-#[cfg(feature = "miette")]
 use crate::stage0::parser::{parse_recipe_from_source, parse_recipe_or_multi_from_source};
-#[cfg(feature = "miette")]
 use crate::{ParseErrorWithSource, source_code::Source};
 
-#[cfg(feature = "miette")]
 const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/errors");
 
 /// Macro to format and snapshot miette diagnostic reports
-#[cfg(feature = "miette")]
 macro_rules! assert_miette_snapshot {
     ($value:expr) => {{
         let mut value = String::new();
@@ -24,7 +20,6 @@ macro_rules! assert_miette_snapshot {
     }};
 }
 
-#[cfg(feature = "miette")]
 fn load_error_test(filename: &str) -> Source {
     let path = format!("{}/{}", TEST_DATA_DIR, filename);
     let contents = fs_err::read_to_string(&path)
@@ -32,7 +27,6 @@ fn load_error_test(filename: &str) -> Source {
     Source::from_string(filename.to_string(), contents)
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_missing_package() {
     let source = load_error_test("missing_package.yaml");
@@ -45,7 +39,6 @@ fn test_error_missing_package() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_missing_name() {
     let source = load_error_test("missing_name.yaml");
@@ -58,7 +51,6 @@ fn test_error_missing_name() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_missing_version() {
     let source = load_error_test("missing_version.yaml");
@@ -71,7 +63,6 @@ fn test_error_missing_version() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_invalid_package_name() {
     let source = load_error_test("invalid_package_name.yaml");
@@ -84,7 +75,6 @@ fn test_error_invalid_package_name() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_unknown_top_level_field() {
     let source = load_error_test("unknown_top_level_field.yaml");
@@ -97,7 +87,6 @@ fn test_error_unknown_top_level_field() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_unknown_about_field() {
     let source = load_error_test("unknown_about_field.yaml");
@@ -110,7 +99,6 @@ fn test_error_unknown_about_field() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_invalid_jinja() {
     let source = load_error_test("invalid_jinja.yaml");
@@ -123,7 +111,6 @@ fn test_error_invalid_jinja() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_unknown_requirements_field() {
     let source = load_error_test("unknown_requirements_field.yaml");
@@ -136,7 +123,6 @@ fn test_error_unknown_requirements_field() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_invalid_license() {
     let source = load_error_test("error_license.yaml");
@@ -149,7 +135,6 @@ fn test_error_invalid_license() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_invalid_build_number() {
     let source = load_error_test("error.yaml");
@@ -162,7 +147,6 @@ fn test_error_invalid_build_number() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_invalid_matchspec() {
     let source = load_error_test("error_matchspec.yaml");
@@ -179,7 +163,6 @@ fn test_error_invalid_matchspec() {
 // Multi-output recipe error tests
 // ============================================================================
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_multi_output_missing_outputs() {
     let source = load_error_test("multi_output_missing_outputs.yaml");
@@ -192,7 +175,6 @@ fn test_error_multi_output_missing_outputs() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_multi_output_staging_with_run_requirements() {
     let source = load_error_test("multi_output_staging_with_run.yaml");
@@ -205,7 +187,6 @@ fn test_error_multi_output_staging_with_run_requirements() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_multi_output_staging_with_about() {
     let source = load_error_test("multi_output_staging_with_about.yaml");
@@ -218,7 +199,6 @@ fn test_error_multi_output_staging_with_about() {
     assert_miette_snapshot!(error_with_source);
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_multi_output_empty_outputs() {
     let source = load_error_test("multi_output_empty_outputs.yaml");

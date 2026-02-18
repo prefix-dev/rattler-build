@@ -2177,6 +2177,13 @@ impl Evaluate for Stage0GitSource {
                 .map(|v| evaluate_bool_value(v, context, "lfs", false))
                 .transpose()?
                 .unwrap_or(false),
+            // Default is true - submodules are updated by default
+            submodules: self
+                .submodules
+                .as_ref()
+                .map(|v| evaluate_bool_value(v, context, "submodules", true))
+                .transpose()?
+                .unwrap_or(true),
             expected_commit: self
                 .expected_commit
                 .as_ref()
