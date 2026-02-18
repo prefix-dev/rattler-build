@@ -1,25 +1,16 @@
 //! Source code tracking for error reporting with miette
-//!
-//! This module is only available when the `miette` feature is enabled.
 
-#[cfg(feature = "miette")]
 use miette::{MietteError, MietteSpanContents, SourceSpan, SpanContents};
-#[cfg(feature = "miette")]
-use std::path::PathBuf;
-#[cfg(feature = "miette")]
-use std::{path::Path, sync::Arc};
-
-#[cfg(feature = "miette")]
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// A helper trait that provides source code for rattler-build-recipe.
 ///
 /// This trait is useful for error reporting to provide information about the
 /// source code for diagnostics.
-#[cfg(feature = "miette")]
 pub trait SourceCode: Debug + Clone + AsRef<str> + miette::SourceCode {}
 
-#[cfg(feature = "miette")]
 impl<T: Debug + Clone + AsRef<str> + miette::SourceCode> SourceCode for T {}
 
 /// The contents of a specific source file together with the name of the source
@@ -27,7 +18,6 @@ impl<T: Debug + Clone + AsRef<str> + miette::SourceCode> SourceCode for T {}
 ///
 /// The name of the source file is used to identify the source file in error
 /// messages.
-#[cfg(feature = "miette")]
 #[derive(Debug, Clone)]
 pub struct Source {
     /// The name of the source.
@@ -38,7 +28,6 @@ pub struct Source {
     pub path: PathBuf,
 }
 
-#[cfg(feature = "miette")]
 impl Source {
     /// Constructs a new instance from a string with a name
     pub fn from_string(name: String, contents: String) -> Self {
@@ -79,14 +68,12 @@ impl Source {
     }
 }
 
-#[cfg(feature = "miette")]
 impl AsRef<str> for Source {
     fn as_ref(&self) -> &str {
         self.code.as_ref()
     }
 }
 
-#[cfg(feature = "miette")]
 impl miette::SourceCode for Source {
     fn read_span<'a>(
         &'a self,

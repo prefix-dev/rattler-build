@@ -386,7 +386,6 @@ compiler:
     assert_eq!(config.zip_keys.as_ref().unwrap()[0].len(), 2);
 }
 
-#[cfg(feature = "miette")]
 mod error_reporting_tests {
     use super::*;
 

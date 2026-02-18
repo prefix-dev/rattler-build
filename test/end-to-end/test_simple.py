@@ -1562,7 +1562,7 @@ def test_missing_pin_subpackage(
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Missing output: test1" in stdout
+    assert "missing output: test1" in stdout
 
 
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
