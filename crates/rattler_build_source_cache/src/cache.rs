@@ -153,72 +153,13 @@ fn convert_pypi_attestation_to_bundle(
         .and_then(|v| v.as_str())
         .ok_or_else(|| err("missing 'verification_material.certificate'"))?;
 
-    // Build tlog entries array
-    let tlog_entries: Vec<serde_json::Value> = if let Some(entries) = verification_material
+    // PyPI transparency_entries already use the sigstore bundle v0.3 JSON format
+    // (camelCase field names, same structure), so pass them through directly.
+    let tlog_entries: Vec<serde_json::Value> = verification_material
         .get("transparency_entries")
         .and_then(|v| v.as_array())
-    {
-        entries
-            .iter()
-            .map(|entry| {
-                // Convert PyPI tlog entry format to sigstore bundle v0.3 format
-                let log_index = entry.get("log_index").and_then(|v| v.as_u64()).unwrap_or(0);
-                let log_id = entry.get("log_id").and_then(|v| v.as_str()).unwrap_or("");
-                let kind = entry
-                    .get("entry_kind")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("dsse");
-                let version = entry
-                    .get("entry_version")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("0.0.1");
-                let integrated_time = entry
-                    .get("integrated_time")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
-
-                let mut tlog_entry = serde_json::json!({
-                    "logIndex": log_index.to_string(),
-                    "logId": { "keyId": log_id },
-                    "kindVersion": { "kind": kind, "version": version },
-                    "integratedTime": integrated_time.to_string(),
-                    "canonicalizedBody": ""
-                });
-
-                // Convert inclusion proof if present
-                if let Some(proof) = entry.get("inclusion_proof") {
-                    let proof_log_index =
-                        proof.get("log_index").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let root_hash = proof
-                        .get("root_hash")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    let tree_size = proof.get("tree_size").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let hashes = proof
-                        .get("hashes")
-                        .and_then(|v| v.as_array())
-                        .cloned()
-                        .unwrap_or_default();
-                    let checkpoint = proof
-                        .get("checkpoint")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-
-                    tlog_entry["inclusionProof"] = serde_json::json!({
-                        "logIndex": proof_log_index.to_string(),
-                        "rootHash": root_hash,
-                        "treeSize": tree_size.to_string(),
-                        "hashes": hashes,
-                        "checkpoint": { "envelope": checkpoint }
-                    });
-                }
-
-                tlog_entry
-            })
-            .collect()
-    } else {
-        vec![]
-    };
+        .cloned()
+        .unwrap_or_default();
 
     // Construct a sigstore v0.3 bundle JSON
     let bundle_json = serde_json::json!({
@@ -841,8 +782,6 @@ impl SourceCache {
         use sigstore_trust_root::TrustedRoot;
         use sigstore_verify::{VerificationPolicy, verify};
 
-        tracing::info!("Verifying attestation for: {}", file_path.display());
-
         // Determine bundle URL: explicit, or auto-derive from PyPI source URL
         let bundle_url = if let Some(url) = &attestation_config.bundle_url {
             Some(url.clone())
@@ -857,7 +796,7 @@ impl SourceCache {
             )
         })?;
 
-        tracing::info!("Downloading attestation bundle from: {}", bundle_url);
+        tracing::info!("Downloading attestation bundle from {}", bundle_url);
         let response_json = self.download_attestation_bundle(&bundle_url).await?;
 
         // Load the production Sigstore trusted root (embedded, no network needed)
@@ -873,11 +812,6 @@ impl SourceCache {
 
         // For each required identity check, find a matching bundle and verify it
         for check in &attestation_config.identity_checks {
-            tracing::info!(
-                "Verifying identity: {} (issuer: {})",
-                check.identity,
-                check.issuer
-            );
 
             let mut matched = false;
             let mut found_identities: Vec<String> = Vec::new();
@@ -898,9 +832,8 @@ impl SourceCache {
                             // Prefix match: expected identity must be a prefix of the actual identity
                             if actual_identity.starts_with(&check.identity) {
                                 tracing::info!(
-                                    "Attestation verified: identity={} issuer={}",
+                                    "\u{2714} Attestation verified (identity={})",
                                     actual_identity,
-                                    result.issuer.as_deref().unwrap_or("unknown")
                                 );
                                 matched = true;
                                 break;
@@ -940,7 +873,13 @@ impl SourceCache {
             }
         }
 
-        tracing::info!("All attestation checks passed for: {}", file_path.display());
+        tracing::info!(
+            "\u{2714} All attestation checks passed for {}",
+            file_path
+                .file_name()
+                .map(|f| f.to_string_lossy())
+                .unwrap_or_else(|| file_path.to_string_lossy())
+        );
         Ok(())
     }
 
