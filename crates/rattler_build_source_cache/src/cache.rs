@@ -484,16 +484,27 @@ impl SourceCache {
             handler.on_download_complete(url.as_str());
         }
 
-        Ok((
-            cache_path,
-            actual_filename.or_else(|| Some(filename.to_string())),
-        ))
+        // If Content-Disposition provided a filename that differs from the URL's,
+        // rename the cached file so downstream code can detect the archive format
+        // from the file extension alone.
+        let final_path = if let Some(ref actual) = actual_filename {
+            let new_path = self.cache_dir.join(format!("{}_{}", key, actual));
+            if new_path != cache_path {
+                fs_err::tokio::rename(&cache_path, &new_path).await?;
+                new_path
+            } else {
+                cache_path
+            }
+        } else {
+            cache_path
+        };
+
+        Ok((final_path, actual_filename))
     }
 
-    /// Check if a file should be extracted
-    fn should_extract(&self, path: &Path) -> bool {
+    /// Check if a file should be extracted based on its filename extension
+    pub(crate) fn should_extract(&self, path: &Path) -> bool {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
         is_archive(name)
     }
 
@@ -593,13 +604,18 @@ pub struct CacheStats {
 
 // Helper functions
 
-fn extract_filename_from_header(header_value: &str) -> Option<String> {
+pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String> {
     for part in header_value.split(';') {
         let part = part.trim();
         if part.starts_with("filename=") {
             let filename = part.strip_prefix("filename=")?;
             let filename = filename.trim_matches('"').trim_matches('\'');
             if !filename.is_empty() {
+                // Strip any path components — only keep the base filename
+                let filename = Path::new(filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(filename);
                 return Some(filename.to_string());
             }
         }
@@ -607,7 +623,7 @@ fn extract_filename_from_header(header_value: &str) -> Option<String> {
     None
 }
 
-fn is_archive(name: &str) -> bool {
+pub(crate) fn is_archive(name: &str) -> bool {
     is_tarball(name) || name.ends_with(".zip") || name.ends_with(".7z")
 }
 
