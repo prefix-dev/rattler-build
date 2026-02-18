@@ -954,10 +954,10 @@ pub fn evaluate_package_name_list(
                 // Templates like `${{ compiler('cxx') }}` render to strings
                 // such as `gxx_linux-64 =13` which are valid MatchSpecs but
                 // not valid bare PackageNames.
-                if let Ok(ms) = MatchSpec::from_str(&s, ParseStrictness::Lenient) {
-                    if let Some(PackageNameMatcher::Exact(name)) = ms.name {
-                        return Ok(Some(name));
-                    }
+                if let Ok(ms) = MatchSpec::from_str(&s, ParseStrictness::Lenient)
+                    && let Some(PackageNameMatcher::Exact(name)) = ms.name
+                {
+                    return Ok(Some(name));
                 }
                 PackageName::from_str(&s).map(Some).map_err(|e| {
                     ParseError::invalid_value(
