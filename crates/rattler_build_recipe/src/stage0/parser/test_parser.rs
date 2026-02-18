@@ -177,8 +177,11 @@ fn parse_python_test(
                 imports = parse_conditional_list_or_item(value_node)?;
             }
             "pip_check" => {
-                pip_check =
-                    Some(parse_value_with_converter(value_node, "pip_check", &BoolConverter)?);
+                pip_check = Some(parse_value_with_converter(
+                    value_node,
+                    "pip_check",
+                    &BoolConverter,
+                )?);
             }
             "python_version" => {
                 python_version = Some(parse_python_version(value_node)?);

@@ -304,7 +304,11 @@ fn parse_git_source(
                 target_directory = Some(parse_value(value_node)?);
             }
             "lfs" => {
-                lfs = Some(parse_value_with_converter(value_node, "lfs", &BoolConverter)?);
+                lfs = Some(parse_value_with_converter(
+                    value_node,
+                    "lfs",
+                    &BoolConverter,
+                )?);
             }
             "submodules" => {
                 submodules = Some(parse_value_with_converter(
