@@ -812,7 +812,6 @@ impl SourceCache {
 
         // For each required identity check, find a matching bundle and verify it
         for check in &attestation_config.identity_checks {
-
             let mut matched = false;
             let mut found_identities: Vec<String> = Vec::new();
             let mut verification_errors: Vec<String> = Vec::new();
