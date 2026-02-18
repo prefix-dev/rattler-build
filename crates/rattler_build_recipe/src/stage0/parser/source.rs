@@ -8,7 +8,9 @@ use crate::stage0::{
     types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, NestedItemList, Value},
 };
 
-use rattler_build_yaml_parser::{parse_conditional_list, parse_value};
+use rattler_build_yaml_parser::{
+    BoolConverter, parse_conditional_list, parse_value, parse_value_with_converter,
+};
 
 /// Parse a SHA256 hash value (can be concrete or template)
 fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
@@ -302,10 +304,14 @@ fn parse_git_source(
                 target_directory = Some(parse_value(value_node)?);
             }
             "lfs" => {
-                lfs = Some(parse_value(value_node)?);
+                lfs = Some(parse_value_with_converter(value_node, "lfs", &BoolConverter)?);
             }
             "submodules" => {
-                submodules = Some(parse_value(value_node)?);
+                submodules = Some(parse_value_with_converter(
+                    value_node,
+                    "submodules",
+                    &BoolConverter,
+                )?);
             }
             "expected_commit" => {
                 expected_commit = Some(parse_value(value_node)?);
