@@ -9,6 +9,7 @@ use goblin::pe::PE;
 use rattler_build_recipe::stage1::GlobVec;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
+use std::io::Read;
 
 use crate::post_process::relink::{RelinkError, Relinker};
 
@@ -18,16 +19,6 @@ pub struct Dll {
     path: PathBuf,
     /// Libraries that this DLL depends on
     libraries: HashSet<PathBuf>,
-}
-
-/// File extensions that are known to be PE (Portable Executable) files on Windows.
-const PE_EXTENSIONS: &[&str] = &["dll", "exe", "pyd", "sys", "ocx", "drv", "cpl", "scr", "efi"];
-
-/// Returns true if the file extension indicates a potential PE file.
-fn has_pe_extension(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| PE_EXTENSIONS.iter().any(|pe_ext| ext.eq_ignore_ascii_case(pe_ext)))
 }
 
 /// List of System DLLs that are allowed to be linked against.
@@ -72,32 +63,32 @@ impl Dll {
     /// Try to parse a PE file and create a Dll analyzer, returning None for
     /// non-PE files.
     ///
-    /// Applies two cheap filters before the full parse:
-    ///  1. File extension – skip obviously non-PE files without any I/O.
-    ///  2. MZ magic – read two bytes, same approach Linux/macOS use for
-    ///     ELF/Mach-O magic.  This is what keeps `.pyc`, `.npz` etc. from
-    ///     ever reaching the full goblin parse.
+    /// Reads two bytes to check the DOS "MZ" magic first (same approach
+    /// Linux/macOS use for ELF/Mach-O magic), then mmaps only when the
+    /// magic matches.
     pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
-        if !has_pe_extension(path) {
-            return Ok(None);
-        }
-
-        let file = File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let mut file = File::open(path)?;
 
         // Quick magic check – every PE file starts with the DOS "MZ" header.
-        if mmap.len() < 2 || mmap[..2] != PE_MAGIC {
+        let mut magic = [0u8; 2];
+        match file.read_exact(&mut magic) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(e.into()),
+        }
+        if magic != PE_MAGIC {
             return Ok(None);
         }
 
+        // Magic matches – mmap for the full parse.
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
         match PE::parse(&mmap) {
             Ok(pe) => Ok(Some(Self {
                 path: path.to_path_buf(),
                 libraries: pe.libraries.iter().map(PathBuf::from).collect(),
             })),
             Err(e) => {
-                // The file starts with MZ but isn't a well-formed PE.
-                // Log and skip rather than failing the build.
+                // Starts with MZ but isn't a well-formed PE.
                 tracing::debug!("[relink/windows] Skipping invalid PE file {path:?}: {e}");
                 Ok(None)
             }
