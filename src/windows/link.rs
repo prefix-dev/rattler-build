@@ -65,8 +65,18 @@ pub enum DllParseError {
     ParseFailed(#[from] goblin::error::Error),
 }
 
+/// The DOS header magic number that every PE file starts with ("MZ").
+const PE_MAGIC: [u8; 2] = [0x4D, 0x5A];
+
 impl Dll {
-    /// Try to parse a PE file and create a Dll analyzer, returning None for non-PE or invalid PE files
+    /// Try to parse a PE file and create a Dll analyzer, returning None for
+    /// non-PE files.
+    ///
+    /// Applies two cheap filters before the full parse:
+    ///  1. File extension – skip obviously non-PE files without any I/O.
+    ///  2. MZ magic – read two bytes, same approach Linux/macOS use for
+    ///     ELF/Mach-O magic.  This is what keeps `.pyc`, `.npz` etc. from
+    ///     ever reaching the full goblin parse.
     pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
         if !has_pe_extension(path) {
             return Ok(None);
@@ -75,35 +85,21 @@ impl Dll {
         let file = File::open(path)?;
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
+        // Quick magic check – every PE file starts with the DOS "MZ" header.
+        if mmap.len() < 2 || mmap[..2] != PE_MAGIC {
+            return Ok(None);
+        }
+
         match PE::parse(&mmap) {
             Ok(pe) => Ok(Some(Self {
                 path: path.to_path_buf(),
                 libraries: pe.libraries.iter().map(PathBuf::from).collect(),
             })),
             Err(e) => {
-                match e {
-                    goblin::error::Error::BadMagic(_) => {
-                        // Not a PE file (bad magic number), skip silently
-                        Ok(None)
-                    }
-                    goblin::error::Error::Malformed(_) => {
-                        // File looks like PE but is structurally malformed (e.g. .pyc, .npz files
-                        // that happen to have bytes partially matching the PE signature)
-                        tracing::debug!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
-                        Ok(None)
-                    }
-                    goblin::error::Error::Scroll(_) => {
-                        // A valid PE file but goblin cannot read and interpret the bytes
-                        tracing::debug!(
-                            "[relink/windows] Skipping uninterpretable PE file {path:?}: {e}"
-                        );
-                        Ok(None)
-                    }
-                    _ => {
-                        // IO, buffer, scroll errors should bubble up as real system errors
-                        Err(RelinkError::ParseError(e))
-                    }
-                }
+                // The file starts with MZ but isn't a well-formed PE.
+                // Log and skip rather than failing the build.
+                tracing::debug!("[relink/windows] Skipping invalid PE file {path:?}: {e}");
+                Ok(None)
             }
         }
     }
