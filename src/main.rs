@@ -18,11 +18,11 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::{LoggingOutputHandler, init_logging},
-    debug_recipe, extract_package, get_recipe_path, get_tool_config,
+    debug_recipe, extract_package, get_recipe_path,
     opt::{
-        App, BuildData, BumpRecipeOpts, CommonData, DebugData, DebugEnvAddOpts, DebugSetupArgs,
-        DebugShellOpts, DebugSubCommands, PackageCommands, PublishData, RebuildData,
-        ShellCompletion, SubCommands, TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugEnvAddOpts, DebugSetupArgs, DebugShellOpts,
+        DebugSubCommands, PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands,
+        TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
     source::create_patch,
@@ -264,38 +264,31 @@ async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
     Ok(())
 }
 
-/// Add packages to a host or build environment in an existing debug build
+/// Add packages to a host or build environment in an existing debug build.
+///
+/// Reads the existing installed packages from the prefix's conda-meta/,
+/// combines them with the new specs, resolves, and installs only what changed.
 async fn debug_env_add(
     env_name: &str,
     opts: DebugEnvAddOpts,
-    config: Option<ConfigBase<()>>,
+    _config: Option<ConfigBase<()>>,
     log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
-    let (work_dir, directories_json) =
+    let (_work_dir, directories_json) =
         parse_directories_info(opts.work_dir, &opts.output_dir).into_diagnostic()?;
 
-    if !work_dir.exists() {
-        return Err(miette::miette!(
-            "Work directory does not exist: {}",
-            work_dir.display()
-        ));
-    }
-
     let directories_json = directories_json.ok_or_else(|| {
-        miette::miette!(
-            "Could not read build directories info. Make sure you have run `rattler-build debug` first."
-        )
+        miette::miette!("Could not read build directories info. Run `rattler-build debug` first.")
     })?;
 
     let prefix_key = format!("{}_prefix", env_name);
-    let target_prefix = directories_json[&prefix_key]
-        .as_str()
-        .ok_or_else(|| {
-            miette::miette!(
-                "{}_prefix not found in build log. The build may have been created with an older version.",
-                env_name
-            )
-        })?;
+    let target_prefix = directories_json[&prefix_key].as_str().ok_or_else(|| {
+        miette::miette!(
+            "{}_prefix not found in build log. \
+                 The build may have been created with an older version.",
+            env_name
+        )
+    })?;
     let target_prefix = PathBuf::from(target_prefix);
 
     if !target_prefix.exists() {
@@ -306,15 +299,40 @@ async fn debug_env_add(
         ));
     }
 
-    // Parse match specs
-    let specs: Vec<MatchSpec> = opts
+    // Parse the new match specs
+    let new_specs: Vec<MatchSpec> = opts
         .specs
         .iter()
         .map(|s| MatchSpec::from_str(s, rattler_conda_types::ParseStrictness::Lenient))
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()?;
 
-    // Determine channels
+    // Read existing installed packages and create "locked" specs from them
+    let existing_records =
+        rattler_conda_types::PrefixRecord::collect_from_prefix(&target_prefix).into_diagnostic()?;
+
+    let mut all_specs: Vec<MatchSpec> = existing_records
+        .iter()
+        .map(|r: &rattler_conda_types::PrefixRecord| {
+            // Lock existing packages to their exact name+version+build so the solver
+            // doesn't remove or change them when adding new packages
+            MatchSpec::from_str(
+                &format!(
+                    "{}={}={}",
+                    r.repodata_record.package_record.name.as_normalized(),
+                    r.repodata_record.package_record.version,
+                    r.repodata_record.package_record.build,
+                ),
+                rattler_conda_types::ParseStrictness::Lenient,
+            )
+            .expect("existing package record should parse as MatchSpec")
+        })
+        .collect();
+
+    // Append the new specs
+    all_specs.extend(new_specs);
+
+    // Resolve channels
     let channels: Vec<rattler_conda_types::ChannelUrl> = {
         let channel_strs = opts.channels.unwrap_or_else(|| {
             vec![rattler_conda_types::NamedChannelOrUrl::from_str("conda-forge").unwrap()]
@@ -333,69 +351,45 @@ async fn debug_env_add(
             .collect()
     };
 
-    // Build a minimal tool configuration
-    let common_data = CommonData::new(
-        None,
-        false,
+    // Build a minimal Configuration using the builder directly
+    let client = rattler_build::tool_configuration::reqwest_client_from_auth_storage(
         opts.auth_file,
-        config.unwrap_or_default(),
-        None,
-        None,
-        true,
-        true,
-        true,
-        false,
-    );
-    let build_data = BuildData::new(
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        #[cfg(feature = "s3")]
         Default::default(),
-        false,
-        false,
-        true,
-        true,
-        false,
+        Default::default(),
         None,
-        None,
-        None,
-        false,
-        None,
-        common_data,
-        false,
-        None,
-        None,
-        None,
-        None,
-        rattler_build::metadata::Debug::new(true),
-        rattler_build::tool_configuration::ContinueOnFailure::No,
-        false,
-        false,
-        false,
-        None,
-        None,
-        None,
-    );
-    let tool_config = get_tool_config(&build_data, log_handler)?;
+    )
+    .into_diagnostic()?;
 
+    let mut builder = rattler_build::tool_configuration::Configuration::builder()
+        .with_reqwest_client(client)
+        .with_channel_priority(rattler_solve::ChannelPriority::Strict);
+
+    if let Some(handler) = log_handler {
+        builder = builder.with_logging_output_handler(handler.clone());
+    }
+
+    let tool_config = builder.finish();
+
+    // Detect platform
     let platform_with_vp = rattler_build::metadata::PlatformWithVirtualPackages::detect(
         &rattler_virtual_packages::VirtualPackageOverrides::default(),
     )
     .into_diagnostic()?;
 
     tracing::info!(
-        "\nInstalling {} package(s) into {} environment at {}",
-        specs.len(),
+        "\nAdding {} new spec(s) to {} environment ({} existing packages)",
+        opts.specs.len(),
         env_name,
-        target_prefix.display()
+        existing_records.len(),
     );
 
+    // Solve with all specs (existing locked + new), then install.
+    // install_packages internally reads PrefixRecord::collect_from_prefix()
+    // and only installs what's new/changed.
     rattler_build::render::solver::create_environment(
         env_name,
-        &specs,
+        &all_specs,
         &platform_with_vp,
         &target_prefix,
         &channels,
