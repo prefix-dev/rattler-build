@@ -51,7 +51,7 @@ impl PyRenderConfig {
             .map(|p| p.parse::<Platform>())
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .unwrap_or_else(Platform::current);
+            .unwrap_or(target_platform);
 
         let extra_context = extra_context
             .map(|dict| {
