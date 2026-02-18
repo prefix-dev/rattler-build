@@ -1278,6 +1278,7 @@ pub fn evaluate_script(
         env,
         secrets,
         content,
+        content_windows: None,
         cwd,
         content_explicit: script.content_explicit,
     })

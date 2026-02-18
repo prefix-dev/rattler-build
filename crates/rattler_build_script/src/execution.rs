@@ -204,11 +204,16 @@ impl Script {
         tracing::debug!("Running script in {}", work_dir.display());
 
         // Determine the interpreter to use:
+        // 0. If content_windows was used on Windows, force cmd interpreter
         // 1. Use explicitly specified interpreter if set
         // 2. Try to infer from the resolved script path (if it's a file)
         // 3. Finally fall back to platform default (bash/cmd)
         let inferred_interpreter = contents.infer_interpreter();
-        let interpreter = if self.interpreter.is_some() {
+        let interpreter = if cfg!(windows) && self.content_windows.is_some() {
+            // When using Windows-specific content from a noarch package,
+            // always use cmd as the interpreter
+            "cmd"
+        } else if self.interpreter.is_some() {
             self.interpreter()
         } else if let Some(ref inferred) = inferred_interpreter {
             tracing::debug!("Inferred interpreter '{}' from script file path", inferred);
@@ -257,6 +262,9 @@ impl Script {
     ///
     /// If `jinja_renderer` is provided, it will be used to render inline scripts.
     /// The renderer function takes a template string and returns the rendered result.
+    ///
+    /// For noarch packages that have a `content_windows` field set, this method
+    /// will return the Windows-specific content when running on Windows.
     pub fn resolve_content<F>(
         &self,
         recipe_dir: &Path,
@@ -266,6 +274,13 @@ impl Script {
     where
         F: Fn(&str) -> Result<String, String>,
     {
+        // If we have Windows-specific content and we're on Windows, use it
+        if cfg!(windows) {
+            if let Some(ref windows_content) = self.content_windows {
+                return Ok(ResolvedScriptContents::Inline(windows_content.clone()));
+            }
+        }
+
         let script_content = match self.contents() {
             // No script was specified, so we try to read the default script. If the file cannot be
             // found we return an empty string.
@@ -620,6 +635,7 @@ mod tests {
         let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
         let script = Script {
             content: ScriptContent::Commands(commands.clone()),
+            content_windows: None,
             interpreter: None,
             env: IndexMap::new(),
             secrets: Vec::new(),

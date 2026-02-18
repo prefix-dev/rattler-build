@@ -5,7 +5,7 @@ use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::Co
 use rattler_build_script::{
     ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
 };
-use rattler_conda_types::{MatchSpec, PackageNameMatcher};
+use rattler_conda_types::{MatchSpec, PackageNameMatcher, Platform};
 
 use crate::{metadata::Output, packaging::PackagingError};
 
@@ -139,11 +139,102 @@ pub(crate) fn write_test_files(
             // Try to render the script contents here
             // TODO(refactor): properly render script here.
             let jinja_renderer = output.jinja_renderer();
+
+            let is_noarch =
+                output.build_configuration.target_platform == Platform::NoArch;
+
+            // For noarch packages with Commands content, keep the commands list
+            // intact so they can be properly resolved at test time on any
+            // platform. This ensures that platform-specific modifications (like
+            // adding `if %errorlevel%` checks on Windows) happen at test time
+            // rather than build time, making the package work correctly on both
+            // Unix and Windows.
+            if is_noarch {
+                if let ScriptContent::Commands(commands) = &command_test.script.content
+                {
+                    let rendered_commands: Vec<String> = commands
+                        .iter()
+                        .map(|cmd| jinja_renderer(cmd))
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| {
+                            std::io::Error::other(format!(
+                                "Failed to render jinja template in test script: {}",
+                                e
+                            ))
+                        })?;
+                    command_test.script.content =
+                        ScriptContent::Commands(rendered_commands);
+                    continue;
+                }
+            }
+
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
-                Some(jinja_renderer),
+                Some(&jinja_renderer),
                 &["sh", "bat"],
             )?;
+
+            // For noarch packages with file-based scripts (Path, CommandOrPath
+            // resolving to a file), try to also find the other platform's
+            // script variant. This allows the test to use the correct script
+            // on each platform.
+            if is_noarch {
+                if let ResolvedScriptContents::Path(ref found_path, _) = contents {
+                    // Determine which platform variant we found
+                    let ext = found_path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("");
+
+                    // Try to find the other platform's variant
+                    let other_ext = match ext {
+                        "sh" | "bash" => Some("bat"),
+                        "bat" | "cmd" => Some("sh"),
+                        _ => None,
+                    };
+
+                    if let Some(other_ext) = other_ext {
+                        let other_path = found_path.with_extension(other_ext);
+                        if other_path.is_file() {
+                            let other_contents =
+                                fs::read_to_string(&other_path)?;
+                            let other_contents = jinja_renderer(&other_contents)
+                                .map_err(|e| {
+                                    std::io::Error::other(format!(
+                                        "Failed to render jinja template in test script: {}",
+                                        e
+                                    ))
+                                })?;
+
+                            // Store the Windows variant separately
+                            if ext == "sh" || ext == "bash" {
+                                command_test.script.content_windows =
+                                    Some(other_contents);
+                            } else {
+                                // The found file is the Windows variant;
+                                // store the Unix variant as the main content
+                                // and set the Windows variant from the
+                                // originally found file.
+                                let main_contents = contents.script().to_string();
+                                let main_contents =
+                                    jinja_renderer(&main_contents).map_err(|e| {
+                                        std::io::Error::other(format!(
+                                            "Failed to render jinja template in test script: {}",
+                                            e
+                                        ))
+                                    })?;
+                                command_test.script.content =
+                                    ScriptContent::Command(other_contents);
+                                command_test.script.content_windows =
+                                    Some(main_contents);
+                                command_test.script.interpreter =
+                                    Some("bash".to_string());
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
 
             // Replace with rendered contents
             match contents {

@@ -9,6 +9,7 @@ fn test_script_serialization_simple_command() {
         env: IndexMap::new(),
         secrets: Vec::new(),
         content: ScriptContent::Command("echo 'Hello World'".to_string()),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -27,6 +28,7 @@ fn test_script_serialization_commands() {
             "echo 'Step 2'".to_string(),
             "echo 'Step 3'".to_string(),
         ]),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -45,6 +47,7 @@ fn test_script_serialization_with_interpreter() {
         env: IndexMap::new(),
         secrets: Vec::new(),
         content: ScriptContent::Command("print('Hello from Python')".to_string()),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -66,6 +69,7 @@ fn test_script_serialization_with_env() {
         env,
         secrets: Vec::new(),
         content: ScriptContent::Commands(vec!["echo $MY_VAR".to_string()]),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -86,6 +90,7 @@ fn test_script_serialization_with_secrets() {
         env: IndexMap::new(),
         secrets: vec!["SECRET_TOKEN".to_string(), "API_KEY".to_string()],
         content: ScriptContent::Command("deploy.sh".to_string()),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -105,6 +110,7 @@ fn test_script_serialization_with_path() {
         env: IndexMap::new(),
         secrets: Vec::new(),
         content: ScriptContent::Path(PathBuf::from("build.sh")),
+        content_windows: None,
         cwd: None,
         content_explicit: false,
     };
@@ -122,6 +128,7 @@ fn test_script_serialization_with_cwd() {
         env: IndexMap::new(),
         secrets: Vec::new(),
         content: ScriptContent::Command("make install".to_string()),
+        content_windows: None,
         cwd: Some(PathBuf::from("src/subdir")),
         content_explicit: false,
     };
@@ -147,6 +154,7 @@ fn test_script_serialization_full() {
             "cmake ..".to_string(),
             "make -j$(nproc)".to_string(),
         ]),
+        content_windows: None,
         cwd: Some(PathBuf::from("project")),
         content_explicit: false,
     };
@@ -217,6 +225,7 @@ fn test_script_roundtrip() {
         env,
         secrets: vec!["SECRET".to_string()],
         content: ScriptContent::Commands(vec!["cmd1".to_string(), "cmd2".to_string()]),
+        content_windows: None,
         cwd: Some(PathBuf::from("dir")),
         content_explicit: true,
     };
@@ -225,4 +234,67 @@ fn test_script_roundtrip() {
     let deserialized: Script = serde_yaml::from_str(&serialized).unwrap();
 
     assert_eq!(original, deserialized);
+}
+
+#[test]
+fn test_script_serialization_with_content_windows() {
+    let script = Script {
+        interpreter: Some("bash".to_string()),
+        env: IndexMap::new(),
+        secrets: Vec::new(),
+        content: ScriptContent::Command("echo 'hello'\npython -c \"import foo\"".to_string()),
+        content_windows: Some(
+            "echo hello\r\nif %errorlevel% neq 0 exit /b %errorlevel%\r\npython -c \"import foo\"\r\nif %errorlevel% neq 0 exit /b %errorlevel%".to_string(),
+        ),
+        cwd: None,
+        content_explicit: false,
+    };
+
+    insta::assert_yaml_snapshot!(script, @r###"
+    interpreter: bash
+    content: "echo 'hello'\npython -c \"import foo\""
+    content_windows: "echo hello\r\nif %errorlevel% neq 0 exit /b %errorlevel%\r\npython -c \"import foo\"\r\nif %errorlevel% neq 0 exit /b %errorlevel%"
+    "###);
+}
+
+#[test]
+fn test_script_roundtrip_with_content_windows() {
+    let original = Script {
+        interpreter: Some("bash".to_string()),
+        env: IndexMap::new(),
+        secrets: Vec::new(),
+        content: ScriptContent::Command("echo hello".to_string()),
+        content_windows: Some(
+            "echo hello\r\nif %errorlevel% neq 0 exit /b %errorlevel%".to_string(),
+        ),
+        cwd: None,
+        // Note: content_explicit is true because content_windows forces Object
+        // serialization, and deserializing from Object form sets content_explicit=true
+        content_explicit: true,
+    };
+
+    let serialized = serde_yaml::to_string(&original).unwrap();
+    let deserialized: Script = serde_yaml::from_str(&serialized).unwrap();
+
+    assert_eq!(original, deserialized);
+}
+
+#[test]
+fn test_script_deserialization_with_content_windows() {
+    let yaml = r#"
+        interpreter: bash
+        content: "echo hello"
+        content_windows: "echo hello\nif %errorlevel% neq 0 exit /b %errorlevel%"
+    "#;
+
+    let script: Script = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(script.interpreter, Some("bash".to_string()));
+    assert_eq!(
+        script.content,
+        ScriptContent::Command("echo hello".to_string())
+    );
+    assert_eq!(
+        script.content_windows,
+        Some("echo hello\nif %errorlevel% neq 0 exit /b %errorlevel%".to_string())
+    );
 }

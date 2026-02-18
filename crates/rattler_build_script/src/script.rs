@@ -18,6 +18,13 @@ pub struct Script {
     /// The contents of the script, either a path or a list of commands.
     pub content: ScriptContent,
 
+    /// Windows-specific script content for noarch packages.
+    ///
+    /// When set, this content is used instead of `content` on Windows.
+    /// This allows noarch packages to carry both Unix and Windows versions
+    /// of file-based test scripts.
+    pub content_windows: Option<String>,
+
     /// The current working directory for the script.
     pub cwd: Option<PathBuf>,
 
@@ -54,6 +61,8 @@ impl Serialize for Script {
                 #[serde(skip_serializing_if = "Option::is_none", flatten)]
                 content: Option<RawScriptContent<'a>>,
                 #[serde(skip_serializing_if = "Option::is_none")]
+                content_windows: Option<&'a String>,
+                #[serde(skip_serializing_if = "Option::is_none")]
                 cwd: Option<&'a PathBuf>,
             },
         }
@@ -61,7 +70,8 @@ impl Serialize for Script {
         let only_content = self.interpreter.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
-            && self.cwd.is_none();
+            && self.cwd.is_none()
+            && self.content_windows.is_none();
 
         // When content_explicit is true, always use the Object form with content: field
         let raw_script = match &self.content {
@@ -76,6 +86,7 @@ impl Serialize for Script {
                 env: &self.env,
                 secrets: &self.secrets,
                 cwd: self.cwd.as_ref(),
+                content_windows: self.content_windows.as_ref(),
                 content: match &self.content {
                     ScriptContent::Command(content) => Some(RawScriptContent::Command { content }),
                     ScriptContent::Commands(content) => {
@@ -122,6 +133,8 @@ impl<'de> Deserialize<'de> for Script {
                 #[serde(default, flatten)]
                 content: Option<RawScriptContent>,
                 #[serde(default)]
+                content_windows: Option<String>,
+                #[serde(default)]
                 cwd: Option<PathBuf>,
             },
         }
@@ -135,6 +148,7 @@ impl<'de> Deserialize<'de> for Script {
                 env,
                 secrets,
                 content,
+                content_windows,
                 cwd,
             } => {
                 // When deserializing from Object form, content was explicitly specified
@@ -154,6 +168,7 @@ impl<'de> Deserialize<'de> for Script {
                         Some(RawScriptContent::Path { file }) => ScriptContent::Path(file),
                         None => ScriptContent::Default,
                     },
+                    content_windows,
                     content_explicit,
                 }
             }
@@ -207,6 +222,7 @@ impl From<ScriptContent> for Script {
             env: Default::default(),
             secrets: Default::default(),
             content: value,
+            content_windows: None,
             cwd: None,
             content_explicit: false,
         }
