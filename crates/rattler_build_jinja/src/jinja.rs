@@ -1156,6 +1156,40 @@ mod tests {
     }
 
     #[test]
+    fn eval_noarch_unix_selector() {
+        // When a noarch recipe is rendered, the variant sets target_platform
+        // to NoArch. The unix/linux/osx/win selectors should still work
+        // based on the host platform (where the package will run).
+        let options = JinjaConfig {
+            target_platform: Platform::NoArch,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        // These should be true because the HOST platform is Linux,
+        // even though target_platform is NoArch
+        assert!(
+            jinja.eval("unix").expect("unix").is_true(),
+            "unix should be true for a noarch package on a linux host"
+        );
+        assert!(
+            jinja.eval("linux").expect("linux").is_true(),
+            "linux should be true for a noarch package on a linux host"
+        );
+        assert!(
+            !jinja.eval("win").expect("win").is_true(),
+            "win should be false for a noarch package on a linux host"
+        );
+        assert!(
+            !jinja.eval("osx").expect("osx").is_true(),
+            "osx should be false for a noarch package on a linux host"
+        );
+    }
+
+    #[test]
     #[should_panic]
     #[rustfmt::skip]
     fn eval2() {
