@@ -45,9 +45,9 @@ full compiler will read `clang_linux-64 9.0` when compiling with
 `rattler-build` defines some default compilers for the following languages
 (inherited from `conda-build`):
 
-- `c`: `gcc` on Linux, `clang` on `osx` and `vs2017` on Windows
-- `cxx`: `gxx` on Linux, `clangxx` on `osx` and `vs2017` on Windows
-- `fortran`: `gfortran` on Linux, `gfortran` on `osx` and `vs2017` on Windows
+- `c`: `gcc` on Linux, `clang` on `osx` and `vs2022` on Windows
+- `cxx`: `gxx` on Linux, `clangxx` on `osx` and `vs2022` on Windows
+- `fortran`: `gfortran` on Linux, `gfortran` on `osx` and `flang` on Windows
 - `rust`: `rust`
 
 ### The `stdlib` function
