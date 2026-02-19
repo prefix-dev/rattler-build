@@ -16,6 +16,9 @@ permissions:
 jobs:
   build-and-upload:
     name: Build & Upload (${{ matrix.os }})
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      ACTIONS_CACHE_SERVICE_V2: on
     strategy:
       fail-fast: false
       matrix:
@@ -28,9 +31,17 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           environments: packaging
+      - name: Configure sccache
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - name: Build package
         run: pixi run --environment=packaging build-package
         env:
           RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: true
       - name: Upload package
         run: pixi run --environment=packaging upload-package
+      - name: Show sccache stats
+        run: pixi run --environment=packaging sccache --stop-server
