@@ -116,7 +116,7 @@ pub struct DebugArgs {
 
     /// Arguments for setting up a debug environment (used when no subcommand is given)
     #[command(flatten)]
-    pub setup: Option<DebugSetupArgs>,
+    pub setup: DebugSetupArgs,
 }
 
 /// Arguments for the default debug setup mode (no subcommand)
