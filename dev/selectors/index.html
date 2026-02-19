@@ -2731,8 +2731,8 @@ valid YAML dictionary. The condition is evaluated using <a href="https://github.
 follows
 the same syntax as a Python expression.</p>
 <p>During rendering, several variables are set based on the platform and variant
-being built. For example, the <code>unix</code> variable is true for macOS and Linux, while
-<code>win</code> is true for Windows. Consider the following recipe executed on Linux:</p>
+being built. For example, the <code>unix</code> variable is true when the host platform is macOS or Linux, while
+<code>win</code> is true when the host platform is Windows. Consider the following recipe executed on Linux:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
@@ -2784,32 +2784,36 @@ items can also be selected, such as:</p>
 <td>the configured <code>build_platform</code> for the build</td>
 </tr>
 <tr>
+<td><code>host_platform</code></td>
+<td>the configured <code>host_platform</code> for the build</td>
+</tr>
+<tr>
 <td><code>linux</code></td>
-<td>"true" if <code>target_platform</code> is Linux</td>
+<td>"true" if <code>host_platform</code> is Linux</td>
 </tr>
 <tr>
 <td><code>osx</code></td>
-<td>"true" if <code>target_platform</code> is OSX / macOS</td>
+<td>"true" if <code>host_platform</code> is OSX / macOS</td>
 </tr>
 <tr>
 <td><code>win</code></td>
-<td>"true" if <code>target_platform</code> is Windows</td>
+<td>"true" if <code>host_platform</code> is Windows</td>
 </tr>
 <tr>
 <td><code>unix</code></td>
-<td>"true" if <code>target_platform</code> is a Unix (macOS or Linux)</td>
+<td>"true" if <code>host_platform</code> is a Unix (macOS or Linux)</td>
 </tr>
 <tr>
 <td><code>x86</code>, <code>x86_64</code></td>
-<td>x86 32/64-bit Architecture</td>
+<td>x86 32/64-bit Architecture (based on <code>host_platform</code>)</td>
 </tr>
 <tr>
 <td><code>aarch64</code></td>
-<td>64-bit Arm (if <code>target_platform</code> is <code>linux-aarch64</code>)</td>
+<td>64-bit Arm (if <code>host_platform</code> is <code>linux-aarch64</code>)</td>
 </tr>
 <tr>
 <td><code>arm64</code></td>
-<td>64-bit Arm (if <code>target_platform</code> is <code>osx-arm64</code> or <code>win-arm64</code>)</td>
+<td>64-bit Arm (if <code>host_platform</code> is <code>osx-arm64</code> or <code>win-arm64</code>)</td>
 </tr>
 <tr>
 <td><code>armV6l</code>, <code>armV7l</code></td>
@@ -2888,9 +2892,9 @@ that the selectors are evaluated by <a href="https://github.com/mitsuhiko/miniji
 Some notable options are:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># equal</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python != &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># not equal</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and not linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is not linux</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and (linux or osx)</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux or osx</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is linux</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and not linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is not linux</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and (linux or osx)</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is linux or osx</span>
 </span></code></pre></div>
 <h3 id="alternatives-for-scalar-fields">Alternatives for scalar fields<a class="headerlink" href="#alternatives-for-scalar-fields" title="Permanent link">#</a></h3>
 <p>Some fields accept scalars rather than lists, and selectors cannot be used. Alternatives include:</p>
