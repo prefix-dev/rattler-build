@@ -145,45 +145,20 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
     }
 
     // No existing files matched at any strip level (e.g. all files are new).
-    // Try to determine the correct strip level by checking if parent directories
-    // exist. This disambiguates between:
-    //   - Git-format diffs where flickzeug already stripped a/b prefixes
-    //     (paths like "src/newfile.txt" where "src/" is a real directory)
-    //   - Plain-format diffs that still have a/b prefixes
-    //     (paths like "b/newfile.txt" where "b/" is NOT a real directory)
-    for strip_level in 0..max_components {
-        let any_parent_exists = patched_files.iter().any(|p| {
-            let path: PathBuf = p.components().skip(strip_level).collect();
-            if path.as_os_str().is_empty() {
-                return false;
-            }
-            match path.parent() {
-                // If the parent is a non-empty path, check if it exists as a directory
-                Some(parent) if !parent.as_os_str().is_empty() => {
-                    work_dir.join(parent).is_dir()
-                }
-                // Root-level files (empty parent) - not a useful signal, skip
-                _ => false,
-            }
+    // Check if paths have conventional a/b diff prefixes. flickzeug strips
+    // these for git-format diffs but preserves them for plain-format diffs,
+    // so their presence tells us which format we're dealing with:
+    //   - Paths like "b/newfile.txt" → plain-format, still has prefix → strip=1
+    //   - Paths like "newfile.txt"   → git-format, already stripped  → strip=0
+    let has_diff_prefix = !patched_files.is_empty()
+        && patched_files.iter().all(|p| {
+            p.components()
+                .next()
+                .and_then(|c| c.as_os_str().to_str())
+                .is_some_and(|s| s == "a" || s == "b")
         });
-        if any_parent_exists {
-            return Ok(strip_level);
-        }
-    }
 
-    // Final fallback: prefer 1 (for a/b prefix convention) but ensure no paths
-    // become empty (which happens when flickzeug already stripped the prefix).
-    for fallback_level in [1, 0] {
-        let all_paths_valid = patched_files.iter().all(|p| {
-            let path: PathBuf = p.components().skip(fallback_level).collect();
-            !path.as_os_str().is_empty()
-        });
-        if all_paths_valid {
-            return Ok(fallback_level);
-        }
-    }
-
-    Ok(0)
+    Ok(if has_diff_prefix { 1 } else { 0 })
 }
 
 fn custom_patch_stripped_paths(
