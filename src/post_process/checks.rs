@@ -244,6 +244,9 @@ pub fn validate_dsolist_files(package_dir: &Path) -> Result<(), LinkingCheckErro
     Ok(())
 }
 
+/// Allow and deny glob patterns loaded from dsolist files.
+type DsoAllowDeny = (Vec<String>, Vec<String>);
+
 /// Load dsolist JSON files from the given prefix directory.
 ///
 /// Returns `None` when no dsolist files matching `subdir` were found (the
@@ -251,10 +254,7 @@ pub fn validate_dsolist_files(package_dir: &Path) -> Result<(), LinkingCheckErro
 /// `Some((allow, deny))` when at least one matching file was processed –
 /// even if the resulting lists are empty, because an explicit empty
 /// allowlist means "nothing is allowed".
-fn load_dsolists(
-    prefix: &Path,
-    subdir: &str,
-) -> Result<Option<(Vec<String>, Vec<String>)>, LinkingCheckError> {
+fn load_dsolists(prefix: &Path, subdir: &str) -> Result<Option<DsoAllowDeny>, LinkingCheckError> {
     let dsolists_dir = prefix.join("etc/conda-build/dsolists.d");
     let mut allow_patterns = Vec::new();
     let mut deny_patterns = Vec::new();
