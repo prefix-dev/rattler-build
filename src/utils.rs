@@ -123,11 +123,18 @@ fn try_remove_with_retry(path: &Path, last_err: Option<std::io::Error>) -> std::
     let trash_path = pending_removal_path(path);
     let (target, renamed) = match std::fs::rename(path, &trash_path) {
         Ok(()) => {
-            tracing::debug!("Renamed {:?} → {:?} for deferred deletion", path, trash_path);
+            tracing::debug!(
+                "Renamed {:?} → {:?} for deferred deletion",
+                path,
+                trash_path
+            );
             (&*trash_path, true)
         }
         Err(rename_err) => {
-            tracing::debug!("Rename failed for {:?}: {rename_err}, retrying in-place", path);
+            tracing::debug!(
+                "Rename failed for {:?}: {rename_err}, retrying in-place",
+                path
+            );
             (path, false)
         }
     };
@@ -156,10 +163,9 @@ fn try_remove_with_retry(path: &Path, last_err: Option<std::io::Error>) -> std::
                         );
                         return Ok(());
                     }
-                    return Err(
-                        last_err
-                            .unwrap_or_else(|| std::io::Error::other("Directory could not be deleted")),
-                    );
+                    return Err(last_err.unwrap_or_else(|| {
+                        std::io::Error::other("Directory could not be deleted")
+                    }));
                 }
                 RetryDecision::Retry { execute_after } => {
                     let sleep_for = execute_after
