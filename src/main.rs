@@ -33,13 +33,31 @@ use rattler_config::config::ConfigBase;
 use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
-/// Parse the directories JSON from a rattler-build-log.txt or work directory
+/// Parse the directories JSON from environment, rattler-build-log.txt, or work directory.
+///
+/// Resolution order:
+/// 1. If `--work-dir` is explicitly given, use it directly.
+/// 2. If `RATTLER_BUILD_DIRECTORIES` env var is set (inside a debug shell), parse it.
+/// 3. Fall back to reading `rattler-build-log.txt` from the output directory.
 fn parse_directories_info(
     work_dir: Option<PathBuf>,
     output_dir: &Path,
 ) -> std::io::Result<(PathBuf, Option<serde_json::Value>)> {
     if let Some(dir) = work_dir {
         return Ok((dir, None));
+    }
+
+    // Check if we're inside a debug shell with RATTLER_BUILD_DIRECTORIES set
+    if let Ok(json_str) = std::env::var("RATTLER_BUILD_DIRECTORIES") {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
+            let work_dir = json["work_dir"].as_str().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "work_dir not found in RATTLER_BUILD_DIRECTORIES",
+                )
+            })?;
+            return Ok((PathBuf::from(work_dir), Some(json)));
+        }
     }
 
     // Read from rattler-build-log.txt
@@ -49,7 +67,7 @@ fn parse_directories_info(
             "Error: Could not find rattler-build-log.txt at {}",
             log_file.display()
         );
-        eprintln!("Please specify --work-dir or run a debug build first.");
+        eprintln!("Hint: Run from inside a `rattler-build debug` shell, or specify --work-dir.");
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "rattler-build-log.txt not found",
@@ -103,6 +121,19 @@ fn build_env_exports(json: &serde_json::Value) -> String {
         }
     }
 
+    // Export the path to the current rattler-build binary so that
+    // subcommands like `$RATTLER_BUILD debug host-add` work even when
+    // the system PATH points to a different (older) installation.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(canonical) = exe.canonicalize() {
+            env_exports.push_str(&format!(
+                "export RATTLER_BUILD='{}'\nalias rattler-build='{}'\n",
+                canonical.display(),
+                canonical.display()
+            ));
+        }
+    }
+
     env_exports
 }
 
@@ -125,11 +156,11 @@ fn print_debug_banner(work_dir: &Path, directories_json: &Option<serde_json::Val
 
     println!();
     println!("  Available commands:");
-    println!("    rattler-build create-patch   Create a patch from your changes");
-    println!("    rattler-build debug host-add <pkg>   Add packages to host env");
-    println!("    rattler-build debug build-add <pkg>  Add packages to build env");
+    println!("    rattler-build create-patch              Create a patch from your changes");
+    println!("    rattler-build debug host-add <pkg>      Add packages to host env");
+    println!("    rattler-build debug build-add <pkg>     Add packages to build env");
     println!();
-    println!("  The build environment has been sourced. Run ./conda_build.sh to");
+    println!("  The build environment has been sourced. Run `bash -x conda_build.sh` to");
     println!("  execute the build script, or make changes and use create-patch.");
     println!();
     println!("  Exit with 'exit' or Ctrl+D.");
