@@ -144,13 +144,22 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         }
     }
 
-    // XXX: This is not entirely correct way of handling this, since
-    // path is not necessarily starts with meaningless one letter
-    // component. Proper handling requires more in-depth analysis.
-    // For example this is fine if source is /dev/null and target is
-    // not, but may be incorrect otherwise, if original file does not
-    // exist.
-    Ok(1)
+    // No existing files matched at any strip level (e.g. all files are new).
+    // Prefer strip level 1 (for traditional a/b prefix convention in unified diffs),
+    // but fall back to 0 if strip level 1 would cause any path to become empty
+    // (which happens when the diff tool has already stripped the prefix, as flickzeug
+    // does for git-format patches).
+    for fallback_level in [1, 0] {
+        let all_paths_valid = patched_files.iter().all(|p| {
+            let path: PathBuf = p.components().skip(fallback_level).collect();
+            !path.as_os_str().is_empty()
+        });
+        if all_paths_valid {
+            return Ok(fallback_level);
+        }
+    }
+
+    Ok(0)
 }
 
 fn custom_patch_stripped_paths(
@@ -871,6 +880,12 @@ mod tests {
         // a single-component path like "original_name.md" would be stripped to an
         // empty path, causing work_dir.join("") to resolve to work_dir itself.
         // Reading a directory as a file produces "Is a directory" error.
+        //
+        // With the improved strip level fallback, strip level 0 is used instead
+        // (since level 1 would produce empty paths), so the patch correctly
+        // identifies the target file. Since the file doesn't exist and the patch
+        // expects existing content, it produces a PatchApplyError - which is the
+        // correct behavior (rather than silently skipping the patch).
         let (tempdir, _) = setup_patch_test_dir();
 
         // Apply a patch that references "original_name.md" which doesn't exist
@@ -883,12 +898,50 @@ mod tests {
             apply_patch_custom,
         );
 
-        // The patch should succeed by creating a new file (since the original doesn't exist)
+        // The patch should fail with a PatchApplyError since the file doesn't
+        // exist and the patch expects to modify existing content.
+        assert!(
+            result.is_err(),
+            "Patch referencing non-existent file should produce an error"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, SourceError::PatchApplyError(_)),
+            "Expected PatchApplyError, got: {:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_git_source_new_file_patch_no_is_a_directory_error() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2177
+        // When a git source is used with a patch that only creates new files (from /dev/null)
+        // in git-format (with "diff --git" header), flickzeug already strips the a/b prefix.
+        // The default strip level of 1 would then strip the entire single-component filename
+        // to empty, causing the patch to be silently skipped (or previously, an "Is a directory"
+        // error). The fix ensures the strip level falls back to 0 in this case.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let result = apply_patches(
+            &[PathBuf::from("test_git_source_new_file.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
         assert!(
             result.is_ok(),
-            "Patch referencing non-existent file should not fail with 'Is a directory': {:?}",
+            "Patch creating new file from /dev/null should not fail: {:?}",
             result.err()
         );
+
+        // Verify the new file was actually created with correct content
+        let new_file = tempdir.path().join("workdir/pyproject.toml");
+        assert!(new_file.exists(), "pyproject.toml should be created");
+        let content = fs_err::read_to_string(&new_file).unwrap();
+        assert!(content.contains("[build-system]"));
+        assert!(content.contains("requires = [\"setuptools>=61.0\"]"));
+        assert!(content.contains("build-backend = \"setuptools.build_meta\""));
     }
 
     /// Prepare all information needed to test patches for package info path.
