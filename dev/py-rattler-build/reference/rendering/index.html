@@ -2205,17 +2205,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.RenderConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#rattler_build.RenderConfig.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3321,17 +3310,6 @@
     <span class="md-ellipsis">
       
         experimental
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.RenderConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
       
     </span>
   </a>
@@ -4775,6 +4753,8 @@ The jinja_config provides platform information and other context needed for eval
         <p>Configuration for rendering recipes with variants.</p>
 <p>This class configures how recipes are rendered, including platform settings,
 experimental features, and additional Jinja context variables.</p>
+<p>The <code>recipe_path</code> is <strong>not</strong> set here — it is automatically injected from
+the :class:<code>~rattler_build.stage0.Stage0Recipe</code> during :meth:<code>render</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4797,7 +4777,7 @@ experimental features, and additional Jinja context variables.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Platform configuration (target, build, host platforms, experimental flag, and recipe_path)</p>
+                <p>Platform configuration (target, build, host platforms, experimental flag)</p>
               </div>
             </td>
             <td>
@@ -4828,7 +4808,7 @@ experimental features, and additional Jinja context variables.</p>
   <summary>Example</summary>
   <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build.tool_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlatformConfig</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">RenderConfig</span><span class="p">(</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">platform</span><span class="o">=</span><span class="n">platform</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">extra_context</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;custom_var&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;build_num&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">}</span>
@@ -4944,30 +4924,6 @@ experimental features, and additional Jinja context variables.</p>
     <div class="doc doc-contents ">
 
         <p>Get whether experimental features are enabled.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.RenderConfig.recipe_path" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">recipe_path</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.RenderConfig.recipe_path" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">recipe_path</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Get the recipe path.</p>
 
     </div>
 
@@ -5111,6 +5067,9 @@ experimental features, and additional Jinja context variables.</p>
         <p>Result of rendering a recipe with a specific variant combination.</p>
 <p>Each RenderedVariant represents one specific variant of a recipe after
 all Jinja templates have been evaluated and variant values applied.</p>
+<p>The :attr:<code>recipe_path</code> is carried over from the
+:class:<code>~rattler_build.stage0.Stage0Recipe</code> that produced this variant
+and is used automatically by :meth:<code>run_build</code>.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -5184,6 +5143,17 @@ all Jinja templates have been evaluated and variant values applied.</p>
             <td>
               <div class="doc-md-description">
                 <p>Pin subpackage dependencies</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rattler_build.RenderedVariant.recipe_path">recipe_path</span></code></td>
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the recipe file on disk</p>
               </div>
             </td>
           </tr>
@@ -5436,23 +5406,23 @@ all Jinja templates have been evaluated and variant values applied.</p>
 <a href="#rattler_build.RenderedVariant.run_build" class="headerlink" title="Permanent link">#</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">run_build</span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tool_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">channels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">recipe_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">no_build_id</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">package_format</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">no_include_recipe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">exclude_newer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">no_build_id</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">package_format</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">no_include_recipe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">exclude_newer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Build this rendered variant.</p>
 <p>This method builds a single rendered variant directly without needing
-to go back through the Stage0 recipe.</p>
+to go back through the Stage0 recipe.  The recipe path is taken from
+this variant automatically (set during :meth:<code>Stage0Recipe.render</code>).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5487,15 +5457,16 @@ to go back through the Stage0 recipe.</p>
                 <code>output_dir</code>
             </td>
             <td>
-                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Directory to store the built package. Defaults to current directory.</p>
+                <p>Directory to store the built package.
+Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;.&#39;</code>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5524,22 +5495,6 @@ to go back through the Stage0 recipe.</p>
             <td>
               <div class="doc-md-description">
                 <p>Optional progress callback for build events.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>recipe_path</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Path to the recipe file (for copying license files, etc.).</p>
               </div>
             </td>
             <td>
@@ -5659,8 +5614,8 @@ to go back through the Stage0 recipe.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">recipe</span> <span class="o">=</span> <span class="n">Stage0Recipe</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">yaml_string</span><span class="p">)</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">rendered</span> <span class="o">=</span> <span class="n">recipe</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">VariantConfig</span><span class="p">())</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Build just the first variant</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">rendered</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">run_build</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;./output&quot;</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Build just the first variant (output goes to &lt;recipe_dir&gt;/output)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">rendered</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">run_build</span><span class="p">()</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Built package: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 </details>

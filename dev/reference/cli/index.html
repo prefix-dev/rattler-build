@@ -2974,6 +2974,8 @@
     Use JSON logging output</li>
 <li><code>plain</code>:
     Use plain logging output</li>
+<li><code>simple</code>:
+    Use simple logging output (colored, no box-drawing frames)</li>
 </ul>
 </li>
 </ul>
@@ -3157,6 +3159,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--debug</code></p>
 <p>Enable debug output in build scripts</p>
+</li>
+<li>
+<p><code>--markdown-summary &lt;MARKDOWN_SUMMARY&gt;</code></p>
+<p>Write a markdown summary to the specified file (appends to the file). Useful for generating PR comments or custom reports</p>
 </li>
 <li>
 <p><code>--error-prefix-in-binary</code></p>
@@ -3365,6 +3371,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Enable debug output in build scripts</p>
 </li>
 <li>
+<p><code>--markdown-summary &lt;MARKDOWN_SUMMARY&gt;</code></p>
+<p>Write a markdown summary to the specified file (appends to the file). Useful for generating PR comments or custom reports</p>
+</li>
+<li>
 <p><code>--error-prefix-in-binary</code></p>
 <p>Error if the host prefix is detected in any binary files</p>
 </li>
@@ -3446,7 +3456,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <p><code>-p</code>, <code>--package-file &lt;PACKAGE_FILE&gt;</code></p>
-<p>The package file to test</p>
+<p>The package file or extracted package directory to test</p>
 </li>
 <li>
 <p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>

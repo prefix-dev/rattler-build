@@ -2779,19 +2779,17 @@
 <p>Let's get started!</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pprint</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">MultiOutputRecipe</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">PlatformConfig</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">RenderConfig</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">SingleOutputRecipe</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">Stage0Recipe</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">VariantConfig</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">MultiOutputRecipe</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">PlatformConfig</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">RenderConfig</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">SingleOutputRecipe</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">Stage0Recipe</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">VariantConfig</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="example-1-loading-a-simple-recipe-from-yaml">Example 1: Loading a Simple Recipe from YAML<a class="headerlink" href="#example-1-loading-a-simple-recipe-from-yaml" title="Permanent link">#</a></h2>
 <p>The most common way to define a recipe is using YAML format. Let's create a simple package recipe:</p>
@@ -3092,7 +3090,8 @@ STAGE 1 - Variant 1 (Rendered, templates evaluated)
 ------------------------------------------------------------
   Variant config: {
     &quot;numpy&quot;: &quot;1.21&quot;,
-    &quot;python&quot;: &quot;3.9&quot;
+    &quot;python&quot;: &quot;3.9&quot;,
+    &quot;target_platform&quot;: &quot;linux-64&quot;
 }
   Package name: my-simple-package
   Package version: 1.0.0
@@ -3100,13 +3099,14 @@ STAGE 1 - Variant 1 (Rendered, templates evaluated)
   Numpy: 1.21
   Host requirements: [&#39;python 3.9.*&#39;, &#39;numpy 1.21.*&#39;]
   Run requirements: [&#39;python&#39;, &#39;numpy &gt;=1.21&#39;]
-  Build string: np121py39h3ff1fb5_0
+  Build string: np121py39h13fef27_0
 
 STAGE 1 - Variant 2 (Rendered, templates evaluated)
 ------------------------------------------------------------
   Variant config: {
     &quot;numpy&quot;: &quot;1.22&quot;,
-    &quot;python&quot;: &quot;3.10&quot;
+    &quot;python&quot;: &quot;3.10&quot;,
+    &quot;target_platform&quot;: &quot;linux-64&quot;
 }
   Package name: my-simple-package
   Package version: 1.0.0
@@ -3114,13 +3114,14 @@ STAGE 1 - Variant 2 (Rendered, templates evaluated)
   Numpy: 1.22
   Host requirements: [&#39;python 3.10.*&#39;, &#39;numpy 1.22.*&#39;]
   Run requirements: [&#39;python&#39;, &#39;numpy &gt;=1.22&#39;]
-  Build string: np122py310h667b11f_0
+  Build string: np122py310h27bf20f_0
 
 STAGE 1 - Variant 3 (Rendered, templates evaluated)
 ------------------------------------------------------------
   Variant config: {
     &quot;numpy&quot;: &quot;1.23&quot;,
-    &quot;python&quot;: &quot;3.11&quot;
+    &quot;python&quot;: &quot;3.11&quot;,
+    &quot;target_platform&quot;: &quot;linux-64&quot;
 }
   Package name: my-simple-package
   Package version: 1.0.0
@@ -3128,87 +3129,63 @@ STAGE 1 - Variant 3 (Rendered, templates evaluated)
   Numpy: 1.23
   Host requirements: [&#39;python 3.11.*&#39;, &#39;numpy 1.23.*&#39;]
   Run requirements: [&#39;python&#39;, &#39;numpy &gt;=1.23&#39;]
-  Build string: np123py311h1aa771a_0
+  Build string: np123py311hadc6f11_0
 
 ============================================================
 Recipe rendering complete!
 </code></pre></div>
 <h2 id="example-6-building-the-package">Example 6: Building the Package<a class="headerlink" href="#example-6-building-the-package" title="Permanent link">#</a></h2>
 <p>Finally, let's actually build the package! We'll take the rendered variants and build them into conda packages:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Create persistent temp directories (clean up from previous runs)</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">recipe_tmpdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">())</span> <span class="o">/</span> <span class="s2">&quot;rattler_build_recipe&quot;</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">output_tmpdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">())</span> <span class="o">/</span> <span class="s2">&quot;rattler_build_output&quot;</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Clean up from previous runs</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="k">if</span> <span class="n">recipe_tmpdir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">recipe_tmpdir</span><span class="p">)</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">if</span> <span class="n">output_tmpdir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">output_tmpdir</span><span class="p">)</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="c1"># Create the directories</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="n">recipe_tmpdir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">output_tmpdir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="c1"># Define dummy recipe path</span>
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="n">recipe_path</span> <span class="o">=</span> <span class="n">recipe_tmpdir</span> <span class="o">/</span> <span class="s2">&quot;recipe.yaml&quot;</span>
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="c1"># Build each variant</span>
-</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Building packages...&quot;</span><span class="p">)</span>
-</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recipe directory: </span><span class="si">{</span><span class="n">recipe_tmpdir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output directory: </span><span class="si">{</span><span class="n">output_tmpdir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
-</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">variant</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rendered_variants</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
-</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Building variant </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rendered_variants</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>    <span class="n">stage1_recipe</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">recipe</span>
-</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>    <span class="n">package</span> <span class="o">=</span> <span class="n">stage1_recipe</span><span class="o">.</span><span class="n">package</span>
-</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>    <span class="n">build</span> <span class="o">=</span> <span class="n">stage1_recipe</span><span class="o">.</span><span class="n">build</span>
-</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>
-</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Package: </span><span class="si">{</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-33"><a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Version: </span><span class="si">{</span><span class="n">package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-34"><a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build string: </span><span class="si">{</span><span class="n">build</span><span class="o">.</span><span class="n">string</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-35"><a id="__codelineno-6-35" name="__codelineno-6-35" href="#__codelineno-6-35"></a>
-</span><span id="__span-6-36"><a id="__codelineno-6-36" name="__codelineno-6-36" href="#__codelineno-6-36"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">run_build</span><span class="p">(</span>
-</span><span id="__span-6-37"><a id="__codelineno-6-37" name="__codelineno-6-37" href="#__codelineno-6-37"></a>        <span class="n">output_dir</span><span class="o">=</span><span class="n">output_tmpdir</span><span class="p">,</span>
-</span><span id="__span-6-38"><a id="__codelineno-6-38" name="__codelineno-6-38" href="#__codelineno-6-38"></a>        <span class="n">recipe_path</span><span class="o">=</span><span class="n">recipe_path</span><span class="p">,</span>
-</span><span id="__span-6-39"><a id="__codelineno-6-39" name="__codelineno-6-39" href="#__codelineno-6-39"></a>    <span class="p">)</span>
-</span><span id="__span-6-40"><a id="__codelineno-6-40" name="__codelineno-6-40" href="#__codelineno-6-40"></a>
-</span><span id="__span-6-41"><a id="__codelineno-6-41" name="__codelineno-6-41" href="#__codelineno-6-41"></a>    <span class="c1"># Display build result information</span>
-</span><span id="__span-6-42"><a id="__codelineno-6-42" name="__codelineno-6-42" href="#__codelineno-6-42"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build complete in </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">build_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s!&quot;</span><span class="p">)</span>
-</span><span id="__span-6-43"><a id="__codelineno-6-43" name="__codelineno-6-43" href="#__codelineno-6-43"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Package: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-44"><a id="__codelineno-6-44" name="__codelineno-6-44" href="#__codelineno-6-44"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">variant</span><span class="p">:</span>
-</span><span id="__span-6-45"><a id="__codelineno-6-45" name="__codelineno-6-45" href="#__codelineno-6-45"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Variant: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">variant</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-46"><a id="__codelineno-6-46" name="__codelineno-6-46" href="#__codelineno-6-46"></a>
-</span><span id="__span-6-47"><a id="__codelineno-6-47" name="__codelineno-6-47" href="#__codelineno-6-47"></a>    <span class="c1"># Display build log</span>
-</span><span id="__span-6-48"><a id="__codelineno-6-48" name="__codelineno-6-48" href="#__codelineno-6-48"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">:</span>
-</span><span id="__span-6-49"><a id="__codelineno-6-49" name="__codelineno-6-49" href="#__codelineno-6-49"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build log: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages captured&quot;</span><span class="p">)</span>
-</span><span id="__span-6-50"><a id="__codelineno-6-50" name="__codelineno-6-50" href="#__codelineno-6-50"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  Build log details:&quot;</span><span class="p">)</span>
-</span><span id="__span-6-51"><a id="__codelineno-6-51" name="__codelineno-6-51" href="#__codelineno-6-51"></a>        <span class="k">for</span> <span class="n">log_entry</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">[:</span><span class="mi">10</span><span class="p">]:</span>  <span class="c1"># Show first 10 log entries</span>
-</span><span id="__span-6-52"><a id="__codelineno-6-52" name="__codelineno-6-52" href="#__codelineno-6-52"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">log_entry</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-6-53"><a id="__codelineno-6-53" name="__codelineno-6-53" href="#__codelineno-6-53"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
-</span><span id="__span-6-54"><a id="__codelineno-6-54" name="__codelineno-6-54" href="#__codelineno-6-54"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    ... and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">10</span><span class="si">}</span><span class="s2"> more messages&quot;</span><span class="p">)</span>
-</span><span id="__span-6-55"><a id="__codelineno-6-55" name="__codelineno-6-55" href="#__codelineno-6-55"></a>
-</span><span id="__span-6-56"><a id="__codelineno-6-56" name="__codelineno-6-56" href="#__codelineno-6-56"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-6-57"><a id="__codelineno-6-57" name="__codelineno-6-57" href="#__codelineno-6-57"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;All builds completed successfully!&quot;</span><span class="p">)</span>
-</span><span id="__span-6-58"><a id="__codelineno-6-58" name="__codelineno-6-58" href="#__codelineno-6-58"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Built packages are available in: </span><span class="si">{</span><span class="n">output_tmpdir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Build each variant</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Building packages...&quot;</span><span class="p">)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recipe path: </span><span class="si">{</span><span class="n">simple_recipe</span><span class="o">.</span><span class="n">recipe_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">variant</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rendered_variants</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Building variant </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rendered_variants</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">stage1_recipe</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">recipe</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">package</span> <span class="o">=</span> <span class="n">stage1_recipe</span><span class="o">.</span><span class="n">package</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">build</span> <span class="o">=</span> <span class="n">stage1_recipe</span><span class="o">.</span><span class="n">build</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Package: </span><span class="si">{</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Version: </span><span class="si">{</span><span class="n">package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build string: </span><span class="si">{</span><span class="n">build</span><span class="o">.</span><span class="n">string</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">run_build</span><span class="p">()</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="c1"># Display build result information</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build complete in </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">build_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s!&quot;</span><span class="p">)</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Package: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">variant</span><span class="p">:</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Variant: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">variant</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>    <span class="c1"># Display build log</span>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">:</span>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Build log: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages captured&quot;</span><span class="p">)</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  Build log details:&quot;</span><span class="p">)</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>        <span class="k">for</span> <span class="n">log_entry</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">[:</span><span class="mi">10</span><span class="p">]:</span>  <span class="c1"># Show first 10 log entries</span>
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">log_entry</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    ... and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">log</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">10</span><span class="si">}</span><span class="s2"> more messages&quot;</span><span class="p">)</span>
+</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>
+</span><span id="__span-6-33"><a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-6-34"><a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;All builds completed successfully!&quot;</span><span class="p">)</span>
+</span><span id="__span-6-35"><a id="__codelineno-6-35" name="__codelineno-6-35" href="#__codelineno-6-35"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Built packages are available in: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building packages...
 ============================================================
-Recipe directory: /tmp/rattler_build_recipe
-Output directory: /tmp/rattler_build_output
+Recipe path: /tmp/rattler_build_7a_82t30/recipe.yaml
 
 Building variant 1/3
   Package: my-simple-package
   Version: 1.0.0
-  Build string: np121py39h3ff1fb5_0
+  Build string: np121py39h13fef27_0
 
 
-  Build complete in 3.24s!
-  Package: /tmp/rattler_build_output/linux-64/my-simple-package-1.0.0-np121py39h3ff1fb5_0.conda
-  Variant: {&#39;python&#39;: &#39;3.9&#39;, &#39;numpy&#39;: &#39;1.21&#39;}
-  Build log: 51 messages captured
+  Build complete in 2.89s!
+  Package: /tmp/rattler_build_7a_82t30/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+  Variant: {&#39;numpy&#39;: &#39;1.21&#39;, &#39;python&#39;: &#39;3.9&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build log: 52 messages captured
 
   Build log details:
     Starting build of 1 outputs
@@ -3221,18 +3198,18 @@ Building variant 1/3
     Adding 0 packages to subdir noarch.
     Successfully added 0 packages to subdir noarch.
     Writing repodata to noarch/repodata.json
-    ... and 41 more messages
+    ... and 42 more messages
 
 Building variant 2/3
   Package: my-simple-package
   Version: 1.0.0
-  Build string: np122py310h667b11f_0
+  Build string: np122py310h27bf20f_0
 
 
-  Build complete in 2.61s!
-  Package: /tmp/rattler_build_output/linux-64/my-simple-package-1.0.0-np122py310h667b11f_0.conda
-  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;numpy&#39;: &#39;1.22&#39;}
-  Build log: 46 messages captured
+  Build complete in 2.46s!
+  Package: /tmp/rattler_build_7a_82t30/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+  Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.22&#39;, &#39;python&#39;: &#39;3.10&#39;}
+  Build log: 47 messages captured
 
   Build log details:
     Starting build of 1 outputs
@@ -3245,18 +3222,18 @@ Resolving host environment:
 
       Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_output/
+       - file:///tmp/rattler_build_7a_82t30/output/
        - conda-forge
-    ... and 36 more messages
+    ... and 37 more messages
 
 Building variant 3/3
   Package: my-simple-package
   Version: 1.0.0
-  Build string: np123py311h1aa771a_0
-  Build complete in 2.18s!
-  Package: /tmp/rattler_build_output/linux-64/my-simple-package-1.0.0-np123py311h1aa771a_0.conda
-  Variant: {&#39;python&#39;: &#39;3.11&#39;, &#39;numpy&#39;: &#39;1.23&#39;}
-  Build log: 46 messages captured
+  Build string: np123py311hadc6f11_0
+  Build complete in 2.17s!
+  Package: /tmp/rattler_build_7a_82t30/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+  Variant: {&#39;python&#39;: &#39;3.11&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.23&#39;}
+  Build log: 47 messages captured
 
   Build log details:
     Starting build of 1 outputs
@@ -3269,14 +3246,16 @@ Resolving host environment:
 
       Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_output/
+       - file:///tmp/rattler_build_7a_82t30/output/
        - conda-forge
-    ... and 36 more messages
+    ... and 37 more messages
+
+
 
 ============================================================
 All builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_output
+Built packages are available in: /tmp/rattler_build_7a_82t30/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned:</p>

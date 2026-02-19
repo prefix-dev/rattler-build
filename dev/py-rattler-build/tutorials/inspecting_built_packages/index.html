@@ -2868,11 +2868,9 @@
 </ol>
 <p>Let's get started!</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">Package</span><span class="p">,</span> <span class="n">RenderConfig</span><span class="p">,</span> <span class="n">Stage0Recipe</span><span class="p">,</span> <span class="n">VariantConfig</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">Package</span><span class="p">,</span> <span class="n">RenderConfig</span><span class="p">,</span> <span class="n">Stage0Recipe</span><span class="p">,</span> <span class="n">VariantConfig</span>
 </span></code></pre></div>
 <h2 id="step-1-build-a-package-with-tests">Step 1: Build a Package with Tests<a class="headerlink" href="#step-1-build-a-package-with-tests" title="Permanent link">#</a></h2>
 <p>First, let's build a package that has embedded tests. We'll create a simple noarch Python package with:
@@ -2941,35 +2939,18 @@
 </span><span id="__span-1-61"><a id="__codelineno-1-61" name="__codelineno-1-61" href="#__codelineno-1-61"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Package: </span><span class="si">{</span><span class="n">demo_recipe</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-1-62"><a id="__codelineno-1-62" name="__codelineno-1-62" href="#__codelineno-1-62"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Version: </span><span class="si">{</span><span class="n">demo_recipe</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-1-63"><a id="__codelineno-1-63" name="__codelineno-1-63" href="#__codelineno-1-63"></a>
-</span><span id="__span-1-64"><a id="__codelineno-1-64" name="__codelineno-1-64" href="#__codelineno-1-64"></a><span class="c1"># Set up build directories</span>
-</span><span id="__span-1-65"><a id="__codelineno-1-65" name="__codelineno-1-65" href="#__codelineno-1-65"></a><span class="n">recipe_tmpdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">())</span> <span class="o">/</span> <span class="s2">&quot;rattler_build_test_demo&quot;</span>
-</span><span id="__span-1-66"><a id="__codelineno-1-66" name="__codelineno-1-66" href="#__codelineno-1-66"></a><span class="n">output_tmpdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">())</span> <span class="o">/</span> <span class="s2">&quot;rattler_build_test_demo_output&quot;</span>
-</span><span id="__span-1-67"><a id="__codelineno-1-67" name="__codelineno-1-67" href="#__codelineno-1-67"></a>
-</span><span id="__span-1-68"><a id="__codelineno-1-68" name="__codelineno-1-68" href="#__codelineno-1-68"></a><span class="c1"># Clean up from previous runs</span>
-</span><span id="__span-1-69"><a id="__codelineno-1-69" name="__codelineno-1-69" href="#__codelineno-1-69"></a><span class="k">if</span> <span class="n">recipe_tmpdir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-1-70"><a id="__codelineno-1-70" name="__codelineno-1-70" href="#__codelineno-1-70"></a>    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">recipe_tmpdir</span><span class="p">)</span>
-</span><span id="__span-1-71"><a id="__codelineno-1-71" name="__codelineno-1-71" href="#__codelineno-1-71"></a><span class="k">if</span> <span class="n">output_tmpdir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-1-72"><a id="__codelineno-1-72" name="__codelineno-1-72" href="#__codelineno-1-72"></a>    <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">output_tmpdir</span><span class="p">)</span>
+</span><span id="__span-1-64"><a id="__codelineno-1-64" name="__codelineno-1-64" href="#__codelineno-1-64"></a><span class="c1"># Build the package (skip tests during build, we&#39;ll run them manually)</span>
+</span><span id="__span-1-65"><a id="__codelineno-1-65" name="__codelineno-1-65" href="#__codelineno-1-65"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Building package...&quot;</span><span class="p">)</span>
+</span><span id="__span-1-66"><a id="__codelineno-1-66" name="__codelineno-1-66" href="#__codelineno-1-66"></a><span class="n">variant</span> <span class="o">=</span> <span class="n">demo_results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-1-67"><a id="__codelineno-1-67" name="__codelineno-1-67" href="#__codelineno-1-67"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">ToolConfiguration</span>
+</span><span id="__span-1-68"><a id="__codelineno-1-68" name="__codelineno-1-68" href="#__codelineno-1-68"></a>
+</span><span id="__span-1-69"><a id="__codelineno-1-69" name="__codelineno-1-69" href="#__codelineno-1-69"></a><span class="n">tool_config</span> <span class="o">=</span> <span class="n">ToolConfiguration</span><span class="p">(</span><span class="n">test_strategy</span><span class="o">=</span><span class="s2">&quot;skip&quot;</span><span class="p">)</span>
+</span><span id="__span-1-70"><a id="__codelineno-1-70" name="__codelineno-1-70" href="#__codelineno-1-70"></a><span class="n">build_result</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">run_build</span><span class="p">(</span>
+</span><span id="__span-1-71"><a id="__codelineno-1-71" name="__codelineno-1-71" href="#__codelineno-1-71"></a>    <span class="n">tool_config</span><span class="o">=</span><span class="n">tool_config</span><span class="p">,</span>
+</span><span id="__span-1-72"><a id="__codelineno-1-72" name="__codelineno-1-72" href="#__codelineno-1-72"></a><span class="p">)</span>
 </span><span id="__span-1-73"><a id="__codelineno-1-73" name="__codelineno-1-73" href="#__codelineno-1-73"></a>
-</span><span id="__span-1-74"><a id="__codelineno-1-74" name="__codelineno-1-74" href="#__codelineno-1-74"></a><span class="n">recipe_tmpdir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-75"><a id="__codelineno-1-75" name="__codelineno-1-75" href="#__codelineno-1-75"></a><span class="n">output_tmpdir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-76"><a id="__codelineno-1-76" name="__codelineno-1-76" href="#__codelineno-1-76"></a>
-</span><span id="__span-1-77"><a id="__codelineno-1-77" name="__codelineno-1-77" href="#__codelineno-1-77"></a><span class="n">recipe_path</span> <span class="o">=</span> <span class="n">recipe_tmpdir</span> <span class="o">/</span> <span class="s2">&quot;recipe.yaml&quot;</span>
-</span><span id="__span-1-78"><a id="__codelineno-1-78" name="__codelineno-1-78" href="#__codelineno-1-78"></a>
-</span><span id="__span-1-79"><a id="__codelineno-1-79" name="__codelineno-1-79" href="#__codelineno-1-79"></a><span class="c1"># Build the package (skip tests during build, we&#39;ll run them manually)</span>
-</span><span id="__span-1-80"><a id="__codelineno-1-80" name="__codelineno-1-80" href="#__codelineno-1-80"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Building package...&quot;</span><span class="p">)</span>
-</span><span id="__span-1-81"><a id="__codelineno-1-81" name="__codelineno-1-81" href="#__codelineno-1-81"></a><span class="n">variant</span> <span class="o">=</span> <span class="n">demo_results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-1-82"><a id="__codelineno-1-82" name="__codelineno-1-82" href="#__codelineno-1-82"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">ToolConfiguration</span>
-</span><span id="__span-1-83"><a id="__codelineno-1-83" name="__codelineno-1-83" href="#__codelineno-1-83"></a>
-</span><span id="__span-1-84"><a id="__codelineno-1-84" name="__codelineno-1-84" href="#__codelineno-1-84"></a><span class="n">tool_config</span> <span class="o">=</span> <span class="n">ToolConfiguration</span><span class="p">(</span><span class="n">test_strategy</span><span class="o">=</span><span class="s2">&quot;skip&quot;</span><span class="p">)</span>
-</span><span id="__span-1-85"><a id="__codelineno-1-85" name="__codelineno-1-85" href="#__codelineno-1-85"></a><span class="n">build_result</span> <span class="o">=</span> <span class="n">variant</span><span class="o">.</span><span class="n">run_build</span><span class="p">(</span>
-</span><span id="__span-1-86"><a id="__codelineno-1-86" name="__codelineno-1-86" href="#__codelineno-1-86"></a>    <span class="n">tool_config</span><span class="o">=</span><span class="n">tool_config</span><span class="p">,</span>
-</span><span id="__span-1-87"><a id="__codelineno-1-87" name="__codelineno-1-87" href="#__codelineno-1-87"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="n">output_tmpdir</span><span class="p">,</span>
-</span><span id="__span-1-88"><a id="__codelineno-1-88" name="__codelineno-1-88" href="#__codelineno-1-88"></a>    <span class="n">recipe_path</span><span class="o">=</span><span class="n">recipe_path</span><span class="p">,</span>
-</span><span id="__span-1-89"><a id="__codelineno-1-89" name="__codelineno-1-89" href="#__codelineno-1-89"></a><span class="p">)</span>
-</span><span id="__span-1-90"><a id="__codelineno-1-90" name="__codelineno-1-90" href="#__codelineno-1-90"></a>
-</span><span id="__span-1-91"><a id="__codelineno-1-91" name="__codelineno-1-91" href="#__codelineno-1-91"></a><span class="n">built_package_path</span> <span class="o">=</span> <span class="n">build_result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-1-92"><a id="__codelineno-1-92" name="__codelineno-1-92" href="#__codelineno-1-92"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Built: </span><span class="si">{</span><span class="n">built_package_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-1-74"><a id="__codelineno-1-74" name="__codelineno-1-74" href="#__codelineno-1-74"></a><span class="n">built_package_path</span> <span class="o">=</span> <span class="n">build_result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-1-75"><a id="__codelineno-1-75" name="__codelineno-1-75" href="#__codelineno-1-75"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Built: </span><span class="si">{</span><span class="n">built_package_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Recipe with Tests Created
 ============================================================
@@ -2977,7 +2958,7 @@ Package: test-demo-package
 Version: 1.0.0
 
 Building package...
-Built: /tmp/rattler_build_test_demo_output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Built: /tmp/rattler_build_grk0tiyx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 </code></pre></div>
 <h2 id="step-2-loading-a-package">Step 2: Loading a Package<a class="headerlink" href="#step-2-loading-a-package" title="Permanent link">#</a></h2>
 <p>Use <code>Package.from_file()</code> to load a built package. This reads the package metadata without extracting the entire archive.</p>
@@ -2992,7 +2973,7 @@ Built: /tmp/rattler_build_test_demo_output/noarch/test-demo-package-1.0.0-pyh461
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Package Loaded Successfully!
 ============================================================
-Path: /tmp/rattler_build_test_demo_output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Path: /tmp/rattler_build_grk0tiyx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 Type: Package
 
 String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -3041,7 +3022,7 @@ NoArch:         python
 License:        MIT
 Arch:           None
 Platform:       None
-Timestamp:      2026-02-17 08:38:28.547000+00:00
+Timestamp:      2026-02-19 12:07:26.370000+00:00
 
 Archive Information
 ----------------------------------------
@@ -3079,10 +3060,10 @@ Constraints (constrains):
   &quot;constrains&quot;: [],
   &quot;license&quot;: &quot;MIT&quot;,
   &quot;license_family&quot;: null,
-  &quot;timestamp&quot;: &quot;2026-02-17 08:38:28.547000+00:00&quot;,
+  &quot;timestamp&quot;: &quot;2026-02-19 12:07:26.370000+00:00&quot;,
   &quot;arch&quot;: null,
   &quot;platform&quot;: null,
-  &quot;path&quot;: &quot;/tmp/rattler_build_test_demo_output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
+  &quot;path&quot;: &quot;/tmp/rattler_build_grk0tiyx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
   &quot;archive_type&quot;: &quot;conda&quot;,
   &quot;filename&quot;: &quot;test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;
 }
@@ -3395,13 +3376,13 @@ Example: Running test with conda-forge channel:
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Rebuilding Package
 ============================================================
-Original package: /tmp/rattler_build_test_demo_output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260217-083833.conda
+Original package: /tmp/rattler_build_grk0tiyx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260219-120731.conda
 
-Original SHA256:  b0d7ed7b14fc2c7e4b0317c7211823945b69979488d1341384edb84b65c6fc30
-Rebuilt SHA256:   4bcaf2940f81db3d605da3fcf863f7b83f9ccfc68536785c2d2e39e4129efee7
+Original SHA256:  0b786e302108a723727c417f722ebdbd2b25eae0a7c67cc7d29377354f02b4d4
+Rebuilt SHA256:   0b786e302108a723727c417f722ebdbd2b25eae0a7c67cc7d29377354f02b4d4
 
-Identical (reproducible): False
+Identical (reproducible): True
 </code></pre></div>
 <p>The <code>RebuildResult</code> provides access to the rebuilt package for further inspection:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Access the rebuilt package for inspection</span>
@@ -3420,7 +3401,7 @@ Identical (reproducible): False
 Name:         test-demo-package
 Version:      1.0.0
 Build string: pyh4616a5c_0
-Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260217-083833.conda
+Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260219-120731.conda
 Files:        1 files
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>

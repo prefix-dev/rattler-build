@@ -2244,17 +2244,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#rattler_build.PlatformConfig.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3228,17 +3217,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#rattler_build.PlatformConfig.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4167,22 +4145,6 @@ If not specified, defaults to the target platform.</p>
                   <code>False</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>recipe_path</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Path to the recipe file (for relative path resolution)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -4193,7 +4155,7 @@ If not specified, defaults to the target platform.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">()</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Create for a specific platform (build and host will default to target)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Create with different platforms for cross-compilation</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span>
@@ -4313,28 +4275,6 @@ If not specified, defaults to the target platform.</p>
 
 </div>
 
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.PlatformConfig.recipe_path" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">recipe_path</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-<a href="#rattler_build.PlatformConfig.recipe_path" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">recipe_path</span> <span class="o">=</span> <span class="n">recipe_path</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
 
 
 
@@ -4352,8 +4292,7 @@ If not specified, defaults to the target platform.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">build_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">host_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">experimental</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">recipe_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -4406,7 +4345,7 @@ If not specified, defaults to the target platform.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Platform configuration (target, build, host platforms, experimental flag, and recipe_path)</p>
+                <p>Platform configuration (target, build, host platforms, experimental flag)</p>
               </div>
             </td>
             <td>
@@ -4445,6 +4384,22 @@ If not specified, defaults to the target platform.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>recipe_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the recipe file (for relative path resolution in Jinja functions)</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4453,7 +4408,7 @@ If not specified, defaults to the target platform.</p>
   <summary>Example</summary>
   <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build.tool_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlatformConfig</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">JinjaConfig</span><span class="p">(</span><span class="n">platform</span><span class="o">=</span><span class="n">platform</span><span class="p">)</span>
 </span></code></pre></div>
 </details>
@@ -4654,7 +4609,12 @@ If not specified, defaults to the target platform.</p>
 
 
 <a href="#rattler_build.JinjaConfig.__init__" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span><span class="n">platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">allow_undefined</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">allow_undefined</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">recipe_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
