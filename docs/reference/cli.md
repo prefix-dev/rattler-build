@@ -1145,6 +1145,59 @@ Store authentication information for a given host
 
 ##### **Options:**
 
+###### **OAuth/OIDC Authentication**
+
+- `--oauth`
+
+	Use OAuth/OIDC authentication
+
+
+- `--oauth-issuer-url <OAUTH_ISSUER_URL>`
+
+	OIDC issuer URL (defaults to <https://{host>})
+
+
+- `--oauth-client-id <OAUTH_CLIENT_ID>`
+
+	OAuth client ID (defaults to "rattler")
+
+
+- `--oauth-client-secret <OAUTH_CLIENT_SECRET>`
+
+	OAuth client secret (for confidential clients)
+
+
+- `--oauth-flow <OAUTH_FLOW>`
+
+	OAuth flow: auto (default), auth-code, device-code
+
+	- Possible values: `auto`, `auth-code`, `device-code`
+
+
+- `--oauth-scope <OAUTH_SCOPES>`
+
+	Additional OAuth scopes to request (repeatable)
+
+
+###### **S3 Authentication**
+
+- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
+
+	The S3 access key ID
+
+
+- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
+
+	The S3 secret access key
+
+
+- `--s3-session-token <S3_SESSION_TOKEN>`
+
+	The S3 session token
+
+
+###### **Token / Basic Authentication**
+
 - `--token <TOKEN>`
 
 	The token to use (for authentication with prefix.dev)
@@ -1163,21 +1216,6 @@ Store authentication information for a given host
 - `--conda-token <CONDA_TOKEN>`
 
 	The token to use on anaconda.org / quetz authentication
-
-
-- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
-
-	The S3 access key ID
-
-
-- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
-
-	The S3 secret access key
-
-
-- `--s3-session-token <S3_SESSION_TOKEN>`
-
-	The S3 session token
 
 
 
