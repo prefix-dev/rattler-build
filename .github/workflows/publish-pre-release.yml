@@ -1,0 +1,36 @@
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+name: Publish Pre-release
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-upload:
+    name: Build & Upload (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+        with:
+          submodules: recursive
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: packaging
+      - name: Build package
+        run: pixi run --environment=packaging build-package
+        env:
+          RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: true
+      - name: Upload package
+        run: pixi run --environment=packaging upload-package
