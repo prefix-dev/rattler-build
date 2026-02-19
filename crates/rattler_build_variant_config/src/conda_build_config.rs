@@ -208,6 +208,7 @@ mod tests {
     fn test_selector_context() {
         let config = JinjaConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..Default::default()
         };
         let jinja = conda_build_config_jinja(&config);
@@ -232,6 +233,7 @@ mod tests {
         // fix the platform for the snapshots
         let jinja_config = JinjaConfig {
             target_platform: Platform::OsxArm64,
+            host_platform: Platform::OsxArm64,
             ..Default::default()
         };
 

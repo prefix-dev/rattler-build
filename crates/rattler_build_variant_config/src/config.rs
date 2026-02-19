@@ -153,6 +153,7 @@ impl VariantConfig {
     ) -> Result<Self, VariantConfigError> {
         let jinja_config = rattler_build_jinja::JinjaConfig {
             target_platform,
+            host_platform: target_platform,
             ..Default::default()
         };
         Self::from_files_with_context(paths, &jinja_config)

@@ -43,7 +43,7 @@ impl PyJinjaConfig {
             .map(|p| Platform::from_str(&p))
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .unwrap_or_else(Platform::current);
+            .unwrap_or(target_platform);
 
         let build_platform = build_platform
             .map(|p| Platform::from_str(&p))
