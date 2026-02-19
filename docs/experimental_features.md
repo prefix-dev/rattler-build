@@ -9,6 +9,21 @@ Currently only the `build` and `rebuild` commands support the following experime
 To enable them, use the `--experimental` flag with the command.
 Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
+## Sigstore source attestation
+
+The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. This is supported for PyPI packages (where the bundle URL is automatically derived) and GitHub releases (where you specify the `bundle_url` manually).
+
+```yaml
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "6489f1..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+See the [Sigstore source attestation documentation](sigstore.md#source-attestation-verification) for more details.
+
 ## Jinja functions
 
 ### `load_from_file(<file_path>)`

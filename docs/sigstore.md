@@ -113,6 +113,65 @@ jobs:
 
 This approach gives you full control over the attestation creation and allows you to customize the predicate or add additional attestation metadata.
 
+## Source attestation verification
+
+!!! note "Experimental"
+    This feature requires the `--experimental` flag: `rattler-build build --experimental -r recipe.yaml`
+
+In addition to signing built packages, rattler-build can also **verify** the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).
+
+### How it works
+
+Add an `attestation` block to a URL source in your recipe:
+
+```yaml title="recipe.yaml"
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "6489f1..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+When rattler-build downloads the source, it will:
+
+1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from `bundle_url`)
+2. Verify the bundle signature against the Sigstore transparency log
+3. Check that the attestation identity matches one of the listed publishers
+
+If verification fails, the build is aborted.
+
+### PyPI sources
+
+For packages hosted on PyPI, the attestation bundle URL is automatically derived from the [PyPI attestation API](https://docs.pypi.org/api/integrity/). You only need to specify the publisher:
+
+```yaml
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "6489f1..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+### GitHub release sources
+
+For source archives from GitHub releases, specify the `bundle_url` pointing to the `.sigstore.json` bundle:
+
+```yaml
+source:
+  url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+  sha256: "eb33e5..."
+  attestation:
+    bundle_url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json
+    publishers:
+      - github:facebook/zstd
+```
+
+### Publisher format
+
+Publishers are specified in `github:owner/repo` format. The identity is matched against the Sigstore certificate's Subject Alternative Name (SAN), which for GitHub Actions is the workflow identity.
+
 ## Verifying attestations
 
 Once packages are published with attestations, they can be verified using several tools:
