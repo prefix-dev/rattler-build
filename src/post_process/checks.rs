@@ -15,6 +15,7 @@ use crate::{
     windows::link::WIN_ALLOWLIST,
 };
 
+use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
 use text_stub_library::TbdVersionedRecord;
@@ -115,16 +116,38 @@ impl fmt::Display for LinkedPackage {
     }
 }
 
-/// Returns the list of host packages that contain DSOs.
-/// These are the packages we should have linked against — if we didn't link
-/// against any DSO from a host package that provides them, it's overdepending.
-fn host_dso_packages(
+/// Returns run dependencies that originated from host run_exports and are DSO
+/// libraries. These are the packages that were added to run deps because a host
+/// package declared run_exports — if we didn't actually link against them, it's
+/// overdepending.
+fn host_run_export_dso_packages(
+    output: &Output,
     package_to_nature_map: &HashMap<PackageName, PackageNature>,
 ) -> Vec<String> {
-    package_to_nature_map
+    output
+        .finalized_dependencies
+        .as_ref()
+        .expect("failed to get the finalized dependencies")
+        .run
+        .depends
         .iter()
-        .filter(|(_, nature)| *nature == &PackageNature::DSOLibrary)
-        .map(|(name, _)| name.as_source().to_owned())
+        .filter_map(|dep| {
+            // Only consider run dependencies that came from host run_exports
+            if let Some(RunExportDependency { from, .. }) = dep.as_run_export()
+                && from == "host"
+            {
+                if let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
+                    &dep.spec().name
+                {
+                    if let Some(nature) = package_to_nature_map.get(exact_name)
+                        && nature == &PackageNature::DSOLibrary
+                    {
+                        return Some(exact_name.as_source().to_owned());
+                    }
+                }
+            }
+            None
+        })
         .collect()
 }
 
@@ -501,8 +524,8 @@ pub fn perform_linking_checks(
 
     let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
 
-    let host_dso_packages = host_dso_packages(&prefix_info.package_to_nature);
-    tracing::trace!("Host DSO packages: {host_dso_packages:#?}",);
+    let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
+    tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
 
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
