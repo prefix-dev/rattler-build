@@ -482,6 +482,8 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
+    let timestamp = chrono::Utc::now();
+
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
@@ -552,7 +554,6 @@ pub async fn get_build_output(
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
-        let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = Output {
             recipe: discovered_output.recipe.clone(),
