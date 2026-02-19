@@ -51,7 +51,7 @@ pub use conditional::{
     parse_conditional_list_or_item_with_converter, parse_conditional_list_with_converter,
     parse_item_with_converter,
 };
-pub use converter::{FromStrConverter, NodeConverter};
+pub use converter::{BoolConverter, FromStrConverter, NodeConverter};
 pub use error::{FileParseError, ParseError, ParseErrorWithSource, ParseResult, WithSourceCode};
 pub use helpers::{contains_jinja_template, get_span, validate_mapping_fields};
 pub use list::{

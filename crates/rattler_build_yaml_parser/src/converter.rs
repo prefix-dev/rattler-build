@@ -73,3 +73,27 @@ where
             .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), span))
     }
 }
+
+/// Converter for `bool` that uses `marked-yaml`'s YAML 1.1-aware `as_bool()`
+/// instead of Rust's `bool::from_str()`.
+///
+/// YAML 1.1 accepts `True`/`False`, `TRUE`/`FALSE`, `yes`/`no`, `on`/`off`
+/// as boolean values, but Rust's `FromStr` only accepts lowercase `true`/`false`.
+/// Use this converter for `parse_value_with_converter::<bool>(...)` calls.
+pub struct BoolConverter;
+
+impl NodeConverter<bool> for BoolConverter {
+    fn convert_scalar(&self, node: &MarkedNode, field_name: &str) -> ParseResult<bool> {
+        let scalar = node
+            .as_scalar()
+            .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
+
+        scalar.as_bool().ok_or_else(|| {
+            ParseError::invalid_value(
+                field_name,
+                format!("expected a boolean value, got '{}'", scalar.as_str()),
+                *scalar.span(),
+            )
+        })
+    }
+}

@@ -632,3 +632,69 @@ fn test_parse_zstd_attestation_example() {
         _ => panic!("Expected URL source"),
     }
 }
+
+/// Regression test: capitalized YAML booleans like `True` / `FALSE` must be accepted
+/// for git source fields `lfs` and `submodules`.
+#[test]
+fn test_parse_git_source_with_capitalized_booleans() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  git: https://github.com/example/repo.git
+  tag: v1.0.0
+  lfs: True
+  submodules: FALSE
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Git(git) => {
+            assert_eq!(git.lfs.as_ref().unwrap().as_concrete(), Some(&true));
+            assert_eq!(git.submodules.as_ref().unwrap().as_concrete(), Some(&false));
+        }
+        _ => panic!("Expected Git source"),
+    }
+}
+
+/// Regression test: capitalized YAML booleans like `True` must be accepted
+/// for the `pip_check` field in python tests.
+#[test]
+fn test_parse_python_test_with_capitalized_pip_check() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+build:
+  number: 0
+
+tests:
+  - python:
+      imports:
+        - mypackage
+      pip_check: True
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let test = recipe.tests.as_slice()[0]
+        .as_value()
+        .unwrap()
+        .as_concrete()
+        .unwrap();
+    match test {
+        TestType::Python { python } => {
+            assert_eq!(
+                python.pip_check.as_ref().unwrap().as_concrete(),
+                Some(&true)
+            );
+        }
+        _ => panic!("Expected Python test"),
+    }
+}
