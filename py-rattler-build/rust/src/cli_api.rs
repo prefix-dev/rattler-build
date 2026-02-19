@@ -75,6 +75,7 @@ pub fn build_recipes_py(
         use_zstd,
         use_jlap,
         use_sharded,
+        false,
     );
     let build_platform = build_platform
         .map(|p| Platform::from_str(&p))
@@ -185,6 +186,7 @@ pub fn test_package_py(
         use_zstd,
         use_jlap,
         use_sharded,
+        false,
     );
     let channel = match channel {
         None => None,

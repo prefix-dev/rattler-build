@@ -65,6 +65,11 @@ pub struct BuildConfiguration {
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// Whether to disable path replacement in log output.
+    /// When true, concrete filesystem paths will be shown instead of
+    /// `$PREFIX`, `$BUILD_PREFIX`, `$SRC_DIR`.
+    #[serde(skip_serializing, default)]
+    pub no_log_path_replacement: bool,
 }
 
 impl BuildConfiguration {
