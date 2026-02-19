@@ -229,7 +229,6 @@ class Package:
         compression_threads: int | None = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-
         use_sharded: bool = True,
     ) -> "TestResult":
         """Run a specific test by index.
@@ -244,7 +243,6 @@ class Package:
             compression_threads: Number of compression threads
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
-
             use_sharded: Enable sharded repodata
 
         Returns:
@@ -271,7 +269,6 @@ class Package:
                 compression_threads=compression_threads,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-
                 use_sharded=use_sharded,
             )
         )
@@ -287,7 +284,6 @@ class Package:
         compression_threads: int | None = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-
         use_sharded: bool = True,
     ) -> list["TestResult"]:
         """Run all tests in the package.
@@ -301,7 +297,6 @@ class Package:
             compression_threads: Number of compression threads
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
-
             use_sharded: Enable sharded repodata
 
         Returns:
@@ -326,7 +321,6 @@ class Package:
                 compression_threads=compression_threads,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-
                 use_sharded=use_sharded,
             )
         ]
@@ -341,7 +335,6 @@ class Package:
         allow_insecure_host: "Sequence[str] | None" = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-
         use_sharded: bool = True,
     ) -> "RebuildResult":
         """Rebuild this package from its embedded recipe.
@@ -359,7 +352,6 @@ class Package:
             allow_insecure_host: List of hosts to allow insecure connections
             use_bz2: Enable bz2 repodata (default: True)
             use_zstd: Enable zstd repodata (default: True)
-
             use_sharded: Enable sharded repodata (default: True)
 
         Returns:
@@ -393,7 +385,6 @@ class Package:
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-
                 use_sharded=use_sharded,
             )
         )
