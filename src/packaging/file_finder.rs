@@ -148,6 +148,7 @@ impl Files {
         prefix: &Path,
         always_include: &GlobVec,
         files: &GlobVec,
+        post_install_files: Option<&HashSet<PathBuf>>,
     ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
@@ -159,7 +160,7 @@ impl Files {
 
         let fs_is_case_sensitive = check_is_case_sensitive()?;
 
-        let previous_files = if prefix.join("conda-meta").exists() {
+        let mut previous_files = if prefix.join("conda-meta").exists() {
             let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
             let mut previous_files =
                 prefix_records
@@ -175,6 +176,13 @@ impl Files {
         } else {
             HashSet::new()
         };
+
+        // If we have a snapshot of files taken after dependency installation,
+        // treat those as "already existing" so that post-link script artifacts
+        // are not attributed to the package being built.
+        if let Some(extra) = post_install_files {
+            previous_files.extend(extra.iter().cloned());
+        }
 
         let current_files = record_files(prefix)?;
 

@@ -22,7 +22,7 @@ use unicode_normalization::UnicodeNormalization;
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles, content_type};
+pub use file_finder::{Files, TempFiles, content_type, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -861,6 +861,7 @@ impl Output {
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,
+        post_install_files: Option<&HashSet<PathBuf>>,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
@@ -868,6 +869,7 @@ impl Output {
             &self.build_configuration.directories.host_prefix,
             &self.recipe.build().always_include_files,
             &self.recipe.build().files,
+            post_install_files,
         )?;
 
         package_conda(self, tool_configuration, &files_after)

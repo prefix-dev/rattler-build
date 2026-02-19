@@ -1184,6 +1184,27 @@ def test_post_link(
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
+def test_post_link_does_not_leak_into_downstream(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "post-link-leaker", tmp_path)
+    rattler_build.build(
+        recipes / "post-link-downstream",
+        tmp_path,
+        custom_channels=[f"file://{tmp_path}"],
+    )
+    pkg = get_extracted_package(tmp_path, "post-link-downstream")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    packaged_paths = [p["_path"] for p in paths["paths"]]
+
+    assert any("post-link-downstream" in p for p in packaged_paths)
+    leaked = [p for p in packaged_paths if "leaked-cache" in p]
+    assert leaked == [], f"Post-link files leaked into downstream package: {leaked}"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
 def test_build_files(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):

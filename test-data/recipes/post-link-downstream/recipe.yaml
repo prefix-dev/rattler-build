@@ -1,0 +1,14 @@
+package:
+  name: post-link-downstream
+  version: "1.0.0"
+
+build:
+  skip:
+    - win
+  script:
+    - mkdir -p $PREFIX/lib/post-link-downstream
+    - echo "downstream marker" > $PREFIX/lib/post-link-downstream/marker.txt
+
+requirements:
+  host:
+    - post-link-leaker
