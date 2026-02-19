@@ -16,7 +16,7 @@ recipe = ["dep:rattler_build_recipe", "dep:rattler_build_jinja"]
 # Core dependencies
 rattler_conda_types = { workspace = true }
 rattler_digest = { workspace = true }
-rattler_package_streaming = { version = "0.23", default-features = false }
+rattler_package_streaming = { workspace = true }
 
 # Optional: Recipe support
 rattler_build_recipe = { workspace = true, optional = true }

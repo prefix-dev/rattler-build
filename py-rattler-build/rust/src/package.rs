@@ -269,7 +269,7 @@ impl PyPackage {
     }
 
     /// Run a specific test by index
-    #[pyo3(signature = (index, channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+    #[pyo3(signature = (index, channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
     #[allow(clippy::too_many_arguments)]
     fn run_test(
         &self,
@@ -282,7 +282,6 @@ impl PyPackage {
         compression_threads: Option<u32>,
         use_bz2: bool,
         use_zstd: bool,
-        use_jlap: bool,
         use_sharded: bool,
     ) -> PyResult<PyTestResult> {
         self.run_test_internal(
@@ -295,14 +294,13 @@ impl PyPackage {
             compression_threads,
             use_bz2,
             use_zstd,
-            use_jlap,
             use_sharded,
         )
         .map(|results| results.into_iter().next().unwrap())
     }
 
     /// Run all tests in the package
-    #[pyo3(signature = (channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+    #[pyo3(signature = (channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
     #[allow(clippy::too_many_arguments)]
     fn run_tests(
         &self,
@@ -314,7 +312,6 @@ impl PyPackage {
         compression_threads: Option<u32>,
         use_bz2: bool,
         use_zstd: bool,
-        use_jlap: bool,
         use_sharded: bool,
     ) -> PyResult<Vec<PyTestResult>> {
         self.run_test_internal(
@@ -327,7 +324,6 @@ impl PyPackage {
             compression_threads,
             use_bz2,
             use_zstd,
-            use_jlap,
             use_sharded,
         )
     }
@@ -336,7 +332,7 @@ impl PyPackage {
     ///
     /// Extracts the recipe embedded in the package and rebuilds it,
     /// then compares SHA256 hashes to verify reproducibility.
-    #[pyo3(signature = (test=None, compression_threads=None, output_dir=None, auth_file=None, allow_insecure_host=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+    #[pyo3(signature = (test=None, compression_threads=None, output_dir=None, auth_file=None, allow_insecure_host=None, use_bz2=true, use_zstd=true, use_sharded=true))]
     #[allow(clippy::too_many_arguments)]
     fn rebuild(
         &self,
@@ -347,7 +343,6 @@ impl PyPackage {
         allow_insecure_host: Option<Vec<String>>,
         use_bz2: bool,
         use_zstd: bool,
-        use_jlap: bool,
         use_sharded: bool,
     ) -> PyResult<PyRebuildResult> {
         // Parse test strategy
@@ -366,7 +361,6 @@ impl PyPackage {
             allow_insecure_host,
             use_bz2,
             use_zstd,
-            use_jlap,
             use_sharded,
         );
 
@@ -498,7 +492,6 @@ impl PyPackage {
         compression_threads: Option<u32>,
         use_bz2: bool,
         use_zstd: bool,
-        use_jlap: bool,
         use_sharded: bool,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
@@ -523,7 +516,6 @@ impl PyPackage {
             allow_insecure_host,
             use_bz2,
             use_zstd,
-            use_jlap,
             use_sharded,
         );
 
