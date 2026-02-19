@@ -277,6 +277,10 @@ mod tests {
         use std::os::windows::fs::OpenOptionsExt;
         use tempfile::TempDir;
 
+        // Windows sharing flags
+        const FILE_SHARE_READ: u32 = 0x1;
+        const FILE_SHARE_DELETE: u32 = 0x4;
+
         #[test]
         fn test_successful_removal() -> std::io::Result<()> {
             let temp_dir = TempDir::new()?;
@@ -306,21 +310,27 @@ mod tests {
             let dir_path = temp_dir.keep();
             let file_path = dir_path.join("locked.txt");
 
-            // Create the file with exclusive sharing mode (locked).
-            // This prevents deletion but NOT rename of the parent dir.
+            // Simulate a realistic antivirus/indexer lock:
+            // FILE_SHARE_READ | FILE_SHARE_DELETE allows rename of the
+            // parent directory but removal may fail because the file
+            // isn't fully gone until the handle is closed.
+            //
+            // share_mode(0) (exclusive) blocks rename too, but that's
+            // not what real-world tools use.
             let _locked_file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .share_mode(0) // Exclusive lock
+                .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
                 .open(&file_path)?;
 
-            // try_remove_with_retry should succeed because it renames
-            // the directory out of the way, freeing the original path.
+            // try_remove_with_retry should succeed: it renames the
+            // directory out of the way, then either deletes or leaves
+            // the trash dir for later cleanup.
             let result = try_remove_with_retry(&dir_path, None);
             assert!(
                 result.is_ok(),
-                "Should succeed via rename even with locked file: {:?}",
+                "Should succeed via rename with antivirus-style lock: {:?}",
                 result.err()
             );
             assert!(
@@ -328,9 +338,7 @@ mod tests {
                 "Original path should be gone (renamed away)"
             );
 
-            // The renamed trash dir may still exist (locked file inside),
-            // but the original path is free — that's what matters.
-            // Drop the lock so temp cleanup can proceed.
+            // Drop the lock so the trash dir can be cleaned up.
             drop(_locked_file);
 
             Ok(())
