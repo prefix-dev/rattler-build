@@ -6,18 +6,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::post_process::{package_nature::PackageNature, relink};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
 };
-use crate::{
-    post_process::{package_nature::PackageNature, relink},
-    windows::link::WIN_ALLOWLIST,
-};
 
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use rattler_conda_types::{PackageName, PrefixRecord};
+use rattler_conda_types::{PackageName, Platform, PrefixRecord};
 use text_stub_library::TbdVersionedRecord;
 use walkdir::WalkDir;
 
@@ -161,7 +158,7 @@ struct DsoList {
     allow: Vec<String>,
     #[serde(default)]
     deny: Vec<String>,
-    subdir: String,
+    subdir: Platform,
 }
 
 /// Validate that a dsolist glob pattern uses forward slashes and is either
@@ -254,7 +251,10 @@ type DsoAllowDeny = (Vec<String>, Vec<String>);
 /// `Some((allow, deny))` when at least one matching file was processed –
 /// even if the resulting lists are empty, because an explicit empty
 /// allowlist means "nothing is allowed".
-fn load_dsolists(prefix: &Path, subdir: &str) -> Result<Option<DsoAllowDeny>, LinkingCheckError> {
+fn load_dsolists(
+    prefix: &Path,
+    subdir: &Platform,
+) -> Result<Option<DsoAllowDeny>, LinkingCheckError> {
     let dsolists_dir = prefix.join("etc/conda-build/dsolists.d");
     let mut allow_patterns = Vec::new();
     let mut deny_patterns = Vec::new();
@@ -294,7 +294,7 @@ fn load_dsolists(prefix: &Path, subdir: &str) -> Result<Option<DsoAllowDeny>, Li
             )));
         }
 
-        if dsolist.subdir != subdir {
+        if dsolist.subdir != *subdir {
             continue;
         }
 
@@ -419,33 +419,12 @@ fn add_windows_system_libs(
     allow_builder: &mut GlobSetBuilder,
     deny_builder: &mut GlobSetBuilder,
 ) -> Result<(), LinkingCheckError> {
-    let subdir = output.build_configuration.target_platform.to_string();
-
     // Load dsolists from both build and host prefixes.
     let build_result = load_dsolists(
         &output.build_configuration.directories.build_prefix,
-        &subdir,
+        &output.build_configuration.target_platform,
     )?;
-    let host_result = load_dsolists(output.prefix(), &subdir)?;
-
-    // If no dsolist files matched at all, fall back to the hardcoded allowlist.
-    // If files *were* found (even with empty allow/deny), respect them – an
-    // explicit empty allowlist means "nothing is allowed".
-    if build_result.is_none() && host_result.is_none() {
-        // 1. Allow any DLL under well-known Windows system directories.
-        //    Globset normalises backslashes on Windows, so forward-slash
-        //    patterns match paths like "C:\Windows\system32\SHLWAPI.dll".
-        for dir in &["C:/Windows/system32/**", "C:/Windows/SysWOW64/**"] {
-            allow_builder.add(GlobBuilder::new(dir).case_insensitive(true).build()?);
-        }
-        // 2. Also allow the bare DLL names from WIN_ALLOWLIST so that
-        //    cross-compiled builds (where resolve_libraries cannot stat
-        //    the Windows filesystem) still pass.
-        for pattern in WIN_ALLOWLIST {
-            allow_builder.add(GlobBuilder::new(pattern).case_insensitive(true).build()?);
-        }
-        return Ok(());
-    }
+    let host_result = load_dsolists(output.prefix(), &output.build_configuration.target_platform)?;
 
     let (build_allow, build_deny) = build_result.unwrap_or_default();
     let (host_allow, host_deny) = host_result.unwrap_or_default();
@@ -453,10 +432,8 @@ fn add_windows_system_libs(
     let mut all_allow: Vec<String> = build_allow.into_iter().chain(host_allow).collect();
     let all_deny: Vec<String> = build_deny.into_iter().chain(host_deny).collect();
 
-    if all_allow.is_empty() && !all_deny.is_empty() {
-        // Only deny lists found: default allow is C:/Windows/System32/*.dll
-        all_allow.push("C:/Windows/System32/*.dll".to_string());
-    }
+    // Always add the system libraries
+    all_allow.push("C:/Windows/System32/**/*.dll".to_string());
 
     let expanded_allow = expand_dsolist(&all_allow);
     let expanded_deny = expand_dsolist(&all_deny);
@@ -759,7 +736,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64")
+        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert_eq!(
@@ -787,7 +764,9 @@ mod tests {
 
         // File exists but targets a different subdir → no match
         assert!(
-            load_dsolists(tmp.path(), "win-64").unwrap().is_none(),
+            load_dsolists(tmp.path(), &Platform::Win64)
+                .unwrap()
+                .is_none(),
             "should return None when no files match the subdir"
         );
     }
@@ -805,7 +784,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), "win-64");
+        let result = load_dsolists(tmp.path(), &Platform::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Unsupported dsolist version 99"), "got: {err}");
@@ -815,7 +794,9 @@ mod tests {
     fn test_load_dsolists_no_directory() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(
-            load_dsolists(tmp.path(), "win-64").unwrap().is_none(),
+            load_dsolists(tmp.path(), &Platform::Win64)
+                .unwrap()
+                .is_none(),
             "should return None when directory does not exist"
         );
     }
@@ -840,7 +821,7 @@ mod tests {
         fs_err::write(dsolists_dir.join("a.json"), json1.to_string()).unwrap();
         fs_err::write(dsolists_dir.join("b.json"), json2.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64")
+        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert!(allow.contains(&"C:/Windows/System32/KERNEL32.dll".to_string()));
@@ -861,7 +842,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), "win-64");
+        let result = load_dsolists(tmp.path(), &Platform::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("backslashes"), "got: {err}");
@@ -880,7 +861,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), "win-64");
+        let result = load_dsolists(tmp.path(), &Platform::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("not an absolute path"), "got: {err}");
@@ -900,7 +881,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), "win-64")
+        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert_eq!(allow, vec!["**/R.dll", "C:/Windows/System32/*.dll"]);

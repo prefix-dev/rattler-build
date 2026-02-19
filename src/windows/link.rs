@@ -21,32 +21,6 @@ pub struct Dll {
     libraries: HashSet<PathBuf>,
 }
 
-/// List of System DLLs that are allowed to be linked against.
-pub const WIN_ALLOWLIST: &[&str] = &[
-    "ADVAPI32.dll",
-    "bcrypt.dll",
-    "COMCTL32.dll",
-    "COMDLG32.dll",
-    "CRYPT32.dll",
-    "dbghelp.dll",
-    "GDI32.dll",
-    "IMM32.dll",
-    "KERNEL32.dll",
-    "NETAPI32.dll",
-    "ole32.dll",
-    "OLEAUT32.dll",
-    "PSAPI.DLL",
-    "RPCRT4.dll",
-    "SHELL32.dll",
-    "SHLWAPI.dll",
-    "USER32.dll",
-    "USERENV.dll",
-    "WINHTTP.dll",
-    "WS2_32.dll",
-    "ntdll.dll",
-    "msvcrt.dll",
-];
-
 #[derive(Debug, thiserror::Error)]
 pub enum DllParseError {
     #[error("failed to read the DLL file: {0}")]
@@ -124,15 +98,6 @@ impl Relinker for Dll {
     ) -> HashMap<PathBuf, Option<PathBuf>> {
         let mut result = HashMap::new();
         for lib in &self.libraries {
-            if WIN_ALLOWLIST.iter().any(|&sys_dll| {
-                lib.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
-                    .unwrap_or(false)
-            }) {
-                continue;
-            }
-
             let dll_name = lib.file_name().unwrap_or_default();
 
             // 1. Check in the same directory as the original DLL
