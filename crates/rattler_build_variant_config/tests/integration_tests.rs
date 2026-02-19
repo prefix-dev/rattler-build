@@ -97,6 +97,7 @@ fn test_conda_build_config_linux() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         ..Default::default()
     };
 
@@ -109,6 +110,7 @@ fn test_conda_build_config_osx() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
         target_platform: Platform::OsxArm64,
+        host_platform: Platform::OsxArm64,
         ..Default::default()
     };
 
@@ -121,6 +123,7 @@ fn test_conda_build_config_win() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
         target_platform: Platform::Win64,
+        host_platform: Platform::Win64,
         ..Default::default()
     };
 
@@ -190,6 +193,7 @@ fn test_flatten_selectors_linux() {
     let path = test_data_dir().join("with_selectors/variants.yaml");
     let jinja_config = rattler_build_jinja::JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         build_platform: Platform::Linux64,
         ..Default::default()
     };
@@ -209,6 +213,7 @@ fn test_flatten_selectors_win() {
     let path = test_data_dir().join("with_selectors/variants.yaml");
     let jinja_config = rattler_build_jinja::JinjaConfig {
         target_platform: Platform::Win64,
+        host_platform: Platform::Win64,
         build_platform: Platform::Win64,
         ..Default::default()
     };
@@ -230,6 +235,7 @@ fn test_load_conda_build_config_with_types() {
     let path = test_data_dir().join("variant_files/variant_config_1.yaml");
     let context = JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         ..Default::default()
     };
 
@@ -268,6 +274,7 @@ fn test_load_variant_config_with_types() {
 
     let jinja_config = rattler_build_jinja::JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         ..Default::default()
     };
     let config = VariantConfig::from_file_with_context(&path, &jinja_config).unwrap();
@@ -343,6 +350,7 @@ compiler:
 "#;
     let jinja_config = rattler_build_jinja::JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         ..Default::default()
     };
     let result = VariantConfig::from_yaml_str_with_context(yaml, &jinja_config);
@@ -369,6 +377,7 @@ compiler:
 "#;
     let jinja_config = rattler_build_jinja::JinjaConfig {
         target_platform: Platform::Linux64,
+        host_platform: Platform::Linux64,
         ..Default::default()
     };
     let result = VariantConfig::from_yaml_str_with_context(yaml, &jinja_config);

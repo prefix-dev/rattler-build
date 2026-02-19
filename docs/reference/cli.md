@@ -46,6 +46,8 @@ This document contains the help content for the `rattler-build` command-line pro
 			Use JSON logging output
 		- `plain`:
 			Use plain logging output
+		- `simple`:
+			Use simple logging output (colored, no box-drawing frames)
 
 
 - `--wrap-log-lines <WRAP_LOG_LINES>`
@@ -250,6 +252,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--debug`
 
 	Enable debug output in build scripts
+
+
+- `--markdown-summary <MARKDOWN_SUMMARY>`
+
+	Write a markdown summary to the specified file (appends to the file). Useful for generating PR comments or custom reports
 
 
 - `--error-prefix-in-binary`
@@ -491,6 +498,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Enable debug output in build scripts
 
 
+- `--markdown-summary <MARKDOWN_SUMMARY>`
+
+	Write a markdown summary to the specified file (appends to the file). Useful for generating PR comments or custom reports
+
+
 - `--error-prefix-in-binary`
 
 	Error if the host prefix is detected in any binary files
@@ -595,7 +607,7 @@ These test files are written at "package creation time" and are part of the pack
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
-	The package file to test
+	The package file or extracted package directory to test
 
 
 - `--compression-threads <COMPRESSION_THREADS>`

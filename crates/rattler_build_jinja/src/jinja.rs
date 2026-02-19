@@ -188,41 +188,42 @@ impl Jinja {
             Value::from(config.host_platform.to_string()),
         );
 
-        // Add common platform shortcuts
+        // Add common platform shortcuts based on the host platform
+        // (the platform where the package will run)
         context.insert(
             "unix".to_string(),
-            Value::from(config.target_platform.is_unix()),
+            Value::from(config.host_platform.is_unix()),
         );
         context.insert(
             "linux".to_string(),
-            Value::from(config.target_platform.is_linux()),
+            Value::from(config.host_platform.is_linux()),
         );
         context.insert(
             "osx".to_string(),
-            Value::from(config.target_platform.is_osx()),
+            Value::from(config.host_platform.is_osx()),
         );
         context.insert(
             "win".to_string(),
-            Value::from(config.target_platform.is_windows()),
+            Value::from(config.host_platform.is_windows()),
         );
 
         // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
-        // All known architectures are defined, with only the current target's architecture being true
-        let current_arch = config.target_platform.arch();
+        // All known architectures are defined, with only the host platform's architecture being true
+        let current_arch = config.host_platform.arch();
         for arch in Arch::iter() {
             context.insert(arch.to_string(), Value::from(current_arch == Some(arch)));
         }
 
         // Add platform aliases (e.g., "linux64", "osx64", "win64")
         // These are the platform string with "-" removed (e.g., "linux-64" -> "linux64")
-        // All known platforms get an alias, with only the current target_platform being true
+        // All known platforms get an alias, with only the current host_platform being true
         for platform in Platform::iter() {
             // Skip noarch and unknown platforms
             if matches!(platform, Platform::NoArch | Platform::Unknown) {
                 continue;
             }
             let alias = platform.to_string().replace('-', "");
-            context.insert(alias, Value::from(platform == config.target_platform));
+            context.insert(alias, Value::from(platform == config.host_platform));
         }
 
         // Add variant variables to context
@@ -1004,9 +1005,11 @@ mod tests {
     }
 
     #[test]
-    #[rustfmt::skip]
     // git version is too old in cross container for aarch64
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "powerpc64"), target_os = "linux")))]
+    #[cfg(not(all(
+        any(target_arch = "aarch64", target_arch = "powerpc64"),
+        target_os = "linux"
+    )))]
     fn eval_git() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1027,17 +1030,38 @@ mod tests {
 
         with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
             create_repo_with_tag(path, "v0.1.0").expect("Failed to clone the git repo");
-            assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
-            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1 left").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 1 right").as_str().unwrap());
             assert_eq!(
-                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).expect_err("test 2").to_string(),
+                jinja
+                    .eval(&format!("git.latest_tag({:?})", path))
+                    .expect("test 0")
+                    .as_str()
+                    .unwrap(),
+                "v0.1.0"
+            );
+            assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_rev({:?})", path))
+                    .expect("test 1 left")
+                    .as_str()
+                    .unwrap(),
+                jinja
+                    .eval(&format!("git.head_rev({:?})", path))
+                    .expect("test 1 right")
+                    .as_str()
+                    .unwrap()
+            );
+            assert_eq!(
+                jinja_wo_experimental
+                    .eval(&format!("git.latest_tag({:?})", path))
+                    .expect_err("test 2")
+                    .to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });
     }
 
     #[test]
-    #[rustfmt::skip]
+
     fn eval_load_from_file() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1054,7 +1078,10 @@ mod tests {
         let path_str = to_forward_slash_lossy(&path);
         fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 1").as_str(),
+            jinja
+                .eval(&format!("load_from_file('{}')['hello']", path_str))
+                .expect("test 1")
+                .as_str(),
             Some("world"),
         );
 
@@ -1062,7 +1089,10 @@ mod tests {
         fs::write(&path, "hello: world").unwrap();
         let path_str = to_forward_slash_lossy(&path);
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
+            jinja
+                .eval(&format!("load_from_file('{}')['hello']", path_str))
+                .expect("test 2")
+                .as_str(),
             Some("world"),
         );
 
@@ -1070,7 +1100,10 @@ mod tests {
         let path_str = to_forward_slash_lossy(&path);
         fs::write(&path, "hello = 'world'").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 3").as_str(),
+            jinja
+                .eval(&format!("load_from_file('{}')['hello']", path_str))
+                .expect("test 3")
+                .as_str(),
             Some("world"),
         );
     }
@@ -1138,7 +1171,7 @@ mod tests {
     }
 
     #[test]
-    #[rustfmt::skip]
+
     fn eval() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1155,15 +1188,125 @@ mod tests {
         assert!(jinja.eval("linux").expect("test 4").is_true());
         assert!(jinja.eval("unix and not win").expect("test 5").is_true());
         assert!(!jinja.eval("unix and not linux").expect("test 6").is_true());
-        assert!(jinja.eval("(unix and not osx) or win").expect("test 7").is_true());
-        assert!(jinja.eval("(unix and not osx) or win or osx").expect("test 8").is_true());
+        assert!(
+            jinja
+                .eval("(unix and not osx) or win")
+                .expect("test 7")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("(unix and not osx) or win or osx")
+                .expect("test 8")
+                .is_true()
+        );
         assert!(jinja.eval("linux and x86_64").expect("test 9").is_true());
         assert!(!jinja.eval("linux and aarch64").expect("test 10").is_true());
     }
 
     #[test]
+    fn eval_noarch_unix_selector() {
+        // When a noarch recipe is rendered, the variant sets target_platform
+        // to NoArch. The unix/linux/osx/win selectors should still work
+        // based on the host platform (where the package will run).
+        let options = JinjaConfig {
+            target_platform: Platform::NoArch,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        // These should be true because the HOST platform is Linux,
+        // even though target_platform is NoArch
+        assert!(
+            jinja.eval("unix").expect("unix").is_true(),
+            "unix should be true for a noarch package on a linux host"
+        );
+        assert!(
+            jinja.eval("linux").expect("linux").is_true(),
+            "linux should be true for a noarch package on a linux host"
+        );
+        assert!(
+            !jinja.eval("win").expect("win").is_true(),
+            "win should be false for a noarch package on a linux host"
+        );
+        assert!(
+            !jinja.eval("osx").expect("osx").is_true(),
+            "osx should be false for a noarch package on a linux host"
+        );
+    }
+
+    #[test]
+    fn eval_platform_shortcuts_use_host_platform() {
+        // When host_platform differs from target_platform, the platform
+        // shortcuts (unix, linux, osx, win) and arch variables should
+        // reflect the host_platform (where the package runs).
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::OsxArm64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        // Platform shortcuts should reflect host_platform (osx-arm64), not target (linux-64)
+        assert!(jinja.eval("unix").expect("osx is unix").is_true());
+        assert!(jinja.eval("osx").expect("host is osx").is_true());
+        assert!(!jinja.eval("linux").expect("host is not linux").is_true());
+        assert!(!jinja.eval("win").expect("host is not win").is_true());
+
+        // Arch should reflect host_platform (arm64), not target (x86_64)
+        assert!(jinja.eval("arm64").expect("host is arm64").is_true());
+        assert!(!jinja.eval("x86_64").expect("host is not x86_64").is_true());
+
+        // Platform aliases should reflect host_platform
+        assert!(jinja.eval("osxarm64").expect("host is osxarm64").is_true());
+        assert!(
+            !jinja
+                .eval("linux64")
+                .expect("host is not linux64")
+                .is_true()
+        );
+
+        // The string variables should still report their respective values
+        assert!(
+            jinja
+                .eval("target_platform == \"linux-64\"")
+                .expect("target_platform string")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("host_platform == \"osx-arm64\"")
+                .expect("host_platform string")
+                .is_true()
+        );
+    }
+
+    #[test]
+    fn eval_platform_shortcuts_windows_host() {
+        // Verify win shortcut works when host is Windows
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Win64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        assert!(jinja.eval("win").expect("host is win").is_true());
+        assert!(!jinja.eval("unix").expect("host is not unix").is_true());
+        assert!(!jinja.eval("linux").expect("host is not linux").is_true());
+        assert!(!jinja.eval("osx").expect("host is not osx").is_true());
+        assert!(jinja.eval("x86_64").expect("host is x86_64").is_true());
+    }
+
+    #[test]
     #[should_panic]
-    #[rustfmt::skip]
     fn eval2() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1298,7 +1441,7 @@ mod tests {
     }
 
     #[test]
-    #[rustfmt::skip]
+
     fn eval_match() {
         let variant = BTreeMap::from_iter(vec![("python".into(), "3.7".into())]);
 
@@ -1311,17 +1454,47 @@ mod tests {
         };
         let jinja = Jinja::new(options);
 
-        assert!(jinja.eval("match(python, '==3.7')").expect("test 1").is_true());
-        assert!(jinja.eval("match(python, '>=3.7')").expect("test 2").is_true());
-        assert!(jinja.eval("match(python, '>=3.7,<3.9')").expect("test 3").is_true());
+        assert!(
+            jinja
+                .eval("match(python, '==3.7')")
+                .expect("test 1")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("match(python, '>=3.7')")
+                .expect("test 2")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("match(python, '>=3.7,<3.9')")
+                .expect("test 3")
+                .is_true()
+        );
 
-        assert!(!jinja.eval("match(python, '!=3.7')").expect("test 4").is_true());
-        assert!(!jinja.eval("match(python, '<3.7')").expect("test 5").is_true());
-        assert!(!jinja.eval("match(python, '>3.5,<3.7')").expect("test 6").is_true());
+        assert!(
+            !jinja
+                .eval("match(python, '!=3.7')")
+                .expect("test 4")
+                .is_true()
+        );
+        assert!(
+            !jinja
+                .eval("match(python, '<3.7')")
+                .expect("test 5")
+                .is_true()
+        );
+        assert!(
+            !jinja
+                .eval("match(python, '>3.5,<3.7')")
+                .expect("test 6")
+                .is_true()
+        );
     }
 
     #[test]
-    #[rustfmt::skip]
+
     fn eval_complicated_match() {
         let variant = BTreeMap::from_iter(vec![("python".into(), "3.7.* *_cpython".into())]);
 
@@ -1334,13 +1507,43 @@ mod tests {
         };
         let jinja = Jinja::new(options);
 
-        assert!(jinja.eval("match(python, '==3.7')").expect("test 1").is_true());
-        assert!(jinja.eval("match(python, '>=3.7')").expect("test 2").is_true());
-        assert!(jinja.eval("match(python, '>=3.7,<3.9')").expect("test 3").is_true());
+        assert!(
+            jinja
+                .eval("match(python, '==3.7')")
+                .expect("test 1")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("match(python, '>=3.7')")
+                .expect("test 2")
+                .is_true()
+        );
+        assert!(
+            jinja
+                .eval("match(python, '>=3.7,<3.9')")
+                .expect("test 3")
+                .is_true()
+        );
 
-        assert!(!jinja.eval("match(python, '!=3.7')").expect("test 4").is_true());
-        assert!(!jinja.eval("match(python, '<3.7')").expect("test 5").is_true());
-        assert!(!jinja.eval("match(python, '>3.5,<3.7')").expect("test 6").is_true());
+        assert!(
+            !jinja
+                .eval("match(python, '!=3.7')")
+                .expect("test 4")
+                .is_true()
+        );
+        assert!(
+            !jinja
+                .eval("match(python, '<3.7')")
+                .expect("test 5")
+                .is_true()
+        );
+        assert!(
+            !jinja
+                .eval("match(python, '>3.5,<3.7')")
+                .expect("test 6")
+                .is_true()
+        );
     }
 
     fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn()) {

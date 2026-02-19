@@ -1,6 +1,7 @@
 use marked_yaml::Node;
 use rattler_build_yaml_parser::{
-    parse_conditional_list, parse_conditional_list_or_item, parse_value,
+    BoolConverter, parse_conditional_list, parse_conditional_list_or_item, parse_value,
+    parse_value_with_converter,
 };
 
 use crate::{
@@ -176,7 +177,11 @@ fn parse_python_test(
                 imports = parse_conditional_list_or_item(value_node)?;
             }
             "pip_check" => {
-                pip_check = Some(parse_value(value_node)?);
+                pip_check = Some(parse_value_with_converter(
+                    value_node,
+                    "pip_check",
+                    &BoolConverter,
+                )?);
             }
             "python_version" => {
                 python_version = Some(parse_python_version(value_node)?);
