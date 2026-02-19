@@ -145,10 +145,34 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
     }
 
     // No existing files matched at any strip level (e.g. all files are new).
-    // Prefer strip level 1 (for traditional a/b prefix convention in unified diffs),
-    // but fall back to 0 if strip level 1 would cause any path to become empty
-    // (which happens when the diff tool has already stripped the prefix, as flickzeug
-    // does for git-format patches).
+    // Try to determine the correct strip level by checking if parent directories
+    // exist. This disambiguates between:
+    //   - Git-format diffs where flickzeug already stripped a/b prefixes
+    //     (paths like "src/newfile.txt" where "src/" is a real directory)
+    //   - Plain-format diffs that still have a/b prefixes
+    //     (paths like "b/newfile.txt" where "b/" is NOT a real directory)
+    for strip_level in 0..max_components {
+        let any_parent_exists = patched_files.iter().any(|p| {
+            let path: PathBuf = p.components().skip(strip_level).collect();
+            if path.as_os_str().is_empty() {
+                return false;
+            }
+            match path.parent() {
+                // If the parent is a non-empty path, check if it exists as a directory
+                Some(parent) if !parent.as_os_str().is_empty() => {
+                    work_dir.join(parent).is_dir()
+                }
+                // Root-level files (empty parent) - not a useful signal, skip
+                _ => false,
+            }
+        });
+        if any_parent_exists {
+            return Ok(strip_level);
+        }
+    }
+
+    // Final fallback: prefer 1 (for a/b prefix convention) but ensure no paths
+    // become empty (which happens when flickzeug already stripped the prefix).
     for fallback_level in [1, 0] {
         let all_paths_valid = patched_files.iter().all(|p| {
             let path: PathBuf = p.components().skip(fallback_level).collect();
@@ -942,6 +966,40 @@ mod tests {
         assert!(content.contains("[build-system]"));
         assert!(content.contains("requires = [\"setuptools>=61.0\"]"));
         assert!(content.contains("build-backend = \"setuptools.build_meta\""));
+    }
+
+    #[test]
+    fn test_git_source_new_file_in_existing_subdir() {
+        // Test that a git-format patch creating a new file in an existing subdirectory
+        // correctly uses strip level 0 (not 1, which would strip the real directory name).
+        // The parent directory check in guess_strip_level should detect that "deep/" is
+        // a real directory and choose strip=0.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let result = apply_patches(
+            &[PathBuf::from("test_git_source_new_file_in_subdir.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Patch creating new file in subdir should not fail: {:?}",
+            result.err()
+        );
+
+        // File should be at deep/newfile_in_existing_subdir.txt (strip=0),
+        // NOT at newfile_in_existing_subdir.txt (which strip=1 would produce).
+        let new_file = tempdir
+            .path()
+            .join("workdir/deep/newfile_in_existing_subdir.txt");
+        assert!(
+            new_file.exists(),
+            "File should be created at deep/newfile_in_existing_subdir.txt"
+        );
+        let content = fs_err::read_to_string(&new_file).unwrap();
+        assert!(content.contains("new file in an existing subdirectory"));
     }
 
     /// Prepare all information needed to test patches for package info path.

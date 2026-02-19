@@ -1,0 +1,8 @@
+diff --git a/deep/newfile_in_existing_subdir.txt b/deep/newfile_in_existing_subdir.txt
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/deep/newfile_in_existing_subdir.txt
+@@ -0,0 +1,2 @@
++This is a new file in an existing subdirectory
++created by a git-format patch
