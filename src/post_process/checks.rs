@@ -135,16 +135,12 @@ fn host_run_export_dso_packages(
             // Only consider run dependencies that came from host run_exports
             if let Some(RunExportDependency { from, .. }) = dep.as_run_export()
                 && from == "host"
-            {
-                if let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
+                && let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
                     &dep.spec().name
-                {
-                    if let Some(nature) = package_to_nature_map.get(exact_name)
-                        && nature == &PackageNature::DSOLibrary
-                    {
-                        return Some(exact_name.as_source().to_owned());
-                    }
-                }
+                && let Some(nature) = package_to_nature_map.get(exact_name)
+                && nature == &PackageNature::DSOLibrary
+            {
+                return Some(exact_name.as_source().to_owned());
             }
             None
         })
