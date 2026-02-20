@@ -2841,14 +2841,16 @@ Package: myproject-tools 2.0.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 1 packages...
 ============================================================
-Recipe path: /tmp/rattler_build_csu_ngcc/recipe.yaml
+Recipe path: /tmp/rattler_build_ofic5am6/recipe.yaml
 
 Building variant 1/2
   Package: myproject-lib
   Version: 2.0.0
   Build string: hb0f4dca_0
-  Build complete in 1.44s!
-  Package: /tmp/rattler_build_csu_ngcc/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+
+
+  Build complete in 1.57s!
+  Package: /tmp/rattler_build_ofic5am6/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 54 messages captured
 
@@ -2858,15 +2860,15 @@ Building variant 2/2
   Build string: hb0f4dca_0
 
 
-  Build complete in 1.45s!
-  Package: /tmp/rattler_build_csu_ngcc/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+  Build complete in 1.55s!
+  Package: /tmp/rattler_build_ofic5am6/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 55 messages captured
 
 ============================================================
 Example 1 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_csu_ngcc/output
+Built packages are available in: /tmp/rattler_build_ofic5am6/output
 </code></pre></div>
 <h2 id="example-2-staging-outputs-shared-build-artifacts">Example 2: Staging Outputs - Shared Build Artifacts<a class="headerlink" href="#example-2-staging-outputs-shared-build-artifacts" title="Permanent link">#</a></h2>
 <p>Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then <strong>copies its files directly into each inheriting package's prefix</strong>. Since these are "new" files in the prefix, they will be included in the final package.</p>
@@ -3043,15 +3045,17 @@ compiled-project-cli 1.5.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 2 packages (with staging)...
 ============================================================
-Recipe path: /tmp/rattler_build_ay0anbp5/recipe.yaml
+Recipe path: /tmp/rattler_build_ds76advn/recipe.yaml
 
 Building variant 1/2
   Package: compiled-project-python
   Version: 1.5.0
   Build string: hb0f4dca_0
   Staging caches: [&#39;shared-build&#39;]
-  Build complete in 1.46s!
-  Package: /tmp/rattler_build_ay0anbp5/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+
+
+  Build complete in 1.64s!
+  Package: /tmp/rattler_build_ds76advn/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 71 messages captured
 
@@ -3062,15 +3066,15 @@ Building variant 2/2
   Staging caches: [&#39;shared-build&#39;]
 
 
-  Build complete in 1.53s!
-  Package: /tmp/rattler_build_ay0anbp5/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+  Build complete in 1.64s!
+  Package: /tmp/rattler_build_ds76advn/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 66 messages captured
 
 ============================================================
 Example 2 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_ay0anbp5/output
+Built packages are available in: /tmp/rattler_build_ds76advn/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned about multi-output recipes and staging:</p>

@@ -1581,6 +1581,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#source-attestation-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source attestation verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source attestation verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypi-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-release-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub release sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publisher-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publisher format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verifying-attestations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2771,6 +2832,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#source-attestation-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source attestation verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source attestation verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypi-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-release-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub release sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publisher-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publisher format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verifying-attestations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2977,25 +3099,68 @@
 </span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">            </span><span class="no">--attestation ${{ steps.attest.outputs.bundle-path }}</span>
 </span></code></pre></div>
 <p>This approach gives you full control over the attestation creation and allows you to customize the predicate or add additional attestation metadata.</p>
+<h2 id="source-attestation-verification">Source attestation verification<a class="headerlink" href="#source-attestation-verification" title="Permanent link">#</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Experimental</p>
+<p>This feature requires the <code>--experimental</code> flag: <code>rattler-build build --experimental -r recipe.yaml</code></p>
+</div>
+<p>In addition to signing built packages, rattler-build can also <strong>verify</strong> the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h3>
+<p>Add an <code>attestation</code> block to a URL source in your recipe:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;6489f1...&quot;</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">attestation</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">publishers</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github:pallets/flask</span>
+</span></code></pre></div>
+<p>When rattler-build downloads the source, it will:</p>
+<ol>
+<li>Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from <code>bundle_url</code>)</li>
+<li>Verify the bundle signature against the Sigstore transparency log</li>
+<li>Check that the attestation identity matches one of the listed publishers</li>
+</ol>
+<p>If verification fails, the build is aborted.</p>
+<h3 id="pypi-sources">PyPI sources<a class="headerlink" href="#pypi-sources" title="Permanent link">#</a></h3>
+<p>For packages hosted on PyPI, the attestation bundle URL is automatically derived from the <a href="https://docs.pypi.org/api/integrity/">PyPI attestation API</a>. You only need to specify the publisher:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;6489f1...&quot;</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">attestation</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">publishers</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github:pallets/flask</span>
+</span></code></pre></div>
+<h3 id="github-release-sources">GitHub release sources<a class="headerlink" href="#github-release-sources" title="Permanent link">#</a></h3>
+<p>For source archives from GitHub releases, specify the <code>bundle_url</code> pointing to the <code>.sigstore.json</code> bundle:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;eb33e5...&quot;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">attestation</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">bundle_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">publishers</span><span class="p">:</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github:facebook/zstd</span>
+</span></code></pre></div>
+<h3 id="publisher-format">Publisher format<a class="headerlink" href="#publisher-format" title="Permanent link">#</a></h3>
+<p>Publishers are specified in <code>github:owner/repo</code> format. The identity is matched against the Sigstore certificate's Subject Alternative Name (SAN), which for GitHub Actions is the workflow identity.</p>
 <h2 id="verifying-attestations">Verifying attestations<a class="headerlink" href="#verifying-attestations" title="Permanent link">#</a></h2>
 <p>Once packages are published with attestations, they can be verified using several tools:</p>
 <h3 id="using-the-github-cli">Using the GitHub CLI<a class="headerlink" href="#using-the-github-cli" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span>my-package-0.1.0-h123_0.conda<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--owner<span class="w"> </span>my-org<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--predicate-type<span class="w"> </span><span class="s2">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span>my-package-0.1.0-h123_0.conda<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--owner<span class="w"> </span>my-org<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--predicate-type<span class="w"> </span><span class="s2">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
 </span></code></pre></div>
 <h3 id="using-cosign">Using cosign<a class="headerlink" href="#using-cosign" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/.*&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/.*&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
 </span></code></pre></div>
 <h3 id="using-sigstore-python">Using sigstore-python<a class="headerlink" href="#using-sigstore-python" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>sigstore
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>sigstore<span class="w"> </span>verify<span class="w"> </span>identity<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--cert-identity<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/my-repo/.github/workflows/build.yml@refs/heads/main&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--cert-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pip<span class="w"> </span>install<span class="w"> </span>sigstore
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sigstore<span class="w"> </span>verify<span class="w"> </span>identity<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>--cert-identity<span class="w"> </span><span class="s2">&quot;https://github.com/my-org/my-repo/.github/workflows/build.yml@refs/heads/main&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>--cert-oidc-issuer<span class="w"> </span><span class="s2">&quot;https://token.actions.githubusercontent.com&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>my-package-0.1.0-h123_0.conda
 </span></code></pre></div>
 <h2 id="viewing-attestations">Viewing attestations<a class="headerlink" href="#viewing-attestations" title="Permanent link">#</a></h2>
 <p>You can find attestations for packages published to prefix.dev in several places:</p>
