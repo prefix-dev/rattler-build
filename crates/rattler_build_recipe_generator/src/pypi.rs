@@ -262,6 +262,15 @@ fn post_process_markers(recipe_yaml: String) -> String {
     result.join("\n")
 }
 
+/// Convert a PyPI package name to a Python import name.
+///
+/// PyPI package names use hyphens as separators (e.g. `pydiverse-common`),
+/// but Python identifiers cannot contain hyphens, so the conventional mapping
+/// replaces each hyphen with an underscore (e.g. `pydiverse_common`).
+fn python_import_name(package_name: &str) -> String {
+    package_name.replace('-', "_")
+}
+
 async fn is_noarch_python(urls: &[PyPiRelease]) -> bool {
     let wheels: Vec<_> = urls
         .iter()
@@ -809,7 +818,7 @@ pub async fn create_recipe(
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
-            imports: vec![metadata.info.name.replace('-', "_")],
+            imports: vec![python_import_name(&metadata.info.name)],
             pip_check: true,
         },
     }));
@@ -1084,6 +1093,22 @@ mod tests {
     fn test_extract_license_none_when_empty() {
         let info = PyPiInfo::default();
         assert!(extract_license(&info).is_none());
+    }
+
+    #[test]
+    fn test_python_import_name() {
+        // Hyphens in PyPI names must become underscores for valid Python identifiers.
+        // See: https://github.com/prefix-dev/rattler-build/issues/1544
+        assert_eq!(python_import_name("pydiverse-common"), "pydiverse_common");
+        assert_eq!(
+            python_import_name("file-read-backwards"),
+            "file_read_backwards"
+        );
+        // Packages without hyphens are unchanged.
+        assert_eq!(python_import_name("numpy"), "numpy");
+        // Casing is preserved (e.g. Flask, PyYAML).
+        assert_eq!(python_import_name("Flask"), "Flask");
+        assert_eq!(python_import_name("PyYAML"), "PyYAML");
     }
 
     #[tokio::test]
