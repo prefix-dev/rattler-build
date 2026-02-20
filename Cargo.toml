@@ -259,9 +259,7 @@ rattler_cache = { version = "0.6.12", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
 rattler_index = { version = "0.27.14", default-features = false }
-rattler_networking = { workspace = true, features = [
-  "rattler_config",
-] }
+rattler_networking = { workspace = true, features = ["rattler_config"] }
 rattler_upload = { version = "0.4.13", default-features = false }
 rattler_s3 = { version = "0.1.23", optional = true }
 rattler_redaction = { version = "0.1.13", default-features = false }
