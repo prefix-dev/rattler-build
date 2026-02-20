@@ -43,7 +43,6 @@ def build_recipes(
     build_num: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
-    use_jlap: bool = False,
     use_sharded: bool = True,
 ) -> None:
     """
@@ -86,7 +85,6 @@ def build_recipes(
         build_num: Override the build number for all outputs. (default: None, uses build number from recipe)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
-        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
         use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
@@ -132,7 +130,6 @@ def build_recipes(
         build_num,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     )
 
@@ -149,7 +146,6 @@ def test_package(
     test_index: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
-    use_jlap: bool = False,
     use_sharded: bool = True,
 ) -> None:
     """
@@ -169,7 +165,6 @@ def test_package(
         test_index: The test to run, selected by index. (default: None - run all tests)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
-        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
         use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
@@ -191,6 +186,5 @@ def test_package(
         test_index,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     )

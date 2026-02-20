@@ -82,7 +82,6 @@ class ToolConfiguration:
         use_zstd: Whether to use zstd compression when downloading repodata (default: True)
         use_bz2: Whether to use bzip2 compression when downloading repodata (default: True)
         use_sharded: Whether to use sharded repodata when downloading (default: True)
-        use_jlap: Whether to use JLAP when downloading repodata (default: False)
 
     Example:
         ```python
@@ -115,7 +114,6 @@ class ToolConfiguration:
         use_zstd: bool = True,
         use_bz2: bool = True,
         use_sharded: bool = True,
-        use_jlap: bool = False,
     ):
         """Create a new tool configuration."""
         self._inner = _tool_config.ToolConfiguration(
@@ -133,7 +131,6 @@ class ToolConfiguration:
             use_zstd=use_zstd,
             use_bz2=use_bz2,
             use_sharded=use_sharded,
-            use_jlap=use_jlap,
         )
 
     @property
@@ -175,11 +172,6 @@ class ToolConfiguration:
     def use_sharded(self) -> bool:
         """Whether to use sharded repodata."""
         return self._inner.use_sharded
-
-    @property
-    def use_jlap(self) -> bool:
-        """Whether to use JLAP."""
-        return self._inner.use_jlap
 
     @property
     def compression_threads(self) -> int | None:
