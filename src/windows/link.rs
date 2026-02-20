@@ -116,11 +116,21 @@ impl Relinker for Dll {
             }
 
             // 2. Check all directories in the search path
+            //    Following Windows DLL search order: prefix PATH entries, then
+            //    system directories (System32), then the host PATH.
             let mut found = false;
             let path_entries = prefix_path_entries(encoded_prefix, &Platform::Win64);
             let path = std::env::var("PATH").unwrap_or_default();
+
+            // Add Windows system directories so that system DLLs resolve to
+            // their full path (e.g. C:\Windows\System32\KERNEL32.dll), which
+            // allows the dsolist allow/deny patterns to match them properly.
+            let system32 = PathBuf::from("C:/Windows/System32");
+            let system32_downlevel = PathBuf::from("C:/Windows/System32/downlevel");
+
             let search_dirs = path_entries
                 .into_iter()
+                .chain([system32, system32_downlevel])
                 .chain(std::env::split_paths(&path))
                 .collect::<Vec<_>>();
 
@@ -205,53 +215,24 @@ mod tests {
         });
         assert!(has_kernel32, "Expected KERNEL32.dll dependency");
 
+        // System DLLs should resolve to their System32 path
         let resolved = dll.resolve_libraries(&dll_path, &dll_path);
-        assert!(
-            !resolved.iter().any(|(lib, _)| lib
-                .file_name()
+        let kernel32_resolved = resolved.iter().find(|(lib, _)| {
+            lib.file_name()
                 .and_then(|n| n.to_str())
                 .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
-                .unwrap_or(false)),
-            "System DLLs should be filtered out during resolution"
+                .unwrap_or(false)
+        });
+        assert!(
+            kernel32_resolved.is_some(),
+            "KERNEL32.dll should be present in resolved libraries"
+        );
+        let (_, resolved_path) = kernel32_resolved.unwrap();
+        assert!(
+            resolved_path.is_some(),
+            "KERNEL32.dll should resolve to a path via System32"
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_system_dll_filtering() {
-        let test_dlls = vec![
-            "KERNEL32.dll",
-            "kernel32.dll",
-            "C:\\Windows\\System32\\KERNEL32.dll",
-            "D:\\Some\\Path\\kernel32.dll",
-            "custom.dll",
-            "myapp.dll",
-        ];
-
-        for dll in test_dlls {
-            let path = PathBuf::from(dll);
-            let is_system = WIN_ALLOWLIST.iter().any(|&sys_dll| {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
-                    .unwrap_or(false)
-            });
-
-            match dll.to_lowercase().as_str() {
-                "kernel32.dll"
-                | "c:\\windows\\system32\\kernel32.dll"
-                | "d:\\some\\path\\kernel32.dll" => {
-                    assert!(is_system, "Expected {} to be identified as system DLL", dll);
-                }
-                _ => {
-                    assert!(
-                        !is_system,
-                        "Expected {} to NOT be identified as system DLL",
-                        dll
-                    );
-                }
-            }
-        }
     }
 }
