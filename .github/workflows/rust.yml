@@ -38,6 +38,18 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
+      # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
+      - name: Set up Windows dev drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@v3
+        with:
+          drive-size: 10GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+      - name: Redirect cargo target directory to dev drive
+        if: runner.os == 'Windows'
+        run: New-Item -ItemType Junction -Path "target" -Target "${{ env.DEV_DRIVE }}/target"
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: "1.89.0"
@@ -86,6 +98,18 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
+      # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
+      - name: Set up Windows dev drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@v3
+        with:
+          drive-size: 10GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+      - name: Redirect cargo target directory to dev drive
+        if: runner.os == 'Windows'
+        run: New-Item -ItemType Junction -Path "target-pixi" -Target "${{ env.DEV_DRIVE }}/target-pixi"
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           # Use target-pixi to match pixi's CARGO_TARGET_DIR
