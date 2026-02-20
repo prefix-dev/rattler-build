@@ -34,6 +34,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # Only use sccache on main to seed the cache; PRs rely on Swatinem/rust-cache
+      RUSTC_WRAPPER: ${{ github.ref == 'refs/heads/main' && 'sccache' || '' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
@@ -47,9 +50,13 @@ jobs:
           env-mapping: |
             CARGO_HOME,{{ DEV_DRIVE }}/.cargo
             RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+            TMP,{{ DEV_DRIVE }}/tmp
+            TEMP,{{ DEV_DRIVE }}/tmp
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
-        run: New-Item -ItemType Junction -Path "target" -Target "${{ env.DEV_DRIVE }}/target"
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force
+          New-Item -ItemType Junction -Path "target" -Target "${{ env.DEV_DRIVE }}/target"
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: "1.89.0"
@@ -59,6 +66,8 @@ jobs:
           shared-key: test-${{ matrix.os }}
           # Only save cache on main to avoid thrashing
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: mozilla-actions/sccache-action@v0.0.9
+        if: github.ref == 'refs/heads/main'
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
@@ -94,6 +103,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
+      # Only use sccache on main to seed the cache; PRs rely on Swatinem/rust-cache
+      RUSTC_WRAPPER: ${{ github.ref == 'refs/heads/main' && 'sccache' || '' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
@@ -107,9 +118,13 @@ jobs:
           env-mapping: |
             CARGO_HOME,{{ DEV_DRIVE }}/.cargo
             RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+            TMP,{{ DEV_DRIVE }}/tmp
+            TEMP,{{ DEV_DRIVE }}/tmp
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
-        run: New-Item -ItemType Junction -Path "target-pixi" -Target "${{ env.DEV_DRIVE }}/target-pixi"
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force
+          New-Item -ItemType Junction -Path "target-pixi" -Target "${{ env.DEV_DRIVE }}/target-pixi"
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           # Use target-pixi to match pixi's CARGO_TARGET_DIR
@@ -117,6 +132,8 @@ jobs:
           shared-key: release-${{ matrix.os }}
           # Only save cache on main to avoid thrashing
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: mozilla-actions/sccache-action@v0.0.9
+        if: github.ref == 'refs/heads/main'
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           cache: true
