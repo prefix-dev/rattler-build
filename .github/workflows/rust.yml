@@ -46,10 +46,9 @@ jobs:
         if: runner.os == 'Windows'
         uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
         with:
-          drive-size: 10GB
+          drive-size: 50GB
           env-mapping: |
             CARGO_HOME,{{ DEV_DRIVE }}/.cargo
-            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
         run: |
@@ -112,10 +111,9 @@ jobs:
         if: runner.os == 'Windows'
         uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
         with:
-          drive-size: 10GB
+          drive-size: 50GB
           env-mapping: |
             CARGO_HOME,{{ DEV_DRIVE }}/.cargo
-            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
         run: |
