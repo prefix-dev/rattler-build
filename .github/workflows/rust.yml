@@ -44,7 +44,7 @@ jobs:
       # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
       - name: Set up Windows dev drive
         if: runner.os == 'Windows'
-        uses: samypr100/setup-dev-drive@v3
+        uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
         with:
           drive-size: 10GB
           env-mapping: |
@@ -66,7 +66,7 @@ jobs:
           shared-key: test-${{ matrix.os }}
           # Only save cache on main to avoid thrashing
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         if: github.ref == 'refs/heads/main'
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
@@ -112,7 +112,7 @@ jobs:
       # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
       - name: Set up Windows dev drive
         if: runner.os == 'Windows'
-        uses: samypr100/setup-dev-drive@v3
+        uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
         with:
           drive-size: 10GB
           env-mapping: |
@@ -132,7 +132,7 @@ jobs:
           shared-key: release-${{ matrix.os }}
           # Only save cache on main to avoid thrashing
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         if: github.ref == 'refs/heads/main'
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
