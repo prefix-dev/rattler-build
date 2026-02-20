@@ -2,12 +2,53 @@
 
 use crate::metadata::Output;
 use fs_err as fs;
+use rattler_conda_types::Platform;
 use std::{
     collections::HashSet,
+    io::Write,
     path::{Component, Path, PathBuf},
 };
 
 use super::PackagingError;
+
+/// Copy a file to the destination, normalizing CRLF line endings to LF for text files.
+///
+/// This ensures that noarch packages are reproducible across Windows and Unix builds
+/// by eliminating platform-specific line endings (see <https://github.com/prefix-dev/rattler-build/issues/837>).
+fn copy_with_normalized_line_endings(src: &Path, dst: &Path) -> Result<(), PackagingError> {
+    let content = fs::read(src)?;
+
+    // Inspect the first 1024 bytes to determine if the file is text
+    let is_text = content_inspector::inspect(&content[..content.len().min(1024)]).is_text();
+
+    if is_text {
+        // Normalize CRLF → LF
+        let mut normalized = Vec::with_capacity(content.len());
+        let mut i = 0;
+        while i < content.len() {
+            if content[i] == b'\r' && i + 1 < content.len() && content[i + 1] == b'\n' {
+                // Skip the \r; the \n will be written in the next iteration
+            } else {
+                normalized.push(content[i]);
+            }
+            i += 1;
+        }
+
+        let mut dst_file = fs::File::create(dst)?;
+        dst_file.write_all(&normalized)?;
+
+        // Copy file permissions (Unix only)
+        #[cfg(unix)]
+        {
+            let perms = fs::metadata(src)?.permissions();
+            fs::set_permissions(dst, perms)?;
+        }
+    } else {
+        fs::copy(src, dst)?;
+    }
+
+    Ok(())
+}
 
 /// We check the (new) `pyc` files against the old files from the environment.
 /// This is a temporary measure to avoid packaging `pyc` files that are not
@@ -92,6 +133,8 @@ impl Output {
     ///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
     ///   as-is.
     /// * Absolute symlinks are made relative so that they are easily relocatable.
+    /// * For any `noarch` package (generic or python), text file line endings are normalized from
+    ///   CRLF to LF so that packages are reproducible across Windows and Unix builds.
     pub fn write_to_dest(
         &self,
         path: &Path,
@@ -274,7 +317,13 @@ impl Output {
             Ok(None)
         } else {
             tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
-            fs::copy(path, &dest_path)?;
+            if target_platform == &Platform::NoArch {
+                // Normalize text file line endings to LF for noarch packages so that
+                // builds are reproducible across Windows and Unix (issue #837).
+                copy_with_normalized_line_endings(path, &dest_path)?;
+            } else {
+                fs::copy(path, &dest_path)?;
+            }
             Ok(Some(dest_path))
         }
     }
@@ -288,6 +337,52 @@ mod test {
     };
 
     use crate::packaging::file_mapper::filter_pyc;
+
+    #[test]
+    fn test_copy_with_normalized_line_endings_text() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let src = temp_dir.path().join("src.txt");
+        let dst = temp_dir.path().join("dst.txt");
+
+        // Write a file with CRLF line endings
+        std::fs::write(&src, b"line1\r\nline2\r\nline3\r\n").unwrap();
+
+        super::copy_with_normalized_line_endings(&src, &dst).unwrap();
+
+        let result = std::fs::read(&dst).unwrap();
+        assert_eq!(result, b"line1\nline2\nline3\n");
+    }
+
+    #[test]
+    fn test_copy_with_normalized_line_endings_binary_unchanged() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let src = temp_dir.path().join("src.bin");
+        let dst = temp_dir.path().join("dst.bin");
+
+        // Write binary data that should not be modified
+        let binary_data: Vec<u8> = vec![0x00, 0x01, 0x02, 0x0D, 0x0A, 0xFF];
+        std::fs::write(&src, &binary_data).unwrap();
+
+        super::copy_with_normalized_line_endings(&src, &dst).unwrap();
+
+        let result = std::fs::read(&dst).unwrap();
+        assert_eq!(result, binary_data);
+    }
+
+    #[test]
+    fn test_copy_with_normalized_line_endings_lf_unchanged() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let src = temp_dir.path().join("src.txt");
+        let dst = temp_dir.path().join("dst.txt");
+
+        // Write a file that already has LF-only line endings
+        std::fs::write(&src, b"line1\nline2\nline3\n").unwrap();
+
+        super::copy_with_normalized_line_endings(&src, &dst).unwrap();
+
+        let result = std::fs::read(&dst).unwrap();
+        assert_eq!(result, b"line1\nline2\nline3\n");
+    }
 
     #[test]
     fn test_filter_file() {
