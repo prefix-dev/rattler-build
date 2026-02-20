@@ -91,7 +91,7 @@ rattler-build build -m variants.yaml
 When a build fails, use `debug` to set up the environment and enter an interactive shell:
 
 ```bash
-rattler-build debug --recipe recipe.yaml
+rattler-build debug shell --recipe recipe.yaml
 ```
 
 This opens a shell with:

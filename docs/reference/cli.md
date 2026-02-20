@@ -16,7 +16,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `completion` — Generate shell completion script
 * `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
-* `debug` — Debug a recipe: set up the build environment and open a debug shell
+* `debug` — Debug a recipe build
 * `create-patch` — Create a patch for a directory
 * `package` — Package-related subcommands
 * `bump-recipe` — Bump a recipe to a new version
@@ -1238,29 +1238,33 @@ Remove authentication information for a given host
 
 ### `debug`
 
-Debug a recipe: set up the build environment and open a debug shell.
+Debug a recipe build.
 
-When called with a recipe, this sets up the build/host environments, creates the build script, and drops you into an interactive shell in the work directory.
+Subcommands: shell     - Set up from a recipe or open an existing debug shell host-add  - Install additional packages into the host prefix build-add - Install additional packages into the build prefix
 
-**Usage:** `rattler-build debug [OPTIONS]` or `rattler-build debug <COMMAND>`
+**Usage:** `rattler-build debug <COMMAND>`
 
 ##### **Subcommands:**
 
-* `shell` — Open a debug shell in an existing build environment
+* `shell` — Open a debug shell, optionally setting up the environment first
 * `host-add` — Install additional packages into the host prefix
 * `build-add` — Install additional packages into the build prefix
+
+
+
+#### `shell`
+
+Open a debug shell, optionally setting up the environment first.
+
+With `--recipe`: resolves dependencies, downloads sources, creates the build script, and (unless `--no-shell`) drops you into an interactive shell. Without `--recipe`: opens a shell in an existing build environment (reads from rattler-build-log.txt or `--work-dir`).
+
+**Usage:** `rattler-build debug shell [OPTIONS]`
 
 ##### **Options:**
 
 - `-r`, `--recipe <RECIPE>`
 
-	Recipe file to debug
-
-	- Default value: `.`
-
-- `-o`, `--output <OUTPUT>`
-
-	Output directory for build artifacts
+	Recipe file or directory to debug. When given, sets up the environment before opening a shell
 
 
 - `--target-platform <TARGET_PLATFORM>`
@@ -1285,12 +1289,17 @@ When called with a recipe, this sets up the build/host environments, creates the
 
 - `--output-name <OUTPUT_NAME>`
 
-	Name of the specific output to debug
+	Name of the specific output to debug (only required when a recipe has multiple outputs)
 
 
 - `--no-shell`
 
-	Only set up the environment without opening a shell
+	Only set up the environment without opening a shell (recipe mode only)
+
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
 
 
 - `--experimental`
@@ -1316,32 +1325,11 @@ When called with a recipe, this sets up the build/host environments, creates the
 
 
 
-#### `shell`
-
-Open a debug shell in an existing build environment.
-
-By default, reads the work directory from the last build in `rattler-build-log.txt`. You can also specify `--work-dir` explicitly.
-
-**Usage:** `rattler-build debug shell [OPTIONS]`
-
-##### **Options:**
-
-- `--work-dir <WORK_DIR>`
-
-	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
-
-
-- `-o`, `--output-dir <OUTPUT_DIR>`
-
-	Output directory containing rattler-build-log.txt
-
-	- Default value: `./output`
-
 
 
 #### `host-add`
 
-Install additional packages into the host prefix.
+Install additional packages into the host prefix
 
 This command resolves and installs the specified packages into the host environment of an existing debug build. Useful for iterating on dependencies without re-running the full debug setup.
 
@@ -1354,6 +1342,7 @@ This command resolves and installs the specified packages into the host environm
 	Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
 
 
+
 ##### **Options:**
 
 - `-c`, `--channel <CHANNELS>`
@@ -1374,9 +1363,10 @@ This command resolves and installs the specified packages into the host environm
 
 
 
+
 #### `build-add`
 
-Install additional packages into the build prefix.
+Install additional packages into the build prefix
 
 This command resolves and installs the specified packages into the build environment of an existing debug build. Useful for adding build tools without re-running the full debug setup.
 
@@ -1389,6 +1379,7 @@ This command resolves and installs the specified packages into the build environ
 	Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
 
 
+
 ##### **Options:**
 
 - `-c`, `--channel <CHANNELS>`
@@ -1406,7 +1397,6 @@ This command resolves and installs the specified packages into the build environ
 	Output directory containing rattler-build-log.txt
 
 	- Default value: `./output`
-
 
 
 
@@ -1458,8 +1448,6 @@ Create a patch for a directory
 - `--dry-run`
 
 	Perform a dry-run: analyze changes and log the diff, but don't write the patch file
-
-
 
 
 

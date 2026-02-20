@@ -213,9 +213,19 @@ pub fn open_debug_shell(
     Ok(())
 }
 
-/// Open a debug shell from DebugShellOpts
+/// Open a debug shell from DebugShellOpts (existing-env mode).
 pub fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
-    let (work_dir, directories_json) = parse_directories_info(opts.work_dir, &opts.output_dir)?;
+    let output_dir = opts
+        .common
+        .output_dir
+        .unwrap_or_else(|| PathBuf::from("./output"));
+    let (work_dir, directories_json) = parse_directories_info(opts.work_dir, &output_dir)?;
+    open_debug_shell(work_dir, directories_json)
+}
+
+/// Open a debug shell using an output directory (post-recipe-setup path).
+pub fn open_shell_from_output_dir(output_dir: PathBuf) -> std::io::Result<()> {
+    let (work_dir, directories_json) = parse_directories_info(None, &output_dir)?;
     open_debug_shell(work_dir, directories_json)
 }
 

@@ -8,7 +8,7 @@ When a build fails:
 
 ```bash
 # Set up the environment and open an interactive debug shell
-rattler-build debug --recipe recipe.yaml
+rattler-build debug shell --recipe recipe.yaml
 
 # You're now in the work directory with the build environment loaded
 # Try running commands manually to see what's failing
@@ -87,34 +87,43 @@ output/
 
 ## The `debug` Command
 
-The `debug` command sets up the build environment from a recipe and drops you into an interactive debug shell:
+The `debug` command provides subcommands for setting up and working with debug
+build environments.
+
+### `debug shell`
+
+The `shell` subcommand has two modes:
+
+**Recipe mode** (`--recipe`): sets up the build environment from a recipe and
+drops you into an interactive debug shell:
 
 1. Resolves and installs build/host dependencies
 2. Downloads and extracts sources, applies patches
 3. Creates the build script (`conda_build.sh` / `conda_build.bat`)
 4. Opens an interactive shell in the work directory with `build_env.sh` sourced
 
-### Usage
+**Existing-env mode** (no `--recipe`): opens a shell in an already-set-up build
+environment.
 
 ```bash
 # Set up environment from a recipe and enter the debug shell
-rattler-build debug --recipe recipe.yaml
+rattler-build debug shell --recipe recipe.yaml
 
 # Set up environment only (no shell)
-rattler-build debug --recipe recipe.yaml --no-shell
-```
+rattler-build debug shell --recipe recipe.yaml --no-shell
 
-### Debug Subcommands
-
-The `debug` command also provides subcommands for working with existing debug environments:
-
-```bash
 # Open a debug shell in the last build (reads from output/rattler-build-log.txt)
 rattler-build debug shell
 
 # Open a shell in a specific build directory
 rattler-build debug shell --work-dir /path/to/build_folder
+```
 
+### `debug host-add` / `debug build-add`
+
+Add packages to the host or build environment without re-running the full setup:
+
+```bash
 # Add packages to the host environment
 rattler-build debug host-add numpy pandas
 
@@ -142,11 +151,11 @@ Inside the debug shell, you have access to:
 
 ### Step 1: Enter the Debug Environment
 
-Use `rattler-build debug` to set up build environments and enter a debug shell in one step:
+Use `rattler-build debug shell` to set up build environments and enter a debug shell in one step:
 
 ```bash
 # set up the build environment and enter the debug shell
-rattler-build debug --recipe recipe.yaml
+rattler-build debug shell --recipe recipe.yaml
 ```
 
 If your recipe succeeds but you still want to debug, you can use `--keep-build` to prevent cleanup and then open a debug shell:
@@ -303,12 +312,12 @@ rattler-build build --recipe recipe.yaml --keep-build
 rattler-build build --recipe recipe.yaml --channel conda-forge --no-test
 
 # Debug commands
-rattler-build debug --recipe recipe.yaml            # Set up env + enter shell
-rattler-build debug --recipe recipe.yaml --no-shell  # Set up env only
-rattler-build debug shell                            # Open shell in last build
-rattler-build debug shell --work-dir /path/to/work   # Open shell in specific build
-rattler-build debug host-add python numpy            # Add packages to host env
-rattler-build debug build-add cmake                  # Add packages to build env
+rattler-build debug shell --recipe recipe.yaml            # Set up env + enter shell
+rattler-build debug shell --recipe recipe.yaml --no-shell  # Set up env only
+rattler-build debug shell                                  # Open shell in last build
+rattler-build debug shell --work-dir /path/to/work         # Open shell in specific build
+rattler-build debug host-add python numpy                  # Add packages to host env
+rattler-build debug build-add cmake                        # Add packages to build env
 
 # Patch commands
 rattler-build create-patch --directory . --name fix --include "*.c"

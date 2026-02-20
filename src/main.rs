@@ -20,9 +20,8 @@ use rattler_build::{
     console_utils::init_logging,
     debug_recipe, extract_package, get_recipe_path,
     opt::{
-        App, BuildData, BumpRecipeOpts, DebugData, DebugShellOpts, DebugSubCommands,
-        PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands,
-        TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, PackageCommands, PublishData,
+        RebuildData, ShellCompletion, SubCommands, TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
     source::create_patch,
@@ -227,18 +226,10 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(args)) => match args.subcommand {
-            Some(DebugSubCommands::Shell(opts)) => debug::debug_shell(opts).into_diagnostic(),
-            Some(DebugSubCommands::HostAdd(opts)) => {
-                debug::debug_env_add("host", opts, config, &log_handler).await
-            }
-            Some(DebugSubCommands::BuildAdd(opts)) => {
-                debug::debug_env_add("build", opts, config, &log_handler).await
-            }
-            None => {
-                // Default: set up debug environment and open shell
-                let no_shell = args.setup.no_shell;
-                let setup = args.setup;
-                let debug_data = DebugData::from_setup_args_and_config(setup, config);
+            DebugSubCommands::Shell(opts) if opts.recipe.is_some() => {
+                // Recipe mode: set up the environment, then optionally open a shell
+                let no_shell = opts.no_shell;
+                let debug_data = DebugData::from_shell_opts_and_config(opts, config);
                 let output_dir = debug_data.output_dir.clone();
                 debug_recipe(debug_data, &log_handler).await?;
 
@@ -246,12 +237,17 @@ async fn async_main() -> miette::Result<()> {
                     return Ok(());
                 }
 
-                // Auto-launch the debug shell using the just-created environment
-                let shell_opts = DebugShellOpts {
-                    work_dir: None,
-                    output_dir,
-                };
-                debug::debug_shell(shell_opts).into_diagnostic()
+                debug::open_shell_from_output_dir(output_dir).into_diagnostic()
+            }
+            DebugSubCommands::Shell(opts) => {
+                // Existing-env mode: open a shell in an already-set-up environment
+                debug::debug_shell(opts).into_diagnostic()
+            }
+            DebugSubCommands::HostAdd(opts) => {
+                debug::debug_env_add("host", opts, config, &log_handler).await
+            }
+            DebugSubCommands::BuildAdd(opts) => {
+                debug::debug_env_add("build", opts, config, &log_handler).await
             }
         },
         Some(SubCommands::CreatePatch(opts)) => {
