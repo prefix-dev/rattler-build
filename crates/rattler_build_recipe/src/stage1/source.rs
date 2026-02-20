@@ -155,6 +155,140 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// Provider for a publisher identity
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PublisherProvider {
+    GitHub,
+    GitLab,
+}
+
+impl fmt::Display for PublisherProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::GitHub => write!(f, "github"),
+            Self::GitLab => write!(f, "gitlab"),
+        }
+    }
+}
+
+/// A parsed publisher identity (e.g., "github:owner/repo@refs/tags/v1.0")
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Publisher {
+    /// The provider (github, gitlab)
+    pub provider: PublisherProvider,
+    /// Repository owner
+    pub owner: String,
+    /// Repository name
+    pub repo: String,
+    /// Optional ref constraint (e.g., "refs/tags/v1.0")
+    pub ref_constraint: Option<String>,
+}
+
+impl Publisher {
+    /// Convert to identity prefix and issuer for sigstore verification.
+    ///
+    /// The identity is a URL prefix that must match the certificate's SAN.
+    /// The ref_constraint is not used here — it can be checked separately if needed.
+    pub fn to_identity_and_issuer(&self) -> (String, String) {
+        match self.provider {
+            PublisherProvider::GitHub => {
+                let identity = format!("https://github.com/{}/{}", self.owner, self.repo);
+                (
+                    identity,
+                    "https://token.actions.githubusercontent.com".to_string(),
+                )
+            }
+            PublisherProvider::GitLab => {
+                let identity = format!("https://gitlab.com/{}/{}", self.owner, self.repo);
+                (identity, "https://gitlab.com".to_string())
+            }
+        }
+    }
+}
+
+impl fmt::Display for Publisher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}/{}", self.provider, self.owner, self.repo)?;
+        if let Some(ref_constraint) = &self.ref_constraint {
+            write!(f, "@{}", ref_constraint)?;
+        }
+        Ok(())
+    }
+}
+
+/// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0"
+pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
+    let (provider_str, rest) = s.split_once(':').ok_or_else(|| {
+        format!(
+            "Invalid publisher format '{}': expected 'provider:owner/repo'",
+            s
+        )
+    })?;
+
+    let provider = match provider_str {
+        "github" => PublisherProvider::GitHub,
+        "gitlab" => PublisherProvider::GitLab,
+        _ => {
+            return Err(format!(
+                "Unknown publisher provider '{}': expected 'github' or 'gitlab'",
+                provider_str
+            ));
+        }
+    };
+
+    let (owner_repo, ref_constraint) = if let Some((or, r)) = rest.split_once('@') {
+        (or, Some(r.to_string()))
+    } else {
+        (rest, None)
+    };
+
+    let (owner, repo) = owner_repo.split_once('/').ok_or_else(|| {
+        format!(
+            "Invalid publisher format '{}': expected 'provider:owner/repo'",
+            s
+        )
+    })?;
+
+    if owner.is_empty() || repo.is_empty() {
+        return Err(format!(
+            "Invalid publisher format '{}': owner and repo must not be empty",
+            s
+        ));
+    }
+
+    Ok(Publisher {
+        provider,
+        owner: owner.to_string(),
+        repo: repo.to_string(),
+        ref_constraint,
+    })
+}
+
+/// Attestation verification configuration (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AttestationConfig {
+    /// URL to download the attestation bundle from (e.g., .sigstore.json file)
+    /// Auto-derived for PyPI sources if not specified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle_url: Option<Url>,
+
+    /// Publisher identities to verify. All must match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publishers: Vec<Publisher>,
+}
+
+impl AttestationConfig {
+    /// Check if the attestation config is empty
+    pub fn is_empty(&self) -> bool {
+        self.bundle_url.is_none() && self.publishers.is_empty()
+    }
+}
+
+fn attestation_is_none_or_empty(s: &Option<AttestationConfig>) -> bool {
+    s.as_ref().map(|c| c.is_empty()).unwrap_or(true)
+}
+
 fn default_submodules() -> bool {
     true
 }
@@ -189,6 +323,10 @@ pub struct UrlSource {
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<PathBuf>,
+
+    /// Optional attestation verification configuration
+    #[serde(default, skip_serializing_if = "attestation_is_none_or_empty")]
+    pub attestation: Option<AttestationConfig>,
 }
 
 /// A local path source (evaluated)
@@ -303,5 +441,81 @@ mod tests {
 
         let path = GitUrl::Path(PathBuf::from("/path/to/repo"));
         assert!(path.to_string().contains("repo"));
+    }
+
+    #[test]
+    fn test_parse_publisher_github() {
+        let p = parse_publisher_string("github:pallets/flask").unwrap();
+        assert_eq!(p.provider, PublisherProvider::GitHub);
+        assert_eq!(p.owner, "pallets");
+        assert_eq!(p.repo, "flask");
+        assert_eq!(p.ref_constraint, None);
+    }
+
+    #[test]
+    fn test_parse_publisher_github_with_ref() {
+        let p = parse_publisher_string("github:owner/repo@refs/tags/v1.0").unwrap();
+        assert_eq!(p.provider, PublisherProvider::GitHub);
+        assert_eq!(p.owner, "owner");
+        assert_eq!(p.repo, "repo");
+        assert_eq!(p.ref_constraint, Some("refs/tags/v1.0".to_string()));
+    }
+
+    #[test]
+    fn test_parse_publisher_gitlab() {
+        let p = parse_publisher_string("gitlab:org/project").unwrap();
+        assert_eq!(p.provider, PublisherProvider::GitLab);
+        assert_eq!(p.owner, "org");
+        assert_eq!(p.repo, "project");
+    }
+
+    #[test]
+    fn test_parse_publisher_invalid_no_colon() {
+        assert!(parse_publisher_string("github-pallets/flask").is_err());
+    }
+
+    #[test]
+    fn test_parse_publisher_invalid_no_slash() {
+        assert!(parse_publisher_string("github:palletsflask").is_err());
+    }
+
+    #[test]
+    fn test_parse_publisher_invalid_provider() {
+        assert!(parse_publisher_string("bitbucket:owner/repo").is_err());
+    }
+
+    #[test]
+    fn test_parse_publisher_empty_owner() {
+        assert!(parse_publisher_string("github:/repo").is_err());
+    }
+
+    #[test]
+    fn test_parse_publisher_empty_repo() {
+        assert!(parse_publisher_string("github:owner/").is_err());
+    }
+
+    #[test]
+    fn test_publisher_display() {
+        let p = parse_publisher_string("github:pallets/flask").unwrap();
+        assert_eq!(p.to_string(), "github:pallets/flask");
+
+        let p = parse_publisher_string("gitlab:org/repo@refs/tags/v2.0").unwrap();
+        assert_eq!(p.to_string(), "gitlab:org/repo@refs/tags/v2.0");
+    }
+
+    #[test]
+    fn test_publisher_to_identity_github() {
+        let p = parse_publisher_string("github:pallets/flask").unwrap();
+        let (identity, issuer) = p.to_identity_and_issuer();
+        assert_eq!(identity, "https://github.com/pallets/flask");
+        assert_eq!(issuer, "https://token.actions.githubusercontent.com");
+    }
+
+    #[test]
+    fn test_publisher_to_identity_gitlab() {
+        let p = parse_publisher_string("gitlab:org/project").unwrap();
+        let (identity, issuer) = p.to_identity_and_issuer();
+        assert_eq!(identity, "https://gitlab.com/org/project");
+        assert_eq!(issuer, "https://gitlab.com");
     }
 }

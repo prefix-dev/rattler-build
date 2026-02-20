@@ -470,6 +470,169 @@ fn test_parse_nested_conditionals() {
     );
 }
 
+#[test]
+fn test_parse_url_source_with_attestation() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://pypi.io/packages/source/f/flask/flask-1.0.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  attestation:
+    publishers:
+      - github:pallets/flask
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    assert_eq!(recipe.source.len(), 1);
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestation
+                .as_ref()
+                .expect("attestation should be set");
+            assert!(
+                att.bundle_url.is_none(),
+                "bundle_url should be None for PyPI"
+            );
+            assert_eq!(att.publishers.len(), 1);
+            assert_eq!(
+                att.publishers[0].as_concrete().unwrap(),
+                "github:pallets/flask"
+            );
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_url_source_with_attestation_bundle_url() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  attestation:
+    bundle_url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json
+    publishers:
+      - github:facebook/zstd
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestation
+                .as_ref()
+                .expect("attestation should be set");
+            assert!(att.bundle_url.is_some(), "bundle_url should be set");
+            assert_eq!(att.publishers.len(), 1);
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_url_source_with_multiple_publishers() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  attestation:
+    bundle_url: https://example.com/archive.tar.gz.sigstore.json
+    publishers:
+      - github:org/repo
+      - gitlab:org/repo
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestation
+                .as_ref()
+                .expect("attestation should be set");
+            assert_eq!(att.publishers.len(), 2);
+            assert_eq!(att.publishers[0].as_concrete().unwrap(), "github:org/repo");
+            assert_eq!(att.publishers[1].as_concrete().unwrap(), "gitlab:org/repo");
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_flask_attestation_example() {
+    let yaml = include_str!("../../../examples/flask-attestation/recipe.yaml");
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    assert_eq!(
+        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        "flask"
+    );
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestation
+                .as_ref()
+                .expect("attestation should be set");
+            assert!(att.bundle_url.is_none());
+            assert_eq!(att.publishers.len(), 1);
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_zstd_attestation_example() {
+    let yaml = include_str!("../../../examples/zstd-attestation/recipe.yaml");
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    assert_eq!(
+        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        "zstd"
+    );
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestation
+                .as_ref()
+                .expect("attestation should be set");
+            assert!(
+                att.bundle_url.is_some(),
+                "zstd example has explicit bundle_url"
+            );
+            assert_eq!(att.publishers.len(), 1);
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
 /// Regression test: capitalized YAML booleans like `True` / `FALSE` must be accepted
 /// for git source fields `lfs` and `submodules`.
 #[test]

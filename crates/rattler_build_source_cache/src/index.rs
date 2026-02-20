@@ -53,6 +53,10 @@ pub struct CacheEntry {
 
     /// Lock file path for this entry
     pub lock_file: Option<PathBuf>,
+
+    /// Whether attestation has been verified for this entry
+    #[serde(default)]
+    pub attestation_verified: bool,
 }
 
 /// The cache index that manages content-addressable cache metadata
@@ -178,6 +182,21 @@ impl CacheIndex {
             drop(entries); // Release lock before writing to disk
 
             // Persist the update
+            let metadata_path = self.metadata_dir.join(format!("{}.json", key));
+            let content = serde_json::to_string_pretty(&updated_entry)?;
+            fs_err::tokio::write(&metadata_path, content).await?;
+        }
+        Ok(())
+    }
+
+    /// Mark an entry's attestation as verified and persist it
+    pub async fn set_attestation_verified(&self, key: &str) -> Result<(), CacheError> {
+        let mut entries = self.entries.write().await;
+        if let Some(entry) = entries.get_mut(key) {
+            entry.attestation_verified = true;
+            let updated_entry = entry.clone();
+            drop(entries);
+
             let metadata_path = self.metadata_dir.join(format!("{}.json", key));
             let content = serde_json::to_string_pretty(&updated_entry)?;
             fs_err::tokio::write(&metadata_path, content).await?;

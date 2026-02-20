@@ -168,12 +168,32 @@ impl GitSource {
     }
 }
 
+/// A single identity check for attestation verification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentityCheck {
+    /// Expected identity prefix (e.g., "https://github.com/pallets/flask")
+    pub identity: String,
+    /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com")
+    pub issuer: String,
+}
+
+/// Attestation verification configuration for the cache layer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttestationVerification {
+    /// URL to download the attestation bundle from, or None for auto-derived PyPI URLs
+    pub bundle_url: Option<url::Url>,
+    /// Identity checks to perform. All must pass.
+    pub identity_checks: Vec<IdentityCheck>,
+}
+
 /// URL source specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UrlSource {
     pub urls: Vec<url::Url>,
     pub checksums: Vec<Checksum>,
     pub file_name: Option<String>,
+    /// Optional attestation verification
+    pub attestation: Option<AttestationVerification>,
 }
 
 /// Source types that can be cached

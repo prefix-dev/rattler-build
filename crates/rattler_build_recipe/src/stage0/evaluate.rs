@@ -48,7 +48,8 @@ use crate::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
         source::{
-            GitRev as Stage0GitRev, GitSource as Stage0GitSource, PathSource as Stage0PathSource,
+            AttestationConfig as Stage0AttestationConfig, GitRev as Stage0GitRev,
+            GitSource as Stage0GitSource, PathSource as Stage0PathSource,
             UrlSource as Stage0UrlSource,
         },
         tests::{
@@ -76,8 +77,9 @@ use crate::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
         },
         source::{
-            GitRev as Stage1GitRev, GitSource as Stage1GitSource, GitUrl as Stage1GitUrl,
-            PathSource as Stage1PathSource, Source as Stage1Source, UrlSource as Stage1UrlSource,
+            AttestationConfig as Stage1AttestationConfig, GitRev as Stage1GitRev,
+            GitSource as Stage1GitSource, GitUrl as Stage1GitUrl, PathSource as Stage1PathSource,
+            Source as Stage1Source, UrlSource as Stage1UrlSource, parse_publisher_string,
         },
         tests::{
             CommandsTest as Stage1CommandsTest, CommandsTestFiles as Stage1CommandsTestFiles,
@@ -2219,6 +2221,13 @@ impl Evaluate for Stage0UrlSource {
             urls.push(url);
         }
 
+        // Evaluate attestation config if present
+        let attestation = self
+            .attestation
+            .as_ref()
+            .map(|config| config.evaluate(context))
+            .transpose()?;
+
         Ok(Stage1UrlSource {
             url: urls,
             sha256: self
@@ -2241,6 +2250,44 @@ impl Evaluate for Stage0UrlSource {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
+            attestation,
+        })
+    }
+}
+
+impl Evaluate for Stage0AttestationConfig {
+    type Output = Stage1AttestationConfig;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // Evaluate bundle_url if present
+        let bundle_url = self
+            .bundle_url
+            .as_ref()
+            .map(|v| {
+                let url_str = evaluate_string_value(v, context)?;
+                url::Url::parse(&url_str).map_err(|e| {
+                    ParseError::invalid_value(
+                        "attestation.bundle_url",
+                        format!("Invalid URL '{}': {}", url_str, e),
+                        Span::new_blank(),
+                    )
+                })
+            })
+            .transpose()?;
+
+        // Evaluate and parse publisher strings
+        let mut publishers = Vec::new();
+        for pub_value in &self.publishers {
+            let pub_str = evaluate_string_value(pub_value, context)?;
+            let publisher = parse_publisher_string(&pub_str).map_err(|e| {
+                ParseError::invalid_value("attestation.publishers", &e, Span::new_blank())
+            })?;
+            publishers.push(publisher);
+        }
+
+        Ok(Stage1AttestationConfig {
+            bundle_url,
+            publishers,
         })
     }
 }

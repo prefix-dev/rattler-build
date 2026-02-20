@@ -344,6 +344,34 @@ source:
   target_directory: my-destination/folder
 ```
 
+#### Attestation verification (experimental)
+
+!!! note
+    This feature requires the `--experimental` flag.
+
+For URL sources, you can specify an `attestation` block to verify that the downloaded archive
+was built by an expected publisher using [Sigstore](https://sigstore.dev) attestations.
+
+```yaml
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+The attestation config has the following fields:
+
+- **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
+  publisher must match for verification to succeed.
+- **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
+  automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
+  `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.
+
+See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
+for more details and examples.
+
 #### Source from multiple sources
 
 Some software is most easily built by aggregating several pieces.

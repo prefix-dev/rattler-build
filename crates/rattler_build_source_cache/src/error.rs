@@ -60,6 +60,18 @@ pub enum CacheError {
     #[error("WalkDir error: {0}")]
     WalkDir(#[from] walkdir::Error),
 
+    #[error("Attestation verification failed: {0}")]
+    AttestationVerification(String),
+
+    #[error("Failed to download attestation bundle from {url}: {reason}")]
+    AttestationBundleDownload { url: String, reason: String },
+
+    #[error("Invalid attestation bundle: {0}")]
+    InvalidAttestationBundle(String),
+
+    #[error("Failed to initialize sigstore trust root: {0}")]
+    SigstoreTrustRoot(String),
+
     #[error("{0}")]
     Other(String),
 }
