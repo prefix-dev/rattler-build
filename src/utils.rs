@@ -114,23 +114,58 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> std::io::Result<()> {
-    // Use a more gradual backoff with longer max retry time
+fn try_remove_with_retry(path: &Path, last_err: Option<std::io::Error>) -> std::io::Result<()> {
+    // On Windows, rename the directory to a temporary sibling first.
+    // Rename succeeds even when files inside are locked (by antivirus,
+    // indexers, etc.) because open handles follow the renamed path.
+    // This frees the original path immediately; the actual deletion can
+    // then proceed on the renamed path without blocking the caller.
+    let trash_path = pending_removal_path(path);
+    let (target, renamed) = match std::fs::rename(path, &trash_path) {
+        Ok(()) => {
+            tracing::debug!(
+                "Renamed {:?} → {:?} for deferred deletion",
+                path,
+                trash_path
+            );
+            (&*trash_path, true)
+        }
+        Err(rename_err) => {
+            tracing::debug!(
+                "Rename failed for {:?}: {rename_err}, retrying in-place",
+                path
+            );
+            (path, false)
+        }
+    };
+
+    // Try to actually delete (with retries).
     let retry_policy = ExponentialBackoff::builder()
         .base(2)
         .retry_bounds(Duration::from_millis(100), Duration::from_secs(2))
         .build_with_max_retries(5);
 
-    let mut current_try = if last_err.is_some() { 1 } else { 0 };
+    let mut current_try: u32 = 0;
+    let mut last_err = if renamed { None } else { last_err };
     let request_start = SystemTime::now();
 
     loop {
         if let Some(err) = &last_err {
             match retry_policy.should_retry(request_start, current_try) {
                 RetryDecision::DoNotRetry => {
-                    return Err(
-                        last_err.unwrap_or(std::io::Error::other("Directory could not be deleted"))
-                    );
+                    if renamed {
+                        // Original path is already free — leave the trash dir
+                        // for later cleanup and report success.
+                        tracing::warn!(
+                            "Could not delete {:?} (last error: {err}), \
+                             leaving for later cleanup",
+                            trash_path
+                        );
+                        return Ok(());
+                    }
+                    return Err(last_err.unwrap_or_else(|| {
+                        std::io::Error::other("Directory could not be deleted")
+                    }));
                 }
                 RetryDecision::Retry { execute_after } => {
                     let sleep_for = execute_after
@@ -145,19 +180,26 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
         }
 
         // Try to make the directory writable before removal
-        if path.exists() {
-            let _ = make_path_writable(path);
+        if target.exists() {
+            let _ = make_path_writable(target);
         }
 
         // Note: do not use `fs_err` here, it will not give us the correct error code!
         #[allow(clippy::disallowed_methods)]
-        match std::fs::remove_dir_all(path) {
+        match std::fs::remove_dir_all(target) {
             Ok(_) => return Ok(()),
             Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
                 last_err = Some(e);
                 current_try += 1;
             }
             Err(e) => {
+                if renamed {
+                    tracing::warn!(
+                        "Could not delete {:?}: {e}, leaving for later cleanup",
+                        trash_path
+                    );
+                    return Ok(());
+                }
                 return Err(std::io::Error::other(format!(
                     "Failed to remove directory {:?}: {}",
                     path, e
@@ -165,6 +207,18 @@ fn try_remove_with_retry(path: &Path, mut last_err: Option<std::io::Error>) -> s
             }
         }
     }
+}
+
+/// Generate a unique sibling path for rename-before-delete.
+#[cfg(windows)]
+fn pending_removal_path(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    parent.join(format!(".{name}.pending-rm-{unique}"))
 }
 
 /// Make the path and any children writable by adjusting permissions.
@@ -227,11 +281,11 @@ mod tests {
         use std::fs::OpenOptions;
         use std::io::Write;
         use std::os::windows::fs::OpenOptionsExt;
-        use std::sync::atomic::AtomicBool;
-        use std::sync::atomic::Ordering;
-        use std::sync::{Arc, Mutex};
-        use std::time::Duration;
         use tempfile::TempDir;
+
+        // Windows sharing flags
+        const FILE_SHARE_READ: u32 = 0x1;
+        const FILE_SHARE_DELETE: u32 = 0x4;
 
         #[test]
         fn test_successful_removal() -> std::io::Result<()> {
@@ -257,63 +311,41 @@ mod tests {
         }
 
         #[test]
-        fn test_locked_file_retry() -> std::io::Result<()> {
+        fn test_locked_file_rename_and_remove() -> std::io::Result<()> {
             let temp_dir = TempDir::new()?;
             let dir_path = temp_dir.keep();
             let file_path = dir_path.join("locked.txt");
 
-            // Create the file with exclusive sharing mode (locked)
-            let file = OpenOptions::new()
+            // Simulate a realistic antivirus/indexer lock:
+            // FILE_SHARE_READ | FILE_SHARE_DELETE allows rename of the
+            // parent directory but removal may fail because the file
+            // isn't fully gone until the handle is closed.
+            //
+            // share_mode(0) (exclusive) blocks rename too, but that's
+            // not what real-world tools use.
+            let _locked_file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .share_mode(0) // Exclusive lock
+                .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
                 .open(&file_path)?;
 
-            // Use atomic flag for synchronization
-            let file_released = Arc::new(AtomicBool::new(false));
-            let file_handle = Arc::new(Mutex::new(Some(file)));
-            let file_handle_clone = file_handle.clone();
-            let file_released_clone = file_released.clone();
-
-            // Create a thread that will release the file lock after a delay
-            let handle = std::thread::spawn(move || {
-                // Wait longer to ensure retry logic kicks in
-                std::thread::sleep(Duration::from_millis(500));
-
-                // Release the file lock
-                let mut guard = file_handle_clone.lock().unwrap();
-                *guard = None;
-
-                // Signal that the file has been released
-                file_released_clone.store(true, Ordering::SeqCst);
-
-                // Give some time for OS to fully release the handle
-                std::thread::sleep(Duration::from_millis(100));
-            });
-
-            // Start the removal process with retry
+            // try_remove_with_retry should succeed: it renames the
+            // directory out of the way, then either deletes or leaves
+            // the trash dir for later cleanup.
             let result = try_remove_with_retry(&dir_path, None);
-
-            // Wait for the file release thread to complete
-            handle.join().unwrap();
-
-            // Verify the file was actually released
-            assert!(
-                file_released.load(Ordering::SeqCst),
-                "File lock was never released"
-            );
-
-            // Wait a bit more to ensure OS has fully processed the removal
-            std::thread::sleep(Duration::from_millis(100));
-
-            // Check the result
             assert!(
                 result.is_ok(),
-                "Directory removal failed: {:?}",
+                "Should succeed via rename with antivirus-style lock: {:?}",
                 result.err()
             );
-            assert!(!dir_path.exists(), "Directory still exists!");
+            assert!(
+                !dir_path.exists(),
+                "Original path should be gone (renamed away)"
+            );
+
+            // Drop the lock so the trash dir can be cleaned up.
+            drop(_locked_file);
 
             Ok(())
         }

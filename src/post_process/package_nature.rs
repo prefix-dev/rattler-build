@@ -55,6 +55,20 @@ pub fn is_dso(file: &Path) -> bool {
 }
 
 impl PackageNature {
+    /// Returns true if this package nature indicates the package provides
+    /// shared objects that other packages may legitimately link against.
+    /// This includes DSO libraries, run-exports libraries, interpreters
+    /// (e.g. python provides python3XX.dll), and plugin libraries.
+    pub fn provides_shared_objects(&self) -> bool {
+        !matches!(
+            self,
+            PackageNature::NonLibrary
+                | PackageNature::InterpretedLibraryPython
+                | PackageNature::InterpretedLibraryR
+                | PackageNature::InterpretedLibraryPythonAndR
+        )
+    }
+
     pub fn from_prefix_record(prefix_record: &PrefixRecord) -> Self {
         let package_name = prefix_record
             .repodata_record
