@@ -116,38 +116,33 @@ impl fmt::Display for LinkedPackage {
     }
 }
 
-/// Returns the list of resolved run dependencies.
-fn resolved_run_dependencies(
+/// Returns run dependencies that originated from host run_exports and are DSO
+/// libraries. These are the packages that were added to run deps because a host
+/// package declared run_exports — if we didn't actually link against them, it's
+/// overdepending.
+fn host_run_export_dso_packages(
     output: &Output,
     package_to_nature_map: &HashMap<PackageName, PackageNature>,
 ) -> Vec<String> {
     output
         .finalized_dependencies
-        .clone()
+        .as_ref()
         .expect("failed to get the finalized dependencies")
         .run
         .depends
         .iter()
-        .filter(|dep| {
-            if let Some(RunExportDependency { from, .. }) = dep.as_run_export() {
-                from != &String::from("build")
-            } else {
-                true
-            }
-        })
-        .flat_map(|dep| {
-            if let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
-                &dep.spec().name
+        .filter_map(|dep| {
+            // Only consider run dependencies that came from host run_exports
+            if let Some(RunExportDependency { from, .. }) = dep.as_run_export()
+                && from == "host"
+                && let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
+                    &dep.spec().name
+                && let Some(nature) = package_to_nature_map.get(exact_name)
+                && nature == &PackageNature::DSOLibrary
             {
-                if let Some(nature) = package_to_nature_map.get(exact_name)
-                    && nature != &PackageNature::DSOLibrary
-                {
-                    return None;
-                }
-                Some(exact_name.as_source().to_owned())
-            } else {
-                None
+                return Some(exact_name.as_source().to_owned());
             }
+            None
         })
         .collect()
 }
@@ -525,9 +520,8 @@ pub fn perform_linking_checks(
 
     let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
 
-    let resolved_run_dependencies =
-        resolved_run_dependencies(output, &prefix_info.package_to_nature);
-    tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
+    let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
+    tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
 
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
@@ -669,8 +663,9 @@ pub fn perform_linking_checks(
         tracing::info!("{linked_package}");
     });
 
-    // If there are any unused run dependencies then it is "overdepending".
-    for run_dependency in resolved_run_dependencies.iter() {
+    // If there are any host packages with DSOs that we didn't link against,
+    // it is "overdepending".
+    for host_package in host_dso_packages.iter() {
         if !package_files
             .iter()
             .map(|package| {
@@ -680,15 +675,15 @@ pub fn perform_linking_checks(
                     .map(|v| v.as_source().to_string())
                     .collect::<Vec<String>>()
             })
-            .any(|libraries| libraries.contains(run_dependency))
+            .any(|libraries| libraries.contains(host_package))
         {
             if dynamic_linking.overdepending_behavior == LinkingCheckBehavior::Error {
                 return Err(LinkingCheckError::Overdepending {
-                    package: PathBuf::from(run_dependency),
+                    package: PathBuf::from(host_package),
                 });
             }
-            tracing::warn!("Overdepending against {run_dependency}");
-            output.record_warning(&format!("Overdepending against {run_dependency}"));
+            tracing::warn!("Overdepending against {host_package}");
+            output.record_warning(&format!("Overdepending against {host_package}"));
         }
     }
     Ok(())

@@ -22,7 +22,7 @@ rustls-tls = [
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-rattler_networking = { version = "0.25.16", optional = true, default-features = false }
+rattler_networking = { workspace = true, optional = true, default-features = false }
 url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]

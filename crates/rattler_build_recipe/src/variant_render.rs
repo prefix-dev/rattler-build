@@ -142,8 +142,13 @@ impl RenderConfig {
     }
 
     /// Set the target platform
+    ///
+    /// This also sets `host_platform` to the same value (mirroring the CLI
+    /// behavior). Call [`with_host_platform`](Self::with_host_platform) afterwards
+    /// if you need a different host platform.
     pub fn with_target_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
         self.target_platform = platform;
+        self.host_platform = platform;
         self
     }
 

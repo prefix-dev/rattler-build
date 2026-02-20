@@ -11,6 +11,7 @@ use crate::{
     apply_patch_custom,
     metadata::{Output, build_reindexed_channels},
     package_test::PackageContentsTestExt as _,
+    packaging::record_files,
     render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
     tool_configuration,
 };
@@ -156,10 +157,30 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    // Snapshot the host prefix before dependency installation so we can
+    // detect files added by post-link scripts (which aren't recorded in
+    // conda-meta and would otherwise leak into the downstream package).
+    let pre_install_files = record_files(&output.build_configuration.directories.host_prefix).ok();
+
     output
         .install_environments(tool_configuration)
         .await
         .into_diagnostic()?;
+
+    // Compute the set of files added during install_environments. This
+    // includes both properly-recorded dependency files *and* untracked
+    // post-link artifacts. Passing this delta to create_package ensures
+    // the untracked artifacts are excluded without accidentally hiding
+    // files restored from a staging cache (which existed before install).
+    let install_added_files = record_files(&output.build_configuration.directories.host_prefix)
+        .ok()
+        .map(|post| {
+            if let Some(pre) = &pre_install_files {
+                post.difference(pre).cloned().collect()
+            } else {
+                post
+            }
+        });
 
     match output.run_build_script().await {
         Ok(_) => {}
@@ -176,7 +197,7 @@ pub async fn run_build(
 
     // Package all the new files
     let (result, paths_json) = output
-        .create_package(tool_configuration)
+        .create_package(tool_configuration, install_added_files.as_ref())
         .await
         .into_diagnostic()?;
 

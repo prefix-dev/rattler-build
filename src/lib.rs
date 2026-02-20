@@ -301,8 +301,7 @@ pub fn get_tool_config(
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
-        .with_sharded_repodata_enabled(build_data.common.use_sharded)
-        .with_jlap_enabled(build_data.common.use_jlap);
+        .with_sharded_repodata_enabled(build_data.common.use_sharded);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())

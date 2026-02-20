@@ -160,6 +160,7 @@ vc:
         // Test with Linux platform (unix = true)
         let jinja_config = JinjaConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -183,6 +184,7 @@ vc:
         // Test with Windows platform (win = true)
         let jinja_config = JinjaConfig {
             target_platform: Platform::Win64,
+            host_platform: Platform::Win64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -202,6 +204,7 @@ target:
 
         let jinja_config = JinjaConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -226,6 +229,7 @@ mixed:
 
         let jinja_config = JinjaConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -250,6 +254,7 @@ python:
 
         let jinja_config = JinjaConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();

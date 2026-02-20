@@ -1065,6 +1065,51 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     }
 
 
+def test_platform_selectors_use_host_platform(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that platform selectors (unix, win, etc.) are based on host_platform, not target_platform.
+
+    When --host-platform and --target-platform differ, the selectors should
+    reflect the host platform (where the package will run).
+    """
+    path_to_recipe = recipes / "noarch_variant"
+    args = rattler_build.build_args(path_to_recipe, tmp_path)
+
+    # Set host_platform=linux-64 but target_platform=win-64
+    # The `unix` selector should be true (based on host), not `win` (based on target)
+    output = rattler_build(
+        *args,
+        "--host-platform=linux-64",
+        "--target-platform=win-64",
+        "--render-only",
+        stderr=DEVNULL,
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    # unix should be true because host_platform is linux-64
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert "unix" in rendered[0]["recipe"]["build"]["string"]
+
+    # Now flip: host_platform=win-64, target_platform=linux-64
+    output = rattler_build(
+        *args,
+        "--host-platform=win-64",
+        "--target-platform=linux-64",
+        "--render-only",
+        stderr=DEVNULL,
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    # win should be true because host_platform is win-64
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win >=11.0.123 foobar"]
+    assert "win" in rendered[0]["recipe"]["build"]["string"]
+
+
 def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "regex_post_process"
     args = rattler_build.build_args(
@@ -1134,6 +1179,27 @@ def test_post_link(
 
     pkg = get_extracted_package(tmp_path, "postlink")
     assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_post_link_does_not_leak_into_downstream(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "post-link-leaker", tmp_path)
+    rattler_build.build(
+        recipes / "post-link-downstream",
+        tmp_path,
+        custom_channels=[f"file://{tmp_path}"],
+    )
+    pkg = get_extracted_package(tmp_path, "post-link-downstream")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    packaged_paths = [p["_path"] for p in paths["paths"]]
+
+    assert any("post-link-downstream" in p for p in packaged_paths)
+    leaked = [p for p in packaged_paths if "leaked-cache" in p]
+    assert leaked == [], f"Post-link files leaked into downstream package: {leaked}"
 
 
 @pytest.mark.skipif(

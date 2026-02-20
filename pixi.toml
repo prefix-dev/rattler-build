@@ -154,6 +154,7 @@ scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]
 cairosvg = ">=2.8.2,<3"
+click = "==8.2.1" # Pin click because of https://github.com/mkdocs/mkdocs/issues/4032
 mike = ">=2.1.3,<3"
 mkdocs = ">=1.6.1,<2"
 mkdocs-material = ">=9.7.0,<10"

@@ -308,6 +308,7 @@ impl Output {
             self.prefix(),
             &staging.build.always_include_files,
             &staging.build.files,
+            None,
         )
         .into_diagnostic()?;
 
