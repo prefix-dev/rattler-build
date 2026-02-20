@@ -12,7 +12,8 @@ The `debug` command sets up a build environment and downloads sources without ru
 
 ```bash
 # Set up debug environment and enter the debug shell
-rattler-build debug shell --recipe recipe.yaml
+rattler-build debug setup --recipe recipe.yaml
+rattler-build debug shell
 
 # You're now in the work directory with the build environment sourced.
 # Edit files directly:

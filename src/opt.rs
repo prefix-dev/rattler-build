@@ -76,7 +76,8 @@ pub enum SubCommands {
     /// Debug a recipe build.
     ///
     /// Subcommands:
-    ///   shell     - Set up from a recipe or open an existing debug shell
+    ///   setup     - Set up a debug environment from a recipe
+    ///   shell     - Open an interactive debug shell
     ///   host-add  - Install additional packages into the host prefix
     ///   build-add - Install additional packages into the build prefix
     Debug(DebugArgs),
@@ -98,8 +99,10 @@ pub enum SubCommands {
 
 /// Arguments for the `debug` command.
 ///
-/// A subcommand is always required. Use `debug shell --recipe` to set up and
-/// enter a debug environment, or `debug shell` to re-enter an existing one.
+/// A subcommand is always required. Use `debug setup` to prepare a debug
+/// environment from a recipe, `debug shell` to enter an existing one
+/// interactively, and `debug run` to execute the build script
+/// non-interactively.
 #[derive(Parser)]
 #[command(subcommand_required = true, arg_required_else_help = true)]
 pub struct DebugArgs {
@@ -111,12 +114,17 @@ pub struct DebugArgs {
 /// Debug subcommands
 #[derive(Parser)]
 pub enum DebugSubCommands {
-    /// Open a debug shell, optionally setting up the environment first.
+    /// Set up a debug environment from a recipe.
     ///
-    /// With `--recipe`: resolves dependencies, downloads sources, creates the
-    /// build script, and (unless `--no-shell`) drops you into an interactive
-    /// shell. Without `--recipe`: opens a shell in an existing build
-    /// environment (reads from rattler-build-log.txt or `--work-dir`).
+    /// Resolves dependencies, downloads sources, applies patches, installs
+    /// build/host environments, and creates the build script — then stops.
+    /// Use `debug shell` or `debug run` afterwards to work in the environment.
+    Setup(DebugSetupOpts),
+
+    /// Open an interactive debug shell in an existing build environment.
+    ///
+    /// By default, reads the work directory from the last build in
+    /// rattler-build-log.txt. You can also specify --work-dir explicitly.
     Shell(DebugShellOpts),
 
     /// Install additional packages into the host prefix
@@ -134,54 +142,47 @@ pub enum DebugSubCommands {
     BuildAdd(DebugEnvAddOpts),
 }
 
-/// Options for the `debug shell` command.
-///
-/// Two modes:
-///   - **Recipe mode** (`--recipe`): sets up the build/host environments from a
-///     recipe, creates the build script, and (unless `--no-shell`) drops you
-///     into an interactive shell.
-///   - **Existing-env mode** (no `--recipe`): opens an interactive shell in an
-///     already-set-up build environment.
+/// Options for the `debug setup` command.
 #[derive(Parser, Debug, Clone)]
-pub struct DebugShellOpts {
-    // ── recipe-mode fields ──────────────────────────────────────────────
-    /// Recipe file or directory to debug. When given, sets up the environment
-    /// before opening a shell.
-    #[arg(short, long)]
-    pub recipe: Option<PathBuf>,
+pub struct DebugSetupOpts {
+    /// Recipe file or directory to debug
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
 
     /// The target platform to build for
-    #[arg(long, requires = "recipe")]
+    #[arg(long)]
     pub target_platform: Option<Platform>,
 
     /// The host platform to build for (defaults to target_platform)
-    #[arg(long, requires = "recipe")]
+    #[arg(long)]
     pub host_platform: Option<Platform>,
 
     /// The build platform to build for (defaults to current platform)
-    #[arg(long, requires = "recipe")]
+    #[arg(long)]
     pub build_platform: Option<Platform>,
 
     /// Channels to use when building
-    #[arg(short = 'c', long = "channel", requires = "recipe")]
+    #[arg(short = 'c', long = "channel")]
     pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// Name of the specific output to debug (only required when a recipe has
     /// multiple outputs)
-    #[arg(long, requires = "recipe")]
+    #[arg(long)]
     pub output_name: Option<String>,
 
-    /// Only set up the environment without opening a shell (recipe mode only)
-    #[arg(long, requires = "recipe")]
-    pub no_shell: bool,
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
 
-    // ── existing-env mode fields ────────────────────────────────────────
+/// Options for the `debug shell` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugShellOpts {
     /// Work directory to use (reads from last build in rattler-build-log.txt
     /// if not specified)
-    #[arg(long, conflicts_with = "recipe")]
+    #[arg(long)]
     pub work_dir: Option<PathBuf>,
 
-    // ── common fields ───────────────────────────────────────────────────
     /// Common options (provides --output-dir among others)
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -1199,16 +1200,14 @@ pub struct DebugData {
 }
 
 impl DebugData {
-    /// Generate a new DebugData struct from DebugShellOpts (recipe mode) and
-    /// an optional config.
-    ///
-    /// Panics if `opts.recipe` is `None` — callers must ensure recipe mode.
-    pub fn from_shell_opts_and_config(
-        opts: DebugShellOpts,
+    /// Generate a new DebugData struct from DebugSetupOpts and an optional
+    /// config.
+    pub fn from_setup_opts_and_config(
+        opts: DebugSetupOpts,
         config: Option<ConfigBase<()>>,
     ) -> Self {
         Self {
-            recipe_path: opts.recipe.expect("recipe must be Some in recipe mode"),
+            recipe_path: opts.recipe,
             output_dir: opts
                 .common
                 .output_dir

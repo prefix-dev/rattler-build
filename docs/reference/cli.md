@@ -1240,32 +1240,34 @@ Remove authentication information for a given host
 
 Debug a recipe build.
 
-Subcommands: shell     - Set up from a recipe or open an existing debug shell host-add  - Install additional packages into the host prefix build-add - Install additional packages into the build prefix
+Subcommands: setup     - Set up a debug environment from a recipe shell     - Open an interactive debug shell host-add  - Install additional packages into the host prefix build-add - Install additional packages into the build prefix
 
 **Usage:** `rattler-build debug <COMMAND>`
 
 ##### **Subcommands:**
 
-* `shell` — Open a debug shell, optionally setting up the environment first
+* `setup` — Set up a debug environment from a recipe
+* `shell` — Open an interactive debug shell in an existing build environment
 * `host-add` — Install additional packages into the host prefix
 * `build-add` — Install additional packages into the build prefix
 
 
 
-#### `shell`
+#### `setup`
 
-Open a debug shell, optionally setting up the environment first.
+Set up a debug environment from a recipe.
 
-With `--recipe`: resolves dependencies, downloads sources, creates the build script, and (unless `--no-shell`) drops you into an interactive shell. Without `--recipe`: opens a shell in an existing build environment (reads from rattler-build-log.txt or `--work-dir`).
+Resolves dependencies, downloads sources, applies patches, installs build/host environments, and creates the build script — then stops. Use `debug shell` or `debug run` afterwards to work in the environment.
 
-**Usage:** `rattler-build debug shell [OPTIONS]`
+**Usage:** `rattler-build debug setup [OPTIONS]`
 
 ##### **Options:**
 
 - `-r`, `--recipe <RECIPE>`
 
-	Recipe file or directory to debug. When given, sets up the environment before opening a shell
+	Recipe file or directory to debug
 
+	- Default value: `.`
 
 - `--target-platform <TARGET_PLATFORM>`
 
@@ -1292,10 +1294,40 @@ With `--recipe`: resolves dependencies, downloads sources, creates the build scr
 	Name of the specific output to debug (only required when a recipe has multiple outputs)
 
 
-- `--no-shell`
+- `--experimental`
 
-	Only set up the environment without opening a shell (recipe mode only)
+	Enable experimental features
 
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+
+
+
+
+#### `shell`
+
+Open an interactive debug shell in an existing build environment.
+
+By default, reads the work directory from the last build in rattler-build-log.txt. You can also specify --work-dir explicitly.
+
+**Usage:** `rattler-build debug shell [OPTIONS]`
+
+##### **Options:**
 
 - `--work-dir <WORK_DIR>`
 

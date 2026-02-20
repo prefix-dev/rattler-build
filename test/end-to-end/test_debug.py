@@ -7,12 +7,11 @@ from helpers import RattlerBuild
 def test_debug_basic(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd):
     rattler_build(
         "debug",
-        "shell",
+        "setup",
         "--recipe",
         str(recipes / "debug_test"),
         "--output-dir",
         str(tmp_path),
-        "--no-shell",
     )
 
     out, err = capfd.readouterr()
@@ -38,25 +37,23 @@ def test_debug_multiple_outputs(
     with pytest.raises(Exception):
         rattler_build(
             "debug",
-            "shell",
+            "setup",
             "--recipe",
             str(recipes / "debug-multiple-outputs"),
             "--output-dir",
             str(tmp_path),
-            "--no-shell",
         )
 
     # should work with --output-name for output1
     rattler_build(
         "debug",
-        "shell",
+        "setup",
         "--recipe",
         str(recipes / "debug-multiple-outputs"),
         "--output-dir",
         str(tmp_path),
         "--output-name",
         "output1",
-        "--no-shell",
     )
 
     # work directory check to see if it was created
@@ -83,14 +80,13 @@ def test_debug_multiple_outputs(
     # test output2 as well
     rattler_build(
         "debug",
-        "shell",
+        "setup",
         "--recipe",
         str(recipes / "debug-multiple-outputs"),
         "--output-dir",
         str(tmp_path),
         "--output-name",
         "output2",
-        "--no-shell",
     )
 
     work_dir = next(tmp_path.glob("**/work"))
@@ -111,12 +107,11 @@ def test_debug_multiple_outputs(
     with pytest.raises(Exception):
         rattler_build(
             "debug",
-            "shell",
+            "setup",
             "--recipe",
             str(recipes / "debug-multiple-outputs"),
             "--output-dir",
             str(tmp_path),
             "--output-name",
             "invalid_output",
-            "--no-shell",
         )

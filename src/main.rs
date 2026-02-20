@@ -226,23 +226,11 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(args)) => match args.subcommand {
-            DebugSubCommands::Shell(opts) if opts.recipe.is_some() => {
-                // Recipe mode: set up the environment, then optionally open a shell
-                let no_shell = opts.no_shell;
-                let debug_data = DebugData::from_shell_opts_and_config(opts, config);
-                let output_dir = debug_data.output_dir.clone();
-                debug_recipe(debug_data, &log_handler).await?;
-
-                if no_shell {
-                    return Ok(());
-                }
-
-                debug::open_shell_from_output_dir(output_dir).into_diagnostic()
+            DebugSubCommands::Setup(opts) => {
+                let debug_data = DebugData::from_setup_opts_and_config(opts, config);
+                debug_recipe(debug_data, &log_handler).await
             }
-            DebugSubCommands::Shell(opts) => {
-                // Existing-env mode: open a shell in an already-set-up environment
-                debug::debug_shell(opts).into_diagnostic()
-            }
+            DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
             DebugSubCommands::HostAdd(opts) => {
                 debug::debug_env_add("host", opts, config, &log_handler).await
             }
