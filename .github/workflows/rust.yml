@@ -55,8 +55,9 @@ jobs:
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
         run: |
-          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force
-          New-Item -ItemType Junction -Path "target" -Target "${{ env.DEV_DRIVE }}/target"
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force | Out-Null
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/target" -Force | Out-Null
+          New-Item -ItemType Junction -Path "target" -Target "${{ env.DEV_DRIVE }}/target" | Out-Null
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: "1.89.0"
@@ -123,8 +124,9 @@ jobs:
       - name: Redirect cargo target directory to dev drive
         if: runner.os == 'Windows'
         run: |
-          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force
-          New-Item -ItemType Junction -Path "target-pixi" -Target "${{ env.DEV_DRIVE }}/target-pixi"
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/tmp" -Force | Out-Null
+          New-Item -ItemType Directory -Path "${{ env.DEV_DRIVE }}/target-pixi" -Force | Out-Null
+          New-Item -ItemType Junction -Path "target-pixi" -Target "${{ env.DEV_DRIVE }}/target-pixi" | Out-Null
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           # Use target-pixi to match pixi's CARGO_TARGET_DIR
