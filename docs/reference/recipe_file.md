@@ -176,14 +176,39 @@ of the work folder.
 
 ##### Specifying a file name
 
-For URL and local paths you can specify a file name. If the source is an archive and a file name is set, automatic extraction is disabled.
+For URL and local path sources, `file_name` renames the downloaded file in the work directory.
+The primary use case is giving a clean name to pre-built binaries whose URL path segments are not
+descriptive:
 
 ```yaml
 source:
-  url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
-  # will put the file in the work directory as `bsdiff4-1.1.4.tar.gz`
-  file_name: bsdiff4-1.1.4.tar.gz
+  url: https://github.com/owner/project/releases/download/v1.0.0/project-v1.0.0-linux-amd64
+  sha256: <sha256>
+  file_name: project  # rename to a clean, platform-independent name
 ```
+
+!!! warning "Setting `file_name` disables automatic archive extraction"
+    When `file_name` is set on an archive source (`.tar.gz`, `.zip`, `.7z`, etc.), the archive is
+    **not extracted** — it is placed in the work directory as-is under the given name.
+    This is true even if `file_name` is set to the same name the archive would have had by default:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # The archive is NOT extracted — it is placed as bsdiff4-1.1.4.tar.gz in the work directory
+      file_name: bsdiff4-1.1.4.tar.gz
+    ```
+
+    To download an archive and have it extracted automatically (the default behaviour), omit
+    `file_name`:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # file_name is not set — the archive is extracted into the work directory
+    ```
 
 #### Source from `git`
 
