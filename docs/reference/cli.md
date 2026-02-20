@@ -16,9 +16,8 @@ This document contains the help content for the `rattler-build` command-line pro
 * `completion` — Generate shell completion script
 * `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
-* `debug` — Debug a recipe by setting up the environment without running the build script
+* `debug` — Debug a recipe: set up the build environment and open a debug shell
 * `create-patch` — Create a patch for a directory
-* `debug-shell` — Open a debug shell in the build environment
 * `package` — Package-related subcommands
 * `bump-recipe` — Bump a recipe to a new version
 
@@ -1239,9 +1238,17 @@ Remove authentication information for a given host
 
 ### `debug`
 
-Debug a recipe by setting up the environment without running the build script
+Debug a recipe: set up the build environment and open a debug shell.
 
-**Usage:** `rattler-build debug [OPTIONS] --recipe <RECIPE>`
+When called with a recipe, this sets up the build/host environments, creates the build script, and drops you into an interactive shell in the work directory.
+
+**Usage:** `rattler-build debug [OPTIONS]` or `rattler-build debug <COMMAND>`
+
+##### **Subcommands:**
+
+* `shell` — Open a debug shell in an existing build environment
+* `host-add` — Install additional packages into the host prefix
+* `build-add` — Install additional packages into the build prefix
 
 ##### **Options:**
 
@@ -1249,6 +1256,7 @@ Debug a recipe by setting up the environment without running the build script
 
 	Recipe file to debug
 
+	- Default value: `.`
 
 - `-o`, `--output <OUTPUT>`
 
@@ -1275,6 +1283,16 @@ Debug a recipe by setting up the environment without running the build script
 	Channels to use when building
 
 
+- `--output-name <OUTPUT_NAME>`
+
+	Name of the specific output to debug
+
+
+- `--no-shell`
+
+	Only set up the environment without opening a shell
+
+
 - `--experimental`
 
 	Enable experimental features
@@ -1290,16 +1308,104 @@ Debug a recipe by setting up the environment without running the build script
 	Channel priority to use when solving
 
 
-- `--output-name <OUTPUT_NAME>`
-
-	Name of the specific output to debug
-
-
 ###### **Modifying result**
 
 - `--output-dir <OUTPUT_DIR>`
 
 	Output directory for build artifacts.
+
+
+
+#### `shell`
+
+Open a debug shell in an existing build environment.
+
+By default, reads the work directory from the last build in `rattler-build-log.txt`. You can also specify `--work-dir` explicitly.
+
+**Usage:** `rattler-build debug shell [OPTIONS]`
+
+##### **Options:**
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `-o`, `--output-dir <OUTPUT_DIR>`
+
+	Output directory containing rattler-build-log.txt
+
+	- Default value: `./output`
+
+
+
+#### `host-add`
+
+Install additional packages into the host prefix.
+
+This command resolves and installs the specified packages into the host environment of an existing debug build. Useful for iterating on dependencies without re-running the full debug setup.
+
+**Usage:** `rattler-build debug host-add [OPTIONS] <SPECS>...`
+
+##### **Arguments:**
+
+- `<SPECS>`
+
+	Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
+
+
+##### **Options:**
+
+- `-c`, `--channel <CHANNELS>`
+
+	Channels to search for packages in
+
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `-o`, `--output-dir <OUTPUT_DIR>`
+
+	Output directory containing rattler-build-log.txt
+
+	- Default value: `./output`
+
+
+
+#### `build-add`
+
+Install additional packages into the build prefix.
+
+This command resolves and installs the specified packages into the build environment of an existing debug build. Useful for adding build tools without re-running the full debug setup.
+
+**Usage:** `rattler-build debug build-add [OPTIONS] <SPECS>...`
+
+##### **Arguments:**
+
+- `<SPECS>`
+
+	Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
+
+
+##### **Options:**
+
+- `-c`, `--channel <CHANNELS>`
+
+	Channels to search for packages in
+
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `-o`, `--output-dir <OUTPUT_DIR>`
+
+	Output directory containing rattler-build-log.txt
+
+	- Default value: `./output`
 
 
 
@@ -1355,26 +1461,6 @@ Create a patch for a directory
 
 
 
-
-
-### `debug-shell`
-
-Open a debug shell in the build environment
-
-**Usage:** `rattler-build debug-shell [OPTIONS]`
-
-##### **Options:**
-
-- `--work-dir <WORK_DIR>`
-
-	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
-
-
-- `-o`, `--output-dir <OUTPUT_DIR>`
-
-	Output directory containing rattler-build-log.txt
-
-	- Default value: `./output`
 
 
 
