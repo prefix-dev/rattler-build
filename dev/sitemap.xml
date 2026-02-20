@@ -2,238 +2,238 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://rattler-build.prefix.dev/dev/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/authentication_and_upload/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/automatic_linting/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/build_options/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/build_script/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/bump_recipe/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/compilers/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/conda_forge/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/config/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/converting_from_conda_build/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/create_patch/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/debugging_builds/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/experimental_features/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/getting_started/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/highlevel/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/internals/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/multiple_output_cache/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/package_spec/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/publish/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/rattler_index/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/rebuild/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/recipe_generation/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/sandbox/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/selectors/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/sigstore/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/special_files/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/system_integration/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/testing/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tips_and_tricks/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/understanding_terminal_output/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/variants/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/windows_quirks/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/build_result/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/configuration/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/exceptions/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/package/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/package_assembler/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/progress/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/recipe/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/recipe_generation/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/rendering/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/reference/upload/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/inspecting_built_packages/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/multi_output_and_staging/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/package_assembly/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/recipe_rendering_basics/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/reference/cli/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/reference/jinja/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/reference/recipe_file/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/cpp/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/go/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/javascript/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/perl/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/python/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/r/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/repackaging/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
     <url>
          <loc>https://rattler-build.prefix.dev/dev/tutorials/rust/</loc>
-         <lastmod>2026-02-19</lastmod>
+         <lastmod>2026-02-20</lastmod>
     </url>
 </urlset>

@@ -2958,7 +2958,7 @@ Package: test-demo-package
 Version: 1.0.0
 
 Building package...
-Built: /tmp/rattler_build_lbvb6zo4/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Built: /tmp/rattler_build_7es0uyhf/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 </code></pre></div>
 <h2 id="step-2-loading-a-package">Step 2: Loading a Package<a class="headerlink" href="#step-2-loading-a-package" title="Permanent link">#</a></h2>
 <p>Use <code>Package.from_file()</code> to load a built package. This reads the package metadata without extracting the entire archive.</p>
@@ -2973,7 +2973,7 @@ Built: /tmp/rattler_build_lbvb6zo4/output/noarch/test-demo-package-1.0.0-pyh4616
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Package Loaded Successfully!
 ============================================================
-Path: /tmp/rattler_build_lbvb6zo4/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Path: /tmp/rattler_build_7es0uyhf/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 Type: Package
 
 String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -3022,7 +3022,7 @@ NoArch:         python
 License:        MIT
 Arch:           None
 Platform:       None
-Timestamp:      2026-02-19 18:28:57.989000+00:00
+Timestamp:      2026-02-20 14:20:54.877000+00:00
 
 Archive Information
 ----------------------------------------
@@ -3060,10 +3060,10 @@ Constraints (constrains):
   &quot;constrains&quot;: [],
   &quot;license&quot;: &quot;MIT&quot;,
   &quot;license_family&quot;: null,
-  &quot;timestamp&quot;: &quot;2026-02-19 18:28:57.989000+00:00&quot;,
+  &quot;timestamp&quot;: &quot;2026-02-20 14:20:54.877000+00:00&quot;,
   &quot;arch&quot;: null,
   &quot;platform&quot;: null,
-  &quot;path&quot;: &quot;/tmp/rattler_build_lbvb6zo4/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
+  &quot;path&quot;: &quot;/tmp/rattler_build_7es0uyhf/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
   &quot;archive_type&quot;: &quot;conda&quot;,
   &quot;filename&quot;: &quot;test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;
 }
@@ -3315,19 +3315,18 @@ Failed tests: []
 </span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>
 </span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="sd">- use_bz2: bool               # Enable bz2 repodata (default: True)</span>
 </span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="sd">- use_zstd: bool              # Enable zstd repodata (default: True)</span>
-</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="sd">- use_jlap: bool              # Enable JLAP incremental repodata</span>
-</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="sd">- use_sharded: bool           # Enable sharded repodata (default: True)</span>
-</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-11-27"><a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="p">)</span>
-</span><span id="__span-11-28"><a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a>
-</span><span id="__span-11-29"><a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="c1"># Example with custom channel</span>
-</span><span id="__span-11-30"><a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Example: Running test with conda-forge channel:&quot;</span><span class="p">)</span>
-</span><span id="__span-11-31"><a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="n">result</span> <span class="o">=</span> <span class="n">pkg</span><span class="o">.</span><span class="n">run_test</span><span class="p">(</span>
-</span><span id="__span-11-32"><a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a>    <span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-11-33"><a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a>    <span class="n">channel</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">],</span>
-</span><span id="__span-11-34"><a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a>    <span class="n">channel_priority</span><span class="o">=</span><span class="s2">&quot;strict&quot;</span><span class="p">,</span>
-</span><span id="__span-11-35"><a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a><span class="p">)</span>
-</span><span id="__span-11-36"><a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Result: </span><span class="si">{</span><span class="s1">&#39;PASS&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;FAIL&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="sd">- use_sharded: bool           # Enable sharded repodata (default: True)</span>
+</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="p">)</span>
+</span><span id="__span-11-27"><a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>
+</span><span id="__span-11-28"><a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="c1"># Example with custom channel</span>
+</span><span id="__span-11-29"><a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Example: Running test with conda-forge channel:&quot;</span><span class="p">)</span>
+</span><span id="__span-11-30"><a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="n">result</span> <span class="o">=</span> <span class="n">pkg</span><span class="o">.</span><span class="n">run_test</span><span class="p">(</span>
+</span><span id="__span-11-31"><a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a>    <span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-11-32"><a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a>    <span class="n">channel</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">],</span>
+</span><span id="__span-11-33"><a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a>    <span class="n">channel_priority</span><span class="o">=</span><span class="s2">&quot;strict&quot;</span><span class="p">,</span>
+</span><span id="__span-11-34"><a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="p">)</span>
+</span><span id="__span-11-35"><a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Result: </span><span class="si">{</span><span class="s1">&#39;PASS&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;FAIL&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Test Configuration Options
 ============================================================
@@ -3350,7 +3349,6 @@ Available options for run_test() and run_tests():
 
 - use_bz2: bool               # Enable bz2 repodata (default: True)
 - use_zstd: bool              # Enable zstd repodata (default: True)
-- use_jlap: bool              # Enable JLAP incremental repodata
 - use_sharded: bool           # Enable sharded repodata (default: True)
 
 
@@ -3376,11 +3374,11 @@ Example: Running test with conda-forge channel:
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Rebuilding Package
 ============================================================
-Original package: /tmp/rattler_build_lbvb6zo4/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260219-182902.conda
+Original package: /tmp/rattler_build_7es0uyhf/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260220-142059.conda
 
-Original SHA256:  79e7e7cc559bca96afbe3c495a0039bfdd9e58e2903339a09825a9921bc4791d
-Rebuilt SHA256:   79e7e7cc559bca96afbe3c495a0039bfdd9e58e2903339a09825a9921bc4791d
+Original SHA256:  ec0f3a5273ec023a560e9676fcbaa1e43ac83b51472e053eea5456715e47c8b6
+Rebuilt SHA256:   ec0f3a5273ec023a560e9676fcbaa1e43ac83b51472e053eea5456715e47c8b6
 
 Identical (reproducible): True
 </code></pre></div>
@@ -3401,7 +3399,7 @@ Identical (reproducible): True
 Name:         test-demo-package
 Version:      1.0.0
 Build string: pyh4616a5c_0
-Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260219-182902.conda
+Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260220-142059.conda
 Files:        1 files
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
