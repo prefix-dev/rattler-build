@@ -46,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         GitReference::Branch("main".to_string()),
         Some(1),
         false,
+        true,
     ));
     
     let repo_path = cache.get_source(&git_source).await?;

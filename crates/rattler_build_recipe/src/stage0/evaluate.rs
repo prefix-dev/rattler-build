@@ -27,7 +27,9 @@ use std::{
 
 use indexmap::IndexMap;
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{MatchSpec, NoArchType, PackageName, ParseStrictness, VersionWithSource};
+use rattler_conda_types::{
+    MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, VersionWithSource,
+};
 use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::{
@@ -948,7 +950,15 @@ pub fn evaluate_package_name_list(
                 if s.is_empty() {
                     return Ok(None);
                 }
-                // Parse the string into a PackageName
+                // Parse as a MatchSpec first to extract the package name.
+                // Templates like `${{ compiler('cxx') }}` render to strings
+                // such as `gxx_linux-64 =13` which are valid MatchSpecs but
+                // not valid bare PackageNames.
+                if let Ok(ms) = MatchSpec::from_str(&s, ParseStrictness::Lenient)
+                    && let Some(PackageNameMatcher::Exact(name)) = ms.name
+                {
+                    return Ok(Some(name));
+                }
                 PackageName::from_str(&s).map(Some).map_err(|e| {
                     ParseError::invalid_value(
                         "package name",
@@ -2175,6 +2185,13 @@ impl Evaluate for Stage0GitSource {
                 .map(|v| evaluate_bool_value(v, context, "lfs", false))
                 .transpose()?
                 .unwrap_or(false),
+            // Default is true - submodules are updated by default
+            submodules: self
+                .submodules
+                .as_ref()
+                .map(|v| evaluate_bool_value(v, context, "submodules", true))
+                .transpose()?
+                .unwrap_or(true),
             expected_commit: self
                 .expected_commit
                 .as_ref()

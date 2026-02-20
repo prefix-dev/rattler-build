@@ -4,7 +4,7 @@ use goblin::mach::Mach;
 use goblin::mach::header::{
     Header, MH_BUNDLE, MH_DYLIB, MH_EXECUTE, SIZEOF_HEADER_32, SIZEOF_HEADER_64,
 };
-use indexmap::IndexSet;
+use itertools::Itertools;
 use memmap2::MmapMut;
 use rattler_build_recipe::stage1::GlobVec;
 use scroll::Pread;
@@ -246,6 +246,10 @@ impl Relinker for Dylib {
                 );
             }
         }
+
+        // Deduplicate rpaths (keep first occurrence only).
+        // On macOS >= 15.4, duplicate LC_RPATH entries cause dlopen() to fail.
+        let final_rpaths: Vec<_> = final_rpaths.into_iter().unique().collect();
 
         if final_rpaths != self.rpaths {
             for (old, new) in self.rpaths.iter().zip(final_rpaths.iter()) {
@@ -546,6 +550,52 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     Ok(())
 }
 
+/// Compute which rpaths to delete and which to add from a list of rpath
+/// changes. Matching add/remove pairs are cancelled one-for-one (multiset
+/// subtraction) so that duplicate rpaths are properly removed. Using plain
+/// set difference would collapse duplicates into a single entry and silently
+/// skip the deletion — leaving the binary with duplicate `LC_RPATH` entries
+/// that cause `dlopen()` to fail on macOS >= 15.4.
+fn compute_rpath_changes(
+    changes: &[(Option<PathBuf>, Option<PathBuf>)],
+) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let mut to_add: Vec<&PathBuf> = Vec::new();
+    let mut to_delete: Vec<&PathBuf> = Vec::new();
+
+    for change in changes {
+        match change {
+            (Some(old), Some(new)) => {
+                to_delete.push(old);
+                to_add.push(new);
+            }
+            (Some(old), None) => {
+                to_delete.push(old);
+            }
+            (None, Some(new)) => {
+                to_add.push(new);
+            }
+            (None, None) => {}
+        }
+    }
+
+    // Cancel out matching pairs: for each rpath in to_add, if there is a
+    // matching entry in to_delete, remove both (they are a no-op together).
+    let mut remaining_add: Vec<PathBuf> = Vec::new();
+    let mut remaining_delete: Vec<&PathBuf> = to_delete;
+    for rpath in to_add {
+        if let Some(pos) = remaining_delete.iter().position(|d| *d == rpath) {
+            remaining_delete.remove(pos);
+        } else {
+            remaining_add.push(rpath.clone());
+        }
+    }
+
+    (
+        remaining_delete.into_iter().cloned().collect(),
+        remaining_add,
+    )
+}
+
 fn install_name_tool(
     dylib_path: &Path,
     changes: &DylibChanges,
@@ -567,31 +617,13 @@ fn install_name_tool(
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    let mut add_set = IndexSet::new();
-    let mut remove_set = IndexSet::new();
+    let (remaining_delete, remaining_add) = compute_rpath_changes(&changes.change_rpath);
 
-    for change in &changes.change_rpath {
-        match change {
-            (Some(old), Some(new)) => {
-                remove_set.insert(old);
-                add_set.insert(new);
-            }
-            (Some(old), None) => {
-                remove_set.insert(old);
-            }
-            (None, Some(new)) => {
-                add_set.insert(new);
-            }
-            (None, None) => {}
-        }
-    }
-
-    // ignore any that are added and removed
-    for rpath in add_set.difference(&remove_set) {
-        cmd.arg("-add_rpath").arg(rpath);
-    }
-    for rpath in remove_set.difference(&add_set) {
+    for rpath in &remaining_delete {
         cmd.arg("-delete_rpath").arg(rpath);
+    }
+    for rpath in &remaining_add {
+        cmd.arg("-add_rpath").arg(rpath);
     }
 
     cmd.arg(dylib_path);
@@ -861,5 +893,221 @@ mod tests {
             &encoded_prefix,
         );
         assert_eq!(resolved, PathBuf::from("/foo/very_long_encoded_prefix/lib"));
+    }
+
+    /// Create a binary with duplicate rpaths by starting from
+    /// `duplicate-rpath-macos` (which has `@loader_path/../lib` and
+    /// `@loader_path/../xxx`) and using the builtin relink to overwrite the
+    /// second rpath to match the first. We can't use `install_name_tool` for
+    /// this because modern macOS rejects duplicate rpaths.
+    fn make_binary_with_duplicate_rpaths(src: &Path, dst: &Path) -> Result<(), RelinkError> {
+        fs::copy(src, dst)?;
+        let make_dup = DylibChanges {
+            change_rpath: vec![(
+                Some(PathBuf::from("@loader_path/../xxx")),
+                Some(PathBuf::from("@loader_path/../lib")),
+            )],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        super::relink(dst, &make_dup)?;
+
+        // Sanity-check: we should now have duplicate rpaths
+        let object = Dylib::new(dst)?;
+        let dup = PathBuf::from("@loader_path/../lib");
+        assert_eq!(
+            object.rpaths,
+            vec![dup.clone(), dup],
+            "Expected duplicate rpaths after binary manipulation"
+        );
+        Ok(())
+    }
+
+    /// Regression test: duplicate rpaths must be removed so that macOS >= 15.4
+    /// does not reject the binary with "duplicate LC_RPATH" errors at load time.
+    /// This exercises the full `Dylib::relink()` path (builtin relink tries
+    /// first, falls back to `install_name_tool` for rpath deletions).
+    #[test]
+    fn test_relink_deduplicates_rpaths() -> Result<(), RelinkError> {
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let tmp_prefix = tmp_dir.path();
+
+        // Set up bin/ and lib/ directories so the rpath resolution finds them
+        let bin_dir = tmp_prefix.join("bin");
+        let lib_dir = tmp_prefix.join("lib");
+        fs::create_dir(&bin_dir)?;
+        fs::create_dir(&lib_dir)?;
+
+        let binary_path = bin_dir.join("zlink-dedup");
+        make_binary_with_duplicate_rpaths(&prefix.join("duplicate-rpath-macos"), &binary_path)?;
+
+        let dup_rpath = PathBuf::from("@loader_path/../lib");
+        let object = Dylib::new(&binary_path)?;
+
+        // Full relink: builtin relink can't handle deletions, so this falls
+        // back to install_name_tool which performs the deduplication.
+        object
+            .relink(
+                tmp_prefix,
+                tmp_prefix,
+                &["lib/".to_string()],
+                &GlobVec::default(),
+                &SystemTools::default(),
+            )
+            .unwrap();
+
+        // After relinking, rpaths must be deduplicated
+        let object = Dylib::new(&binary_path)?;
+        assert!(
+            object.rpaths.iter().filter(|r| *r == &dup_rpath).count() == 1,
+            "Expected exactly one @loader_path/../lib rpath, got: {:?}",
+            object.rpaths
+        );
+
+        Ok(())
+    }
+
+    /// Test that `install_name_tool` correctly removes the duplicate rpath
+    /// via `compute_rpath_changes` producing the right delete/add lists.
+    #[test]
+    fn test_install_name_tool_deduplicates_rpaths() -> Result<(), RelinkError> {
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink-dedup-int");
+        make_binary_with_duplicate_rpaths(&prefix.join("duplicate-rpath-macos"), &binary_path)?;
+
+        let dup_rpath = PathBuf::from("@loader_path/../lib");
+
+        // Directly call install_name_tool with changes that remove the duplicate:
+        // [dup, dup] -> [dup] means: keep one (old=dup, new=dup) and delete one (old=dup, new=None)
+        let changes = DylibChanges {
+            change_rpath: vec![
+                (Some(dup_rpath.clone()), Some(dup_rpath.clone())),
+                (Some(dup_rpath.clone()), None),
+            ],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(
+            object.rpaths,
+            vec![dup_rpath],
+            "install_name_tool should have removed the duplicate rpath"
+        );
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod rpath_change_tests {
+    use super::compute_rpath_changes;
+    use std::path::PathBuf;
+
+    fn p(s: &str) -> PathBuf {
+        PathBuf::from(s)
+    }
+
+    /// [A, A] -> [A]: one duplicate must be deleted.
+    #[test]
+    fn duplicate_rpath_yields_one_delete() {
+        let a = p("@loader_path/../lib");
+        // Change computation for [A, A] -> [A]:
+        //   zip produces (Some(A), Some(A))  — slot stays
+        //   extra old produces (Some(A), None) — duplicate removed
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (Some(a.clone()), None)];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a], "should delete exactly one duplicate");
+        assert!(add.is_empty(), "should not add anything");
+    }
+
+    /// [A, A, A] -> [A]: two duplicates must be deleted.
+    #[test]
+    fn triple_rpath_yields_two_deletes() {
+        let a = p("@loader_path/../lib");
+        let changes = vec![
+            (Some(a.clone()), Some(a.clone())),
+            (Some(a.clone()), None),
+            (Some(a.clone()), None),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a.clone(), a], "should delete two duplicates");
+        assert!(add.is_empty());
+    }
+
+    /// [A] -> [B]: straightforward replacement.
+    #[test]
+    fn simple_replacement() {
+        let a = p("/old/lib");
+        let b = p("@loader_path/../lib");
+        let changes = vec![(Some(a.clone()), Some(b.clone()))];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![a]);
+        assert_eq!(add, vec![b]);
+    }
+
+    /// [A] -> [A, B]: existing rpath kept, new one added.
+    #[test]
+    fn add_extra_rpath() {
+        let a = p("@loader_path/../lib");
+        let b = p("@loader_path/");
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (None, Some(b.clone()))];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert!(del.is_empty(), "nothing should be deleted");
+        assert_eq!(add, vec![b]);
+    }
+
+    /// [A, B] -> [A]: one rpath removed.
+    #[test]
+    fn remove_one_rpath() {
+        let a = p("@loader_path/../lib");
+        let b = p("@loader_path/");
+        let changes = vec![(Some(a.clone()), Some(a.clone())), (Some(b.clone()), None)];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert_eq!(del, vec![b]);
+        assert!(add.is_empty());
+    }
+
+    /// No changes → nothing emitted.
+    #[test]
+    fn empty_changes() {
+        let (del, add) = compute_rpath_changes(&[]);
+        assert!(del.is_empty());
+        assert!(add.is_empty());
+    }
+
+    /// Existing test scenario: [@loader_path/] -> [@loader_path/../../../, @loader_path/]
+    /// Should only add the new rpath; the existing one cancels out.
+    #[test]
+    fn existing_test_change_and_add() {
+        let lp = p("@loader_path/");
+        let lp_up = p("@loader_path/../../../");
+        let changes = vec![
+            (Some(lp.clone()), Some(lp_up.clone())),
+            (None, Some(lp.clone())),
+        ];
+
+        let (del, add) = compute_rpath_changes(&changes);
+        assert!(del.is_empty(), "lp/ delete should cancel with lp/ add");
+        assert_eq!(add, vec![lp_up], "only the new rpath should be added");
     }
 }

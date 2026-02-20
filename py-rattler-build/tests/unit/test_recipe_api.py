@@ -384,3 +384,90 @@ requirements:
 
     # Note: We don't actually call run_build() in this test to avoid
     # creating actual build artifacts during testing
+
+
+def test_from_yaml_creates_recipe_path_in_temp_dir() -> None:
+    """Test that from_yaml creates a recipe file in a temp directory."""
+    yaml_content = """
+package:
+  name: path-test
+  version: 1.0.0
+"""
+    recipe = Stage0Recipe.from_yaml(yaml_content)
+    recipe_path = recipe.recipe_path
+
+    assert recipe_path.exists()
+    assert recipe_path.name == "recipe.yaml"
+    assert recipe_path.read_text(encoding="utf-8") == yaml_content
+
+
+def test_from_yaml_with_recipe_dir(tmp_path: Path) -> None:
+    """Test that from_yaml writes the recipe to a user-specified directory."""
+    yaml_content = """
+package:
+  name: path-test
+  version: 1.0.0
+"""
+    recipe_dir = tmp_path / "my_recipe"
+    recipe = Stage0Recipe.from_yaml(yaml_content, recipe_dir=recipe_dir)
+
+    assert recipe.recipe_path == recipe_dir / "recipe.yaml"
+    assert recipe.recipe_path.exists()
+    assert recipe.recipe_path.read_text(encoding="utf-8") == yaml_content
+
+
+def test_from_file_uses_original_path() -> None:
+    """Test that from_file uses the original file path."""
+    recipe = Stage0Recipe.from_file(str(TEST_RECIPE_FILE))
+    assert recipe.recipe_path == TEST_RECIPE_FILE.resolve()
+
+
+def test_from_dict_creates_recipe_path() -> None:
+    """Test that from_dict creates a recipe file."""
+    recipe_dict = {
+        "package": {"name": "dict-test", "version": "1.0.0"},
+        "build": {"number": 0},
+    }
+    recipe = Stage0Recipe.from_dict(recipe_dict)
+    assert recipe.recipe_path.exists()
+    assert recipe.recipe_path.name == "recipe.yaml"
+
+
+def test_from_dict_with_recipe_dir(tmp_path: Path) -> None:
+    """Test that from_dict writes the recipe to a user-specified directory."""
+    recipe_dict = {
+        "package": {"name": "dict-test", "version": "1.0.0"},
+        "build": {"number": 0},
+    }
+    recipe_dir = tmp_path / "my_recipe"
+    recipe = Stage0Recipe.from_dict(recipe_dict, recipe_dir=recipe_dir)
+
+    assert recipe.recipe_path == recipe_dir / "recipe.yaml"
+    assert recipe.recipe_path.exists()
+
+
+def test_rendered_variant_carries_recipe_path() -> None:
+    """Test that RenderedVariant inherits recipe_path from Stage0Recipe."""
+    yaml_content = """
+package:
+  name: carry-path-test
+  version: 1.0.0
+"""
+    recipe = Stage0Recipe.from_yaml(yaml_content)
+    rendered = recipe.render(VariantConfig())
+
+    assert rendered[0].recipe_path == recipe.recipe_path
+
+
+def test_default_output_dir_is_recipe_dir_output() -> None:
+    """Test that run_build defaults output_dir to recipe_path.parent / 'output'."""
+    yaml_content = """
+package:
+  name: default-output-test
+  version: 1.0.0
+"""
+    recipe = Stage0Recipe.from_yaml(yaml_content)
+    rendered = recipe.render(VariantConfig())
+
+    expected_output_dir = recipe.recipe_path.parent / "output"
+    assert expected_output_dir == rendered[0].recipe_path.parent / "output"

@@ -161,6 +161,107 @@ impl BuildOutput {
         record.map(|r| (r, is_requested))
     }
 
+    /// Generate markdown summary content for this build output.
+    pub fn generate_markdown_summary(&self) -> String {
+        let summary = self.build_summary.lock().unwrap();
+        let identifier = self.identifier();
+        let mut md = String::new();
+
+        md.push_str(&format!("### Build summary for {}\n", identifier));
+        if let Some(artifact) = &summary.artifact {
+            let bytes = HumanBytes(fs::metadata(artifact).map(|m| m.len()).unwrap_or(0));
+            md.push_str(&format!(
+                "**Artifact**: {} ({})\n",
+                artifact.display(),
+                bytes
+            ));
+        } else {
+            md.push_str("**No artifact was created**\n");
+        }
+
+        if let Some(paths) = &summary.paths {
+            if paths.paths.is_empty() {
+                md.push_str("Included files: **No files included**\n");
+            } else {
+                fn format_entry(entry: &PathsEntry) -> String {
+                    let mut extra_info = Vec::new();
+                    if entry.prefix_placeholder.is_some() {
+                        extra_info.push("contains prefix");
+                    }
+                    if entry.no_link {
+                        extra_info.push("no link");
+                    }
+                    match entry.path_type {
+                        PathType::SoftLink => extra_info.push("soft link"),
+                        PathType::HardLink => {}
+                        PathType::Directory => extra_info.push("directory"),
+                    }
+                    let bytes = entry.size_in_bytes.unwrap_or(0);
+
+                    format!(
+                        "| `{}` | {} | {} |",
+                        entry.relative_path.to_string_lossy(),
+                        HumanBytes(bytes),
+                        extra_info.join(", ")
+                    )
+                }
+
+                md.push_str("<details>\n");
+                md.push_str(&format!(
+                    "<summary>Included files ({} files)</summary>\n\n",
+                    paths.paths.len()
+                ));
+                md.push_str("| Path | Size | Extra info |\n");
+                md.push_str("| --- | --- | --- |\n");
+                for path in &paths.paths {
+                    md.push_str(&format!("{}\n", format_entry(path)));
+                }
+                md.push_str("\n</details>\n\n");
+            }
+        }
+
+        // Track features (down_prioritize_variant)
+        if let Some(down_prioritize) = self.recipe.build().variant.down_prioritize_variant {
+            let mut track_features = Vec::new();
+            for i in 0..down_prioritize.abs() {
+                track_features.push(format!("{}-p-{}", self.name().as_normalized(), i));
+            }
+            if !track_features.is_empty() {
+                md.push_str(&format!(
+                    "**Track features**: `{}`\n\n",
+                    track_features.join("`, `")
+                ));
+            }
+        }
+
+        if !summary.warnings.is_empty() {
+            md.push_str("> [!WARNING]\n");
+            md.push_str("> **Warnings during build:**\n>\n");
+            for warning in &summary.warnings {
+                md.push_str(&format!("> - {}\n", warning));
+            }
+            md.push('\n');
+        }
+
+        md.push_str(&format!(
+            "<details><summary>Resolved dependencies</summary>\n\n{}\n</details>\n\n",
+            self.format_as_markdown()
+        ));
+
+        md
+    }
+
+    /// Write markdown summary to a file (appends).
+    pub fn write_markdown_summary(&self, path: &Path) -> Result<(), std::io::Error> {
+        let md = self.generate_markdown_summary();
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(path)?;
+        write!(file, "{}", md)?;
+        Ok(())
+    }
+
     /// Print a nice summary of the build
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();
@@ -188,87 +289,20 @@ impl BuildOutput {
             tracing::info!("No artifact was created");
         }
 
+        // Drop the summary lock before calling generate_markdown_summary
+        // which also acquires the lock
+        drop(summary);
+
         if let Ok(github_summary) = std::env::var("GITHUB_STEP_SUMMARY") {
             if !github_integration_enabled() {
                 return Ok(());
             }
-            // append to the summary file
             let mut summary_file = fs::OpenOptions::new()
                 .append(true)
                 .create(true)
                 .open(github_summary)?;
 
-            writeln!(summary_file, "### Build summary for {}", identifier)?;
-            if let Some(article) = &summary.artifact {
-                let bytes = HumanBytes(fs::metadata(article).map(|m| m.len()).unwrap_or(0));
-                writeln!(
-                    summary_file,
-                    "**Artifact**: {} ({})",
-                    article.display(),
-                    bytes
-                )?;
-            } else {
-                writeln!(summary_file, "**No artifact was created**")?;
-            }
-
-            if let Some(paths) = &summary.paths {
-                if paths.paths.is_empty() {
-                    writeln!(summary_file, "Included files: **No files included**")?;
-                } else {
-                    /// Github detail expander
-                    fn format_entry(entry: &PathsEntry) -> String {
-                        let mut extra_info = Vec::new();
-                        if entry.prefix_placeholder.is_some() {
-                            extra_info.push("contains prefix");
-                        }
-                        if entry.no_link {
-                            extra_info.push("no link");
-                        }
-                        match entry.path_type {
-                            PathType::SoftLink => extra_info.push("soft link"),
-                            // skip default
-                            PathType::HardLink => {}
-                            PathType::Directory => extra_info.push("directory"),
-                        }
-                        let bytes = entry.size_in_bytes.unwrap_or(0);
-
-                        format!(
-                            "| `{}` | {} | {} |",
-                            entry.relative_path.to_string_lossy(),
-                            HumanBytes(bytes),
-                            extra_info.join(", ")
-                        )
-                    }
-
-                    writeln!(summary_file, "<details>")?;
-                    writeln!(
-                        summary_file,
-                        "<summary>Included files ({} files)</summary>\n",
-                        paths.paths.len()
-                    )?;
-                    writeln!(summary_file, "| Path | Size | Extra info |")?;
-                    writeln!(summary_file, "| --- | --- | --- |")?;
-                    for path in &paths.paths {
-                        writeln!(summary_file, "{}", format_entry(path))?;
-                    }
-                    writeln!(summary_file, "\n</details>\n")?;
-                }
-            }
-
-            if !summary.warnings.is_empty() {
-                writeln!(summary_file, "> [!WARNING]")?;
-                writeln!(summary_file, "> **Warnings during build:**\n>")?;
-                for warning in &summary.warnings {
-                    writeln!(summary_file, "> - {}", warning)?;
-                }
-                writeln!(summary_file)?;
-            }
-
-            writeln!(
-                summary_file,
-                "<details><summary>Resolved dependencies</summary>\n\n{}\n</details>\n",
-                self.format_as_markdown()
-            )?;
+            write!(summary_file, "{}", self.generate_markdown_summary())?;
         }
         Ok(())
     }

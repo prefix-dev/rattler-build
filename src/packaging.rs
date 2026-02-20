@@ -702,6 +702,9 @@ pub fn package_conda(
 
     tracing::info!("Post-processing done!");
 
+    // Validate any dsolist JSON files being packaged (CEP-28)
+    post_process::checks::validate_dsolist_files(tmp.temp_dir.path())?;
+
     let info_folder = tmp.temp_dir.path().join("info");
 
     tracing::info!("Writing test files");

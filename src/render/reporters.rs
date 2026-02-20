@@ -5,7 +5,7 @@ use std::{
 
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rattler::install::Placement;
-use rattler_repodata_gateway::{DownloadReporter, JLAPReporter, Reporter};
+use rattler_repodata_gateway::{DownloadReporter, Reporter};
 use url::Url;
 
 /// Reporter used for tracking download progress via `MultiProgress`.
@@ -92,10 +92,6 @@ impl DownloadReporter for GatewayReporter {
 }
 
 impl Reporter for GatewayReporter {
-    fn jlap_reporter(&self) -> Option<&dyn JLAPReporter> {
-        None
-    }
-
     fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
         Some(self)
     }

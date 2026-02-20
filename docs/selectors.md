@@ -10,8 +10,8 @@ follows
 the same syntax as a Python expression.
 
 During rendering, several variables are set based on the platform and variant
-being built. For example, the `unix` variable is true for macOS and Linux, while
-`win` is true for Windows. Consider the following recipe executed on Linux:
+being built. For example, the `unix` variable is true when the host platform is macOS or Linux, while
+`win` is true when the host platform is Windows. Consider the following recipe executed on Linux:
 
 ```yaml
 requirements:
@@ -72,7 +72,7 @@ The following variables are available during rendering of the recipe:
 | `osx`                | "true" if `host_platform` is OSX / macOS                               |
 | `win`                | "true" if `host_platform` is Windows                                   |
 | `unix`               | "true" if `host_platform` is a Unix (macOS or Linux)                   |
-| `x86`, `x86_64`      | x86 32/64-bit Architecture                                             |
+| `x86`, `x86_64`      | x86 32/64-bit Architecture (based on `host_platform`)                  |
 | `aarch64`            | 64-bit Arm (if `host_platform` is `linux-aarch64`)                     |
 | `arm64`              | 64-bit Arm (if `host_platform` is `osx-arm64` or `win-arm64`)          |
 | `armV6l`, `armV7l`   | 32-bit Arm                                                             |

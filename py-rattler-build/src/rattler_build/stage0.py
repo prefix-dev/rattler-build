@@ -8,6 +8,8 @@ and conditional resolution.
 
 from __future__ import annotations
 
+import json
+import tempfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -42,48 +44,95 @@ class Stage0Recipe(ABC):
     # Attributes set by concrete subclasses
     _inner: _stage0.SingleOutputRecipe | _stage0.MultiOutputRecipe
     _wrapper: _stage0.Stage0Recipe
+    _recipe_path: Path
+
+    @property
+    def recipe_path(self) -> Path:
+        """Get the path to the recipe file on disk.
+
+        This is always set:
+        - ``from_file()`` uses the provided file path.
+        - ``from_yaml()`` / ``from_dict()`` write the recipe to ``recipe_dir``
+          (or a temporary directory when ``recipe_dir`` is not given).
+        """
+        return self._recipe_path
 
     @classmethod
-    def from_yaml(cls, yaml: str) -> Stage0Recipe:
-        """
-        Parse a recipe from YAML string.
+    def _write_recipe(cls, content: str, recipe_dir: Path | str | None) -> Path:
+        """Write recipe content to a directory, returning the recipe file path.
 
-        Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
+        If *recipe_dir* is ``None`` a temporary directory is created automatically.
         """
+        if recipe_dir is None:
+            recipe_dir = Path(tempfile.mkdtemp(prefix="rattler_build_"))
+        else:
+            recipe_dir = Path(recipe_dir)
+
+        recipe_dir.mkdir(parents=True, exist_ok=True)
+        recipe_path = recipe_dir / "recipe.yaml"
+        recipe_path.write_text(content, encoding="utf-8")
+        return recipe_path
+
+    @classmethod
+    def from_yaml(cls, yaml: str, *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+        """Parse a recipe from a YAML string.
+
+        Args:
+            yaml: The YAML recipe content.
+            recipe_dir: Directory to write the recipe file into.  When
+                ``None`` (the default) a temporary directory is created.
+
+        Returns:
+            SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
+        """
+        recipe_path = cls._write_recipe(yaml, recipe_dir)
+
         wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
 
     @classmethod
     def from_file(cls, path: str | Path) -> Stage0Recipe:
-        """
-        Parse a recipe from a YAML file.
+        """Parse a recipe from a YAML file.
 
-        Returns the appropriate type: SingleOutputRecipe or MultiOutputRecipe.
+        The file path is used as the recipe path directly — no copy is made.
+
+        Returns:
+            SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
         """
+        path = Path(path).resolve()
         with open(path, encoding="utf-8") as f:
-            return cls.from_yaml(f.read())
+            yaml = f.read()
+
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
+        if wrapper.is_single_output():
+            single_inner = wrapper.as_single_output()
+            return SingleOutputRecipe(single_inner, wrapper, path)
+        else:
+            multi_inner = wrapper.as_multi_output()
+            return MultiOutputRecipe(multi_inner, wrapper, path)
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any]) -> Stage0Recipe:
-        """
-        Create a recipe from a Python dictionary.
+    def from_dict(cls, recipe_dict: dict[str, Any], *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+        """Create a recipe from a Python dictionary.
 
         This method validates the dictionary structure and provides detailed error
         messages if the structure is invalid or types don't match.
 
         Args:
-            recipe_dict: Dictionary containing recipe data (must match recipe schema)
+            recipe_dict: Dictionary containing recipe data (must match recipe schema).
+            recipe_dir: Directory to write the recipe file into.  When
+                ``None`` (the default) a temporary directory is created.
 
         Returns:
-            SingleOutputRecipe or MultiOutputRecipe depending on the recipe type
+            SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
 
         Raises:
-            PyRecipeParseError: If the dictionary structure is invalid or types don't match
+            PyRecipeParseError: If the dictionary structure is invalid or types don't match.
 
         Example:
             ```python
@@ -99,13 +148,15 @@ class Stage0Recipe(ABC):
             recipe = Stage0Recipe.from_dict(recipe_dict)
             ```
         """
+        recipe_path = cls._write_recipe(json.dumps(recipe_dict, indent=2), recipe_dir)
+
         wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
 
     def as_single_output(self) -> SingleOutputRecipe:
         """
@@ -169,6 +220,10 @@ class Stage0Recipe(ABC):
         This method takes this Stage0 recipe and evaluates all Jinja templates
         with different variant combinations to produce ready-to-build Stage1 recipes.
 
+        The recipe's :attr:`recipe_path` is automatically injected into the
+        render configuration so that Jinja functions like ``include()`` and
+        ``file_name()`` can resolve relative paths.
+
         Args:
             variant_config: Optional VariantConfig to use. If None, creates an empty config.
             render_config: Optional RenderConfig to use. If None, uses default config.
@@ -188,8 +243,8 @@ class Stage0Recipe(ABC):
         if variant_config is None:
             variant_config = VariantConfig()
 
-        # Handle render_config parameter
-        render_config_inner = None if render_config is None else render_config._config
+        # Build a RenderConfig with the recipe_path injected
+        render_config_inner = RenderConfig._with_recipe_path(render_config, self._recipe_path)
 
         # Unwrap variant_config to get inner Rust object
         variant_config_inner = variant_config._inner
@@ -197,35 +252,34 @@ class Stage0Recipe(ABC):
         # Render the recipe using the wrapper
         rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
 
-        return [RenderedVariant(r) for r in rendered]
+        return [RenderedVariant(r, self._recipe_path) for r in rendered]
 
     def run_build(
         self,
         variant_config: VariantConfig | None = None,
         tool_config: ToolConfiguration | None = None,
-        output_dir: str | Path = ".",
+        output_dir: str | Path | None = None,
         channels: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
-        recipe_path: str | Path | None = None,
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
         debug: bool = False,
         exclude_newer: datetime | None = None,
     ) -> list[BuildResult]:
-        """
-        Build this recipe.
+        """Build this recipe.
 
-        This method renders the recipe with variants and then builds the rendered outputs
-        directly without writing temporary files.
+        This method renders the recipe with variants and then builds the rendered
+        outputs.  The :attr:`recipe_path` is used automatically for directory
+        setup and recipe inclusion in the package.
 
         Args:
             variant_config: Optional VariantConfig to use for building variants.
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
-            output_dir: Directory to store the built packages. Defaults to current directory.
+            output_dir: Directory to store the built packages.
+                Defaults to ``<recipe_dir>/output``.
             channels: List of channels to use for resolving dependencies. Defaults to ["conda-forge"].
             progress_callback: Optional progress callback for build events.
-            recipe_path: Path to the recipe file (for copying license files, etc.).
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
@@ -238,7 +292,8 @@ class Stage0Recipe(ABC):
         Example:
             ```python
             recipe = Stage0Recipe.from_yaml(yaml_string)
-            results = recipe.run_build(output_dir="./output")
+            # Build with default output dir (<recipe_dir>/output)
+            results = recipe.run_build()
             for result in results:
                 print(f"Built {result.name} {result.version}")
                 print(f"Package at: {result.packages[0]}")
@@ -261,7 +316,6 @@ class Stage0Recipe(ABC):
                 output_dir=output_dir,
                 channels=channels,
                 progress_callback=progress_callback,
-                recipe_path=recipe_path,
                 no_build_id=no_build_id,
                 package_format=package_format,
                 no_include_recipe=no_include_recipe,
@@ -276,9 +330,10 @@ class Stage0Recipe(ABC):
 class SingleOutputRecipe(Stage0Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe):
+    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
         self._inner = inner
         self._wrapper = wrapper
+        self._recipe_path = recipe_path
 
     @property
     def schema_version(self) -> int:
@@ -362,9 +417,10 @@ class StagingOutput:
 class MultiOutputRecipe(Stage0Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe):
+    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
         self._inner = inner
         self._wrapper = wrapper
+        self._recipe_path = recipe_path
 
     @property
     def schema_version(self) -> int:

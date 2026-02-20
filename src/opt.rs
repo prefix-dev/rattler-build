@@ -246,10 +246,6 @@ pub struct CommonOpts {
     #[clap(long, env = "RATTLER_SHARDED", default_value = "true", hide = true)]
     pub use_sharded: bool,
 
-    /// Enable support for JLAP (JSON Lines Append Protocol)
-    #[clap(long, env = "RATTLER_JLAP", default_value = "false", hide = true)]
-    pub use_jlap: bool,
-
     /// Enable experimental features
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
@@ -281,7 +277,6 @@ pub struct CommonData {
     pub use_zstd: bool,
     pub use_bz2: bool,
     pub use_sharded: bool,
-    pub use_jlap: bool,
 }
 
 impl CommonData {
@@ -297,7 +292,6 @@ impl CommonData {
         use_zstd: bool,
         use_bz2: bool,
         use_sharded: bool,
-        use_jlap: bool,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
@@ -320,7 +314,6 @@ impl CommonData {
             for v in value {
                 mirrors.push(mirror_middleware::Mirror {
                     url: ensure_trailing_slash(v),
-                    no_jlap: false,
                     no_bz2: false,
                     no_zstd: false,
                     max_failures: None,
@@ -344,7 +337,6 @@ impl CommonData {
             use_zstd,
             use_bz2,
             use_sharded,
-            use_jlap,
         }
     }
 
@@ -359,7 +351,6 @@ impl CommonData {
             value.use_zstd,
             value.use_bz2,
             value.use_sharded,
-            value.use_jlap,
         )
     }
 }
@@ -523,6 +514,11 @@ pub struct BuildOpts {
     /// Enable debug output in build scripts
     #[arg(long, help_heading = "Modifying result")]
     pub debug: bool,
+
+    /// Write a markdown summary to the specified file (appends to the file).
+    /// Useful for generating PR comments or custom reports.
+    #[arg(long, help_heading = "Modifying result")]
+    pub markdown_summary: Option<PathBuf>,
 
     /// Continue building even if (one) of the packages fails to build.
     /// This is useful when building many packages with `--recipe-dir`.`
@@ -729,6 +725,7 @@ pub struct BuildData {
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
+    pub markdown_summary: Option<PathBuf>,
 }
 
 impl BuildData {
@@ -765,6 +762,7 @@ impl BuildData {
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
+        markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
             up_to,
@@ -805,6 +803,7 @@ impl BuildData {
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
+            markdown_summary,
         }
     }
 }
@@ -856,6 +855,7 @@ impl BuildData {
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
             opts.build_num,
+            opts.markdown_summary,
         )
     }
 }
@@ -910,7 +910,7 @@ pub struct TestOpts {
     #[arg(short = 'c', long = "channel")]
     pub channels: Option<Vec<NamedChannelOrUrl>>,
 
-    /// The package file to test
+    /// The package file or extracted package directory to test
     #[arg(short, long)]
     pub package_file: PathBuf,
 

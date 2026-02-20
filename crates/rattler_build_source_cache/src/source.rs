@@ -20,35 +20,56 @@ impl Checksum {
         }
     }
 
-    /// Validate a file against this checksum
-    pub fn validate(&self, path: &std::path::Path) -> bool {
+    /// Validate a file against this checksum.
+    /// Returns `Ok(())` if the checksum matches, or `Err(ChecksumMismatch)` with details.
+    pub fn validate(&self, path: &std::path::Path) -> Result<(), ChecksumMismatch> {
         use md5::{Digest, Md5};
         use sha2::Sha256;
         use std::io::Read;
 
-        let mut file = match std::fs::File::open(path) {
-            Ok(f) => f,
-            Err(_) => return false,
-        };
+        let mut file = std::fs::File::open(path).map_err(|e| ChecksumMismatch {
+            expected: self.to_hex(),
+            actual: format!("<failed to open file: {e}>"),
+            kind: self.kind(),
+        })?;
 
         let mut buffer = Vec::new();
-        if file.read_to_end(&mut buffer).is_err() {
-            return false;
-        }
+        file.read_to_end(&mut buffer)
+            .map_err(|e| ChecksumMismatch {
+                expected: self.to_hex(),
+                actual: format!("<failed to read file: {e}>"),
+                kind: self.kind(),
+            })?;
 
-        match self {
-            Checksum::Sha256(expected) => {
+        let actual_hex = match self {
+            Checksum::Sha256(_) => {
                 let mut hasher = Sha256::new();
                 hasher.update(&buffer);
-                let result = hasher.finalize();
-                result[..] == expected[..]
+                hex::encode(hasher.finalize())
             }
-            Checksum::Md5(expected) => {
+            Checksum::Md5(_) => {
                 let mut hasher = Md5::new();
                 hasher.update(&buffer);
-                let result = hasher.finalize();
-                result[..] == expected[..]
+                hex::encode(hasher.finalize())
             }
+        };
+
+        if actual_hex == self.to_hex() {
+            Ok(())
+        } else {
+            Err(ChecksumMismatch {
+                expected: self.to_hex(),
+                actual: actual_hex,
+                kind: self.kind(),
+            })
+        }
+    }
+
+    /// Returns the kind of this checksum.
+    pub fn kind(&self) -> ChecksumKind {
+        match self {
+            Checksum::Sha256(_) => ChecksumKind::Sha256,
+            Checksum::Md5(_) => ChecksumKind::Md5,
         }
     }
 
@@ -68,6 +89,23 @@ pub enum ChecksumKind {
     Md5,
 }
 
+impl std::fmt::Display for ChecksumKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChecksumKind::Sha256 => write!(f, "sha256"),
+            ChecksumKind::Md5 => write!(f, "md5"),
+        }
+    }
+}
+
+/// Details about a checksum mismatch
+#[derive(Debug, Clone)]
+pub struct ChecksumMismatch {
+    pub expected: String,
+    pub actual: String,
+    pub kind: ChecksumKind,
+}
+
 /// Git source specification that wraps rattler_git functionality
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitSource {
@@ -75,8 +113,15 @@ pub struct GitSource {
     pub reference: RattlerGitReference,
     pub depth: Option<i32>,
     pub lfs: bool,
+    /// Whether to recursively initialize and update submodules (defaults to true)
+    #[serde(default = "default_submodules")]
+    pub submodules: bool,
     /// Optionally an expected commit hash to verify after checkout
     pub expected_commit: Option<String>,
+}
+
+fn default_submodules() -> bool {
+    true
 }
 
 impl GitSource {
@@ -91,12 +136,14 @@ impl GitSource {
         reference: RattlerGitReference,
         depth: Option<i32>,
         lfs: bool,
+        submodules: bool,
     ) -> Self {
         Self {
             url,
             reference,
             depth,
             lfs,
+            submodules,
             expected_commit: None,
         }
     }
@@ -107,6 +154,7 @@ impl GitSource {
         reference: RattlerGitReference,
         depth: Option<i32>,
         lfs: bool,
+        submodules: bool,
         expected_commit: Option<String>,
     ) -> Self {
         Self {
@@ -114,6 +162,7 @@ impl GitSource {
             reference,
             depth,
             lfs,
+            submodules,
             expected_commit,
         }
     }

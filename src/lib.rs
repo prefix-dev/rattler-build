@@ -58,7 +58,7 @@ use package_test::TestConfiguration;
 use rattler_build_recipe::{
     stage0,
     stage1::{Recipe, TestType},
-    variant_render::{RenderConfig, render_recipe_with_variant_config},
+    variant_render::RenderConfig,
 };
 use rattler_build_variant_config::VariantConfig;
 
@@ -149,17 +149,12 @@ fn find_variants(
     experimental: bool,
 ) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
-    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_content)
-        .map_err(|e| {
-            let source = rattler_build_recipe::source_code::Source::from_string(
-                recipe_path.display().to_string(),
-                recipe_content.to_string(),
-            );
-            // Use ParseErrorWithSource for better span highlighting
-            let error_with_source = rattler_build_recipe::ParseErrorWithSource::new(source, e);
-            miette::Report::new(error_with_source)
-        })
-        .wrap_err("Failed to parse recipe")?;
+    let source = rattler_build_recipe::source_code::Source::from_string(
+        recipe_path.display().to_string(),
+        recipe_content.to_string(),
+    );
+    let stage0_recipe =
+        rattler_build_recipe::parse_recipe(&source).wrap_err("Failed to parse recipe")?;
 
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
@@ -190,20 +185,8 @@ fn find_variants(
 
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
-        render_recipe_with_variant_config(&stage0_recipe, variant_config, render_config)
-            .map_err(|e| {
-                let source = miette::NamedSource::new(
-                    recipe_path.display().to_string(),
-                    recipe_content.to_string(),
-                );
-                miette::Report::new(e).with_source_code(source)
-            })
+        rattler_build_recipe::render_recipe(&source, &stage0_recipe, variant_config, render_config)
             .wrap_err("Failed to render recipe with variants")?;
-
-    // Apply topological sorting to ensure correct build order for multi-output recipes
-    let rendered_variants =
-        rattler_build_recipe::variant_render::topological_sort_variants(rendered_variants)
-            .map_err(|e| miette::miette!("{}", e))?;
 
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();
@@ -318,8 +301,7 @@ pub fn get_tool_config(
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
-        .with_sharded_repodata_enabled(build_data.common.use_sharded)
-        .with_jlap_enabled(build_data.common.use_jlap);
+        .with_sharded_repodata_enabled(build_data.common.use_sharded);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -416,6 +398,21 @@ pub async fn get_build_output(
             miette::Report::new(e)
         })?;
 
+    // Warn if target_platform is set in variant config - it's not supported and will be ignored
+    let target_platform_variants = variant_config
+        .variants
+        .get(&NormalizedKey("target_platform".into()));
+    if target_platform_variants.is_some()
+        && target_platform_variants
+            .map(|v| v != &vec![Variable::from(build_data.target_platform.to_string())])
+            .unwrap_or(false)
+    {
+        tracing::warn!(
+            "Setting 'target_platform' in a variant config file is not supported and will be ignored. \
+            Please use the '--target-platform' command-line flag to specify the target platform."
+        );
+    }
+
     // Always insert target_platform and build_platform
     variant_config.variants.insert(
         "target_platform".into(),
@@ -483,6 +480,8 @@ pub async fn get_build_output(
     let global_build_name = recipe_name
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
+
+    let timestamp = chrono::Utc::now();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -554,7 +553,6 @@ pub async fn get_build_output(
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
-        let timestamp = chrono::Utc::now();
         let virtual_package_override = VirtualPackageOverrides::from_env();
         let output = Output {
             recipe: discovered_output.recipe.clone(),
@@ -725,6 +723,7 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
     tool_configuration: Configuration,
+    markdown_summary: Option<&Path>,
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
@@ -887,6 +886,14 @@ pub async fn run_build_from_args(
             tracing::error!("Error writing build summary: {}", e);
             e
         });
+
+        // Write to markdown summary file if requested
+        if let Some(md_path) = markdown_summary {
+            let _ = output.write_markdown_summary(md_path).map_err(|e| {
+                tracing::error!("Error writing markdown summary: {}", e);
+                e
+            });
+        }
     }
 
     Ok(())
@@ -1403,7 +1410,7 @@ pub async fn build_recipes(
     outputs = skip_noarch(outputs, &tool_config).await?;
 
     // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-    run_build_from_args(outputs, tool_config).await?;
+    run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
 }
@@ -1686,6 +1693,7 @@ pub async fn debug_recipe(
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
+        markdown_summary: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

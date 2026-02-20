@@ -3,28 +3,21 @@
 //! These tests demonstrate the error messages produced by the variant config parser
 //! when encountering various error conditions.
 
-#[cfg(feature = "miette")]
 use rattler_build_variant_config::VariantConfigError;
-#[cfg(feature = "miette")]
 use rattler_build_variant_config::yaml_parser::parse_variant_str;
-#[cfg(feature = "miette")]
 use rattler_build_yaml_parser::ParseErrorWithSource;
 
-#[cfg(feature = "miette")]
 use std::sync::Arc;
 
-#[cfg(feature = "miette")]
 const TEST_DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/errors");
 
 /// A simple source code wrapper for error reporting
-#[cfg(feature = "miette")]
 #[derive(Debug, Clone)]
 struct Source {
     name: String,
     code: Arc<str>,
 }
 
-#[cfg(feature = "miette")]
 impl Source {
     fn from_string(name: String, contents: String) -> Self {
         Self {
@@ -34,14 +27,12 @@ impl Source {
     }
 }
 
-#[cfg(feature = "miette")]
 impl AsRef<str> for Source {
     fn as_ref(&self) -> &str {
         self.code.as_ref()
     }
 }
 
-#[cfg(feature = "miette")]
 impl miette::SourceCode for Source {
     fn read_span<'a>(
         &'a self,
@@ -65,7 +56,6 @@ impl miette::SourceCode for Source {
 }
 
 /// Macro to format and snapshot miette diagnostic reports
-#[cfg(feature = "miette")]
 macro_rules! assert_miette_snapshot {
     ($value:expr) => {{
         let mut value = String::new();
@@ -77,7 +67,6 @@ macro_rules! assert_miette_snapshot {
     }};
 }
 
-#[cfg(feature = "miette")]
 fn load_error_test(filename: &str) -> Source {
     let path = format!("{}/{}", TEST_DATA_DIR, filename);
     let contents = fs_err::read_to_string(&path)
@@ -85,7 +74,6 @@ fn load_error_test(filename: &str) -> Source {
     Source::from_string(filename.to_string(), contents)
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_with_map() {
     let source = load_error_test("with_map.yaml");
@@ -106,7 +94,6 @@ fn test_error_with_map() {
     }
 }
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_wrong_type() {
     let source = load_error_test("wrong_type.yaml");
@@ -130,7 +117,6 @@ fn test_error_wrong_type() {
 // Note: invalid_jinja.yaml doesn't cause a parse error because Jinja templates
 // are stored as strings and validated later during evaluation, not during parsing.
 
-#[cfg(feature = "miette")]
 #[test]
 fn test_error_zip_keys_error() {
     let source = load_error_test("zip_keys_error.yaml");

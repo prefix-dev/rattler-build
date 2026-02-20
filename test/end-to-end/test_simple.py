@@ -1065,6 +1065,51 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     }
 
 
+def test_platform_selectors_use_host_platform(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that platform selectors (unix, win, etc.) are based on host_platform, not target_platform.
+
+    When --host-platform and --target-platform differ, the selectors should
+    reflect the host platform (where the package will run).
+    """
+    path_to_recipe = recipes / "noarch_variant"
+    args = rattler_build.build_args(path_to_recipe, tmp_path)
+
+    # Set host_platform=linux-64 but target_platform=win-64
+    # The `unix` selector should be true (based on host), not `win` (based on target)
+    output = rattler_build(
+        *args,
+        "--host-platform=linux-64",
+        "--target-platform=win-64",
+        "--render-only",
+        stderr=DEVNULL,
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    # unix should be true because host_platform is linux-64
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert "unix" in rendered[0]["recipe"]["build"]["string"]
+
+    # Now flip: host_platform=win-64, target_platform=linux-64
+    output = rattler_build(
+        *args,
+        "--host-platform=win-64",
+        "--target-platform=linux-64",
+        "--render-only",
+        stderr=DEVNULL,
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    # win should be true because host_platform is win-64
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win >=11.0.123 foobar"]
+    assert "win" in rendered[0]["recipe"]["build"]["string"]
+
+
 def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "regex_post_process"
     args = rattler_build.build_args(
@@ -1562,7 +1607,7 @@ def test_missing_pin_subpackage(
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Missing output: test1" in stdout
+    assert "missing output: test1" in stdout
 
 
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1967,6 +2012,7 @@ def test_relative_file_loading(
         "pl",
         "nu",
         "r",
+        "powershell",
     ],
 )
 def test_interpreter_detection(
@@ -2003,6 +2049,8 @@ def test_interpreter_detection(
         expected_output = "Hello from Nushell!"
     elif interpreter == "r":
         expected_output = "Hello from R!"
+    elif interpreter == "powershell":
+        expected_output = "Hello from PowerShell!"
     else:
         expected_output = f"Hello from {interpreter.upper()}!"
 
@@ -2030,6 +2078,7 @@ def test_interpreter_detection_all_tests(
     assert "Hello from Perl!" in test_output
     assert "Hello from R!" in test_output
     assert "Hello from Nushell!" in test_output
+    assert "Hello from PowerShell!" in test_output
     assert "all tests passed!" in test_output
 
 
@@ -2424,6 +2473,55 @@ def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert (pkg / "info/index.json").exists()
 
 
+def test_simple_powershell_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "simple-powershell-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "simple-powershell-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_powershell(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "powershell-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "powershell-test")
+
+    assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows",
+    reason="powershell default test only relevant on Windows",
+)
+def test_powershell_default(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "powershell-default/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "powershell-default")
+
+    assert (pkg / "info/index.json").exists()
+
+
+@pytest.mark.skipif(
+    platform.system() != "Windows", reason="prefer bat test only relevant on Windows"
+)
+def test_prefer_bat(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "prefer-bat/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "prefer-bat")
+
+    assert (pkg / "info/index.json").exists()
+
+
 @pytest.mark.skipif(
     platform.system() != "Windows", reason="PE header test only relevant on Windows"
 )
@@ -2683,3 +2781,115 @@ def test_topological_sort_with_variants(
     assert len(package_names) == 6, (
         f"Expected 6 packages (2 variants each), got {len(package_names)}"
     )
+
+
+@pytest.mark.skipif(
+    not (
+        (platform.system() == "Darwin" and platform.machine() == "arm64")
+        or (platform.system() == "Linux" and platform.machine() == "x86_64")
+    ),
+    reason="Only runs on macOS arm64 or Linux x86_64",
+)
+def test_v0_legacy_tests(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test that legacy v0 packages with run_test.sh and run_test.py execute correctly.
+
+    This is a regression test for a bug where CopyDir was called with a file
+    path instead of the test directory, causing 'File already exists' errors.
+    """
+    import urllib.request
+
+    if platform.system() == "Darwin":
+        url = "https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py39he7485ab_3.conda"
+        filename = "zstandard-0.23.0-py39he7485ab_3.conda"
+    else:
+        url = "https://conda.anaconda.org/conda-forge/linux-64/zstandard-0.23.0-py311hbc35293_1.conda"
+        filename = "zstandard-0.23.0-py311hbc35293_1.conda"
+
+    package_path = tmp_path / filename
+    urllib.request.urlretrieve(url, package_path)
+
+    rattler_build.test(str(package_path))
+
+
+def test_git_lfs_local_source(rattler_build: RattlerBuild, tmp_path: Path):
+    """
+    Tests that git sources with LFS-tracked files work correctly for local repos.
+
+    This exercises the fix for LFS on Windows where:
+    1. git clone --local / git reset --hard must skip the LFS smudge filter
+       (the bare database doesn't have LFS objects)
+    2. git lfs fetch needs the original source path (not the database) and
+       must use a plain path instead of file:// URLs
+    """
+    # Check git-lfs is installed
+    try:
+        subprocess.run(
+            ["git", "lfs", "version"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pytest.skip("git-lfs not installed, skipping test")
+
+    repo_dir = tmp_path / "lfs_repo"
+    recipe_dir = tmp_path / "recipe"
+    repo_dir.mkdir()
+    recipe_dir.mkdir()
+
+    def git(*args, cwd=repo_dir):
+        subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    # Set up a git repo with LFS tracking
+    git("init", "--initial-branch=main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.com")
+    git("lfs", "install", "--local")
+    git("lfs", "track", "*.bin")
+    git("add", ".gitattributes")
+    git("commit", "-m", "Add LFS tracking")
+
+    # Create an LFS-tracked file and a regular file
+    lfs_content = b"lfs-tracked-binary-content-1234567890"
+    (repo_dir / "data.bin").write_bytes(lfs_content)
+    (repo_dir / "README.md").write_text("hello")
+    git("add", "data.bin", "README.md")
+    git("commit", "-m", "Add files")
+
+    recipe_content = f"""\
+package:
+  name: test-git-lfs
+  version: 1.0.0
+source:
+  git: {repo_dir.as_posix()}
+  lfs: true
+build:
+  noarch: generic
+  script:
+    - if: unix
+      then:
+        - cp data.bin $PREFIX/data.bin
+        - cp README.md $PREFIX/README.md
+      else:
+        - copy data.bin %PREFIX%\\data.bin
+        - copy README.md %PREFIX%\\README.md
+"""
+    (recipe_dir / "recipe.yaml").write_text(recipe_content)
+
+    build_output = tmp_path / "output"
+    rattler_build.build(recipe_dir / "recipe.yaml", build_output)
+
+    pkg = get_extracted_package(build_output, "test-git-lfs")
+
+    # The LFS file should contain the actual content, not a pointer stub
+    resolved = (pkg / "data.bin").read_bytes()
+    assert resolved == lfs_content, (
+        f"LFS file should contain actual content, got: {resolved!r}"
+    )
+    assert (pkg / "README.md").read_text() == "hello"

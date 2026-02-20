@@ -492,6 +492,9 @@ pub async fn create_cpan_recipe(
     recipe
         .context
         .insert("version".to_string(), metadata.release.version.clone());
+    recipe
+        .context
+        .insert("build_number".to_string(), "0".to_string());
 
     // Set source
     let source = UrlSourceElement {
@@ -519,6 +522,8 @@ pub async fn create_cpan_recipe(
         recipe.requirements.run.extend(run_deps);
     }
 
+    // Set build number
+    recipe.build.number = "${{ build_number }}".to_string();
     // Set build script
     recipe.build.script = r#"perl Makefile.PL INSTALLDIRS=vendor
 make

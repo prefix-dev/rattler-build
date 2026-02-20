@@ -96,7 +96,7 @@ impl SourceCache {
         // Use rattler_git to fetch the repository
         tracing::info!("Fetching git repository: {}", git_url);
         let git_cache = self.cache_dir.join("git");
-        tokio::fs::create_dir_all(&git_cache).await?;
+        fs_err::tokio::create_dir_all(&git_cache).await?;
 
         let fetch_result = self
             .git_resolver
@@ -124,9 +124,14 @@ impl SourceCache {
             tracing::info!("Verified expected commit: {}", expected);
         }
 
+        // Handle submodules if needed (defaults to true)
+        if source.submodules {
+            self.git_submodule_update(&repo_path).await?;
+        }
+
         // Handle LFS if needed
         if source.lfs {
-            self.git_lfs_pull(&repo_path).await?;
+            self.git_lfs_pull(&repo_path, &source.url).await?;
         }
 
         // Create cache entry
@@ -156,8 +161,34 @@ impl SourceCache {
         })
     }
 
+    /// Initialize and recursively update git submodules
+    async fn git_submodule_update(&self, repo_path: &Path) -> Result<(), CacheError> {
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .arg("submodule")
+            .arg("update")
+            .arg("--init")
+            .arg("--recursive")
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("Failed to update git submodules: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(CacheError::Git(format!(
+                "Git submodule update failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Pull LFS files for a git repository
-    async fn git_lfs_pull(&self, repo_path: &Path) -> Result<(), CacheError> {
+    async fn git_lfs_pull(
+        &self,
+        repo_path: &Path,
+        source_url: &url::Url,
+    ) -> Result<(), CacheError> {
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
@@ -170,7 +201,38 @@ impl SourceCache {
             return Err(CacheError::Git("git-lfs not installed".to_string()));
         }
 
-        // Fetch LFS files
+        // Point git-lfs at the original source via `lfs.url` config.
+        // The checkout's origin remote points to the local bare database
+        // (set by `git clone --local`), which doesn't have LFS objects.
+        // We use lfs.url rather than modifying origin so only LFS is affected.
+        // For file:// URLs, convert to a plain local path because git-lfs does
+        // not handle the file:// protocol correctly (especially on Windows).
+        let lfs_url = if source_url.scheme() == "file" {
+            source_url
+                .to_file_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| source_url.as_str().to_string())
+        } else {
+            source_url.as_str().to_string()
+        };
+
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .arg("config")
+            .arg("lfs.url")
+            .arg(&lfs_url)
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("Failed to configure lfs.url: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(CacheError::Git(format!(
+                "Failed to configure lfs.url: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        // Fetch LFS files from the configured lfs.url.
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
             .arg("lfs")
@@ -263,10 +325,12 @@ impl SourceCache {
             if cache_path.exists() {
                 // Validate all checksums if provided
                 if !checksums.is_empty() {
-                    let all_valid = checksums.iter().all(|cs| cs.validate(&cache_path));
-                    if !all_valid {
+                    let mismatch = checksums
+                        .iter()
+                        .find_map(|cs| cs.validate(&cache_path).err());
+                    if mismatch.is_some() {
                         tracing::warn!("Checksum validation failed, re-downloading");
-                        tokio::fs::remove_file(&cache_path).await?;
+                        fs_err::tokio::remove_file(&cache_path).await?;
                     } else {
                         self.index.touch(&key).await?;
                         tracing::info!("Found source in cache: {}", cache_path.display());
@@ -286,9 +350,14 @@ impl SourceCache {
 
         // Validate all checksums
         for cs in checksums {
-            if !cs.validate(&cache_path) {
-                tokio::fs::remove_file(&cache_path).await?;
-                return Err(CacheError::ValidationFailed { path: cache_path });
+            if let Err(mismatch) = cs.validate(&cache_path) {
+                fs_err::tokio::remove_file(&cache_path).await?;
+                return Err(CacheError::ValidationFailed {
+                    path: cache_path,
+                    expected: mismatch.expected,
+                    actual: mismatch.actual,
+                    kind: mismatch.kind.to_string(),
+                });
             }
         }
 
@@ -359,7 +428,7 @@ impl SourceCache {
                 return Err(CacheError::FileNotFound(source_path));
             }
 
-            tokio::fs::copy(&source_path, &cache_path).await?;
+            fs_err::tokio::copy(&source_path, &cache_path).await?;
             return Ok((cache_path, Some(filename.to_string())));
         }
 
@@ -392,7 +461,7 @@ impl SourceCache {
         }
 
         // Stream download to file
-        let mut file = tokio::fs::File::create(&cache_path).await?;
+        let mut file = fs_err::tokio::File::create(&cache_path).await?;
         let mut stream = response.bytes_stream();
         let mut downloaded = 0u64;
 
@@ -415,16 +484,27 @@ impl SourceCache {
             handler.on_download_complete(url.as_str());
         }
 
-        Ok((
-            cache_path,
-            actual_filename.or_else(|| Some(filename.to_string())),
-        ))
+        // If Content-Disposition provided a filename that differs from the URL's,
+        // rename the cached file so downstream code can detect the archive format
+        // from the file extension alone.
+        let final_path = if let Some(ref actual) = actual_filename {
+            let new_path = self.cache_dir.join(format!("{}_{}", key, actual));
+            if new_path != cache_path {
+                fs_err::tokio::rename(&cache_path, &new_path).await?;
+                new_path
+            } else {
+                cache_path
+            }
+        } else {
+            cache_path
+        };
+
+        Ok((final_path, actual_filename))
     }
 
-    /// Check if a file should be extracted
-    fn should_extract(&self, path: &Path) -> bool {
+    /// Check if a file should be extracted based on its filename extension
+    pub(crate) fn should_extract(&self, path: &Path) -> bool {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
         is_archive(name)
     }
 
@@ -494,7 +574,7 @@ impl SourceCache {
             }
 
             let path = self.index.get_cache_path(&entry);
-            if let Ok(metadata) = tokio::fs::metadata(&path).await {
+            if let Ok(metadata) = fs_err::tokio::metadata(&path).await {
                 if metadata.is_file() {
                     total_size += metadata.len();
                 } else if metadata.is_dir() {
@@ -524,13 +604,18 @@ pub struct CacheStats {
 
 // Helper functions
 
-fn extract_filename_from_header(header_value: &str) -> Option<String> {
+pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String> {
     for part in header_value.split(';') {
         let part = part.trim();
         if part.starts_with("filename=") {
             let filename = part.strip_prefix("filename=")?;
             let filename = filename.trim_matches('"').trim_matches('\'');
             if !filename.is_empty() {
+                // Strip any path components — only keep the base filename
+                let filename = Path::new(filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(filename);
                 return Some(filename.to_string());
             }
         }
@@ -538,7 +623,7 @@ fn extract_filename_from_header(header_value: &str) -> Option<String> {
     None
 }
 
-fn is_archive(name: &str) -> bool {
+pub(crate) fn is_archive(name: &str) -> bool {
     is_tarball(name) || name.ends_with(".zip") || name.ends_with(".7z")
 }
 
@@ -638,7 +723,7 @@ fn extract_7z(archive: &Path, target: &Path) -> Result<(), CacheError> {
 
 async fn calculate_dir_size(dir: &Path) -> Result<u64, CacheError> {
     let mut total = 0u64;
-    let mut entries = tokio::fs::read_dir(dir).await?;
+    let mut entries = fs_err::tokio::read_dir(dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let metadata = entry.metadata().await?;

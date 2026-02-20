@@ -4,6 +4,7 @@ authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 preview = ['pixi-build']
+name = "rattler-build"
 
 [workspace.target.osx.build-variants]
 c_compiler_version = ["19"]
@@ -89,6 +90,7 @@ actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
 cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
 cargo-deny = "cargo deny --workspace check license --deny warnings"
 cargo-fmt = "cargo fmt"
+cargo-fmt-check = "cargo fmt -- --check"
 prettier-check = { cmd = "prettier --check", description = "Check YAML formatting with prettier" }
 prettier-fmt = { cmd = "prettier --write", description = "Format YAML with prettier" }
 nbstripout = "nbstripout"
@@ -118,6 +120,18 @@ tbump = "*"
 [feature.dev.tasks]
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
+
+[feature.packaging.dependencies]
+python = ">=3.13,<3.15"
+sccache = ">=0.12,<0.13"
+tomlkit = ">=0.13,<0.14"
+
+[feature.packaging.activation.env]
+RUSTC_WRAPPER = "sccache"
+
+[feature.packaging.tasks]
+build-package = "python scripts/build_package.py"
+upload-package = "python scripts/upload_package.py"
 
 
 [target.linux-64.dependencies]
@@ -158,8 +172,12 @@ default = { features = [
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
+packaging = { features = ["packaging"], no-default-feature = true }
 
 # pixi build
+[package]
+name.workspace = true
+
 [package.build.backend]
 name = "pixi-build-rust"
 version = "*"
@@ -170,7 +188,3 @@ channels = [
 
 [package.build.config]
 compilers = ["rust", "c"]
-
-[package]
-name = "rattler-build"
-version = "0.0.0dev"   # NOTE: how to set this automatically?

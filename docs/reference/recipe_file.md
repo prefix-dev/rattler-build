@@ -246,6 +246,20 @@ source:
   lfs: true # note: defaults to false
 ```
 
+By default, rattler-build will recursively initialize and update all git
+submodules. For repositories with large or numerous submodules that aren't needed
+for the build, you can disable this by setting `submodules: false`:
+
+```yaml
+source:
+  git: https://github.com/riscv-collab/riscv-gnu-toolchain.git
+  tag: "2024.09.03"
+  submodules: false # note: defaults to true
+```
+
+If you need only specific submodules, set `submodules: false` and initialize them
+manually in your build script.
+
 ##### Verifying commit hash with `expected_commit`
 
 !!! note
