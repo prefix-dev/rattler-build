@@ -22,14 +22,14 @@ build:
       regex: "regex-post-process"
       replacement: "regex-post-process-replaced"
     - files:
-        - '*.pc'
+        - "*.pc"
       regex: (?:-L|-I)?"?([^;\s]+/sysroot/)
-      replacement: '$(CONDA_BUILD_SYSROOT_S)'
+      replacement: "$(CONDA_BUILD_SYSROOT_S)"
     - files:
-        - '*.cmake'
+        - "*.cmake"
       regex: ([^;\s"]+/sysroot)
-      replacement: '$$ENV{CONDA_BUILD_SYSROOT}'
+      replacement: "$$ENV{CONDA_BUILD_SYSROOT}"
     - files:
-        - '*.cmake'
+        - "*.cmake"
       regex: ([^;\s"]+/MacOSX\d*\.?\d*\.sdk)
-      replacement: '$$ENV{CONDA_BUILD_SYSROOT}'
+      replacement: "$$ENV{CONDA_BUILD_SYSROOT}"

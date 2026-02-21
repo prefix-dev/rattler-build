@@ -9,7 +9,7 @@ package:
 build:
   number: 0
   always_include_files:
-  - lib/empty-folder
+    - lib/empty-folder
 
   script: |
     mkdir -p ${PREFIX}/lib/symlink

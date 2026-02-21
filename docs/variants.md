@@ -31,7 +31,7 @@ numpy:
 - "1.20"
 ```
 
-If we have a recipe, that has a `build`, `host` or `run` dependency on `python`
+If we have a recipe that has a `build` or `host` dependency on `python`,
 we will build multiple variants of this package, one for each configured
 `python` version ("3.8", "3.9" and "3.10").
 
@@ -87,16 +87,28 @@ When multiple variant configuration files are merged, the following rules apply:
 
 ### `conda-build` Compatibility
 
-Since version 0.35.0, rattler-build supports conda_build_config.yaml files,
+Since version 0.35.0, rattler-build supports `conda_build_config.yaml` files,
 parsing a subset of conda-build's configuration syntax. The filename must match
 exactly to be recognized as a conda-build config file.
+
+## Overriding the variant configuration from the command line
+
+You can override the chosen variant configuration by passing in the variant you want from the CLI:
+
+```console
+rattler-build build --recipe ./my-recipe --variant python=3.12 --variant numpy="2.*"
+```
+
+To build against multiple Python versions you can separate the variant strings by `,`, e.g. `--variant python=3.12,3.13`.
+
+This will follow the same logic as using multiple variant files: the CLI will overwrite any variant keys set by files that were loaded.
 
 ## Package hash from variant
 
 You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
 It serves as a mechanism to discern different build configurations that produce a package with the same name and version.
 
-The hash is computed by dumping all of the variant configuration values that are used by a
+The hash is computed by dumping all the variant configuration values that are used by a
 given recipe into a JSON file, and then hashing that JSON file.
 
 For example, in our `python` example, we would get a variant configuration file that looks something like:
@@ -133,7 +145,7 @@ numpy: ["1.12", "1.14"]
 However, if we use the `zip_keys` and specify:
 
 ```yaml
-zip_keys: ["python", "numpy"]
+zip_keys: [["python", "numpy"]]
 python: ["3.8", "3.9"]
 numpy: ["1.12", "1.14"]
 ```
@@ -186,6 +198,14 @@ requirements:
   - libcurl >=8,<9
 ```
 
+### Channel sources
+
+You can specify the channels when building by adjusting `channel_sources` in your variant file:
+
+```yaml
+channel_sources: conda-forge/label/rust_dev,conda-forge
+```
+
 ## Prioritizing variants
 
 You might produce multiple variants for a package, but want to define a _priority_ for a given variant.
@@ -211,6 +231,44 @@ build:
     # this will down-prioritize the cuda variant versus other variants of the package
     down_prioritize_variant: ${{ 1 if cuda else 0 }}
 ```
+
+???+ example "Example: CUDA / CPU variant with automatic fallback"
+
+    A common pattern is to build both GPU and CPU variants, where the solver
+    picks the GPU variant when CUDA is available and falls back to CPU otherwise.
+    The `__cuda` virtual package in `run` requirements is the key — it makes
+    the GPU package uninstallable on non-CUDA systems.
+
+    ```yaml title="recipe.yaml"
+    context:
+      # ...
+      cuda_version: ${{ env.get("CONDA_OVERRIDE_CUDA", default="None") }}
+      cuda: ${{ "enabled" if cuda_version != "None" else "disabled" }}
+
+    build:
+      # ...
+      variant:
+        use_keys:
+          - ${{ "cuda" if cuda == "enabled" }}
+        # deprioritize the CPU variant so the solver prefers GPU when available
+        down_prioritize_variant: ${{ 0 if cuda == "enabled" else 1 }}
+
+    requirements:
+      build:
+        # ...
+        - if: cuda == "enabled"
+          then: ${{ compiler('cuda') }}
+      host:
+        # ...
+        - if: cuda == "enabled"
+          then:
+            - cuda-version ==${{ cuda_version }}
+            # ... other CUDA host dependencies
+      run:
+        - if: cuda == "enabled"
+          then:
+            - __cuda  # ensures this variant is only installed in CUDA environments
+    ```
 
 ### Mutex packages
 

@@ -1,2 +1,6 @@
 # GitHub syntax highlighting
-pixi.lock linguist-language=YAML
+pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+Cargo.lock merge=binary linguist-generated=true
+
+# Test data files should always use LF line endings for cross-platform consistency
+test-data/patch_application/**/*.py text eol=lf

@@ -1,0 +1,9 @@
+--- original_name.md
++++ original_name.md
+@@ -1,4 +1,5 @@
+ I am a long text.
+ And I want to be patched.
++Oh, wow, I was patched even with a renamed file!
+ By the patching tool in rattler-build.
+ Thank you!
+\ No newline at end of file

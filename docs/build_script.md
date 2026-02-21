@@ -1,4 +1,4 @@
-# Build scripts
+# Scripts for building and testing packages
 
 The `build.sh` file is the build script for Linux and macOS and `build.bat` is
 the build script for Windows. These scripts contain the logic that carries out
@@ -33,8 +33,8 @@ build:
         - cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh
     - if: win
       then:
-        - mkdir %PREFIX%\bin
-        - copy %RECIPE_DIR%\my_script_with_recipe.bat %PREFIX%\bin\super-cool-script.bat
+        - mkdir %LIBRARY_BIN%
+        - copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 ```
 
 ## Environment variables
@@ -77,6 +77,23 @@ So far, the following interpreters are supported:
 - `cmd.exe` (default on Windows)
 - `nushell`
 - `python`
+- `perl`
+- `rscript` (for R scripts)
+- `ruby`
+- `node` or `nodejs` (for NodeJS scripts)
+
+`rattler-build` automatically detects the interpreter based on the file extension
+(`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you can specify it in the
+`interpreter` key in the `script` section of your recipe.
+
+```yaml title="recipe.yaml"
+build:
+  script: myscript.py  # automatically selects the Python interpreter
+
+requirements:
+  build:
+    - python  # required to execute the `myscript.py` script
+```
 
 !!! note
     Using alternative interpreters is less battle-tested than using `bash` or
@@ -119,6 +136,44 @@ build:
 requirements:
   build:
     - python
+```
+
+### Using `ruby`
+
+In order to use `ruby` you can select the `interpreter: ruby` or have a
+`build.rb` file in your recipe directory and `ruby` in the
+`requirements/build` section.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: ruby
+    content: |
+      puts "Hello from Ruby!"
+
+# Note: it's required to have `ruby` in the `build` section of your recipe!
+requirements:
+  build:
+    - ruby
+```
+
+### Using `nodejs`
+
+In order to use `nodejs` you can select the `interpreter: nodejs` (or `node`) or have a
+`build.js` file in your recipe directory and `nodejs` in the
+`requirements/build` section.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: nodejs
+    content: |
+      console.log("Hello from NodeJS!");
+
+# Note: it's required to have `nodejs` in the `build` section of your recipe!
+requirements:
+  build:
+    - nodejs
 ```
 
 
@@ -176,7 +231,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 `PY_VER`
 
 : Specifies the Python version against which the build is occurring.
-  This can be modified with a `variant_config.yaml` file.
+  This can be modified with a `variants.yaml` file.
 
 `PATH`
 

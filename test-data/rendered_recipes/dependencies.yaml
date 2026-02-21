@@ -103,7 +103,7 @@ resolved:
     size: 250351
     subdir: osx-arm64
     timestamp: 1679532511311
-    version: '8.2'
+    version: "8.2"
     fn: readline-8.2-h92ec313_1.conda
     url: https://conda.anaconda.org/conda-forge/osx-arm64/readline-8.2-h92ec313_1.conda
     channel: https://conda.anaconda.org/conda-forge/
@@ -118,7 +118,7 @@ resolved:
     size: 794741
     subdir: osx-arm64
     timestamp: 1698751574074
-    version: '6.4'
+    version: "6.4"
     fn: ncurses-6.4-h463b476_2.conda
     url: https://conda.anaconda.org/conda-forge/osx-arm64/ncurses-6.4-h463b476_2.conda
     channel: https://conda.anaconda.org/conda-forge/

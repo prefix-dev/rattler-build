@@ -5,8 +5,8 @@ use throbber_widgets_tui::ThrobberState;
 use tui_input::Input;
 
 use crate::{
-    console_utils::LoggingOutputHandler, get_tool_config, metadata::Output,
-    tool_configuration::Configuration, BuildData,
+    BuildData, console_utils::LoggingOutputHandler, get_tool_config, metadata::Output,
+    tool_configuration::Configuration,
 };
 
 /// Representation of a package.

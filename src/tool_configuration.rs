@@ -1,19 +1,23 @@
 //! Configuration for the rattler-build tool
 //! This is useful when using rattler-build as a library
 
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_networking::{
+    AuthenticationStorage,
     authentication_storage::{self, AuthenticationStorageError},
-    AuthenticationMiddleware, AuthenticationStorage,
+    mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
-use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+#[cfg(feature = "s3")]
+use thiserror::Error;
+use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -45,14 +49,39 @@ pub enum TestStrategy {
     NativeAndEmulated,
 }
 
+/// Whether we want to continue building on failure of a package or stop the build
+/// entirely
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContinueOnFailure {
+    /// Continue building on failure of a package
+    Yes,
+    /// Stop the build entirely on failure of a package
+    #[default]
+    No,
+}
+
+// This is the key part - implement From<bool> for your type
+impl From<bool> for ContinueOnFailure {
+    fn from(value: bool) -> Self {
+        if value {
+            ContinueOnFailure::Yes
+        } else {
+            ContinueOnFailure::No
+        }
+    }
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
     /// If set to a value, a progress bar will be shown
     pub fancy_log_handler: LoggingOutputHandler,
 
-    /// The authenticated reqwest download client to use
-    pub client: ClientWithMiddleware,
+    /// The HTTP client with S3, mirrors, and auth middleware
+    pub client: rattler_build_networking::BaseClient,
+
+    /// The source cache for downloading and caching source code
+    pub source_cache: Option<Arc<rattler_build_source_cache::SourceCache>>,
 
     /// Set this to true if you want to keep the build directory after the build
     /// is done
@@ -66,6 +95,9 @@ pub struct Configuration {
 
     /// Whether to use bzip2
     pub use_bz2: bool,
+
+    /// Whether to use sharded repodata
+    pub use_sharded: bool,
 
     /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
@@ -81,6 +113,9 @@ pub struct Configuration {
     /// threads does not matter for the final result.
     pub compression_threads: Option<u32>,
 
+    /// Concurrency limit for I/O operations
+    pub io_concurrency_limit: Option<usize>,
+
     /// The package cache to use to store packages in.
     pub package_cache: PackageCache,
 
@@ -89,6 +124,26 @@ pub struct Configuration {
 
     /// What channel priority to use in solving
     pub channel_priority: ChannelPriority,
+
+    /// List of hosts for which SSL certificate verification should be skipped
+    pub allow_insecure_host: Option<Vec<String>>,
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub continue_on_failure: ContinueOnFailure,
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub error_prefix_in_binary: bool,
+
+    /// Whether to allow symlinks in packages on Windows (defaults to false)
+    pub allow_symlinks_on_windows: bool,
+
+    /// Whether to allow absolute paths in license_file entries (defaults to false)
+    pub allow_absolute_license_paths: bool,
+
+    /// Whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler-build
+    /// to execute scripts / bundle up files.
+    pub environments_externally_managed: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -108,45 +163,50 @@ pub fn get_auth_store(
 }
 
 /// Create a reqwest client with the authentication middleware
+///
+/// * `auth_file` - Optional path to an authentication file
+/// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-) -> Result<ClientWithMiddleware, AuthenticationStorageError> {
+    #[cfg(feature = "s3")] s3_middleware_config: HashMap<String, s3_middleware::S3Config>,
+    mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
+    allow_insecure_host: Option<Vec<String>>,
+) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
-    let timeout = 5 * 60;
-    Ok(reqwest_middleware::ClientBuilder::new(
-        reqwest::Client::builder()
-            .no_gzip()
-            .pool_max_idle_per_host(20)
-            .user_agent(APP_USER_AGENT)
-            .read_timeout(std::time::Duration::from_secs(timeout))
-            .build()
-            .expect("failed to create client"),
-    )
-    .with(RetryTransientMiddleware::new_with_policy(
-        ExponentialBackoff::builder().build_with_max_retries(3),
-    ))
-    .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-        auth_storage,
-    )))
-    .build())
+    Ok(rattler_build_networking::BaseClient::builder()
+        .user_agent(APP_USER_AGENT)
+        .timeout(5 * 60)
+        .insecure_hosts(allow_insecure_host.unwrap_or_default())
+        .with_authentication(auth_storage)
+        .with_s3(s3_middleware_config)
+        .with_mirrors(mirror_middleware_config)
+        .build())
 }
 
 /// A builder for a [`Configuration`].
 pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
-    client: Option<ClientWithMiddleware>,
+    client: Option<rattler_build_networking::BaseClient>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
+    use_sharded: bool,
     skip_existing: SkipExisting,
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
+    io_concurrency_limit: Option<usize>,
     channel_priority: ChannelPriority,
+    allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: ContinueOnFailure,
+    error_prefix_in_binary: bool,
+    allow_symlinks_on_windows: bool,
+    allow_absolute_license_paths: bool,
+    environments_externally_managed: bool,
 }
 
 impl Configuration {
@@ -168,11 +228,19 @@ impl ConfigurationBuilder {
             test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: true,
+            use_sharded: true,
             skip_existing: SkipExisting::None,
             noarch_build_platform: None,
             channel_config: None,
             compression_threads: None,
+            io_concurrency_limit: None,
             channel_priority: ChannelPriority::Strict,
+            allow_insecure_host: None,
+            continue_on_failure: ContinueOnFailure::No,
+            error_prefix_in_binary: false,
+            allow_symlinks_on_windows: false,
+            allow_absolute_license_paths: false,
+            environments_externally_managed: false,
         }
     }
 
@@ -181,6 +249,38 @@ impl ConfigurationBuilder {
     pub fn with_cache_dir(self, cache_dir: PathBuf) -> Self {
         Self {
             cache_dir: Some(cache_dir),
+            ..self
+        }
+    }
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
+        Self {
+            continue_on_failure,
+            ..self
+        }
+    }
+
+    /// Whether to error if the host prefix is detected in binary files
+    pub fn with_error_prefix_in_binary(self, error_prefix_in_binary: bool) -> Self {
+        Self {
+            error_prefix_in_binary,
+            ..self
+        }
+    }
+
+    /// Whether to allow symlinks in packages on Windows
+    pub fn with_allow_symlinks_on_windows(self, allow_symlinks_on_windows: bool) -> Self {
+        Self {
+            allow_symlinks_on_windows,
+            ..self
+        }
+    }
+
+    /// Whether to allow absolute paths in license_file entries
+    pub fn with_allow_absolute_license_paths(self, allow_absolute_license_paths: bool) -> Self {
+        Self {
+            allow_absolute_license_paths,
             ..self
         }
     }
@@ -224,6 +324,15 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set the maximum I/O concurrency during package installation or None to use
+    /// a default based on number of cores
+    pub fn with_io_concurrency_limit(self, io_concurrency_limit: Option<usize>) -> Self {
+        Self {
+            io_concurrency_limit,
+            ..self
+        }
+    }
+
     /// Sets whether to keep the build output or delete it after the build is
     /// done.
     pub fn with_keep_build(self, keep_build: bool) -> Self {
@@ -234,7 +343,7 @@ impl ConfigurationBuilder {
     }
 
     /// Sets the request client to use for network requests.
-    pub fn with_reqwest_client(self, client: ClientWithMiddleware) -> Self {
+    pub fn with_reqwest_client(self, client: rattler_build_networking::BaseClient) -> Self {
         Self {
             client: Some(client),
             ..self
@@ -273,6 +382,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Whether downloading sharded repodata is enabled.
+    pub fn with_sharded_repodata_enabled(self, sharded_repodata_enabled: bool) -> Self {
+        Self {
+            use_sharded: sharded_repodata_enabled,
+            ..self
+        }
+    }
+
     /// Define the noarch platform
     pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
         Self {
@@ -289,14 +406,33 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set the list of hosts for which SSL certificate verification should be skipped
+    pub fn with_allow_insecure_host(self, allow_insecure_host: Option<Vec<String>>) -> Self {
+        Self {
+            allow_insecure_host,
+            ..self
+        }
+    }
+
+    /// Set whether the environments are externally managed (e.g. by `pixi-build`).
+    /// This is only useful for other libraries that build their own environments and only use rattler
+    /// to execute scripts / bundle up files.
+    pub fn with_environments_externally_managed(
+        self,
+        environments_externally_managed: bool,
+    ) -> Self {
+        Self {
+            environments_externally_managed,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
-        let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None).expect("failed to create client")
-        });
+        let client = self.client.unwrap_or_default();
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
@@ -306,13 +442,12 @@ impl ConfigurationBuilder {
         let repodata_gateway = Gateway::builder()
             .with_cache_dir(cache_dir.join(rattler_cache::REPODATA_CACHE_DIR))
             .with_package_cache(package_cache.clone())
-            .with_client(client.clone())
+            .with_client(client.get_client().clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
-                    jlap_enabled: true,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
-                    sharded_enabled: true,
+                    sharded_enabled: self.use_sharded,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),
@@ -327,17 +462,108 @@ impl ConfigurationBuilder {
         Configuration {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
+            source_cache: None, // Built lazily on first use
             no_clean: self.no_clean,
             test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
+            use_sharded: self.use_sharded,
             skip_existing: self.skip_existing,
             noarch_build_platform: self.noarch_build_platform,
             channel_config,
             compression_threads: self.compression_threads,
+            io_concurrency_limit: self.io_concurrency_limit,
             package_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,
+            allow_insecure_host: self.allow_insecure_host,
+            continue_on_failure: self.continue_on_failure,
+            error_prefix_in_binary: self.error_prefix_in_binary,
+            allow_symlinks_on_windows: self.allow_symlinks_on_windows,
+            allow_absolute_license_paths: self.allow_absolute_license_paths,
+            environments_externally_managed: self.environments_externally_managed,
         }
     }
+}
+
+/// Error type for S3 credential resolution
+#[cfg(feature = "s3")]
+#[derive(Debug, Error)]
+pub enum S3CredentialError {
+    /// Failed to get authentication storage
+    #[error("Failed to get authentication storage: {0}")]
+    AuthStorageError(#[from] AuthenticationStorageError),
+
+    /// Failed to load credentials from AWS SDK
+    #[error("Failed to load credentials from AWS SDK: {0}")]
+    SdkError(#[from] rattler_s3::FromSDKError),
+
+    /// No credentials found
+    #[error(
+        "No S3 credentials found for bucket '{bucket}'. Please configure credentials via `rattler auth` or AWS environment variables."
+    )]
+    NoCredentials {
+        /// The bucket name
+        bucket: String,
+    },
+}
+
+/// Resolve S3 credentials for the given bucket URL.
+///
+/// This function tries to resolve S3 credentials in the following order:
+/// 1. If S3 config is present for the bucket in the configuration, use it with auth storage
+/// 2. Fall back to AWS SDK default credential chain
+///
+/// # Arguments
+/// * `s3_config` - S3 middleware configuration (from rattler config)
+/// * `auth_file` - Optional path to an authentication file
+/// * `bucket_url` - The S3 bucket URL to resolve credentials for
+#[cfg(feature = "s3")]
+pub async fn resolve_s3_credentials(
+    s3_config: &HashMap<String, s3_middleware::S3Config>,
+    auth_file: Option<PathBuf>,
+    bucket_url: &Url,
+) -> Result<rattler_s3::ResolvedS3Credentials, S3CredentialError> {
+    let bucket_name = bucket_url.host_str().unwrap_or_default();
+
+    // Check if we have custom S3 config for this bucket
+    if let Some(config) = s3_config.get(bucket_name)
+        && let s3_middleware::S3Config::Custom {
+            endpoint_url,
+            region,
+            force_path_style,
+        } = config
+    {
+        // Create S3Credentials from the config
+        let s3_creds = rattler_s3::S3Credentials {
+            endpoint_url: endpoint_url.clone(),
+            region: region.clone(),
+            addressing_style: if *force_path_style {
+                rattler_s3::S3AddressingStyle::Path
+            } else {
+                rattler_s3::S3AddressingStyle::VirtualHost
+            },
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
+
+        // Try to resolve with auth storage
+        let auth_storage = get_auth_store(auth_file.clone())?;
+        if let Some(resolved) = s3_creds.resolve(bucket_url, &auth_storage) {
+            tracing::debug!(
+                "Resolved S3 credentials for bucket '{}' from config + auth storage",
+                bucket_name
+            );
+            return Ok(resolved);
+        }
+    }
+
+    // Fall back to AWS SDK default credential chain
+    tracing::debug!(
+        "Using AWS SDK default credential chain for bucket '{}'",
+        bucket_name
+    );
+    let resolved = rattler_s3::ResolvedS3Credentials::from_sdk().await?;
+    Ok(resolved)
 }

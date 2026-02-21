@@ -1,0 +1,11 @@
+package:
+  name: test-package
+  version: 1.0.0
+
+requirements:
+  build:
+    - gcc
+  install:
+    - python
+  runtime:
+    - numpy

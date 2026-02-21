@@ -1,6 +1,6 @@
 <h1>
-  <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
+  <a href="https://prefix.dev/tools/rattler-build">
+    <img alt="banner" src="https://github.com/user-attachments/assets/456f8ef1-1c7b-463d-ad88-de3496b05db2">
   </a>
 </h1>
 
@@ -26,10 +26,9 @@
 The `rattler-build` tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
-run is a package that can be installed using `mamba`, `rattler` or `conda`.
+run is a package that can be installed using [`pixi`](https://github.com/prefix-dev/pixi), [`mamba`](https://github.com/mamba-org/mamba), or [`conda`](https://conda.org).
 
-`rattler-build` does not have any dependencies on `conda-build` or Python and
-works as a standalone binary.
+`rattler-build` is a standalone binary written from scratch in Rust, and does not have any dependencies on `conda-build` or Python.
 
 ![](https://github.com/prefix-dev/rattler-build/assets/885054/98377399-aae4-45a5-a4e9-982a3c7b2d50)
 
@@ -81,21 +80,13 @@ executed as subprocess. We plan to reduce the number of external dependencies
 over time by writing what we need in Rust to make `rattler-build` fully
 self-contained.
 
-* `tar` to unpack tarballs downloaded from the internet in a variety of formats.
-  `.gz`, `.bz2` and `.xz` are widely used and one might have to install the
-  compression packages as well (e.g. `gzip`, `bzip2`, ...)
-* `patch` to patch source code after downloading
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require `git`
-  in the future)
+* `git` is required to checkout Git repositories.
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
-
-On Windows, to obtain these dependencies from conda-forge, one can install
-`m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
 
 ### Documentation
 

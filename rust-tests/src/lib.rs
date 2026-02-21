@@ -167,10 +167,10 @@ mod tests {
     }
 
     fn rattler() -> RattlerBuild {
-        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
-            if let Some(ret) = RattlerBuild::with_binary(path) {
-                return ret;
-            }
+        if let Ok(path) = std::env::var("RATTLER_BUILD_PATH")
+            && let Some(ret) = RattlerBuild::with_binary(path)
+        {
+            return ret;
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
@@ -248,7 +248,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
             serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
-        assert!(!index_json.contains_key("depends"));
+        assert_eq!(index_json.get("depends"), Some(&serde_json::json!([])));
     }
 
     fn get_package(folder: impl AsRef<Path>, mut glob_str: String) -> PathBuf {
@@ -508,6 +508,14 @@ mod tests {
     }
 
     #[test]
+    fn test_7z_source() {
+        let tmp = tmp("test_7z_source");
+        let rattler_build = rattler().build(recipes().join("7z-source"), tmp.as_dir(), None, None);
+
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
     fn test_dry_run_cf_upload() {
         let tmp = tmp("test_polarify");
         let variant = recipes().join("polarify").join("linux_64_.yaml");
@@ -674,5 +682,141 @@ requirements:
     - python
 "#;
         run_build_from_yaml_string(recipe_content.to_string());
+    }
+
+    #[test]
+    fn test_missing_license_file() {
+        let tmp = tmp("test_missing_license_file");
+        let rattler_build = rattler().build(
+            recipes().join("missing_license_file"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert!(output.contains("No license files were copied"));
+        assert!(output.contains("The following license files were not found: does-not-exist.txt"));
+    }
+
+    #[test]
+    fn test_missing_license_glob() {
+        let tmp = tmp("test_missing_license_glob");
+        let rattler_build = rattler().build(
+            recipes().join("missing_license_glob"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert!(output.contains("No license files were copied"));
+        assert!(output.contains("The following license files were not found: *.license"));
+    }
+
+    #[test]
+    fn test_absolute_path_license_without_flag() {
+        let tmp = tmp("test_absolute_path_license_without_flag");
+        let recipe_path = recipes().join("absolute_path_license");
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipe_path.display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+        ]);
+
+        // This should fail without --allow-absolute-license-paths
+        assert!(!rattler_build.status.success());
+
+        let output = String::from_utf8_lossy(&rattler_build.stdout);
+        assert!(output.contains("Absolute paths in license_file are not allowed"));
+        // Check for parts of the flag name (may be wrapped across lines in output)
+        assert!(output.contains("allow-absolute"));
+    }
+
+    #[test]
+    fn test_absolute_path_license_with_flag() {
+        let tmp = tmp("test_absolute_path_license_with_flag");
+        let recipe_path = recipes().join("absolute_path_license");
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipe_path.display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+            "--allow-absolute-license-paths",
+        ]);
+
+        // This should succeed with --allow-absolute-license-paths
+        assert!(rattler_build.status.success());
+
+        // Verify both the relative and absolute path license files were copied
+        let pkg = get_extracted_package(tmp.as_dir(), "absolute-path-license");
+        assert!(pkg.join("info/licenses/LICENSE").exists());
+        assert!(pkg.join("info/licenses/external_license.txt").exists());
+    }
+
+    #[test]
+    fn test_sourceforge_redirects() {
+        let tmp = tmp("test_sourceforge_redirects");
+        let rattler_build = rattler().build(
+            recipes().join("sourceforge-redirects"),
+            tmp.as_dir(),
+            None,
+            None,
+        );
+
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
+    fn test_target_platform_in_variant_config_warning() {
+        let tmp = tmp("test_target_platform_warning");
+        let variant_config_path = test_data_dir()
+            .join("variant_files/variant_with_target_platform.yaml")
+            .display()
+            .to_string();
+
+        let output_dir = tmp.as_dir().display().to_string();
+        let recipe_str = recipes().join("binary_prefix_test").display().to_string();
+
+        let rattler_build = rattler().with_args([
+            "--log-style=plain",
+            "build",
+            "--recipe",
+            &recipe_str,
+            "--package-format=tarbz2",
+            "--output-dir",
+            &output_dir,
+            "--variant-config",
+            &variant_config_path,
+            "--render-only",
+        ]);
+
+        assert!(rattler_build.status.success());
+
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        // Check that the warning message appears
+        assert!(
+            output.contains("Setting 'target_platform' in a variant config file is not supported"),
+            "Expected warning about target_platform not being supported in variant config"
+        );
+        assert!(
+            output.contains("Please use the '--target-platform' command-line flag"),
+            "Expected suggestion to use --target-platform flag"
+        );
     }
 }

@@ -12,8 +12,8 @@ build:
 
 tests:
   - script:
-    - if: unix
-      then:
-        - test -f $PREFIX/fail.txt
-      else:
-        - if not exist %PREFIX%\fail.txt (exit 1)
+      - if: unix
+        then:
+          - test -f $PREFIX/fail.txt
+        else:
+          - if not exist %PREFIX%\fail.txt (exit 1)

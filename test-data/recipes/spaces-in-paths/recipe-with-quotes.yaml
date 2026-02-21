@@ -1,0 +1,20 @@
+context:
+  name: spaces-in-paths-quotes
+  version: 1.0.0
+
+package:
+  name: spaces-in-paths-quotes
+  version: "1.0.0"
+
+build:
+  script:
+    - if: unix
+      then: |
+        echo "This is a test with spaces in paths" > "$PREFIX/test.txt"
+        mkdir "$PREFIX/dir with spaces"
+        echo "This file is in a directory with spaces" > "$PREFIX/dir with spaces/file.txt"
+    - if: win
+      then: |
+        echo "This is a test with spaces in paths" > "%PREFIX%\test.txt"
+        mkdir "%PREFIX%\dir with spaces"
+        (echo This file is in a directory with spaces) > "%PREFIX%\dir with spaces\file.txt"

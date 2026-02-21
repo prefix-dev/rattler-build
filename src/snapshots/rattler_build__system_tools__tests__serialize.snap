@@ -1,6 +1,5 @@
 ---
 source: src/system_tools.rs
-assertion_line: 284
 expression: json
 ---
 {

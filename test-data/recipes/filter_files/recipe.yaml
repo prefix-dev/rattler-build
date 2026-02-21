@@ -13,3 +13,5 @@ build:
     - mkdir -p $PREFIX/lib
     - touch $PREFIX/lib/libarchive.la
     - touch $PREFIX/exists.txt
+    - mkdir -p $PREFIX/.github/
+    - touch $PREFIX/.github/foo

@@ -1,7 +1,7 @@
 //! The rebuild module contains rebuild helper functions.
 
 use fs_err as fs;
-use rattler_conda_types::package::ArchiveType;
+use rattler_conda_types::package::CondaArchiveType;
 use std::path::{Path, PathBuf};
 
 /// Extracts a folder from a tar.bz2 archive.
@@ -19,10 +19,10 @@ fn folder_from_tar_bz2(
         let path = entry.path()?;
         if let Ok(stripped_path) = path.strip_prefix(find_path) {
             let dest_file = dest_folder.join(stripped_path);
-            if let Some(parent_folder) = dest_file.parent() {
-                if !parent_folder.exists() {
-                    fs::create_dir_all(parent_folder)?;
-                }
+            if let Some(parent_folder) = dest_file.parent()
+                && !parent_folder.exists()
+            {
+                fs::create_dir_all(parent_folder)?;
             }
             entry.unpack(dest_file)?;
         }
@@ -52,10 +52,10 @@ fn folder_from_conda(
         let path = entry.path()?;
         if let Ok(stripped_path) = path.strip_prefix(find_path) {
             let dest_file = dest_folder.join(stripped_path);
-            if let Some(parent_folder) = dest_file.parent() {
-                if !parent_folder.exists() {
-                    fs::create_dir_all(parent_folder)?;
-                }
+            if let Some(parent_folder) = dest_file.parent()
+                && !parent_folder.exists()
+            {
+                fs::create_dir_all(parent_folder)?;
             }
             entry.unpack(dest_file)?;
         }
@@ -65,7 +65,7 @@ fn folder_from_conda(
 
 /// Extracts a recipe from a package archive to a destination folder.
 pub fn extract_recipe(package: &Path, dest_folder: &Path) -> Result<(), std::io::Error> {
-    let archive_type = ArchiveType::try_from(package).ok_or_else(|| {
+    let archive_type = CondaArchiveType::try_from(package).ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "package does not point to valid archive",
@@ -73,8 +73,8 @@ pub fn extract_recipe(package: &Path, dest_folder: &Path) -> Result<(), std::io:
     })?;
     let path = PathBuf::from("info/recipe");
     match archive_type {
-        ArchiveType::TarBz2 => folder_from_tar_bz2(package, &path, dest_folder)?,
-        ArchiveType::Conda => folder_from_conda(package, &path, dest_folder)?,
+        CondaArchiveType::TarBz2 => folder_from_tar_bz2(package, &path, dest_folder)?,
+        CondaArchiveType::Conda => folder_from_conda(package, &path, dest_folder)?,
     };
     Ok(())
 }

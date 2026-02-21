@@ -4,7 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "py-rattler-build"
-requires-python = ">=3.8"
+version = "0.48.0"
+requires-python = ">=3.10"
 description = "The fastest way to build conda packages programatically"
 readme = "README.md"
 authors = [{ name = "Wolf Vollprecht", email = "w.vollprecht@gmail.com" }]
@@ -18,7 +19,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 license = "BSD-3-Clause"
-dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/prefix-dev/rattler-build"
@@ -27,20 +27,24 @@ Issues = "https://github.com/prefix-dev/rattler-build/labels/python-bindings"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+manifest-path = "rust/Cargo.toml"
+module-name = "rattler_build._rattler_build"
+python-source = "src"
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py310"
+lint.extend-select = ["UP"]
 
 [tool.mypy]
-python_version = "3.8"
-files = ["rattler_build", "tests", "examples"]
+python_version = "3.10"
+files = ["src/rattler_build", "tests", "examples"]
 strict = true
 enable_error_code = ["redundant-expr", "truthy-bool", "ignore-without-code"]
 disable_error_code = ["empty-body"]
 
 [[tool.mypy.overrides]]
-module = ["rattler_build.rattler_build"]
+module = ["rattler_build._rattler_build"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -51,3 +55,6 @@ module = ["rattler_build.*"]
 # amounts to duplicating almost all type annotations on our api, as the Python api itself is a
 # thin wrapper around the PyO3 api to start with.
 warn_return_any = false
+
+[tool.ty.rules]
+unresolved-import = "ignore" # Ignore until ty can deal with the Rust shared lib

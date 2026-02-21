@@ -1,0 +1,194 @@
+//! Parser for the Package section
+
+use marked_yaml::Node as MarkedNode;
+use rattler_build_jinja::JinjaTemplate;
+use rattler_build_yaml_parser::{ParseMapping, helpers::contains_jinja_template};
+
+use std::str::FromStr;
+
+use crate::{
+    error::{ParseError, ParseResult},
+    stage0::{Value, package::Package, parser::helpers::get_span},
+};
+
+/// Parse a Package section from YAML
+///
+/// The Package section contains the package name and version.
+///
+/// Example YAML:
+/// ```yaml
+/// package:
+///   name: my-package
+///   version: 1.0.0
+/// ```
+pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
+    // Validate field names first
+    yaml.validate_keys("package", &["name", "version"])?;
+
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+            .with_message("Package section must be a mapping")
+    })?;
+
+    // Parse required 'name' field
+    let name_node = mapping
+        .get("name")
+        .ok_or_else(|| ParseError::missing_field("name", get_span(yaml)))?;
+
+    let name_scalar = name_node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(name_node))
+            .with_message("Package name must be a scalar")
+    })?;
+
+    let name_str = name_scalar.as_str();
+    let name_span = *name_scalar.span();
+
+    // Parse the name - check if it's a template or concrete value
+    let name = if contains_jinja_template(name_str) {
+        // Template
+        let template = JinjaTemplate::new(name_str.to_string())
+            .map_err(|e| ParseError::jinja_error(e, name_span))?;
+        Value::new_template(template, Some(name_span))
+    } else {
+        // Concrete package name
+        let package_name = rattler_conda_types::PackageName::try_from(name_str)
+            .map_err(|e| ParseError::invalid_value("name", e.to_string(), name_span))?;
+        Value::new_concrete(
+            crate::stage0::package::PackageName(package_name),
+            Some(name_span),
+        )
+    };
+
+    // Parse required 'version' field
+    let version_node = mapping
+        .get("version")
+        .ok_or_else(|| ParseError::missing_field("version", get_span(yaml)))?;
+
+    let version_scalar = version_node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(version_node))
+            .with_message("Package version must be a scalar")
+    })?;
+
+    let version_str = version_scalar.as_str();
+    let version_span = *version_scalar.span();
+
+    // Parse the version - check if it's a template or concrete value
+    let version = if contains_jinja_template(version_str) {
+        // Template
+        let template = JinjaTemplate::new(version_str.to_string())
+            .map_err(|e| ParseError::jinja_error(e, version_span))?;
+        Value::new_template(template, Some(version_span))
+    } else {
+        // Concrete version
+        let version_with_source = rattler_conda_types::VersionWithSource::from_str(version_str)
+            .map_err(|e| ParseError::invalid_value("version", e.to_string(), version_span))?;
+        Value::new_concrete(version_with_source, Some(version_span))
+    };
+
+    Ok(Package { name, version })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_yaml_package(yaml_str: &str) -> MarkedNode {
+        let wrapped = format!("package:\n{}", yaml_str);
+        let root = marked_yaml::parse_yaml(0, &wrapped).expect("Failed to parse test YAML");
+        let mapping = root.as_mapping().expect("Expected mapping");
+        mapping.get("package").expect("Field not found").clone()
+    }
+
+    #[test]
+    fn test_parse_package_concrete() {
+        let yaml_str = r#"
+  name: my-package
+  version: 1.0.0"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let package = parse_package(&yaml).unwrap();
+
+        // Check that both fields are concrete
+        assert!(package.name.is_concrete());
+        assert!(package.version.is_concrete());
+
+        // Check name
+        if let Some(value) = package.name.as_concrete() {
+            assert_eq!(value.to_string(), "my-package");
+        } else {
+            panic!("Expected concrete name");
+        }
+    }
+
+    #[test]
+    fn test_parse_package_with_templates() {
+        let yaml_str = r#"
+  name: '${{ name }}'
+  version: '${{ version }}'"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let package = parse_package(&yaml).unwrap();
+
+        // Check templates
+        assert!(package.name.is_template());
+        assert!(package.version.is_template());
+
+        // Check variables
+        let vars = package.used_variables();
+        let mut sorted_vars = vars.clone();
+        sorted_vars.sort();
+        assert_eq!(sorted_vars, vec!["name", "version"]);
+    }
+
+    #[test]
+    fn test_parse_package_missing_name() {
+        let yaml_str = r#"
+  version: 1.0.0"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let result = parse_package(&yaml);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("name"));
+    }
+
+    #[test]
+    fn test_parse_package_missing_version() {
+        let yaml_str = r#"
+  name: my-package"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let result = parse_package(&yaml);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(err_string.contains("missing"));
+        assert!(err_string.contains("version"));
+    }
+
+    #[test]
+    fn test_parse_package_invalid_name() {
+        let yaml_str = r#"
+  name: "Invalid Name With Spaces"
+  version: 1.0.0"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let result = parse_package(&yaml);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_package_unknown_field() {
+        let yaml_str = r#"
+  name: my-package
+  version: 1.0.0
+  unknown: field"#;
+        let yaml = parse_yaml_package(yaml_str);
+        let result = parse_package(&yaml);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(err_string.contains("unknown field"));
+    }
+}

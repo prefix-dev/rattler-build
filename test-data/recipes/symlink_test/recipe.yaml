@@ -1,0 +1,22 @@
+context:
+  name: symlink-test
+  version: "1.0.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 0
+  script:
+    - mkdir -p $PREFIX/bin
+    - echo '#!/bin/bash' > $PREFIX/bin/real_script
+    - echo 'echo "Hello from real script"' >> $PREFIX/bin/real_script
+    - chmod +x $PREFIX/bin/real_script
+    - ln -s real_script $PREFIX/bin/symlink_script
+    - ln -s real_script $PREFIX/bin/another_symlink
+    - ls -la $PREFIX/bin/
+
+about:
+  summary: Test package with symlinks
+  description: This package contains symlinks to test symlink handling

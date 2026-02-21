@@ -1,0 +1,13 @@
+package:
+  name: test-errorlevel-injection
+  version: "0.1.0"
+
+tests:
+  - script:
+      - echo "This test is designed to fail."
+      # make something that sets error level to non-zero
+      - python.exe -c "import sys; sys.exit(1)"
+      - echo "This line will not be executed."
+    requirements:
+      run:
+        - python

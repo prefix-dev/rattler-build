@@ -34,26 +34,26 @@ jobs:
     name: Python Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build sdist"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           command: sdist
           args: --out dist
-    #   - name: "Test sdist"
-    #     run: |
-    #       rustup default $(cat rust-toolchain)
-    #       cd py-rattler-build
-    #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-    #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
+      #   - name: "Test sdist"
+      #     run: |
+      #       rustup default $(cat rust-toolchain)
+      #       cd py-rattler-build
+      #       pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+      #       python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload sdist"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: sdist
           path: py-rattler-build/dist
@@ -69,20 +69,20 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
-#         There are a number of issues with cross compiling ring to windows on aarch64.
-#         For now, we just won't build a wheel, we will revisit this in the future.
-#          - target: aarch64-pc-windows-msvc
-#            arch: x64
+    #         There are a number of issues with cross compiling ring to windows on aarch64.
+    #         For now, we just won't build a wheel, we will revisit this in the future.
+    #          - target: aarch64-pc-windows-msvc
+    #            arch: x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
@@ -94,7 +94,7 @@ jobs:
           python -m pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: windows-wheels-${{ matrix.platform.target }}
           path: py-rattler-build/dist
@@ -109,15 +109,15 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -129,7 +129,7 @@ jobs:
           pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: linux-wheels-${{ matrix.target }}
           path: py-rattler-build/dist
@@ -147,25 +147,25 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
-          manylinux: '2_28'
+          manylinux: "2_28"
           args: --release --out dist  --no-default-features --features rustls-tls
-      - uses: uraimo/run-on-arch-action@v3
+      - uses: uraimo/run-on-arch-action@1c358dc49363439f8c563ce8f93005f7fe76b849 # v3
         if: matrix.platform.arch != 'ppc64'
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
-          distro: ubuntu20.04
+          distro: ubuntu22.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
@@ -175,59 +175,10 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: linux-wheels-${{ matrix.platform.target }}
           path: py-rattler-build/dist
-
-#   linux-cross-native-tls:
-#     runs-on: ubuntu-latest
-#     name: Python Build ${{ matrix.platform.target }}
-#     strategy:
-#       fail-fast: false
-#       matrix:
-#         platform:
-# #          - target: s390x-unknown-linux-gnu
-# #            arch: s390x
-#           - target: powerpc64le-unknown-linux-gnu
-#             arch: ppc64le
-#           - target: powerpc64-unknown-linux-gnu
-#             arch: ppc64
-
-#     steps:
-#       - uses: actions/checkout@v4
-#         with:
-#           ref: ${{ inputs.sha }}
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: ${{ env.PYTHON_VERSION }}
-#       - name: "Build wheels"
-#         uses: PyO3/maturin-action@v1
-#         with:
-#           working-directory: py-rattler-build
-#           target: ${{ matrix.platform.target }}
-#           manylinux: auto
-#           docker-options: ${{ matrix.platform.maturin_docker_options }}
-#           args: --release --out dist --no-default-features --features native-tls,vendored-openssl
-#       - uses: uraimo/run-on-arch-action@v3
-#         if: matrix.platform.arch != 'ppc64'
-#         name: Test wheel
-#         with:
-#           arch: ${{ matrix.platform.arch }}
-#           distro: ubuntu20.04
-#           githubToken: ${{ github.token }}
-#           install: |
-#             apt-get update
-#             apt-get install -y --no-install-recommends python3 python3-pip
-#             pip3 install -U pip
-#           run: |
-#             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall
-#             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
-#       - name: "Upload wheels"
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: linux-wheels-${{ matrix.platform.target }}
-#           path: py-rattler-build/dist
 
   musllinux:
     runs-on: ubuntu-latest
@@ -239,16 +190,16 @@ jobs:
           - x86_64-unknown-linux-musl
         #   - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels (rustls-tls)"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -256,7 +207,7 @@ jobs:
           args: --release --out dist --no-default-features --features rustls-tls
       - name: "Build wheels (native-tls)"
         if: matrix.target != 'x86_64-unknown-linux-musl'
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.target }}
@@ -264,7 +215,7 @@ jobs:
           args: --release --out dist --no-default-features --features native-tls,vendored-openssl
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
@@ -273,7 +224,7 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/py-rattler-build/dist/ --force-reinstall --break-system-packages
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: linux-wheels-${{ matrix.target }}
           path: py-rattler-build/dist
@@ -291,20 +242,20 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           working-directory: py-rattler-build
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --out dist --no-default-features --features rustls-tls
-      - uses: uraimo/run-on-arch-action@v3
+      - uses: uraimo/run-on-arch-action@1c358dc49363439f8c563ce8f93005f7fe76b849 # v3
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
@@ -316,51 +267,24 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall --break-system-packages
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: linux-wheels-${{ matrix.platform.target }}
-          path: py-rattler-build/dist
-
-  macos-x86_64:
-    runs-on: macos-13   # x86_64 runner
-    name: Python Build x86_64-macos
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          architecture: x64
-      - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@v1
-        with:
-          working-directory: py-rattler-build
-          target: x86_64
-          args: --release --out dist --no-default-features --features rustls-tls
-      - name: "Test wheel - x86_64"
-        run: |
-          pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          python -c "import rattler_build; print(rattler_build.rattler_build_version())"
-      - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-wheels-x86_64
           path: py-rattler-build/dist
 
   macos-universal:
     runs-on: macos-latest
     name: Python Build universal2-apple-macos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels - universal2"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1
         with:
           args: --release --target universal2-apple-darwin --out dist --no-default-features --features rustls-tls
           working-directory: py-rattler-build
@@ -369,7 +293,7 @@ jobs:
           pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: macos-wheels-universal2
           path: py-rattler-build/dist
@@ -380,7 +304,7 @@ jobs:
     # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: main # We checkout the main branch to check for the commit
       - name: Check main branch
@@ -412,11 +336,10 @@ jobs:
     needs:
       - sdist
       - macos-universal
-      - macos-x86_64
       - windows
       - linux
       - linux-cross
-    #   - linux-cross-native-tls
+      #   - linux-cross-native-tls
       - musllinux
       - musllinux-cross
       - validate-tag
@@ -428,12 +351,12 @@ jobs:
       # For pypi trusted publishing
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
         with:
           merge-multiple: true
           path: wheels
       - name: Publish to PyPi
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
         with:
           skip-existing: true
           packages-dir: wheels
@@ -449,7 +372,7 @@ jobs:
       # For git tag
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           ref: ${{ inputs.sha }}
       - name: git tag

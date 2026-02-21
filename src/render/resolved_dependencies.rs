@@ -5,32 +5,30 @@ use std::{
     sync::Arc,
 };
 
-use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
+use rattler_build_recipe::stage1::{Dependency, Requirements};
+use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
-    package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
-    Platform, RepoDataRecord,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
+    package::RunExportsJson,
 };
-use reqwest_middleware::ClientWithMiddleware;
+use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use thiserror::Error;
-use tokio::sync::{mpsc, Semaphore};
 
-use super::pin::PinError;
 use crate::{
-    metadata::{build_reindexed_channels, BuildConfiguration, Output},
+    metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
-    recipe::parser::{Dependency, Requirements},
     render::{
-        pin::PinArgs,
+        run_exports::filter_run_exports,
         solver::{install_packages, solve_environment},
     },
-    run_exports::{RunExportExtractor, RunExportExtractorError},
-    tool_configuration,
-    tool_configuration::Configuration,
+    tool_configuration::{self, Configuration},
 };
+
+use super::reporters::GatewayReporter;
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -273,10 +271,12 @@ impl ResolvedDependencies {
             .resolved
             .iter()
             .map(|r| {
-                let spec = self
-                    .specs
-                    .iter()
-                    .find(|s| s.spec().name.as_ref() == Some(&r.package_record.name));
+                let spec = self.specs.iter().find(|s| {
+                    s.spec().name.as_ref()
+                        == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                            r.package_record.name.clone(),
+                        ))
+                });
 
                 if let Some(s) = spec {
                     (r, Some(s))
@@ -343,7 +343,12 @@ impl ResolvedDependencies {
                     .iter()
                     // Run export dependencies are not direct dependencies
                     .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
-                    .any(|s| s.spec().name.as_ref() == Some(&record.package_record.name))
+                    .any(|s| {
+                        s.spec().name.as_ref()
+                            == Some(&rattler_conda_types::PackageNameMatcher::Exact(
+                                record.package_record.name.clone(),
+                            ))
+                    })
             {
                 continue;
             }
@@ -353,6 +358,48 @@ impl ResolvedDependencies {
         result
     }
 }
+impl Display for ResolvedDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        write!(f, "{}", self.to_table(table, false))
+    }
+}
+
+/// Render dependencies as (name, rest) pairs, sorted by name.
+/// When multiple dependencies have the same name, they will be grouped together.
+/// Empty specs are shown as "*" to indicate "any version".
+fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(String, String)> {
+    // Collect all dependencies as (name, rest) pairs
+    // The rendered string format is "name spec (annotation)" so we split on first space
+    let mut items: Vec<(String, String)> = deps
+        .iter()
+        .map(|d| {
+            let rendered = d.render(long);
+            // Split on first space to separate name from the rest
+            if let Some((name, rest)) = rendered.split_once(' ') {
+                (name.to_string(), rest.to_string())
+            } else {
+                // No space means just a name with no version spec
+                (rendered.clone(), String::new())
+            }
+        })
+        .collect();
+
+    // Replace empty specs with "*" to indicate "any version"
+    for (_, rest) in &mut items {
+        if rest.is_empty() {
+            *rest = "*".to_string();
+        }
+    }
+
+    // Sort alphabetically by name
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    items
+}
 
 impl FinalizedRunDependencies {
     pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
@@ -361,41 +408,59 @@ impl FinalizedRunDependencies {
             .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
             .set_header(vec!["Name", "Spec"]);
 
-        // Helper function to add a section with optional padding
-        let mut add_section = |section_name: &str, items: &[String], needs_padding: bool| {
-            if items.is_empty() {
-                return needs_padding;
-            }
-
-            if needs_padding {
-                table.add_row(vec!["", ""]);
-            }
-
+        // Helper function to add a section header
+        fn add_section_header(table: &mut comfy_table::Table, section_name: &str) {
             let mut row = comfy_table::Row::new();
             row.add_cell(
                 comfy_table::Cell::new(section_name).add_attribute(comfy_table::Attribute::Bold),
             );
             table.add_row(row);
+        }
 
-            items.iter().for_each(|item| {
+        // Helper function to add grouped dependencies
+        // When multiple deps have the same name, only the first shows the name
+        fn add_grouped_items(table: &mut comfy_table::Table, items: &[(String, String)]) {
+            let mut prev_name: Option<&str> = None;
+            for (name, rest) in items {
+                // Only show name if different from previous
+                let display_name = if prev_name == Some(name.as_str()) {
+                    ""
+                } else {
+                    prev_name = Some(name.as_str());
+                    name.as_str()
+                };
+
+                table.add_row(vec![display_name, rest.as_str()]);
+            }
+        }
+
+        // Helper function to add simple string items
+        fn add_simple_items(table: &mut comfy_table::Table, items: &[String]) {
+            for item in items {
                 table.add_row(item.splitn(2, ' ').collect::<Vec<&str>>());
-            });
+            }
+        }
 
-            true
-        };
+        let mut has_previous_section = false;
 
-        // Add dependencies section
-        let depends_rendered: Vec<String> = self.depends.iter().map(|d| d.render(long)).collect();
-        let mut has_previous_section = add_section("Run dependencies", &depends_rendered, false);
+        // Add dependencies section (grouped by name)
+        let depends_rendered = render_grouped_dependencies(&self.depends, long);
+        if !depends_rendered.is_empty() {
+            add_section_header(&mut table, "Run dependencies");
+            add_grouped_items(&mut table, &depends_rendered);
+            has_previous_section = true;
+        }
 
-        // Add constraints section
-        let constraints_rendered: Vec<String> =
-            self.constraints.iter().map(|d| d.render(long)).collect();
-        has_previous_section = add_section(
-            "Run constraints",
-            &constraints_rendered,
-            has_previous_section,
-        );
+        // Add constraints section (grouped by name)
+        let constraints_rendered = render_grouped_dependencies(&self.constraints, long);
+        if !constraints_rendered.is_empty() {
+            if has_previous_section {
+                table.add_row(vec!["", ""]);
+            }
+            add_section_header(&mut table, "Run constraints");
+            add_grouped_items(&mut table, &constraints_rendered);
+            has_previous_section = true;
+        }
 
         // Add run exports sections if not empty
         if !self.run_exports.is_empty() {
@@ -409,11 +474,12 @@ impl FinalizedRunDependencies {
 
             for (name, exports) in sections {
                 if !exports.is_empty() {
-                    has_previous_section = add_section(
-                        &format!("Run exports ({name})"),
-                        exports,
-                        has_previous_section,
-                    );
+                    if has_previous_section {
+                        table.add_row(vec!["", ""]);
+                    }
+                    add_section_header(&mut table, &format!("Run exports ({name})"));
+                    add_simple_items(&mut table, exports);
+                    has_previous_section = true;
                 }
             }
         }
@@ -445,7 +511,7 @@ pub enum ResolveError {
     FinalizedDependencyNotFound,
 
     #[error("Failed to resolve dependencies: {0}")]
-    DependencyResolutionError(#[from] anyhow::Error),
+    DependencyResolutionError(String),
 
     #[error("Could not collect run exports")]
     CouldNotCollectRunExports(#[from] RunExportExtractorError),
@@ -459,14 +525,26 @@ pub enum ResolveError {
     #[error("Could not apply pin: {0}")]
     PinApplyError(#[from] PinError),
 
-    #[error("Could not apply pin. The following subpackage is not available: {0:?}")]
-    SubpackageNotFound(PackageName),
+    #[error("Could not apply pin_subpackage. The following subpackage is not available: {}", .0.as_normalized())]
+    PinSubpackageNotFound(PackageName),
+
+    #[error("Could not apply pin_compatible. The following package is not part of the solution: {}", .0.as_normalized())]
+    PinCompatibleNotFound(PackageName),
 
     #[error("Compiler configuration error: {0}")]
     CompilerError(String),
 
     #[error("Could not reindex channels: {0}")]
     RefreshChannelError(std::io::Error),
+}
+
+/// Controls whether to download missing run exports during dependency resolution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunExportsDownload {
+    /// Download packages to extract run exports when they are missing
+    DownloadMissing,
+    /// Skip downloading packages for run exports extraction
+    SkipDownload,
 }
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and
@@ -486,60 +564,61 @@ pub fn apply_variant(
             match s {
                 Dependency::Spec(m) => {
                     let m = m.clone();
-                    if build_time && m.version.is_none() && m.build.is_none() {
-                        if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.into()) {
-                                // if the variant starts with an alphanumeric character,
-                                // we have to add a '=' to the version spec
-                                let mut spec = version.to_string();
+                    if build_time
+                        && m.version.is_none()
+                        && m.build.is_none()
+                        && let Some(name) = &m.name
+                        && let Some(version) = variant.get(&name.to_string().into())
+                    {
+                        // if the variant starts with an alphanumeric character,
+                        // we have to add a '=' to the version spec
+                        let mut spec = version.to_string();
 
-                                // check if all characters are alphanumeric or ., in that case add
-                                // a '=' to get "startswith" behavior
-                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={spec}");
-                                }
-
-                                let variant = name.as_normalized().to_string();
-                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
-                                    ResolveError::VariantSpecParseError(variant.clone(), e)
-                                })?;
-
-                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
-
-                                return Ok(VariantDependency { spec, variant }.into());
-                            }
+                        // check if all characters are alphanumeric or ., in that case add
+                        // a '=' to get "startswith" behavior
+                        if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                            spec = format!("={spec}");
                         }
+
+                        let variant = name.to_string();
+                        let spec: NamelessMatchSpec = spec
+                            .parse()
+                            .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
+
+                        let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                        return Ok(VariantDependency { spec, variant }.into());
                     }
-                    Ok(SourceDependency { spec: m }.into())
+                    Ok(SourceDependency { spec: *m }.into())
                 }
                 Dependency::PinSubpackage(pin) => {
-                    let name = &pin.pin_value().name;
+                    let name = &pin.pin_subpackage.name;
                     let subpackage = subpackages
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinSubpackageNotFound(name.clone()))?;
                     let pinned = pin
-                        .pin_value()
+                        .pin_subpackage
                         .apply(&subpackage.version, &subpackage.build_string)?;
                     Ok(PinSubpackageDependency {
                         spec: pinned,
                         name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
+                        args: pin.pin_subpackage.args.clone(),
                     }
                     .into())
                 }
                 Dependency::PinCompatible(pin) => {
-                    let name = &pin.pin_value().name;
+                    let name = &pin.pin_compatible.name;
                     let pin_package = compatibility_specs
                         .get(name)
-                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                        .ok_or(ResolveError::PinCompatibleNotFound(name.clone()))?;
 
                     let pinned = pin
-                        .pin_value()
+                        .pin_compatible
                         .apply(&pin_package.version, &pin_package.build)?;
                     Ok(PinCompatibleDependency {
                         spec: pinned,
                         name: name.as_normalized().to_string(),
-                        args: pin.pin_value().args.clone(),
+                        args: pin.pin_compatible.args.clone(),
                     }
                     .into())
                 }
@@ -548,55 +627,76 @@ pub fn apply_variant(
         .collect()
 }
 
+use rattler::package_cache::CacheReporter;
+use rattler_repodata_gateway::DownloadReporter;
+
+struct RunExportsProgressReporter {
+    repodata_reporter: GatewayReporter,
+    package_cache_reporter: PackageCacheReporter,
+}
+
+impl RunExportsProgressReporter {
+    fn new(
+        repodata_reporter: GatewayReporter,
+        package_cache_reporter: PackageCacheReporter,
+    ) -> Self {
+        Self {
+            repodata_reporter,
+            package_cache_reporter,
+        }
+    }
+}
+
+impl RunExportsReporter for RunExportsProgressReporter {
+    fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
+        Some(&self.repodata_reporter)
+    }
+
+    fn create_package_download_reporter(
+        &self,
+        repo_data_record: &RepoDataRecord,
+    ) -> Option<Box<dyn CacheReporter>> {
+        let mut reporter = self.package_cache_reporter.clone();
+        let entry = reporter.add(repo_data_record);
+        Some(Box::new(entry) as Box<dyn CacheReporter>)
+    }
+}
+
 /// Collect run exports from the package cache and add them to the package
 /// records.
-/// TODO: There are many ways that would allow us to optimize this function.
-/// 1. This currently downloads an entire package, but we only need the
-///    `run_exports.json`.
-/// 2. There are special run_exports.json files available for some channels.
-async fn amend_run_exports(
+async fn ensure_run_exports(
     records: &mut [RepoDataRecord],
-    client: ClientWithMiddleware,
-    package_cache: PackageCache,
+    gateway: &Gateway,
     multi_progress: MultiProgress,
     progress_prefix: impl Into<Cow<'static, str>>,
     top_level_pb: Option<ProgressBar>,
+    progress_style: ProgressStyle,
+    finish_style: ProgressStyle,
 ) -> Result<(), RunExportExtractorError> {
-    let max_concurrent_requests = Arc::new(Semaphore::new(50));
-    let (tx, mut rx) = mpsc::channel(50);
+    let progress_prefix: Cow<'static, str> = progress_prefix.into();
+    let placement = top_level_pb
+        .as_ref()
+        .map(|pb| Placement::After(pb.clone()))
+        .unwrap_or(Placement::End);
 
-    let progress = PackageCacheReporter::new(
-        multi_progress,
-        top_level_pb.map_or(Placement::End, Placement::After),
-    )
-    .with_prefix(progress_prefix);
+    let repodata_reporter = GatewayReporter::builder()
+        .with_multi_progress(multi_progress.clone())
+        .with_progress_template(progress_style.clone())
+        .with_finish_template(finish_style.clone())
+        .with_placement(placement.clone())
+        .finish();
 
-    for (pkg_idx, pkg) in records.iter().enumerate() {
-        if pkg.package_record.run_exports.is_some() {
-            // If the package already boasts run exports, we don't need to do anything.
-            continue;
-        }
+    let package_cache_reporter =
+        PackageCacheReporter::new(multi_progress, placement).with_prefix(progress_prefix);
 
-        let extractor = RunExportExtractor::default()
-            .with_max_concurrent_requests(max_concurrent_requests.clone())
-            .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+    let reporter: Arc<dyn RunExportsReporter> = Arc::new(RunExportsProgressReporter::new(
+        repodata_reporter,
+        package_cache_reporter,
+    ));
 
-        let tx = tx.clone();
-        let record = pkg.clone();
-        tokio::spawn(async move {
-            let result = extractor.extract(&record).await;
-            let _ = tx.send((pkg_idx, result)).await;
-        });
-    }
-
-    drop(tx);
-
-    while let Some((pkg_idx, run_exports)) = rx.recv().await {
-        records[pkg_idx].package_record.run_exports = run_exports?;
-    }
-
-    Ok(())
+    gateway
+        .ensure_run_exports(records.iter_mut(), Some(reporter))
+        .await
 }
 
 pub async fn install_environments(
@@ -616,7 +716,8 @@ pub async fn install_environments(
         &output.build_configuration.directories.build_prefix,
         tool_configuration,
     )
-    .await?;
+    .await
+    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
     install_packages(
         "host",
@@ -629,7 +730,8 @@ pub async fn install_environments(
         &output.build_configuration.directories.host_prefix,
         tool_configuration,
     )
-    .await?;
+    .await
+    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
     Ok(())
 }
@@ -654,15 +756,15 @@ fn render_run_exports(
             .collect::<Vec<_>>())
     };
 
-    let run_exports = output.recipe.requirements().run_exports();
+    let run_exports = &output.recipe.requirements().run_exports;
 
     if !run_exports.is_empty() {
         Ok(RunExportsJson {
-            strong: render_run_exports(run_exports.strong())?,
-            weak: render_run_exports(run_exports.weak())?,
-            noarch: render_run_exports(run_exports.noarch())?,
-            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
-            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
+            strong: render_run_exports(&run_exports.strong)?,
+            weak: render_run_exports(&run_exports.weak)?,
+            noarch: render_run_exports(&run_exports.noarch)?,
+            strong_constrains: render_run_exports(&run_exports.strong_constraints)?,
+            weak_constrains: render_run_exports(&run_exports.weak_constraints)?,
         })
     } else {
         Ok(RunExportsJson::default())
@@ -684,14 +786,29 @@ pub(crate) async fn resolve_dependencies(
     output: &Output,
     channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
+    download_missing_run_exports: RunExportsDownload,
 ) -> Result<FinalizedDependencies, ResolveError> {
-    let merge_build_host = output.recipe.build().merge_build_and_host_envs();
+    let merge_build_host = output.recipe.build().merge_build_and_host_envs;
 
     let mut compatibility_specs = HashMap::new();
 
+    let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+        let client = tool_configuration.client.get_client().clone();
+        let package_cache = tool_configuration.package_cache.clone();
+        Some(
+            Gateway::builder()
+                .with_max_concurrent_requests(50)
+                .with_client(client)
+                .with_package_cache(package_cache)
+                .finish(),
+        )
+    } else {
+        None
+    };
+
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let build_env_specs = apply_variant(
-            requirements.build(),
+            &requirements.build,
             &output.build_configuration,
             &compatibility_specs,
             true,
@@ -710,30 +827,39 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(ResolveError::from)?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
                         .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+                        .finished_progress_style();
+                    ensure_run_exports(
+                        &mut resolved,
+                        gateway.as_ref().unwrap(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                        progress_style,
+                        finish_style,
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -749,7 +875,7 @@ pub(crate) async fn resolve_dependencies(
 
     // host env
     let mut host_env_specs = apply_variant(
-        requirements.host(),
+        &requirements.host,
         &output.build_configuration,
         &compatibility_specs,
         true,
@@ -762,23 +888,11 @@ pub(crate) async fn resolve_dependencies(
         build_run_exports.extend(build_env.run_exports(true));
     }
 
-    let output_ignore_run_exports = requirements.ignore_run_exports(None);
-    let mut build_run_exports = output_ignore_run_exports.filter(&build_run_exports, "build")?;
-
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_build_env) = &cache.build {
-            let cache_build_run_exports = cache_build_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_build_run_exports, "cache-build")?;
-            build_run_exports.extend(&filtered);
-        }
-    }
+    let build_run_exports = filter_run_exports(
+        &requirements.ignore_run_exports,
+        &build_run_exports,
+        "build",
+    )?;
 
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
 
@@ -789,7 +903,7 @@ pub(crate) async fn resolve_dependencies(
     if merge_build_host {
         // add the requirements of build to host
         let specs = apply_variant(
-            requirements.build(),
+            &requirements.build,
             &output.build_configuration,
             &compatibility_specs,
             true,
@@ -806,30 +920,39 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(ResolveError::from)?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
 
-        // Add the run exports to the records that don't have them yet.
-        tool_configuration
-            .fancy_log_handler
-            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
-                amend_run_exports(
-                    &mut resolved,
-                    tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
-                    tool_configuration
+        // Optionally add run exports to records that don't have them yet by
+        // downloading packages and extracting run_exports.json
+        if download_missing_run_exports == RunExportsDownload::DownloadMissing {
+            tool_configuration
+                .fancy_log_handler
+                .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                    let progress_style = tool_configuration.fancy_log_handler.default_bytes_style();
+                    let finish_style = tool_configuration
                         .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                    tool_configuration
-                        .fancy_log_handler
-                        .with_indent_levels("  "),
-                    Some(pb),
-                )
-            })
-            .await
-            .map_err(ResolveError::CouldNotCollectRunExports)?;
+                        .finished_progress_style();
+                    ensure_run_exports(
+                        &mut resolved,
+                        gateway.as_ref().unwrap(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                        tool_configuration
+                            .fancy_log_handler
+                            .with_indent_levels("  "),
+                        Some(pb),
+                        progress_style,
+                        finish_style,
+                    )
+                })
+                .await
+                .map_err(ResolveError::CouldNotCollectRunExports)?;
+        }
 
         resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
@@ -857,24 +980,33 @@ pub(crate) async fn resolve_dependencies(
         false,
     )?;
 
-    // add in dependencies from the finalized cache
+    // Add in dependencies from the finalized cache
+    // This includes run_exports that were already filtered during staging cache build
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
-        tracing::info!(
-            "Adding dependencies from finalized cache: {:?}",
-            finalized_cache.run.depends
-        );
+        // Check if we should inherit run_exports from the staging cache
+        // Default is true if not specified
+        let should_inherit_run_exports = output
+            .recipe
+            .inherits_from
+            .as_ref()
+            .map(|i| i.inherit_run_exports)
+            .unwrap_or(true);
 
+        // Add dependencies from cache, but filter out RunExports if inherit_run_exports is false
         depends = depends
             .iter()
-            .chain(finalized_cache.run.depends.iter())
-            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
+            .chain(finalized_cache.run.depends.iter().filter(|dep| {
+                // Include non-RunExport dependencies always
+                // Include RunExport dependencies only if inherit_run_exports is true
+                if matches!(dep, DependencyInfo::RunExport(_)) {
+                    should_inherit_run_exports
+                } else {
+                    true
+                }
+            }))
             .cloned()
             .collect();
 
-        tracing::info!(
-            "Adding constraints from finalized cache: {:?}",
-            finalized_cache.run.constraints
-        );
         constraints = constraints
             .iter()
             .chain(finalized_cache.run.constraints.iter())
@@ -894,22 +1026,8 @@ pub(crate) async fn resolve_dependencies(
     }
 
     // And filter the run exports
-    let mut host_run_exports = output_ignore_run_exports.filter(&host_run_exports, "host")?;
-
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        if let Some(cache_host_env) = &cache.host {
-            let cache_host_run_exports = cache_host_env.run_exports(true);
-            let filtered = output
-                .recipe
-                .cache
-                .as_ref()
-                .expect("recipe should have cache section")
-                .requirements
-                .ignore_run_exports(Some(&output_ignore_run_exports))
-                .filter(&cache_host_run_exports, "cache-host")?;
-            host_run_exports.extend(&filtered);
-        }
-    }
+    let host_run_exports =
+        filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
@@ -923,30 +1041,6 @@ pub(crate) async fn resolve_dependencies(
         constraints.extend(build_run_exports.strong_constraints.iter().cloned());
         constraints.extend(host_run_exports.strong_constraints.iter().cloned());
         constraints.extend(host_run_exports.weak_constraints.iter().cloned());
-    }
-
-    if let Some(cache) = &output.finalized_cache_dependencies {
-        // add in the run exports from the cache
-        // filter run dependencies that came from run exports
-        let ignore_run_exports = requirements.ignore_run_exports(None);
-        // Note: these run exports are already filtered
-        let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
-            DependencyInfo::RunExport(run_export) => {
-                let source_package: Option<PackageName> = run_export.source_package.parse().ok();
-                let spec_name = &run_export.spec.name;
-
-                let by_name = spec_name
-                    .as_ref()
-                    .map(|n| ignore_run_exports.by_name().contains(n))
-                    .unwrap_or(false);
-                let by_package = source_package
-                    .map(|s| ignore_run_exports.from_package().contains(&s))
-                    .unwrap_or(false);
-
-                !by_name && !by_package
-            }
-            _ => false,
-        });
     }
 
     let run_specs = FinalizedRunDependencies {
@@ -978,6 +1072,7 @@ impl Output {
     pub async fn resolve_dependencies(
         self,
         tool_configuration: &tool_configuration::Configuration,
+        download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
         let span = tracing::info_span!("Resolving environments");
         let _enter = span.enter();
@@ -995,6 +1090,7 @@ impl Output {
             &self,
             &channels,
             tool_configuration,
+            download_missing_run_exports,
         )
         .await?;
 
@@ -1015,6 +1111,34 @@ impl Output {
             .finalized_dependencies
             .as_ref()
             .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        if tool_configuration.environments_externally_managed {
+            let span = tracing::info_span!(
+                "Externally resolved dependencies",
+                recipe = self.identifier()
+            );
+            let _enter = span.enter();
+            if let Some(build) = &dependencies.build {
+                tracing::info!(
+                    "\nResolved build dependencies({}):\n{}",
+                    self.identifier(),
+                    build
+                );
+            }
+            if let Some(host) = &dependencies.host {
+                tracing::info!(
+                    "Resolved host dependencies({}):\n{}",
+                    self.identifier(),
+                    host
+                );
+            }
+            tracing::info!(
+                "Resolved run dependencies({}):\n{}",
+                self.identifier(),
+                dependencies.run
+            );
+            return Ok(());
+        }
 
         install_environments(self, dependencies, tool_configuration).await
     }

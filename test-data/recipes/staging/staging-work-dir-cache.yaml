@@ -1,0 +1,62 @@
+# New test case: Staging output that caches work directory files
+# Tests that both prefix AND work directory files are cached and restored
+
+schema_version: 1
+
+recipe:
+  name: work-dir-cache-test
+  version: 1.0.0
+
+outputs:
+  # Staging output that generates files in both work dir and prefix
+  - staging:
+      name: work-stage
+    build:
+      script:
+        - if: unix
+          then: |
+            # Generate files in prefix
+            mkdir -p $PREFIX/lib
+            echo "library" > $PREFIX/lib/mylib.a
+            # Generate files in work directory (build artifacts)
+            mkdir -p build
+            echo "build config" > build/config.txt
+            echo "build log" > build/build.log
+        - if: win
+          then: |
+            rem Generate files in prefix
+            mkdir %PREFIX%\lib
+            echo library > %PREFIX%\lib\mylib.lib
+            rem Generate files in work directory (build artifacts)
+            mkdir build
+            echo build config > build\config.txt
+            echo build log > build\build.log
+
+  # Package that inherits and should have access to both
+  # the prefix files AND the work directory files from cache
+  - package:
+      name: work-dir-test
+      version: 1.0.0
+    inherit: work-stage
+    build:
+      script:
+        - if: unix
+          then: |
+            # Verify work dir files were restored from cache
+            test -f build/config.txt || exit 1
+            test -f build/build.log || exit 1
+            cat build/config.txt
+        - if: win
+          then: |
+            rem Verify work dir files were restored from cache
+            if not exist build\config.txt exit /b 1
+            if not exist build\build.log exit /b 1
+            type build\config.txt
+      files:
+        - lib/**
+    tests:
+      - script:
+          - if: unix
+            then: test -f $PREFIX/lib/mylib.a
+          - if: win
+            then: if not exist %PREFIX%\lib\mylib.lib exit /b 1

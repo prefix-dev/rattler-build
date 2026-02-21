@@ -1,0 +1,9 @@
+package:
+  name: test-interpreter-bat
+  version: 0.1.0
+
+build:
+  script: build.bat
+
+tests:
+  - script: build.bat

@@ -1,21 +1,17 @@
-use std::{
-    future::IntoFuture,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{future::IntoFuture, path::Path};
 
-use anyhow::Context;
+use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
 use comfy_table::Table;
 use console::style;
 use futures::FutureExt;
-use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use indicatif::HumanBytes;
 use itertools::Itertools;
+use miette::{IntoDiagnostic, WrapErr};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
-use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
-use url::Url;
+use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
 
-use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
+use super::reporters::GatewayReporter;
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
@@ -57,6 +53,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
     tracing::info!("\n{table}");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn solve_environment(
     name: &str,
     specs: &[MatchSpec],
@@ -65,7 +62,8 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-) -> anyhow::Result<Vec<RepoDataRecord>> {
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+) -> miette::Result<Vec<RepoDataRecord>> {
     let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
     tracing::info!("\nResolving {name} environment:\n");
@@ -105,6 +103,7 @@ pub async fn solve_environment(
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
+        exclude_newer,
         ..SolverTask::from_iter(&repo_data)
     };
 
@@ -113,7 +112,8 @@ pub async fn solve_environment(
     // date.
     let solver_result = tool_configuration
         .fancy_log_handler
-        .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
+        .wrap_in_progress("solving", move || Solver.solve(solver_task))
+        .into_diagnostic()?;
 
     // Print the result as a table
     print_as_table(&solver_result.records);
@@ -131,7 +131,8 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-) -> anyhow::Result<Vec<RepoDataRecord>> {
+    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
         specs,
@@ -140,6 +141,7 @@ pub async fn create_environment(
         tool_configuration,
         channel_priority,
         solve_strategy,
+        exclude_newer,
     )
     .await?;
 
@@ -155,96 +157,6 @@ pub async fn create_environment(
     Ok(required_packages)
 }
 
-struct GatewayReporter {
-    progress_bars: Arc<Mutex<Vec<ProgressBar>>>,
-    multi_progress: indicatif::MultiProgress,
-    progress_template: Option<ProgressStyle>,
-    finish_template: Option<ProgressStyle>,
-}
-
-#[derive(Default)]
-struct GatewayReporterBuilder {
-    multi_progress: Option<indicatif::MultiProgress>,
-    progress_template: Option<ProgressStyle>,
-    finish_template: Option<ProgressStyle>,
-}
-
-impl GatewayReporter {
-    pub fn builder() -> GatewayReporterBuilder {
-        GatewayReporterBuilder::default()
-    }
-}
-
-impl rattler_repodata_gateway::Reporter for GatewayReporter {
-    fn on_download_start(&self, _url: &Url) -> usize {
-        let progress_bar = self
-            .multi_progress
-            .add(ProgressBar::new(1))
-            .with_finish(indicatif::ProgressFinish::AndLeave)
-            .with_prefix("Downloading");
-
-        // use the configured style
-        if let Some(template) = &self.progress_template {
-            progress_bar.set_style(template.clone());
-        }
-
-        // progress_bar.enable_steady_tick(Duration::from_millis(100));
-
-        let mut progress_bars = self.progress_bars.lock().unwrap();
-        progress_bars.push(progress_bar);
-        progress_bars.len() - 1
-    }
-
-    fn on_download_complete(&self, _url: &Url, index: usize) {
-        // Remove the progress bar from the multi progress
-        let pb = &self.progress_bars.lock().unwrap()[index];
-        if let Some(template) = &self.finish_template {
-            pb.set_style(template.clone());
-            pb.finish_with_message("Done".to_string());
-        } else {
-            pb.finish();
-        }
-    }
-
-    fn on_download_progress(&self, _url: &Url, index: usize, bytes: usize, total: Option<usize>) {
-        let progress_bar = &self.progress_bars.lock().unwrap()[index];
-        progress_bar.set_length(total.unwrap_or(bytes) as u64);
-        progress_bar.set_position(bytes as u64);
-    }
-}
-
-impl GatewayReporterBuilder {
-    #[must_use]
-    pub fn with_multi_progress(
-        mut self,
-        multi_progress: indicatif::MultiProgress,
-    ) -> GatewayReporterBuilder {
-        self.multi_progress = Some(multi_progress);
-        self
-    }
-
-    #[must_use]
-    pub fn with_progress_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
-        self.progress_template = Some(template);
-        self
-    }
-
-    #[must_use]
-    pub fn with_finish_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
-        self.finish_template = Some(template);
-        self
-    }
-
-    pub fn finish(self) -> GatewayReporter {
-        GatewayReporter {
-            progress_bars: Arc::new(Mutex::new(Vec::new())),
-            multi_progress: self.multi_progress.expect("multi progress is required"),
-            progress_template: self.progress_template,
-            finish_template: self.finish_template,
-        }
-    }
-}
-
 /// Load repodata from channels. Only includes necessary records for platform &
 /// specs.
 pub async fn load_repodatas(
@@ -252,7 +164,7 @@ pub async fn load_repodatas(
     target_platform: Platform,
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,
-) -> anyhow::Result<Vec<rattler_repodata_gateway::RepoData>> {
+) -> miette::Result<Vec<rattler_repodata_gateway::RepoData>> {
     let channels = channels
         .iter()
         .map(|url| Channel::from_url(url.clone()))
@@ -284,7 +196,8 @@ pub async fn load_repodatas(
         .recursive(true)
         .into_future()
         .boxed()
-        .await?;
+        .await
+        .into_diagnostic()?;
 
     tool_configuration
         .fancy_log_handler
@@ -301,24 +214,35 @@ pub async fn install_packages(
     target_platform: Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
-) -> anyhow::Result<()> {
+) -> miette::Result<()> {
     // Make sure the target prefix exists, regardless of whether we'll actually
     // install anything in there.
-    tokio::fs::create_dir_all(&target_prefix)
-        .await
-        .with_context(|| {
+    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
+        .into_diagnostic()
+        .wrap_err_with(|| {
             format!(
                 "failed to create target prefix: {}",
                 target_prefix.display()
             )
         })?;
 
-    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
+    if !prefix.path().join("conda-meta/history").exists() {
+        // Create an empty history file if it doesn't exist
+        fs_err::create_dir_all(prefix.path().join("conda-meta")).into_diagnostic()?;
+        fs_err::File::create(prefix.path().join("conda-meta/history")).into_diagnostic()?;
+    }
+
+    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix).into_diagnostic()?;
 
     if !installed_packages.is_empty() && name.starts_with("host") {
         // we have to clean up extra files in the prefix
-        let extra_files =
-            Files::from_prefix(target_prefix, &Default::default(), &Default::default())?;
+        let extra_files = Files::from_prefix(
+            target_prefix,
+            &Default::default(),
+            &Default::default(),
+            None,
+        )
+        .into_diagnostic()?;
 
         tracing::info!(
             "Cleaning up {} files in the prefix from a previous build.",
@@ -327,18 +251,19 @@ pub async fn install_packages(
 
         for f in extra_files.new_files {
             if !f.is_dir() {
-                fs_err::remove_file(target_prefix.join(f))?;
+                fs_err::remove_file(target_prefix.join(f)).into_diagnostic()?;
             }
         }
     }
 
     tracing::info!("\nInstalling {name} environment\n");
     Installer::new()
-        .with_download_client(tool_configuration.client.clone())
+        .with_download_client(tool_configuration.client.get_client().clone())
         .with_target_platform(target_platform)
         .with_execute_link_scripts(true)
         .with_package_cache(tool_configuration.package_cache.clone())
         .with_installed_packages(installed_packages)
+        .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())
         .with_reporter(
             IndicatifReporter::builder()
                 .with_multi_progress(
@@ -354,7 +279,8 @@ pub async fn install_packages(
                 .finish(),
         )
         .install(&target_prefix, required_packages.to_owned())
-        .await?;
+        .await
+        .into_diagnostic()?;
 
     tracing::info!(
         "{} Successfully updated the {name} environment",

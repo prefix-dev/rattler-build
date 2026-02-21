@@ -26,7 +26,7 @@ python:
 cplusplus:
   - if: unix
     then:
-     - "10"
-     - "1000"
+      - "10"
+      - "1000"
   - if: win
     then: "100"

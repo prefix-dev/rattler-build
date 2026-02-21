@@ -2,7 +2,7 @@ name: Python bindings CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
@@ -11,10 +11,10 @@ on:
       - Cargo.*
 
       # When something in the bindings themselves changes
-      - 'py-rattler-build/**/*'
+      - "py-rattler-build/**/*"
 
       # Or when this workflow changes
-      - '.github/workflows/python-bindings.yml'
+      - ".github/workflows/python-bindings.yml"
   workflow_dispatch:
 
 concurrency:
@@ -29,25 +29,24 @@ jobs:
     name: Format, Lint and Test Python bindings
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
-      - uses: prefix-dev/setup-pixi@v0.8.3
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          workspaces: "py-rattler-build -> target"
+          shared-key: python-bindings
+          # Only save cache on main to avoid thrashing
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           manifest-path: py-rattler-build/pixi.toml
-      - name: Check formatting
-        working-directory: py-rattler-build
-        run: |
-          pixi run -e test fmt-check
+          cache: true
       - name: Check Cargo.lock
         working-directory: py-rattler-build
         run: |
-          pixi run -e test check-cargo-lock
-      - name: Lint
-        working-directory: py-rattler-build
-        run: |
-          pixi run -e test lint
+          pixi run check-cargo-lock
       - name: Run tests
         working-directory: py-rattler-build
         run: |
-          pixi run -e test test --color=yes
+          pixi run test --color=yes

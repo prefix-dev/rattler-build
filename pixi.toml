@@ -1,66 +1,118 @@
-[project]
-name = "rattler-build"
+[workspace]
 description = "Conda package builder, using the rattler rust backend"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
-channels = ["conda-forge"]
+channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
+preview = ['pixi-build']
+name = "rattler-build"
+
+[workspace.target.osx.build-variants]
+c_compiler_version = ["19"]
 
 [tasks]
 build-release = "cargo build --release"
 install = "cargo install --path . --locked"
-test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
+test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
   "build-release",
 ] }
-test = "cargo test"
-test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
-generate-cli-docs = "cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown"
+test = "cargo test --workspace --all-targets"
+test-slow = "cargo test --release --workspace --all-targets"
+test-patch-extra = "cargo test --features patch-test-extra"
+test-all = { depends-on = ["test-slow", "test-end-to-end"] }
+install-as = { cmd = "python scripts/install.py", depends-on = [
+  "build-release",
+], description = "Install release build to a custom location" }
+test-ci = "cargo test --release -p rust-tests"
+generate-cli-docs = "mkdir -p src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"
+generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
+check-native-tls = "python scripts/check-native-tls.py"
 
 [feature.docs.tasks]
-build-docs = "mkdocs build --strict"
-docs = "mkdocs serve"
-deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
-deploy-dev = "mike deploy --push dev devel"
+download-font = "bash docs/layouts/download-font-to-cache.sh"
+convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
+  "py-rattler-build/notebooks/*.ipynb",
+  "py-rattler-build/rust/src/**/*.rs",
+  "py-rattler-build/src/**/*.py",
+  "src/**/*.rs",
+  "crates/**/*.rs",
+], outputs = [
+  "docs/py-rattler-build/tutorials/*.md",
+] }
+build-docs = { cmd = "mkdocs build --strict", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
+docs = { cmd = "mkdocs serve", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
+deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
+deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
+  "download-font",
+  "convert-notebooks",
+] }
 
 [dependencies]
 openssl = "3.*"
-rust = ">=1.83.0,<1.84"
-compilers = "1.6.0.*"
+rust = ">=1.89.0,<1.90"
+rust-src = ">=1.89.0,<1.90"
+compilers = ">=1.11.0,<2"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
 cmake = "3.27.6.*"
 make = "4.3.*"
 perl = "5.32.1.*"
 pytest = "7.4.2.*"
+pytest-xdist = ">=3.6.1,<4"
 pyyaml = ">=6.0.1,<6.1"
 conda-package-handling = "2.2.0.*"
 requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
-rust-src = ">=1.83.0,<2"
 boto3 = "*"
+
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
-pre-commit = ">=3.7.1,<4"
-pre-commit-hooks = ">=4.6.0,<5"
-ruff = ">=0.4.8,<0.5"
+cargo-deny = ">=0.18.3,<0.19"
+prettier = ">=3.7.0,<4"
+ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
 typos = ">=1.23.1,<2"
+nbstripout = ">=0.8.2,<0.9"
 
 [feature.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
-cargo-clippy = "cargo clippy --all-targets --workspace -- -D warnings -Dclippy::dbg_macro"
+cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
+cargo-deny = "cargo deny --workspace check license --deny warnings"
 cargo-fmt = "cargo fmt"
-check-openssl = "python tests/scripts/check-openssl.py"
-lint = "pre-commit run --all-files --hook-stage=manual"
-pre-commit-install = "pre-commit install --install-hooks"
-pre-commit-run = "pre-commit run --all-files"
+cargo-fmt-check = "cargo fmt -- --check"
+prettier-check = { cmd = "prettier --check", description = "Check YAML formatting with prettier" }
+prettier-fmt = { cmd = "prettier --write", description = "Format YAML with prettier" }
+nbstripout = "nbstripout"
 ruff-format = "ruff format --force-exclude"
 ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
 toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
 toml-lint = "taplo lint --verbose **/pixi.toml"
-typos = "typos --write-changes --force-exclude"
+typos = "typos --force-exclude"
+
+[feature.pre-commit.dependencies]
+lefthook = ">=2.0.11,<3"
+
+[feature.pre-commit.tasks]
+lefthook = { cmd = "lefthook", description = "Run lefthook" }
+lint = { depends-on = [
+  "lint-fast",
+  "lint-slow",
+], description = "Run all linters and formatters on all code" }
+lint-fast = { cmd = "lefthook run pre-commit --all-files --force", description = "Run all fast linters and formatters on all code (no clippy)" }
+lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "Run all slow linters and formatters on all code" }
+pre-commit-install = "lefthook install"
+pre-commit-install-minimal = "lefthook install pre-commit"
 
 [feature.dev.dependencies]
 tbump = "*"
@@ -68,6 +120,18 @@ tbump = "*"
 [feature.dev.tasks]
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
+
+[feature.packaging.dependencies]
+python = ">=3.13,<3.15"
+sccache = ">=0.12,<0.13"
+tomlkit = ">=0.13,<0.14"
+
+[feature.packaging.activation.env]
+RUSTC_WRAPPER = "sccache"
+
+[feature.packaging.tasks]
+build-package = "python scripts/build_package.py"
+upload-package = "python scripts/upload_package.py"
 
 
 [target.linux-64.dependencies]
@@ -89,23 +153,39 @@ scripts = ["scripts/activate.sh"]
 scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]
-cairosvg = "2.7.1.*"
-mike = "2.0.0.*"
+cairosvg = ">=2.8.2,<3"
+click = "==8.2.1" # Pin click because of https://github.com/mkdocs/mkdocs/issues/4032
+mike = ">=2.1.3,<3"
 mkdocs = ">=1.6.1,<2"
-mkdocs-material = ">=9.6.4,<10"
-mkdocstrings = ">=0.27.0,<0.28"
-mkdocstrings-python = ">=1.13.0,<2"
-pillow = ">=9.4.0"
-ruff = ">=0.4.10,<0.5"
-
+mkdocs-material = ">=9.7.0,<10"
+mkdocstrings = ">=0.30.1,<0.31"
+mkdocstrings-python = ">=1.18.2,<2"
+pillow = ">=11.3.0,<12"
+ruff = ">=0.14.7,<0.15"
+py-rattler-build = { path = "./py-rattler-build" }
+nbconvert = ">=7.16,<8"
+ipykernel = ">=6.29,<7"
 
 [environments]
 default = { features = [
   "dev",
 ], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
-docs = { features = [
-  "docs",
-], no-default-feature = true, solve-group = "default" }
-lint = { features = [
-  "lint",
-], no-default-feature = true, solve-group = "default" }
+docs = { features = ["docs"], no-default-feature = true }
+lint = { features = ["lint"], solve-group = "default" }
+pre-commit = { features = ["pre-commit"], no-default-feature = true }
+packaging = { features = ["packaging"], no-default-feature = true }
+
+# pixi build
+[package]
+name.workspace = true
+
+[package.build.backend]
+name = "pixi-build-rust"
+version = "*"
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+
+[package.build.config]
+compilers = ["rust", "c"]

@@ -1,6 +1,0 @@
----
-source: src/recipe/parser/requirements.rs
-expression: deserialized
----
-build:
-  - compiler: cxx

@@ -1,0 +1,53 @@
+[package]
+name = "rattler_build_package"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A library for creating conda packages from files and metadata"
+
+[features]
+default = ["recipe"]
+# Support for building from rattler_build_recipe structures
+recipe = ["dep:rattler_build_recipe", "dep:rattler_build_jinja"]
+
+[dependencies]
+# Core dependencies
+rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
+rattler_package_streaming = { workspace = true, default-features = false }
+
+# Optional: Recipe support
+rattler_build_recipe = { workspace = true, optional = true }
+rattler_build_jinja = { workspace = true, optional = true }
+rattler_build_types = { workspace = true, optional = true }
+
+# File operations
+fs-err = { workspace = true }
+walkdir = { workspace = true }
+globset = { workspace = true }
+content_inspector = "0.2"
+memmap2 = "0.9"
+memchr = "2.7"
+pathdiff = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Parallelism
+rayon = "1.10"
+
+# Utilities
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+indicatif = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+rstest = { workspace = true }

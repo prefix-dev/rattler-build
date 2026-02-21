@@ -1,0 +1,58 @@
+# Converted from test-data/recipes/cache/recipe-symlinks.yaml
+# Tests that symlinks are properly cached and restored in staging outputs
+
+schema_version: 1
+
+recipe:
+  name: cache-symlinks
+  version: 1.0.0
+
+outputs:
+  # Staging output that creates various symlinks
+  - staging:
+      name: symlink-builder
+    build:
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/bin
+            touch $PREFIX/bin/exe
+            ln -s $PREFIX/bin/exe $PREFIX/bin/exe-symlink
+            ln -s $PREFIX/bin/exe $PREFIX/bin/absolute-exe-symlink
+            touch $PREFIX/foo.txt
+            ln -s $PREFIX/foo.txt $PREFIX/foo-symlink.txt
+            ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
+            ln -s $PREFIX/non-existent-file $PREFIX/broken-symlink.txt
+            ln -s ./foo.txt $PREFIX/relative-symlink.txt
+            echo $PREFIX > $PREFIX/prefix.txt
+        - if: win
+          then: |
+            mkdir %PREFIX%\bin
+            type nul > %PREFIX%\bin\exe.exe
+            mklink %PREFIX%\bin\exe-symlink.exe %PREFIX%\bin\exe.exe
+            type nul > %PREFIX%\foo.txt
+            mklink %PREFIX%\foo-symlink.txt %PREFIX%\foo.txt
+            echo %PREFIX% > %PREFIX%\prefix.txt
+
+  # Package output with most symlinks
+  - package:
+      name: cache-symlinks
+      version: 1.0.0
+    inherit: symlink-builder
+    build:
+      files:
+        include:
+          - "**/*"
+        exclude:
+          - "absolute-symlink.txt"
+          - "bin/absolute-exe-symlink"
+
+  # Package output with only absolute symlinks
+  - package:
+      name: absolute-cache-symlinks
+      version: 1.0.0
+    inherit: symlink-builder
+    build:
+      files:
+        - "absolute-symlink.txt"
+        - "bin/absolute-exe-symlink"

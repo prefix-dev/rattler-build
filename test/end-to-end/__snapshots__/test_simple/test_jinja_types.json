@@ -7,6 +7,7 @@
   "cquoted": "5",
   "cquoted_bool": "true",
   "cstring": "blah",
+  "ending_with": true,
   "float": "1.23",
   "inline_list": [
     "a",
@@ -35,5 +36,8 @@
     "b",
     "c"
   ],
+  "not_ending_with": false,
+  "not_starting_with": false,
+  "starting_with": true,
   "string": "blah"
 }

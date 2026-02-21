@@ -1,0 +1,15 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+expression: vars
+---
+[
+    "c_compiler",
+    "c_compiler_version",
+    "cuda",
+    "linux",
+    "openmp",
+    "osx",
+    "some_variable",
+    "unix",
+    "win",
+]

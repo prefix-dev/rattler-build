@@ -55,7 +55,7 @@ The recipe spec has the following parts:
   build the recipe
 - [x] `build`: defines how to build the recipe and what build number to use
 - [x] `requirements`: defines requirements of the top-level package
-- [x] `test`: defines tests for the top-level package
+- [x] `tests`: defines tests for the top-level package
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
 
@@ -176,14 +176,39 @@ of the work folder.
 
 ##### Specifying a file name
 
-For URL and local paths you can specify a file name. If the source is an archive and a file name is set, automatic extraction is disabled.
+For URL and local path sources, `file_name` renames the downloaded file in the work directory.
+The primary use case is giving a clean name to pre-built binaries whose URL path segments are not
+descriptive:
 
 ```yaml
 source:
-  url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
-  # will put the file in the work directory as `bsdiff4-1.1.4.tar.gz`
-  file_name: bsdiff4-1.1.4.tar.gz
+  url: https://github.com/owner/project/releases/download/v1.0.0/project-v1.0.0-linux-amd64
+  sha256: <sha256>
+  file_name: project  # rename to a clean, platform-independent name
 ```
+
+!!! warning "Setting `file_name` disables automatic archive extraction"
+    When `file_name` is set on an archive source (`.tar.gz`, `.zip`, `.7z`, etc.), the archive is
+    **not extracted** — it is placed in the work directory as-is under the given name.
+    This is true even if `file_name` is set to the same name the archive would have had by default:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # The archive is NOT extracted — it is placed as bsdiff4-1.1.4.tar.gz in the work directory
+      file_name: bsdiff4-1.1.4.tar.gz
+    ```
+
+    To download an archive and have it extracted automatically (the default behaviour), omit
+    `file_name`:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # file_name is not set — the archive is extracted into the work directory
+    ```
 
 #### Source from `git`
 
@@ -246,6 +271,37 @@ source:
   lfs: true # note: defaults to false
 ```
 
+By default, rattler-build will recursively initialize and update all git
+submodules. For repositories with large or numerous submodules that aren't needed
+for the build, you can disable this by setting `submodules: false`:
+
+```yaml
+source:
+  git: https://github.com/riscv-collab/riscv-gnu-toolchain.git
+  tag: "2024.09.03"
+  submodules: false # note: defaults to true
+```
+
+If you need only specific submodules, set `submodules: false` and initialize them
+manually in your build script.
+
+##### Verifying commit hash with `expected_commit`
+
+!!! note
+    This feature is only available with `--experimental` as it was not part of the standardization yet.
+
+
+For security and reproducibility, you can specify an `expected_commit` field to verify that the checked out commit matches the expected SHA hash. This is useful to detect if a tag or branch has been moved to point to a different commit:
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
+  expected_commit: 50a1f7ed6c168eb0815d424cba2df62790f168f0
+```
+
+If the actual commit does not match the expected commit, the build will fail with an error message indicating the mismatch. This feature is inspired by [Wolfi/Melange](https://github.com/wolfi-dev/wolfi-os) and provides an additional layer of security for your builds.
+
 #### Source from a local path
 
 If the path is relative, it is taken relative to the recipe directory. The
@@ -288,6 +344,34 @@ source:
   target_directory: my-destination/folder
 ```
 
+#### Attestation verification (experimental)
+
+!!! note
+    This feature requires the `--experimental` flag.
+
+For URL sources, you can specify an `attestation` block to verify that the downloaded archive
+was built by an expected publisher using [Sigstore](https://sigstore.dev) attestations.
+
+```yaml
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+The attestation config has the following fields:
+
+- **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
+  publisher must match for verification to succeed.
+- **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
+  automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
+  `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.
+
+See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
+for more details and examples.
+
 #### Source from multiple sources
 
 Some software is most easily built by aggregating several pieces.
@@ -309,6 +393,32 @@ source:
 
 Here, the two URL tarballs will go into one folder, and the `git` repo is checked
 out into its own space. `git` will not clone into a non-empty folder.
+
+### Include only certain files from source
+
+While you can specify only the files you need from a source, `source.filter` gives you the option to filter with globs instead.
+
+```yaml title="recipe.yaml"
+source:
+  path: /path/to/source
+  filter:
+    - list
+    - of
+    - globs
+```
+
+Glob patterns throughout the recipe file can also use a flexible `include` /
+`exclude` pair, such as:
+
+```yaml title="recipe.yaml"
+source:
+  path: /path/to/source
+  filter:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
 
 ## Build section
 
@@ -366,6 +476,9 @@ build:
         - echo "unix"
 ```
 
+There are many other configurable settings, such as environment variables and secrets.
+Please see [Build script](../build_script.md) for more information.
+
 ### Skipping builds
 
 Lists conditions under which `rattler-build` should skip the build of this recipe.
@@ -407,6 +520,37 @@ build:
     of preprocess-selectors: `noarch` packages are built with the directives which
     evaluate to `true` in the platform it is built on, which probably will result
     in incorrect/incomplete installation in other platforms.
+
+### Include only certain files in the package
+
+Sometimes you may want to include only a subset of the files installed by the
+build process in your package. For this, the `files` key can be used. Only _new_
+files are considered for inclusion (ie. files that were not in the host
+environment beforehand).
+
+```yaml title="recipe.yaml"
+build:
+  # select files to be included in the package
+  # this can be used to remove files from the package, even if they are installed in the
+  # environment
+  files:
+    - list
+    - of
+    - globs
+```
+
+Glob patterns throughout the recipe file can also use a flexible `include` /
+`exclude` pair, such as:
+
+```yaml title="recipe.yaml"
+build:
+  files:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
+
 
 ### Python specific options
 
@@ -641,7 +785,6 @@ Using a runtime dependency name:
 !!! note
     `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
-
 ## Tests section
 
 `rattler-build` supports four different types of tests. The "script test" installs
@@ -685,6 +828,19 @@ tests:
       - echo "hello world"
       - bsdiff4 -h
       - bspatch4 -h
+```
+
+#### External scripts
+
+You can also easily run a script from your recipe directory.
+Note that your package should either depend on the interpreter (e.g. Python or R)
+or you need to add a `requirements` section to the test that installs the interpreter.
+
+```yaml
+tests:
+  - script: tests/run_test.py
+  - script: tests/run_test.R
+  - script: tests/run_test.sh
 ```
 
 #### Extra test files
@@ -748,6 +904,7 @@ tests:
         - bsdiff4
         - bspatch4
       pip_check: true  # can be left out because this is the default
+      python_version: 3.12.*  # optional: use list for multiple versions, default resolves to environment
 ```
 
 Internally this will write a small Python script that imports the modules:
@@ -755,6 +912,41 @@ Internally this will write a small Python script that imports the modules:
 ```python
 import bsdiff4
 import bspatch4
+```
+
+### Perl tests
+
+For this test type you can list a set of Perl modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+tests:
+  - perl:
+      uses:
+        - Call::Context
+```
+
+Internally this will write a small Perl script that imports the modules:
+
+```perl
+use Call::Context;
+```
+
+### R tests
+
+For this test type you can list a set of R modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+- r:
+    libraries:
+      - knitr
+```
+
+Internally this will write a small R script that imports the modules:
+
+```r
+library(knitr)
 ```
 
 ### Check for package contents
@@ -773,6 +965,15 @@ tests:
         - etc/libmamba
         - etc/libmamba/*.mamba.txt
 
+      # For more advanced cases, you can use the expanded form with exists and not_exists:
+      # files:
+      #   exists:
+      #     - etc/libmamba/test.txt
+      #     - etc/libmamba
+      #     - etc/libmamba/*.mamba.txt
+      #   not_exists:
+      #     - etc/libmamba/unwanted.txt
+
       # checks for the existence of `mamba/api/__init__.py` inside of the
       # Python site-packages directory (note: also see Python import checks)
       site_packages:
@@ -784,6 +985,10 @@ tests:
       # sure things work fine
       bin:
         - mamba
+
+      # enable strict mode: error if any file in the package is not matched by one of the globs
+      # (default: false)
+      strict: true
 
       # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
       # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
@@ -797,9 +1002,6 @@ tests:
 ```
 
 ### Downstream tests
-
-!!! warning
-    Downstream tests are not yet implemented in `rattler-build`.
 
 A downstream test can mention a single package that has a dependency on the package being built.
 The test will install the package and run the tests of the downstream package with our current
@@ -891,7 +1093,7 @@ outputs:
       name: test
     requirements:
       build:
-        - ${{ pin_subpackage('libtest', max_pin='x.x') }}
+        - ${{ pin_subpackage('libtest', upper_bound='x.x') }}
 ```
 
 The outputs are topologically sorted by the dependency graph which is taking the
@@ -986,7 +1188,7 @@ context:
   version: "5.1.2"
   # later keys can reference previous keys
   # and use jinja functions to compute new values
-  major_version: ${{ version.split('.')[0] }}
+  major_version: ${{ (version | split('.'))[0] }}
   tests_to_skip:
     # fails for one reason
     - test_foo
@@ -1051,22 +1253,25 @@ specified rules.
 
 #### Pin expressions
 
-`rattler-build` knows pin expressions. A pin expression can have a `min_pin`,
-`max_pin` and `exact` value. A `max_pin` and `min_pin` are specified with a
-string containing only `x` and `.`, e.g. `max_pin="x.x.x"` would signify to pin
+`rattler-build` knows pin expressions. A pin expression can have a `lower_bound`,
+`upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
+string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
 the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
 
-A pin with `min_pin="x.x",max_pin="x.x"` for a package of version `1.2.2` would
+A pin with `lower_bound="x.x",upper_bound="x.x"` for a package of version `1.2.2` would
 evaluate to `>=1.2,<1.3.0a0`.
 
 If `exact=true`, then the `hash` is included, and the package is pinned exactly,
 e.g. `==1.2.2 h1234`. This is a unique package variant that cannot exist more
 than once, and thus is "exactly" pinned.
 
+You can also hard-code version strings into `lower_bound` and `upper_bound`.
+See the [Jinja Reference](./jinja.md) for more information.
+
 #### Pin subpackage
 
 Pin subpackage refers to another package from the same recipe file. It is
-commonly used in the `build/run_exports` section to export a run export from the
+commonly used in the `requirements/run_exports` section to export a run export from the
 package, or with multiple outputs to refer to a previous build.
 
 It looks something like:
@@ -1079,7 +1284,7 @@ package:
 requirements:
   run_exports:
     # this will evaluate to `mypkg <1.3`
-    - ${{ pin_subpackage(name, max_pin='x.x') }}
+    - ${{ pin_subpackage(name, upper_bound='x.x') }}
 ```
 
 #### Pin compatible
@@ -1097,13 +1302,13 @@ requirements:
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', min_pin='x.x', max_pin='x') }}
+    - ${{ pin_compatible('numpy', min_pin='x.x', upper_bound='x') }}
 ```
 
 #### The env Jinja functions
 
-You can access the current environment variables using the `env` object in
-Jinja.
+You can access the environment variables set outside the build script using the
+`env` object in Jinja.
 
 There are three functions:
 
@@ -1237,5 +1442,5 @@ tests:
 
 ### Jinja functions
 
-- [`load_from_file`](../experimental_features.md#load-from-files)
+- [`load_from_file`](../experimental_features.md#load_from_filefile_path)
 - [`git.*` functions](../experimental_features.md#git-functions)

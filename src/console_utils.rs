@@ -1,7 +1,9 @@
 //! This module contains utilities for logging and progress bar handling.
 use std::{
     borrow::Cow,
+    collections::hash_map::DefaultHasher,
     future::Future,
+    hash::{Hash, Hasher},
     io,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -9,26 +11,84 @@ use std::{
 };
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use console::style;
+use console::{Style, style};
 use indicatif::{
     HumanBytes, HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle,
 };
-use tracing::{field, Level};
-use tracing_core::{span::Id, Event, Field, Subscriber};
+use tracing::{Level, field};
+use tracing_core::{Event, Field, Subscriber, span::Id};
 use tracing_subscriber::{
+    EnvFilter, Layer,
     filter::{Directive, ParseError},
     fmt::{
-        self,
+        self, FmtContext, FormatEvent, FormatFields, MakeWriter,
         format::{self, Format},
-        FmtContext, FormatEvent, FormatFields, MakeWriter,
     },
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    EnvFilter, Layer,
 };
 
 use crate::consts;
+
+/// A palette of colors used for different package builds.
+/// These are chosen to be visually distinct and readable on both light and dark terminals.
+const SPAN_COLOR_PALETTE: &[console::Color] = &[
+    console::Color::Cyan,
+    console::Color::Green,
+    console::Color::Yellow,
+    console::Color::Blue,
+    console::Color::Magenta,
+    console::Color::Color256(208), // Orange
+    console::Color::Color256(141), // Light purple
+    console::Color::Color256(43),  // Teal
+];
+
+/// Returns a deterministic color for a given package identifier.
+/// The color is chosen by hashing the identifier and selecting from the palette.
+fn get_span_color(identifier: &str) -> Style {
+    let mut hasher = DefaultHasher::new();
+    identifier.hash(&mut hasher);
+    let hash = hasher.finish();
+    let color_index = (hash as usize) % SPAN_COLOR_PALETTE.len();
+    Style::new().fg(SPAN_COLOR_PALETTE[color_index])
+}
+
+/// A visitor that extracts the message field without Debug-escaping,
+/// preserving ANSI escape codes from subprocess output.
+struct PlainMessageVisitor<'a> {
+    writer: &'a mut dyn std::fmt::Write,
+    result: std::fmt::Result,
+}
+
+impl<'a> PlainMessageVisitor<'a> {
+    fn new(writer: &'a mut dyn std::fmt::Write) -> Self {
+        Self {
+            writer,
+            result: Ok(()),
+        }
+    }
+}
+
+impl field::Visit for PlainMessageVisitor<'_> {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            self.result = write!(self.writer, "{}", value);
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            self.result = write!(self.writer, "{:?}", value);
+        }
+    }
+}
 
 /// A custom formatter for tracing events.
 pub struct TracingFormatter;
@@ -48,7 +108,11 @@ where
         if *metadata.level() == tracing_core::metadata::Level::INFO
             && metadata.target().starts_with("rattler_build")
         {
-            ctx.format_fields(writer.by_ref(), event)?;
+            // Format the message directly instead of using ctx.format_fields(),
+            // which uses DefaultFields and Debug-escapes ANSI escape bytes.
+            let mut visitor = PlainMessageVisitor::new(&mut writer);
+            event.record(&mut visitor);
+            visitor.result?;
             writeln!(writer)
         } else {
             let default_format = Format::default();
@@ -57,23 +121,36 @@ where
     }
 }
 
-#[derive(Debug)]
 struct SpanInfo {
     id: Id,
     start_time: Instant,
     header: String,
     header_printed: bool,
+    /// The color style used for this span's tree characters.
+    /// This is inherited from parent spans or computed from the package identifier.
+    color: Style,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct SharedState {
     span_stack: Vec<SpanInfo>,
     warnings: Vec<String>,
 }
 
+impl std::fmt::Debug for SharedState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedState")
+            .field("span_stack_len", &self.span_stack.len())
+            .field("warnings", &self.warnings)
+            .finish()
+    }
+}
+
 struct CustomVisitor<'a> {
     writer: &'a mut dyn io::Write,
     result: io::Result<()>,
+    /// Captures the span_color field for deterministic color computation.
+    span_color: Option<String>,
 }
 
 impl<'a> CustomVisitor<'a> {
@@ -81,6 +158,7 @@ impl<'a> CustomVisitor<'a> {
         Self {
             writer,
             result: Ok(()),
+            span_color: None,
         }
     }
 }
@@ -89,6 +167,11 @@ impl field::Visit for CustomVisitor<'_> {
     fn record_str(&mut self, field: &Field, value: &str) {
         if self.result.is_err() {
             return;
+        }
+
+        // Capture span_color field for deterministic color computation
+        if field.name() == "span_color" {
+            self.span_color = Some(value.to_string());
         }
 
         self.record_debug(field, &format_args!("{}", value))
@@ -147,12 +230,13 @@ fn chunk_string_without_ansi(input: &str, max_chunk_length: usize) -> Vec<String
     chunks
 }
 
-fn indent_levels(indent: usize) -> String {
+/// Creates an indentation string with vertical bars colored according to each span's color.
+fn indent_levels_colored(span_stack: &[SpanInfo]) -> String {
     let mut s = String::new();
-    for _ in 0..indent {
-        s.push_str(" │");
+    for span_info in span_stack {
+        s.push_str(&format!(" {}", span_info.color.apply_to("│")));
     }
-    format!("{}", style(s).cyan())
+    s
 }
 
 impl<S> Layer<S> for LoggingOutputHandler
@@ -169,9 +253,13 @@ where
 
         if let Some(span) = ctx.span(id) {
             let mut s = Vec::new();
-            let mut w = io::Cursor::new(&mut s);
-            attrs.record(&mut CustomVisitor::new(&mut w));
-            let s = String::from_utf8_lossy(w.get_ref());
+            let color_key = {
+                let mut w = io::Cursor::new(&mut s);
+                let mut visitor = CustomVisitor::new(&mut w);
+                attrs.record(&mut visitor);
+                visitor.span_color
+            };
+            let s = String::from_utf8_lossy(&s);
 
             let name = if s.is_empty() {
                 span.name().to_string()
@@ -179,14 +267,31 @@ where
                 format!("{}{}", span.name(), s)
             };
 
-            let indent = indent_levels(state.span_stack.len());
-            let header = format!("{indent}\n{indent} {} {}", style("╭─").cyan(), name);
+            // Determine the color for this span:
+            // - If there's a span_color field, compute color from it
+            // - Otherwise, inherit from parent span
+            // - If no parent, use gray (for initial/setup output)
+            let span_color = if let Some(ref key) = color_key {
+                get_span_color(key)
+            } else if let Some(parent) = state.span_stack.last() {
+                parent.color.clone()
+            } else {
+                Style::new().dim()
+            };
+
+            let header = if self.simple {
+                format!("\n{} {}", span_color.apply_to("==>"), name)
+            } else {
+                let indent = indent_levels_colored(&state.span_stack);
+                format!("{indent}\n{indent} {} {}", span_color.apply_to("╭─"), name)
+            };
 
             state.span_stack.push(SpanInfo {
                 id: id.clone(),
                 start_time: Instant::now(),
                 header,
                 header_printed: false,
+                color: span_color,
             });
         }
     }
@@ -197,26 +302,37 @@ where
         if let Some(pos) = state.span_stack.iter().position(|info| &info.id == id) {
             let elapsed = state.span_stack[pos].start_time.elapsed();
             let header_printed = state.span_stack[pos].header_printed;
+            let span_color = state.span_stack[pos].color.clone();
+
             state.span_stack.truncate(pos);
 
             if !header_printed {
                 return;
             }
 
-            let indent = indent_levels(pos);
-            let indent_plus_one = indent_levels(pos + 1);
+            if self.simple {
+                eprintln!(
+                    "{} (took {})",
+                    span_color.apply_to("<=="),
+                    HumanDuration(elapsed)
+                );
+            } else {
+                // Get the indent before truncating (parent spans only)
+                let indent = indent_levels_colored(&state.span_stack);
+                // For indent_plus_one, we need to include this span's color too
+                let indent_plus_one = format!("{} {}", indent, span_color.apply_to("│"));
 
-            eprintln!(
-                "{indent_plus_one}\n{indent} {} (took {})",
-                style("╰───────────────────").cyan(),
-                HumanDuration(elapsed)
-            );
+                eprintln!(
+                    "{indent_plus_one}\n{indent} {} (took {})",
+                    span_color.apply_to("╰───────────────────"),
+                    HumanDuration(elapsed)
+                );
+            }
         }
     }
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let mut state = self.state.lock().unwrap();
-        let indent = indent_levels(state.span_stack.len());
 
         // Print pending headers
         for span_info in &mut state.span_stack {
@@ -230,39 +346,60 @@ where
         event.record(&mut CustomVisitor::new(&mut s));
         let message = String::from_utf8_lossy(&s);
 
-        let (prefix, prefix_len) = if event.metadata().level() <= &Level::WARN {
-            state.warnings.push(message.to_string());
-            if event.metadata().level() == &Level::ERROR {
-                (style("× error ").red().bold(), 7)
-            } else {
-                (style("⚠ warning ").yellow().bold(), 9)
-            }
-        } else {
-            (style(""), 0)
-        };
-
-        self.progress_bars.suspend(|| {
-            if !self.wrap_lines {
-                for line in message.lines() {
-                    eprintln!("{} {}{}", indent, prefix, line);
+        if self.simple {
+            let prefix = if event.metadata().level() <= &Level::WARN {
+                state.warnings.push(message.to_string());
+                if event.metadata().level() == &Level::ERROR {
+                    format!("[{}] ", style("ERROR").red().bold())
+                } else {
+                    format!("[{}] ", style("WARN").yellow().bold())
                 }
             } else {
-                let width = terminal_size::terminal_size()
-                    .map(|(w, _)| w.0)
-                    .unwrap_or(160) as usize;
-                let max_width = width - (state.span_stack.len() * 2) - 1 - prefix_len;
+                String::new()
+            };
 
+            self.progress_bars.suspend(|| {
                 for line in message.lines() {
-                    if line.len() <= max_width {
+                    eprintln!("{}{}", prefix, line);
+                }
+            });
+        } else {
+            let indent = indent_levels_colored(&state.span_stack);
+
+            let (prefix, prefix_len) = if event.metadata().level() <= &Level::WARN {
+                state.warnings.push(message.to_string());
+                if event.metadata().level() == &Level::ERROR {
+                    (style("× error ").red().bold(), 7)
+                } else {
+                    (style("⚠ warning ").yellow().bold(), 9)
+                }
+            } else {
+                (style(""), 0)
+            };
+
+            self.progress_bars.suspend(|| {
+                if !self.wrap_lines {
+                    for line in message.lines() {
                         eprintln!("{} {}{}", indent, prefix, line);
-                    } else {
-                        for chunk in chunk_string_without_ansi(line, max_width) {
-                            eprintln!("{} {}{}", indent, prefix, chunk);
+                    }
+                } else {
+                    let width = terminal_size::terminal_size()
+                        .map(|(w, _)| w.0)
+                        .unwrap_or(160) as usize;
+                    let max_width = width - (state.span_stack.len() * 2) - 1 - prefix_len;
+
+                    for line in message.lines() {
+                        if line.len() <= max_width {
+                            eprintln!("{} {}{}", indent, prefix, line);
+                        } else {
+                            for chunk in chunk_string_without_ansi(line, max_width) {
+                                eprintln!("{} {}{}", indent, prefix, chunk);
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 }
 
@@ -271,6 +408,8 @@ where
 pub struct LoggingOutputHandler {
     state: Arc<Mutex<SharedState>>,
     wrap_lines: bool,
+    /// When true, use simple formatting (no box-drawing, simple section headers).
+    simple: bool,
     progress_bars: MultiProgress,
     writer: io::Stderr,
 }
@@ -279,6 +418,7 @@ impl Clone for LoggingOutputHandler {
     fn clone(&self) -> Self {
         Self {
             wrap_lines: self.wrap_lines,
+            simple: self.simple,
             state: self.state.clone(),
             progress_bars: self.progress_bars.clone(),
             writer: io::stderr(),
@@ -291,6 +431,7 @@ impl Default for LoggingOutputHandler {
     fn default() -> Self {
         Self {
             wrap_lines: true,
+            simple: false,
             state: Arc::new(Mutex::new(SharedState::default())),
             progress_bars: MultiProgress::new(),
             writer: io::stderr(),
@@ -300,10 +441,10 @@ impl Default for LoggingOutputHandler {
 
 impl LoggingOutputHandler {
     /// Return a string with the current indentation level (bars added to the
-    /// front of the string).
+    /// front of the string), colored according to each span's color.
     pub fn with_indent_levels(&self, template: &str) -> String {
         let state = self.state.lock().unwrap();
-        let indent_str = indent_levels(state.span_stack.len());
+        let indent_str = indent_levels_colored(&state.span_stack);
         format!("{} {}", indent_str, template)
     }
 
@@ -503,6 +644,8 @@ pub enum LogStyle {
     Json,
     /// Use plain logging output.
     Plain,
+    /// Use simple logging output (colored, no box-drawing frames).
+    Simple,
 }
 
 /// Constructs a default [`EnvFilter`] that is used when the user did not
@@ -530,6 +673,62 @@ pub fn get_default_env_filter(
     Ok(result)
 }
 
+/// Strip ANSI escape codes from a string.
+fn strip_ansi_codes(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1B' {
+            // Skip the escape sequence
+            while let Some(&next_char) = chars.peek() {
+                chars.next();
+                if next_char.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// A visitor that formats messages without debug-style quoting for GitHub Actions output.
+struct GitHubActionsVisitor<'a> {
+    writer: &'a mut dyn io::Write,
+    result: io::Result<()>,
+}
+
+impl<'a> GitHubActionsVisitor<'a> {
+    fn new(writer: &'a mut dyn io::Write) -> Self {
+        Self {
+            writer,
+            result: Ok(()),
+        }
+    }
+}
+
+impl field::Visit for GitHubActionsVisitor<'_> {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            self.result = write!(self.writer, "{}", value);
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if self.result.is_err() {
+            return;
+        }
+        if field.name() == "message" {
+            // Use Display-style formatting to avoid extra quotes around strings
+            self.result = write!(self.writer, "{:?}", value);
+        }
+    }
+}
+
 struct GitHubActionsLayer(bool);
 
 impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
@@ -540,8 +739,9 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
         let metadata = event.metadata();
 
         let mut message = Vec::new();
-        event.record(&mut CustomVisitor::new(&mut message));
+        event.record(&mut GitHubActionsVisitor::new(&mut message));
         let message = String::from_utf8_lossy(&message);
+        let message = strip_ansi_codes(&message);
 
         match *metadata.level() {
             Level::ERROR => println!("::error ::{}", message),
@@ -585,10 +785,13 @@ pub fn init_logging(
     let use_colors = match color {
         Color::Always => Some(true),
         Color::Never => Some(false),
-        Color::Auto => None,
+        // All logging output goes to stderr, so sync stdout color detection
+        // to match stderr. This ensures `console::style()` (which checks stdout)
+        // produces ANSI only when stderr actually supports it.
+        Color::Auto => Some(console::colors_enabled_stderr()),
     };
 
-    // Enable disable colors for the colors crate
+    // Enable/disable colors for the console crate
     if let Some(use_colors) = use_colors {
         console::set_colors_enabled(use_colors);
         console::set_colors_enabled_stderr(use_colors);
@@ -632,6 +835,9 @@ pub fn init_logging(
             registry.with(log_handler.clone()).init();
         }
         LogStyle::Plain => {
+            // Plain mode should not produce any ANSI escape codes
+            console::set_colors_enabled(false);
+            console::set_colors_enabled_stderr(false);
             registry
                 .with(
                     fmt::layer()
@@ -645,6 +851,10 @@ pub fn init_logging(
             registry
                 .with(fmt::layer().json().with_writer(io::stderr))
                 .init();
+        }
+        LogStyle::Simple => {
+            log_handler.simple = true;
+            registry.with(log_handler.clone()).init();
         }
     }
 

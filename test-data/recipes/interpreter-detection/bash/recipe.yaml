@@ -1,0 +1,9 @@
+package:
+  name: test-interpreter-bash
+  version: 0.1.0
+
+build:
+  script: build.sh
+
+tests:
+  - script: test.sh

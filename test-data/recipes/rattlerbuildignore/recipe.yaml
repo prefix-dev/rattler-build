@@ -1,0 +1,19 @@
+package:
+  name: test-rattlerbuildignore
+  version: 1.0.0
+
+source:
+  - path: .
+
+build:
+  script:
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/files
+        - cp -r * $PREFIX/files/ 2>/dev/null || true
+      else:
+        - mkdir %PREFIX%\files
+        - xcopy * %PREFIX%\files\ /E /I /Y 2>nul || exit 0
+
+about:
+  summary: Test package for .condapackageignore functionality

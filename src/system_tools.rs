@@ -285,10 +285,12 @@ mod tests {
         insta::assert_snapshot!(json);
 
         let deserialized: SystemTools = serde_json::from_str(&json).unwrap();
-        assert!(deserialized
-            .used_tools
-            .lock()
-            .unwrap()
-            .contains_key(&Tool::Patchelf));
+        assert!(
+            deserialized
+                .used_tools
+                .lock()
+                .unwrap()
+                .contains_key(&Tool::Patchelf)
+        );
     }
 }

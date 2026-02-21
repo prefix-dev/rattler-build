@@ -1,0 +1,10 @@
+context:
+  build_abi3: true
+
+package:
+  name: version-independent-test
+  version: "1.0.0"
+
+build:
+  python:
+    version_independent: ${{ build_abi3 }}

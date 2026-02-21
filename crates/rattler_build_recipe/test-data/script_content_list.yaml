@@ -1,0 +1,11 @@
+package:
+  name: hellopackage
+  version: 1.0.0
+
+build:
+  script:
+    content: ${{ PYTHON }} --help
+
+requirements:
+  host:
+    - python

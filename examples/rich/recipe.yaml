@@ -1,17 +1,13 @@
-
-
 context:
-  version: "13.4.2"
+  version: "14.2.0"
 
 package:
   name: "rich"
   version: ${{ version }}
 
 source:
-  - url:
-      - https://example.com/rich-${{ version }}.tar.gz  # this will give a 404!
-      - https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
-    sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
+  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+    sha256: 73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4
 
 build:
   # Thanks to `noarch: python` this package works on all platforms
@@ -38,11 +34,6 @@ tests:
   - python:
       imports:
         - rich
-  - script:
-      - python -e "print(\"foo\")"
-    requirements:
-      run:
-        - python
 
 about:
   homepage: https://github.com/Textualize/rich

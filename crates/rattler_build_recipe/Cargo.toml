@@ -1,0 +1,60 @@
+[package]
+name = "rattler_build_recipe"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
+
+[features]
+default = ["variant-config"]
+variant-config = ["dep:rattler_build_variant_config", "dep:petgraph"]
+
+[dependencies]
+rattler_build_types = { workspace = true }
+rattler_build_jinja = { workspace = true }
+rattler_build_script = { path = "../rattler_build_script" }
+rattler_build_variant_config = { path = "../rattler_build_variant_config", optional = true }
+rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser", version = "0.1.0" }
+
+serde = { workspace = true }
+serde-value = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+serde_with = { workspace = true }
+rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
+itertools = { workspace = true }
+indexmap = { workspace = true }
+minijinja = { workspace = true, features = ["unstable_machinery"] }
+marked-yaml = { workspace = true }
+miette = { workspace = true }
+pathdiff = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+spdx = { workspace = true }
+globset = { workspace = true }
+fs-err = { workspace = true }
+regex = { workspace = true }
+sha1 = { workspace = true }
+petgraph = { workspace = true, optional = true, default-features = false }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml"] }
+walkdir = { workspace = true }
+clap = { workspace = true }
+
+# Enable fancy miette for tests to demonstrate error messages
+[dev-dependencies.miette]
+workspace = true
+features = ["fancy"]
+
+# Examples automatically enable required features
+[[example]]
+name = "parse_recipe"
+required-features = ["variant-config"]
+
+[package.metadata.cargo-all-features]
+# Auto-enable features for examples
+always_include_features = ["variant-config"]

@@ -1,19 +1,19 @@
 //! Relink shared objects to use an relative path prefix
 
+use goblin::elf::header::{ELFCLASS32, ELFCLASS64, ET_DYN, ET_EXEC, et_to_str, header32, header64};
 use goblin::elf::{Dyn, Elf};
-use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
 use itertools::Itertools;
 use memmap2::MmapMut;
-use scroll::ctx::SizeWith;
+use rattler_build_recipe::stage1::GlobVec;
 use scroll::Pwrite;
+use scroll::ctx::SizeWith;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
-use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
@@ -37,13 +37,49 @@ impl Relinker for SharedObject {
     /// Check if the file is an ELF file by reading the first 4 bytes
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
-        let mut signature: [u8; 4] = [0; 4];
-        match file.read_exact(&mut signature) {
+
+        // Read enough bytes for the largest possible header (64-bit)
+        let mut header_buf = [0u8; header64::SIZEOF_EHDR];
+        match file.read_exact(&mut header_buf) {
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
             Err(e) => return Err(e.into()),
         }
-        Ok(ELFMAG.iter().eq(signature.iter()))
+
+        // Check ELF magic
+        if &header_buf[0..4] != goblin::elf64::header::ELFMAG {
+            return Ok(false);
+        }
+
+        // Determine if it's 32 or 64 bit and parse accordingly
+        let e_type = match header_buf[4] {
+            // EI_CLASS
+            ELFCLASS32 => {
+                let header_bytes: &[u8; header32::SIZEOF_EHDR] = header_buf
+                    [..header32::SIZEOF_EHDR]
+                    .try_into()
+                    .expect("Invalid header size for ELFCLASS32");
+                header32::Header::from_bytes(header_bytes).e_type
+            }
+            ELFCLASS64 => {
+                let header_bytes: &[u8; header64::SIZEOF_EHDR] = &header_buf; // Already the right size
+                header64::Header::from_bytes(header_bytes).e_type
+            }
+            _ => return Ok(false), // Invalid ELF class
+        };
+
+        // Only process executables and shared libraries
+        let should_relink = matches!(e_type, ET_EXEC | ET_DYN);
+
+        if !should_relink {
+            tracing::debug!(
+                "Skipping ELF file with type {}: {}",
+                et_to_str(e_type),
+                path.display()
+            );
+        }
+
+        Ok(should_relink)
     }
 
     /// Create a new shared object from a path
@@ -118,7 +154,10 @@ impl Relinker for SharedObject {
                 .strip_prefix(prefix)
                 .expect("library not in prefix"),
         );
-        if let Ok(rpath_without_loader) = rpath.strip_prefix("$ORIGIN") {
+        if let Ok(rpath_without_loader) = rpath
+            .strip_prefix("$ORIGIN")
+            .or_else(|_| rpath.strip_prefix("${ORIGIN}"))
+        {
             if let Some(library_parent) = self_path.parent() {
                 return to_lexical_absolute(rpath_without_loader, library_parent);
             } else {
@@ -169,7 +208,7 @@ impl Relinker for SharedObject {
         let mut final_rpaths = Vec::new();
 
         for rpath in rpaths.iter().chain(runpaths.iter()) {
-            if rpath.starts_with("$ORIGIN") {
+            if rpath.starts_with("$ORIGIN") || rpath.starts_with("${ORIGIN}") {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
@@ -194,7 +233,12 @@ impl Relinker for SharedObject {
                     },
                 )?;
 
-                tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
+                tracing::debug!(
+                    "Converted rpath {} to $ORIGIN/{} for {:?}",
+                    rpath.display(),
+                    relative_path.display(),
+                    self.path
+                );
                 final_rpaths.push(PathBuf::from(format!(
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
@@ -234,7 +278,11 @@ fn call_patchelf(
 ) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
-    tracing::info!("patchelf for {:?}: {:?}", elf_path, new_rpath);
+    tracing::info!(
+        "Relinking {:?} (patchelf)",
+        elf_path.file_name().unwrap_or_default()
+    );
+    tracing::debug!("New rpath: {:?}", new_rpath);
 
     let mut cmd = system_tools.call(Tool::Patchelf)?;
 
@@ -393,7 +441,7 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
         }
     }
 
-    tracing::info!("Patched dynamic section of {:?}", elf_path);
+    tracing::info!("Relinking {:?}", elf_path.file_name().unwrap_or_default());
 
     data_mut.flush()?;
 
@@ -407,13 +455,35 @@ mod test {
     use std::path::Path;
     use tempfile::tempdir_in;
 
-    // Assert the following case:
-    //
-    // rpath: "/rattler-build_zlink/host_env_placehold/lib"
-    // encoded prefix: "/rattler-build_zlink/host_env_placehold"
-    // binary path: test-data/binary_files/tmp/zlink
-    // prefix: "test-data/binary_files"
-    // new rpath: $ORIGIN/../lib
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_file_type_detection() -> Result<(), RelinkError> {
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+
+        // Test that object files are not recognized as valid for relinking
+        let object_file = test_data.join("simple-elf.o");
+        assert!(
+            !SharedObject::test_file(&object_file)?,
+            "Object files should not be valid for relinking"
+        );
+
+        // Test that shared libraries are recognized as valid
+        let so_file = test_data.join("simple.so");
+        assert!(
+            SharedObject::test_file(&so_file)?,
+            "Shared libraries should be valid for relinking"
+        );
+
+        // Test existing binary that we know is valid
+        let binary_file = test_data.join("zlink");
+        assert!(
+            SharedObject::test_file(&binary_file)?,
+            "Executables should be valid for relinking"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn relink_patchelf() -> Result<(), RelinkError> {
         if which::which("patchelf").is_err() {
@@ -423,11 +493,11 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
-        let globvec = GlobVec::from_vec(vec!["/usr/lib/custom**"], None);
+        let globvec = GlobVec::from_strings(vec!["/usr/lib/custom**".to_string()], vec![]).unwrap();
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib
@@ -474,7 +544,7 @@ mod test {
 
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
-        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink-no-rpath");
         fs::copy(prefix.join("zlink-no-rpath"), &binary_path)?;
 

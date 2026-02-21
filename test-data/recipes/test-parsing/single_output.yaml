@@ -23,6 +23,16 @@ source:
       - file.patch
     file_name: test-package.tar.gz
     target_directory: test-package
+    filter:
+      include:
+        - include/*
+        - "**/foo.txt"
+        - x.txt
+        - out/**
+      exclude:
+        - foo/*
+        - bar.txt
+        - baz/
   - git: https://github.com/test/package
     depth: 10
     patches:
@@ -149,6 +159,22 @@ tests:
         - src_file.txt
   - package_contents:
       lib:
+        not_exists:
+          - test.so
+          - test.so.*
+        exists:
+          - footest.so
+          - footest.so.*
+      files:
+        exists:
+          - test.txt
+          - license.txt
+        not_exists:
+          - test2.txt
+          - license2.txt
+
+  - package_contents:
+      lib:
         - test
         - test.so.*
       include:
@@ -158,7 +184,7 @@ tests:
         - test
         - test.exe
         - foo*
-      site_packages: 
+      site_packages:
         - numpy
         - numpy/foo/__init__.py
       files:

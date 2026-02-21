@@ -1,18 +1,19 @@
 use fs_err as fs;
+use rattler_build_recipe::stage1::GlobVec;
 
-use crate::metadata::Output;
 use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
-use crate::recipe::parser::GlobVec;
+use crate::metadata::Output;
 use crate::system_tools::{SystemTools, ToolError};
+use crate::windows::link::Dll;
 use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use super::checks::{perform_linking_checks, LinkingCheckError};
+use super::checks::{LinkingCheckError, perform_linking_checks};
 
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
@@ -103,26 +104,23 @@ pub trait Relinker {
     ) -> Result<(), RelinkError>;
 }
 
-/// Returns true if the file is valid (i.e. ELF or Mach-o)
-pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkError> {
-    if platform.is_linux() {
-        SharedObject::test_file(path)
-    } else if platform.is_osx() {
-        Dylib::test_file(path)
-    } else {
-        Err(RelinkError::UnknownPlatform)
-    }
-}
-
 /// Returns the relink helper for the current platform.
 pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
-    if !is_valid_file(platform, path)? {
-        return Err(RelinkError::UnknownFileFormat);
-    }
     if platform.is_linux() {
+        if !SharedObject::test_file(path)? {
+            return Err(RelinkError::UnknownFileFormat);
+        }
         Ok(Box::new(SharedObject::new(path)?))
     } else if platform.is_osx() {
+        if !Dylib::test_file(path)? {
+            return Err(RelinkError::UnknownFileFormat);
+        }
         Ok(Box::new(Dylib::new(path)?))
+    } else if platform.is_windows() {
+        match Dll::try_new(path)? {
+            Some(dll) => Ok(Box::new(dll)),
+            None => Err(RelinkError::UnknownFileFormat),
+        }
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -147,12 +145,11 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
 /// On macOS (Mach-O files), we do the same trick and set the rpath to a relative path with the special
 /// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
-    let dynamic_linking = output.recipe.build().dynamic_linking();
+    let dynamic_linking = &output.recipe.build().dynamic_linking;
     let target_platform = output.build_configuration.target_platform;
-    let relocation_config = dynamic_linking.binary_relocation();
+    let relocation_config = &dynamic_linking.binary_relocation;
 
     if target_platform == Platform::NoArch
-        || target_platform.is_windows()
         // skip linking checks for wasm
         || target_platform.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
@@ -160,8 +157,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         return Ok(());
     }
 
-    let rpaths = dynamic_linking.rpaths();
-    let rpath_allowlist = dynamic_linking.rpath_allowlist();
+    let rpaths = dynamic_linking.rpaths.to_vec();
+    let rpath_allowlist = &dynamic_linking.rpath_allowlist;
 
     let tmp_prefix = temp_files.temp_dir.path();
     let encoded_prefix = &temp_files.encoded_prefix;
@@ -170,30 +167,52 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     // allow to use tools from build prefix such as patchelf, install_name_tool, ...
     let system_tools = output.system_tools.with_build_prefix(output.build_prefix());
 
-    for (p, content_type) in temp_files.content_type_map() {
-        let metadata = fs::symlink_metadata(p)?;
-        if metadata.is_symlink() || metadata.is_dir() {
-            tracing::debug!("Relink skipping symlink or directory: {}", p.display());
-            continue;
-        }
+    use rayon::prelude::*;
+    let results: Vec<Result<Option<PathBuf>, RelinkError>> = temp_files
+        .content_type_map()
+        .par_iter()
+        .map(|(p, content_type)| {
+            let metadata = fs::symlink_metadata(p)?;
+            if metadata.is_symlink() || metadata.is_dir() {
+                tracing::debug!("Relink skipping symlink or directory: {}", p.display());
+                return Ok(None);
+            }
 
-        if content_type != &Some(content_inspector::ContentType::BINARY) {
-            continue;
-        }
+            if content_type != &Some(content_inspector::ContentType::BINARY) {
+                return Ok(None);
+            }
 
-        if !relocation_config.is_match(p) {
-            continue;
-        }
-        if is_valid_file(target_platform, p)? {
-            let relinker = get_relinker(target_platform, p)?;
-            relinker.relink(
-                tmp_prefix,
-                encoded_prefix,
-                &rpaths,
-                rpath_allowlist,
-                &system_tools,
-            )?;
-            binaries.insert(p.clone());
+            let rel_path = p.strip_prefix(tmp_prefix)?;
+            if !relocation_config.is_match(rel_path) {
+                return Ok(None);
+            }
+
+            match get_relinker(target_platform, p) {
+                Ok(relinker) => {
+                    if !target_platform.is_windows() {
+                        relinker.relink(
+                            tmp_prefix,
+                            encoded_prefix,
+                            &rpaths,
+                            rpath_allowlist,
+                            &system_tools,
+                        )?;
+                    }
+                    Ok(Some(p.clone()))
+                }
+                Err(RelinkError::UnknownFileFormat) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+        .collect();
+
+    for result in results {
+        match result {
+            Ok(Some(path)) => {
+                binaries.insert(path);
+            }
+            Ok(None) => {}
+            Err(e) => return Err(e),
         }
     }
     perform_linking_checks(output, &binaries, tmp_prefix)?;

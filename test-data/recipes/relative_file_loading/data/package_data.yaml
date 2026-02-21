@@ -1,0 +1,9 @@
+name: test-relative-loading
+version: 1.0.0
+description: "Loaded from relative file"
+extra_metadata:
+  key1: value1
+  key2: value2
+build_data:
+  steps:
+    - "echo 'Step loaded from relative file'"

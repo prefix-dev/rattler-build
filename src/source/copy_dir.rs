@@ -1,16 +1,16 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
     collections::{HashMap, HashSet},
+    fs::FileTimes,
     path::{Path, PathBuf},
 };
 
 use fs_err::create_dir_all;
 
 use globset::Glob;
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, overrides::OverrideBuilder};
+use rattler_build_recipe::stage1::{GlobVec, GlobWithSource};
 use rayon::iter::{ParallelBridge, ParallelIterator};
-
-use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
 
@@ -32,6 +32,24 @@ impl Default for CopyOptions {
             buffer_size: 8 * 1024 * 1024,
         }
     }
+}
+
+/// Copy metadata from source to destination
+/// `fs::copy` handles permissions, but it won't be called if the file is reflinked
+/// We need to deal with permissions and timestamps ourselves
+fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
+    let metadata = fs_err::metadata(from)?;
+
+    // Copy timestamps using std::fs::FileTimes
+    let file_times = FileTimes::new()
+        .set_accessed(metadata.accessed()?)
+        .set_modified(metadata.modified()?);
+
+    let file = std::fs::OpenOptions::new().write(true).open(to)?;
+    file.set_times(file_times)?;
+    file.set_permissions(metadata.permissions())?;
+
+    Ok(())
 }
 
 /// Cross platform way of creating a symlink
@@ -62,46 +80,49 @@ pub(crate) fn create_symlink(
     Ok(())
 }
 
-/// Copy a file or directory, or symlink to another location.
-/// Use reflink if possible.
-pub(crate) fn copy_file(
-    from: impl AsRef<Path>,
-    to: impl AsRef<Path>,
-    paths_created: &mut HashSet<PathBuf>,
-    options: &CopyOptions,
-) -> Result<(), SourceError> {
-    let path = from.as_ref();
-    let dest_path = to.as_ref();
+// /// Copy a file or directory, or symlink to another location.
+// /// Use reflink if possible.
+// pub(crate) fn copy_file(
+//     from: impl AsRef<Path>,
+//     to: impl AsRef<Path>,
+//     paths_created: &mut HashSet<PathBuf>,
+//     options: &CopyOptions,
+// ) -> Result<(), SourceError> {
+//     let path = from.as_ref();
+//     let dest_path = to.as_ref();
 
-    if path.is_dir() {
-        create_dir_all_cached(dest_path, paths_created)?;
-        Ok(())
-    } else {
-        // create dir if parent does not exist
-        if let Some(parent) = dest_path.parent() {
-            create_dir_all_cached(parent, paths_created)?;
-        }
+//     // if file is a symlink, copy it as a symlink. Note: it can be a symlink to a file or directory
+//     if path.is_symlink() {
+//         let link_target = fs_err::read_link(path)?;
 
-        // if file is a symlink, copy it as a symlink
-        if path.is_symlink() {
-            let link_target = fs_err::read_link(path)?;
-            create_symlink(link_target, dest_path)?;
-            Ok(())
-        } else {
-            if dest_path.exists() {
-                if !(options.overwrite || options.skip_exist) {
-                    tracing::error!("File already exists: {:?}", dest_path);
-                } else if options.skip_exist {
-                    tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
-                } else if options.overwrite {
-                    tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
-                }
-            }
-            reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
-            Ok(())
-        }
-    }
-}
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
+
+//         create_symlink(link_target, dest_path)?;
+//         Ok(())
+//     } else if path.is_dir() {
+//         create_dir_all_cached(dest_path, paths_created)?;
+//         Ok(())
+//     } else {
+//         // create dir if parent does not exist
+//         if let Some(parent) = dest_path.parent() {
+//             create_dir_all_cached(parent, paths_created)?;
+//         }
+
+//         if dest_path.exists() {
+//             if !(options.overwrite || options.skip_exist) {
+//                 tracing::error!("File already exists: {:?}", dest_path);
+//             } else if options.skip_exist {
+//                 tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
+//             } else if options.overwrite {
+//                 tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+//             }
+//         }
+//         reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
+//         Ok(())
+//     }
+// }
 
 /// The copy_dir function accepts additionally a list of globs to ignore or include in the copy process.
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
@@ -118,7 +139,9 @@ pub(crate) struct CopyDir<'a> {
     globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
+    use_condapackageignore: bool,
     hidden: bool,
+    exclude_git_dirs: bool,
     copy_options: CopyOptions,
 }
 
@@ -132,8 +155,12 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
+            // use .condapackageignore files by default
+            use_condapackageignore: true,
             // include hidden files by default
             hidden: false,
+            // exclude .git directories by default for path sources
+            exclude_git_dirs: false,
             copy_options: CopyOptions::default(),
         }
     }
@@ -151,6 +178,12 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn use_git_global(mut self, b: bool) -> Self {
         self.use_git_global = b;
+        self
+    }
+
+    #[allow(unused)]
+    pub fn use_condapackageignore(mut self, b: bool) -> Self {
+        self.use_condapackageignore = b;
         self
     }
 
@@ -174,6 +207,12 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
+    pub fn exclude_git_dirs(mut self, b: bool) -> Self {
+        self.exclude_git_dirs = b;
+        self
+    }
+
     pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
         create_dir_all(self.to_path)?;
@@ -184,13 +223,29 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_paths = WalkBuilder::new(self.from_path)
+        let mut walk_builder = WalkBuilder::new(self.from_path);
+        walk_builder
             // disregard global gitignore
             .git_global(self.use_git_global)
             // ignore any .gitignore files from parent directories
             .parents(false)
             .git_ignore(self.use_gitignore)
-            .hidden(self.hidden)
+            // Always disable .ignore files - they should not affect source copying
+            .ignore(false)
+            .hidden(self.hidden);
+
+        // Conditionally exclude .git directories for path sources only
+        if self.exclude_git_dirs {
+            let mut override_builder = OverrideBuilder::new(self.from_path);
+            override_builder.add("!.git/").unwrap();
+            let overrides = override_builder.build().unwrap();
+            walk_builder.overrides(overrides);
+        }
+        if self.use_condapackageignore {
+            walk_builder.add_custom_ignore_filename(".condapackageignore");
+        }
+
+        let copied_paths = walk_builder
             .build()
             .filter_map(|entry| {
                 let entry = match entry {
@@ -257,7 +312,16 @@ impl<'a> CopyDir<'a> {
                     let stripped_path = path.strip_prefix(self.from_path)?;
                     let dest_path = self.to_path.join(stripped_path);
 
-                    if path.is_dir() {
+                    if path.is_symlink() {
+                        let link_target = fs_err::read_link(path)?;
+
+                        if let Some(parent) = dest_path.parent() {
+                            create_dir_all_cached(parent, paths_created)?;
+                        }
+
+                        create_symlink(link_target, &dest_path)?;
+                        Ok(Some(dest_path))
+                    } else if path.is_dir() {
                         create_dir_all_cached(&dest_path, paths_created)?;
                         Ok(Some(dest_path))
                     } else {
@@ -266,32 +330,23 @@ impl<'a> CopyDir<'a> {
                             create_dir_all_cached(parent, paths_created)?;
                         }
 
-                        // if file is a symlink, copy it as a symlink
-                        if path.is_symlink() {
-                            let link_target = fs_err::read_link(path)?;
-                            #[cfg(unix)]
-                            fs_err::os::unix::fs::symlink(link_target, &dest_path)?;
-                            #[cfg(windows)]
-                            std::os::windows::fs::symlink_file(link_target, &dest_path)?;
-                        } else {
-                            if dest_path.exists() {
-                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
-                                    tracing::error!("File already exists: {:?}", dest_path);
-                                } else if self.copy_options.skip_exist {
-                                    tracing::warn!(
-                                        "File already exists! Skipping file: {:?}",
-                                        dest_path
-                                    );
-                                } else if self.copy_options.overwrite {
-                                    tracing::warn!(
-                                        "File already exists! Overwriting file: {:?}",
-                                        dest_path
-                                    );
-                                }
+                        if dest_path.exists() {
+                            if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                tracing::error!("File already exists: {:?}", dest_path);
+                            } else if self.copy_options.skip_exist {
+                                tracing::warn!(
+                                    "File already exists! Skipping file: {:?}",
+                                    dest_path
+                                );
+                            } else if self.copy_options.overwrite {
+                                tracing::warn!(
+                                    "File already exists! Overwriting file: {:?}",
+                                    dest_path
+                                );
                             }
-                            reflink_or_copy(path, &dest_path, &self.copy_options)
-                                .map_err(SourceError::FileSystemError)?;
                         }
+                        reflink_or_copy(path, &dest_path, &self.copy_options)
+                            .map_err(SourceError::FileSystemError)?;
 
                         Ok(Some(dest_path))
                     }
@@ -383,13 +438,25 @@ where
     }
 
     // Reflink or copy the file
-    if (reflink_copy::reflink_or_copy(from, &to)?).is_none() {
-        // File has been reflinked, on Linux we need to copy the permissions
-        #[cfg(target_os = "linux")]
-        {
-            let metadata = fs_err::metadata(from)?;
-            let permissions = metadata.permissions();
-            fs_err::set_permissions(to, permissions)?;
+    match reflink_copy::reflink_or_copy(from, &to) {
+        Ok(None) => {
+            // File has been reflinked
+            #[cfg(target_os = "linux")]
+            {
+                copy_metadata(from, to.as_ref())?;
+            }
+        }
+        Ok(Some(_)) => {
+            // File has been copied
+            match copy_metadata(from, to.as_ref()) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::debug!("Failed to copy metadata for {:?} {:?}", to.as_ref(), e);
+                }
+            }
+        }
+        Err(e) => {
+            return Err(e);
         }
     }
 
@@ -415,6 +482,7 @@ impl CopyDirResult {
         &mut self.include_globs
     }
 
+    #[allow(unused)]
     pub fn any_include_glob_matched(&self) -> bool {
         self.include_globs.values().any(|m| m.get_matched())
     }
@@ -463,7 +531,7 @@ impl Match {
     }
 
     #[inline]
-    fn get_matched(&self) -> bool {
+    pub(crate) fn get_matched(&self) -> bool {
         self.matched
     }
 
@@ -476,15 +544,15 @@ impl Match {
 #[cfg(test)]
 mod test {
     use fs_err::{self as fs, File};
-    use std::collections::HashSet;
 
-    use crate::recipe::parser::GlobVec;
+    use super::GlobVec;
+    use std::collections::HashSet;
 
     #[test]
     fn test_copy_dir() {
         let tmp_dir = tempfile::TempDir::new().unwrap();
-        let tmp_dir_path = tmp_dir.into_path();
-        let dir = tmp_dir_path.as_path().join("test_copy_dir");
+        let tmp_dir_path = tmp_dir.path().to_path_buf();
+        let dir = tmp_dir_path.join("test_copy_dir");
 
         fs_err::create_dir_all(&dir).unwrap();
 
@@ -497,7 +565,7 @@ mod test {
         fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
         fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
 
-        let dest_dir = tmp_dir_path.as_path().join("test_copy_dir_dest");
+        let dest_dir = tmp_dir_path.join("test_copy_dir_dest");
         let _copy_dir = super::CopyDir::new(&dir, &dest_dir)
             .use_gitignore(false)
             .run()
@@ -510,8 +578,8 @@ mod test {
         assert!(dest_dir.join("test_dir").join("test.md").exists());
         assert!(dest_dir.join("test_dir").join("test_dir2").exists());
 
-        let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
-        // ignore all txt files
+        let dest_dir_2 = tmp_dir_path.join("test_copy_dir_dest_2");
+        // include only txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
             .with_globvec(&GlobVec::from_vec(vec!["*.txt"], None))
             .use_gitignore(false)
@@ -521,9 +589,9 @@ mod test {
         assert_eq!(copy_dir.copied_paths().len(), 1);
         assert_eq!(copy_dir.copied_paths()[0], dest_dir_2.join("test.txt"));
 
-        let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
+        let dest_dir_3 = tmp_dir_path.join("test_copy_dir_dest_3");
 
-        // ignore all txt files
+        // exclude all txt files (match everything except txt)
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_3)
             .with_globvec(&GlobVec::from_vec(vec![], Some(vec!["*.txt"])))
             .use_gitignore(false)
@@ -625,6 +693,168 @@ mod test {
         assert_eq!(
             fs::read_link(broken_symlink_dest).unwrap(),
             std::path::PathBuf::from("/does/not/exist")
+        );
+    }
+
+    #[test]
+    fn test_copy_symlinked_directory() {
+        #[cfg(windows)]
+        {
+            // check if we have permissions to create symlinks
+            let tmp_dir = tempfile::TempDir::new().unwrap();
+            let test_symlink = tmp_dir.path().join("test_symlink");
+            if std::os::windows::fs::symlink_dir("does_not_exist", &test_symlink).is_err() {
+                return;
+            }
+        }
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+        fs::create_dir_all(&dir).unwrap();
+
+        // Create a target directory with some content
+        let target_dir = tmp_dir.path().join("target_dir");
+        fs::create_dir_all(&target_dir).unwrap();
+        fs::write(target_dir.join("file_in_target.txt"), "content").unwrap();
+
+        // Create a symlink to the directory
+        let symlinked_dir = tmp_dir.path().join("symlinked_dir");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target_dir, &symlinked_dir).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&target_dir, &symlinked_dir).unwrap();
+
+        // Add a regular file as well
+        fs::write(tmp_dir.path().join("regular_file.txt"), "regular content").unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+
+        let _copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        // Check that the symlinked directory was copied as a symlink
+        let dest_symlinked_dir = dest_dir.path().join("symlinked_dir");
+        assert!(dest_symlinked_dir.exists());
+        assert!(dest_symlinked_dir.is_symlink());
+
+        // The symlink should point to the same relative path
+        let link_target = fs::read_link(&dest_symlinked_dir).unwrap();
+        assert_eq!(link_target, target_dir);
+
+        // Verify other files were copied
+        assert!(dest_dir.path().join("regular_file.txt").exists());
+        assert!(dest_dir.path().join("target_dir").exists());
+        assert!(
+            dest_dir
+                .path()
+                .join("target_dir")
+                .join("file_in_target.txt")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn test_git_directory_exclusion() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src = tmp_dir.path().join("src");
+        fs_err::create_dir_all(&src).unwrap();
+
+        // Create regular files and .git structure
+        fs::write(src.join("main.rs"), "fn main() {}").unwrap();
+        let git_obj = src.join(".git/objects/ab/1234567890abcdef");
+        fs_err::create_dir_all(git_obj.parent().unwrap()).unwrap();
+        fs::write(&git_obj, "fake git object").unwrap();
+
+        #[cfg(unix)]
+        if git_obj.metadata().is_ok() {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs_err::set_permissions(&git_obj, std::fs::Permissions::from_mode(0o444));
+        }
+
+        let dest = tmp_dir.path().join("dest");
+        let result = super::CopyDir::new(&src, &dest)
+            .use_gitignore(false)
+            .exclude_git_dirs(true)
+            .run()
+            .unwrap();
+
+        assert!(dest.join("main.rs").exists() && !dest.join(".git").exists());
+        assert!(
+            !result
+                .copied_paths()
+                .iter()
+                .any(|p| p.components().any(|c| c.as_os_str() == ".git"))
+        );
+    }
+
+    /// Test that `.condapackageignore` with `*` inside a directory ignores all contents.
+    /// This is useful for excluding output directories when using `path: ../` in source configs.
+    #[test]
+    fn test_condapackageignore_ignores_directory_contents() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let src_dir = tmp_dir.path().join("source");
+
+        // Create directory structure:
+        // source/
+        //   regular_file.txt
+        //   included_dir/
+        //     included.txt
+        //   ignored_dir/
+        //     .condapackageignore  <- contains "*" to ignore all contents
+        //     should_be_ignored.txt
+        //     nested/
+        //       also_ignored.txt
+
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("regular_file.txt"), "content").unwrap();
+
+        let included_dir = src_dir.join("included_dir");
+        fs::create_dir_all(&included_dir).unwrap();
+        fs::write(included_dir.join("included.txt"), "content").unwrap();
+
+        let ignored_dir = src_dir.join("ignored_dir");
+        fs::create_dir_all(&ignored_dir).unwrap();
+        // Create .condapackageignore with "*" to ignore all contents in this directory
+        fs::write(ignored_dir.join(".condapackageignore"), "*\n").unwrap();
+        fs::write(ignored_dir.join("should_be_ignored.txt"), "content").unwrap();
+
+        let nested_ignored = ignored_dir.join("nested");
+        fs::create_dir_all(&nested_ignored).unwrap();
+        fs::write(nested_ignored.join("also_ignored.txt"), "content").unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+        let copy_result = super::CopyDir::new(&src_dir, dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        // Should have copied regular_file.txt and included_dir/included.txt
+        assert!(dest_dir.path().join("regular_file.txt").exists());
+        assert!(dest_dir.path().join("included_dir/included.txt").exists());
+
+        // Should NOT have copied anything from ignored_dir (including the dir itself)
+        assert!(!dest_dir.path().join("ignored_dir").exists());
+        assert!(
+            !dest_dir
+                .path()
+                .join("ignored_dir/should_be_ignored.txt")
+                .exists()
+        );
+        assert!(
+            !dest_dir
+                .path()
+                .join("ignored_dir/nested/also_ignored.txt")
+                .exists()
+        );
+
+        // Verify the copied paths don't include the ignored directory
+        let copied_paths: HashSet<_> = copy_result.copied_paths().iter().collect();
+        assert!(
+            copied_paths
+                .iter()
+                .all(|p| !p.to_string_lossy().contains("ignored_dir"))
         );
     }
 }

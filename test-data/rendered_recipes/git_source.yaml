@@ -3,24 +3,24 @@ recipe:
   context: {}
   package:
     name: git_source
-    version: '1'
+    version: "1"
   source:
-  - git: https://github.com/prefix-dev/rattler-build
-    rev: refs/tags/v0.1.0
-  - git: https://github.com/wolfv/rattler-build
-    rev: refs/heads/main
-    target_directory: main
-  - git: https://github.com/prefix-dev/rattler-build
-    target_directory: HEAD
-  - git: https://github.com/prefix-dev/rattler-build
-    rev: df83c1edf287a756b8fc995e03e9632af0344777
-    target_directory: initial_version
+    - git: https://github.com/prefix-dev/rattler-build
+      rev: refs/tags/v0.1.0
+    - git: https://github.com/wolfv/rattler-build
+      rev: refs/heads/main
+      target_directory: main
+    - git: https://github.com/prefix-dev/rattler-build
+      target_directory: HEAD
+    - git: https://github.com/prefix-dev/rattler-build
+      rev: df83c1edf287a756b8fc995e03e9632af0344777
+      target_directory: initial_version
   build:
     number: 0
     string: h60d57d3_0
     script:
-    - test -f README.md
-    - cat ./initial_version/build.sh
+      - test -f README.md
+      - cat ./initial_version/build.sh
   requirements: {}
 build_configuration:
   target_platform: osx-arm64
@@ -43,7 +43,7 @@ build_configuration:
   subpackages:
     git_source:
       name: git_source
-      version: '1'
+      version: "1"
       build_string: h60d57d3_0
   packaging_settings:
     archive_type: tar_bz2
@@ -55,16 +55,16 @@ finalized_dependencies:
     depends: []
     constraints: []
 finalized_sources:
-- git: https://github.com/prefix-dev/rattler-build
-  rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
-- git: https://github.com/wolfv/rattler-build
-  rev: f38cc776f5193a3773b68bde03eeee8aac05366d
-  target_directory: main
-- git: https://github.com/prefix-dev/rattler-build
-  rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
-  target_directory: HEAD
-- git: https://github.com/prefix-dev/rattler-build
-  rev: df83c1edf287a756b8fc995e03e9632af0344777
-  target_directory: initial_version
+  - git: https://github.com/prefix-dev/rattler-build
+    rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
+  - git: https://github.com/wolfv/rattler-build
+    rev: f38cc776f5193a3773b68bde03eeee8aac05366d
+    target_directory: main
+  - git: https://github.com/prefix-dev/rattler-build
+    rev: 4ae7bd207b437c3a5955788e6516339a84358e1c
+    target_directory: HEAD
+  - git: https://github.com/prefix-dev/rattler-build
+    rev: df83c1edf287a756b8fc995e03e9632af0344777
+    target_directory: initial_version
 system_tools:
   rattler-build: 0.12.1

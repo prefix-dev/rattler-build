@@ -1,0 +1,12 @@
+package:
+  name: win-symlink-test
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - mkdir %PREFIX%\bin
+    - mkdir %PREFIX%\lib
+    - echo "target file content" > %PREFIX%\lib\target.txt
+    - echo "executable content" > %PREFIX%\bin\real_exe.bat
+    - mklink %PREFIX%\bin\symlink_to_target.txt %PREFIX%\lib\target.txt

@@ -1,26 +1,33 @@
 //! Command-line options.
 
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
-use clap::{arg, builder::ArgPredicate, crate_version, Parser, ValueEnum};
-use clap_complete::{shells, Generator};
+use chrono;
+use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
+use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::{package::ArchiveType, Platform};
-use rattler_package_streaming::write::CompressionLevel;
+use rattler_build_script::{SandboxArguments, SandboxConfiguration};
+use rattler_conda_types::{
+    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
+};
+use rattler_config::config::ConfigBase;
+use rattler_config::config::build::PackageFormatAndCompression;
+use rattler_networking::mirror_middleware;
+#[cfg(feature = "s3")]
+use rattler_networking::s3_middleware;
 use rattler_solve::ChannelPriority;
-use serde_json::{json, Value};
-use tracing::warn;
+use rattler_upload::upload::opt::UploadOpts;
+use serde_json::{Value, json};
 use url::Url;
 
-#[cfg(feature = "recipe-generation")]
-use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
-    script::{SandboxArguments, SandboxConfiguration},
-    tool_configuration::{SkipExisting, TestStrategy},
-    url_with_trailing_slash::UrlWithTrailingSlash,
+    metadata::Debug,
+    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
+#[cfg(feature = "recipe-generation")]
+use rattler_build_recipe_generator::GenerateRecipeOpts;
 
 /// Application subcommands.
 #[derive(Parser)]
@@ -28,6 +35,11 @@ use crate::{
 pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
+
+    /// Publish packages to a channel.
+    /// This command builds packages from recipes (or uses already built packages),
+    /// uploads them to a channel, and runs indexing.
+    Publish(PublishOpts),
 
     /// Run a test for a single package
     ///
@@ -55,11 +67,52 @@ pub enum SubCommands {
     Completion(ShellCompletion),
 
     #[cfg(feature = "recipe-generation")]
-    /// Generate a recipe from PyPI or CRAN
+    /// Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
     GenerateRecipe(GenerateRecipeOpts),
 
     /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
+
+    /// Debug a recipe by setting up the environment without running the build script
+    Debug(DebugOpts),
+
+    /// Create a patch for a directory
+    CreatePatch(CreatePatchOpts),
+
+    /// Open a debug shell in the build environment
+    DebugShell(DebugShellOpts),
+
+    /// Package-related subcommands
+    #[command(subcommand)]
+    Package(PackageCommands),
+
+    /// Bump a recipe to a new version
+    ///
+    /// This command updates the version and SHA256 checksum(s) in a recipe file.
+    /// It can either use a specified version or auto-detect the latest version
+    /// from supported providers (GitHub, PyPI, crates.io).
+    BumpRecipe(BumpRecipeOpts),
+}
+
+/// Options for the debug-shell command
+#[derive(Parser, Debug, Clone)]
+pub struct DebugShellOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Output directory containing rattler-build-log.txt
+    #[arg(short, long, default_value = "./output")]
+    pub output_dir: PathBuf,
+}
+
+/// Package-related subcommands.
+#[derive(Parser, Debug, Clone)]
+pub enum PackageCommands {
+    /// Inspect and display information about a built package
+    Inspect(InspectOpts),
+    /// Extract a conda package to a directory
+    Extract(ExtractOpts),
 }
 
 /// Shell completion options.
@@ -144,6 +197,10 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
+    /// The rattler-build configuration file to use
+    #[arg(long, global = true)]
+    pub config_file: Option<PathBuf>,
+
     /// Enable or disable colored output from rattler-build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
@@ -166,7 +223,7 @@ impl App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Default)]
 pub struct CommonOpts {
     /// Output directory for build artifacts.
     #[clap(
@@ -185,9 +242,17 @@ pub struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     pub use_bz2: bool,
 
+    /// Enable support for sharded repodata
+    #[clap(long, env = "RATTLER_SHARDED", default_value = "true", hide = true)]
+    pub use_sharded: bool,
+
     /// Enable experimental features
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
+
+    /// List of hosts for which SSL certificate verification should be skipped
+    #[arg(long, value_delimiter = ',')]
+    pub allow_insecure_host: Option<Vec<String>>,
 
     /// Path to an auth-file to read authentication information from
     #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
@@ -205,33 +270,88 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
-}
-
-impl From<CommonOpts> for CommonData {
-    fn from(value: CommonOpts) -> Self {
-        Self::new(
-            value.output_dir,
-            value.experimental,
-            value.auth_file,
-            value.channel_priority.map(|c| c.value),
-        )
-    }
+    #[cfg(feature = "s3")]
+    pub s3_config: HashMap<String, s3_middleware::S3Config>,
+    pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
+    pub allow_insecure_host: Option<Vec<String>>,
+    pub use_zstd: bool,
+    pub use_bz2: bool,
+    pub use_sharded: bool,
 }
 
 impl CommonData {
     /// Create a new instance of `CommonData`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
+        config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
+        allow_insecure_host: Option<Vec<String>>,
+        use_zstd: bool,
+        use_bz2: bool,
+        use_sharded: bool,
     ) -> Self {
+        // mirror config
+        // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
+        let mut mirror_config = HashMap::new();
+        tracing::debug!("Using mirrors: {:?}", config.mirrors);
+
+        fn ensure_trailing_slash(url: &url::Url) -> url::Url {
+            if url.path().ends_with('/') {
+                url.clone()
+            } else {
+                // Do not use `join` because it removes the last element
+                format!("{}/", url)
+                    .parse()
+                    .expect("Failed to add trailing slash to URL")
+            }
+        }
+
+        for (key, value) in &config.mirrors {
+            let mut mirrors = Vec::new();
+            for v in value {
+                mirrors.push(mirror_middleware::Mirror {
+                    url: ensure_trailing_slash(v),
+                    no_bz2: false,
+                    no_zstd: false,
+                    max_failures: None,
+                });
+            }
+            mirror_config.insert(ensure_trailing_slash(key), mirrors);
+        }
+
+        #[cfg(feature = "s3")]
+        let s3_config = rattler_networking::s3_middleware::compute_s3_config(&config.s3_options.0);
+
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
+            #[cfg(feature = "s3")]
+            s3_config,
+            mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
+            allow_insecure_host,
+            use_zstd,
+            use_bz2,
+            use_sharded,
         }
+    }
+
+    fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
+        Self::new(
+            value.output_dir,
+            value.experimental,
+            value.auth_file,
+            config,
+            value.channel_priority.map(|c| c.value),
+            value.allow_insecure_host,
+            value.use_zstd,
+            value.use_bz2,
+            value.use_sharded,
+        )
     }
 }
 
@@ -258,72 +378,8 @@ impl FromStr for ChannelPriorityWrapper {
     }
 }
 
-/// Container for the CLI package format and compression level
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PackageFormatAndCompression {
-    /// The archive type that is selected
-    pub archive_type: ArchiveType,
-    /// The compression level that is selected
-    pub compression_level: CompressionLevel,
-}
-
-// deserializer for the package format and compression level
-impl FromStr for PackageFormatAndCompression {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.split(':');
-        let package_format = split.next().ok_or("invalid")?;
-
-        let compression = split.next().unwrap_or("default");
-
-        // remove all non-alphanumeric characters
-        let package_format = package_format
-            .chars()
-            .filter(|c| c.is_alphanumeric())
-            .collect::<String>();
-
-        let archive_type = match package_format.to_lowercase().as_str() {
-            "tarbz2" => ArchiveType::TarBz2,
-            "conda" => ArchiveType::Conda,
-            _ => return Err(format!("Unknown package format: {}", package_format)),
-        };
-
-        let compression_level = match compression {
-            "max" | "highest" => CompressionLevel::Highest,
-            "default" | "normal" => CompressionLevel::Default,
-            "fast" | "lowest" | "min" => CompressionLevel::Lowest,
-            number if number.parse::<i32>().is_ok() => {
-                let number = number.parse::<i32>().unwrap_or_default();
-                match archive_type {
-                    ArchiveType::TarBz2 => {
-                        if !(1..=9).contains(&number) {
-                            return Err("Compression level for .tar.bz2 must be between 1 and 9"
-                                .to_string());
-                        }
-                    }
-                    ArchiveType::Conda => {
-                        if !(-7..=22).contains(&number) {
-                            return Err(
-                                "Compression level for conda packages (zstd) must be between -7 and 22".to_string()
-                            );
-                        }
-                    }
-                }
-                CompressionLevel::Numeric(number)
-            }
-            _ => return Err(format!("Unknown compression level: {}", compression)),
-        };
-
-        Ok(PackageFormatAndCompression {
-            archive_type,
-            compression_level,
-        })
-    }
-}
-
 /// Build options.
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Default)]
 pub struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the
     /// current directory.
@@ -331,12 +387,13 @@ pub struct BuildOpts {
         short,
         long = "recipe",
         default_value = ".",
-        default_value_if("recipe_dir", ArgPredicate::IsPresent, None)
+        default_value_if("recipe_dir", ArgPredicate::IsPresent, None),
+        conflicts_with = "recipe_dir"
     )]
     pub recipes: Vec<PathBuf>,
 
     /// The directory that contains recipes.
-    #[arg(long, value_parser = is_dir)]
+    #[arg(long, value_parser = is_dir, conflicts_with = "recipes")]
     pub recipe_dir: Option<PathBuf>,
 
     /// Build recipes up to the specified package.
@@ -359,11 +416,16 @@ pub struct BuildOpts {
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     pub variant_config: Option<Vec<PathBuf>>,
+
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11).
+    /// Multiple values separated by commas will create multiple build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
 
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]
@@ -396,6 +458,12 @@ pub struct BuildOpts {
     /// The number of threads to use for compression (only relevant when also
     /// using `--package-format conda`)
     pub compression_threads: Option<u32>,
+
+    #[arg(long, env = "RATTLER_IO_CONCURRENCY_LIMIT")]
+    /// The maximum number of concurrent I/O operations to use when installing packages
+    /// This can be controlled by the `RATTLER_IO_CONCURRENCY_LIMIT` environment variable
+    /// Defaults to 8 times the number of CPUs
+    pub io_concurrency_limit: Option<usize>,
 
     /// Don't store the recipe in the final package
     #[arg(long, help_heading = "Modifying result")]
@@ -442,7 +510,187 @@ pub struct BuildOpts {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
+
+    /// Enable debug output in build scripts
+    #[arg(long, help_heading = "Modifying result")]
+    pub debug: bool,
+
+    /// Write a markdown summary to the specified file (appends to the file).
+    /// Useful for generating PR comments or custom reports.
+    #[arg(long, help_heading = "Modifying result")]
+    pub markdown_summary: Option<PathBuf>,
+
+    /// Continue building even if (one) of the packages fails to build.
+    /// This is useful when building many packages with `--recipe-dir`.`
+    #[clap(long)]
+    pub continue_on_failure: bool,
+
+    /// Error if the host prefix is detected in any binary files
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_prefix_in_binary: bool,
+
+    /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+    #[arg(long, help_heading = "Modifying result")]
+    pub allow_symlinks_on_windows: bool,
+
+    /// Allow absolute paths in license_file entries (defaults to false)
+    #[arg(long, hide = true, help_heading = "Modifying result")]
+    pub allow_absolute_license_paths: bool,
+
+    /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
 }
+
+/// Publish options for the `publish` command.
+///
+/// This command either builds packages from recipes OR publishes pre-built packages,
+/// then uploads them to a specified channel (local or remote), followed by running indexing.
+#[derive(Parser, Clone)]
+pub struct PublishOpts {
+    /// Package files (*.conda, *.tar.bz2) to publish directly, or recipe files (*.yaml) to build and publish.
+    /// If .conda or .tar.bz2 files are provided, they will be published directly without building.
+    /// If .yaml files are provided, they will be built first, then published.
+    /// Use --recipe-dir (from build options below) to scan a directory for recipes instead.
+    /// Defaults to "recipe.yaml" in the current directory if not specified.
+    #[arg(default_value = "recipe.yaml")]
+    pub package_or_recipe: Vec<PathBuf>,
+
+    /// The channel or URL to publish the package to.
+    ///
+    /// Examples:
+    /// - prefix.dev: https://prefix.dev/my-channel
+    /// - anaconda.org: https://anaconda.org/my-org
+    /// - S3: s3://my-bucket
+    /// - Filesystem: file:///path/to/channel or /path/to/channel
+    /// - Quetz: quetz://server.company.com/channel
+    /// - Artifactory: artifactory://server.company.com/channel
+    ///
+    /// Note: This channel is also used as the highest priority channel when solving dependencies.
+    #[arg(long = "to", help_heading = "Publishing")]
+    pub to: NamedChannelOrUrl,
+
+    /// Override the build number for all outputs.
+    /// Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`).
+    /// When using a relative bump, the highest build number from the target channel is used as the base.
+    #[arg(long, help_heading = "Publishing")]
+    pub build_number: Option<String>,
+
+    /// Force upload even if the package already exists (not recommended - may break lockfiles).
+    /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
+    #[arg(long, help_heading = "Publishing")]
+    pub force: bool,
+
+    /// Automatically generate attestations when uploading to prefix.dev channels.
+    /// Only works when uploading to prefix.dev channels with trusted publishing enabled.
+    #[arg(long, help_heading = "Publishing")]
+    pub generate_attestation: bool,
+
+    /// Build options.
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug)]
+pub struct PublishData {
+    pub to: NamedChannelOrUrl,
+    pub build_number: Option<String>,
+    pub force: bool,
+    pub generate_attestation: bool,
+    pub package_files: Vec<PathBuf>,
+    pub recipe_paths: Vec<PathBuf>,
+    pub build: BuildData,
+}
+
+impl PublishData {
+    /// Generate a new PublishData struct from PublishOpts and an optional config.
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
+        // Separate package files from recipe paths based on file extension
+        let mut package_files = Vec::new();
+        let mut recipe_paths = Vec::new();
+
+        // Determine recipe paths from options, in order of priority:
+        // 1. --recipe-dir flag
+        // 2. --recipe flag (if not at default value)
+        // 3. positional arguments
+        if let Some(ref recipe_dir) = opts.build.recipe_dir {
+            // Use recipe_dir - will be expanded later to find all recipes in the directory
+            recipe_paths.push(recipe_dir.clone());
+        } else {
+            // Check if --recipe was explicitly specified (not just the default ".")
+            let default_recipe = PathBuf::from(".");
+            let recipe_flag_specified = opts.build.recipes.len() != 1
+                || opts.build.recipes.first() != Some(&default_recipe);
+
+            // Check if positional argument is at default value
+            let default_positional = PathBuf::from("recipe.yaml");
+            let positional_is_default = opts.package_or_recipe.len() == 1
+                && opts.package_or_recipe.first() == Some(&default_positional);
+
+            // If --recipe was specified and positional is at default, prefer --recipe
+            let paths_to_process = if recipe_flag_specified && positional_is_default {
+                opts.build.recipes.clone()
+            } else {
+                opts.package_or_recipe
+            };
+
+            // Process the selected paths
+            for path in paths_to_process {
+                if path.is_dir() && path.join("recipe.yaml").is_file() {
+                    // If it's a directory containing recipe.yaml, treat it as a recipe path
+                    recipe_paths.push(path);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy();
+                    if ext_str == "conda" || ext_str == "bz2" {
+                        package_files.push(path);
+                        continue;
+                    } else if ext_str == "yaml" || ext_str == "yml" {
+                        recipe_paths.push(path);
+                        continue;
+                    }
+                }
+
+                // If no extension or unrecognized, treat directories as potential recipe dirs
+                if path.is_dir() {
+                    recipe_paths.push(path);
+                }
+            }
+        }
+
+        // Prepend the --to channel to the list of channels for dependency resolution
+        let mut build_opts = opts.build;
+        let to_channel = opts.to.clone();
+
+        // Add the to channel as the first channel (highest priority)
+        let channels = if let Some(mut channels) = build_opts.channels.take() {
+            channels.insert(0, to_channel.clone());
+            Some(channels)
+        } else {
+            Some(vec![to_channel.clone()])
+        };
+
+        build_opts.channels = channels;
+
+        Self {
+            to: opts.to,
+            build_number: opts.build_number,
+            force: opts.force,
+            generate_attestation: opts.generate_attestation,
+            package_files,
+            recipe_paths,
+            build: BuildData::from_opts_and_config(build_opts, config),
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
@@ -450,8 +698,9 @@ pub struct BuildData {
     pub build_platform: Platform,
     pub target_platform: Platform,
     pub host_platform: Platform,
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
+    pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
     pub with_solve: bool,
@@ -459,6 +708,7 @@ pub struct BuildData {
     pub no_build_id: bool,
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
+    pub io_concurrency_limit: usize,
     pub no_include_recipe: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
@@ -468,6 +718,14 @@ pub struct BuildData {
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
+    pub debug: Debug,
+    pub continue_on_failure: ContinueOnFailure,
+    pub error_prefix_in_binary: bool,
+    pub allow_symlinks_on_windows: bool,
+    pub allow_absolute_license_paths: bool,
+    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub build_num_override: Option<u64>,
+    pub markdown_summary: Option<PathBuf>,
 }
 
 impl BuildData {
@@ -478,8 +736,9 @@ impl BuildData {
         build_platform: Option<Platform>,
         target_platform: Option<Platform>,
         host_platform: Option<Platform>,
-        channels: Option<Vec<String>>,
+        channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
+        variant_overrides: HashMap<String, Vec<String>>,
         ignore_recipe_variants: bool,
         render_only: bool,
         with_solve: bool,
@@ -487,6 +746,7 @@ impl BuildData {
         no_build_id: bool,
         package_format: Option<PackageFormatAndCompression>,
         compression_threads: Option<u32>,
+        io_concurrency_limit: Option<usize>,
         no_include_recipe: bool,
         test: Option<TestStrategy>,
         common: CommonData,
@@ -495,6 +755,14 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
+        debug: Debug,
+        continue_on_failure: ContinueOnFailure,
+        error_prefix_in_binary: bool,
+        allow_symlinks_on_windows: bool,
+        allow_absolute_license_paths: bool,
+        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        build_num_override: Option<u64>,
+        markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
             up_to,
@@ -505,18 +773,20 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             variant_config: variant_config.unwrap_or_default(),
+            variant_overrides,
             ignore_recipe_variants,
             render_only,
             with_solve,
             keep_build,
             no_build_id,
             package_format: package_format.unwrap_or(PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
+                archive_type: CondaArchiveType::Conda,
                 compression_level: CompressionLevel::Default,
             }),
             compression_threads,
+            io_concurrency_limit: io_concurrency_limit.unwrap_or(num_cpus::get() * 8),
             no_include_recipe,
             test: test.unwrap_or_default(),
             color_build_log: true,
@@ -526,38 +796,66 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
+            debug,
+            continue_on_failure,
+            error_prefix_in_binary,
+            allow_symlinks_on_windows,
+            allow_absolute_license_paths,
+            exclude_newer,
+            build_num_override,
+            markdown_summary,
         }
     }
 }
 
-impl From<BuildOpts> for BuildData {
-    fn from(opts: BuildOpts) -> Self {
+impl BuildData {
+    /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
+    /// BuildOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
-            opts.target_platform,
+            opts.target_platform, // todo: read this from config as well
             opts.host_platform,
-            opts.channels,
+            opts.channels.or_else(|| {
+                config
+                    .as_ref()
+                    .and_then(|config| config.default_channels.clone())
+            }),
             opts.variant_config,
+            opts.variant_overrides.into_iter().collect(),
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format,
+            opts.package_format.or_else(|| {
+                config
+                    .as_ref()
+                    .and_then(|config| config.build.package_format.clone())
+            }),
             opts.compression_threads,
+            opts.io_concurrency_limit,
             opts.no_include_recipe,
             opts.test.or(if opts.no_test {
                 Some(TestStrategy::Skip)
             } else {
                 None
             }),
-            opts.common.into(),
+            CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
+            Debug::new(opts.debug),
+            opts.continue_on_failure.into(),
+            opts.error_prefix_in_binary,
+            opts.allow_symlinks_on_windows,
+            opts.allow_absolute_license_paths,
+            opts.exclude_newer,
+            opts.build_num,
+            opts.markdown_summary,
         )
     }
 }
@@ -581,20 +879,52 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
     Ok((key.to_string(), json!(value)))
 }
 
+/// Parse variant override (e.g., "python=3.12" or "python=3.12,3.11")
+fn parse_variant_override(
+    s: &str,
+) -> Result<(String, Vec<String>), Box<dyn Error + Send + Sync + 'static>> {
+    let (key, value) = s
+        .split_once('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+
+    let values: Vec<String> = value.split(',').map(|v| v.trim().to_string()).collect();
+    Ok((key.to_string(), values))
+}
+
+/// Parse a datetime string in RFC3339 format
+fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|e| {
+            format!(
+                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+                s, e
+            )
+        })
+}
+
 /// Test options.
 #[derive(Parser)]
 pub struct TestOpts {
     /// Channels to use when testing
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
-    /// The package file to test
+    /// The package file or extracted package directory to test
     #[arg(short, long)]
     pub package_file: PathBuf,
 
     /// The number of threads to use for compression.
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
+
+    /// The index of the test to run. This is used to run a specific test from the package.
+    #[clap(long)]
+    pub test_index: Option<usize>,
+
+    /// Build test environment and output debug information for manual debugging.
+    #[arg(long)]
+    pub debug: bool,
 
     /// Common options.
     #[clap(flatten)]
@@ -604,36 +934,70 @@ pub struct TestOpts {
 #[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub struct TestData {
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
+    pub test_index: Option<usize>,
+    pub debug: Debug,
 }
 
-impl From<TestOpts> for TestData {
-    fn from(value: TestOpts) -> Self {
+impl TestData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: TestOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
             value.compression_threads,
-            value.common.into(),
+            Debug::new(value.debug),
+            value.test_index,
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl TestData {
     /// Create a new instance of `TestData`
     pub fn new(
         package_file: PathBuf,
-        channels: Option<Vec<String>>,
+        channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
+        debug: Debug,
+        test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
         Self {
             package_file,
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             compression_threads,
+            test_index,
+            debug,
             common,
+        }
+    }
+}
+
+/// Represents a package source that can be either a local path or a URL
+#[derive(Debug, Clone)]
+pub enum PackageSource {
+    /// Local file path
+    Path(PathBuf),
+    /// Remote URL
+    Url(Url),
+}
+
+impl FromStr for PackageSource {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Try to parse as URL first
+        if s.starts_with("http://") || s.starts_with("https://") {
+            match Url::parse(s) {
+                Ok(url) => Ok(PackageSource::Url(url)),
+                Err(e) => Err(format!("Invalid URL: {}", e)),
+            }
+        } else {
+            // Treat as local path
+            Ok(PackageSource::Path(PathBuf::from(s)))
         }
     }
 }
@@ -641,9 +1005,9 @@ impl TestData {
 /// Rebuild options.
 #[derive(Parser)]
 pub struct RebuildOpts {
-    /// The package file to rebuild
+    /// The package file to rebuild (can be a local path or URL)
     #[arg(short, long)]
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
     #[arg(long, hide = true)]
@@ -657,6 +1021,10 @@ pub struct RebuildOpts {
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
 
+    /// The number of threads to use for I/O operations when installing packages.
+    #[clap(long, env = "RATTLER_IO_CONCURRENCY_LIMIT")]
+    pub io_concurrency_limit: Option<usize>,
+
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -665,14 +1033,16 @@ pub struct RebuildOpts {
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct RebuildData {
-    pub package_file: PathBuf,
+    pub package_file: PackageSource,
     pub test: TestStrategy,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
 }
 
-impl From<RebuildOpts> for RebuildData {
-    fn from(value: RebuildOpts) -> Self {
+impl RebuildData {
+    /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
+    /// RebuildOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<ConfigBase<()>>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -681,15 +1051,13 @@ impl From<RebuildOpts> for RebuildData {
                 TestStrategy::default()
             }),
             value.compression_threads,
-            value.common.into(),
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl RebuildData {
     /// Create a new instance of `RebuildData`
     pub fn new(
-        package_file: PathBuf,
+        package_file: PackageSource,
         test: TestStrategy,
         compression_threads: Option<u32>,
         common: CommonData,
@@ -703,509 +1071,200 @@ impl RebuildData {
     }
 }
 
-/// Upload options.
-#[derive(Parser, Debug)]
-pub struct UploadOpts {
-    /// The package file to upload
-    #[arg(global = true, required = false)]
-    pub package_files: Vec<PathBuf>,
+/// Debug options
+#[derive(Parser)]
+pub struct DebugOpts {
+    /// Recipe file to debug
+    #[arg(short, long)]
+    pub recipe: PathBuf,
 
-    /// The server type
-    #[clap(subcommand)]
-    pub server_type: ServerType,
+    /// Output directory for build artifacts
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 
-    /// Common options.
+    /// The target platform to build for
+    #[arg(long)]
+    pub target_platform: Option<Platform>,
+
+    /// The host platform to build for (defaults to target_platform)
+    #[arg(long)]
+    pub host_platform: Option<Platform>,
+
+    /// The build platform to build for (defaults to current platform)
+    #[arg(long)]
+    pub build_platform: Option<Platform>,
+
+    /// Channels to use when building
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+
+    /// Common options
     #[clap(flatten)]
     pub common: CommonOpts,
+
+    /// Name of the specific output to debug (only required when a recipe has multiple outputs)
+    #[arg(long, help = "Name of the specific output to debug")]
+    pub output_name: Option<String>,
 }
 
-/// Server type.
-#[derive(Clone, Debug, PartialEq, Parser)]
-#[allow(missing_docs)]
-pub enum ServerType {
-    Quetz(QuetzOpts),
-    Artifactory(ArtifactoryOpts),
-    Prefix(PrefixOpts),
-    Anaconda(AnacondaOpts),
-    S3(S3Opts),
-    #[clap(hide = true)]
-    CondaForge(CondaForgeOpts),
+#[derive(Debug, Clone)]
+/// Data structure containing the configuration for debugging a recipe
+pub struct DebugData {
+    /// Path to the recipe file to debug
+    pub recipe_path: PathBuf,
+    /// Directory where build artifacts will be stored
+    pub output_dir: PathBuf,
+    /// Platform where the build is being executed
+    pub build_platform: Platform,
+    /// Target platform for the build
+    pub target_platform: Platform,
+    /// Host platform for runtime dependencies
+    pub host_platform: Platform,
+    /// List of channels to search for dependencies
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+    /// Common configuration options
+    pub common: CommonData,
+    /// Name of the specific output to debug (if recipe has multiple outputs)
+    pub output_name: Option<String>,
 }
 
-/// Upload to a Quetz server.
-/// Authentication is used from the keychain / auth-file.
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct QuetzOpts {
-    /// The URL to your Quetz server
-    #[arg(short, long, env = "QUETZ_SERVER_URL")]
-    pub url: Url,
-
-    /// The URL to your channel
-    #[arg(short, long = "channel", env = "QUETZ_CHANNEL")]
-    pub channels: String,
-
-    /// The Quetz API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "QUETZ_API_KEY")]
-    pub api_key: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct QuetzData {
-    pub url: UrlWithTrailingSlash,
-    pub channels: String,
-    pub api_key: Option<String>,
-}
-
-impl From<QuetzOpts> for QuetzData {
-    fn from(value: QuetzOpts) -> Self {
-        Self::new(value.url, value.channels, value.api_key)
-    }
-}
-
-impl QuetzData {
-    /// Create a new instance of `QuetzData`
-    pub fn new(url: Url, channels: String, api_key: Option<String>) -> Self {
+impl DebugData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<ConfigBase<()>>) -> Self {
         Self {
-            url: url.into(),
-            channels,
-            api_key,
+            recipe_path: opts.recipe,
+            output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
+            build_platform: opts.build_platform.unwrap_or(Platform::current()),
+            target_platform: opts.target_platform.unwrap_or(Platform::current()),
+            host_platform: opts
+                .host_platform
+                .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
+            channels: opts.channels,
+            common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
+            output_name: opts.output_name,
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Artifactory channel.
-/// Authentication is used from the keychain / auth-file.
-pub struct ArtifactoryOpts {
-    /// The URL to your Artifactory server
-    #[arg(short, long, env = "ARTIFACTORY_SERVER_URL")]
-    pub url: Url,
+/// Options for the `create-patch` command.
+#[derive(Parser, Debug, Clone)]
+pub struct CreatePatchOpts {
+    /// Directory where we want to create the patch.
+    /// Defaults to current directory if not specified.
+    #[arg(short, long)]
+    pub directory: Option<PathBuf>,
 
-    /// The URL to your channel
-    #[arg(short, long = "channel", env = "ARTIFACTORY_CHANNEL")]
-    pub channels: String,
+    /// The name for the patch file to create.
+    #[arg(long, default_value = "changes")]
+    pub name: String,
 
-    /// Your Artifactory username
-    #[arg(long, env = "ARTIFACTORY_USERNAME", hide = true)]
-    pub username: Option<String>,
+    /// Whether to overwrite the patch file if it already exists.
+    #[arg(long, default_value = "false")]
+    pub overwrite: bool,
 
-    /// Your Artifactory password
-    #[arg(long, env = "ARTIFACTORY_PASSWORD", hide = true)]
-    pub password: Option<String>,
+    /// Optional directory where the patch file should be written. Defaults to the recipe directory determined from `.source_info.json` if not provided.
+    #[arg(long, value_name = "DIR")]
+    pub patch_dir: Option<PathBuf>,
 
-    /// Your Artifactory token
-    #[arg(short, long, env = "ARTIFACTORY_TOKEN")]
-    pub token: Option<String>,
-}
+    /// Comma-separated list of file names (or glob patterns) that should be excluded from the diff.
+    #[arg(long, value_delimiter = ',')]
+    pub exclude: Option<Vec<String>>,
 
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct ArtifactoryData {
-    pub url: UrlWithTrailingSlash,
-    pub channels: String,
-    pub token: Option<String>,
-}
+    /// Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+    #[arg(long, value_delimiter = ',')]
+    pub add: Option<Vec<String>>,
 
-impl TryFrom<ArtifactoryOpts> for ArtifactoryData {
-    type Error = miette::Error;
+    /// Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs")
+    /// If not specified, all modified files are included (subject to --exclude)
+    #[arg(long, value_delimiter = ',')]
+    pub include: Option<Vec<String>>,
 
-    fn try_from(value: ArtifactoryOpts) -> Result<Self, Self::Error> {
-        let token = match (value.username, value.password, value.token) {
-            (_, _, Some(token)) => Some(token),
-            (Some(_), Some(password), _) => {
-                warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
-                Some(password)
-            }
-            (Some(_), None, _) => {
-                return Err(miette::miette!(
-                    "Artifactory username provided without a password"
-                ));
-            }
-            (None, Some(_), _) => {
-                return Err(miette::miette!(
-                    "Artifactory password provided without a username"
-                ));
-            }
-            _ => None,
-        };
-        Ok(Self::new(value.url, value.channels, token))
-    }
-}
-
-impl ArtifactoryData {
-    /// Create a new instance of `ArtifactoryData`
-    pub fn new(url: Url, channels: String, token: Option<String>) -> Self {
-        Self {
-            url: url.into(),
-            channels,
-            token,
-        }
-    }
-}
-
-/// Options for uploading to a prefix.dev server.
-/// Authentication is used from the keychain / auth-file
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct PrefixOpts {
-    /// The URL to the prefix.dev server (only necessary for self-hosted
-    /// instances)
-    #[arg(
-        short,
-        long,
-        env = "PREFIX_SERVER_URL",
-        default_value = "https://prefix.dev"
-    )]
-    pub url: Url,
-
-    /// The channel to upload the package to
-    #[arg(short, long, env = "PREFIX_CHANNEL")]
-    pub channel: String,
-
-    /// The prefix.dev API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "PREFIX_API_KEY")]
-    pub api_key: Option<String>,
-
-    /// Upload one or more attestation files alongside the package
-    /// Note: if you add an attestation, you can _only_ upload a single package.
-    #[arg(long, required = false)]
-    pub attestation: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct PrefixData {
-    pub url: UrlWithTrailingSlash,
-    pub channel: String,
-    pub api_key: Option<String>,
-    pub attestation: Option<PathBuf>,
-}
-
-impl From<PrefixOpts> for PrefixData {
-    fn from(value: PrefixOpts) -> Self {
-        Self::new(value.url, value.channel, value.api_key, value.attestation)
-    }
-}
-
-impl PrefixData {
-    /// Create a new instance of `PrefixData`
-    pub fn new(
-        url: Url,
-        channel: String,
-        api_key: Option<String>,
-        attestation: Option<PathBuf>,
-    ) -> Self {
-        Self {
-            url: url.into(),
-            channel,
-            api_key,
-            attestation,
-        }
-    }
-}
-
-/// Options for uploading to a Anaconda.org server
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct AnacondaOpts {
-    /// The owner of the distribution (e.g. conda-forge or your username)
-    #[arg(short, long, env = "ANACONDA_OWNER")]
-    pub owner: String,
-
-    /// The channel / label to upload the package to (e.g. main / rc)
-    #[arg(short, long = "channel", env = "ANACONDA_CHANNEL")]
-    pub channels: Option<Vec<String>>,
-
-    /// The Anaconda API key, if none is provided, the token is read from the
-    /// keychain / auth-file
-    #[arg(short, long, env = "ANACONDA_API_KEY")]
-    pub api_key: Option<String>,
-
-    /// The URL to the Anaconda server
-    #[arg(short, long, env = "ANACONDA_SERVER_URL")]
-    pub url: Option<Url>,
-
-    /// Replace files on conflict
-    #[arg(long, short, env = "ANACONDA_FORCE")]
-    pub force: bool,
-}
-
-fn parse_s3_url(value: &str) -> Result<Url, String> {
-    let url: Url = Url::parse(value).map_err(|_| format!("`{}` isn't a valid URL", value))?;
-    if url.scheme() == "s3" && url.host_str().is_some() {
-        Ok(url)
-    } else {
-        Err(format!(
-            "Only S3 URLs of format s3://bucket/... can be used, not `{}`",
-            value
-        ))
-    }
-}
-
-/// Options for uploading to S3
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct S3Opts {
-    /// The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
-    #[arg(short, long, env = "S3_CHANNEL", value_parser = parse_s3_url)]
-    pub channel: Url,
-
-    /// The endpoint URL of the S3 backend
-    #[arg(
-        long,
-        env = "S3_ENDPOINT_URL",
-        default_value = "https://s3.amazonaws.com"
-    )]
-    pub endpoint_url: Url,
-
-    /// The region of the S3 backend
-    #[arg(long, env = "S3_REGION", default_value = "eu-central-1")]
-    pub region: String,
-
-    /// Whether to use path-style S3 URLs
-    #[arg(long, env = "S3_FORCE_PATH_STYLE", default_value = "false")]
-    pub force_path_style: bool,
-
-    /// The access key ID for the S3 bucket.
-    #[arg(long, env = "S3_ACCESS_KEY_ID", requires_all = ["secret_access_key"])]
-    pub access_key_id: Option<String>,
-
-    /// The secret access key for the S3 bucket.
-    #[arg(long, env = "S3_SECRET_ACCESS_KEY", requires_all = ["access_key_id"])]
-    pub secret_access_key: Option<String>,
-
-    /// The session token for the S3 bucket.
-    #[arg(long, env = "S3_SESSION_TOKEN", requires_all = ["access_key_id", "secret_access_key"])]
-    pub session_token: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct AnacondaData {
-    pub owner: String,
-    pub channels: Vec<String>,
-    pub api_key: Option<String>,
-    pub url: UrlWithTrailingSlash,
-    pub force: bool,
-}
-
-impl From<AnacondaOpts> for AnacondaData {
-    fn from(value: AnacondaOpts) -> Self {
-        Self::new(
-            value.owner,
-            value.channels,
-            value.api_key,
-            value.url,
-            value.force,
-        )
-    }
-}
-
-impl AnacondaData {
-    /// Create a new instance of `PrefixData`
-    pub fn new(
-        owner: String,
-        channel: Option<Vec<String>>,
-        api_key: Option<String>,
-        url: Option<Url>,
-        force: bool,
-    ) -> Self {
-        Self {
-            owner,
-            channels: channel.unwrap_or_else(|| vec!["main".to_string()]),
-            api_key,
-            url: url
-                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
-                .into(),
-            force,
-        }
-    }
-}
-
-/// Options for uploading to conda-forge
-#[derive(Clone, Debug, PartialEq, Parser)]
-pub struct CondaForgeOpts {
-    /// The Anaconda API key
-    #[arg(long, env = "STAGING_BINSTAR_TOKEN")]
-    pub staging_token: String,
-
-    /// The feedstock name
-    #[arg(long, env = "FEEDSTOCK_NAME")]
-    pub feedstock: String,
-
-    /// The feedstock token
-    #[arg(long, env = "FEEDSTOCK_TOKEN")]
-    pub feedstock_token: String,
-
-    /// The staging channel name
-    #[arg(long, env = "STAGING_CHANNEL")]
-    pub staging_channel: Option<String>,
-
-    /// The Anaconda Server URL
-    #[arg(long, env = "ANACONDA_SERVER_URL")]
-    pub anaconda_url: Option<Url>,
-
-    /// The validation endpoint url
-    #[arg(long, env = "VALIDATION_ENDPOINT")]
-    pub validation_endpoint: Option<Url>,
-
-    /// The CI provider
-    #[arg(long, env = "CI")]
-    pub provider: Option<String>,
-
-    /// Dry run, don't actually upload anything
-    #[arg(long, env = "DRY_RUN")]
+    /// Perform a dry-run: analyze changes and log the diff, but don't write the patch file.
+    #[arg(long, default_value = "false")]
     pub dry_run: bool,
 }
 
-#[derive(Debug)]
-#[allow(missing_docs)]
-pub struct CondaForgeData {
-    pub staging_token: String,
-    pub feedstock: String,
-    pub feedstock_token: String,
-    pub staging_channel: String,
-    pub anaconda_url: UrlWithTrailingSlash,
-    pub validation_endpoint: Url,
-    pub provider: Option<String>,
+/// Options for the `package inspect` command.
+#[derive(Parser, Debug, Clone)]
+pub struct InspectOpts {
+    /// Path to the package file (.conda, .tar.bz2)
+    pub package_file: PathBuf,
+
+    /// Show detailed file listing with hashes and sizes
+    #[arg(long)]
+    pub paths: bool,
+
+    /// Show extended about information
+    #[arg(long)]
+    pub about: bool,
+
+    /// Show run exports
+    #[arg(long)]
+    pub run_exports: bool,
+
+    /// Show all available information
+    #[arg(long)]
+    pub all: bool,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl InspectOpts {
+    /// Check if paths should be shown (either explicitly or via --all)
+    pub fn show_paths(&self) -> bool {
+        self.paths || self.all
+    }
+
+    /// Check if about info should be shown (either explicitly or via --all)
+    pub fn show_about(&self) -> bool {
+        self.about || self.all
+    }
+
+    /// Check if run exports should be shown (either explicitly or via --all)
+    pub fn show_run_exports(&self) -> bool {
+        self.run_exports || self.all
+    }
+}
+
+/// Options for the `package extract` command.
+#[derive(Parser, Debug, Clone)]
+pub struct ExtractOpts {
+    /// Path to the package file (.conda, .tar.bz2) or a URL to download from
+    pub package_file: PackageSource,
+
+    /// Destination directory for extraction (defaults to package name without extension)
+    #[arg(short = 'd', long)]
+    pub dest: Option<PathBuf>,
+}
+
+/// Options for the `bump-recipe` command.
+#[derive(Parser, Debug, Clone)]
+pub struct BumpRecipeOpts {
+    /// Path to the recipe file (recipe.yaml). Defaults to current directory.
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// The new version to bump to. If not specified, will auto-detect the latest
+    /// version from the source URL's provider (GitHub, PyPI, crates.io).
+    #[arg(long)]
+    pub version: Option<String>,
+
+    /// Include pre-release versions when auto-detecting (e.g., alpha, beta, rc).
+    #[arg(long, default_value = "false")]
+    pub include_prerelease: bool,
+
+    /// Only check for updates without modifying the recipe.
+    #[arg(long, default_value = "false")]
+    pub check_only: bool,
+
+    /// Perform a dry-run: show what would be changed without writing to the file.
+    #[arg(long, default_value = "false")]
     pub dry_run: bool,
-}
 
-impl From<CondaForgeOpts> for CondaForgeData {
-    fn from(value: CondaForgeOpts) -> Self {
-        Self::new(
-            value.staging_token,
-            value.feedstock,
-            value.feedstock_token,
-            value.staging_channel,
-            value.anaconda_url,
-            value.validation_endpoint,
-            value.provider,
-            value.dry_run,
-        )
-    }
-}
-
-impl CondaForgeData {
-    /// Create a new instance of `PrefixData`
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        staging_token: String,
-        feedstock: String,
-        feedstock_token: String,
-        staging_channel: Option<String>,
-        anaconda_url: Option<Url>,
-        validation_endpoint: Option<Url>,
-        provider: Option<String>,
-        dry_run: bool,
-    ) -> Self {
-        Self {
-            staging_token,
-            feedstock,
-            feedstock_token,
-            staging_channel: staging_channel.unwrap_or_else(|| "cf-staging".to_string()),
-            anaconda_url: anaconda_url
-                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
-                .into(),
-            validation_endpoint: validation_endpoint.unwrap_or_else(|| {
-                Url::parse("https://conda-forge.herokuapp.com/feedstock-outputs/copy").unwrap()
-            }),
-            provider,
-            dry_run,
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::str::FromStr;
-
-    use rattler_conda_types::package::ArchiveType;
-    use rattler_package_streaming::write::CompressionLevel;
-
-    use super::PackageFormatAndCompression;
-
-    #[test]
-    fn test_parse_packaging() {
-        let package_format = PackageFormatAndCompression::from_str("tar-bz2").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Default
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Default
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("tar-bz2:1").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Numeric(1)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str(".tar.bz2:max").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Highest
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("tarbz2:5").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Numeric(5)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:1").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Numeric(1)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:max").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Highest
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:-5").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Numeric(-5)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:fast").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Lowest
-            }
-        );
-    }
+    /// Keep the current build number instead of resetting it to 0.
+    #[arg(long, default_value = "false")]
+    pub keep_build_number: bool,
 }

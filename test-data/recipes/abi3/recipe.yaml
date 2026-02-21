@@ -1,3 +1,6 @@
+context:
+  python_min: "3.8"
+
 package:
   name: python-abi3-package-sample
   version: 0.0.1
@@ -15,6 +18,8 @@ build:
 requirements:
   build:
     - ${{ compiler('c') }}
+    - if: host_platform != build_platform
+      then: cross-python_${{ host_platform }}
   host:
     - python-abi3
     - python
@@ -36,7 +41,7 @@ tests:
 
 about:
   homepage: https://github.com/joerick/python-abi3-package-sample
-  summary: 'ABI3 example'
+  summary: "ABI3 example"
   license: Apache-2.0
   license_file: LICENSE
 

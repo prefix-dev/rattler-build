@@ -54,12 +54,11 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         .variant()
         .get(&"python".into())
         .map(|s| s.to_string());
-    if python_version.is_none() {
-        if let Some((record, requested)) = output.find_resolved_package("python") {
-            if requested {
-                python_version = Some(record.package_record.version.to_string());
-            }
-        }
+    if python_version.is_none()
+        && let Some((record, requested)) = output.find_resolved_package("python")
+        && requested
+    {
+        python_version = Some(record.package_record.version.to_string());
     }
 
     if let Some(py_ver) = python_version {
@@ -121,6 +120,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
+/// Returns a map of environment variables for all supported languages (Python, R).
 pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
@@ -256,7 +256,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(vars, "PIP_NO_INDEX", "True");
 
     // For noarch packages, do not write any bytecode
-    if output.recipe.build().is_python_version_independent() {
+    if output.is_python_version_independent() {
         insert!(vars, "PYTHONDONTWRITEBYTECODE", "1");
     }
 
@@ -270,7 +270,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(
         vars,
         "PKG_BUILDNUM",
-        output.recipe.build().number().to_string()
+        output.recipe.build().number.unwrap_or(0).to_string()
     );
 
     let hash = output.build_configuration.hash.clone();

@@ -1,0 +1,44 @@
+package:
+  name: merge-build-host
+  version: "0.1.0"
+
+build:
+  merge_build_and_host_envs: true
+  script: |
+    if [[ ${PREFIX} != ${CONDA_PREFIX} ]]; then
+      echo "PREFIX and CONDA_PREFIX are not the same. Host and build envs have not been merged!"
+      exit 1
+    else
+      echo "PREFIX and CONDA_PREFIX are the same. Host and build envs have been merged!"
+    fi
+
+    # check that "build_env" ($BUILD_PREFIX) is not mentioned in build_env.sh
+    if grep -q "build_env" build_env.sh; then
+      echo "BUILD_PREFIX is mentioned in build_env.sh. Host and build envs have not been merged!"
+      exit 1
+    else
+      echo "BUILD_PREFIX is not mentioned in build_env.sh. Host and build envs have been merged!"
+    fi
+
+    if grep -q ":PATH" build_env.sh; then
+      echo "PATH is not appended!"
+      exit 1
+    else
+      echo "PATH is properly extended"
+    fi
+
+    # check that HOST_PREFIX AND BUILD_PREFIX are the same
+    if [[ ${PREFIX} != ${BUILD_PREFIX} ]]; then
+      echo "PREFIX and BUILD_PREFIX are not the same. Host and build envs have not been merged!"
+      exit 1
+    else
+      echo "PREFIX and BUILD_PREFIX are the same. Host and build envs have been merged!"
+    fi
+
+    # check that we have a file under $PREFIX/conda-meta/history
+    if [[ ! -f ${PREFIX}/conda-meta/history ]]; then
+      echo "history file not found under $PREFIX/conda-meta/history"
+      exit 1
+    else
+      echo "history file found under $PREFIX/conda-meta/history"
+    fi

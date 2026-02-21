@@ -1,0 +1,18 @@
+package:
+  name: build_files
+  version: 1.0.0
+
+build:
+  files:
+    include:
+      - include/*
+    exclude:
+      - "*.exe"
+
+  script: |
+    mkdir -p $PREFIX/include
+    mkdir -p $PREFIX/lib
+    touch $PREFIX/include/include_file.h
+    touch $PREFIX/include/include_file.c
+    touch $PREFIX/include/include_file.exe
+    touch $PREFIX/lib/lib_foo.so

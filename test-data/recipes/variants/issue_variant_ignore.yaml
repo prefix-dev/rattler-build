@@ -1,0 +1,49 @@
+schema_version: 1
+
+context:
+  version: 3.4.0
+  eigen_max_align_bytes: ${{ "16" if eigen_abi_profile == "100" else ("32" if eigen_abi_profile == "80" else ("64" if eigen_abi_profile == "70" else "unsupported_eigen_abi_profile_value")) }}
+
+recipe:
+  name: eigen-variant-example
+  version: ${{ version }}
+
+build:
+  number: 1
+
+outputs:
+  - package:
+      name: eigen
+      version: ${{ version }}
+
+    build:
+      variant:
+        ignore_keys:
+          - eigen_abi_profile
+
+  - package:
+      name: eigen-abi
+      version: ${{ version }}.${{ eigen_abi_profile }}
+    requirements:
+      run_exports:
+        - ${{ pin_subpackage('eigen-abi', upper_bound='x.x.x.x') }}
+      run:
+        - ${{ pin_subpackage('eigen', upper_bound='x.x.x') }}
+    tests:
+      - script:
+          - echo "This is a metapackage, no test is necessary."
+
+  - package:
+      name: eigen-abi-other
+      version: ${{ version }}
+    build:
+      variant:
+        use_keys:
+          - some_key
+        ignore_keys:
+          - eigen_abi_profile
+
+about:
+  homepage: http://eigen.tuxfamily.org/
+  license: MPL-2.0
+  summary: C++ template library for linear algebra

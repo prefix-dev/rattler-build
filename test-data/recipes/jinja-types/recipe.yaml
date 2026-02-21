@@ -32,6 +32,10 @@ context:
   # quoted bool is quoted in variants.yaml and thus should be a string
   is_quoted_true_var: ${{ quoted_bool is string }}
   is_quoted_int_var: ${{ quoted_int is string }}
+  starting_with: ${{ xstring is startingwith('blah') }}
+  not_starting_with: ${{ xstring is startingwith('foo') }}
+  ending_with: ${{ xstring is startingwith('blah') }}
+  not_ending_with: ${{ xstring is startingwith('foo') }}
 
 package:
   name: testtypes

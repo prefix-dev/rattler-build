@@ -1,6 +1,6 @@
 context:
   name: xtensor
-  version: 0.24.6
+  version: 0.27.1
 
 package:
   name: ${{ name|lower }}
@@ -8,7 +8,7 @@ package:
 
 source:
   url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
+  sha256: 117c192ae3b7c37c0156dedaa88038e0599a6b264666c3c6c2553154b500fe23
 build:
   number: 0
 
@@ -30,8 +30,9 @@ tests:
       include:
         - xtensor/xarray.hpp
       files:
-        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
-        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
+        - "**/share/cmake/xtensor/xtensorConfig.cmake"
+        - "**/share/cmake/xtensor/xtensorConfigVersion.cmake"
+
 about:
   homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause

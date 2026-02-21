@@ -1,0 +1,16 @@
+package:
+  name: test-interpreter-py
+  version: 0.1.0
+
+build:
+  script: build.py
+
+requirements:
+  build:
+    - python
+
+tests:
+  - script: build.py
+    requirements:
+      run:
+        - python

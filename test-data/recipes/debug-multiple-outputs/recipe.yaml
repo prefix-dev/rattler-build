@@ -1,0 +1,20 @@
+recipe:
+  name: debug-multiple-outputs
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: output1
+    build:
+      script: |
+        echo "Building output1"
+        mkdir -p $PREFIX/output1
+        echo "Hello from output1" > $PREFIX/output1/hello.txt
+
+  - package:
+      name: output2
+    build:
+      script: |
+        echo "Building output2"
+        mkdir -p $PREFIX/output2
+        echo "Hello from output2" > $PREFIX/output2/hello.txt

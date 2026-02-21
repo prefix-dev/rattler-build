@@ -1,0 +1,8 @@
+--- ./workdir/text.md.bak	2021-12-27 12:22:09.000000000 -0800
++++ ./workdir/text.md	2021-12-27 12:22:14.000000000 -0800
+@@ -1,4 +1,5 @@
+ I am a long text.
+ And I want to be patched.
++This was patched using .bak extension!
+ By the patching tool in rattler-build.
+ Thank you!

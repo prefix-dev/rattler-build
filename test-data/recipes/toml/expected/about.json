@@ -2,6 +2,17 @@
   "channels": [
     "https://conda.anaconda.org/conda-forge/"
   ],
+  "extra": {
+    "foobar": 123,
+    "recipe-maintainers": [
+      "conda-forge/toml-feedstock"
+    ],
+    "tags": [
+      "toml",
+      "config",
+      "parser"
+    ]
+  },
   "home": "https://github.com/uiri/toml",
   "license": "MIT",
   "summary": "Python lib for TOML."

@@ -2,8 +2,38 @@
 
 ## Authenticating with a server
 
-You may want to use private channels for which you need to be authenticated. To
-do this ephemerally you can use the `RATTLER_AUTH_FILE` environment variable to
+You may want to use private channels for which you need to be authenticated.
+There are two ways to configure authentication: using the `rattler-build auth` command
+for persistent storage, or the `RATTLER_AUTH_FILE` environment variable for ephemeral use.
+
+### Using `rattler-build auth` (recommended)
+
+The `auth` command stores credentials securely in your system's keychain. This is the
+recommended approach for interactive use.
+
+```bash
+# Login to prefix.dev with a token
+rattler-build auth login prefix.dev --token <your_token>
+
+# Login to anaconda.org with a conda token
+rattler-build auth login anaconda.org --conda-token <your_token>
+
+# Login with basic HTTP authentication (e.g., Artifactory)
+rattler-build auth login my-artifactory.com --username <user> --password <pass>
+
+# Login to an S3 bucket
+rattler-build auth login s3://my-bucket --s3-access-key-id <key> --s3-secret-access-key <secret>
+
+# Remove stored credentials
+rattler-build auth logout prefix.dev
+```
+
+Once logged in, `rattler-build` will automatically use these credentials when accessing
+the corresponding hosts.
+
+### Using `RATTLER_AUTH_FILE` (ephemeral)
+
+For CI/CD or ephemeral environments, you can use the `RATTLER_AUTH_FILE` environment variable to
 point to a JSON file with the following structure:
 
 ```json
@@ -159,15 +189,17 @@ rattler-build upload anaconda -o <your_username> -c <label> <package_files>
 ### S3
 
 To upload to an S3 bucket, you need to set access key ID, secret access key and (optionally) a session token.
-If not using `rattler-build auth login s3://my-bucket --s3-access-key-id <access-key-id> --s3-secret-access-key <secret-access-key> --s3-session-token <session-token>`, you can set the corresponding `AWS_*` environment variables (even if not using AWS S3).
+If not using `rattler-build auth login s3://my-bucket --s3-access-key-id <access-key-id> --s3-secret-access-key <secret-access-key> --s3-session-token <session-token>`, you can set the corresponding `S3_*` environment variables.
+
 For instance, the following example uploads to a Cloudflare R2 S3 bucket:
 
 ```bash
-export AWS_ACCESS_KEY_ID=<your_access_key_id>
-export AWS_SECRET_ACCESS_KEY=<your_secret_access_key>
+export S3_ACCESS_KEY_ID=<your_access_key_id>
+export S3_SECRET_ACCESS_KEY=<your_secret_access_key>
+
 rattler-build upload s3 \
   --channel s3://my-bucket/my-channel \
   --region auto \
   --endpoint-url https://xyz.r2.cloudflarestorage.com \
-  --force-path-style true
+  --addressing-style path
 ```

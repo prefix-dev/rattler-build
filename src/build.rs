@@ -3,14 +3,27 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec};
+use rattler_build_recipe::stage1::TestType;
+use rattler_build_script::InterpreterError;
+use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    metadata::{build_reindexed_channels, Output},
-    recipe::parser::TestType,
-    render::solver::load_repodatas,
+    apply_patch_custom,
+    metadata::{Output, build_reindexed_channels},
+    package_test::PackageContentsTestExt as _,
+    packaging::record_files,
+    render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
     tool_configuration,
 };
+
+/// Behavior for handling the working directory during the build process
+#[derive(Debug, Clone, Copy)]
+pub enum WorkingDirectoryBehavior {
+    /// Preserve the working directory (don't clean up)
+    Preserve,
+    /// Clean up the working directory after build
+    Cleanup,
+}
 
 /// Check if the build should be skipped because it already exists in any of the
 /// channels
@@ -96,47 +109,115 @@ pub async fn skip_existing(
 /// dependencies, and execute the build script. Returns the path to the
 /// resulting package.
 pub async fn run_build(
-    output: Output,
+    mut output: Output,
     tool_configuration: &tool_configuration::Configuration,
+    working_directory_behavior: WorkingDirectoryBehavior,
 ) -> miette::Result<(Output, PathBuf)> {
+    let cleanup = matches!(
+        working_directory_behavior,
+        WorkingDirectoryBehavior::Cleanup
+    );
     output
         .build_configuration
         .directories
-        .create_build_dir(true)
+        .create_build_dir(cleanup)
         .into_diagnostic()?;
 
-    let span = tracing::info_span!("Running build for", recipe = output.identifier());
+    let span = tracing::info_span!(
+        "Running build for",
+        recipe = output.identifier(),
+        span_color = output.identifier()
+    );
     let _enter = span.enter();
     output.record_build_start();
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = if output.recipe.cache.is_some() {
-        output.build_or_fetch_cache(tool_configuration).await?
-    } else {
-        output
-            .fetch_sources(tool_configuration)
-            .await
-            .into_diagnostic()?
-    };
+    // Process staging caches if this output depends on any
+    // This will build or restore staging caches and return their dependencies/sources if inherited
+    let staging_result = output.process_staging_caches(tool_configuration).await?;
 
+    // If we inherit from a staging cache, store its dependencies and sources
+    if let Some((deps, sources)) = staging_result {
+        output.finalized_cache_dependencies = Some(deps);
+        output.finalized_cache_sources = Some(sources);
+    }
+
+    // Fetch sources for this output
     let output = output
-        .resolve_dependencies(tool_configuration)
+        .fetch_sources(tool_configuration, apply_patch_custom)
         .await
         .into_diagnostic()?;
+
+    // Resolve dependencies for this output
+    // If we inherited from a staging cache, finalized_cache_dependencies will be merged
+    // into the final dependencies during the resolve_dependencies call
+    let output = output
+        .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
+        .await
+        .into_diagnostic()?;
+
+    // Snapshot the host prefix before dependency installation so we can
+    // detect files added by post-link scripts (which aren't recorded in
+    // conda-meta and would otherwise leak into the downstream package).
+    let pre_install_files = record_files(&output.build_configuration.directories.host_prefix).ok();
 
     output
         .install_environments(tool_configuration)
         .await
         .into_diagnostic()?;
 
-    output.run_build_script().await.into_diagnostic()?;
+    // Compute the set of files added during install_environments. This
+    // includes both properly-recorded dependency files *and* untracked
+    // post-link artifacts. Passing this delta to create_package ensures
+    // the untracked artifacts are excluded without accidentally hiding
+    // files restored from a staging cache (which existed before install).
+    let install_added_files = record_files(&output.build_configuration.directories.host_prefix)
+        .ok()
+        .map(|post| {
+            if let Some(pre) = &pre_install_files {
+                post.difference(pre).cloned().collect()
+            } else {
+                post
+            }
+        });
+
+    match output.run_build_script().await {
+        Ok(_) => {}
+        Err(InterpreterError::Debug(info)) => {
+            tracing::info!("{}", info);
+            return Err(miette::miette!(
+                "Script not executed because debug mode is enabled"
+            ));
+        }
+        Err(InterpreterError::ExecutionFailed(_)) => {
+            return Err(miette::miette!("Script failed to execute"));
+        }
+    }
 
     // Package all the new files
     let (result, paths_json) = output
-        .create_package(tool_configuration)
+        .create_package(tool_configuration, install_added_files.as_ref())
         .await
         .into_diagnostic()?;
+
+    // Check for binary prefix if configured
+    if tool_configuration.error_prefix_in_binary {
+        tracing::info!("Checking for embedded prefix in binary files...");
+        check_for_binary_prefix(&output, &paths_json)?;
+    }
+
+    // Check for symlinks on Windows if not allowed
+    // Skip the check for noarch packages that have __unix in run dependencies,
+    // since they will never be installed on Windows.
+    if (output.build_configuration.target_platform.is_windows()
+        || (output.build_configuration.target_platform == Platform::NoArch
+            && !has_unix_virtual_package(&output)))
+        && !tool_configuration.allow_symlinks_on_windows
+    {
+        tracing::info!("Checking for symlinks ...");
+        check_for_symlinks_on_windows(&output, &paths_json)?;
+    }
 
     output.record_artifact(&result, &paths_json);
 
@@ -163,4 +244,68 @@ pub async fn run_build(
     }
 
     Ok((output, result))
+}
+
+/// Check if any binary files contain the host prefix
+fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::FileMode;
+
+    for paths_entry in &paths_json.paths {
+        if let Some(prefix_placeholder) = &paths_entry.prefix_placeholder
+            && prefix_placeholder.file_mode == FileMode::Binary
+        {
+            return Err(miette::miette!(
+                "Package {} contains Binary file {} which contains host prefix placeholder, which may cause issues when the package is installed to a different location. \
+                    Consider fixing the build process to avoid embedding the host prefix in binaries. \
+                    To allow this, remove the --error-prefix-in-binary flag.",
+                output.name().as_normalized(),
+                paths_entry.relative_path.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if the output has a Unix-specific virtual package (`__unix`, `__osx`,
+/// `__linux`, or `__glibc`) in its finalized run dependencies, indicating this
+/// package is only intended for Unix systems.
+fn has_unix_virtual_package(output: &Output) -> bool {
+    output.finalized_dependencies.as_ref().is_some_and(|deps| {
+        deps.run.depends.iter().any(|dep| {
+            matches!(
+                &dep.spec().name,
+                Some(rattler_conda_types::PackageNameMatcher::Exact(name))
+                    if ["__unix", "__osx", "__linux", "__glibc"]
+                        .contains(&name.as_normalized())
+            )
+        })
+    })
+}
+
+/// Check if any files are symlinks on Windows
+fn check_for_symlinks_on_windows(
+    output: &Output,
+    paths_json: &PathsJson,
+) -> Result<(), miette::Error> {
+    use rattler_conda_types::package::PathType;
+
+    let mut symlinks = Vec::new();
+
+    for paths_entry in &paths_json.paths {
+        if paths_entry.path_type == PathType::SoftLink {
+            symlinks.push(paths_entry.relative_path.display().to_string());
+        }
+    }
+
+    if !symlinks.is_empty() {
+        return Err(miette::miette!(
+            "Package {} contains symlinks which are not supported on most Windows systems:\n  - {}\n\
+            To allow symlinks, use the --allow-symlinks-on-windows flag.",
+            output.name().as_normalized(),
+            symlinks.join("\n  - ")
+        ));
+    }
+
+    Ok(())
 }
