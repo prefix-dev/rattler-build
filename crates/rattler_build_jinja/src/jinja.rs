@@ -893,6 +893,8 @@ fn set_jinja(
         Ok(())
     }
 
+    let recipe_dir = recipe_path.as_ref().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
     env.add_function("load_from_file", move |path: String| {
         check_experimental(experimental)?;
 
@@ -913,7 +915,13 @@ fn set_jinja(
     env.add_global("env", Value::from_object(crate::env::Env));
 
     // Add git object (experimental)
-    env.add_global("git", Value::from_object(crate::git::Git { experimental }));
+    env.add_global(
+        "git",
+        Value::from_object(crate::git::Git {
+            experimental,
+            recipe_dir,
+        }),
+    );
 
     env
 }
@@ -1052,6 +1060,71 @@ mod tests {
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });
+    }
+
+    #[test]
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(
+        any(target_arch = "aarch64", target_arch = "powerpc64"),
+        target_os = "linux"
+    )))]
+    fn eval_git_relative_path() {
+        // Create a temp directory with:
+        //   <tempdir>/repo/   -- a git repo with a tag
+        //   <tempdir>/recipe/ -- a "recipe" directory
+        // Then use a relative path "../repo" from the recipe directory.
+        let tempdir = tempfile::tempdir().unwrap();
+        let base = tempdir.path();
+
+        let repo_dir = base.join("repo");
+        let recipe_dir = base.join("recipe");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        create_repo_with_tag(&repo_dir, "v2.3.0").expect("Failed to create git repo");
+
+        let recipe_file = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_file, "").unwrap();
+
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            experimental: true,
+            recipe_path: Some(recipe_file),
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Test latest_tag with relative path
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag(\"../repo\")")
+                .expect("relative path latest_tag")
+                .as_str()
+                .unwrap(),
+            "v2.3.0"
+        );
+
+        // Test head_rev with relative path
+        let head = jinja
+            .eval("git.head_rev(\"../repo\")")
+            .expect("relative path head_rev");
+        assert!(
+            head.as_str().unwrap().len() == 40,
+            "expected a 40-char SHA, got {:?}",
+            head.as_str()
+        );
+
+        // Test latest_tag_rev matches head_rev (single commit repo)
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag_rev(\"../repo\")")
+                .expect("relative path latest_tag_rev")
+                .as_str()
+                .unwrap(),
+            head.as_str().unwrap()
+        );
     }
 
     #[test]
