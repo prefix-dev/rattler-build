@@ -265,9 +265,11 @@ impl BaseClientBuilder {
         };
 
         let auth_storage = self.auth_storage.unwrap_or_else(|| {
+            tracing::debug!("No authentication storage provided to client builder, loading from environment and defaults");
             rattler_networking::AuthenticationStorage::from_env_and_defaults()
                 .expect("Failed to load authentication storage")
         });
+        tracing::debug!("Authentication middleware configured for HTTP client");
 
         // Prepare middlewares once and reuse the same instances (via Arc) for both clients.
         let mirror_mw = self

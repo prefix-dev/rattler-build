@@ -23,6 +23,7 @@ reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
 rattler_networking = { workspace = true, optional = true, default-features = false }
+tracing = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]

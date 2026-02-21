@@ -346,6 +346,7 @@ fn create_authenticated_client() -> miette::Result<reqwest_middleware::ClientWit
         .into_diagnostic()
         .context("Failed to create HTTP client")?;
 
+    tracing::debug!("Using default authentication storage (keychain/netrc) for package info client");
     let authentication_storage =
         AuthenticationStorage::from_env_and_defaults().into_diagnostic()?;
 

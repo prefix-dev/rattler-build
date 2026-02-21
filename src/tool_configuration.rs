@@ -152,13 +152,67 @@ pub fn get_auth_store(
 ) -> Result<AuthenticationStorage, AuthenticationStorageError> {
     match auth_file {
         Some(auth_file) => {
+            tracing::info!("Loading authentication from file: {}", auth_file.display());
+
+            if !auth_file.exists() {
+                tracing::warn!(
+                    "Authentication file does not exist: {}. Requests will be made without authentication.",
+                    auth_file.display()
+                );
+            } else {
+                // Try to read and validate the file, logging which hosts are configured
+                match std::fs::read_to_string(&auth_file) {
+                    Ok(contents) => {
+                        match serde_json::from_str::<
+                            std::collections::BTreeMap<String, serde_json::Value>,
+                        >(&contents)
+                        {
+                            Ok(parsed) => {
+                                if parsed.is_empty() {
+                                    tracing::warn!(
+                                        "Authentication file is empty (no hosts configured): {}",
+                                        auth_file.display()
+                                    );
+                                } else {
+                                    let hosts: Vec<&str> =
+                                        parsed.keys().map(|k| k.as_str()).collect();
+                                    tracing::info!(
+                                        "Found authentication for {} host(s): {}",
+                                        hosts.len(),
+                                        hosts.join(", ")
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to parse authentication file {}: {}. \
+                                     Check that it contains valid JSON with the expected format.",
+                                    auth_file.display(),
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to read authentication file {}: {}",
+                            auth_file.display(),
+                            e
+                        );
+                    }
+                }
+            }
+
             let mut store = AuthenticationStorage::empty();
             store.add_backend(Arc::from(
                 authentication_storage::backends::file::FileStorage::from_path(auth_file)?,
             ));
             Ok(store)
         }
-        None => rattler_networking::AuthenticationStorage::from_env_and_defaults(),
+        None => {
+            tracing::debug!("Using default authentication storage (keychain/netrc)");
+            rattler_networking::AuthenticationStorage::from_env_and_defaults()
+        }
     }
 }
 
@@ -174,6 +228,7 @@ pub fn reqwest_client_from_auth_storage(
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
+    tracing::debug!("Building authenticated HTTP client");
     Ok(rattler_build_networking::BaseClient::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(5 * 60)

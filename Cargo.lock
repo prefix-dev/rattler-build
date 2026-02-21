@@ -4934,6 +4934,7 @@ dependencies = [
  "reqwest-middleware",
  "reqwest-retry",
  "tokio",
+ "tracing",
  "url",
 ]
 
