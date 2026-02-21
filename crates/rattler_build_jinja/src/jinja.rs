@@ -893,7 +893,9 @@ fn set_jinja(
         Ok(())
     }
 
-    let recipe_dir = recipe_path.as_ref().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+    let recipe_dir = recipe_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
 
     env.add_function("load_from_file", move |path: String| {
         check_experimental(experimental)?;
