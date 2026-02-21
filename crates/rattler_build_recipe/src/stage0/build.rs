@@ -79,6 +79,12 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default)]
     pub post_process: ConditionalList<PostProcess>,
+
+    /// Package format and compression level override.
+    /// Can be one of `tar-bz2` or `conda`. You can also add a compression
+    /// level, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>`
+    /// (from -7 to 22).
+    pub package_format: Option<Value<String>>,
 }
 
 impl Default for Build {
@@ -98,6 +104,7 @@ impl Default for Build {
             variant: VariantKeyUsage::default(),
             prefix_detection: PrefixDetection::default(),
             post_process: ConditionalList::default(),
+            package_format: None,
         }
     }
 }
@@ -277,6 +284,7 @@ impl Build {
             variant,
             prefix_detection,
             post_process,
+            package_format,
         } = self;
 
         let mut vars = Vec::new();
@@ -410,6 +418,11 @@ impl Build {
         // Post-process (handle conditional items)
         vars.extend(post_process.used_variables());
         collect_post_process_vars(post_process.iter(), &mut vars);
+
+        // Package format
+        if let Some(package_format) = package_format {
+            vars.extend(package_format.used_variables());
+        }
 
         vars.sort();
         vars.dedup();

@@ -355,6 +355,12 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+
+    /// Package format and compression level override from the recipe.
+    /// Can be one of `tar-bz2` or `conda`, optionally with a compression level,
+    /// e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_format: Option<String>,
 }
 
 /// Dynamic linking configuration
@@ -527,6 +533,7 @@ impl Build {
             && self.prefix_detection.ignore.is_none()
             && !self.prefix_detection.ignore_binary_files
             && self.post_process.is_empty()
+            && self.package_format.is_none()
     }
 }
 
@@ -565,5 +572,21 @@ mod tests {
 
         assert!(!build.is_default());
         assert!(!build.script.is_default());
+    }
+
+    #[test]
+    fn test_build_with_package_format() {
+        let build = Build {
+            package_format: Some("conda:3".to_string()),
+            ..Default::default()
+        };
+        assert!(!build.is_default());
+        assert_eq!(build.package_format, Some("conda:3".to_string()));
+    }
+
+    #[test]
+    fn test_build_default_has_no_package_format() {
+        let build = Build::default();
+        assert!(build.package_format.is_none());
     }
 }

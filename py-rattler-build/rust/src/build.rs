@@ -205,16 +205,24 @@ pub fn build_rendered_variant_py(
             solve_strategy: SolveStrategy::Highest,
             timestamp,
             subpackages: subpackages.clone(),
-            packaging_settings: PackagingSettings::from_args(
-                package_format
-                    .as_ref()
-                    .map(|p| p.archive_type)
-                    .unwrap_or(rattler_conda_types::package::CondaArchiveType::Conda),
-                package_format
-                    .as_ref()
-                    .map(|p| p.compression_level)
-                    .unwrap_or(rattler_conda_types::compression_level::CompressionLevel::Default),
-            ),
+            packaging_settings: {
+                // If no explicit package_format was passed, check the recipe
+                let effective_format = package_format.clone().or_else(|| {
+                    recipe.build.package_format.as_ref().and_then(|fmt| {
+                        PackageFormatAndCompression::from_str(fmt).ok()
+                    })
+                });
+                PackagingSettings::from_args(
+                    effective_format
+                        .as_ref()
+                        .map(|p| p.archive_type)
+                        .unwrap_or(rattler_conda_types::package::CondaArchiveType::Conda),
+                    effective_format
+                        .as_ref()
+                        .map(|p| p.compression_level)
+                        .unwrap_or(rattler_conda_types::compression_level::CompressionLevel::Default),
+                )
+            },
             store_recipe: !effective_no_include_recipe,
             force_colors: false, // Set to false for Python API
             sandbox_config: None,

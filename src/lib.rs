@@ -586,10 +586,31 @@ pub async fn get_build_output(
                 solve_strategy: SolveStrategy::Highest,
                 timestamp,
                 subpackages: subpackages.clone(),
-                packaging_settings: PackagingSettings::from_args(
-                    build_data.package_format.archive_type,
-                    build_data.package_format.compression_level,
-                ),
+                packaging_settings: {
+                    // If the recipe specifies a package_format and the CLI
+                    // didn't explicitly override it, use the recipe's value.
+                    if !build_data.package_format_explicitly_set {
+                        if let Some(ref recipe_fmt) = recipe.build().package_format {
+                            let parsed: PackageFormatAndCompression = recipe_fmt
+                                .parse()
+                                .map_err(|e: String| miette::miette!("Invalid package_format '{}' in recipe: {}", recipe_fmt, e))?;
+                            PackagingSettings::from_args(
+                                parsed.archive_type,
+                                parsed.compression_level,
+                            )
+                        } else {
+                            PackagingSettings::from_args(
+                                build_data.package_format.archive_type,
+                                build_data.package_format.compression_level,
+                            )
+                        }
+                    } else {
+                        PackagingSettings::from_args(
+                            build_data.package_format.archive_type,
+                            build_data.package_format.compression_level,
+                        )
+                    }
+                },
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
@@ -1678,6 +1699,7 @@ pub async fn debug_recipe(
             archive_type: CondaArchiveType::Conda,
             compression_level: CompressionLevel::Default,
         },
+        package_format_explicitly_set: false,
         compression_threads: None,
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,

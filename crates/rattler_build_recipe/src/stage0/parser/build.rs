@@ -453,10 +453,13 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "post_process" => {
                 build.post_process = parse_post_process_list(value_node)?;
             }
+            "package_format" => {
+                build.package_format = Some(parse_field!("build.package_format", value_node));
+            }
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process, package_format")
                 );
             }
         }
@@ -953,5 +956,44 @@ post_process:
         } else {
             panic!("Expected conditional item");
         }
+    }
+
+    #[test]
+    fn test_parse_build_with_package_format() {
+        let yaml = r#"package_format: "conda:1""#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.package_format.is_some());
+        let fmt = build.package_format.unwrap();
+        assert_eq!(fmt.as_concrete().unwrap(), "conda:1");
+    }
+
+    #[test]
+    fn test_parse_build_with_package_format_tar_bz2() {
+        let yaml = r#"package_format: tar-bz2"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.package_format.is_some());
+        let fmt = build.package_format.unwrap();
+        assert_eq!(fmt.as_concrete().unwrap(), "tar-bz2");
+    }
+
+    #[test]
+    fn test_parse_build_with_package_format_template() {
+        let yaml = r#"package_format: "${{ package_format }}""#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.package_format.is_some());
+        let fmt = build.package_format.unwrap();
+        // Should be a template, not a concrete value
+        assert!(fmt.as_concrete().is_none());
+    }
+
+    #[test]
+    fn test_parse_build_empty_has_no_package_format() {
+        let yaml = "{}";
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.package_format.is_none());
     }
 }

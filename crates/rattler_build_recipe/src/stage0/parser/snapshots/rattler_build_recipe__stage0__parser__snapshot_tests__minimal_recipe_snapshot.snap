@@ -38,6 +38,7 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  package_format: null
 requirements: {}
 about:
   homepage: null

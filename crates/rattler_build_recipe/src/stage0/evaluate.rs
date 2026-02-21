@@ -2098,6 +2098,9 @@ impl Evaluate for Stage0Build {
             false,
         )?;
 
+        // Evaluate package_format
+        let package_format = evaluate_optional_string_value(&self.package_format, context)?;
+
         Ok(Stage1Build {
             number,
             string,
@@ -2113,6 +2116,7 @@ impl Evaluate for Stage0Build {
             variant,
             prefix_detection,
             post_process,
+            package_format,
         })
     }
 }
@@ -2927,6 +2931,9 @@ fn merge_stage1_build(
         output.post_process
     };
 
+    // Package format: use output if set, otherwise inherit from top-level
+    let package_format = output.package_format.or(toplevel.package_format);
+
     stage1::Build {
         script,
         number,
@@ -2942,6 +2949,7 @@ fn merge_stage1_build(
         variant,
         prefix_detection,
         post_process,
+        package_format,
     }
 }
 

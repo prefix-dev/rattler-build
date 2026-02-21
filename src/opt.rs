@@ -707,6 +707,10 @@ pub struct BuildData {
     pub keep_build: bool,
     pub no_build_id: bool,
     pub package_format: PackageFormatAndCompression,
+    /// Whether the package format was explicitly set via CLI or config file
+    /// (as opposed to being the default value). When true, the CLI value
+    /// takes precedence over any recipe-level package_format setting.
+    pub package_format_explicitly_set: bool,
     pub compression_threads: Option<u32>,
     pub io_concurrency_limit: usize,
     pub no_include_recipe: bool,
@@ -781,6 +785,7 @@ impl BuildData {
             with_solve,
             keep_build,
             no_build_id,
+            package_format_explicitly_set: package_format.is_some(),
             package_format: package_format.unwrap_or(PackageFormatAndCompression {
                 archive_type: CondaArchiveType::Conda,
                 compression_level: CompressionLevel::Default,

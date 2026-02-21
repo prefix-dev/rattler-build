@@ -584,6 +584,31 @@ build:
     version_independent: true  # defaults to false
 ```
 
+#### Package format
+
+The package format and compression level can be set directly in the recipe. This
+is especially useful when packaging large binary files (e.g. ML models) where
+heavy compression provides little benefit and slows down the build.
+
+The format string follows the same syntax as the `--package-format` CLI option.
+Valid values are `tar-bz2` or `conda`, optionally with a compression level:
+`tar-bz2:<level>` (1-9) or `conda:<level>` (-7 to 22).
+
+```yaml
+build:
+  # Use conda format with minimal compression (fast, good for large binaries)
+  package_format: "conda:1"
+```
+
+```yaml
+build:
+  # Use tar-bz2 format
+  package_format: tar-bz2
+```
+
+If the `--package-format` CLI flag is explicitly provided, it overrides the
+recipe value.
+
 ## Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in

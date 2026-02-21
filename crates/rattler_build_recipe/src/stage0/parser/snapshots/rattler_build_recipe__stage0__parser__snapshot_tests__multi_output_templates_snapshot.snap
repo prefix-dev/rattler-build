@@ -45,6 +45,7 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  package_format: null
 about:
   homepage: null
   license: null
@@ -114,6 +115,7 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    package_format: null
   about:
     homepage: https://example.com/${{ name }}
     license: MIT
@@ -162,6 +164,7 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    package_format: null
   about:
     homepage: null
     license: MIT

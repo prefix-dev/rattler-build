@@ -46,6 +46,7 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  package_format: null
 about:
   homepage: https://example.com/
   license: Apache-2.0
@@ -134,6 +135,7 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    package_format: null
   about:
     homepage: null
     license: Apache-2.0
@@ -187,6 +189,7 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    package_format: null
   about:
     homepage: null
     license: Apache-2.0
@@ -242,6 +245,7 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    package_format: null
   about:
     homepage: null
     license: Apache-2.0
