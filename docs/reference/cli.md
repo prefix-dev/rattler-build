@@ -1020,6 +1020,12 @@ Generate a recipe for a Python package from PyPI
 	Whether to generate recipes for all dependencies
 
 
+- `--pypi-index-url <PYPI_INDEX_URLS>`
+
+	Specify the PyPI index URL(s) to use for recipe generation
+
+	- Default value: `https://pypi.org/pypi`
+
 
 
 

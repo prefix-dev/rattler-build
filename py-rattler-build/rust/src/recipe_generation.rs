@@ -8,11 +8,12 @@ use crate::run_async_task;
 
 /// Generate a PyPI recipe and return the YAML as a string.
 #[pyfunction]
-#[pyo3(signature = (package, version=None, use_mapping=true))]
+#[pyo3(signature = (package, version=None, use_mapping=true, pypi_index_urls=None))]
 pub fn generate_pypi_recipe_string_py(
     package: String,
     version: Option<String>,
     use_mapping: bool,
+    pypi_index_urls: Option<Vec<String>>,
 ) -> PyResult<String> {
     let opts = PyPIOpts {
         package,
@@ -20,6 +21,8 @@ pub fn generate_pypi_recipe_string_py(
         write: false,
         use_mapping,
         tree: false,
+        pypi_index_urls: pypi_index_urls
+            .unwrap_or_else(|| vec!["https://pypi.org/pypi".to_string()]),
     };
 
     run_async_task(generate_pypi_recipe_string(&opts))
