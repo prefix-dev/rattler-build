@@ -523,6 +523,24 @@ pub fn perform_linking_checks(
     let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
     tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
 
+    // Collect run dependency package names so we can verify that libraries
+    // linked from the host prefix actually belong to a run dependency.
+    let run_dependency_names: HashSet<PackageName> = output
+        .finalized_dependencies
+        .as_ref()
+        .expect("failed to get the finalized dependencies")
+        .run
+        .depends
+        .iter()
+        .filter_map(|dep| {
+            if let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) = &dep.spec().name {
+                Some(name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // check all DSOs and what they are linking
     let target_platform = output.target_platform();
     let host_prefix = output.prefix();
@@ -596,13 +614,24 @@ pub fn perform_linking_checks(
                 continue;
             }
 
-            // Check if the package has the library linked.
-            if let Some(package) = package.linked_dsos.get(lib) {
-                link_info.linked_packages.push(LinkedPackage {
-                    name: lib.to_path_buf(),
-                    link_origin: LinkOrigin::ForeignPackage(package.as_normalized().to_string()),
-                });
-                continue;
+            // Check if the library is provided by a package in the host prefix
+            // AND that package is in the run dependencies. If the package is not
+            // a run dependency, this is overlinking — we fall through to the
+            // overlinking detection below.
+            if let Some(providing_package) = package.linked_dsos.get(lib) {
+                if run_dependency_names.contains(providing_package) {
+                    link_info.linked_packages.push(LinkedPackage {
+                        name: lib.to_path_buf(),
+                        link_origin: LinkOrigin::ForeignPackage(
+                            providing_package.as_normalized().to_string(),
+                        ),
+                    });
+                    continue;
+                }
+                tracing::debug!(
+                    "Library {lib:?} is provided by host package '{}' which is not in run dependencies",
+                    providing_package.as_normalized()
+                );
             }
 
             // Check if the library is one of the system libraries (i.e. comes from sysroot).
