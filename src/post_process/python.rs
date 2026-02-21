@@ -304,17 +304,6 @@ pub(crate) fn create_entry_points(
         return Ok(Vec::new());
     }
 
-    // Warn if the prefix contains spaces, since shebang lines don't support quoted paths on Linux
-    // and the generated entry point scripts may fail to execute at runtime.
-    let prefix_str = output.prefix().to_string_lossy();
-    if prefix_str.contains(' ') {
-        tracing::warn!(
-            "The prefix path '{}' contains spaces. Entry point shebang lines do not support \
-            quoted paths on Linux, so the generated scripts may fail to execute.",
-            prefix_str
-        );
-    }
-
     let mut new_files = Vec::new();
 
     let (python_record, _) = output.find_resolved_package("python").ok_or_else(|| {

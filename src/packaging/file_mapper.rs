@@ -181,14 +181,6 @@ impl Output {
                 // entrypoints are in `Scripts/...` folder, and on Unix they are in
                 // the `bin/...` folder. So we need to make sure that the
                 // entrypoints are in the right place.
-                tracing::warn!(
-                    "noarch: python package contains '{}' which is not registered as an \
-                    entry_point. If this is a Python script, consider adding it to the \
-                    'build.python.entry_points' section of your recipe (e.g. \
-                    `mycommand = mypackage.module:main`). It will be placed in \
-                    'python-scripts/' instead of 'bin/'.",
-                    path_rel.display()
-                );
                 let mut new_parts = path_rel.components().collect::<Vec<_>>();
                 new_parts[0] = Component::Normal("python-scripts".as_ref());
 
