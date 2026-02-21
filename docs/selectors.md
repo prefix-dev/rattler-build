@@ -54,7 +54,7 @@ host:
 Other examples often found in the wild:
 
 ```yaml
-if: build_platform != target_platform ... # true if cross-platform build
+if: build_platform != host_platform ... # true if cross-platform build
 if: osx and arm64 ... # true for apple silicon (osx-arm64)
 if: linux and (aarch64 or ppc64le)) ... # true for linux ppc64le or linux-aarch64
 ```
@@ -65,9 +65,9 @@ The following variables are available during rendering of the recipe:
 
 | Variable             | Description                                                            |
 |----------------------|------------------------------------------------------------------------|
-| `target_platform`    | the configured `target_platform` for the build                         |
 | `build_platform`     | the configured `build_platform` for the build                          |
 | `host_platform`      | the configured `host_platform` for the build                           |
+| `target_platform`    | the configured `target_platform` for the build                         |
 | `linux`              | "true" if `host_platform` is Linux                                     |
 | `osx`                | "true" if `host_platform` is OSX / macOS                               |
 | `win`                | "true" if `host_platform` is Windows                                   |

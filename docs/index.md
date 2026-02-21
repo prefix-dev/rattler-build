@@ -302,7 +302,7 @@ For the `curl` library recipe, two additional script files (`build.sh` and `buil
 # Get an updated config.sub and config.guess
 cp $BUILD_PREFIX/share/libtool/build-aux/config.* .
 
-if [[ $target_platform =~ linux.* ]]; then
+if [[ $host_platform =~ linux.* ]]; then
     USESSL="--with-openssl=${PREFIX}"
 else
     USESSL="--with-secure-transport"

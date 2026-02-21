@@ -390,7 +390,7 @@ macOS.
 | Variable                   | Description                                                                                                              |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `MACOSX_DEPLOYMENT_TARGET` | Same as the Anaconda Python macOS deployment target. Currently `10.9` for intel 32- and 64bit macOS, and 11.0 for arm64. |
-| `OSX_ARCH`                 | `i386` or `x86_64` or `arm64`, depending on the target platform                                                          |
+| `OSX_ARCH`                 | `i386` or `x86_64` or `arm64`, depending on the host platform                                                            |
 
 #### Linux
 
