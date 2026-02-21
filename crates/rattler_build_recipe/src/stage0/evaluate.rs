@@ -35,9 +35,9 @@ use rattler_digest::{Md5Hash, Sha256Hash};
 use crate::{
     ParseError, Span,
     stage0::{
-        self, About as Stage0About, Build as Stage0Build, Extra as Stage0Extra, License,
-        Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
-        Stage0Recipe, TestType as Stage0TestType,
+        self, About as Stage0About, App as Stage0App, Build as Stage0Build, Extra as Stage0Extra,
+        License, Package as Stage0Package, Requirements as Stage0Requirements,
+        Source as Stage0Source, Stage0Recipe, TestType as Stage0TestType,
         build::{
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
             ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
@@ -64,9 +64,9 @@ use crate::{
         types::{ConditionalList, Item, JinjaExpression, Value},
     },
     stage1::{
-        self, About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
-        Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
-        Requirements as Stage1Requirements, Rpaths,
+        self, About as Stage1About, AllOrGlobVec, App as Stage1App, Dependency, Evaluate,
+        EvaluationContext, Extra as Stage1Extra, GlobVec, Package as Stage1Package,
+        Recipe as Stage1Recipe, Requirements as Stage1Requirements, Rpaths,
         build::{
             Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
@@ -1629,6 +1629,19 @@ impl Evaluate for Stage0About {
     }
 }
 
+impl Evaluate for Stage0App {
+    type Output = Stage1App;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1App {
+            entry: evaluate_optional_string_value(&self.entry, context)?,
+            icon: evaluate_optional_string_value(&self.icon, context)?,
+            summary: evaluate_optional_string_value(&self.summary, context)?,
+            app_type: evaluate_optional_string_value(&self.app_type, context)?,
+        })
+    }
+}
+
 // Evaluate RunExports with dependency parsing
 impl Evaluate for Stage0RunExports {
     type Output = Stage1RunExports;
@@ -2702,6 +2715,7 @@ impl Evaluate for Stage0Recipe {
         let package = self.package.evaluate(&context_with_vars)?;
         let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
+        let app = self.app.evaluate(&context_with_vars)?;
         let requirements = self.requirements.evaluate(&context_with_vars)?;
         let extra = self.extra.evaluate(&context_with_vars)?;
 
@@ -2829,6 +2843,7 @@ impl Evaluate for Stage0Recipe {
             package,
             build,
             about,
+            app,
             requirements,
             extra,
             source,
@@ -2992,6 +3007,17 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
     }
 }
 
+/// Merge two Stage1 App configurations
+/// The output app takes precedence for non-empty fields
+fn merge_stage1_app(toplevel: stage1::App, output: stage1::App) -> stage1::App {
+    stage1::App {
+        entry: output.entry.or(toplevel.entry),
+        icon: output.icon.or(toplevel.icon),
+        summary: output.summary.or(toplevel.summary),
+        app_type: output.app_type.or(toplevel.app_type),
+    }
+}
+
 /// Helper to evaluate a package output into a Stage1Recipe
 /// This handles merging top-level recipe sections with output-specific sections
 fn evaluate_package_output_to_recipe(
@@ -3108,6 +3134,14 @@ fn evaluate_package_output_to_recipe(
 
         // Merge: output-specific fields take precedence
         merge_stage1_about(toplevel_about, output_about)
+    };
+
+    // Evaluate app section
+    // Merge: output-specific fields take precedence
+    let app = {
+        let toplevel_app = recipe.app.evaluate(context)?;
+        let output_app = output.app.evaluate(context)?;
+        merge_stage1_app(toplevel_app, output_app)
     };
 
     // Evaluate requirements
@@ -3247,6 +3281,7 @@ fn evaluate_package_output_to_recipe(
         package,
         build,
         about,
+        app,
         requirements,
         extra,
         source,

@@ -559,8 +559,42 @@ impl Output {
         new_files.insert(paths_json_path);
 
         let index_json_path = root_dir.join(IndexJson::package_path());
-        let index_json = File::create(&index_json_path)?;
-        serde_json::to_writer_pretty(index_json, &self.index_json()?)?;
+        let index_json_file = File::create(&index_json_path)?;
+        let mut index_json_value = serde_json::to_value(&self.index_json()?)?;
+
+        // Inject app section fields into index.json for Anaconda Navigator app discovery
+        let app = self.recipe.app();
+        if !app.is_empty() {
+            if let serde_json::Value::Object(ref mut map) = index_json_value {
+                if let Some(entry) = &app.entry {
+                    map.insert(
+                        "app_entry".to_string(),
+                        serde_json::Value::String(entry.clone()),
+                    );
+                }
+                if let Some(app_type) = &app.app_type {
+                    map.insert(
+                        "app_type".to_string(),
+                        serde_json::Value::String(app_type.clone()),
+                    );
+                }
+                if let Some(icon) = &app.icon {
+                    map.insert("icon".to_string(), serde_json::Value::String(icon.clone()));
+                }
+                if let Some(summary) = &app.summary {
+                    map.insert(
+                        "summary".to_string(),
+                        serde_json::Value::String(summary.clone()),
+                    );
+                }
+                map.insert(
+                    "type".to_string(),
+                    serde_json::Value::String("app".to_string()),
+                );
+            }
+        }
+
+        serde_json::to_writer_pretty(index_json_file, &index_json_value)?;
         new_files.insert(index_json_path);
 
         let hash_input_path = info_folder.join("hash_input.json");

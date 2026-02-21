@@ -5,6 +5,7 @@
 //! error messages.
 
 mod about;
+mod app;
 mod build;
 mod extra;
 mod helpers;
@@ -196,6 +197,12 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         crate::stage0::Extra::default()
     };
 
+    let app = if let Some(app_node) = mapping.get("app") {
+        app::parse_app(app_node)?
+    } else {
+        crate::stage0::App::default()
+    };
+
     // Parse optional source section (can be empty)
     let source = if let Some(source_node) = mapping.get("source") {
         parse_source(source_node)?
@@ -218,6 +225,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
             "package"
                 | "build"
                 | "about"
+                | "app"
                 | "requirements"
                 | "extra"
                 | "source"
@@ -230,7 +238,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
                 format!("unknown top-level field '{}'", key_str),
                 *key.span(),
             )
-            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
+            .with_suggestion("valid top-level fields are: package, build, about, app, requirements, extra, source, tests, schema_version, context"));
         }
     }
 
@@ -240,6 +248,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
         package,
         build,
         about,
+        app,
         requirements,
         extra,
         source,

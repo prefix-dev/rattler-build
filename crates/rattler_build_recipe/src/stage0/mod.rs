@@ -2,6 +2,7 @@
 //! This means, it still contains Jinja templates and if-else statements.
 
 mod about;
+mod app;
 mod build;
 pub mod evaluate;
 mod extra;
@@ -15,6 +16,7 @@ mod tests;
 mod types;
 
 pub use about::{About, License};
+pub use app::App;
 pub use build::{BinaryRelocation, Build};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;

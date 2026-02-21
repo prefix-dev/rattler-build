@@ -98,6 +98,12 @@ pub fn parse_multi_output_recipe(
         crate::stage0::Extra::default()
     };
 
+    let app = if let Some(app_node) = mapping.get("app") {
+        super::app::parse_app(app_node)?
+    } else {
+        crate::stage0::App::default()
+    };
+
     let tests = if let Some(tests_node) = mapping.get("tests") {
         parse_tests(tests_node)?
     } else {
@@ -128,6 +134,7 @@ pub fn parse_multi_output_recipe(
             "version",
             "build",
             "about",
+            "app",
             "extra",
             "source",
             "tests",
@@ -144,6 +151,7 @@ pub fn parse_multi_output_recipe(
         source,
         build,
         about,
+        app,
         extra,
         tests,
         outputs,
@@ -473,6 +481,13 @@ fn parse_package_output(
         crate::stage0::About::default()
     };
 
+    // Parse optional app
+    let app = if let Some(app_node) = mapping.get("app") {
+        super::app::parse_app(app_node)?
+    } else {
+        crate::stage0::App::default()
+    };
+
     // Parse optional tests
     let tests = if let Some(tests_node) = mapping.get("tests") {
         parse_tests(tests_node)?
@@ -491,6 +506,7 @@ fn parse_package_output(
             "requirements",
             "build",
             "about",
+            "app",
             "tests",
         ],
     )?;
@@ -502,6 +518,7 @@ fn parse_package_output(
         requirements,
         build,
         about,
+        app,
         tests,
     })
 }

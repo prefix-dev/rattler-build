@@ -16,6 +16,7 @@ use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
 use rattler_conda_types::Platform;
 
 pub mod about;
+pub mod app;
 pub mod build;
 pub mod extra;
 pub mod hash;
@@ -29,6 +30,7 @@ pub mod tests;
 mod variant_tests;
 
 pub use about::About;
+pub use app::App;
 pub use build::{Build, Rpaths};
 pub use extra::Extra;
 pub use hash::{HashInfo, HashInput, compute_hash};

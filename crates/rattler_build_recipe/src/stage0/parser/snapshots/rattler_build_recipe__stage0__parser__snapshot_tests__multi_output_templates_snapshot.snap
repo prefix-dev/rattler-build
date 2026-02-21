@@ -53,6 +53,7 @@ about:
   description: null
   documentation: null
   repository: null
+app: {}
 extra: {}
 outputs:
 - staging:
@@ -122,6 +123,7 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}
 - package:
     name: ${{ name }}-lib
     version: ${{ version }}
@@ -170,3 +172,4 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}
