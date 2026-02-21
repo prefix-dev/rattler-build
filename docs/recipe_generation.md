@@ -22,7 +22,7 @@ The PyPI recipe generation supports additional flags:
 - `-t/--tree` generate recipes for all dependencies
 - `--pypi-index-url` specify one or more PyPI index URLs to use for recipe generation (comma-separated)
 
-The `--pypi-index-url` option allows you to use alternative PyPI mirrors or private PyPI repositories. You can specify multiple URLs, and the system will try each in order until one succeeds. This is especially useful for organizations with private packages or in environments with limited internet access. You can also set the `RATTLER_PYPI_INDEX_URL` environment variable.
+The `--pypi-index-url` option allows you to use alternative PyPI mirrors or private PyPI repositories. You can specify multiple URLs, and the system will try each in order until one succeeds. This is especially useful for organizations with private packages or in environments with limited internet access. You can also set the `RATTLER_BUILD_PYPI_INDEX_URL` environment variable.
 
 ```sh
 # Use a custom PyPI index

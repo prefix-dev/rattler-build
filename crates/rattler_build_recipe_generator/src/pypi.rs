@@ -41,13 +41,16 @@ pub struct PyPIOpts {
     pub tree: bool,
 
     /// Specify the PyPI index URL(s) to use for recipe generation
-    #[cfg_attr(feature = "cli", arg(
-        long = "pypi-index-url",
-        env = "RATTLER_PYPI_INDEX_URL",
-        default_value = "https://pypi.org/pypi",
-        value_delimiter = ',',
-        help = "Specify the PyPI index URL(s) to use for recipe generation"
-    ))]
+    #[cfg_attr(
+        feature = "cli",
+        arg(
+            long = "pypi-index-url",
+            env = "RATTLER_BUILD_PYPI_INDEX_URL",
+            default_value = "https://pypi.org/pypi",
+            value_delimiter = ',',
+            help = "Specify the PyPI index URL(s) to use for recipe generation"
+        )
+    )]
     pub pypi_index_urls: Vec<String>,
 }
 
@@ -320,8 +323,7 @@ async fn fetch_pypi_metadata(
                     ));
                 }
 
-                let release: PyPrReleaseResponse =
-                    response.json().await.into_diagnostic()?;
+                let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
                 Ok((release.info, release.urls))
             } else {
                 let url = format!("{}{}/json", base_url, opts.package);
@@ -339,8 +341,7 @@ async fn fetch_pypi_metadata(
                     ));
                 }
 
-                let response: PyPiResponse =
-                    response.json().await.into_diagnostic()?;
+                let response: PyPiResponse = response.json().await.into_diagnostic()?;
 
                 // Get the latest release
                 let urls = response
@@ -359,9 +360,7 @@ async fn fetch_pypi_metadata(
                 let release = urls
                     .iter()
                     .find(|r| r.filename.ends_with(".tar.gz"))
-                    .ok_or_else(|| {
-                        miette::miette!("No source distribution found in {}", base_url)
-                    })?
+                    .ok_or_else(|| miette::miette!("No source distribution found in {}", base_url))?
                     .clone();
 
                 let wheel_url = urls
