@@ -1,0 +1,34 @@
+context:
+  version: "0.1.0"
+
+package:
+  name: zlink
+  version: ${{ version }}
+
+source:
+  path: ../../../examples/linking/zlink/
+
+build:
+  script:
+    - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${CMAKE_ARGS}
+    - cmake --build build --config Release
+    - cmake --install build --prefix ${PREFIX}
+  dynamic_linking:
+    overdepending_behavior: ignore
+    # This should detect that we link against zlib but it's not in run deps
+    overlinking_behavior: error
+
+requirements:
+  # Use ignore_run_exports to prevent zlib's run_exports from automatically
+  # adding it to run dependencies. This simulates the real-world scenario from
+  # issue #2192: a package links against a library whose package is in host
+  # but NOT in run dependencies.
+  ignore_run_exports:
+    from_package:
+      - zlib
+  build:
+    - ${{ compiler('c') }}
+    - ninja
+    - cmake
+  host:
+    - zlib

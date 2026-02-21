@@ -601,6 +601,41 @@ mod tests {
         assert!(output.contains("linking check error: Overdepending against"));
     }
 
+    /// Reproducer for https://github.com/prefix-dev/rattler-build/issues/2192
+    ///
+    /// When a library (zlib) is in `host` requirements but NOT in `run`
+    /// requirements (because `ignore_run_exports` suppresses the automatic
+    /// addition), the binary links against libz.so which IS found in the host
+    /// prefix. The overlinking check should detect that the providing package
+    /// is not in run deps, but currently it doesn't — it short-circuits when
+    /// the library is found in any host package (see `perform_linking_checks`
+    /// in `src/post_process/checks.rs` around the `ForeignPackage` branch).
+    ///
+    /// Expected: build fails with "Overlinking against" error
+    /// Actual:   build succeeds (the library is found in a host package and
+    ///           marked as ForeignPackage without verifying it's in run deps)
+    #[test]
+    #[cfg(target_os = "linux")]
+    #[ignore = "Known bug: https://github.com/prefix-dev/rattler-build/issues/2192"]
+    fn test_overlinking_host_not_run() {
+        let tmp = tmp("test_overlinking_host_not_run");
+        let rattler_build = rattler().build(
+            recipes().join("overlinking_host_not_run"),
+            tmp.as_dir(),
+            None,
+            Some("linux-64"),
+        );
+        // This SHOULD fail because zlib is linked but not in run deps.
+        // Currently it incorrectly succeeds (the bug from issue #2192).
+        assert!(
+            !rattler_build.status.success(),
+            "Build should have failed due to overlinking against zlib (in host but not in run), \
+             but it succeeded. This confirms issue #2192."
+        );
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert!(output.contains("linking check error: Overlinking against"));
+    }
+
     #[test]
     #[cfg(target_os = "linux")]
     fn test_allow_missing_dso() {
