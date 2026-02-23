@@ -1273,4 +1273,66 @@ build:
             used_variant.keys().collect::<Vec<_>>()
         );
     }
+
+    /// Regression test: conditional dependency with undefined variant variable
+    ///
+    /// When a variant variable is only defined conditionally (e.g., only for `unix and x86_64`),
+    /// and a dependency uses that variable in a Jinja template guarded by the same condition,
+    /// the recipe should render successfully when the condition is false — even though the
+    /// variable is undefined. The Jinja rendering must be deferred so it only happens when
+    /// the `if` clause is truthy.
+    ///
+    /// Regression test: a conditional dependency that uses a variant variable in the `then`
+    /// branch must not be rendered when the condition is false (even if the variable is
+    /// undefined), and must render correctly when the condition is true.
+    #[test]
+    fn test_conditional_dependency_with_variant_variable() {
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  run:
+    - if: unix and x86_64
+      then: x86_64-microarch-level ==${{ x86_64_microarch_level }}
+
+build:
+  number: 0
+"#;
+
+        // Case 1: condition is false, variable is undefined — should not error.
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("x86_64".to_string(), Variable::from(false));
+
+        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+        assert_eq!(recipe.package().name().as_source(), "test");
+        assert!(
+            recipe.requirements.run.is_empty(),
+            "Expected no run dependencies when condition is false, got: {:?}",
+            recipe.requirements.run
+        );
+
+        // Case 2: condition is true, variable is defined — dependency should render.
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("x86_64".to_string(), Variable::from(true));
+        variant.insert("x86_64_microarch_level".to_string(), Variable::from("3"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+        assert_eq!(recipe.package().name().as_source(), "test");
+        assert_eq!(
+            recipe.requirements.run.len(),
+            1,
+            "Expected one run dependency when condition is true, got: {:?}",
+            recipe.requirements.run
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("x86_64_microarch_level")),
+            "x86_64_microarch_level should be tracked in used_variant"
+        );
+    }
 }
