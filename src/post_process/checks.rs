@@ -54,10 +54,11 @@ struct PackageLinkInfo {
 
 impl fmt::Display for PackageLinkInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let file = self.file.display().to_string().replace('\\', "/");
         writeln!(
             f,
             "\n[{}] links against:",
-            console::style(self.file.display()).white().bold()
+            console::style(&file).white().bold()
         )?;
         for (i, package) in self.linked_packages.iter().enumerate() {
             let connector = if i != self.linked_packages.len() - 1 {
@@ -87,27 +88,25 @@ enum LinkOrigin {
 
 impl fmt::Display for LinkedPackage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Normalize path separators to forward slashes for consistent display.
+        let name = self.name.display().to_string().replace('\\', "/");
         match &self.link_origin {
             LinkOrigin::System => {
-                write!(f, "{} (system)", console::style(self.name.display()).dim())
+                write!(f, "{} (system)", console::style(&name).dim())
             }
             LinkOrigin::PackageItself => {
-                write!(
-                    f,
-                    "{} (package)",
-                    console::style(self.name.display()).blue()
-                )
+                write!(f, "{} (package)", console::style(&name).blue())
             }
             LinkOrigin::ForeignPackage(package) => {
                 write!(
                     f,
                     "{} ({})",
-                    console::style(self.name.display()).green(),
+                    console::style(&name).green(),
                     console::style(package).italic()
                 )
             }
             LinkOrigin::NotFound => {
-                write!(f, "{}", console::style(self.name.display()).red())
+                write!(f, "{}", console::style(&name).red())
             }
         }
     }
@@ -261,6 +260,10 @@ fn load_dsolists(
     let mut found_matching_file = false;
 
     let Ok(entries) = fs_err::read_dir(&dsolists_dir) else {
+        tracing::debug!(
+            "DSO list directory {} does not exist, skipping...",
+            dsolists_dir.display()
+        );
         return Ok(None);
     };
 
@@ -320,13 +323,13 @@ fn load_dsolists(
 }
 
 /// Expand dsolist patterns following conda-build's `_expand_dsolist` behavior.
-/// - Patterns starting with `*` are kept as-is
+/// - Patterns containing glob wildcards (`*`, `?`, `[`) are kept as-is
 /// - Absolute paths are converted to `**/{filename}` patterns
 fn expand_dsolist(patterns: &[String]) -> Vec<String> {
     patterns
         .iter()
         .map(|p| {
-            if p.starts_with('*') {
+            if p.contains('*') || p.contains('?') || p.contains('[') {
                 p.clone()
             } else {
                 let path = Path::new(p);
@@ -428,6 +431,10 @@ fn add_windows_system_libs(
 
     let (build_allow, build_deny) = build_result.unwrap_or_default();
     let (host_allow, host_deny) = host_result.unwrap_or_default();
+
+    tracing::debug!(
+        "Loaded dsolists - build allow: {build_allow:#?}, build deny: {build_deny:#?}, host allow: {host_allow:#?}, host deny: {host_deny:#?}"
+    );
 
     let mut all_allow: Vec<String> = build_allow.into_iter().chain(host_allow).collect();
     let all_deny: Vec<String> = build_deny.into_iter().chain(host_deny).collect();
@@ -546,6 +553,11 @@ pub fn perform_linking_checks(
                     let mut file_dsos = Vec::new();
 
                     let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix);
+                    tracing::debug!(
+                        "Resolved libraries for {}: {:#?}",
+                        file.display(),
+                        resolved_libraries
+                    );
                     for (lib, resolved) in &resolved_libraries {
                         // filter out @self on macOS
                         if target_platform.is_osx() && lib.to_str() == Some("self") {
@@ -588,6 +600,7 @@ pub fn perform_linking_checks(
             }
         })
         .collect();
+
     tracing::trace!("Package files: {package_files:#?}");
 
     let mut linked_packages = Vec::new();
@@ -936,6 +949,27 @@ mod tests {
         ];
         let expanded = expand_dsolist(&patterns);
         assert_eq!(expanded, vec!["*.dll", "**/ucrtbased.dll"]);
+    }
+
+    #[test]
+    fn test_expand_dsolist_glob_in_middle_kept_as_is() {
+        // Patterns with wildcards anywhere (not just at the start) should be
+        // kept as-is to avoid turning "C:/Windows/System32/**/*.dll" into
+        // the overly broad "**/*.dll".
+        let patterns = vec![
+            "C:/Windows/System32/**/*.dll".to_string(),
+            "/usr/lib/x86_64-linux-gnu/lib?.so".to_string(),
+            "/opt/[ab]/lib.so".to_string(),
+        ];
+        let expanded = expand_dsolist(&patterns);
+        assert_eq!(
+            expanded,
+            vec![
+                "C:/Windows/System32/**/*.dll",
+                "/usr/lib/x86_64-linux-gnu/lib?.so",
+                "/opt/[ab]/lib.so",
+            ]
+        );
     }
 
     #[test]
