@@ -29,16 +29,16 @@ fn parse_directories_info(
     }
 
     // Check if we're inside a debug shell with RATTLER_BUILD_DIRECTORIES set
-    if let Ok(json_str) = std::env::var("RATTLER_BUILD_DIRECTORIES") {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
-            let work_dir = json["work_dir"].as_str().ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "work_dir not found in RATTLER_BUILD_DIRECTORIES",
-                )
-            })?;
-            return Ok((PathBuf::from(work_dir), Some(json)));
-        }
+    if let Ok(json_str) = std::env::var("RATTLER_BUILD_DIRECTORIES")
+        && let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str)
+    {
+        let work_dir = json["work_dir"].as_str().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "work_dir not found in RATTLER_BUILD_DIRECTORIES",
+            )
+        })?;
+        return Ok((PathBuf::from(work_dir), Some(json)));
     }
 
     // Read from rattler-build-log.txt
@@ -105,14 +105,14 @@ fn build_env_exports(json: &serde_json::Value) -> String {
     // Export the path to the current rattler-build binary so that
     // subcommands like `$RATTLER_BUILD debug host-add` work even when
     // the system PATH points to a different (older) installation.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Ok(canonical) = exe.canonicalize() {
-            env_exports.push_str(&format!(
-                "export RATTLER_BUILD='{}'\nalias rattler-build='{}'\n",
-                canonical.display(),
-                canonical.display()
-            ));
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Ok(canonical) = exe.canonicalize()
+    {
+        env_exports.push_str(&format!(
+            "export RATTLER_BUILD='{}'\nalias rattler-build='{}'\n",
+            canonical.display(),
+            canonical.display()
+        ));
     }
 
     env_exports
