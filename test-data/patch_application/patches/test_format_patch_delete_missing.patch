@@ -1,0 +1,18 @@
+From 7203acd80d048de1b13fdff813e69a0a4621396b Mon Sep 17 00:00:00 2001
+From: Test User <test@example.com>
+Date: Wed, 30 Apr 2025 14:03:16 +0200
+Subject: [PATCH] remove symlink
+
+---
+ cpp/test/vcpkg.json | 1 -
+ 1 file changed, 1 deletion(-)
+ delete mode 120000 cpp/test/vcpkg.json
+
+diff --git a/cpp/test/vcpkg.json b/cpp/test/vcpkg.json
+deleted file mode 120000
+index 8c77963..0000000
+--- a/cpp/test/vcpkg.json
++++ /dev/null
+@@ -1 +0,0 @@
+-../vcpkg.json
+\ No newline at end of file

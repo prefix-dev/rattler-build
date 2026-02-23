@@ -117,6 +117,19 @@ fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError
     .map(|(content, _stats)| content)
 }
 
+/// Check whether the paths in a patch still have conventional `a/` or `b/`
+/// prefixes. When flickzeug encounters a `diff --git` header it strips these
+/// prefixes automatically, so they will be absent. For traditional unified
+/// diffs (without a git header) the prefixes are preserved.
+fn paths_have_ab_prefix(patched_files: &HashSet<PathBuf>) -> bool {
+    patched_files.iter().any(|p| {
+        p.components()
+            .next()
+            .and_then(|c| c.as_os_str().to_str())
+            .is_some_and(|s| s == "a" || s == "b")
+    })
+}
+
 // Returns number by which all patch paths must be stripped to be
 // successfully applied, or returns and error if no such number could
 // be determined.
@@ -144,13 +157,18 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         }
     }
 
-    // XXX: This is not entirely correct way of handling this, since
-    // path is not necessarily starts with meaningless one letter
-    // component. Proper handling requires more in-depth analysis.
-    // For example this is fine if source is /dev/null and target is
-    // not, but may be incorrect otherwise, if original file does not
-    // exist.
-    Ok(1)
+    // When no file from the patch exists on disk we fall back to a default
+    // strip level. flickzeug already strips the conventional `a/` and `b/`
+    // prefixes when a `diff --git` header is present, so the paths we see
+    // are the *real* paths. In that case the correct default is 0 (no
+    // stripping). For traditional unified diffs the `a/`/`b/` prefix is
+    // still present and needs to be stripped, so the default is 1.
+    let default_strip = if paths_have_ab_prefix(&patched_files) {
+        1
+    } else {
+        0
+    };
+    Ok(default_strip)
 }
 
 fn custom_patch_stripped_paths(
@@ -304,7 +322,18 @@ pub(crate) fn apply_patch_custom(
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
-                fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
+                let target = work_dir.join(&o);
+                if target.exists() || target.is_symlink() {
+                    fs_err::remove_file(&target).map_err(SourceError::Io)?;
+                } else {
+                    // The file may already be absent, e.g. a symlink that was
+                    // not extracted on Windows.  Treat this as a no-op since
+                    // the desired end state (file gone) is already achieved.
+                    tracing::warn!(
+                        "Patch wants to delete {:?} but it does not exist, skipping",
+                        o
+                    );
+                }
             }
             (Some(o), Some(m)) => {
                 // Check if the original file exists
@@ -840,6 +869,145 @@ mod tests {
     }
 
     #[test]
+    fn test_format_patch_delete_missing_file() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2198
+        // When git format-patch generates a patch to delete a symlink, flickzeug
+        // strips the a/b prefix (because it sees the diff --git header). If the
+        // symlink wasn't extracted (e.g. on Windows), guess_strip_level must not
+        // fall back to strip_level=1 which would incorrectly strip the first real
+        // path component.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // The patch references cpp/test/vcpkg.json which does NOT exist in workdir.
+        // With the old fallback of Ok(1), this would strip "cpp/" giving the wrong
+        // path "test/vcpkg.json". With the fix, the fallback is Ok(0) because
+        // flickzeug already stripped the a/ prefix.
+        let result = apply_patches(
+            &[PathBuf::from("test_format_patch_delete_missing.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // Should succeed: the file doesn't exist, and the deletion should be
+        // treated as a no-op (file already absent).
+        assert!(
+            result.is_ok(),
+            "Deleting a non-existent file (e.g. unextracted symlink) should not fail: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_format_patch_delete_existing_file() {
+        // Verify that git format-patch style deletion of an existing file still
+        // works correctly with the updated strip level logic.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let to_delete = tempdir.path().join("workdir/to_be_deleted.txt");
+        assert!(to_delete.exists(), "file should exist before patching");
+
+        apply_patches(
+            &[PathBuf::from("test_format_patch_delete_existing.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("format-patch style deletion of existing file should work");
+
+        assert!(
+            !to_delete.exists(),
+            "to_be_deleted.txt should be deleted by the patch"
+        );
+    }
+
+    #[test]
+    fn test_strip_level_default_with_git_format_patch() {
+        // Verify that guess_strip_level returns 0 (not 1) for git format-patch
+        // style patches where flickzeug has already stripped the a/b prefix.
+        let patch_content = b"From abc Mon Sep 17 00:00:00 2001\n\
+            From: User <user@example.com>\n\
+            Date: Mon, 1 Jan 2024 00:00:00 +0000\n\
+            Subject: [PATCH] test\n\
+            \n\
+            ---\n \
+            some/nested/file.txt | 1 -\n \
+            1 file changed, 1 deletion(-)\n\
+            \n\
+            diff --git a/some/nested/file.txt b/some/nested/file.txt\n\
+            deleted file mode 100644\n\
+            index 1234567..0000000\n\
+            --- a/some/nested/file.txt\n\
+            +++ /dev/null\n\
+            @@ -1 +0,0 @@\n\
+            -content\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let patched_files = parse_patch(&patch);
+
+        // flickzeug should have stripped the a/ prefix since diff --git is present
+        assert!(
+            patched_files.contains(&PathBuf::from("some/nested/file.txt")),
+            "Expected 'some/nested/file.txt' in patched files, got: {:?}",
+            patched_files
+        );
+        assert!(
+            !patched_files.contains(&PathBuf::from("a/some/nested/file.txt")),
+            "Should not contain a/ prefix: {:?}",
+            patched_files
+        );
+
+        // With no matching files on disk, the fallback should be 0 (not 1)
+        let tempdir = TempDir::new().unwrap();
+        let strip_level = guess_strip_level(&patch, tempdir.path()).unwrap();
+        assert_eq!(
+            strip_level, 0,
+            "Default strip level should be 0 for git format-patch (a/b prefix already stripped)"
+        );
+    }
+
+    #[test]
+    fn test_strip_level_default_with_plain_diff() {
+        // Verify that guess_strip_level returns 1 for plain unified diffs
+        // where the a/b prefix is still present.
+        let patch_content = b"--- a/some/file.txt\n\
+            +++ b/some/file.txt\n\
+            @@ -1 +1 @@\n\
+            -old\n\
+            +new\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let patched_files = parse_patch(&patch);
+
+        // Without diff --git, flickzeug should NOT strip the a/b prefix
+        assert!(
+            patched_files.contains(&PathBuf::from("a/some/file.txt"))
+                || patched_files.contains(&PathBuf::from("some/file.txt")),
+            "Expected path in patched files, got: {:?}",
+            patched_files
+        );
+
+        // With no matching files on disk, the fallback should be 1
+        // (to strip the a/ prefix)
+        let tempdir = TempDir::new().unwrap();
+        let strip_level = guess_strip_level(&patch, tempdir.path()).unwrap();
+
+        // If flickzeug strips a/ even without diff --git, the fallback should be 0
+        // If flickzeug keeps a/ prefix, the fallback should be 1
+        if patched_files.contains(&PathBuf::from("a/some/file.txt")) {
+            assert_eq!(
+                strip_level, 1,
+                "Default strip level should be 1 for plain diff with a/b prefix"
+            );
+        } else {
+            assert_eq!(
+                strip_level, 0,
+                "Default strip level should be 0 when prefix already stripped"
+            );
+        }
+    }
+
+    #[test]
     fn test_missing_patch_file_returns_error() {
         let (tempdir, _) = setup_patch_test_dir();
 
@@ -867,15 +1035,16 @@ mod tests {
     fn test_patch_with_nonexistent_file_no_panic() {
         // Regression test for https://github.com/prefix-dev/rattler-build/issues/2137
         // When a patch references a file that doesn't exist in the work directory
-        // (e.g., because file_name renamed it), and the strip level falls back to 1,
-        // a single-component path like "original_name.md" would be stripped to an
-        // empty path, causing work_dir.join("") to resolve to work_dir itself.
-        // Reading a directory as a file produces "Is a directory" error.
+        // (e.g., because file_name renamed it), the patch should produce a clean
+        // error – not panic or produce "Is a directory" error (which happened
+        // before the empty-path guard was added).
+        //
+        // test_renamed_file.patch is a plain unified diff (no diff --git header)
+        // referencing "original_name.md". Since that file doesn't exist and the
+        // hunk expects existing content, patch application correctly fails with
+        // an ApplyError rather than panicking.
         let (tempdir, _) = setup_patch_test_dir();
 
-        // Apply a patch that references "original_name.md" which doesn't exist
-        // in the workdir (simulates file_name renaming the downloaded file).
-        // This should NOT panic or produce "Is a directory" error.
         let result = apply_patches(
             &[PathBuf::from("test_renamed_file.patch")],
             &tempdir.path().join("workdir"),
@@ -883,11 +1052,14 @@ mod tests {
             apply_patch_custom,
         );
 
-        // The patch should succeed by creating a new file (since the original doesn't exist)
+        // The patch should fail cleanly (not panic or "Is a directory")
         assert!(
-            result.is_ok(),
-            "Patch referencing non-existent file should not fail with 'Is a directory': {:?}",
-            result.err()
+            result.is_err(),
+            "Patch referencing non-existent file should fail with ApplyError"
+        );
+        assert!(
+            matches!(result.unwrap_err(), SourceError::PatchApplyError(_)),
+            "Expected PatchApplyError"
         );
     }
 
