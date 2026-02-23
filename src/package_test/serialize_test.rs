@@ -4,6 +4,7 @@ use fs_err as fs;
 use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::CommandsTest};
 use rattler_build_script::{
     ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
+    platform_script_extensions,
 };
 use rattler_conda_types::{MatchSpec, PackageNameMatcher};
 
@@ -142,7 +143,7 @@ pub(crate) fn write_test_files(
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
+                platform_script_extensions(),
             )?;
 
             // Replace with rendered contents

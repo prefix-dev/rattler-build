@@ -162,15 +162,6 @@ impl Script {
     where
         F: Fn(&str) -> Result<String, String>,
     {
-        // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
-        if cfg!(windows) {
-            valid_script_extensions.push("bat");
-            valid_script_extensions.push("ps1");
-        } else {
-            valid_script_extensions.push("sh");
-        }
-
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
@@ -178,7 +169,7 @@ impl Script {
             .collect::<IndexMap<String, String>>();
 
         let contents =
-            self.resolve_content(recipe_dir, jinja_renderer, &valid_script_extensions)?;
+            self.resolve_content(recipe_dir, jinja_renderer, crate::platform_script_extensions())?;
 
         let secrets = self
             .secrets()
@@ -846,15 +837,12 @@ mod tests {
             other => panic!("Expected Path variant, got {:?}", other),
         }
 
-        // Verify the platform-appropriate extensions match what build and test
-        // serialization should use (the fix for #2199).
-        let platform_extensions: &[&str] =
-            if cfg!(windows) { &["bat"] } else { &["sh"] };
+        // Verify that platform_script_extensions() selects the correct file.
         let contents = script
             .resolve_content(
                 recipe_dir,
                 None::<fn(&str) -> Result<String, String>>,
-                platform_extensions,
+                crate::platform_script_extensions(),
             )
             .unwrap();
         match &contents {

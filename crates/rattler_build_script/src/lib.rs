@@ -7,7 +7,7 @@ pub mod sandbox;
 mod script;
 
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
-pub use script::{Script, ScriptContent, determine_interpreter_from_path};
+pub use script::{Script, ScriptContent, determine_interpreter_from_path, platform_script_extensions};
 
 #[cfg(feature = "execution")]
 mod execution;

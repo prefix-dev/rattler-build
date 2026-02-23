@@ -12,7 +12,7 @@ use std::{collections::HashMap, collections::HashSet};
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
     Debug as ScriptDebug, ExecutionArgs, InterpreterError, ResolvedScriptContents,
-    SandboxArguments, SandboxConfiguration, Script, ScriptContent,
+    SandboxArguments, SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
 };
 
 use crate::{
@@ -66,7 +66,7 @@ impl Output {
             script: self.recipe.build().script.resolve_content(
                 &self.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
+                platform_script_extensions(),
             )?,
             env_vars: env_vars
                 .into_iter()
