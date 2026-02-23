@@ -9,6 +9,7 @@ use goblin::pe::PE;
 use rattler_build_recipe::stage1::GlobVec;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
+use std::io::Read;
 
 use crate::post_process::relink::{RelinkError, Relinker};
 
@@ -20,31 +21,6 @@ pub struct Dll {
     libraries: HashSet<PathBuf>,
 }
 
-/// List of System DLLs that are allowed to be linked against.
-pub const WIN_ALLOWLIST: &[&str] = &[
-    "ADVAPI32.dll",
-    "bcrypt.dll",
-    "COMCTL32.dll",
-    "COMDLG32.dll",
-    "CRYPT32.dll",
-    "dbghelp.dll",
-    "GDI32.dll",
-    "IMM32.dll",
-    "KERNEL32.dll",
-    "NETAPI32.dll",
-    "ole32.dll",
-    "OLEAUT32.dll",
-    "PSAPI.DLL",
-    "RPCRT4.dll",
-    "SHELL32.dll",
-    "USER32.dll",
-    "USERENV.dll",
-    "WINHTTP.dll",
-    "WS2_32.dll",
-    "ntdll.dll",
-    "msvcrt.dll",
-];
-
 #[derive(Debug, thiserror::Error)]
 pub enum DllParseError {
     #[error("failed to read the DLL file: {0}")]
@@ -54,40 +30,41 @@ pub enum DllParseError {
     ParseFailed(#[from] goblin::error::Error),
 }
 
-impl Dll {
-    /// Try to parse a PE file and create a Dll analyzer, returning None for non-PE or invalid PE files
-    pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
-        let file = File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+/// The DOS header magic number that every PE file starts with ("MZ").
+const PE_MAGIC: [u8; 2] = [0x4D, 0x5A];
 
+impl Dll {
+    /// Try to parse a PE file and create a Dll analyzer, returning None for
+    /// non-PE files.
+    ///
+    /// Reads two bytes to check the DOS "MZ" magic first (same approach
+    /// Linux/macOS use for ELF/Mach-O magic), then mmaps only when the
+    /// magic matches.
+    pub fn try_new(path: &Path) -> Result<Option<Self>, RelinkError> {
+        let mut file = File::open(path)?;
+
+        // Quick magic check – every PE file starts with the DOS "MZ" header.
+        let mut magic = [0u8; 2];
+        match file.read_exact(&mut magic) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(e.into()),
+        }
+        if magic != PE_MAGIC {
+            return Ok(None);
+        }
+
+        // Magic matches – mmap for the full parse.
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
         match PE::parse(&mmap) {
             Ok(pe) => Ok(Some(Self {
                 path: path.to_path_buf(),
                 libraries: pe.libraries.iter().map(PathBuf::from).collect(),
             })),
             Err(e) => {
-                match e {
-                    goblin::error::Error::BadMagic(_) => {
-                        // Not a PE file (bad magic number), skip silently
-                        Ok(None)
-                    }
-                    goblin::error::Error::Malformed(_) => {
-                        // File looks like PE but is structurally malformed
-                        tracing::warn!("[relink/windows] Skipping malformed PE file {path:?}: {e}");
-                        Ok(None)
-                    }
-                    goblin::error::Error::Scroll(_) => {
-                        // A valid PE file but goblin can not reading and interpreting bytes
-                        tracing::warn!(
-                            "[relink/windows] Skipping uninterpretable PE file {path:?}: {e}"
-                        );
-                        Ok(None)
-                    }
-                    _ => {
-                        // IO, buffer, scroll errors should bubble up as real system errors
-                        Err(RelinkError::ParseError(e))
-                    }
-                }
+                // Starts with MZ but isn't a well-formed PE.
+                tracing::debug!("[relink/windows] Skipping invalid PE file {path:?}: {e}");
+                Ok(None)
             }
         }
     }
@@ -121,15 +98,6 @@ impl Relinker for Dll {
     ) -> HashMap<PathBuf, Option<PathBuf>> {
         let mut result = HashMap::new();
         for lib in &self.libraries {
-            if WIN_ALLOWLIST.iter().any(|&sys_dll| {
-                lib.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
-                    .unwrap_or(false)
-            }) {
-                continue;
-            }
-
             let dll_name = lib.file_name().unwrap_or_default();
 
             // 1. Check in the same directory as the original DLL
@@ -148,11 +116,21 @@ impl Relinker for Dll {
             }
 
             // 2. Check all directories in the search path
+            //    Following Windows DLL search order: prefix PATH entries, then
+            //    system directories (System32), then the host PATH.
             let mut found = false;
             let path_entries = prefix_path_entries(encoded_prefix, &Platform::Win64);
             let path = std::env::var("PATH").unwrap_or_default();
+
+            // Add Windows system directories so that system DLLs resolve to
+            // their full path (e.g. C:\Windows\System32\KERNEL32.dll), which
+            // allows the dsolist allow/deny patterns to match them properly.
+            let system32 = PathBuf::from("C:/Windows/System32");
+            let system32_downlevel = PathBuf::from("C:/Windows/System32/downlevel");
+
             let search_dirs = path_entries
                 .into_iter()
+                .chain([system32, system32_downlevel])
                 .chain(std::env::split_paths(&path))
                 .collect::<Vec<_>>();
 
@@ -237,53 +215,24 @@ mod tests {
         });
         assert!(has_kernel32, "Expected KERNEL32.dll dependency");
 
+        // System DLLs should resolve to their System32 path
         let resolved = dll.resolve_libraries(&dll_path, &dll_path);
-        assert!(
-            !resolved.iter().any(|(lib, _)| lib
-                .file_name()
+        let kernel32_resolved = resolved.iter().find(|(lib, _)| {
+            lib.file_name()
                 .and_then(|n| n.to_str())
                 .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
-                .unwrap_or(false)),
-            "System DLLs should be filtered out during resolution"
+                .unwrap_or(false)
+        });
+        assert!(
+            kernel32_resolved.is_some(),
+            "KERNEL32.dll should be present in resolved libraries"
+        );
+        let (_, resolved_path) = kernel32_resolved.unwrap();
+        assert!(
+            resolved_path.is_some(),
+            "KERNEL32.dll should resolve to a path via System32"
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_system_dll_filtering() {
-        let test_dlls = vec![
-            "KERNEL32.dll",
-            "kernel32.dll",
-            "C:\\Windows\\System32\\KERNEL32.dll",
-            "D:\\Some\\Path\\kernel32.dll",
-            "custom.dll",
-            "myapp.dll",
-        ];
-
-        for dll in test_dlls {
-            let path = PathBuf::from(dll);
-            let is_system = WIN_ALLOWLIST.iter().any(|&sys_dll| {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
-                    .unwrap_or(false)
-            });
-
-            match dll.to_lowercase().as_str() {
-                "kernel32.dll"
-                | "c:\\windows\\system32\\kernel32.dll"
-                | "d:\\some\\path\\kernel32.dll" => {
-                    assert!(is_system, "Expected {} to be identified as system DLL", dll);
-                }
-                _ => {
-                    assert!(
-                        !is_system,
-                        "Expected {} to NOT be identified as system DLL",
-                        dll
-                    );
-                }
-            }
-        }
     }
 }
