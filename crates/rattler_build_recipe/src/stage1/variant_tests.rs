@@ -1282,11 +1282,11 @@ build:
     /// variable is undefined. The Jinja rendering must be deferred so it only happens when
     /// the `if` clause is truthy.
     ///
-    /// Previously, rattler-build would eagerly render `${{ x86_64_microarch_level }}` even
-    /// when the condition was false, producing an invalid MatchSpec like
-    /// `x86_64-microarch-level ==` (empty version), which caused a parse error.
+    /// Regression test: a conditional dependency that uses a variant variable in the `then`
+    /// branch must not be rendered when the condition is false (even if the variable is
+    /// undefined), and must render correctly when the condition is true.
     #[test]
-    fn test_conditional_dependency_with_undefined_variant_variable() {
+    fn test_conditional_dependency_with_variant_variable() {
         let yaml = r#"
 package:
   name: test
@@ -1300,66 +1300,36 @@ requirements:
 build:
   number: 0
 "#;
-        // Simulate a non-x86_64 platform (e.g., osx-arm64) where the condition is false
-        // and x86_64_microarch_level is NOT in the variant at all.
+
+        // Case 1: condition is false, variable is undefined — should not error.
         let mut variant = IndexMap::new();
         variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
         variant.insert("unix".to_string(), Variable::from(true));
         variant.insert("x86_64".to_string(), Variable::from(false));
 
-        // This should succeed — the false branch means the Jinja template is never rendered,
-        // so the undefined variable never causes an invalid MatchSpec.
         let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
         assert_eq!(recipe.package().name().as_source(), "test");
-
-        // The run dependencies should be empty since the condition was false.
         assert!(
             recipe.requirements.run.is_empty(),
             "Expected no run dependencies when condition is false, got: {:?}",
             recipe.requirements.run
         );
-    }
 
-    /// Test the positive case: conditional dependency renders correctly when condition is true
-    /// and the variant variable IS defined.
-    #[test]
-    fn test_conditional_dependency_with_defined_variant_variable() {
-        let yaml = r#"
-package:
-  name: test
-  version: "1.0.0"
-
-requirements:
-  run:
-    - if: unix and x86_64
-      then: x86_64-microarch-level ==${{ x86_64_microarch_level }}
-
-build:
-  number: 0
-"#;
-        // Simulate a linux-64 platform where the condition IS true
-        // and x86_64_microarch_level IS in the variant.
+        // Case 2: condition is true, variable is defined — dependency should render.
         let mut variant = IndexMap::new();
         variant.insert("target_platform".to_string(), Variable::from("linux-64"));
         variant.insert("unix".to_string(), Variable::from(true));
         variant.insert("x86_64".to_string(), Variable::from(true));
-        variant.insert(
-            "x86_64_microarch_level".to_string(),
-            Variable::from("3"),
-        );
+        variant.insert("x86_64_microarch_level".to_string(), Variable::from("3"));
 
         let (recipe, used_variant) = evaluate_recipe(yaml, variant);
         assert_eq!(recipe.package().name().as_source(), "test");
-
-        // The run dependency should be present with the rendered version.
         assert_eq!(
             recipe.requirements.run.len(),
             1,
             "Expected one run dependency when condition is true, got: {:?}",
             recipe.requirements.run
         );
-
-        // The variant variable should be tracked as used
         assert!(
             used_variant.contains_key(&NormalizedKey::from("x86_64_microarch_level")),
             "x86_64_microarch_level should be tracked in used_variant"
