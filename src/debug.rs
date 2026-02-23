@@ -9,7 +9,8 @@ use std::{
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::LoggingOutputHandler,
-    opt::{DebugEnvAddOpts, DebugShellOpts},
+    opt::{CreatePatchOpts, DebugEnvAddOpts, DebugRunOpts, DebugShellOpts, DebugWorkdirOpts},
+    source::create_patch,
 };
 use rattler_conda_types::MatchSpec;
 use rattler_config::config::ConfigBase;
@@ -137,9 +138,9 @@ fn print_debug_banner(work_dir: &Path, directories_json: &Option<serde_json::Val
 
     println!();
     println!("  Available commands:");
-    println!("    rattler-build create-patch              Create a patch from your changes");
-    println!("    rattler-build debug host-add <pkg>      Add packages to host env");
-    println!("    rattler-build debug build-add <pkg>     Add packages to build env");
+    println!("    rattler-build debug create-patch         Create a patch from your changes");
+    println!("    rattler-build debug host-add <pkg>       Add packages to host env");
+    println!("    rattler-build debug build-add <pkg>      Add packages to build env");
     println!();
     println!("  The build environment has been sourced. Run `bash -x conda_build.sh` to");
     println!("  execute the build script, or make changes and use create-patch.");
@@ -221,6 +222,162 @@ pub fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
         .unwrap_or_else(|| PathBuf::from("./output"));
     let (work_dir, directories_json) = parse_directories_info(opts.work_dir, &output_dir)?;
     open_debug_shell(work_dir, directories_json)
+}
+
+/// Print the work directory path to stdout.
+pub fn debug_workdir(opts: DebugWorkdirOpts) -> std::io::Result<()> {
+    let output_dir = opts
+        .common
+        .output_dir
+        .unwrap_or_else(|| PathBuf::from("./output"));
+    let (work_dir, _) = parse_directories_info(opts.work_dir, &output_dir)?;
+    println!("{}", work_dir.display());
+    Ok(())
+}
+
+/// Re-run the build script in an existing debug environment.
+///
+/// Returns the exit code of the build script so the caller can propagate it.
+pub fn debug_run(opts: DebugRunOpts) -> std::io::Result<i32> {
+    let output_dir = opts
+        .common
+        .output_dir
+        .unwrap_or_else(|| PathBuf::from("./output"));
+    let (work_dir, _) = parse_directories_info(opts.work_dir, &output_dir)?;
+
+    if !work_dir.exists() {
+        eprintln!(
+            "Error: Work directory does not exist: {}",
+            work_dir.display()
+        );
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Work directory not found: {}", work_dir.display()),
+        ));
+    }
+
+    let build_env = work_dir.join("build_env.sh");
+    if !build_env.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("build_env.sh not found in {}", work_dir.display()),
+        ));
+    }
+
+    #[cfg(unix)]
+    let build_script = work_dir.join("conda_build.sh");
+    #[cfg(windows)]
+    let build_script = work_dir.join("conda_build.bat");
+
+    if !build_script.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "build script not found: {}",
+                build_script.display()
+            ),
+        ));
+    }
+
+    let bash_flag = if opts.trace { "-ex" } else { "-e" };
+
+    let script = format!(
+        "cd '{}' && source build_env.sh && bash {} conda_build.sh",
+        work_dir.display(),
+        bash_flag,
+    );
+
+    let status = Command::new("bash")
+        .arg("-c")
+        .arg(&script)
+        .status()?;
+
+    Ok(status.code().unwrap_or(1))
+}
+
+/// Create a patch from changes in the work directory.
+pub fn debug_create_patch(opts: CreatePatchOpts) -> miette::Result<()> {
+    let exclude_vec = opts.exclude.clone().unwrap_or_default();
+    let add_vec = opts.add.clone().unwrap_or_default();
+    let include_vec = opts.include.clone().unwrap_or_default();
+
+    // Try to parse environment variable if available
+    let env_dirs = std::env::var("RATTLER_BUILD_DIRECTORIES")
+        .ok()
+        .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok());
+
+    // Determine the directory to use: --directory → env var → log file → cwd
+    let directory = if let Some(dir) = opts.directory {
+        dir
+    } else if let Some(ref json) = env_dirs {
+        if let Some(work_dir) = json["work_dir"].as_str() {
+            tracing::info!(
+                "Using work directory from RATTLER_BUILD_DIRECTORIES: {}",
+                work_dir
+            );
+            PathBuf::from(work_dir)
+        } else {
+            std::env::current_dir().into_diagnostic()?
+        }
+    } else {
+        // Try rattler-build-log.txt before falling back to cwd
+        let log_file = PathBuf::from("./output/rattler-build-log.txt");
+        if log_file.exists() {
+            if let Ok(content) = fs_err::read_to_string(&log_file)
+                && let Some(last_line) = content.lines().last()
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(last_line)
+                && let Some(work_dir) = json["work_dir"].as_str()
+            {
+                tracing::info!(
+                    "Using work directory from rattler-build-log.txt: {}",
+                    work_dir
+                );
+                PathBuf::from(work_dir)
+            } else {
+                std::env::current_dir().into_diagnostic()?
+            }
+        } else {
+            std::env::current_dir().into_diagnostic()?
+        }
+    };
+
+    // Determine patch_dir - use recipe_dir from environment if available and not specified
+    let patch_dir = if opts.patch_dir.is_none() {
+        if let Some(ref json) = env_dirs {
+            if let Some(recipe_dir) = json["recipe_dir"].as_str() {
+                tracing::info!(
+                    "Using recipe directory from RATTLER_BUILD_DIRECTORIES for patch output: {}",
+                    recipe_dir
+                );
+                Some(PathBuf::from(recipe_dir))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        opts.patch_dir
+    };
+
+    match create_patch::create_patch(
+        directory,
+        &opts.name,
+        opts.overwrite,
+        patch_dir.as_deref(),
+        &exclude_vec,
+        &add_vec,
+        &include_vec,
+        opts.dry_run,
+    ) {
+        Ok(()) => Ok(()),
+        Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
+            tracing::warn!("Not writing patch file, already exists: {}", path.display());
+            tracing::warn!("Use --overwrite to replace the existing patch file.");
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Add packages to a host or build environment in an existing debug build.

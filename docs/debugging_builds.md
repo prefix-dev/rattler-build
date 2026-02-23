@@ -1,28 +1,132 @@
 # Debugging Builds
 
-This guide covers how to debug conda package builds with rattler-build when things go wrong. It's designed for both humans and AI agents working with recipes.
+This guide covers how to debug conda package builds with rattler-build when
+things go wrong. It's designed for both humans and AI agents working with
+recipes.
 
-## Quick Start
+## Debugging Workflow
 
-When a build fails, the build directory is automatically preserved. You can jump
-straight into a debug shell:
+Suppose you have a recipe that fails to build:
 
-```bash
-# Open an interactive debug shell in the last failed build
-rattler-build debug shell
+```yaml title="recipe.yaml"
+package:
+  name: test
+  version: "1.0"
 
-# You're now in the work directory with the build environment loaded
-# Try running commands manually to see what's failing
-bash -x conda_build.sh
+build:
+  script:
+    - exit 1
 ```
 
-If you want to debug a recipe without running a full build first, use
-`debug setup` to prepare the environment:
+Running `rattler-build build --recipe recipe.yaml` will fail. When a build
+fails, the build directory is automatically preserved so you can investigate.
+
+### Step 1: Enter the Debug Shell
+
+Jump straight into the failed build environment:
+
+```bash
+rattler-build debug shell
+```
+
+This opens an interactive shell in the work directory with the build environment
+loaded. All environment variables (`$PREFIX`, `$BUILD_PREFIX`, etc.) are set up
+exactly as they were during the build.
+
+### Step 2: Debug Interactively
+
+```bash
+# Run the full build script with tracing to see where it fails
+bash -x conda_build.sh
+
+# Or run individual commands to isolate the issue
+./configure --prefix=$PREFIX
+make VERBOSE=1
+make install
+```
+
+### Step 3: Modify Dependencies (Optional)
+
+If you need additional packages in the host or build environment, you can add
+them without re-running the full setup:
+
+```bash
+# Add packages to the host environment
+rattler-build debug host-add libfoo libbar
+
+# Add build tools
+rattler-build debug build-add gdb valgrind
+```
+
+### Step 4: Create a Patch for Fixes
+
+After fixing issues in the source code:
+
+```bash
+# Create a patch from your changes
+rattler-build debug create-patch \
+  --directory . \
+  --name my-fix \
+  --exclude "*.o,*.so,*.pyc"
+
+# Preview what would be included
+rattler-build debug create-patch \
+  --directory . \
+  --name my-fix \
+  --dry-run
+```
+
+To include new files:
+
+```bash
+rattler-build debug create-patch \
+  --directory . \
+  --name my-fix \
+  --add "*.txt,src/new_file.c"
+```
+
+### Step 5: Update Recipe and Rebuild
+
+Add the patch to your recipe:
+
+```yaml
+source:
+  - url: https://example.com/source.tar.gz
+    sha256: ...
+    patches:
+      # this needs to be manually added
+      - my-fix.patch
+```
+
+Then rebuild:
+
+```bash
+rattler-build build --recipe recipe.yaml
+```
+
+### Debugging a Successful Build
+
+If your recipe builds *successfully* but you still want to inspect the
+environment, use `--keep-build` to prevent cleanup:
+
+```bash
+rattler-build build --recipe recipe.yaml --keep-build
+rattler-build debug shell
+```
+
+### Setting Up a Debug Environment Without Building
+
+If you want to prepare a debug environment without running the build script at
+all, use `debug setup`. This resolves dependencies, downloads sources, and
+creates the build script — but doesn't execute it:
 
 ```bash
 rattler-build debug setup --recipe recipe.yaml
 rattler-build debug shell
 ```
+
+This is useful when you want to inspect or modify sources before running the
+build for the first time.
 
 ## Inspecting and Extracting Packages
 
@@ -121,6 +225,62 @@ rattler-build debug shell
 rattler-build debug shell --work-dir /path/to/build_folder
 ```
 
+### `debug workdir`
+
+Prints the absolute path to the work directory. Useful for scripts and AI agents
+that need to locate the build directory without parsing JSON:
+
+```bash
+# Print the work directory from the last build
+rattler-build debug workdir
+
+# Use in a script
+WORK_DIR=$(rattler-build debug workdir)
+```
+
+### `debug run`
+
+Re-runs the build script (`conda_build.sh`) in an existing debug environment.
+Sources `build_env.sh` first so all environment variables are set up. The exit
+code of the build script is propagated:
+
+```bash
+# Re-run the build script
+rattler-build debug run
+
+# Re-run with shell tracing (bash -x) for verbose output
+rattler-build debug run --trace
+
+# Run in a specific work directory
+rattler-build debug run --work-dir /path/to/work
+```
+
+### `debug create-patch`
+
+Creates a unified diff patch from changes in the work directory. The patch file
+is written to the recipe directory so you can add it to the recipe's `patches:`
+list:
+
+```bash
+# Create a patch from your changes
+rattler-build debug create-patch --name my-fix
+
+# Specify the work directory explicitly
+rattler-build debug create-patch --directory /path/to/work --name my-fix
+
+# Preview what would be included
+rattler-build debug create-patch --name my-fix --dry-run
+
+# Filter files
+rattler-build debug create-patch --name my-fix --exclude "*.o,*.so"
+rattler-build debug create-patch --name my-fix --include "*.c,*.h"
+rattler-build debug create-patch --name my-fix --add "*.txt,src/new_file.c"
+```
+
+Directory resolution order: `--directory` flag, then `$RATTLER_BUILD_DIRECTORIES`
+env var (set inside a debug shell), then `rattler-build-log.txt`, then the
+current directory.
+
 ### `debug host-add` / `debug build-add`
 
 Add packages to the host or build environment without re-running the full setup:
@@ -148,105 +308,6 @@ Inside the debug shell, you have access to:
 | `$RATTLER_BUILD_BUILD_DIR`     | The build directory root                   |
 | `$RATTLER_BUILD_HOST_PREFIX`   | Path to the host prefix                    |
 | `$RATTLER_BUILD_BUILD_PREFIX`  | Path to the build prefix                   |
-
-## Debugging Workflow
-
-### Step 1: Enter the Debug Environment
-
-If a build has already failed, the build directory is preserved automatically —
-just open a shell:
-
-```bash
-rattler-build debug shell
-```
-
-If you want to set up a debug environment without running a full build:
-
-```bash
-rattler-build debug setup --recipe recipe.yaml
-rattler-build debug shell
-```
-
-If your recipe builds *successfully* but you still want to inspect the
-environment, use `--keep-build` to prevent cleanup:
-
-```bash
-rattler-build build --recipe recipe.yaml --keep-build
-rattler-build debug shell
-```
-
-### Step 2: Debug Interactively
-
-```bash
-# enter the debug shell
-rattler-build debug shell
-
-# Run the full build script with tracing
-bash -x conda_build.sh
-
-# Or run individual commands
-./configure --prefix=$PREFIX
-make VERBOSE=1
-make install
-```
-
-### Step 3: Modify Dependencies (Optional)
-
-If you need additional packages in the host or build environment, you can add them without re-running the full setup:
-
-```bash
-# Add packages to the host environment
-rattler-build debug host-add libfoo libbar
-
-# Add build tools
-rattler-build debug build-add gdb valgrind
-```
-
-### Step 4: Create a Patch for Fixes
-
-After fixing issues in the source code:
-
-```bash
-# Create a patch from your changes
-rattler-build create-patch \
-  --directory . \
-  --name my-fix \
-  --exclude "*.o,*.so,*.pyc"
-
-# Preview what would be included
-rattler-build create-patch \
-  --directory . \
-  --name my-fix \
-  --dry-run
-```
-
-To include new files:
-
-```bash
-rattler-build create-patch \
-  --directory . \
-  --name my-fix \
-  --add "*.txt,src/new_file.c"
-```
-
-### Step 5: Update Recipe and Rebuild
-
-Add the patch to your recipe:
-
-```yaml
-source:
-  - url: https://example.com/source.tar.gz
-    sha256: ...
-    patches:
-      # this needs to be manually added
-      - my-fix.patch
-```
-
-Then rebuild:
-
-```bash
-rattler-build build --recipe recipe.yaml
-```
 
 ## Common Debugging Scenarios
 
@@ -316,34 +377,33 @@ Code, Codex, etc.) that cannot use interactive shells. The key principle is:
 # 1. Set up the debug environment (slow, only once)
 rattler-build debug setup --recipe recipe.yaml
 
-# 2. Find the work directory from the build log
-WORK_DIR=$(jq -r '.work_dir' output/rattler-build-log.txt | tail -1)
+# 2. Get the work directory
+WORK_DIR=$(rattler-build debug workdir)
 
 # 3. Edit source files in $WORK_DIR to fix the issue
 #    (agent edits files directly)
 
 # 4. Re-run the build script (fast — no dependency resolution)
-cd "$WORK_DIR" && source build_env.sh && bash conda_build.sh
+rattler-build debug run
 
 # 5. If the build fails, go back to step 3
 # 6. Once it works, create a patch
-rattler-build create-patch --directory "$WORK_DIR" --name my-fix
+rattler-build debug create-patch --name my-fix
 ```
 
 ### Key Points for Agents
 
 - **`debug setup`** is non-interactive — it sets up everything and exits. Use
   this instead of `debug shell` which opens an interactive shell.
-- **Re-running the build script** (`source build_env.sh && bash conda_build.sh`)
-  is the fast inner loop. It takes seconds, not minutes, because dependencies
-  are already installed.
-- **`rattler-build-log.txt`** contains one JSON line per setup invocation. The
-  last line has `work_dir`, `host_prefix`, `build_prefix`, and other paths the
-  agent needs.
+- **`debug workdir`** prints the work directory path to stdout — no `jq` or log
+  parsing needed.
+- **`debug run`** re-runs the build script with the environment already set up.
+  Use `--trace` for verbose `bash -x` output. This is the fast inner loop — it
+  takes seconds, not minutes, because dependencies are already installed.
 - **`debug host-add` / `debug build-add`** let agents add missing dependencies
   without re-running the full setup.
-- **`create-patch`** generates a unified diff from changes in the work directory.
-  The agent can then add the patch to the recipe.
+- **`debug create-patch`** generates a unified diff from changes in the work
+  directory. The agent can then add the patch to the recipe.
 
 ### Parsing the Build Log
 
@@ -382,13 +442,13 @@ rattler-build build --recipe recipe.yaml --channel conda-forge --no-test
 rattler-build debug setup --recipe recipe.yaml         # Set up environment
 rattler-build debug shell                              # Open shell in last build
 rattler-build debug shell --work-dir /path/to/work     # Open shell in specific build
+rattler-build debug workdir                            # Print work directory path
+rattler-build debug run                                # Re-run build script
+rattler-build debug run --trace                        # Re-run with bash -x tracing
 rattler-build debug host-add python numpy              # Add packages to host env
 rattler-build debug build-add cmake                    # Add packages to build env
-
-# Patch commands
-rattler-build create-patch --directory . --name fix --include "*.c"
-rattler-build create-patch --directory . --name fix --exclude "*.o"
-rattler-build create-patch --directory . --name fix --add "*.txt" --dry-run
+rattler-build debug create-patch --name fix            # Create patch from changes
+rattler-build debug create-patch --name fix --dry-run  # Preview patch
 
 # Test commands
 rattler-build test --package-file output/linux-64/mypackage-1.0.tar.bz2

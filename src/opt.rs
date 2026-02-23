@@ -82,9 +82,6 @@ pub enum SubCommands {
     ///   build-add - Install additional packages into the build prefix
     Debug(DebugArgs),
 
-    /// Create a patch for a directory
-    CreatePatch(CreatePatchOpts),
-
     /// Package-related subcommands
     #[command(subcommand)]
     Package(PackageCommands),
@@ -140,6 +137,27 @@ pub enum DebugSubCommands {
     /// environment of an existing debug build. Useful for adding build tools
     /// without re-running the full debug setup.
     BuildAdd(DebugEnvAddOpts),
+
+    /// Print the work directory path.
+    ///
+    /// Prints the absolute path to the work directory from the last debug
+    /// setup (or the directory given by --work-dir). Useful for scripts and
+    /// AI agents that need to locate the build directory.
+    Workdir(DebugWorkdirOpts),
+
+    /// Re-run the build script in an existing debug environment.
+    ///
+    /// Sources `build_env.sh` and executes `conda_build.sh` (or `.bat` on
+    /// Windows). Use --trace to enable `bash -x` for verbose output.
+    /// The exit code of the build script is propagated.
+    Run(DebugRunOpts),
+
+    /// Create a patch from changes in the work directory.
+    ///
+    /// Generates a unified diff between the original sources and your
+    /// modifications. The patch file is written to the recipe directory
+    /// so you can add it to the recipe's `patches:` list.
+    CreatePatch(CreatePatchOpts),
 }
 
 /// Options for the `debug setup` command.
@@ -182,6 +200,36 @@ pub struct DebugShellOpts {
     /// if not specified)
     #[arg(long)]
     pub work_dir: Option<PathBuf>,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug workdir` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugWorkdirOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug run` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugRunOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Enable shell tracing (bash -x) for verbose build output
+    #[arg(long)]
+    pub trace: bool,
 
     /// Common options (provides --output-dir among others)
     #[clap(flatten)]

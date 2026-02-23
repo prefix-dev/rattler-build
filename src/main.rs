@@ -24,7 +24,6 @@ use rattler_build::{
         RebuildData, ShellCompletion, SubCommands, TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
-    source::create_patch,
     tool_configuration::APP_USER_AGENT,
 };
 use rattler_config::config::ConfigBase;
@@ -237,74 +236,16 @@ async fn async_main() -> miette::Result<()> {
             DebugSubCommands::BuildAdd(opts) => {
                 debug::debug_env_add("build", opts, config, &log_handler).await
             }
-        },
-        Some(SubCommands::CreatePatch(opts)) => {
-            let exclude_vec = opts.exclude.clone().unwrap_or_default();
-            let add_vec = opts.add.clone().unwrap_or_default();
-            let include_vec = opts.include.clone().unwrap_or_default();
-
-            // Try to parse environment variable if available
-            let env_dirs = std::env::var("RATTLER_BUILD_DIRECTORIES")
-                .ok()
-                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok());
-
-            // Determine the directory to use
-            let directory = if let Some(dir) = opts.directory {
-                dir
-            } else if let Some(ref json) = env_dirs {
-                // Use work_dir from environment variable (set by debug-shell)
-                if let Some(work_dir) = json["work_dir"].as_str() {
-                    tracing::info!(
-                        "Using work directory from RATTLER_BUILD_DIRECTORIES: {}",
-                        work_dir
-                    );
-                    PathBuf::from(work_dir)
-                } else {
-                    std::env::current_dir().into_diagnostic()?
+            DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),
+            DebugSubCommands::Run(opts) => {
+                let exit_code = debug::debug_run(opts).into_diagnostic()?;
+                if exit_code != 0 {
+                    std::process::exit(exit_code);
                 }
-            } else {
-                // Fall back to current directory
-                std::env::current_dir().into_diagnostic()?
-            };
-
-            // Determine patch_dir - use recipe_dir from environment if available and not specified
-            let patch_dir = if opts.patch_dir.is_none() {
-                if let Some(ref json) = env_dirs {
-                    if let Some(recipe_dir) = json["recipe_dir"].as_str() {
-                        tracing::info!(
-                            "Using recipe directory from RATTLER_BUILD_DIRECTORIES for patch output: {}",
-                            recipe_dir
-                        );
-                        Some(PathBuf::from(recipe_dir))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                opts.patch_dir
-            };
-
-            match create_patch::create_patch(
-                directory,
-                &opts.name,
-                opts.overwrite,
-                patch_dir.as_deref(),
-                &exclude_vec,
-                &add_vec,
-                &include_vec,
-                opts.dry_run,
-            ) {
-                Ok(()) => Ok(()),
-                Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
-                    tracing::warn!("Not writing patch file, already exists: {}", path.display());
-                    tracing::warn!("Use --overwrite to replace the existing patch file.");
-                    Ok(())
-                }
-                Err(e) => Err(e.into()),
+                Ok(())
             }
-        }
+            DebugSubCommands::CreatePatch(opts) => debug::debug_create_patch(opts),
+        },
         Some(SubCommands::Package(cmd)) => match cmd {
             PackageCommands::Inspect(opts) => show_package_info(opts),
             PackageCommands::Extract(opts) => extract_package(opts).await,
