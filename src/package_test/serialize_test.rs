@@ -142,7 +142,7 @@ pub(crate) fn write_test_files(
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                &["sh", "bat"],
+                if cfg!(windows) { &["bat"] } else { &["sh"] },
             )?;
 
             // Replace with rendered contents
