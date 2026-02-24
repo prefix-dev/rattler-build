@@ -24,7 +24,7 @@ use crate::tool_config;
 use crate::tracing_subscriber;
 
 /// Result of a successful package build
-#[pyclass(name = "BuildResult")]
+#[pyclass(name = "BuildResult", from_py_object)]
 #[derive(Clone)]
 pub struct BuildResultPy {
     /// List of paths to built package files

@@ -14,7 +14,7 @@ use rattler_conda_types::{NoArchType, PackageName, Platform, VersionWithSource};
 use crate::error::RattlerBuildError;
 
 /// Archive type for conda packages
-#[pyclass(name = "ArchiveType", eq, eq_int)]
+#[pyclass(name = "ArchiveType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PyArchiveType {
     /// .tar.bz2 format (legacy)
@@ -51,7 +51,7 @@ impl From<PyArchiveType> for ArchiveType {
 }
 
 /// Represents a file to be included in the package
-#[pyclass(name = "FileEntry")]
+#[pyclass(name = "FileEntry", from_py_object)]
 #[derive(Clone)]
 pub struct PyFileEntry {
     pub(crate) inner: FileEntry,
