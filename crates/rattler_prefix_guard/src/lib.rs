@@ -181,11 +181,10 @@ mod sys {
 
     #[allow(dead_code)]
     pub fn error_unsupported(err: &Error) -> bool {
-        match err.raw_os_error() {
-            #[allow(unreachable_patterns)]
-            Some(libc::ENOTSUP | libc::EOPNOTSUPP | libc::ENOSYS) => true,
-            _ => false,
-        }
+        matches!(
+            err.raw_os_error(),
+            Some(libc::ENOTSUP | libc::EOPNOTSUPP | libc::ENOSYS)
+        )
     }
 
     #[cfg(not(target_os = "solaris"))]

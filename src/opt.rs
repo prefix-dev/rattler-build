@@ -3,7 +3,7 @@
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
 use chrono;
-use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
+use clap::{Parser, ValueEnum, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};

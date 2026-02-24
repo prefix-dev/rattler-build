@@ -58,8 +58,8 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 
 [dependencies]
 openssl = "3.*"
-rust = ">=1.89.0,<1.90"
-rust-src = ">=1.89.0,<1.90"
+rust = ">=1.93.1,<1.94"
+rust-src = ">=1.93.1,<1.94"
 compilers = ">=1.11.0,<2"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
