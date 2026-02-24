@@ -33,13 +33,22 @@ This opens an interactive shell in the work directory with the build environment
 loaded. All environment variables (`$PREFIX`, `$BUILD_PREFIX`, etc.) are set up
 exactly as they were during the build.
 
-### Step 2: Debug Interactively
+### Step 2: Re-run the Build Script
+
+Use `debug run` to re-execute the build script with the full environment already
+loaded:
 
 ```bash
-# Run the full build script with tracing to see where it fails
-bash -x conda_build.sh
+# Re-run the build script
+rattler-build debug run
 
-# Or run individual commands to isolate the issue
+# Re-run with shell tracing (bash -x) for verbose output
+rattler-build debug run --trace
+```
+
+Or drop into the shell and run individual commands to isolate the issue:
+
+```bash
 ./configure --prefix=$PREFIX
 make VERBOSE=1
 make install
@@ -112,6 +121,19 @@ environment, use `--keep-build` to prevent cleanup:
 ```bash
 rattler-build build --recipe recipe.yaml --keep-build
 rattler-build debug shell
+```
+
+### Locating the Work Directory
+
+Use `debug workdir` to print the absolute path to the work directory. This is
+handy for scripts or when you need to navigate there manually:
+
+```bash
+# Print the work directory from the last build
+rattler-build debug workdir
+
+# Use in a script
+WORK_DIR=$(rattler-build debug workdir)
 ```
 
 ### Setting Up a Debug Environment Without Building
@@ -192,108 +214,7 @@ output/
 └─ <platform>/                      # Built packages
 ```
 
-## The `debug` Command
-
-The `debug` command provides subcommands for setting up and working with debug
-build environments.
-
-### `debug setup`
-
-Sets up a debug environment from a recipe without opening a shell:
-
-1. Resolves and installs build/host dependencies
-2. Downloads and extracts sources, applies patches
-3. Creates the build script (`conda_build.sh` / `conda_build.bat`)
-
-```bash
-# Set up environment from a recipe
-rattler-build debug setup --recipe recipe.yaml
-
-# Set up with a specific output directory
-rattler-build debug setup --recipe recipe.yaml --output-dir ./my-output
-```
-
-### `debug shell`
-
-Opens an interactive debug shell in an existing build environment:
-
-```bash
-# Open a debug shell in the last build (reads from output/rattler-build-log.txt)
-rattler-build debug shell
-
-# Open a shell in a specific build directory
-rattler-build debug shell --work-dir /path/to/build_folder
-```
-
-### `debug workdir`
-
-Prints the absolute path to the work directory. Useful for scripts and AI agents
-that need to locate the build directory without parsing JSON:
-
-```bash
-# Print the work directory from the last build
-rattler-build debug workdir
-
-# Use in a script
-WORK_DIR=$(rattler-build debug workdir)
-```
-
-### `debug run`
-
-Re-runs the build script (`conda_build.sh`) in an existing debug environment.
-Sources `build_env.sh` first so all environment variables are set up. The exit
-code of the build script is propagated:
-
-```bash
-# Re-run the build script
-rattler-build debug run
-
-# Re-run with shell tracing (bash -x) for verbose output
-rattler-build debug run --trace
-
-# Run in a specific work directory
-rattler-build debug run --work-dir /path/to/work
-```
-
-### `debug create-patch`
-
-Creates a unified diff patch from changes in the work directory. The patch file
-is written to the recipe directory so you can add it to the recipe's `patches:`
-list:
-
-```bash
-# Create a patch from your changes
-rattler-build debug create-patch --name my-fix
-
-# Specify the work directory explicitly
-rattler-build debug create-patch --directory /path/to/work --name my-fix
-
-# Preview what would be included
-rattler-build debug create-patch --name my-fix --dry-run
-
-# Filter files
-rattler-build debug create-patch --name my-fix --exclude "*.o,*.so"
-rattler-build debug create-patch --name my-fix --include "*.c,*.h"
-rattler-build debug create-patch --name my-fix --add "*.txt,src/new_file.c"
-```
-
-Directory resolution order: `--directory` flag, then `$RATTLER_BUILD_DIRECTORIES`
-env var (set inside a debug shell), then `rattler-build-log.txt`, then the
-current directory.
-
-### `debug host-add` / `debug build-add`
-
-Add packages to the host or build environment without re-running the full setup:
-
-```bash
-# Add packages to the host environment
-rattler-build debug host-add numpy pandas
-
-# Add packages to the build environment
-rattler-build debug build-add cmake ninja
-```
-
-### Environment Variables Available in the Debug Shell
+## Environment Variables Available in the Debug Shell
 
 Inside the debug shell, you have access to:
 
@@ -314,12 +235,11 @@ Inside the debug shell, you have access to:
 ### Compilation Failures
 
 ```bash
+# Re-run the build script with tracing to see where it fails
+rattler-build debug run --trace
+
+# Or enter the shell and run specific build commands
 rattler-build debug shell
-
-# Run with verbose output
-bash -x conda_build.sh 2>&1 | less
-
-# Or specific build commands
 make VERBOSE=1
 cmake --build . --verbose
 ```
