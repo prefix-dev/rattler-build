@@ -19,6 +19,7 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       ACTIONS_CACHE_SERVICE_V2: on
+      CARGO_HOME: ${{ github.workspace }}/.cargo
     strategy:
       fail-fast: false
       matrix:
